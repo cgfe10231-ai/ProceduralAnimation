@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Blender backups and temporary files
+*.blend@
+*.blend1
+*.blend2
+*.blend3
+*.blend.tmp*
+
+# Output directories & generated renders
+output/
+renders/
+tests/output/
+*.log
+
+# OS & Editor specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
