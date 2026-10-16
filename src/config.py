@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass, field
+from typing import Tuple, List
 
 @dataclass
 class PipelineConfig:
@@ -30,9 +31,39 @@ class PipelineConfig:
     # Determinism
     random_seed: int = 42
 
+    # Scene & Ground parameters (World Convention: Z=Up, ground top at Z=0.0)
+    ground_size: Tuple[float, float] = (24.0, 24.0)  # (width X, length Y) in meters
+    ground_thickness: float = 0.2
+    ground_color: Tuple[float, float, float, float] = (0.18, 0.20, 0.22, 1.0)
+
+    # Environment layout parameters
+    building_count: int = 6
+    pillar_count: int = 8
+    corridor_clearance: float = 2.4  # Minimum clear distance around character walking path
+    building_color: Tuple[float, float, float, float] = (0.45, 0.48, 0.52, 1.0)
+    pillar_color: Tuple[float, float, float, float] = (0.75, 0.45, 0.25, 1.0)
+
+    # Reserved character trajectory corridor waypoints:
+    # 1. Start / Stand: (0.0, -8.0, 0.0)
+    # 2. Walk to Stop/Turn area: (0.0, 0.0, 0.0)
+    # 3. Exit direction: towards (3.5, 7.0, 0.0)
+    character_path_points: List[Tuple[float, float, float]] = field(
+        default_factory=lambda: [(0.0, -8.0, 0.0), (0.0, 0.0, 0.0), (3.5, 7.0, 0.0)]
+    )
+
+    # Lighting parameters
+    key_light_energy: float = 2500.0
+    key_light_location: Tuple[float, float, float] = (8.0, -8.0, 12.0)
+    fill_light_energy: float = 800.0
+    fill_light_location: Tuple[float, float, float] = (-6.0, 6.0, 8.0)
+
+    # Camera parameters
+    camera_focal_length: float = 50.0
+    # Preview stills to render and validate across the timeline
+    preview_frames: Tuple[int, ...] = (1, 180)
+
     # Output artifact file names
     blend_filename: str = "procedural_scene.blend"
-    preview_image_filename: str = "preview_frame_0001.png"
 
     @property
     def total_frames(self) -> int:
@@ -48,6 +79,11 @@ class PipelineConfig:
     def blend_file_path(self) -> str:
         return os.path.join(self.output_dir, self.blend_filename)
 
+    def get_preview_image_path(self, frame: int) -> str:
+        filename = f"preview_frame_{frame:04d}.png"
+        return os.path.join(self.output_dir, filename)
+
     @property
     def preview_image_path(self) -> str:
-        return os.path.join(self.output_dir, self.preview_image_filename)
+        """Default to first preview frame."""
+        return self.get_preview_image_path(self.preview_frames[0])

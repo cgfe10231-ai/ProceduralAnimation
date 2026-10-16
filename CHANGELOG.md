@@ -4,33 +4,48 @@
 
 ---
 
+## [2026-10-16] 任务 3：程序化三维场景、灯光与摄像机基础系统
+
+### 新增 (Added)
+* **纯数学布局生成器与走廊净空算法**：
+  * 创建 `src/scene/layout.py`：基于固定种子生成地面尺寸、建筑体块、柱状障碍物与运动路径点，并通过点线投影距离算法确保 $\ge 2.4\text{ m}$ 走廊净空。
+* **程序化场景构建与材质**：
+  * 更新 `src/scene/builder.py`：实现符合统一世界坐标约定（$Z=0$ 为地表）的程序化地台、6 座建筑体块、8 根圆柱障碍物与航标标记。
+* **程序化主辅灯光与环境**：
+  * 更新 `src/lighting/setup.py`：创建 2500W 暖色主光、800W 冷色辅光与世界环境天光。
+* **自动目标追踪与关键帧运镜摄像机**：
+  * 更新 `src/camera/controller.py`：标准 50mm 镜头、绑定 `TRACK_TO` 观察目标，在第 1 帧、第 180 帧、第 360 帧配置平滑运镜轨迹。
+* **多帧预览渲染与多维验证系统**：
+  * 更新 `src/render/engine.py`：支持批量渲染多帧预览图像。
+  * 更新 `src/validation/checker.py`：新增空间坐标标高（$Z=0$）、走廊净空、相机关键帧位移与多帧渲染图像差异性自动校验。
+  * 创建 `tests/test_task3_spatial.py`：空间种子确定性与净空单元测试。
+  * 创建 `tests/verify_task3_blend.py`：重开 `.blend` 文件校验场景集合、对象及相机关键帧状态。
+* **规范与决策记录**：
+  * 更新 `ARCHITECTURE.md`：记录统一物理世界坐标约定（$Z$ 轴向上，$Z=0$ 为地面，单位米）。
+  * 录入 `[DEC-010]`：世界坐标约定与纯数据走廊安全净空机制。
+
+### 状态验证 (Verification)
+* **坐标与净空验证**：地台顶面精确处于 $Z = 0.000000\text{ m}$；走廊净空经几何检验 100% 通过无碰撞。
+* **种子确定性与变异性**：相同种子（Seed=42）产出坐标 100% 相同；不同种子（Seed=99）产出坐标不同。
+* **摄像机动态位移**：第 1 帧与第 180 帧空间位移实测达 $11.3578\text{ m}$，朝向目标稳定。
+* **产物多维核验**：
+  * `output/procedural_scene.blend`（105,272 字节，无头重开核验通过）。
+  * `output/preview_frame_0001.png`（306,427 字节，1280x720，远景全景）。
+  * `output/preview_frame_0180.png`（248,321 字节，1280x720，中景跟拍新视角）。
+  * 两张预览图经 SHA256 哈希比对与视觉检查证实具有明确视角差异。
+* **管线执行与退出码**：`run_pipeline.ps1` 执行成功，退出码为 `0`。
+
+---
+
 ## [2026-10-16] 任务 2：建立 Git 版本控制与程序化动画工程骨架
 
 ### 新增 (Added)
-* **版本控制**：
-  * 初始化本地 Git 仓库 (`git init`)。
-  * 创建 `.gitignore`，自动忽略 Python 缓存、日志、`output/` 及 `tests/output/` 等测试/渲染二进制产物。
-* **模块化工程骨架 (`src/`)**：
-  * 创建 `src/config.py`：集中配置 `PipelineConfig`（FPS 24、360 帧、1280x720 分辨率、Workbench 引擎、随机种子 42、统一输出路径）。
-  * 创建 `src/scene/builder.py`：场景初始化、时间线与分辨率注入及校准标记创建。
-  * 创建 `src/camera/controller.py`：标准摄像机构建与激活。
-  * 创建 `src/lighting/setup.py`：基础照明布设。
-  * 创建 `src/character/`、`src/rig/`、`src/motion/`：核心子系统模块规范与接口占位。
-  * 创建 `src/render/engine.py`：渲染引擎设置、单帧渲染与 `.blend` 保存。
-  * 创建 `src/validation/checker.py`：产物完整性与图像尺寸自动核验。
-  * 创建 `src/pipeline.py`：全流程管线协调器。
-  * 创建 `run_pipeline.py` 与 `run_pipeline.ps1`：统一的宿主/Blender双模调用入口。
-* **架构与决策**：
-  * 更新 `ARCHITECTURE.md`：详细绘制模块化结构与数据流。
-  * 录入 `[DEC-009]`：模块化工程骨架与配置驱动模式。
+* 初始化本地 Git 仓库 (`git init`) 与 `.gitignore`。
+* 创建模块化工程骨架 `src/`（`config.py`、`pipeline.py`、`scene/`、`camera/`、`lighting/`、`render/`、`validation/` 等）。
+* 录入 `[DEC-009]`。
 
 ### 状态验证 (Verification)
-* **Git 隔离与跟踪范围**：实测 `git status`，`output/` 与 `tests/output/` 等产物均被准确忽略，无外部文件被追踪。
-* **全管线执行与重现**：
-  * 执行 `run_pipeline.ps1`，Blender 5.1.1 后台无头运行成功，返回码为 `0`。
-  * 输出 `output/procedural_scene.blend`（87,440 字节，非空）。
-  * 输出 `output/preview_frame_0001.png`（315,929 字节，通过二进制校验确认为 `1280 x 720`）。
-  * 重复执行测试通过，管线稳定可靠。
+* 验证通过：`run_pipeline.ps1` 退出码 0，生成 `output/procedural_scene.blend` 与单帧图像。
 
 ---
 
@@ -38,23 +53,17 @@
 
 ### 新增 (Added)
 * 测试套件：`tests/test_env.py`、`tests/verify_blend.py`、`tests/run_validation.py`、`tests/run_test.ps1`。
-* 决策记录：`[DEC-008]`（Blender 5.1.1 Headless 调用规范与闭环检验基准）。
+* 录入 `[DEC-008]`。
 
 ### 状态验证 (Verification)
 * Blender 5.1.1 + Python 3.13.9 路径定位与无头执行成功。
-* 生成 `tests/output/test_scene.blend` 与 `tests/output/test_render.png` (320x180)，二次重开场景验证通过。
 
 ---
 
 ## [2026-10-15] 任务 0.5：建立跨 AI 同步协议与上下文恢复机制
 
 ### 新增 (Added)
-* 创建 `AI_SYNC.md`。
-* 增加任务生命周期协议与防状态漂移原则。
-* 决策记录：`[DEC-007]`。
-
-### 状态验证 (Verification)
-* 系统提示词成功自动挂载根目录规则至 `<user_rules>`。
+* 创建 `AI_SYNC.md`，增加任务生命周期协议与防状态漂移原则。录入 `[DEC-007]`。
 
 ---
 
