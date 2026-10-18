@@ -1,7 +1,38 @@
-"""Procedural motion generation package (Task 5A, Task 5B & Task 5C)."""
+"""Procedural motion generation package (Task 5A, Task 5B, Task 5C, Task 6A, 6B & Task 6C)."""
 
 from src.config import PipelineConfig
 from src.motion.forward_walk import compute_forward_swing_point, generate_forward_walk
+from src.motion.framework import (
+    ActionExecutionResult,
+    BlenderPoseApplicator,
+    ContactConstraintAdapter,
+    ContactPointState,
+    EnvironmentQuery,
+    MotionAction,
+    MotionMode,
+    MotionPlanner,
+    MotionRuntimeContext,
+    MotionState,
+    StartStopWalkAction,
+    create_initial_motion_state,
+    forward_unit_vector_from_yaw,
+    right_unit_vector_from_yaw,
+    root_local_to_world_vector,
+    run_task5c_via_motion_framework,
+    world_to_root_local_vector,
+)
+from src.motion.run_cycle import (
+    RunAction,
+    apply_run_upper_body_pose,
+    compute_run_swing_point,
+    run_task6b_via_motion_framework,
+)
+from src.motion.sprint_start import (
+    SprintStartAction,
+    build_sprint_schedule,
+    evaluate_sprint_root_kinematics,
+    run_task6c_via_motion_framework,
+)
 from src.motion.start_stop_walk import (
     build_step_schedule,
     evaluate_root_kinematics,
@@ -24,5 +55,32 @@ __all__ = [
     "build_step_schedule",
     "evaluate_root_kinematics",
     "generate_start_stop_walk",
+    "MotionMode",
+    "ContactPointState",
+    "MotionState",
+    "EnvironmentQuery",
+    "ContactConstraintAdapter",
+    "BlenderPoseApplicator",
+    "MotionRuntimeContext",
+    "ActionExecutionResult",
+    "MotionAction",
+    "StartStopWalkAction",
+    "RunAction",
+    "SprintStartAction",
+    "build_sprint_schedule",
+    "evaluate_sprint_root_kinematics",
+    "run_task6c_via_motion_framework",
+    "MotionPlanner",
+    "create_initial_motion_state",
+    "run_task5c_via_motion_framework",
+    "run_task6b_via_motion_framework",
+    "compute_run_swing_point",
+    "apply_run_upper_body_pose",
+    "forward_unit_vector_from_yaw",
+    "right_unit_vector_from_yaw",
+    "world_to_root_local_vector",
+    "root_local_to_world_vector",
 ]
+
+
 

@@ -113,6 +113,47 @@ class PipelineConfig:
     start_stop_decel_torso_lean_deg: float = -1.2  # Subtle torso counter-lean / upright recovery during deceleration (deg)
     start_stop_preview_frames: Tuple[int, ...] = (1, 30, 103, 155, 204)
     start_stop_blend_filename: str = "character_start_stop_walk.blend"
+    # Task 6A extensible motion system foundation artifacts
+    motion_framework_blend_filename: str = "character_motion_framework_5c.blend"
+    motion_framework_preview_filename: str = "preview_motion_framework_5c.png"
+    # Task 6B isolated procedural running (RunAction) parameters & artifacts
+    run_cycle_frames: int = 24  # 1.0s per full running cycle at 24 FPS (12 frames per half-step)
+    run_stance_frames: int = 7  # Stance frames per 12-frame half-step (remaining 5 frames = airborne flight)
+    run_cycles: int = 4  # 4 full cycles = 96 frames (4.0s @ 24 FPS)
+    run_step_length: float = 0.45  # Half-cycle step length (m); full cycle stride = 0.90m (speed = 0.90 m/s)
+    run_step_height: float = 0.22  # Peak swing ankle lift (m), providing clear dual-foot airborne clearance
+    run_pelvis_base_z: float = -0.046  # Athletic base pelvis lowering (m) keeping stance strictly within 0.82m reach
+    run_pelvis_bounce_amp: float = 0.024  # Vertical pelvis bounce amplitude (m): dips in mid-stance, peaks in mid-flight
+    run_pelvis_sway_amp: float = 0.014  # Lateral (+/-X) pelvis weight shift amplitude (m)
+    run_pelvis_yaw_deg: float = 7.5  # Pelvis axial twist amplitude (deg)
+    run_pelvis_roll_deg: float = 3.0  # Pelvis coronal tilt amplitude (deg)
+    run_torso_lean_deg: float = 10.0  # Forward torso lean angle for running (deg)
+    run_torso_yaw_deg: float = 9.5  # Spine counter-twist amplitude (deg)
+    run_arm_swing_deg: float = 42.0  # Upper-arm contra-lateral drive amplitude (deg)
+    run_elbow_base_deg: float = 65.0  # Flexed running forearm base angle (deg)
+    run_elbow_swing_deg: float = 22.0  # Dynamic forearm flexion amplitude (deg)
+    run_preview_frames: Tuple[int, ...] = (4, 10, 16, 22, 58)
+    run_blend_filename: str = "character_run_prototype.blend"
+    # Task 6C isolated explosive start & sprint acceleration (SprintStartAction) parameters & artifacts
+    sprint_prep_frames: int = 18  # Stationary crouch/lean preparation frames (tau in [0, 18))
+    sprint_accel_frames: int = 48  # Burst acceleration duration (2.0s), v(x) = vmax * (2x - x^2)
+    sprint_steady_frames: int = 48  # Steady sprint duration (2.0s)
+    sprint_target_speed: float = 2.0  # Sprint speed (m/s); leg length 0.82m, stride ~0.83m
+    sprint_start_frames: int = 12  # Frames after release labelled 'start' (push-off) before 'accelerate'
+    sprint_step_frames_start: int = 12  # Step duration at v=0 (frames)
+    sprint_step_frames_sprint: int = 10  # Step duration at sprint speed (frames)
+    sprint_stance_frames_start: int = 9  # Stance frames per step at v=0 (long push-off contact)
+    sprint_stance_frames_sprint: int = 4  # Stance frames per step at sprint speed (flight grows to 6)
+    sprint_step_height_start: float = 0.20  # Swing ankle lift at v=0 (m)
+    sprint_step_height_sprint: float = 0.28  # Swing ankle lift at sprint speed (m)
+    sprint_crouch_start: float = -0.10  # Pelvis lowering during set/push-off (m)
+    sprint_pelvis_base_z: float = -0.062  # Sprint pelvis base lowering (m)
+    sprint_pelvis_bounce_amp: float = 0.026  # Sprint pelvis vertical bounce amplitude (m)
+    sprint_lean_start_deg: float = 20.0  # Spine forward lean at set/push-off (deg)
+    sprint_lean_sprint_deg: float = 13.0  # Spine forward lean at steady sprint (deg)
+    sprint_arm_swing_deg: float = 48.0  # Sprint arm drive amplitude (deg)
+    sprint_blend_filename: str = "character_sprint_start_prototype.blend"
+    sprint_preview_frames: Tuple[int, ...] = (1, 18, 30, 62, 110)
 
     @property
     def total_frames(self) -> int:
@@ -213,3 +254,51 @@ class PipelineConfig:
 
     def get_start_stop_preview_path(self, frame: int) -> str:
         return os.path.join(self.output_dir, f"preview_start_stop_frame_{frame:04d}.png")
+
+    @property
+    def motion_framework_blend_path(self) -> str:
+        return os.path.join(self.output_dir, self.motion_framework_blend_filename)
+
+    @property
+    def motion_framework_preview_path(self) -> str:
+        return os.path.join(self.output_dir, self.motion_framework_preview_filename)
+
+    @property
+    def run_half_step_frames(self) -> int:
+        return self.run_cycle_frames // 2
+
+    @property
+    def run_flight_frames(self) -> int:
+        return self.run_half_step_frames - self.run_stance_frames
+
+    @property
+    def run_total_frames(self) -> int:
+        return self.run_cycle_frames * self.run_cycles
+
+    @property
+    def run_stride_length(self) -> float:
+        return 2.0 * self.run_step_length
+
+    @property
+    def run_speed_mps(self) -> float:
+        cycle_seconds = self.run_cycle_frames / float(self.fps)
+        return self.run_stride_length / cycle_seconds
+
+    @property
+    def run_blend_path(self) -> str:
+        return os.path.join(self.output_dir, self.run_blend_filename)
+
+    def get_run_preview_path(self, frame: int) -> str:
+        return os.path.join(self.output_dir, f"preview_run_frame_{frame:04d}.png")
+
+
+    @property
+    def sprint_total_frames(self) -> int:
+        return self.sprint_prep_frames + self.sprint_accel_frames + self.sprint_steady_frames
+
+    @property
+    def sprint_blend_path(self) -> str:
+        return os.path.join(self.output_dir, self.sprint_blend_filename)
+
+    def get_sprint_preview_path(self, frame: int) -> str:
+        return os.path.join(self.output_dir, f"preview_sprint_frame_{frame:04d}.png")
