@@ -1,69 +1,42 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-16  
-> **当前阶段**：任务 3（程序化三维场景、灯光与摄像机基础系统完成）
+> **记录时间**：2026-10-18  
+> **当前阶段**：任务 5C（起步、加速、稳定行走、减速与停止完成）
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **统一世界坐标系统与地面基准**：
-  * 坐标约定执行：Z 轴向上，度量单位采用米。
-  * 地面标高实测：地台顶表面精准对齐 $Z = 0.000000\text{ m}$，尺寸为 $24.0\text{ m} \times 24.0\text{ m}$，厚度 $0.2\text{ m}$，材质赋色正常。
-* **程序化环境生成与走廊安全净空**：
-  * 环境元素分类：生成 6 座矩形建筑体块与 8 根柱状柱体障碍物，各具独立尺寸与位置，均稳固坐落于地表。
-  * 走廊净空数学断言：角色的 3 个连续运动关键位点（站立 $(0,-8,0)$、转身 $(0,0,0)$、离场 $(3.5,7,0)$）及连接线段，在 $\ge 2.4\text{ m}$ 净空半径约束下未发生任何障碍物碰撞（`verify_layout_corridor_clearance` 断言通过）。
-* **随机种子确定性与可复现性**：
-  * 固定种子复现（Seed=42）：两次生成所有障碍物坐标完全一致，偏差为 0。
-  * 种子变异测试（Seed=42 vs Seed=99）：不同种子产生截然不同的空间布局（单测 `tests/test_task3_spatial.py` 执行通过）。
-* **程序化多光源照明系统**：
-  * 主光源 (`PipelineKeyLight`，2500W 暖光，位于 $(8,-8,12)$) 与辅光源 (`PipelineFillLight`，800W 冷光，位于 $(-6,6,8)$) 以及环境天光均成功创建并点亮场景。
-* **程序化自动追踪与关键帧运镜摄像机**：
-  * 摄像机焦距标定：50mm 标准镜头。
-  * 目标追踪：绑定 `TRACK_TO` 约束至观察目标 `CameraLookAtTarget`。
-  * 动态运镜位移：第 1 帧摄像机位于 $(10,-14,7)$，第 180 帧平滑位移至 $(8,-3,5)$，实测两帧空间位移距离达 $11.3578\text{ m}$。
-* **多帧预览渲染与产物核验**：
-  * 成功输出两张不同时间节点的预览图像：
-    * `output/preview_frame_0001.png`（306,427 字节，1280x720，远景大景别全貌）
-    * `output/preview_frame_0180.png`（248,321 字节，1280x720，中景跟拍新视角）
-  * 二进制哈希比对与视觉检查证实两张渲染图构图完全不同，摄像机运镜效果真实生效。
-* **.blend 工程保存与重开校验**：
-  * 生成 `output/procedural_scene.blend`（105,272 字节，非空）。
-  * 运行 `tests/verify_task3_blend.py` 在无头模式下重新载入该文件，确认 `Environment`、`Lighting`、`Camera` 集合及其包含的所有几何体、光源、摄像机和关键帧数据均完好保存。
+* **任务 5C 起步、加速、稳定行走、减速与停止**：
+  * 复用 Task 5A/5B 步态、Task 4C 双腿 IK 与 Task 4D 支撑脚锁定机制，在 [`src/motion/start_stop_walk.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/start_stop_walk.py) 中实现 204 帧（24 FPS，8.5 秒）完整连续变速行走序列（静止 12 帧 $\rightarrow$ 起步与加速 54 帧 $\rightarrow$ 匀速行走 72 帧 $\rightarrow$ 减速与收步停止 54 帧 $\rightarrow$ 停止静止 12 帧），参数集中于 [`src/config.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/config.py)。
+  * **实测关键指标（经 [`tests/verify_task5c_start_stop_walk.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task5c_start_stop_walk.py) 重开核验通过）**：
+    * **根节点位移与连续速度曲线**：`CharacterRoot` 沿 `+Y` 从 `-8.0000 m` 平滑移动至 `-6.7400 m`（总位移 `1.2600 m`）；初末静止阶段最大速度 `0.000000 m/s`，加速段由 `0.0 m/s` 单调平滑升至目标速度 `0.2400 m/s`，匀速段恒为 `0.2400 m/s`，减速段由 `0.2400 m/s` 单调平滑降至 `0.0 m/s`，相邻帧最大速度变化 `|dv| = 0.00698 m/s`，无倒退或跳变。
+    * **步幅、步频与足部接触协调**：7 个半步落点序列 `[-7.85, -7.61, -7.37, -7.13, -6.89, -6.74, -6.74] m`，对应步长 `[0.15, 0.24, 0.24, 0.24, 0.24, 0.15, 0.00] m` 与步频周期 `[30, 24, 24, 24, 24, 24, 30] 帧`；各支撑窗口内左右脚最大踝骨骼漂移与最大网格中心漂移均为 `0.000024 m`（`0.024 mm`）；停止时双脚并拢接地（`Y = -6.7400 m`，前后差 `0.000000 m`）。
+    * **姿态平滑性、防穿地、膝关节与 IK 可达性**：单帧最大骨盆高度变化 `0.00612 m`、最大躯干俯仰变化 `0.287°`、最大手臂摆角变化 `3.394°`（无跳帧）；全 204 帧最低脚底 `min Z = -0.000029 m`（无穿地），行走段双膝前屈偏移 `>= +0.1015 m`（全程 `>= +0.0010 m`，无反折），最大髋踝距离 `0.82000 m <= 0.82 m`，**IK 不可达事件数 = `0`**。
+  * **独立产物与回归验证**：生成 [`output/character_start_stop_walk.blend`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/character_start_stop_walk.blend) 与 5 张代表性预览图 `output/preview_start_stop_frame_0001/0030/0103/0155/0204.png`；复验 Task 5B（`tests/verify_task5b_forward_walk.py`）通过（退出码 0）。
+* **任务 5B 程序化连续向前行走**：已验证（`output/character_forward_walk.blend` 完好保留）。
+* **任务 5A 程序化原地行走循环**：已验证（`output/character_walk_cycle.blend` 完好保留）。
+* **任务 4D / 4C / 4B / 4A / 3**：已验证。
 
 ### [已实现]
-* 纯 Python 几何布局引擎与走廊净空检测：`src/scene/layout.py`
-* 场景与地台构建器：`src/scene/builder.py`
-* 动态运镜与目标追踪控制器：`src/camera/controller.py`
-* 主辅照明与环境光系统：`src/lighting/setup.py`
-* 扩展后统一集中配置类：`src/config.py`
-* 空间单元测试与重开验证套件：`tests/test_task3_spatial.py`、`tests/verify_task3_blend.py`
+* 起步/加速/匀速/减速/停止生成与验证：`src/motion/start_stop_walk.py`、`src/motion/start_stop_walk_prototype.py`、`run_start_stop_walk_prototype.py`、`tests/verify_task5c_start_stop_walk.py`
+* 连续向前行走与原地步态：`src/motion/forward_walk.py`、`src/motion/walk_cycle.py`
+* 支撑脚锁定、双腿 IK、骨骼绑定与场景系统：`src/rig/`、`src/character/`、`src/scene/`、`src/camera/`、`src/lighting/`、`src/config.py`
 
 ### [已执行但未完整验证]
-* **规则机制分级生效细节**：
-  * 根目录 `GEMINI.md` 与 `AGENTS.md` 已由会话系统提示词证实自动生效；但 `.agents/rules/project_rules.md` 的独立加载行为及外部新会话自动恢复状态，按纪律保持为**未完整验证**。
+* `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* **后续任务业务实现**：
-  * 程序化人形占位角色生成与刚性/蒙皮绑定 (`src/character/`, `src/rig/`)
-  * 8 阶段连续运动动力学与关键帧驱动 (`src/motion/`)
-  * 正式 Cycles/Eevee 批量渲染序列管线
+* 路径转向、多方向连续运动及完整 360 帧长镜头状态机编排（Task 5D+）
 
 ### [已知缺陷]
 * 无。
 
 ### [理论可行但尚未测试]
-* 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果（待用户人工实际验证）。
+* 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
 
 ---
 
-## 2. 差异说明（规格 vs 实际实现 vs 实际测试结果）
-* **需求规格**：第一阶段最终目标为 15秒/360帧/8阶段动作连续人形动画。
-* **当前实际实现**：任务 3 建立了空间坐标基准（Z=0）、程序化地面、避障环境、光照和关键帧动态摄像机，并输出第 1 帧和第 180 帧渲染图。
-* **实际测试结果**：Blender 5.1.1 后台无头管线全部通过，空间约束与两张预览图像全部核验通过，未提前制作正式角色与角色动画。
-
----
-
-## 3. 下一步建议
-进入【任务 4：程序化人形占位角色生成与骨骼装配基础】。
+## 2. 下一步建议
+等待用户指示后进入 Task 5D。

@@ -1,11 +1,85 @@
-"""Procedural rigging and bone control interface.
+"""Procedural rigging, bone control, leg IK, and foot contact package (Task 4B, 4C, 4D)."""
 
-Reserved for future armature construction and constraints implementation.
-"""
+from src.rig.builder import (
+    BONE_HIERARCHY,
+    BONE_SPECIFICATIONS,
+    PART_TO_BONE_MAP,
+    bind_character_to_rig,
+    build_rig,
+)
+from src.rig.foot_contact import (
+    FLAT_GROUND_Z,
+    MAX_EFFECTIVE_SUPPORT_REACH,
+    MAX_SUPPORT_DRIFT_TOLERANCE,
+    evaluate_foot_support,
+    get_foot_support_state,
+    lock_foot_contact,
+    move_character_root_with_support,
+    unlock_foot_contact,
+)
+from src.rig.ik import (
+    ANKLE_REST_Z,
+    FOOT_ROT_CONSTRAINT_NAMES,
+    HIP_REST_Z,
+    HIP_X_OFFSET,
+    IK_CONSTRAINT_NAMES,
+    IK_TARGET_NAMES,
+    KNEE_REST_Z,
+    MAX_LEG_REACH,
+    MIN_LEG_REACH,
+    POLE_FORWARD_OFFSET,
+    POLE_TARGET_NAMES,
+    SHIN_LENGTH,
+    THIGH_LENGTH,
+    get_leg_ik_state,
+    reset_leg_ik,
+    set_foot_ik_target,
+    setup_leg_ik,
+)
+from src.rig.pose import (
+    apply_pose_dict,
+    get_bone_world_head_tail,
+    get_part_world_center,
+    reset_pose,
+    set_bone_location,
+    set_bone_rotation,
+)
 
-from src.config import PipelineConfig
-
-def build_rig(config: PipelineConfig, character_obj=None):
-    """Placeholder interface for procedural armature generation and binding."""
-    # Formal armature rigging implementation deferred to dedicated task
-    return None
+__all__ = [
+    "BONE_HIERARCHY",
+    "BONE_SPECIFICATIONS",
+    "PART_TO_BONE_MAP",
+    "build_rig",
+    "bind_character_to_rig",
+    "reset_pose",
+    "set_bone_rotation",
+    "set_bone_location",
+    "apply_pose_dict",
+    "get_bone_world_head_tail",
+    "get_part_world_center",
+    "IK_TARGET_NAMES",
+    "POLE_TARGET_NAMES",
+    "IK_CONSTRAINT_NAMES",
+    "FOOT_ROT_CONSTRAINT_NAMES",
+    "HIP_X_OFFSET",
+    "HIP_REST_Z",
+    "KNEE_REST_Z",
+    "ANKLE_REST_Z",
+    "THIGH_LENGTH",
+    "SHIN_LENGTH",
+    "MAX_LEG_REACH",
+    "MIN_LEG_REACH",
+    "POLE_FORWARD_OFFSET",
+    "setup_leg_ik",
+    "reset_leg_ik",
+    "get_leg_ik_state",
+    "set_foot_ik_target",
+    "FLAT_GROUND_Z",
+    "MAX_SUPPORT_DRIFT_TOLERANCE",
+    "MAX_EFFECTIVE_SUPPORT_REACH",
+    "lock_foot_contact",
+    "unlock_foot_contact",
+    "evaluate_foot_support",
+    "get_foot_support_state",
+    "move_character_root_with_support",
+]

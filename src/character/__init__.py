@@ -1,11 +1,5 @@
-"""Procedural character generation module interface.
+"""Procedural character generation package (Task 4A placeholder mesh)."""
 
-Reserved for future character generation implementation.
-"""
+from src.character.builder import build_character, REQUIRED_PARTS
 
-from src.config import PipelineConfig
-
-def build_character(config: PipelineConfig):
-    """Placeholder interface for procedural humanoid character creation."""
-    # Formal character implementation deferred to dedicated task
-    return None
+__all__ = ["build_character", "REQUIRED_PARTS"]
