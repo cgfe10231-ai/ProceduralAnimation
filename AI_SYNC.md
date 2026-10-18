@@ -1,43 +1,56 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6 阶段基准建立与 Git 自动收尾规则固化 (Task 6 Baseline & Git Lifecycle Rules)
-* **任务状态**：已验证（Task 6A、6B、6C 均已通过实机复验并存入本地 Git 检查点）
+* **当前任务编号**：任务 6C（基于统一运动框架实现爆发式起步与加速冲刺）
+* **任务状态**：已验证（Task 6C 通过 Blender 5.1.1 后台生成与重开核验；Task 6A/6B/5C 全部回归通过）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：`9702d8940864fa0ab9c7499802ef3369e514dfa2` (`9702d89`)
-  * **未提交文件**：无（工作树保持干净，所有 Task 6 成果均已纳入检查点）
+  * **待提交内容**：Task 6C 文档更新 (`PROJECT_STATE.md`、`AI_SYNC.md`)
+  * **上一 Commit SHA**：`68db938`
 
 ---
 
 ### 1. 本次新增/修改文件
-* **规则与协议更新**：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`（固化第 7 节 Git 版本控制与自动收尾纪律）
-* **代码与测试固化**：
-  * `src/config.py`、`src/motion/__init__.py`
-  * `src/motion/framework.py`、`src/motion/run_cycle.py`、`src/motion/sprint_start.py`
-  * `run_motion_framework_prototype.py`、`run_run_prototype.py`、`run_sprint_prototype.py`
-  * `tests/verify_task6a_motion_framework.py`、`tests/verify_task6b_run.py`、`tests/verify_task6c_sprint_start.py`
+* **新增模块与脚本**：
+  * `src/motion/sprint_start.py`（实现 `SprintStartAction`，经由 `MotionPlanner` 调度）
+  * `run_sprint_prototype.py`（执行管线并渲染 5 张关键预览图）
+  * `tests/verify_task6c_sprint_start.py`（自动化核验脚本：速度、步态自适应、IK、接触漂移、落点与动量继承）
+  * `output/character_sprint_start_prototype.blend`（独立生成的 114 帧冲刺原型）
+  * `output/preview_sprint_frame_0001/0018/0030/0062/0110.png`（静止、蓄力、蹬地、加速与稳定冲刺姿态图）
+* **修改配置与入口**：
+  * `src/config.py`（增补冲刺时间线、步时、步高、姿态角与产物路径配置）
+  * `src/motion/__init__.py`（导出 Task 6C 符号）
   * `PROJECT_STATE.md`、`AI_SYNC.md`
 
-### 2. 实际执行的测试及结果
-* **全套回归测试 [已验证]**：
-  * Task 6C (`tests/verify_task6c_sprint_start.py`): 通过（退出码 0）
-  * Task 6B (`tests/verify_task6b_run.py`): 通过（退出码 0）
-  * Task 6A (`tests/verify_task6a_motion_framework.py`): 通过（退出码 0）
-  * Task 5C (`tests/verify_task5c_start_stop_walk.py`): 通过（退出码 0）
-* **Git 提交审查与检查点 [已验证]**：
-  * 审查 `.gitignore`，确认临时文件、渲染图与 `.blend` 已正确隔离。
-  * 精确暂存 15 个代码、测试与文档文件，杜绝盲目 `git add -A`。
-  * 成功生成基准提交 `9702d89`，未执行远程推送，未改写历史。
+### 2. 核心实测指标与验证结果
+* **最高速度与加速度**：
+  * 角色从静止 $0.0\text{ m/s}$ 连续平滑加速至最高冲刺速度 **`2.0000 m/s`**（为行走 $0.24\text{ m/s}$ 的 8.3 倍、常规跑步 $0.90\text{ m/s}$ 的 2.2 倍）。
+  * 加速耗时 **`48 帧`（`2.00 秒`）**，解析加速度从初始 $a_0 = 2.0\text{ m/s}^2$ 连续降至 $0$，加速段单调递增，无速度抖动；冲刺段恒为 $2.0000\text{ m/s}$。
+* **总位移与总帧数**：
+  * 全长 **`114 帧`（`4.75 秒` @ 24 FPS）**，包含 18 帧静止蓄力 + 48 帧爆发加速 + 48 帧稳定冲刺。
+  * `CharacterRoot` 沿 $+Y$ 从 $-8.0000\text{ m}$ 移动至 $-1.4167\text{ m}$，总位移 **`6.5833 m`**。
+* **自适应协调步态参数**：
+  * **步时**：由起步的 `12 帧` 逐步缩短至冲刺的 `10 帧`（步频由 `2.00 步/秒` 提升至 `2.40 步/秒`）。
+  * **支撑时间**：由初始推蹬的 `9 帧` 随速度提升缩短至 `4 帧`。
+  * **腾空时间**：由初始的 `3 帧` 显著扩大至 `6 帧`（双脚真正腾空，最低离地高度 $+0.0240\text{ m}$）。
+  * **步长**：由首步推蹬的 `0.350 m` 随速度增大递增至稳定冲刺的 `0.833 m`。
+* **接触约束与误差**：
+  * 支撑期左脚最大漂移 **`0.000014 m`**、右脚最大漂移 **`0.000024 m`**，落点世界 $Y$ 误差 `<= 0.000003 m`。
+  * 最低脚底 $Z$ 为 `-0.000033 m`（无穿地）。
+* **身体姿态与严格 IK**：
+  * 蓄力下蹲 `0.0992 m`，躯干前倾达 `22.83°`；稳定冲刺躯干前倾均值 `14.95°`，骨盆形成 `0.0520 m` 弹跳。
+  * 双膝前屈偏移 `>= +0.1414 m`（无反折）；最大髋踝距离 `0.82000 m <= 0.82 m`，**IK 0 违规，IK 目标钳制发生 0 次**。
+* **动量继承状态**：
+  * 动作结束时保持 `SPRINT` 模式，世界速度向量为 `(0.0, 2.0, 0.0) m/s`，保留真实步态相位与双脚接触状态。
+* **回归测试**：
+  * Task 6A、Task 6B 与 Task 5C 验证脚本全绿通过（退出码 0）。
 
-### 3. 新增的重要决策
-* 确立每个任务开始前必须执行 `git status --short` 保护工作现场；任务完成验证后必须更新文档并本地 commit 归档；交接卡片必须包含 commit SHA 与工作树状态；严禁强制推送与硬重置。
+### 3. 遗留问题与限制
+1. 动作序列在冲刺中途截止，末尾保留 $2.0\text{ m/s}$ 速度；后续若要平稳停下或过渡到慢跑，需补充专门的减速或步态衔接动作。
+2. 终点附近场景存在圆柱体块，本原型聚焦于平地动力学，尚未实现几何避障。
 
-### 4. 已知问题与阻碍
-* **当前无阻碍**。
+### 4. 下一步建议
+* 开启 Task 6D 或后续运动动作（如冲刺急停制动、急转弯或跑跳越障衔接）。
 
-### 5. 下一步建议
-* 等待用户指示后开启后续任务。
-
-### 6. 是否需要用户批准
+### 5. 是否需要用户批准
 * **否**。

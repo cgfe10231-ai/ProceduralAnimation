@@ -1,39 +1,42 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-18  
-> **当前阶段**：任务 6B（程序化跑步模式 Run 完成）
+> **当前阶段**：任务 6C（基于统一运动框架实现爆发式起步与加速冲刺完成）
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 6B 在现有统一运动框架中实现程序化跑步模式 Run**：
-  * 复用 [`src/motion/framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py) 中的 `MotionAction`、`MotionPlanner`、`ContactConstraintAdapter`、`BlenderPoseApplicator` 及既有骨架/IK/接触控制，在 [`src/motion/run_cycle.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/run_cycle.py) 中实现 `RunAction`（共 4 个周期、96 帧 @ 24 FPS、总时长 4.0 秒），集中参数于 [`src/config.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/config.py)。
-  * **实测关键指标（经 [`run_run_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_run_prototype.py) 生成、[`tests/verify_task6b_run.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6b_run.py) 重开核验通过）**：
-    * **速度、步长、步频与总位移**：前进速度恒定为 **`0.9000 m/s`**（为慢速行走 `0.24 m/s` 的 **3.75 倍**），单步步长 **`0.4500 m`**、完整周期步幅 **`0.9000 m`**，跑步周期 **`24 帧`（`1.00 s`）**、半步周期 **`12 帧`（`0.50 s`，步频 `2.0 步/秒`）**；96 帧内 `CharacterRoot` 沿 `+Y` 从 `-8.0000 m` 连续移动至 `-4.4375 m`（总位移 **`3.5625 m`**），并在 `MotionState.velocity` 中完整保留世界速度向量 `(0.0, 0.90, 0.0) m/s`。
-    * **四阶段周期结构与双脚腾空（Flight）区间**：每个 24 帧周期严格包含 `stance_L`（7 帧）$\rightarrow$ `flight_1`（5 帧）$\rightarrow$ `stance_R`（7 帧）$\rightarrow$ `flight_2`（5 帧）；**每周期双脚同时腾空 `10 帧`（`0.4167 s`，占周期 `41.7%`）**，4 个周期共 **`40 帧`** 腾空；所有腾空帧中双脚 `is_locked` 均为 `False`，且双脚真实离地高度 `foot_min_z` 处于 **`[+0.0207, +0.1535] m`**（全程离地 `>= 2.07 cm`）。
-    * **支撑脚锁定稳定性与落点精度**：各 7 帧支撑期内，左脚最大踝骨骼与网格漂移均为 **`0.000012 m`**（`0.012 mm`），右脚最大踝骨骼与网格漂移均为 **`0.000011 m`**（`0.011 mm`），支撑落点世界 Y 误差 `<= 0.000001 m`。
-    * **骨盆起伏、防穿地、膝前屈与严格 IK 可达**：骨盆随支撑吸收与腾空跃起产生平滑弹跳（中支撑平均 `Z = 0.8200 m` $\rightarrow$ 中腾空平均 `Z = 0.8680 m`，弹跳抬升 **`+0.0480 m`**），单帧最大骨盆高度差 `0.01200 m`（周期边界 `24->25`、`48->49`、`72->73` 无跳变）；全 96 帧最低 `foot_min_z = -0.000018 m`（无穿地），双膝前屈偏移 `>= +0.1218 m`（无反折），最大髋踝距离 **`0.78213 m <= 0.82 m`**，**IK 不可达事件数 = `0`**。
-    * **非零起点/帧号组合与回归验证**：验证 `RunAction` 从 `frame = 101`、`Y = -4.4000 m` 接续执行通过；复验 Task 6A（[`tests/verify_task6a_motion_framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6a_motion_framework.py)）与 Task 5C（[`tests/verify_task5c_start_stop_walk.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task5c_start_stop_walk.py)）全部通过（退出码 `0`）。
+* **任务 6C 基于统一运动框架实现爆发式起步与加速冲刺 (SprintStartAction)**：
+  * 在 [`src/motion/sprint_start.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/sprint_start.py) 中实现 `SprintStartAction`，经由 `MotionPlanner` 调度执行，复用 `ContactConstraintAdapter`、`BlenderPoseApplicator`、双腿 IK 与 Task 6B 摆动抬腿轨迹函数 `compute_run_swing_point`，动作序列为：静止准备（蓄力下蹲与身体前倾） $\rightarrow$ 蹬地起跑 $\rightarrow$ 连续加速 $\rightarrow$ 稳定冲刺，全长 114 帧（准备 18 帧 + 加速 48 帧 + 冲刺 48 帧 @ 24 FPS，总时长 4.75 秒）。
+  * **实测关键指标（经 [`run_sprint_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_sprint_prototype.py) 生成独立原型 [`output/character_sprint_start_prototype.blend`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/character_sprint_start_prototype.blend)，由 [`tests/verify_task6c_sprint_start.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6c_sprint_start.py) 重开核验通过）**：
+    * **连续加速与冲刺速度**：速度从静止 `0.0 m/s` 解析加速至目标冲刺速度 **`2.0000 m/s`**（初始加速度 $a_0 = 2.0\text{ m/s}^2$，加速段严格单调，最大帧间速度差 $|dv| = 0.0816\text{ m/s}$），进入冲刺段后恒定在 `[2.0000, 2.0000] m/s`；全长 114 帧总根位移 **`6.5833 m`**（$Y$ 从 `-8.0000 m` 移动至 `-1.4167 m`）。
+    * **步态与运动状态自适应协调**：步时从起步的 `12 帧` 缩短至冲刺的 `10 帧`（步频由 `2.00 步/秒` 升至 `2.40 步/秒`）；单步支撑时间由起步推蹬的 `9 帧` 缩减至冲刺的 `4 帧`；单步腾空时间由起步的 `3 帧` 扩大至冲刺的 `6 帧`；步长由起步的 `0.350 m` 平滑增长至冲刺的 `0.833 m`。
+    * **接触约束与支撑稳定性**：支撑期左脚最大漂移 **`0.000014 m`**、右脚最大漂移 **`0.000024 m`**，落点世界 $Y$ 误差 `<= 0.000003 m`；腾空期双脚接触约束正确释放，最低腾空离地高度 `+0.0240 m`；全过程最低脚底 $Z$ 为 `-0.000033 m`（无穿地）。
+    * **姿态连续性与严格 IK 可达**：准备期骨盆蓄力下蹲 `0.0992 m`，躯干前倾达到 `22.83°`；进入冲刺后躯干前倾平稳调整至均值 `14.95°`，骨盆形成幅度 `0.0520 m` 的垂直弹跳；释放起步后双膝前屈偏移 `>= +0.1414 m`（无反折）；最大髋踝距离 **`0.82000 m <= 0.82 m`**，**IK 不可达事件数 = `0`**；动作内部检测并确认 **IK 目标钳制发生次数 = `0`**（杜绝伪造约束）。
+    * **动量继承与多动作衔接验证**：动作结束于第 114 帧，保持 `SPRINT` 运动模式，世界速度向量为 `(0.0, 2.0, 0.0) m/s`，保留步态相位 `0.562` 与真实接触状态；在重开核验中以偏移起点（第 201 帧、$Y = -3.0000\text{ m}$）经 `MotionPlanner` 衔接测试成功（总位移 `6.5833 m`，终点 $Y = 3.5833\text{ m}$，IK 0 违规）。
+    * **回归验证**：原有 Task 6B 跑步（`tests/verify_task6b_run.py`）、Task 6A 运动框架（`tests/verify_task6a_motion_framework.py`）及 Task 5C 行走（`tests/verify_task5c_start_stop_walk.py`）复验全部通过（退出码 `0`）。
+* **任务 6B 程序化跑步模式 Run**：已验证（`output/character_run_prototype.blend` 完好保留）。
 * **任务 6A 建立可扩展的程序化运动系统基础架构**：已验证（`output/character_motion_framework_5c.blend` 完好保留）。
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证（所有历史 `.blend` 完好保留）。
 
 ### [已实现]
-* 程序化跑步模式与验证：`src/motion/run_cycle.py`、`run_run_prototype.py`、`tests/verify_task6b_run.py`
-* 可扩展程序化运动框架与验证：`src/motion/framework.py`、`run_motion_framework_prototype.py`、`tests/verify_task6a_motion_framework.py`
-* 起步/加速/匀速/减速/停止生成与验证：`src/motion/start_stop_walk.py`、`src/motion/start_stop_walk_prototype.py`、`run_start_stop_walk_prototype.py`、`tests/verify_task5c_start_stop_walk.py`
-* 连续向前行走与原地步态：`src/motion/forward_walk.py`、`src/motion/walk_cycle.py`
-* 支撑脚锁定、双腿 IK、骨骼绑定与场景系统：`src/rig/`、`src/character/`、`src/scene/`、`src/camera/`、`src/lighting/`、`src/config.py`
+* 爆发式起步与冲刺加速：`src/motion/sprint_start.py`、`run_sprint_prototype.py`、`tests/verify_task6c_sprint_start.py`
+* 程序化跑步模式：`src/motion/run_cycle.py`、`run_run_prototype.py`、`tests/verify_task6b_run.py`
+* 可扩展运动框架：`src/motion/framework.py`、`run_motion_framework_prototype.py`、`tests/verify_task6a_motion_framework.py`
+* 变速行走、匀速行走与原地步态：`src/motion/start_stop_walk.py`、`src/motion/forward_walk.py`、`src/motion/walk_cycle.py`
+* 基础绑定、IK、接触约束与场景系统：`src/rig/`、`src/character/`、`src/scene/`、`src/camera/`、`src/lighting/`、`src/config.py`
 
 ### [已执行但未完整验证]
 * `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* 爆发起步、变速冲刺（Sprint）、急停、跳跃、翻滚、滑铲、撑越障碍、攀爬、蹬墙、下坡借力、障碍物检测与自动动作决策（按要求未在 Task 6B 中实现）。
+* 冲刺减速、急停、转向、跳跃、翻滚、撑越障碍与环境障碍物检测（留待后续任务扩展）。
 
-### [已知缺陷]
-* 无。
+### [已知缺陷与遗留说明]
+1. `SprintStartAction` 序列以持续冲刺状态截出，未包含急停或减速逻辑；后续若衔接静止需补充专门的减速制动或过渡动作。
+2. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
@@ -41,14 +44,4 @@
 ---
 
 ## 2. 下一步建议
-等待用户指示后进入下一阶段运动任务（如冲刺、加减速切换或跑跳）。
-
-## Task 6C ������2026-10-18������֤��������ʽ������ٳ��
-* ���� src/motion/sprint_start.py��SprintStartAction���� MotionPlanner ���ã���un_sprint_prototype.py��	ests/verify_task6c_sprint_start.py������ output/character_sprint_start_prototype.blend��output/preview_sprint_frame_0001/0018/0030/0062/0110.png���޸� src/config.py��src/motion/__init__.py��
-* ʵ�⣨Blender 5.1.1 ��̨���ɲ��ؿ����飬�˳��� 0����114 ֡��׼�� 18 + ���� 48 + ��� 48�����ٶ� 0 -> 2.0 m/s��=vmax(2x-x^2)������ʱ�� 2.0 s����ʼ���ٶ� 2.0 m/s^2�����ٶε��������֡�� dv 0.082 m/s������̶κ� 2.0 m/s����λ�� 6.5833 m��Y -8.0 -> -1.4167����
-* ��̬���ٶȱ仯����ʱ 12->10 ֡��֧�� 9->4 ֡���ڿ� 3->6 ֡������ 0.350->0.833 m����Ƶ 2.00->2.40 ��/�롣
-* �Ӵ���֧�Ž�Ư�� L 0.000014 m / R 0.000024 m����� Y ��� 0.000003 m���ڿ���˫���ͷţ������� +0.0240 m����ͽŵ� -0.000033 m�������𲽺�ϥǰ�� >= +0.1414 m������������ 0.82000 m��IK ���ɴ� 0��IK Ŀ�걻ǯ�ƴ��� 0�������ڲ���⣬��ǯ���򱨴�����
-* ��̬�������¶� 0.099 m��׼������ǰ�� 22.8 deg�����ǰ���ֵ 14.95 deg�����赯����Χ 0.052 m����֡������仯 0.019 m������ 2.0 deg���ֱ� 18.4 deg��
-* ����״̬��SPRINT ģʽ�������ٶ� (0, 2.0, 0) m/s��������̬��λ��Ӵ�״̬��ƫ����� frame 201 / Y=-3.0 �� MotionPlanner ���飩��
-* �ع飺Task 6A��6B��5C ��֤�ű�ȫ��ͨ�����˳��� 0����
-* ����/���ƣ�(1) ĩβ�ڳ����;��ֹ���������������д����Ӵ��νӣ���δʵ���� RunAction/���ٵ��޷촮����(2) RunAction ����δ��ֱ�ӵ��ã���������ڶ��켣���� compute_run_swing_point���Ӵ����������ܣ���̬����Ϊ�����ı䲽�����ȣ�(3) ��֤�ű����ֱ۵�֡��ֵ��Ϊ 20 deg�����Ұڱ۷�ֵб��Լ 15-18 deg/֡���ǲ���������(4) �״���֤��ϥ���������ʼֱ��֡��ϥƫ�� 0.001 m���� Task 5C վ������һ�£�ʧ�ܣ��ѽ��ü���޶����ͷź�֡��һ�ξֲ��޸�����(5) �յ㸽��������Բ��/��飬��ԭ��δ���ϰ���⡣
+等待用户指示后进入 Task 6D 或后续运动状态编排（如冲刺急停、转向或跑跳衔接）。
