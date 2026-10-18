@@ -1,4 +1,4 @@
-"""Procedural motion generation package (Task 5A, Task 5B, Task 5C, Task 6A, 6B & Task 6C)."""
+"""Procedural motion generation package (Task 5A, Task 5B, Task 5C, Task 6A, 6B, Task 6C & Task 6D)."""
 
 from src.config import PipelineConfig
 from src.motion.forward_walk import compute_forward_swing_point, generate_forward_walk
@@ -26,6 +26,12 @@ from src.motion.run_cycle import (
     apply_run_upper_body_pose,
     compute_run_swing_point,
     run_task6b_via_motion_framework,
+)
+from src.motion.sprint_brake import (
+    SprintBrakeAction,
+    apply_brake_pose,
+    evaluate_brake_root_kinematics,
+    run_task6d_via_motion_framework,
 )
 from src.motion.sprint_start import (
     SprintStartAction,
@@ -67,9 +73,13 @@ __all__ = [
     "StartStopWalkAction",
     "RunAction",
     "SprintStartAction",
+    "SprintBrakeAction",
     "build_sprint_schedule",
     "evaluate_sprint_root_kinematics",
+    "evaluate_brake_root_kinematics",
+    "apply_brake_pose",
     "run_task6c_via_motion_framework",
+    "run_task6d_via_motion_framework",
     "MotionPlanner",
     "create_initial_motion_state",
     "run_task5c_via_motion_framework",
@@ -81,6 +91,3 @@ __all__ = [
     "world_to_root_local_vector",
     "root_local_to_world_vector",
 ]
-
-
-

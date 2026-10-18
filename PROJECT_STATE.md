@@ -1,27 +1,29 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-18  
-> **当前阶段**：任务 6C（基于统一运动框架实现爆发式起步与加速冲刺完成）
+> **记录时间**：2026-10-19  
+> **当前阶段**：任务 6D（基于统一运动框架实现冲刺后的主动制动与急停完成）
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 6C 基于统一运动框架实现爆发式起步与加速冲刺 (SprintStartAction)**：
-  * 在 [`src/motion/sprint_start.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/sprint_start.py) 中实现 `SprintStartAction`，经由 `MotionPlanner` 调度执行，复用 `ContactConstraintAdapter`、`BlenderPoseApplicator`、双腿 IK 与 Task 6B 摆动抬腿轨迹函数 `compute_run_swing_point`，动作序列为：静止准备（蓄力下蹲与身体前倾） $\rightarrow$ 蹬地起跑 $\rightarrow$ 连续加速 $\rightarrow$ 稳定冲刺，全长 114 帧（准备 18 帧 + 加速 48 帧 + 冲刺 48 帧 @ 24 FPS，总时长 4.75 秒）。
-  * **实测关键指标（经 [`run_sprint_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_sprint_prototype.py) 生成独立原型 [`output/character_sprint_start_prototype.blend`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/character_sprint_start_prototype.blend)，由 [`tests/verify_task6c_sprint_start.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6c_sprint_start.py) 重开核验通过）**：
-    * **连续加速与冲刺速度**：速度从静止 `0.0 m/s` 解析加速至目标冲刺速度 **`2.0000 m/s`**（初始加速度 $a_0 = 2.0\text{ m/s}^2$，加速段严格单调，最大帧间速度差 $|dv| = 0.0816\text{ m/s}$），进入冲刺段后恒定在 `[2.0000, 2.0000] m/s`；全长 114 帧总根位移 **`6.5833 m`**（$Y$ 从 `-8.0000 m` 移动至 `-1.4167 m`）。
-    * **步态与运动状态自适应协调**：步时从起步的 `12 帧` 缩短至冲刺的 `10 帧`（步频由 `2.00 步/秒` 升至 `2.40 步/秒`）；单步支撑时间由起步推蹬的 `9 帧` 缩减至冲刺的 `4 帧`；单步腾空时间由起步的 `3 帧` 扩大至冲刺的 `6 帧`；步长由起步的 `0.350 m` 平滑增长至冲刺的 `0.833 m`。
-    * **接触约束与支撑稳定性**：支撑期左脚最大漂移 **`0.000014 m`**、右脚最大漂移 **`0.000024 m`**，落点世界 $Y$ 误差 `<= 0.000003 m`；腾空期双脚接触约束正确释放，最低腾空离地高度 `+0.0240 m`；全过程最低脚底 $Z$ 为 `-0.000033 m`（无穿地）。
-    * **姿态连续性与严格 IK 可达**：准备期骨盆蓄力下蹲 `0.0992 m`，躯干前倾达到 `22.83°`；进入冲刺后躯干前倾平稳调整至均值 `14.95°`，骨盆形成幅度 `0.0520 m` 的垂直弹跳；释放起步后双膝前屈偏移 `>= +0.1414 m`（无反折）；最大髋踝距离 **`0.82000 m <= 0.82 m`**，**IK 不可达事件数 = `0`**；动作内部检测并确认 **IK 目标钳制发生次数 = `0`**（杜绝伪造约束）。
-    * **动量继承与多动作衔接验证**：动作结束于第 114 帧，保持 `SPRINT` 运动模式，世界速度向量为 `(0.0, 2.0, 0.0) m/s`，保留步态相位 `0.562` 与真实接触状态；在重开核验中以偏移起点（第 201 帧、$Y = -3.0000\text{ m}$）经 `MotionPlanner` 衔接测试成功（总位移 `6.5833 m`，终点 $Y = 3.5833\text{ m}$，IK 0 违规）。
-    * **回归验证**：原有 Task 6B 跑步（`tests/verify_task6b_run.py`）、Task 6A 运动框架（`tests/verify_task6a_motion_framework.py`）及 Task 5C 行走（`tests/verify_task5c_start_stop_walk.py`）复验全部通过（退出码 `0`）。
+* **任务 6D 基于统一运动框架实现冲刺后的主动制动与急停 (SprintBrakeAction)**：
+  * 在 [`src/motion/sprint_brake.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/sprint_brake.py) 中实现 `SprintBrakeAction`，经由 `MotionPlanner` 调度无缝承接 Task 6C 末尾运动状态（$v = 2.0\text{ m/s}$，冲刺前倾与双脚接触状态），动作序列为：承接起步 $\rightarrow$ 左脚主抗惯性制动步 $\rightarrow$ 右脚次级迈步 $\rightarrow$ 左脚落位终点 $\rightarrow$ 右脚并拢收步 $\rightarrow$ 对称双支撑静止站立，制动段全长 48 帧（36 帧主动减速制动 + 12 帧稳定静止站立收势 @ 24 FPS，时长 2.0 秒；整段冲刺+制动动画共 162 帧，时长 6.75 秒）。
+  * **实测关键指标（经 [`run_sprint_brake_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_sprint_brake_prototype.py) 生成独立原型 [`output/character_sprint_brake_prototype.blend`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/character_sprint_brake_prototype.blend)，由 [`tests/verify_task6d_sprint_brake.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6d_sprint_brake.py) 重开核验通过）**：
+    * **交界处平滑连续性**：第 114 帧（冲刺末尾）至 115 帧（制动首帧）根节点位移 $\Delta Y = 0.08328\text{ m}$，对应离散速度为 $1.9987\text{ m/s}$（完全贴合 2.0 m/s 理论连续性）；躯干俯仰角差值 $\Delta = 0.000^\circ$（均为 $15.091^\circ$）；骨盆高度差值 $\Delta = 0.00000\text{ m}$（均为 $0.80962\text{ m}$）；双脚接触锁定状态完全平滑继承。
+    * **制动曲线与停止精度**：根运动采用解析半余弦速度剖面 $v(x) = \frac{v_0}{2}(1 + \cos(\pi x))$，离散速度严格单调递减至 $0.000000\text{ m/s}$，无倒退（最小速度非负，反向位移为 0）；制动段总位移精确为 **`1.50000 m`**（根节点 $Y$ 从 `-1.4167 m` 位移至 `+0.0833 m`，总全长 162 帧位移为 `8.0833 m`）；最大减速度为 **`-2.0944 m/s^2`**；最后 10 帧根节点 $Y$ 抖动严格为 **`0.00000000 m`**。
+    * **自适应步态与接触稳定性**：多步制动中支撑脚最大漂移左脚 **`0.000035 m`**、右脚 **`0.000033 m`**（均 $\le 0.035\text{ mm}$）；最低脚底 $Z = -0.000043\text{ m}$（无穿地）；膝关节始终保持前向屈曲（前向偏移量 $\ge +0.0602\text{ m}$，无反折/翻转）；最大髋踝实际距离为 **`0.82000 m <= 0.82 m`**；全过程 **IK 不可达事件数 = `0`**，**内部 IK 目标限制钳制次数 = `0`**。
+    * **最终静止双支撑姿态**：第 162 帧双脚对称锁止在 $Y = +0.0833\text{ m}$（左右脚对齐误差 $\Delta Y = 0.000000\text{ m}$），骨盆恢复至自然站立高度，躯干完全回正（$0.0^\circ$），双臂自然下垂收束，运动模式标记为 `STOP`。
+    * **多动作偏移调度能力**：在任意起始帧（如第 201 帧）及空间偏移点（$Y = -3.0000\text{ m}$）经 `MotionPlanner` 调度两动作连续执行成功（201..362 帧，位移 `8.0833 m`，终点 $Y = 5.0833\text{ m}$，IK 0 违规，终态严格为 `STOP`）。
+    * **回归验证**：原有 Task 6C 冲刺起跑（`tests/verify_task6c_sprint_start.py`）、Task 6B 跑步（`tests/verify_task6b_run.py`）及 Task 5C 行走（`tests/verify_task5c_start_stop_walk.py`）复验全部通过（退出码 `0`）。
+* **任务 6C 基于统一运动框架实现爆发式起步与加速冲刺**：已验证（`output/character_sprint_start_prototype.blend` 完好保留）。
 * **任务 6B 程序化跑步模式 Run**：已验证（`output/character_run_prototype.blend` 完好保留）。
 * **任务 6A 建立可扩展的程序化运动系统基础架构**：已验证（`output/character_motion_framework_5c.blend` 完好保留）。
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证（所有历史 `.blend` 完好保留）。
 
 ### [已实现]
+* 冲刺主动制动与急停：`src/motion/sprint_brake.py`、`run_sprint_brake_prototype.py`、`tests/verify_task6d_sprint_brake.py`
 * 爆发式起步与冲刺加速：`src/motion/sprint_start.py`、`run_sprint_prototype.py`、`tests/verify_task6c_sprint_start.py`
 * 程序化跑步模式：`src/motion/run_cycle.py`、`run_run_prototype.py`、`tests/verify_task6b_run.py`
 * 可扩展运动框架：`src/motion/framework.py`、`run_motion_framework_prototype.py`、`tests/verify_task6a_motion_framework.py`
@@ -32,11 +34,10 @@
 * `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* 冲刺减速、急停、转向、跳跃、翻滚、撑越障碍与环境障碍物检测（留待后续任务扩展）。
+* 急转弯（Sharp Turn）、跑跳（Running Jump）、翻滚（Roll）、滑铲（Slide）、撑越障碍（Vault）与环境障碍物射线几何避障。
 
 ### [已知缺陷与遗留说明]
-1. `SprintStartAction` 序列以持续冲刺状态截出，未包含急停或减速逻辑；后续若衔接静止需补充专门的减速制动或过渡动作。
-2. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
+1. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
@@ -44,4 +45,4 @@
 ---
 
 ## 2. 下一步建议
-等待用户指示后进入 Task 6D 或后续运动状态编排（如冲刺急停、转向或跑跳衔接）。
+等待用户指示后进入 Task 6E 或后续运动动作编排（如急转弯、跑跳或翻滚越障）。

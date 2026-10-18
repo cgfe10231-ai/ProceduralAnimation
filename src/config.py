@@ -154,6 +154,11 @@ class PipelineConfig:
     sprint_arm_swing_deg: float = 48.0  # Sprint arm drive amplitude (deg)
     sprint_blend_filename: str = "character_sprint_start_prototype.blend"
     sprint_preview_frames: Tuple[int, ...] = (1, 18, 30, 62, 110)
+    # Task 6D isolated sprint braking & sudden stop (SprintBrakeAction) parameters & artifacts
+    sprint_brake_frames: int = 36  # Duration of active deceleration (1.5s @ 24 FPS) from 2.0 m/s to 0 m/s
+    sprint_settle_frames: int = 12  # Duration of final stationary standing/settling (0.5s @ 24 FPS)
+    sprint_brake_blend_filename: str = "character_sprint_brake_prototype.blend"
+    sprint_brake_preview_frames: Tuple[int, ...] = (110, 114, 120, 138, 155)
 
     @property
     def total_frames(self) -> int:
@@ -302,3 +307,14 @@ class PipelineConfig:
 
     def get_sprint_preview_path(self, frame: int) -> str:
         return os.path.join(self.output_dir, f"preview_sprint_frame_{frame:04d}.png")
+
+    @property
+    def sprint_brake_total_frames(self) -> int:
+        return self.sprint_brake_frames + self.sprint_settle_frames
+
+    @property
+    def sprint_brake_blend_path(self) -> str:
+        return os.path.join(self.output_dir, self.sprint_brake_blend_filename)
+
+    def get_sprint_brake_preview_path(self, frame: int) -> str:
+        return os.path.join(self.output_dir, f"preview_sprint_brake_frame_{frame:04d}.png")
