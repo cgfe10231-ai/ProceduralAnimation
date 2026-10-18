@@ -1,31 +1,43 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 5C（起步、加速、稳定行走、减速与停止）
-* **任务状态**：已验证（未进入任务 5D，未实现路径转向）
+* **当前任务编号**：任务 6 阶段基准建立与 Git 自动收尾规则固化 (Task 6 Baseline & Git Lifecycle Rules)
+* **任务状态**：已验证（Task 6A、6B、6C 均已通过实机复验并存入本地 Git 检查点）
+* **Git 状态**：
+  * **当前分支**：`master`
+  * **最新 Commit SHA**：`9702d8940864fa0ab9c7499802ef3369e514dfa2` (`9702d89`)
+  * **未提交文件**：无（工作树保持干净，所有 Task 6 成果均已纳入检查点）
 
 ---
 
 ### 1. 本次新增/修改文件
-* **新增**：`src/motion/start_stop_walk.py`、`src/motion/start_stop_walk_prototype.py`、`run_start_stop_walk_prototype.py`、`tests/verify_task5c_start_stop_walk.py`、`output/character_start_stop_walk.blend`、`output/preview_start_stop_frame_0001/0030/0103/0155/0204.png`
-* **修改**：`src/config.py`、`src/motion/__init__.py`、`PROJECT_STATE.md`、`AI_SYNC.md`
+* **规则与协议更新**：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`（固化第 7 节 Git 版本控制与自动收尾纪律）
+* **代码与测试固化**：
+  * `src/config.py`、`src/motion/__init__.py`
+  * `src/motion/framework.py`、`src/motion/run_cycle.py`、`src/motion/sprint_start.py`
+  * `run_motion_framework_prototype.py`、`run_run_prototype.py`、`run_sprint_prototype.py`
+  * `tests/verify_task6a_motion_framework.py`、`tests/verify_task6b_run.py`、`tests/verify_task6c_sprint_start.py`
+  * `PROJECT_STATE.md`、`AI_SYNC.md`
 
 ### 2. 实际执行的测试及结果
-* **204 帧全阶段变速行走与重开核验 [已验证]**：Blender 5.1.1 后台执行 `run_start_stop_walk_prototype.py` 与 `tests/verify_task5c_start_stop_walk.py` 均通过（退出码 0）。
-* **核心实测指标 [已验证]**：
-  * **根运动位置与连续速度曲线**：`CharacterRoot` 沿 `+Y` 从 `-8.0000 m` 平滑移动至 `-6.7400 m`（总位移 `1.2600 m`）；静止段（1..13 帧、193..204 帧）速度为 `0.000000 m/s`，起步加速段（13..67 帧）单调平滑升至 `0.2400 m/s`，匀速段（67..139 帧）恒为 `0.2400 m/s`，减速收步段（139..193 帧）单调平滑降至 `0.0 m/s`，相邻帧最大速度差 `|dv| = 0.00698 m/s`。
-  * **步幅、步频与支撑脚稳定**：7 个半步落点 `[-7.85, -7.61, -7.37, -7.13, -6.89, -6.74, -6.74] m`，步长 `[0.15, 0.24, 0.24, 0.24, 0.24, 0.15, 0.00] m`，步时 `[30, 24, 24, 24, 24, 24, 30] 帧`；各支撑期最大踝骨骼与网格漂移均为 `0.000024 m`（`0.024 mm`）；收步停止时双脚平齐接地于 `Y = -6.7400 m`（差值 `0.000000 m`）。
-  * **姿态连续、防穿地、膝方向与 IK 可达**：单帧最大骨盆高度差 `0.00612 m`、躯干俯仰差 `0.287°`、臂摆差 `3.394°`（无姿态跳变）；最低 `Foot min Z = -0.000029 m`（无穿地），行走段膝前屈偏移 `>= +0.1015 m`（全程 `>= +0.0010 m`），最大髋踝距离 `0.82000 m <= 0.82 m`，**IK 不可达事件数 = `0`**。
-* **回归验证 [已验证]**：复跑 Task 5B 验证脚本 `tests/verify_task5b_forward_walk.py` 通过（退出码 0）。
+* **全套回归测试 [已验证]**：
+  * Task 6C (`tests/verify_task6c_sprint_start.py`): 通过（退出码 0）
+  * Task 6B (`tests/verify_task6b_run.py`): 通过（退出码 0）
+  * Task 6A (`tests/verify_task6a_motion_framework.py`): 通过（退出码 0）
+  * Task 5C (`tests/verify_task5c_start_stop_walk.py`): 通过（退出码 0）
+* **Git 提交审查与检查点 [已验证]**：
+  * 审查 `.gitignore`，确认临时文件、渲染图与 `.blend` 已正确隔离。
+  * 精确暂存 15 个代码、测试与文档文件，杜绝盲目 `git add -A`。
+  * 成功生成基准提交 `9702d89`，未执行远程推送，未改写历史。
 
 ### 3. 新增的重要决策
-* 采用分段 $C^1$ 余弦平滑速度曲线 $v(\tau)$ 及其解析积分驱动 `CharacterRoot`，并将起步（步长 `0.15 m` / `30 帧`）、加速（`0.24 m` / `24 帧`）、匀速（3 步 `0.24 m` / `24 帧`）、减速（`0.15 m` / `24 帧`）及并脚收步（`0.00 m` 差 / `30 帧`）的步态相位与根位移严格同步。
+* 确立每个任务开始前必须执行 `git status --short` 保护工作现场；任务完成验证后必须更新文档并本地 commit 归档；交接卡片必须包含 commit SHA 与工作树状态；严禁强制推送与硬重置。
 
 ### 4. 已知问题与阻碍
 * **当前无阻碍**。
 
 ### 5. 下一步建议
-* 等待用户指示后进入任务 5D。
+* 等待用户指示后开启后续任务。
 
 ### 6. 是否需要用户批准
 * **否**。
