@@ -5,8 +5,8 @@
 * **任务状态**：已验证（经 `tests/verify_task6fa_arm_ik.py` 与 `tests/verify_task6fa_visual_prototype.py` 完整验证；Task 6D/6C/6B/5C/4C 全部回归通过）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：待提交并填入
-  * **未提交文件**：无（工作区干净，所有 Task 6F-A 可视化验收代码与文档已纳入）
+  * **最新 Commit SHA**：`82adeb8`
+  * **未提交文件**：无（工作区干净，所有 Task 6F-A 可视化验收代码与文档已完整提交）
 
 ---
 
