@@ -5,8 +5,8 @@
 * **任务状态**：已验证（经 `tests/verify_task6fd_whole_body_controller.py` 10 项测试完整验证；Task 6F-C/6F-B/6F-A/6D 全部回归通过）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：待提交 (Pending commit)
-  * **未提交文件**：Task 6F-D 源码、测试与必要文档更新
+  * **最新 Commit SHA**：`853cd06`
+  * **未提交文件**：无（工作区干净，所有 Task 6F-D 源码、测试与文档已完整提交）
 
 ---
 
