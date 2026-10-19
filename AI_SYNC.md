@@ -5,8 +5,8 @@
 * **任务状态**：已验证（经 `tests/verify_task6ga_body_kinematics.py` 10 项测试完整验证；Task 6F-D/6F-C/6F-B/6F-A/6D 全部回归通过）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：待提交（前序为 `5321da2`）
-  * **未提交文件**：Task 6G-A 源码、测试与文档准备提交
+  * **最新 Commit SHA**：`c55864c`
+  * **未提交文件**：无（工作区干净，所有 Task 6G-A 源码、测试与文档已完整提交）
 
 ---
 
