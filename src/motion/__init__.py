@@ -72,6 +72,14 @@ from src.motion.joint_limits import (
     normalize_angle_deg,
     normalize_angle_rad,
 )
+from src.motion.whole_body_controller import (
+    EndEffectorFeedback,
+    EndEffectorTarget,
+    UnmetConstraint,
+    WholeBodyControlResult,
+    WholeBodyControlTargets,
+    WholeBodyController,
+)
 
 
 def apply_motion(config: PipelineConfig, rig_obj=None):
@@ -140,5 +148,11 @@ __all__ = [
     "extract_evaluated_bone_rotation_rad",
     "normalize_angle_deg",
     "normalize_angle_rad",
+    "EndEffectorTarget",
+    "EndEffectorFeedback",
+    "UnmetConstraint",
+    "WholeBodyControlTargets",
+    "WholeBodyControlResult",
+    "WholeBodyController",
 ]
 

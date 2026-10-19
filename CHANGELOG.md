@@ -2,6 +2,41 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+
+## [2026-10-19] 任务 6F-D：统一全身控制接口与最小协调器
+
+### 新增 (Added)
+* **统一全身控制器与多末端协调器 (`src/motion/whole_body_controller.py`)**：
+  * 构建统一目标描述与反馈数据结构：
+    * `EndEffectorTarget`：末端执行器统一目标规格（目标 ID、世界空间 3D 坐标、世界空间 3D 欧拉朝向、肘/膝极向引导、激活开关、控制权重、接触锁定标志、达程限幅控制）。
+    * `WholeBodyControlTargets`：全身目标流式构建器，链式配置双臂（`set_hand`）、双脚（`set_foot`）、骨盆位姿（`set_pelvis`）、空间根节点（`set_root`）及躯干姿态（`set_trunk_posture`）。
+    * `UnmetConstraint`：未满足约束详细记录（类别 `REACHABILITY` / `ORIENTATION_ERROR` / `ROM_VIOLATION` / `ROM_CONFLICT`、目标名称、描述、量化误差值、额外上下文）。
+    * `EndEffectorFeedback`：各末端毫米级位置追踪误差（`position_error_m`）、度级朝向误差（`orientation_error_deg`）、达程距离、最大物理达程与可达性标志（`is_reachable`）。
+    * `WholeBodyControlResult`：单帧全身控制结果（综合成功标志、末端反馈字典、骨盆世界坐标、全身质心结果、ROM 校验结果、未满足约束列表及格式化摘要）。
+  * 核心全身控制器 `WholeBodyController`：
+    * 严格复用现有 19 骨骼层级与求解器（`arm_ik.py`、`ik.py`、`rigid_link.py`、`joint_limits.py`），零重建骨架、零重写 IK 算法。
+    * 统一调度空间根节点、骨盆起伏、躯干 FK 摆动、双腿 IK 与双手 IK。
+    * 真实可达性判定：基于请求目标与髋/肩关节距离真实评估物理达程，超出时准确记录 `REACHABILITY` 违规。
+    * 真实 ROM 截断与冲突报告：在 evaluated IK 链后调用 `JointModel.validate_armature_pose(use_evaluated_ik=True)` 校验全身 17 个解剖学关节；若存在超限则设置 `success = False`，零虚假成功上报。
+    * 实时同步计算全身质心（`compute_whole_body_com`）。
+* **自动化测试套件 (`tests/verify_task6fd_whole_body_controller.py`)**：
+  * 测试 1：双臂独立 IK 同时控制（左手误差 $0.041\text{ mm}$，右手误差 $0.020\text{ mm}$，朝向对齐误差 $0.000^\circ$）。
+  * 测试 2：双脚独立 IK 同时控制（左脚误差 $0.003\text{ mm}$，右脚悬空抬起误差 $0.029\text{ mm}$）。
+  * 测试 3：单帧四肢末端（hand_L, hand_R, foot_L, foot_R）同时控制，全末端误差 $< 0.05\text{ mm}$，ROM 0 违规。
+  * 测试 4：选择性禁用独立性测试（禁用左手自动回退至 FK 模式，完全不干扰右手与双脚跟踪）。
+  * 测试 5：骨盆下蹲（$Z=0.83\text{ m}$）与躯干倾斜下，末端世界空间绝对坐标目标稳定保持（误差 $< 0.03\text{ mm}$）。
+  * 测试 6：手部位置与 3D 朝向解耦测试（腕部位置固定，手部在生理 ROM 内变动 3 组朝向，腕部漂移 $< 0.04\text{ mm}$，朝向对齐误差 $0.000^\circ$）。
+  * 测试 7：控制器内部 ROM 校验与独立 `JointModel` 校验完全一致（故意过弯脊柱，两者量化超限量严格相等：$20.00^\circ$）。
+  * 测试 8：物理不可达目标与 ROM 冲突真实截获（远距不可达目标准确报告 `REACHABILITY` 与 `ROM_VIOLATION`，`success=False`，零虚假放行）。
+  * 测试 9：控制器内部全身质心与 `rigid_link` 模块直接计算严格吻合（数值差异严格为 $0.0000000000\text{ m}$）。
+  * 测试 10：继承 `MotionAction` 的 `WholeBodyDemoAction` 运行 8 帧，验证控制器与上层动作管线无缝接入。
+* **回归测试**：
+  * Task 6F-C 关节 ROM 测试、Task 6F-B 刚体连杆质心测试、Task 6F-A 双臂 IK 测试、Task 6D 冲刺急停测试均 100% 通过（退出码 0）。
+* **决策记录**：
+  * 录入 `[DEC-019]`。
+
+---
+
 ## [2026-10-19] 任务 6F-C：关节自由度（DOF）与生理活动范围（ROM）约束系统
 
 ### 新增 (Added)

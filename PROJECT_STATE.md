@@ -1,13 +1,27 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-19  
-> **当前阶段**：任务 6F-C（关节自由度与生理活动范围 ROM 约束系统完成）  
+> **当前阶段**：任务 6F-D（统一全身控制接口与最小协调器完成）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6F-D 统一全身控制接口与最小协调器 (`WholeBodyController`)**：
+  * 在 [`src/motion/whole_body_controller.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/whole_body_controller.py) 中实现多末端协调与统一接口，经由 [`tests/verify_task6fd_whole_body_controller.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6fd_whole_body_controller.py) 自动化测试套件（10 项严苛测试）完整验证。
+  * **实测关键指标**：
+    * **双臂独立控制**：左右手同时跟踪不同目标，位置误差分别为 $0.041\text{ mm}$ 与 $0.020\text{ mm}$，3D 朝向对齐误差严格为 **`0.000 deg`**。
+    * **双脚独立控制**：支撑脚接地误差 $0.003\text{ mm}$，空中摆动脚抬升误差 $0.029\text{ mm}$。
+    * **单帧四肢末端同时控制**：四肢（hand_L, hand_R, foot_L, foot_R）同时激活，各末端误差均 $< 0.05\text{ mm}$，全肢体处于物理达程内，ROM 0 违规。
+    * **选择性禁用独立性**：禁用左手（`enabled=False`）平滑回退至 FK 模式，完全不干扰右手与双脚（右手误差保持 $0.015\text{ mm}$）。
+    * **骨盆与基座协调不变性**：骨盆下蹲 $-0.06\text{ m}$（世界 $Z=0.8300\text{ m}$）并俯仰躯干，手脚世界绝对坐标目标精准保持（误差 $< 0.03\text{ mm}$）。
+    * **手部位置与 3D 朝向解耦**：腕部位置固定，手部在生理 ROM 内变动 3 组朝向，腕部漂移 $< 0.04\text{ mm}$，朝向对齐误差 $0.0000^\circ$。
+    * **ROM 校验一致性**：控制器内部 ROM 校验与独立 `JointModel` 校验完全一致（故意过弯脊柱，两者量化超限量严格相等：$20.00^\circ$）。
+    * **不可达与 ROM 冲突真实截获**：超出达程目标（$Y=-6.5\text{ m}$ 远超 $0.56\text{ m}$）真实报告 `REACHABILITY` 与 `ROM_VIOLATION`，`success = False`，杜绝虚假成功。
+    * **全身质心一致性**：控制器内部全身质心与 `rigid_link` 独立计算数值差异严格为 **`0.0000000000 m`**。
+    * **动作架构无缝接入**：`WholeBodyDemoAction(MotionAction)` 连续执行 8 帧，每帧生成合法 `MotionState` 并持久化 CoM 与追踪参数。
+    * **全量回归验证**：Task 6F-C 关节 ROM 测试、Task 6F-B 刚体连杆质心测试、Task 6F-A 双臂 IK 测试、Task 6D 冲刺制动急停测试均 100% 全绿通过（退出码 `0`）。
 * **任务 6F-C 关节自由度（DOF）与生理活动范围（ROM）约束系统**：
   * 在 [`src/motion/joint_limits.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/joint_limits.py) 中实现解耦式关节模型与非静默校验/截断系统，经由 [`tests/verify_task6fc_joint_limits.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6fc_joint_limits.py) 自动化测试套件完整验证。
   * **实测关键指标**：
@@ -35,6 +49,7 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证。
 
 ### [已实现]
+* 统一全身控制接口与最小协调器：`src/motion/whole_body_controller.py`、`tests/verify_task6fd_whole_body_controller.py`
 * 关节自由度与生理活动范围（ROM）约束系统：`src/motion/joint_limits.py`、`tests/verify_task6fc_joint_limits.py`
 * 刚体连杆分段、质量分布模型与全身质心计算：`src/motion/rigid_link.py`、`tests/verify_task6fb_rigid_link.py`
 * 双臂独立 IK 与世界空间控制：`src/rig/arm_ik.py`、`run_arm_ik_prototype.py`、`tests/verify_task6fa_arm_ik.py`、`tests/verify_task6fa_visual_prototype.py`、`output/character_arm_ik_prototype.blend`

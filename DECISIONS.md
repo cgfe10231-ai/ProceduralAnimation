@@ -225,3 +225,32 @@
   - 骨骼几何长度 100% 保持恒定（0 变形拉伸）；
   - 为未来 Whole-Body Controller、全身动力学协调及跑跳攀爬动作提供了坚固的生理安全截断防护底座。
 
+---
+
+### [DEC-019] 统一全身控制接口与最小协调器架构 (Task 6F-D)
+* **状态**：已采纳并实测验证 (Accepted & Verified)
+* **日期**：2026-10-19
+* **背景**：在 Task 6A~6D（行走、奔跑、冲刺、急停）和 Task 6F-A~6F-C（双臂 IK、质量分布/CoM、关节 ROM）完成后，动作生成中存在各部位控制逻辑分散的问题（腿部 IK、手部 IK、躯干 FK、骨盆起伏、质心计算、ROM 校验等散落在不同模块）。需要一个统一的全身控制接口（`WholeBodyController`），对四肢末端执行器、躯干、骨盆及空间根节点进行单帧集中调度，并提供可量化的追踪误差反馈与真实现实约束评估。
+* **决策**：
+  1. **层级定位与非颠覆性原则**：
+     - `WholeBodyController` 定位为身体姿态与多末端协调层，直接服务于 `MotionAction`，而非取代上层的 `MotionPlanner`。
+     - 严格复用现有 19 骨骼角色结构与现有求解器（`arm_ik.py`、`ik.py`、`rigid_link.py`、`joint_limits.py`），严禁构建第二套骨骼或第二套 IK 数学。
+  2. **统一目标描述与流式构建**：
+     - 引入 `EndEffectorTarget` 与 `WholeBodyControlTargets`，支持通过链式调用指定：
+       * 双手世界空间位置与独立 3D 欧拉朝向目标（含肘部极向指引与达程限幅开关）；
+       * 双脚世界空间位置目标与接触锁定标志（`is_locked`，自动同步地面接触防滑逻辑）；
+       * 根节点世界位置与航向角（`root_yaw_deg`）；
+       * 骨盆基座高度起伏与三维倾斜；
+       * 躯干脊椎、颈部与头部的 FK 生理姿态；
+       * 单末端独立启用/禁用（`enabled=False` 自动回退至 FK 模式，完全不影响其余活动肢体）。
+  3. **真实反馈与零虚假成功报告**：
+     - 返回结构化的 `WholeBodyControlResult`，提供各末端毫米级位置误差（`position_error_m`）与度级朝向误差（`orientation_error_deg`）；
+     - 真实计算达程可达性（`req_dist <= max_reach`），超出物理达程时明确上报 `REACHABILITY` 违规；
+     - 在活动 IK 链评估后，主动调用 `JointModel.validate_armature_pose(use_evaluated_ik=True)` 校验全身 17 个解剖学关节；若存在超限则上报 `ROM_VIOLATION`，且 `result.success` 严格置为 `False`，绝不静默放行；
+     - 实时同步计算全身质心（`compute_whole_body_com`），向 `MotionState` 注入统一 CoM 物理遥测参数。
+  4. **无缝动作接入（Subclassed MotionAction Integration）**：
+     - 在验证套件中构建 `WholeBodyDemoAction(MotionAction)`，证明 `WholeBodyController` 能够无缝嵌入标准动画管线，每帧计算并持久化连续 `MotionState`，与 Task 5C/6A~6D 的架构完全一致。
+* **影响**：
+  - 角色具备了“四肢末端 + 浮动骨盆 + 躯干姿态 + 全身 CoM + 生理 ROM”集中原子化控制的能力；
+  - 10 项严苛验证全绿通过：双臂与双脚毫米级精准贴合（误差 $< 0.05\text{ mm}$），手部朝向误差 $0.0000^\circ$，超限目标与 ROM 冲突 100% 真实截获，CoM 数值与物理分段模型严格吻合；
+  - 为未来支撑多边形平衡计算、跑酷翻越接触控制及复杂全身特技动作奠定了坚实的高阶控制架构。
