@@ -93,6 +93,18 @@ from src.motion.body_kinematics import (
     sample_body_pose_from_controller_result,
     sample_body_pose_snapshot,
 )
+from src.motion.body_inertia import (
+    BodyInertiaModel,
+    DEFAULT_13_SEGMENT_INERTIA_MODEL,
+    DEFAULT_15_SEGMENT_INERTIA_MODEL,
+    InertiaTensor,
+    SegmentGeometrySpec,
+    SegmentInertiaState,
+    WholeBodyInertiaState,
+    compute_whole_body_inertia,
+    compute_whole_body_inertia_from_snapshots,
+    enrich_motion_state_with_inertia,
+)
 
 
 def apply_motion(config: PipelineConfig, rig_obj=None):
@@ -178,5 +190,15 @@ __all__ = [
     "relative_angular_velocity",
     "relative_rotation_vector",
     "enrich_motion_state_with_kinematics",
+    "InertiaTensor",
+    "SegmentGeometrySpec",
+    "BodyInertiaModel",
+    "DEFAULT_15_SEGMENT_INERTIA_MODEL",
+    "DEFAULT_13_SEGMENT_INERTIA_MODEL",
+    "SegmentInertiaState",
+    "WholeBodyInertiaState",
+    "compute_whole_body_inertia",
+    "compute_whole_body_inertia_from_snapshots",
+    "enrich_motion_state_with_inertia",
 ]
 

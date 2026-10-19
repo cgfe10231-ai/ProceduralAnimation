@@ -279,3 +279,36 @@
   - 角色运动系统具备了完整的空间一阶与二阶微分运动学感知能力（根节点、骨盆、全身质心、15 个刚体连杆、17 个解剖关节及 4 个末端执行器）；
   - 10 项严苛验证全部通过：静止 0 速度、匀速直线平移误差为 0、恒定定轴旋转误差 $< 3 \times 10^{-8}\text{ rad/s}$、任意 3D 复合旋转误差 $< 2 \times 10^{-6}\text{ rad/s}$、单侧肢体运动严格隔离无串扰、SprintStart 到 SprintBrake 动作交界处速度严格平滑连续；
   - 为未来接触动量交换、惯性张量与极速动态平衡动作奠定了坚实无奇点的运动学基石。
+
+---
+
+### [DEC-021] 刚体连杆分段惯性张量与多连杆全身角动量模型架构规范 (Task 6G-B)
+* **状态**：已采纳并实测验证 (Accepted & Verified)
+* **日期**：2026-10-20
+* **背景**：在完成多刚体质量分布模型、全身质心计算（Task 6F-B）与连续微分运动学状态（Task 6G-A）后，系统需要进一步获取人体当前姿态的惯性分布特性（惯性张量）与多连杆动态角动量，为后续腾空姿态调整、支撑接触动量交换及倒立摆/动态平衡补偿奠定模型基础。严禁将多刚体系统简化为单刚体“$I_{\text{body}} \boldsymbol{\omega}$”，必须严格遵循多刚体动力学中的自转（Spin）与轨道（Orbital）角动量解耦求和法则。
+* **决策**：
+  1. **分段局部惯性张量与几何近似**：
+     - 在 [`src/motion/body_inertia.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/body_inertia.py) 中引入 `InertiaTensor` 与 `SegmentGeometrySpec`。
+     - 严格复用现有 15 分段模型（`DEMPSTER_WINTER_15_SEGMENT_MODEL`）与 13 分段模型（`DEMPSTER_13_SEGMENT_MODEL`）。
+     - 各分段局部惯性张量均相对于分段自身质心，在骨骼局部坐标系（+Y 为纵向主轴）中定义，几何近似包含椭球体（头）、椭圆柱体（躯干、骨盆）、圆柱体（上臂、前臂、大腿、小腿）及长方体（手、脚）。
+     - 保证局部惯性张量数学上严格对称且正定（主转动惯量与特征值严格 $> 0$）。
+  2. **平行轴定理与全身质心参考点统一**：
+     - 世界坐标系下各分段相对自身质心的惯性张量为 $\mathbf{I}_{i, \text{world}}^{\text{CoM}_i} = \mathbf{R}_i \mathbf{I}_{i, \text{local}} \mathbf{R}_i^T$（$\mathbf{R}_i \in SO(3)$ 为局部到世界的纯旋转矩阵）。
+     - 依据 3D 平行轴定理（Steiner's Theorem），各分段相对于全身统一 CoM 的惯性张量为：
+       $$\mathbf{I}_{i, \text{world}}^{\text{CoM}} = \mathbf{I}_{i, \text{world}}^{\text{CoM}_i} + m_i \left( \|\mathbf{r}_i\|^2 \mathbf{E}_3 - \mathbf{r}_i \mathbf{r}_i^T \right)$$
+       其中 $\mathbf{r}_i = \mathbf{c}_{i, \text{world}} - \mathbf{c}_{\text{world}}$ 为分段质心相对于全身 CoM 的位移矢量。
+     - 求和得到全身惯性张量：$\mathbf{I}_{\text{body}}^{\text{CoM}} = \sum_{i=1}^N \mathbf{I}_{i, \text{world}}^{\text{CoM}}$。
+     - 严格验证整体平移不变性（Frobenius 误差 $< 10^{-5}\text{ kg}\cdot\text{m}^2$）与刚体旋转张量变换协变性（$\mathbf{Q} \mathbf{I} \mathbf{Q}^T$ 误差 $< 10^{-5}\text{ kg}\cdot\text{m}^2$）。
+  3. **多连杆全身角动量严格物理分解**：
+     - 针对任意姿态与运动状态，全身角动量相对于全身 CoM 严格按两项求和：
+       $$\mathbf{H}_{\text{CoM}} = \sum_{i=1}^N \left( \mathbf{H}_{i, \text{spin}} + \mathbf{H}_{i, \text{orbital}} \right) = \sum_{i=1}^N \left( \mathbf{I}_{i, \text{world}}^{\text{CoM}_i} \boldsymbol{\omega}_{i, \text{world}} + \mathbf{r}_i \times (m_i \mathbf{v}_{i, \text{world}}) \right)$$
+     - 严密证明并实测：当多连杆系统整体以统一角速度 $\boldsymbol{\omega}$ 发生刚体旋转时，计算所得多连杆角动量 $\mathbf{H}_{\text{CoM}}$ 与单刚体解析公式 $\mathbf{I}_{\text{body}}^{\text{CoM}} \boldsymbol{\omega}$ 完全一致（绝对误差 $< 1.1 \times 10^{-6}\text{ kg}\cdot\text{m}^2/\text{s}$，相对误差 $< 10^{-7}$）。
+     - 四肢独立摆动时，精确量化局部自转项与肢体摆动轨道项的各自贡献，杜绝单刚体粗暴替代。
+  4. **姿态灵敏性与无侵入无损接入**：
+     - 实测四肢收束（Tucked）与伸展（T-Pose）下的转动惯量差异达 $2.540$ 倍（$0.946 \rightarrow 2.403\text{ kg}\cdot\text{m}^2$），单臂侧平举即引起 $I_{zz}$ 增加 $+0.654\text{ kg}\cdot\text{m}^2$ 及显著惯性积 $I_{xy}$，物理响应灵敏真实。
+     - 提供 `enrich_motion_state_with_inertia` 将惯性张量与角动量无缝注入 `MotionState.params`，100% 保持现有动作系统零破坏。
+* **影响**：
+  - 角色运动学与惯性系统补齐了刚体惯性张量与全连杆角动量关键一环；
+  - 13 项严苛自动化验证全部通过，所有分段局部张量对称正定、解析几何公式完全匹配、平移旋转协变性精准、静止角动量严格为 0、四肢运动物理分解清晰、历史回归全绿；
+  - 为未来支撑多边形与动态平衡补偿（Task 6G-C/Task 7）提供了坚实可靠的多刚体惯性物理底座。
+

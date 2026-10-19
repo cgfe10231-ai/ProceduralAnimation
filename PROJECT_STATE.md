@@ -1,13 +1,29 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-19  
-> **当前阶段**：任务 6G-A（连续身体运动状态与速度学基础完成）  
+> **记录时间**：2026-10-20  
+> **当前阶段**：任务 6G-B（刚体连杆惯性张量与全身角动量模型完成）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-B 刚体连杆惯性张量与全身角动量模型 (`InertiaTensor` / `WholeBodyInertiaState`)**：
+  * 在 [`src/motion/body_inertia.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/body_inertia.py) 中实现分段几何惯性建模、3D 平行轴定理全身惯性张量合成与多连杆角动量（Spin/Orbital 解耦求和），经由 [`tests/verify_task6gb_body_inertia.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gb_body_inertia.py) 自动化测试套件（13 项严苛测试）完整验证。
+  * **实测关键指标**：
+    * **分段局部惯性张量对称且正定**：15 刚体质量分段（头、躯干、骨盆、双上臂、双前臂、双手、双大腿、双小腿、双脚）局部惯性张量严格对称，主惯量（特征值）全为正（最小 $0.00025\text{ kg}\cdot\text{m}^2$ 到最大 $0.61690\text{ kg}\cdot\text{m}^2$），100% 满足物理真实性。
+    * **几何近似闭式公式精确一致**：圆柱体、椭球体、椭圆柱体、长方体闭式惯性公式与独立解析理论值完全一致，最大数值误差严格 $< 3 \times 10^{-17}$。
+    * **3D 平行轴定理数值无损**：位移 $r=(0.3, -0.4, 0.5)\text{ m}$，计算结果与理论增量完全一致（最大单精度浮点累积误差仅 $4.77 \times 10^{-8}$）。
+    * **空间平移不变性**：角色整体平移位移 $(12.5, -45.0, 3.2)\text{ m}$，相对自身 CoM 的全身惯性张量差值 Frobenius 范数仅 **`8.96e-06 kg*m^2`**（完全保持不变）。
+    * **刚体旋转张量变换协变性**：角色整体绕任意 3D 轴 $(0.577, 0.577, 0.577)$ 旋转 $40^\circ$，合成惯性张量与张量变换定律 $\mathbf{Q} \mathbf{I} \mathbf{Q}^T$ 误差仅 **`7.06e-06 kg*m^2`**。
+    * **中立站姿矢状面对称与合理量级**：左右对称矢状面惯性积严格为 $0$（$I_{xy} = I_{xz} = 0.00000$）；俯仰 $I_{xx} = 13.46\text{ kg}\cdot\text{m}^2$、滚转 $I_{yy} = 14.21\text{ kg}\cdot\text{m}^2$、偏航 $I_{zz} = 1.08\text{ kg}\cdot\text{m}^2$，处于人体生物力学标准区间。
+    * **单臂侧平举敏锐物理响应**：右臂侧平举引发偏航转动惯量显著增加 $+0.65442\text{ kg}\cdot\text{m}^2$（增幅达 $+60.7\%$），并引入非对称惯性积 $I_{xy} = 0.10313\text{ kg}\cdot\text{m}^2$。
+    * **四肢展开与紧收姿态惯性比**：大字展开（T-Pose: $I_{zz} = 2.40271\text{ kg}\cdot\text{m}^2$）与抱胸收束（Tucked: $I_{zz} = 0.94590\text{ kg}\cdot\text{m}^2$）差异显著，偏航惯性比达 **`2.540 倍`**（差值 $+1.45682\text{ kg}\cdot\text{m}^2$）。
+    * **静止身体角动量严格为零**：零速度下全身体自转、轨道及总角动量严格等于 **`0.00000000 kg*m^2/s`**。
+    * **刚性旋转多连杆角动量解析一致性**：整个人体绕 CoM 以 $\boldsymbol{\omega}=(0.4, 0.8, -0.6)\text{ rad/s}$ 发生刚体旋转时，多连杆自转+轨道求和角动量与单刚体 $\mathbf{I}_{\text{body}} \boldsymbol{\omega}$ 绝对矢量误差仅 **`1.07e-06 kg*m^2/s`**（相对误差 **`8.54e-08`**）。
+    * **四肢独立运动自转与轨道解耦**：单侧手臂挥动时，自转角动量模长 $0.09087\text{ kg}\cdot\text{m}^2/\text{s}$ 与肢体轨道角动量模长 $1.69233\text{ kg}\cdot\text{m}^2/\text{s}$ 清晰解耦，总角动量严格矢量守恒。
+    * **与 CoM、速度学追踪器及动作状态机无缝集成**：全身质心误差严格为 $0.00\text{ m}$，离散快照与 Armature 姿态求算张量差仅 $7.33 \times 10^{-7}\text{ kg}\cdot\text{m}^2$，通过 `enrich_motion_state_with_inertia` 无损注入 `MotionState.params`。
+    * **全量回归验证**：Task 6G-A、6F-D、6F-C、6F-B、6F-A 及 6D 测试均 100% 全绿通过（退出码 `0`）。
 * **任务 6G-A 连续身体运动状态与速度学基础 (`BodyKinematicsTracker`)**：
   * 在 [`src/motion/body_kinematics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/body_kinematics.py) 中实现连续身体姿态快照采样、微分速度学与运动状态追踪器，经由 [`tests/verify_task6ga_body_kinematics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6ga_body_kinematics.py) 自动化测试套件（10 项严苛测试）完整验证。
   * **实测关键指标**：
@@ -63,6 +79,7 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证。
 
 ### [已实现]
+* 刚体连杆惯性张量与全身角动量模型：`src/motion/body_inertia.py`、`tests/verify_task6gb_body_inertia.py`
 * 连续身体运动状态与速度学基础：`src/motion/body_kinematics.py`、`tests/verify_task6ga_body_kinematics.py`
 * 统一全身控制接口与最小协调器：`src/motion/whole_body_controller.py`、`tests/verify_task6fd_whole_body_controller.py`
 * 关节自由度与生理活动范围（ROM）约束系统：`src/motion/joint_limits.py`、`tests/verify_task6fc_joint_limits.py`

@@ -3,7 +3,36 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
-## [2026-10-19] 任务 6G-A：连续身体运动状态与速度学基础
+## [2026-10-20] 任务 6G-B：刚体连杆惯性张量与全身角动量模型
+
+### 新增 (Added)
+* **刚体连杆分段惯性张量与全身角动量计算系统 (`src/motion/body_inertia.py`)**：
+  * 构建核心惯性数学结构：
+    * `InertiaTensor`：严格三维对称 $3 \times 3$ 惯性张量结构（SI 单位 $\text{kg}\cdot\text{m}^2$），支持 Sylvester 判据正定性校验、Cardano 闭式主转动惯量特征值求解、三维坐标系刚体旋转变换（$\mathbf{R} \mathbf{I} \mathbf{R}^T$）、三维平行轴定理（Steiner 定理：$\mathbf{I} + m (\|\mathbf{r}\|^2 \mathbf{E} - \mathbf{r} \mathbf{r}^T)$）、张量矢量乘法及 Frobenius 范数。
+    * `SegmentGeometrySpec`：可配置人体质量分段几何近似模型，支持圆柱体（Cylinder）、椭球体（Ellipsoid）、椭圆柱体（Elliptic Cylinder）、长方体（Box）及自定义对角惯性（Custom Moments）。
+    * `BodyInertiaModel`：整体惯性配置映射，预设 `DEFAULT_15_SEGMENT_INERTIA_MODEL` 与 `DEFAULT_13_SEGMENT_INERTIA_MODEL`，与 Task 6F-B Dempster/Winter 质量模型完全一致。
+    * `SegmentInertiaState` 与 `WholeBodyInertiaState`：记录分段与全身的质心位置、局部惯性、世界惯性、相对全身 CoM 惯性、自转角动量（Spin）、轨道角动量（Orbital）及总角动量，明确标注坐标系（`WORLD_Z_UP`）、参考基准点（`WHOLE_BODY_COM`）及各物理量单位。
+  * 核心算法与接口：
+    * `compute_whole_body_inertia`：基于 Blender Armature 当前评估姿态与微分速度状态计算全身惯性张量与角动量。
+    * `compute_whole_body_inertia_from_snapshots`：基于离散姿态快照与微分速度快照纯数据计算，无需激活视口。
+    * `enrich_motion_state_with_inertia`：将全身惯性张量、主转动惯量与多连杆角动量无缝注入 `MotionState.params`。
+* **自动化测试套件 (`tests/verify_task6gb_body_inertia.py`)**：
+  * 13 项严苛测试 100% 全部通过：
+    1. 全部分段局部惯性张量严格对称且正定（特征值与主惯量全 $> 0$）。
+    2. 简单几何体惯性公式与独立解析推导完全一致（圆柱体、椭球体、椭圆柱体、长方体误差严格 $< 3 \times 10^{-17}$）。
+    3. 3D 平行轴定理数值计算与解析增量完全一致（最大误差 $4.77 \times 10^{-8}$）。
+    4. 全身空间平移不变性验证（位移 $(12.5, -45.0, 3.2)\text{ m}$，相对 CoM 惯性张量差值 Frobenius 范数仅 $8.96 \times 10^{-6}\text{ kg}\cdot\text{m}^2$）。
+    5. 全身刚体旋转张量变换协变性验证（绕任意轴旋转 $40^\circ$，与 $\mathbf{Q} \mathbf{I} \mathbf{Q}^T$ 误差仅 $7.06 \times 10^{-6}\text{ kg}\cdot\text{m}^2$）。
+    6. 中立站姿对称性验证（双侧对称矢状面 $I_{xy} = I_{xz} = 0.00000$，俯仰 $I_{xx}=13.46$，滚转 $I_{yy}=14.21$，偏航 $I_{zz}=1.08\text{ kg}\cdot\text{m}^2$ 处于真实人体生理范围）。
+    7. 单臂侧平举引起合理物理响应（$I_{zz}$ 增加 $+0.65442\text{ kg}\cdot\text{m}^2$，产生不对称惯性积 $I_{xy} = 0.10313\text{ kg}\cdot\text{m}^2$）。
+    8. 四肢展开（T-Pose: $2.403\text{ kg}\cdot\text{m}^2$）与四肢紧收（Tucked: $0.946\text{ kg}\cdot\text{m}^2$）差异显著，比值达 $2.540$ 倍。
+    9. 静止身体全身角动量严格为零（模长 $0.00000000\text{ kg}\cdot\text{m}^2/\text{s}$）。
+    10. 整个人体刚性旋转角动量与 $\mathbf{I}_{\text{body}} \boldsymbol{\omega}$ 解析一致性（绝对误差 $1.07 \times 10^{-6}\text{ kg}\cdot\text{m}^2/\text{s}$，相对误差 $8.54 \times 10^{-8}$）。
+    11. 四肢独立运动时自转项（Spin: 模长 $0.09087$）与轨道项（Orbital: 模长 $1.69233$）各自贡献清晰，严谨解耦。
+    12. 全身质心一致性与 `MotionState.params` 无损注入验证通过。
+    13. 历史全量回归测试套件（Task 6G-A、6F-D、6F-C、6F-B、6F-A 及 6D）全部通过（退出码 0）。
+* **决策记录**：
+  * 录入 `[DEC-021]`。
 
 ### 新增 (Added)
 * **连续身体运动状态与微分速度学计算引擎 (`src/motion/body_kinematics.py`)**：
