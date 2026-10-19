@@ -5,13 +5,8 @@
 * **任务状态**：已验证（经 `tests/verify_task6fb_rigid_link.py` 完整验证；Task 6F-A/6D 全部回归通过）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：待提交（自动收尾提交即将执行）
-  * **待提交文件**：
-    * `src/motion/rigid_link.py`（刚体连杆分段、质量分布模型与全身质心计算核心实现）
-    * `src/motion/__init__.py`（导出 rigid_link 相关符号）
-    * `tests/verify_task6fb_rigid_link.py`（Task 6F-B 完整自动化验证套件）
-    * `DECISIONS.md`（录入 `[DEC-017]`）
-    * `PROJECT_STATE.md`、`CHANGELOG.md`、`HANDOFF.md`、`AI_SYNC.md`（同步更新状态、变更历史与交接卡片）
+  * **最新 Commit SHA**：`d62ea47`
+  * **未提交文件**：无（工作区干净，所有 Task 6F-B 源码、测试与文档已完整提交）
 
 ---
 
