@@ -2,6 +2,33 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+## [2026-10-19] 任务 6F-B：刚体连杆、质量分布与全身质心（CoM）计算
+
+### 新增 (Added)
+* **刚体连杆分段与解耦式人体质量模型 (`src/motion/rigid_link.py`)**：
+  * 构建轻量级不可变数据结构：`RigidSegmentSpec`（分段 ID、关联骨骼名、质量比、标称长度、质心局部比例分数、局部偏移三维向量）、`BodyMassDistribution`（多连杆质量分布与质量守恒自动校验 $\sum w_i = 1.0$）、`SegmentCoMResult`（局部/骨架/世界各空间评估质心）与 `WholeBodyCoMResult`（全身加权质心与分段明细）。
+  * 内置标准解剖学生物力学质量分布：
+    * `DEMPSTER_WINTER_15_SEGMENT_MODEL`：基于 Winter (2009) / Dempster (1955) 标准 15 分段模型（Head 0.081, Torso 0.355, Pelvis 0.142, Bilateral UpperArm 2x0.028, Forearm 2x0.016, Hand 2x0.006, Thigh 2x0.100, Shank 2x0.0465, Foot 2x0.0145，总和严格为 1.0000）。
+    * `DEMPSTER_13_SEGMENT_MODEL`：针对 13 块占位几何网格合并前臂与手部（LowerArm 0.022）的 13 分段模型。
+  * 提供 `with_total_mass()`、`with_overrides()` 与 `create_custom_mass_distribution()` 接口，支持任意整体质量重缩放（如 85kg）与局部比重重定义。
+* **全身与分段质心前向运动学多空间计算器 (`compute_whole_body_com`)**：
+  * 基于 evaluated `pose_bone.matrix` 读取骨骼在 Armature 空间的位置，通过局部标称质心比例与偏移计算骨架空间质心，再经由 `armature_obj.matrix_world` 无缝映射至世界空间。
+  * 坐标空间严格无二次变换（Zero Double-Transform）：严禁对已父级绑定到 `CharacterRoot` 的 Armature 再次应用根节点变换，经根节点平移测试验证 Armature 内部质心坐标 100% 保持不变（差值 $0.000000\text{ m}$）。
+  * 零破坏非侵入式：只读读取 evaluated 位姿，零修改、零关键帧插入，与现有 FK、腿部 IK 及双臂 IK 100% 兼容。
+* **自动化测试套件 (`tests/verify_task6fb_rigid_link.py`)**：
+  * 测试 1：质量守恒与合法性（15 分段与 13 分段比例总和严格为 $1.000000$，单段质量比及长度严格大于 0）。
+  * 测试 2：自定义总质量缩放（85.0kg 实测总和 $85.0000\text{ kg}$）与自定义比重重归一化。
+  * 测试 3：中立站姿静态质心基准（世界坐标 $X=0.000000\text{ m}, Y=-7.997891\text{ m}, Z=1.047881\text{ m}$，质心高度比 $57.58\%$，完全落在解剖学基准 $55\% \sim 58\%$ 区间）。
+  * 测试 4：独立数值验算（API 计算全身质心与独立分段质心加权求和完全一致，数值差异严格为 $0.0000000000\text{ m}$）。
+  * 测试 5：单臂前平举（$+90^\circ$）质心前移 $\Delta Y=+13.915\text{ mm}$、上抬 $\Delta Z=+13.915\text{ mm}$；单臂侧平举质心外展 $\Delta X=-13.915\text{ mm}$、上抬 $\Delta Z=+13.915\text{ mm}$。
+  * 测试 6：双臂不对称位姿质心计算与位姿复原不产生任何质心漂移（漂移 $0.0000000000\text{ m}$）。
+  * 测试 7：腿部 IK 抬腿（$0.20\text{ m}$）与双臂 IK 独立抓取姿态下质心正确响应（$\Delta Z=+29.07\text{ mm}$），骨骼变换矩阵零干扰。
+  * 测试 8：骨盆下蹲（$-80\text{ mm}$）质心下降 $\Delta Z = -80.00\text{ mm}$；根节点平移 $(+2.5, +5.0, +0.3)\text{ m}$ 世界空间质心严格平移对应矢量，Armature 空间质心严格不变。
+* **回归测试**：
+  * Task 6F-A 双臂 IK 测试、Task 6D 冲刺制动急停测试均 100% 通过（退出码 0）。
+* **决策记录**：
+  * 录入 `[DEC-017]`。
+
 ---
 
 ## [2026-10-19] 任务 6F-A：双臂独立 IK 与世界空间控制

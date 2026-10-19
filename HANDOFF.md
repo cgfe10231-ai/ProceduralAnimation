@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成任务 6F-A（双臂独立 IK 与世界空间控制），等待用户指示开启 Task 6F-B（刚体连杆动力学、质心 CoM 与关节 ROM 限位系统）。
+完成任务 6F-B（刚体连杆、质量分布与全身质心计算），等待用户指示开启 Task 6F-C（各关节生理活动范围 ROM 限位保护与姿态平衡恢复辅助机制）。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -15,28 +15,29 @@
 * 实现爆发式起步与冲刺加速 `SprintStartAction`（Task 6C）。
 * 实现主动制动与急停 `SprintBrakeAction`（Task 6D）。
 * 完成刚体连杆人体运动控制源码全面审计与最小架构设计（Task 6E）。
-* 完成双臂独立 IK 与手部三维世界朝向控制系统（Task 6F-A）：
-  * `src/rig/arm_ik.py`：双臂两骨骼 IK、肘部极向控制、手部独立 3D 世界朝向控制、达程球面保护、FK 零侵入兼容。
-  * `run_arm_ik_prototype.py`：生成独立交互式验收原型 `output/character_arm_ik_prototype.blend`（216 帧，带 4 彩色标记与专属机位）。
-  * `tests/verify_task6fa_arm_ik.py`、`tests/verify_task6fa_visual_prototype.py`：自动化验证套件。
-  * 录入 `[DEC-016]`。
+* 完成双臂独立 IK 与手部三维世界朝向控制系统（Task 6F-A）。
+* 完成刚体连杆分段、质量分布模型与全身质心（CoM）计算（Task 6F-B）：
+  * `src/motion/rigid_link.py`：`RigidSegmentSpec`、`BodyMassDistribution`、`compute_whole_body_com`。
+  * 内置 Winter (2009) / Dempster (1955) 标准 15 分段模型与 13 几何分段合并模型，支持自定义质量重缩放与比例覆盖。
+  * 前向运动学多坐标系计算（局部/骨架/世界），严格杜绝根节点二次变换（Zero Double-Transform）。
+  * `tests/verify_task6fb_rigid_link.py`：自动化验证套件（8 项核心检验全数通过）。
+  * 录入 `[DEC-017]`。
 
 ## 3. 已验证
-* 双臂到达精度：左右手各 5 处可达空间目标位置误差均 $\le 0.051\text{ mm}$（规格 $\le 1\text{ mm}$）。
-* 骨骼连杆长度：上臂严格为 $0.3000\text{ m}$、前臂严格为 $0.2600\text{ m}$，零异常伸缩。
-* 双侧独立性：双臂同时指定不同目标零冲突，对侧腕部漂移严格为 **`0.00000000 m`**。
-* 手部朝向解耦：手部 3D 朝向对齐误差 **`0.0000^\circ`**，腕部伴生漂移 $\le 0.025\text{ mm}$。
-* 肘部极向偏转：极向引导肘部偏转位移达 **`19.31 cm`**，腕部零漂移（$\le 0.005\text{ mm}$）。
-* 超达程保护：超限时安全投影至 0.5600m，骨骼零拉长。
-* 可视化验收原型：`output/character_arm_ik_prototype.blend` 直接重开验证通过，时间轴 1..216 帧，5 阶段动作流畅，0 关节翻转。
-* 现有能力回归：Task 6D、Task 6C、Task 6B、Task 5C、Task 4C 自动化测试全绿通过。
+* 质量守恒与合法性：15 分段与 13 分段模型质量比严格归一为 $1.000000$。
+* 静态中立立姿质心高度：$Z = 1.047881\text{ m}$，占全身高 $1.82\text{ m}$ 的 $57.58\%$（解剖学黄金区间 $55\% \sim 58\%$），横向绝对对称误差严格为 $0.000000\text{ m}$。
+* 独立数值验算精度：API 与独立分段加权和差异严格为 $0.0000000000\text{ m}$。
+* 动态姿态敏感性：单臂前平举（$+90^\circ$）质心前移 $\Delta Y = +13.915\text{ mm}$、上抬 $\Delta Z = +13.915\text{ mm}$；单臂侧平举质心外展 $\Delta X = -13.915\text{ mm}$、上抬 $\Delta Z = +13.915\text{ mm}$。双臂不对称回归复原漂移严格为 $0.0000000000\text{ m}$。
+* 主动 IK 兼容性：抬腿与双侧伸手姿态下质心正确响应（$\Delta Z = +29.07\text{ mm}$），骨骼变换矩阵零干扰。
+* 零二次变换保证：骨盆下蹲 $-80\text{ mm}$ 全身质心实测下降 $-80.00\text{ mm}$；根节点平移 $(+2.5, +5.0, +0.3)\text{ m}$ 世界空间质心精确平移对应矢量，Armature 局部空间质心坐标完全不变（差异严格为 $0.0000000000\text{ m}$）。
+* 现有能力回归：Task 6F-A 双臂 IK 测试、Task 6D 冲刺制动急停测试均 100% 全绿通过。
 
 ## 4. 当前文件
 * 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`
 * 规范与状态文档：`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md`、`PROJECT_STATE.md`、`CHANGELOG.md`、`README.md`
 * 核心源码：`src/`（`config.py`、`pipeline.py`、`scene/`、`camera/`、`lighting/`、`render/`、`validation/`、`character/`、`rig/`、`motion/`）
 * 管线入口：`run_sprint_brake_prototype.py`、`run_sprint_prototype.py`、`run_pipeline.py`、`run_pipeline.ps1`
-* 测试套件：`tests/`（`verify_task6fa_arm_ik.py`、`verify_task6d_sprint_brake.py` 等）
+* 测试套件：`tests/`（`verify_task6fb_rigid_link.py`、`verify_task6fa_arm_ik.py`、`verify_task6d_sprint_brake.py` 等）
 * 运行产物：`output/`（受 `.gitignore` 忽略）
 
 ## 5. 已知问题
@@ -44,7 +45,7 @@
 * 终点附近场景存在圆柱体块，当前原型聚焦于平地动力学，未接入几何避障。
 
 ## 6. 下一步
-* 等待用户指示开启 Task 6F-B（刚体连杆动力学、质心 CoM 与关节 ROM 限位系统）。
+* 等待用户指示开启 Task 6F-C（各关节生理活动范围 ROM 限位保护与姿态平衡恢复辅助机制）。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。

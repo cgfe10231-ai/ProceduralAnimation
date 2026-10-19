@@ -45,6 +45,17 @@ from src.motion.start_stop_walk import (
     generate_start_stop_walk,
 )
 from src.motion.walk_cycle import compute_swing_trajectory, generate_walk_cycle
+from src.motion.rigid_link import (
+    BodyMassDistribution,
+    DEFAULT_HUMAN_TOTAL_MASS_KG,
+    DEMPSTER_13_SEGMENT_MODEL,
+    DEMPSTER_WINTER_15_SEGMENT_MODEL,
+    RigidSegmentSpec,
+    SegmentCoMResult,
+    WholeBodyCoMResult,
+    compute_whole_body_com,
+    create_custom_mass_distribution,
+)
 
 
 def apply_motion(config: PipelineConfig, rig_obj=None):
@@ -90,4 +101,14 @@ __all__ = [
     "right_unit_vector_from_yaw",
     "world_to_root_local_vector",
     "root_local_to_world_vector",
+    "RigidSegmentSpec",
+    "BodyMassDistribution",
+    "SegmentCoMResult",
+    "WholeBodyCoMResult",
+    "DEFAULT_HUMAN_TOTAL_MASS_KG",
+    "DEMPSTER_WINTER_15_SEGMENT_MODEL",
+    "DEMPSTER_13_SEGMENT_MODEL",
+    "compute_whole_body_com",
+    "create_custom_mass_distribution",
 ]
+

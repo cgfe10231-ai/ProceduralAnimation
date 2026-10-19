@@ -184,3 +184,23 @@
   4. **零侵入向后兼容**：所有约束初始化权重默认设为 `influence = 0.0`。在纯 FK 动作中，双臂与双手 100% 继承父级摆臂，现有所有历史动作测试 100% 全绿通过。
 * **影响**：双手获得了独立于身体基座的世界空间位置、朝向和肘部极向控制能力，位置误差 $< 0.05\text{ mm}$，为后续攀爬、撑越、伏地动作打下稳定基石。
 
+---
+
+### [DEC-017] 刚体连杆分段与解耦式全身质心（CoM）计算架构 (Task 6F-B)
+* **状态**：已采纳并实测验证 (Accepted & Verified)
+* **日期**：2026-10-19
+* **背景**：为了在后续高动态特技动作（如跑跳、空中平衡、落地缓冲、接触抗倾覆）中实现基于物理原理的姿态协调和自适应重心平衡，角色需要具备实时准确计算全身质心（Center of Mass, CoM）的能力。现有骨架包含 19 根控制骨骼，几何网格为 13 块占位体，控制骨骼与解剖学质量分段在概念上存在差异，必须解耦。同时必须保证坐标空间严谨，杜绝根节点二次变换（Double Transform）Bug，且不能对现有动作系统产生任何破坏。
+* **决策**：
+  1. **分段解耦数据结构**：引入轻量级数据类 `RigidSegmentSpec` 与 `BodyMassDistribution`，将质量分段（Anatomical Segments）与 Blender 控制骨骼（PoseBones）完全解耦，支持任意骨骼绑定与局部质心比例/偏移（Fraction & Offset）。
+  2. **标准生物力学质量分布**：内置 Winter (2009) / Dempster (1955) 标准 15 分段模型（Head 0.081, Torso 0.355, Pelvis 0.142, Bilateral UpperArm 2x0.028, Forearm 2x0.016, Hand 2x0.006, Thigh 2x0.100, Shank 2x0.0465, Foot 2x0.0145，总和严格归一为 1.0000），以及与现有 13 块占位网格对应的 13 分段合并模型（Forearm + Hand 合并为 LowerArm 0.022）。同时提供 `with_total_mass()`、`with_overrides()` 及 `create_custom_mass_distribution()` 支持任意总质量缩放与自定义比例重归一化。
+  3. **精确无二次变换坐标变换**：
+     - 单分段质心在骨骼局部坐标系中定义：$\mathbf{p}_{\text{local}} = (0, c_{\text{frac}} \cdot L_{\text{bone}}, 0) + \mathbf{offset}_{\text{local}}$。
+     - 变换到 Armature 空间：$\mathbf{p}_{\text{arm}} = \mathbf{M}_{\text{pose}} \cdot \mathbf{p}_{\text{local}}$。
+     - 变换到世界空间：$\mathbf{p}_{\text{world}} = \mathbf{M}_{\text{arm\_world}} \cdot \mathbf{p}_{\text{arm}}$。
+     由于 `CharacterArmature` 在层级上已父级绑定至 `CharacterRoot`，`arm.matrix_world` 已完整包含根节点位置与朝向，无需且严禁再次乘以根节点变换，彻底杜绝双重变换（Double-transform）。
+  4. **零破坏非侵入式读取**：`compute_whole_body_com` 仅以只读方式读取 evaluated `pose_bone.matrix` 和 `armature_obj.matrix_world`，完全不修改、不插入任何关键帧或驱动器，与现有 FK、腿部 IK、双臂 IK 完全兼容。
+* **影响**：
+  - 静态标准立姿质心高度比实测为 $1.0479\text{ m} / 1.82\text{ m} = 57.58\%$，左右横向对称误差严格为 $0.000000\text{ m}$，与人体解剖学生物力学基准（$55\% \sim 58\%$）完全吻合。
+  - 骨盆升降、肢体伸展、IK 控制下质心动态响应精确敏锐（单臂前平举 $\Delta Y=+13.9\text{ mm}, \Delta Z=+13.9\text{ mm}$；单臂侧平举 $\Delta X=-13.9\text{ mm}, \Delta Z=+13.9\text{ mm}$）。
+  - 为后续 Task 6F-C 关节生理限位（ROM）以及后续步态质心动量补偿提供底层几何与质量物理数据支撑。
+
