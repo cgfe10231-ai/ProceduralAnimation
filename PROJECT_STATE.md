@@ -1,16 +1,26 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-19  
-> **当前阶段**：任务 6E（刚体连杆人体运动控制审计与最小架构设计完成）  
+> **当前阶段**：任务 6F-A（双臂独立 IK 与世界空间控制完成）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 6E 刚体连杆人体运动控制审计与最小架构设计**：
-  * **全面源码审计核验**：完成对当前 19 根骨骼几何定义（[`src/rig/builder.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/builder.py)）、关节局部轴向约定（$X$ 俯仰屈伸, $Y$ 扭转, $Z$ 展收）与限位约束缺失、FK/IK 控制器（[`src/rig/ik.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py)、[`src/rig/pose.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/pose.py)）、接触锁定机制（[`src/rig/foot_contact.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/foot_contact.py)）及统一运动框架（[`src/motion/framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py)）的全面源码审计。确认现有骨架未设置关节生理限位（ROM），所有动作上半身过度依赖硬编码三角函数经验曲线且肩部与手部完全未被激活（固定 0°）；确认双脚具备独立世界空间目标与接触锁定，但双手完全缺失 IK 与世界空间追踪；确认人体质量、加权质心（CoM）、惯性与接触动力学模型完全缺失。
-  * **最小架构设计**：在 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md) 第 4 节完成“物理约束辅助的刚体连杆人体运动控制架构设计”，确立“程序化动作 + 物理约束辅助”技术路线，设计三级能力矩阵、分层模块蓝图（新增 `src/rig/arm_ik.py`、新增 `src/motion/rigid_link.py`、扩展 `foot_contact.py` 与 `framework.py`），起草 `RigidSegmentSpec`、`JointLimitSpec`、`EndEffectorTarget`、`WholeBodyPoseSpec` 核心数据接口草案，并明确 Task 6F 最小实现范围、测试验收指标与零侵入向后兼容策略。架构决策已固化至 `[DEC-015]`。
+* **任务 6F-A 双臂独立 IK 与世界空间控制**：
+  * 在 [`src/rig/arm_ik.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/arm_ik.py) 中实现双臂两骨骼 IK（`upper_arm` + `forearm` $\rightarrow$ `HandIK.L/R`，`ElbowPole.L/R`）与独立手部 3D 世界朝向控制（`HandRotation.L/R`），经由 [`tests/verify_task6fa_arm_ik.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6fa_arm_ik.py) 自动化测试套件完整验证。
+  * **实测关键指标**：
+    * **19 根骨骼与层级完整性**：原有骨骼命名与层级 100% 保持不变，未做任何破坏性修改。
+    * **默认 FK 透传性**：约束默认初始化为 `influence = 0.0`，FK 姿态摆臂 100% 正常透传无阻滞。
+    * **独立世界空间到达精度**：左右手在多个可达空间目标（前伸、下伸、外展、胸前触碰、高抬）实测位置误差均 $\le 0.051\text{ mm}$（远超 $\le 1\text{ mm}$ 规格要求）。
+    * **骨骼长度严格保持**：上臂长严格为 $0.3000\text{ m}$、前臂长严格为 $0.2600\text{ m}$，骨骼零伸缩拉长。
+    * **双侧独立性与零串扰**：双臂同时指向不同空间目标时互不覆盖，单侧目标变动引起的对侧腕部漂移严格为 **`0.00000000 m`**。
+    * **手部 3D 朝向精确解耦**：位置固定下独立调整手部三维欧拉角，朝向对齐误差严格为 **`0.0000^\circ`**，伴生腕部位置漂移 $\le 0.025\text{ mm}$。
+    * **肘部极向旋转控制**：在末端位置不动的前提下，极向目标引导肘部偏转位移达 **`11.71 cm`**，对应腕部漂移仅 $0.0048\text{ mm}$。
+    * **超达程安全防护**：超出 0.56m 最大达程时，`clamp_reach=True` 准确球面投影至 0.5600m；`clamp_reach=False` 明确报告不可达与精确误差，全过程 **0 骨骼异常拉伸**。
+    * **回归验证**：原有 Task 6D 制动急停、Task 6C 冲刺起跑、Task 6B 跑步、Task 5C 行走及 Task 4C 腿部 IK 回归套件全绿通过（退出码 `0`）。
+* **任务 6E 刚体连杆人体运动控制审计与最小架构设计**：已验证。
 * **任务 6D 基于统一运动框架实现冲刺后的主动制动与急停 (SprintBrakeAction)**：
   * 在 [`src/motion/sprint_brake.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/sprint_brake.py) 中实现 `SprintBrakeAction`，经由 `MotionPlanner` 调度无缝承接 Task 6C 末尾运动状态（$v = 2.0\text{ m/s}$，冲刺前倾与双脚接触状态），动作序列为：承接起步 $\rightarrow$ 左脚主抗惯性制动步 $\rightarrow$ 右脚次级迈步 $\rightarrow$ 左脚落位终点 $\rightarrow$ 右脚并拢收步 $\rightarrow$ 对称双支撑静止站立，制动段全长 48 帧（36 帧主动减速制动 + 12 帧稳定静止站立收势 @ 24 FPS，时长 2.0 秒；整段冲刺+制动动画共 162 帧，时长 6.75 秒）。
   * **实测关键指标（经 [`run_sprint_brake_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_sprint_brake_prototype.py) 生成独立原型 [`output/character_sprint_brake_prototype.blend`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/character_sprint_brake_prototype.blend)，由 [`tests/verify_task6d_sprint_brake.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6d_sprint_brake.py) 重开核验通过）**：
@@ -26,7 +36,8 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证（所有历史 `.blend` 完好保留）。
 
 ### [已实现]
-* 刚体连杆人体运动控制审计与最小架构设计：`ARCHITECTURE.md`（第 4 节）、`DECISIONS.md`（`[DEC-015]`）、`CHANGELOG.md`、`HANDOFF.md`
+* 双臂独立 IK 与世界空间控制：`src/rig/arm_ik.py`、`tests/verify_task6fa_arm_ik.py`
+* 刚体连杆人体运动控制审计与最小架构设计：`ARCHITECTURE.md`（第 4 节）、`DECISIONS.md`（`[DEC-015]`、`[DEC-016]`）、`CHANGELOG.md`、`HANDOFF.md`
 * 冲刺主动制动与急停：`src/motion/sprint_brake.py`、`run_sprint_brake_prototype.py`、`tests/verify_task6d_sprint_brake.py`
 * 爆发式起步与冲刺加速：`src/motion/sprint_start.py`、`run_sprint_prototype.py`、`tests/verify_task6c_sprint_start.py`
 * 程序化跑步模式：`src/motion/run_cycle.py`、`run_run_prototype.py`、`tests/verify_task6b_run.py`
@@ -38,7 +49,7 @@
 * `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* Task 6F 最小刚体连杆控制层与双手 IK 实现（`src/rig/arm_ik.py`、`src/motion/rigid_link.py`）。
+* Task 6F-B 刚体连杆动力学、质心 CoM 与关节 ROM 限位系统（`src/motion/rigid_link.py`）。
 * 急转弯（Sharp Turn）、跑跳（Running Jump）、翻滚（Roll）、滑铲（Slide）、撑越障碍（Vault）与环境障碍物射线几何避障。
 
 ### [已知缺陷与遗留说明]
@@ -50,4 +61,4 @@
 ---
 
 ## 2. 下一步建议
-等待用户指示后进入 Task 6F（最小刚体连杆控制层与双手 IK 原型实现与验证）。
+等待用户指示后进入 Task 6F-B（刚体连杆动力学、全身质心 CoM 与关节生理活动限位 ROM 截断系统）。
