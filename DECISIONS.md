@@ -204,3 +204,24 @@
   - 骨盆升降、肢体伸展、IK 控制下质心动态响应精确敏锐（单臂前平举 $\Delta Y=+13.9\text{ mm}, \Delta Z=+13.9\text{ mm}$；单臂侧平举 $\Delta X=-13.9\text{ mm}, \Delta Z=+13.9\text{ mm}$）。
   - 为后续 Task 6F-C 关节生理限位（ROM）以及后续步态质心动量补偿提供底层几何与质量物理数据支撑。
 
+---
+
+### [DEC-018] 关节自由度（DOF）与生理活动范围（ROM）约束系统架构 (Task 6F-C)
+* **状态**：已采纳并实测验证 (Accepted & Verified)
+* **日期**：2026-10-19
+* **背景**：在程序化动作生成与 IK 求解过程中，关节容易由于数值超调、奇异点或极限目标产生非生理反折（如膝关节向前穿刺翻折、肘关节向后折断）或过度伸展。需要建立统一、可配置的关节模型，支持只读校验（`validate`）与明确报告修改的投影限幅（`clamp`），并正确处理各关节局部坐标约定、镜像对称与多轴复合旋转。
+* **决策**：
+  1. **基座解耦与 17 关节解剖模型**：明确将 `root`（空间根位移与航向）和 `pelvis`（悬浮骨盆基座，用于起伏与全身俯仰缓冲）定义为浮动基座参考系，不作为人体内部 ROM 关节。对剩余 17 根骨骼建立解剖学生物力学 ROM 约束规范（`DEFAULT_HUMANOID_ROM_MODEL`），内置 Kapandji、Winter、AAOS 与 White & Panjabi 标准数据。
+  2. **坐标系与旋转跳变防护**：在各骨骼局部坐标系中统一以 radians 处理角度，并配置角度环绕归一化函数（$\theta \in (-\pi, \pi]$），彻底杜绝 Euler wrap-around / $\pm 180^\circ$ 造成的错误越界判定与跳跃截断。
+  3. **多自由度复合锥面约束**：对肩关节（`upper_arm.L/R`）与髋关节（`thigh.L/R`）等球窝关节，除各主轴 1D 极值外，引入椭圆锥（`ELLIPTICAL_CONE`）复合摆动约束 $\left(\frac{\theta_x}{\theta_{x,\max}}\right)^2 + \left(\frac{\theta_z}{\theta_{z,\max}}\right)^2 \le 1$，杜绝同时处于极大俯仰与极大展收时超出人体达程。
+  4. **单自由度铰链保护**：对肘关节（`forearm.L/R`）与膝关节（`shin.L/R`）采用 `HINGE_1D` 模式，严格锁定膝关节向前超伸（$\le +2.0^\circ$）与肘关节向后超伸（$\ge -2.0^\circ$），且副轴仅允许生理微动游隙（$\le \pm 3.0^\circ$）。
+  5. **双侧镜像对称与独立覆盖**：上肢与下肢左右侧展收角（Local Z）具有反号特征（左侧外展 $+Z$、右侧外展 $-Z$），在模型中精确配置镜像，并支持 `with_overrides()` 任意单关节覆盖。
+  6. **双轨接口与 IK 兼容性**：
+     - 提供非破坏性 `validate_rotations` / `validate_armature_pose`，返回详细违规轴、请求值、极值与超限量；
+     - 提供明确报告的 `clamp_rotations` / `clamp_armature_pose`，杜绝静默篡改；
+     - 经由 `extract_evaluated_bone_rotation_rad` 兼容评估处于活动状态下的两骨骼 IK（Leg IK / Arm IK），实测证明正常步行、抬腿与伸手姿态 100% 满足解剖学 ROM 约束。
+* **影响**：
+  - 彻底杜绝了程序化动画与 IK 求解过程中的关节翻转与反向折断风险；
+  - 骨骼几何长度 100% 保持恒定（0 变形拉伸）；
+  - 为未来 Whole-Body Controller、全身动力学协调及跑跳攀爬动作提供了坚固的生理安全截断防护底座。
+

@@ -56,6 +56,22 @@ from src.motion.rigid_link import (
     compute_whole_body_com,
     create_custom_mass_distribution,
 )
+from src.motion.joint_limits import (
+    ConstraintMode,
+    AxisViolation,
+    JointViolation,
+    JointValidationResult,
+    AxisModification,
+    JointModification,
+    JointClampResult,
+    JointLimitSpec,
+    JointModel,
+    DEFAULT_HUMANOID_ROM_MODEL,
+    create_custom_joint_model,
+    extract_evaluated_bone_rotation_rad,
+    normalize_angle_deg,
+    normalize_angle_rad,
+)
 
 
 def apply_motion(config: PipelineConfig, rig_obj=None):
@@ -110,5 +126,19 @@ __all__ = [
     "DEMPSTER_13_SEGMENT_MODEL",
     "compute_whole_body_com",
     "create_custom_mass_distribution",
+    "ConstraintMode",
+    "AxisViolation",
+    "JointViolation",
+    "JointValidationResult",
+    "AxisModification",
+    "JointModification",
+    "JointClampResult",
+    "JointLimitSpec",
+    "JointModel",
+    "DEFAULT_HUMANOID_ROM_MODEL",
+    "create_custom_joint_model",
+    "extract_evaluated_bone_rotation_rad",
+    "normalize_angle_deg",
+    "normalize_angle_rad",
 ]
 
