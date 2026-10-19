@@ -5,13 +5,8 @@
 * **任务状态**：已验证（经 `tests/verify_task6fc_joint_limits.py` 完整验证；Task 6F-B/6F-A/6D 全部回归通过）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：待提交（自动收尾提交即将执行）
-  * **待提交文件**：
-    * `src/motion/joint_limits.py`（关节自由度与生理活动范围 ROM 约束系统核心实现）
-    * `src/motion/__init__.py`（导出 joint_limits 相关符号）
-    * `tests/verify_task6fc_joint_limits.py`（Task 6F-C 完整自动化验证套件）
-    * `DECISIONS.md`（录入 `[DEC-018]`）
-    * `PROJECT_STATE.md`、`CHANGELOG.md`、`HANDOFF.md`、`AI_SYNC.md`（同步更新状态、变更历史与交接卡片）
+  * **最新 Commit SHA**：`fb09e27`
+  * **未提交文件**：无（工作区干净，所有 Task 6F-C 源码、测试与文档已完整提交）
 
 ---
 
