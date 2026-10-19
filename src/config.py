@@ -159,6 +159,9 @@ class PipelineConfig:
     sprint_settle_frames: int = 12  # Duration of final stationary standing/settling (0.5s @ 24 FPS)
     sprint_brake_blend_filename: str = "character_sprint_brake_prototype.blend"
     sprint_brake_preview_frames: Tuple[int, ...] = (110, 114, 120, 138, 155)
+    # Task 6F-A arm IK visual acceptance prototype artifact
+    arm_ik_blend_filename: str = "character_arm_ik_prototype.blend"
+    arm_ik_total_frames: int = 216
 
     @property
     def total_frames(self) -> int:
@@ -318,3 +321,8 @@ class PipelineConfig:
 
     def get_sprint_brake_preview_path(self, frame: int) -> str:
         return os.path.join(self.output_dir, f"preview_sprint_brake_frame_{frame:04d}.png")
+
+    @property
+    def arm_ik_blend_path(self) -> str:
+        return os.path.join(self.output_dir, self.arm_ik_blend_filename)
+

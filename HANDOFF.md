@@ -17,7 +17,8 @@
 * 完成刚体连杆人体运动控制源码全面审计与最小架构设计（Task 6E）。
 * 完成双臂独立 IK 与手部三维世界朝向控制系统（Task 6F-A）：
   * `src/rig/arm_ik.py`：双臂两骨骼 IK、肘部极向控制、手部独立 3D 世界朝向控制、达程球面保护、FK 零侵入兼容。
-  * `tests/verify_task6fa_arm_ik.py`：自动化验证套件。
+  * `run_arm_ik_prototype.py`：生成独立交互式验收原型 `output/character_arm_ik_prototype.blend`（216 帧，带 4 彩色标记与专属机位）。
+  * `tests/verify_task6fa_arm_ik.py`、`tests/verify_task6fa_visual_prototype.py`：自动化验证套件。
   * 录入 `[DEC-016]`。
 
 ## 3. 已验证
@@ -25,8 +26,9 @@
 * 骨骼连杆长度：上臂严格为 $0.3000\text{ m}$、前臂严格为 $0.2600\text{ m}$，零异常伸缩。
 * 双侧独立性：双臂同时指定不同目标零冲突，对侧腕部漂移严格为 **`0.00000000 m`**。
 * 手部朝向解耦：手部 3D 朝向对齐误差 **`0.0000^\circ`**，腕部伴生漂移 $\le 0.025\text{ mm}$。
-* 肘部极向偏转：极向引导肘部偏转位移达 **`11.71 cm`**，腕部零漂移（$\le 0.005\text{ mm}$）。
+* 肘部极向偏转：极向引导肘部偏转位移达 **`19.31 cm`**，腕部零漂移（$\le 0.005\text{ mm}$）。
 * 超达程保护：超限时安全投影至 0.5600m，骨骼零拉长。
+* 可视化验收原型：`output/character_arm_ik_prototype.blend` 直接重开验证通过，时间轴 1..216 帧，5 阶段动作流畅，0 关节翻转。
 * 现有能力回归：Task 6D、Task 6C、Task 6B、Task 5C、Task 4C 自动化测试全绿通过。
 
 ## 4. 当前文件

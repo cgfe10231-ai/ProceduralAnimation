@@ -8,7 +8,7 @@
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 6F-A 双臂独立 IK 与世界空间控制**：
+* **任务 6F-A 双臂独立 IK 与世界空间控制及可视化验收原型**：
   * 在 [`src/rig/arm_ik.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/arm_ik.py) 中实现双臂两骨骼 IK（`upper_arm` + `forearm` $\rightarrow$ `HandIK.L/R`，`ElbowPole.L/R`）与独立手部 3D 世界朝向控制（`HandRotation.L/R`），经由 [`tests/verify_task6fa_arm_ik.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6fa_arm_ik.py) 自动化测试套件完整验证。
   * **实测关键指标**：
     * **19 根骨骼与层级完整性**：原有骨骼命名与层级 100% 保持不变，未做任何破坏性修改。
@@ -19,6 +19,7 @@
     * **手部 3D 朝向精确解耦**：位置固定下独立调整手部三维欧拉角，朝向对齐误差严格为 **`0.0000^\circ`**，伴生腕部位置漂移 $\le 0.025\text{ mm}$。
     * **肘部极向旋转控制**：在末端位置不动的前提下，极向目标引导肘部偏转位移达 **`11.71 cm`**，对应腕部漂移仅 $0.0048\text{ mm}$。
     * **超达程安全防护**：超出 0.56m 最大达程时，`clamp_reach=True` 准确球面投影至 0.5600m；`clamp_reach=False` 明确报告不可达与精确误差，全过程 **0 骨骼异常拉伸**。
+    * **可视化验收原型 (`output/character_arm_ik_prototype.blend`)**：制作 216 帧（9.0 秒 @ 24 FPS）交互式时间轴，分 5 阶段演示双侧序列到达、双侧同时运动、腕部固定手掌 3D 旋转、腕部固定肘部极向偏转（位移 19.31cm）及平滑回归静止；场景配置 4 个彩色目标标记（蓝/红/青/黄），摄像机聚焦上半身，经由 [`tests/verify_task6fa_visual_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6fa_visual_prototype.py) 独立重开验证全部通过，0 关节翻转。
     * **回归验证**：原有 Task 6D 制动急停、Task 6C 冲刺起跑、Task 6B 跑步、Task 5C 行走及 Task 4C 腿部 IK 回归套件全绿通过（退出码 `0`）。
 * **任务 6E 刚体连杆人体运动控制审计与最小架构设计**：已验证。
 * **任务 6D 基于统一运动框架实现冲刺后的主动制动与急停 (SprintBrakeAction)**：
@@ -36,7 +37,7 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证（所有历史 `.blend` 完好保留）。
 
 ### [已实现]
-* 双臂独立 IK 与世界空间控制：`src/rig/arm_ik.py`、`tests/verify_task6fa_arm_ik.py`
+* 双臂独立 IK 与世界空间控制：`src/rig/arm_ik.py`、`run_arm_ik_prototype.py`、`tests/verify_task6fa_arm_ik.py`、`tests/verify_task6fa_visual_prototype.py`、`output/character_arm_ik_prototype.blend`
 * 刚体连杆人体运动控制审计与最小架构设计：`ARCHITECTURE.md`（第 4 节）、`DECISIONS.md`（`[DEC-015]`、`[DEC-016]`）、`CHANGELOG.md`、`HANDOFF.md`
 * 冲刺主动制动与急停：`src/motion/sprint_brake.py`、`run_sprint_brake_prototype.py`、`tests/verify_task6d_sprint_brake.py`
 * 爆发式起步与冲刺加速：`src/motion/sprint_start.py`、`run_sprint_prototype.py`、`tests/verify_task6c_sprint_start.py`
