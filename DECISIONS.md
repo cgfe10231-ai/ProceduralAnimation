@@ -254,3 +254,28 @@
   - 角色具备了“四肢末端 + 浮动骨盆 + 躯干姿态 + 全身 CoM + 生理 ROM”集中原子化控制的能力；
   - 10 项严苛验证全绿通过：双臂与双脚毫米级精准贴合（误差 $< 0.05\text{ mm}$），手部朝向误差 $0.0000^\circ$，超限目标与 ROM 冲突 100% 真实截获，CoM 数值与物理分段模型严格吻合；
   - 为未来支撑多边形平衡计算、跑酷翻越接触控制及复杂全身特技动作奠定了坚实的高阶控制架构。
+---
+
+### [DEC-020] 连续身体运动状态与速度学计算架构 (Task 6G-A)
+* **状态**：已采纳并实测验证 (Accepted & Verified)
+* **日期**：2026-10-19
+* **背景**：在已有动作生成（Task 6A~6D）与静态全身姿态控制（Task 6F-A~6F-D）基础上，系统缺乏统一、严谨的身体微分运动学与速度学层。现有 `MotionState.velocity` 仅记录根节点前向标量速度，缺少空间根角速度、全身质心速度、各刚体连杆空间速度及各关节局部角速度，且直接逐轴对欧拉角求差会在跨越 $\pm 180^\circ$ 时产生严重的虚假超大速度跳变。需要建立一套通用的离散与连续微分运动学接口，为后续惯性预测、接触碰撞与简化动力学提供可复用基础。
+* **决策**：
+  1. **最短测地线 SO(3) 四元数角速度求解**：
+     - 严禁对欧拉角直接差分。采用四元数内积符号对齐（$\mathbf{q}_0 \cdot \mathbf{q}_1 \ge 0$）确保位于同一超球半球，通过四元数相对旋转提取最小角位移 $\theta \mathbf{n}$。
+     - 严格区分世界空间空间角速度与关节局部角速度：
+       * 空间/世界角速度（根节点、质心、刚体连杆）：$\Delta \mathbf{q}_{\text{world}} = \mathbf{q}_1 \cdot \mathbf{q}_0^{-1}$，$\boldsymbol{\omega}_{\text{world}} = \frac{\theta \mathbf{n}}{\Delta t}$；
+       * 局部/体固角速度（骨骼在父级空间中的关节角速度）：$\Delta \mathbf{q}_{\text{local}} = \mathbf{q}_0^{-1} \cdot \mathbf{q}_1$，$\boldsymbol{\omega}_{\text{local}} = \frac{\theta \mathbf{n}}{\Delta t}$。
+     - 彻底消除 $\pm 180^\circ$ 边界穿越时的虚假速度尖峰（实测 $+175^\circ \rightarrow -175^\circ$ 角速度严格为平滑的 $+200^\circ/\text{s}$，0 异常跳变）。
+  2. **显式任意时间步长 $\Delta t$ 参数化**：
+     - 严禁将微分计算与固定 24 FPS 绑定，所有速度与加速度接口均显式接受实数 $\Delta t$，在可变帧率与物理子步下严格保证确定性与尺度守恒。
+  3. **实际姿态优先与控制器期望解耦**：
+     - 速度学求解优先采样 `WholeBodyController` 求解后的实际评估姿态（`evaluated_armature` / `WholeBodyControlResult`），避免使用未达成的目标虚报运动状态。
+     - 显式分离实际推导速度（`root_linear_velocity`）与控制器指令速度（`commanded_velocity`），输出量化追踪残差（`velocity_tracking_error_mps`）。
+  4. **全链路物理守恒与零破坏接入**：
+     - 严密保持全多刚体动量守恒：实测全身 CoM 线速度与 15 个连杆质量加权速度和 $\sum w_i \mathbf{v}_i$ 的数值差异严格在 float32 精度内（$< 10^{-5}\text{ m/s}$）。
+     - 通过 `enrich_motion_state_with_kinematics` 将全套速度学遥测数据注入现有 `MotionState.params`，100% 保持现有 `MotionAction`、`MotionPlanner` 调用契约不变。
+* **影响**：
+  - 角色运动系统具备了完整的空间一阶与二阶微分运动学感知能力（根节点、骨盆、全身质心、15 个刚体连杆、17 个解剖关节及 4 个末端执行器）；
+  - 10 项严苛验证全部通过：静止 0 速度、匀速直线平移误差为 0、恒定定轴旋转误差 $< 3 \times 10^{-8}\text{ rad/s}$、任意 3D 复合旋转误差 $< 2 \times 10^{-6}\text{ rad/s}$、单侧肢体运动严格隔离无串扰、SprintStart 到 SprintBrake 动作交界处速度严格平滑连续；
+  - 为未来接触动量交换、惯性张量与极速动态平衡动作奠定了坚实无奇点的运动学基石。

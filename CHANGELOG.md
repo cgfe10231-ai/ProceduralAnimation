@@ -3,6 +3,41 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-19] 任务 6G-A：连续身体运动状态与速度学基础
+
+### 新增 (Added)
+* **连续身体运动状态与微分速度学计算引擎 (`src/motion/body_kinematics.py`)**：
+  * 构建核心数据结构：
+    * `BodyPoseSnapshot`：单时刻离散实际姿态快照（根节点世界位置与四元数/欧拉角、骨盆位置/四元数、全身 CoM、15 个刚体连杆世界位置与四元数、17 个解剖关节局部相对旋转/四元数、4 个末端执行器世界位置与接触接地状态）。
+    * `BodyVelocityState`：空间微分速度与加速度状态（根节点世界线速度/空间角速度、骨盆线速度、全身 CoM 速度、15 连杆空间速度、17 关节父级局部角速度、4 末端空间线速度、根节点与 CoM 空间线加速度/角加速度，以及控制器指令速度与追踪残差）。
+    * `BodyMotionState`：位姿快照与速度状态复合结构，提供直观的标量速率与角速度属性。
+  * 最短测地线 SO(3) 空间角速度求解器 (`relative_angular_velocity`)：
+    * 采用四元数半球对齐（$q_0 \cdot q_1 \ge 0$）与最小测地角位移，彻底消除跨越 $\pm 180^\circ$ 时的虚假超大速度跳变。
+    * 支持世界空间空间角速度（`frame="world"`，$\Delta q = q_1 \cdot q_0^{-1}$）与父级骨骼局部角速度（`frame="local"`，$\Delta q = q_0^{-1} \cdot q_1$）。
+  * 状态化跟踪与时序微分器 (`BodyKinematicsTracker`)：
+    * 提供单帧在线因果更新接口（`update` / `sample_and_update`）。
+    * 提供全局轨迹批处理微分接口（`compute_trajectory_motion_states`），支持因果一阶差分（`backward`）与高阶二阶中心差分（`central`）。
+    * 提供零速度初始状态构造器（`create_zero_velocity_state`）。
+  * 与现有动作框架无缝集成 (`enrich_motion_state_with_kinematics`)：
+    * 将全身物理质心速度、空间根角速度、刚体连杆速度等注入 `MotionState.params`，100% 保持已有 `MotionAction`、`MotionPlanner` 兼容性。
+* **自动化测试套件 (`tests/verify_task6ga_body_kinematics.py`)**：
+  * 测试 1：静态姿态 0 速度验证通过（线速度严格为 $0.000\text{ m/s}$，角速度严格为 $0.000\text{ rad/s}$）。
+  * 测试 2：恒定匀速直线平移，推导线速度严格匹配解析解（误差 $0.0000000000\text{ m/s}$，无虚假副轴速度）。
+  * 测试 3：恒定角速度定轴旋转，推导角速度严格匹配解析解（误差 $2.91 \times 10^{-8}\text{ rad/s}$）。
+  * 测试 4：任意 3D 空间复合多轴旋转，重构角速度向量误差严格在 $1.43 \times 10^{-6}\text{ rad/s}$。
+  * 测试 5：跨越 $\pm 180^\circ$（$+175^\circ \rightarrow -175^\circ$）角速度严格为连续平滑的 $+200^\circ/\text{s}$（$-175^\circ \rightarrow +175^\circ$ 为 $-200^\circ/\text{s}$），0 速度跳跃尖峰。
+  * 测试 6：可变时间步长 $\Delta t$ 尺度缩放验证（$0.1\text{ s}$ 到 $0.005\text{ s}$ 误差严格为 0）。
+  * 测试 7：单侧手臂运动物理隔离性验证（左手 $2.0\text{ m/s}$，右臂及双腿严格保持 $0.000\text{ m/s}$ 零串扰）。
+  * 测试 8：多刚体动量守恒定理验证（直接 CoM 差分速度与 15 个连杆质量加权速度和数学差异仅 $6.12 \times 10^{-6}\text{ m/s}$，完美符合 float32 累积精度）。
+  * 测试 9：WholeBodyController 实际求解姿态无缝采样并注入 MotionState。
+  * 测试 10：SprintStart 到 SprintBrake 动作交界面（帧 114 $\rightarrow$ 115）速度严格连续平滑（速度跳变差仅 $0.0038\text{ m/s}$）。
+* **回归测试**：
+  * Task 6F-D 全身控制器测试、Task 6F-C 关节 ROM 测试、Task 6F-B 刚体连杆质心测试、Task 6F-A 双臂 IK 测试、Task 6D 冲刺急停测试均 100% 通过（退出码 0）。
+* **决策记录**：
+  * 录入 `[DEC-020]`。
+
+---
+
 ## [2026-10-19] 任务 6F-D：统一全身控制接口与最小协调器
 
 ### 新增 (Added)

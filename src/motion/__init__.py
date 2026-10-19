@@ -80,6 +80,19 @@ from src.motion.whole_body_controller import (
     WholeBodyControlTargets,
     WholeBodyController,
 )
+from src.motion.body_kinematics import (
+    BodyKinematicsTracker,
+    BodyMotionState,
+    BodyPoseSnapshot,
+    BodyVelocityState,
+    compute_differential_velocity,
+    create_zero_velocity_state,
+    enrich_motion_state_with_kinematics,
+    relative_angular_velocity,
+    relative_rotation_vector,
+    sample_body_pose_from_controller_result,
+    sample_body_pose_snapshot,
+)
 
 
 def apply_motion(config: PipelineConfig, rig_obj=None):
@@ -154,5 +167,16 @@ __all__ = [
     "WholeBodyControlTargets",
     "WholeBodyControlResult",
     "WholeBodyController",
+    "BodyPoseSnapshot",
+    "BodyVelocityState",
+    "BodyMotionState",
+    "BodyKinematicsTracker",
+    "sample_body_pose_snapshot",
+    "sample_body_pose_from_controller_result",
+    "compute_differential_velocity",
+    "create_zero_velocity_state",
+    "relative_angular_velocity",
+    "relative_rotation_vector",
+    "enrich_motion_state_with_kinematics",
 ]
 
