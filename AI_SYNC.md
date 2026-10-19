@@ -5,8 +5,8 @@
 * **任务状态**：已验证（经 `tests/verify_task6gb_body_inertia.py` 13 项测试完整验证；Task 6G-A/6F-D/6F-C/6F-B/6F-A/6D 全部回归通过）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：待提交（前序为 `0f5cdd5`）
-  * **未提交文件**：Task 6G-B 源码、测试与文档准备提交
+  * **最新 Commit SHA**：`d9fcc36`
+  * **未提交文件**：无（工作区干净，所有 Task 6G-B 源码、测试与文档已完整提交）
 
 ---
 
