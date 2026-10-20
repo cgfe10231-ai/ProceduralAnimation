@@ -1,44 +1,53 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-C-R3A（系统架构深度审计与规范锁定阶段）
-* **任务状态**：已验证（全仓库代码审计完成，建立 ARCHITECTURE.md v2.0，创建 ARCHITECTURE_SYNC.md 永久卡片，同步永久项目规则，回答 6 大物理数学模块代码级质询，锁定架构规范；等待用户确认后进入 R3B 执行合流修复）
+* **当前任务编号**：任务 6G-C-R3B-1（统一架构规范修订与最小兼容桥接层）
+* **任务状态**：已验证（权威架构修订至 v2.1，完成最小兼容桥接层 `kinematic_bridge.py`，实现足部接地锁定独占性与手臂 FK/IK 仲裁，10 项严苛验证 100% 通过，0.0000 mm 姿态等价性与历史步态曲线不可变性全量核验通过，历史 6 大核心测试 100% 全绿）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **审计依据基准 Commit SHA**：`8582bc3` (对应文档更新 `4111a51`)
-  * **本任务提交 Commit SHA**：`d283ba8`
-  * **未提交文件**：无（工作区干净）
+  * **基准 Commit SHA**：`d283ba8`
+  * **本任务提交 Commit SHA**：`892116c`
+  * **未提交文件**：无
 
 ---
 
-### 1. R3A 架构审计核心结论
-* **查清三套分立管线现实**：
-  1. 历史动作管线（`StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction`）：使用私有姿态函数与 `ContactConstraintAdapter` 直接驱动骨架，未接入 `WholeBodyController`。
-  2. 物理分析与全身控制工具链（`WholeBodyController`、`JointModel`、`rigid_link`、`body_kinematics`、`body_inertia`、`contact_model`）：作为事后只读遥测存在，未被历史动作调用，无物理闭环。
-  3. 演示原型脚本（`run_contact_obstacle_integration.py`）：脱离动作系统，通过在 30 帧循环中重复执行完全相同的静态目标硬编码摆拍，导致画面呈现僵硬切片。
-* **物理数学模块定位**：
-  * 系统当前是严格的“开环解析运动学驱动 + 事后只读物理遥测”。
-  * `rigid_link.py`（CoM）、`body_kinematics.py`（速度/加速度）、`body_inertia.py`（惯性张量/角动量）、`contact_model.py`（接触几何/支撑分类）均为只读数据采集，无力矩驱动、姿态修正或平衡闭环。
-* **更新权威文档与规则**：
-  * 更新 `ARCHITECTURE.md` (v2.0)，确立统一世界坐标系、两套架构图、11 大模块合同、6 大历史动作复用表及 4 大架构断裂点。
-  * 创建永久架构同步卡片 `ARCHITECTURE_SYNC.md`（包含 12 项必填章节）。
-  * 同步更新 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`，新增第 8 节“架构对齐与防伪造纪律”。
+### 1. R3B-1 架构修订与桥接层核心成果
+* **权威架构规范锁定 (ARCHITECTURE.md v2.1 & ARCHITECTURE_SYNC.md v2.1)**：
+  * 确立 10 大架构设计原则、三层架构演化视图（现状断裂点 -> R3B 统一桥接落地 -> 未来 6G-D/6H/7A 物理平衡闭环）；
+  * 确立单帧 6 阶段执行协议表（Phase 1 规划 -> Phase 2 接触防滑锁定 -> Phase 3 WBC 统一求解 -> Phase 4 真实 ROM 校验 -> Phase 5 事后只读遥测丰富 -> Phase 6 状态提交）；
+  * 梳理 12 大核心模块契约表与 6 大历史动作复用矩阵；
+  * 同步永久规则 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`，确立防伪造与阶段接入纪律。
+* **实现最小兼容桥接层 (`src/motion/kinematic_bridge.py`)**：
+  * `KinematicPlannedPose`：结构化输入容器，包含根节点、骨盆位姿、躯干 FK、足部目标与锁定标记、手部 IK/FK 目标；
+  * `convert_planned_pose_to_wbc_targets`：手部 FK/IK 显式仲裁，足部接地锁定标记无损转发；
+  * `KinematicBridgeExecutor`：严格编排 6-Phase 生命周期，统筹 `foot_contact` 接地世界锚定锁定、`WholeBodyController` 独占姿态求解、`JointModel` ROM 与到达性诚实验证、事后只读物理遥测丰富（CoM、速度、惯性张量、角动量、接触模型）及 `MotionState` 状态提交。
+* **所有权与防冲突纪律**：
+  * 足部接地防滑锁定由 `src/rig/foot_contact.py` 独占世界空间管理；WBC 在求解时感知 `is_locked`，严禁解绑或破坏锁定状态。
+  * 手部显式仲裁：`enabled=False` 时 arm IK 约束 influence 归零，由 FK 关节角完全主导；`enabled=True` 时 arm IK 接管，保证双臂摆动与抓握各得其所。
+  * 真实失败汇报机制：ROM 截断后重新评估末端到达性，若发生超限或 ROM 违背，`execute_frame` 严格诚实汇报 `success=False`，绝对禁止伪造通过。
 
 ---
 
-### 2. 6 大物理数学模块真实调用事实清单
-1. **`rigid_link.py` (CoM)**：未被任何动作调用，仅被 `whole_body_controller`、`body_kinematics`、`body_inertia` 事后读取，纯只读指标。
-2. **`body_kinematics.py` (速度学)**：输入为已评估的骨架姿态快照，输出有限差分速度，仅写入 `MotionState.params`，不驱动骨骼。
-3. **`body_inertia.py` (惯性/角动量)**：仅在测试中被调用，无转动力矩，无阻尼修正，与当前动画无因果驱动关系。
-4. **`contact_model.py` (接触几何)**：只读检测四肢与环境间隙及支撑分类，不改变 IK 目标位置，未与 `foot_contact.py` 接地锁定打通。
-5. **`WholeBodyController`**：未被任何生产级 `MotionAction` 调用；仅被独立原型脚本与测试脚本调用。
-6. **物理闭环状态**：不存在双向力学/姿态反馈闭环，系统为纯单向只读数据流。
+### 2. 验证结果清单 (`tests/verify_task6gc_r3b1_bridge.py` 10/10 全绿)
+1. **Test 01: Lossless Input Mapping**：100% 空间与运动学字段无损转换。
+2. **Test 02: FK/IK Arbitration & Control Ownership**：显式手部仲裁，腕部追踪误差仅 0.041 mm。
+3. **Test 03: Stance Foot Ground Anchor Preservation**：控制器漂移 0.000000 mm，骨骼漂移 0.246 mm。
+4. **Test 04: Truthful ROM & Reach Failure Reporting**：超限及越界严格诚实汇报 `success=False`。
+5. **Test 05: Quantitative Pose Equivalence**：桥接与历史动作姿态在骨盆、左踝、右踝误差严格为 **0.0000 mm**。
+6. **Test 06: Immutability of Historical Gait Curves**：历史 7 步排期、0.24 m/s 稳态速度、1.26 m 总位移 100% 完整保留。
+7. **Test 07: Data Types, Units & Coordinate Consistency**：+Z Up，地面 Z=0.0，双支撑标识完全兼容。
+8. **Test 08: Duplicate Write Conflict Prevention**：WBC 与 foot_contact 独占写所有权零冲突。
+9. **Test 09: Full Single-Frame 6-Phase Pipeline Execution**：5 帧完整 6 阶段流水线执行，关键帧正确写入。
+10. **Test 10: Core Historical Regression Suite**：历史 6 大核心模块回归测试 100% 全绿（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）。
 
 ---
 
 ### 3. 下一步建议与禁止事项
-* **下一步**：等待用户指令进入 **Task 6G-C-R3B（架构合流与连续运动修复）**。
+* **下一步**：进入 **Task 6G-C-R3B-2（历史动作向统一桥接层无损迁移）**：
+  * 将 `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 的底层姿态落地重构调用 `KinematicBridgeExecutor.execute_frame`；
+  * 保持步态生成、速度曲线与步态排期 100% 零修改；
+  * 彻底废除控制器双轨制。
 * **禁止事项**：
   * 严禁跳入 Task 6G-D。
-  * 严禁在 R3A 阶段编写新动作算法或修改 rig。
-  * 严禁编写独立脚本拼凑动画冒充连续动作。
+  * 严禁重写成熟历史步态曲线。
+  * 严禁使用独立脚本拼凑演示。
