@@ -345,4 +345,23 @@
   - 15 项自动化验证全数通过，历史 6 大核心回归套件 100% 保持全绿；
   - 为 Task 6G-D 质心平衡、接触动量与简化接触动力学奠定了清晰的几何约束接口。
 
+---
+
+### [DEC-023] 连续步态与离散障碍物接触原型解耦架构规范 (Task 6G-C Rework)
+* **状态**：已采纳并实测验证 (Accepted & Verified)
+* **日期**：2026-10-20
+* **背景**：在 Task 6G-C 目视验收中，用户发现角色在障碍物之间移动时呈现“单腿抬起整体平移滑行 2 米”的严重缺陷。根本原因是原型脚本脱离了 `MotionPlanner` 和 `StartStopWalkAction` 步态调度状态机，错误地在离散姿态目标之间使用粗暴的数学平滑插值移动根节点，导致连续步态与多部位障碍物测试耦合混杂。
+* **决策**：
+  1. **完全解耦为两套独立 Blender 视口工程**：
+     - **场景 A (`output/contact_walk_integration.blend` / `run_contact_walk_integration.py`)**：专注于真实连续人类步态与接触系统的实时闭环。100% 沿用 Task 5C / 6A 验证的步态调度机制（`StartStopWalkAction`），呈现 204 帧完整的起步-加速-交替步态行走-减速-停步全过程；四肢交替抬腿跨步（Z 抬升 100~137 mm），支撑脚微米级锁定（漂移 < 0.005 mm），对侧手臂协调摆动；`ContactModel` 实时逐帧评估双脚接触并驱动绿色八面体标记物在支撑相激活、摆动相熄灭。
+     - **场景 B (`output/contact_obstacle_integration.blend` / `run_contact_obstacle_integration.py`)**：专注于多部位障碍物接触（Double Stance, Vault Touch, Foot on Wall, Ledge Hang, Flight Phase）。采用 5 个清晰分段的独立观察片段（Hold Clips），角色严格正对目标障碍物（朝向点积 1.0000，夹角 0.00 deg），自然垂臂，接触贴合精度达到微米级（误差严格 < 0.05 mm），彻底杜绝在障碍物之间伪造虚假单腿滑行。
+  2. **工程架构审计与防漂移文档**：
+     - 输出 `docs/MOTION_INTEGRATION_AUDIT.md`，建立从 Task 3 到 6G-C 的历史能力映射表、动作生成机制剖析、数据流闭环与单腿滑行根因分析。
+  3. **自动化测试双场景全覆盖**：
+     - 在 `tests/verify_task6gc_contact_model.py` 中分别建立 `test_16_scene_a_walk_integration_acceptance`（量化检验位移、交替抬腿、防滑锁定、臂摆与标记物动态切换）与 `test_17_scene_b_obstacle_integration_acceptance`（量化检验朝向对齐、垂臂、形态差异、接触精度、保持稳定度）。
+* **影响**：
+  - 彻底杜绝了“单腿悬空刚体平移”伪造步态的架构缺陷；
+  - 既完整保护并展示了历史经过严苛验证的程序化真实步态，又清晰展示了 ContactModel 在多部位、多表面复杂障碍物下的几何约束与支撑分类能力；
+  - 17 项全量测试 100% 通过，为后续 Task 6G-D 提供了可靠、无歧义的物理约束与接触系统基础。
+
 

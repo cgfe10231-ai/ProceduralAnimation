@@ -1,28 +1,36 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-20  
-> **当前阶段**：任务 6G-C（多部位接触几何、约束与支撑状态系统完成，已通过 16 项自动化验证，待用户 Blender 目视复验）  
+> **当前阶段**：任务 6G-C（第二次工程级返工完成：输出 MOTION_INTEGRATION_AUDIT.md 架构审计、交付双独立 Blender 原型、17 项全量测试 100% 通过，待用户 Blender 目视复验）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 6G-C 多部位接触几何、约束与支撑状态系统 (`contact_model.py` / `run_contact_model_prototype.py` / `output/contact_model_debug.blend`)**：
-  * 在 [`src/motion/contact_model.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py) 中实现多部位接触类型（UNILATERAL / GRASP / FREE）、生命周期状态机（CANDIDATE / ESTABLISHED / RELEASED / BROKEN）、几何约束误差量化、6 类多表面支撑状态分类、共面 2D 凸包支撑多边形与环境刚体协变更新。
-  * 由 [`tests/verify_task6gc_contact_model.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gc_contact_model.py) 自动化测试套件（16 项严苛测试，含数学模型测试、核心历史回归套件与视口集成验收套件）完整验证通过。
-  * 由 [`run_contact_model_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_contact_model_prototype.py) 生成独立 Blender 交互视口工程 [`output/contact_model_debug.blend`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/contact_model_debug.blend)（187.7 KB），包含 4 类环境几何体、180 帧 6 阶段独立调试片段与着色接触锚点/外法线指示器。
-  * **实测关键指标**：
-    * **解剖接触锚点与骨骼原点严格解耦**：脚底偏置 $(0, 0.077, -0.070)\text{ m}$，手掌偏置 $(0, 0.050, -0.015)\text{ m}$，局部到世界矩阵变换绝对误差严格为 **`0.00e+00 m`**。
-    * **外法线单位模长与外侧约定**：任意 3D 法线经单位化后模长误差严格为 **`0.00e+00`**，且严格指向环境外侧。
-    * **单向推力 vs 双向抓握约束严格区分**：单向接触拉开 $+50\text{ mm}$ 准确报 `EXCESSIVE_GAP`，下压穿透 $-30\text{ mm}$ 准确报 `EXCESSIVE_PENETRATION`；抓握约束对 3D 偏移超过公差（$35\text{ mm} > 20\text{ mm}$）准确报 `GRASP_DISPLACEMENT`。
-    * **角色朝向与障碍物方向对齐**：6 个演示片段中角色前向矢量与目标方向点积均严格为 **`1.0000`**，偏转夹角严格为 **`0.00 deg`**。
-    * **站立基础姿态自然下垂**：双脚站立时双手腕部位于肩部下方 **`0.560 m`**（$\ge 0.40\text{ m}$），双臂自然垂直下垂，杜绝横向拉伸。
-    * **6 场景姿态真实形态差异**：15 组场景对之间关节角度欧氏距离均 $\ge 67.65^\circ$（远超 $\ge 20^\circ$ 阈值），形态分明。
-    * **接触贴合精度与保持稳定性**：地表接触误差 $0.00\text{ mm}$、箱顶接触误差 $0.02\text{ mm}$、蹬墙接触误差 $0.04\text{ mm}$、抓杆接触误差 $0.01\text{ mm}$；各保持片段内接触锚点漂移严格为 **`0.000 mm`**。
-    * **运动连续性**：180 帧全程最大单帧位移仅 $318\text{ mm} \le 400\text{ mm}$，平滑自然，无跳步瞬移。
-    * **核心全量回归验证**：Task 6G-B、6G-A、6F-D、6F-C、6F-B、6F-A 核心测试套件 100% 全绿（全部退出码 `0`）。
-    * **目视验收状态**：已完成自动化集成验收，**待用户 Blender 目视复验**。
+* **任务 6G-C 多部位接触几何、约束与支撑状态系统（第二次工程级返工交付）**：
+  * **工程架构审计与根因分析**：编写 [`docs/MOTION_INTEGRATION_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/MOTION_INTEGRATION_AUDIT.md)（13.4 KB），系统性梳理 Task 3 到 6G 历史运动能力，剖析 6G-C 初次实现中脱离步态调度、使用数学插值平移根节点导致“单腿悬空滑行”的根本原因，确立解耦返工方案与双原型设计边界。
+  * **场景 A：真实连续行走与接触系统集成原型 (`output/contact_walk_integration.blend` / `run_contact_walk_integration.py`)**：
+    * 100% 沿用 Task 5C / 6A 验证的 `StartStopWalkAction`，生成 204 帧真实人类连续平滑步态（起步-加速-交替步态行走-减速-合拢停步）；
+    * 根节点总位移严格符合理论规划（$Y: -8.0000\text{ m} \rightarrow -6.7400\text{ m}$，位移 $1.2600\text{ m}$，峰值速度 $0.2400\text{ m/s}$）；
+    * 左右腿交替摆动与支撑，摆动脚具备清晰地面抬升（Step 0 右脚抬升 $100.0\text{ mm}$，Step 1 左脚抬升 $127.7\text{ mm}$，Step 2 右脚抬升 $137.6\text{ mm}$），彻底杜绝贴地拖动或刚体滑行；
+    * 支撑脚微米级防滑锁定（左脚支撑漂移 $0.0012\text{ mm}$，右脚支撑漂移 $0.0047\text{ mm}$，严格 $< 0.05\text{ mm}$）；
+    * 对侧手臂自然协调摆动（F28 夹角差 $+26.00^\circ$，F54 夹角差 $-51.56^\circ$，反向摆动）；
+    * `ContactModel` 实时逐帧评估双脚接触并驱动绿色八面体标记物与向上外法线箭头在支撑相激活、摆动相熄灭。
+  * **场景 B：多部位障碍物接触与支撑状态原型 (`output/contact_obstacle_integration.blend` / `run_contact_obstacle_integration.py`)**：
+    * 包含 5 个清晰分段的 30 帧独立观察片段（F1..150）：Double Stance、Vault Touch（单手撑跳箱）、Foot on Wall（脚蹬垂直墙面）、Ledge Hang（双手抓杆悬垂）、Flight Phase（空中奔跑腾空）；
+    * 角色前向矢状面严格正对障碍物（朝向点积严格为 $1.0000$，偏转夹角 $0.00^\circ$）；
+    * 基础站姿自然垂臂（腕部位于肩部下方 $0.560\text{ m} \ge 0.40\text{ m}$）；
+    * 5 场景形态显著分明（最小两两关节欧氏角差异达 $70.06^\circ \ge 20.0^\circ$）；
+    * 接触锚点贴合精度达到微米级（地表 $0.00\text{ mm}$、箱顶 $0.02\text{ mm}$、蹬墙 $0.04\text{ mm}$、抓杆 $0.01\text{ mm}$，均严格 $< 10\text{ mm}$）；
+    * 观察片段内接触锚点绝对锁定（漂移严格为 $0.0000\text{ mm} \le 0.1\text{ mm}$）；
+    * 彻底杜绝在障碍物之间伪造虚假单腿滑行。
+  * **自动化测试套件 (`tests/verify_task6gc_contact_model.py`) 17/17 项全部通过**：
+    * 14 项接触几何、生命周期、刚体协变数学测试全绿；
+    * 历史 6 大核心回归套件（Task 6G-B, 6G-A, 6F-D, 6F-C, 6F-B, 6F-A）100% 保持全绿（退出码 `0`）；
+    * Test 16（场景 A 行走集成验收）全绿；
+    * Test 17（场景 B 障碍物接触验收）全绿。
+  * **目视验收状态**：已完成自动化集成验收，**待用户 Blender 目视复验**。坚决不进入 Task 6G-D。
 * **任务 6G-B 刚体连杆惯性张量与全身角动量模型 (`InertiaTensor` / `WholeBodyInertiaState`)**：
   * 在 [`src/motion/body_inertia.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/body_inertia.py) 中实现分段几何惯性建模、3D 平行轴定理全身惯性张量合成与多连杆角动量（Spin/Orbital 解耦求和），经由 [`tests/verify_task6gb_body_inertia.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gb_body_inertia.py) 自动化测试套件（13 项严苛测试）完整验证。
   * **实测关键指标**：

@@ -612,38 +612,224 @@ def test_15_core_regression_suite() -> bool:
 
 
 # =============================================================================
-# Test 16: Visual Prototype Integration Acceptance Suite
+# Test 16: Scene A - Continuous Walking Integration Acceptance
 # =============================================================================
-def test_16_visual_prototype_integration_acceptance() -> bool:
-    print("\n--- Test 16: Visual Prototype Integration Acceptance Suite ---")
-    blend_path = os.path.join(PROJECT_ROOT, "output", "contact_model_debug.blend")
+def test_16_scene_a_walk_integration_acceptance() -> bool:
+    print("\n--- Test 16: Scene A - Continuous Walking Integration Acceptance ---")
+    blend_path = os.path.join(PROJECT_ROOT, "output", "contact_walk_integration.blend")
     if not os.path.exists(blend_path):
-        print(f"FAILED: Visual prototype file not found at: {blend_path}")
+        print(f"FAILED: Scene A walk blend file not found at: {blend_path}")
         return False
 
     file_size_kb = os.path.getsize(blend_path) / 1024.0
-    print(f"Inspecting prototype .blend ({file_size_kb:.1f} KB): {blend_path}")
+    print(f"Inspecting Scene A walk blend ({file_size_kb:.1f} KB): {blend_path}")
 
-    # Load blend file into bpy
     bpy.ops.wm.open_mainfile(filepath=blend_path)
     scene = bpy.context.scene
     arm = bpy.data.objects.get("CharacterArmature")
     root = bpy.data.objects.get("CharacterRoot")
 
     if arm is None or root is None:
-        print("FAILED: CharacterArmature or CharacterRoot not found in blend file")
+        print("FAILED: CharacterArmature or CharacterRoot not found")
         return False
 
-    # 1. Facing alignment with obstacles across all 6 segments
+    # 1. Total timeline frames
+    total_frames = scene.frame_end - scene.frame_start + 1
+    print(f"[Check 1] Timeline frame range: {scene.frame_start}..{scene.frame_end} ({total_frames} frames)")
+    if total_frames != 204:
+        print(f"FAILED: Expected 204 frames of locomotion, got {total_frames}")
+        return False
+
+    # 2. Total displacement along +Y
+    scene.frame_set(1)
+    bpy.context.view_layer.update()
+    p_start = root.matrix_world.translation.copy()
+
+    scene.frame_set(204)
+    bpy.context.view_layer.update()
+    p_end = root.matrix_world.translation.copy()
+
+    total_disp_y = p_end.y - p_start.y
+    print(f"[Check 2] Root displacement: Y={p_start.y:.4f}m -> Y={p_end.y:.4f}m (disp={total_disp_y:.4f}m)")
+    if abs(total_disp_y - 1.26) > 0.02:
+        print(f"FAILED: Expected 1.26m total displacement, got {total_disp_y:.4f}m")
+        return False
+
+    # 3. Alternating swing and stance phases across steps
+    print("\n[Check 3] Alternating leg swing and lift clearance")
+    gait_checks_passed = True
+
+    # F1: both feet on ground (Idle Stand)
+    scene.frame_set(1)
+    bpy.context.view_layer.update()
+    ak_l_f1 = (arm.matrix_world @ arm.pose.bones["shin.L"].tail).z
+    ak_r_f1 = (arm.matrix_world @ arm.pose.bones["shin.R"].tail).z
+    print(f"  F001 (Start Stand): L ankle Z={ak_l_f1:.4f}m, R ankle Z={ak_r_f1:.4f}m (expected ~0.07m)")
+    if abs(ak_l_f1 - 0.07) > 0.015 or abs(ak_r_f1 - 0.07) > 0.015:
+        gait_checks_passed = False
+
+    # F28: Step 0 mid-swing (Right foot swinging forward, Left foot grounded in stance)
+    scene.frame_set(28)
+    bpy.context.view_layer.update()
+    ak_l_f28 = (arm.matrix_world @ arm.pose.bones["shin.L"].tail).z
+    ak_r_f28 = (arm.matrix_world @ arm.pose.bones["shin.R"].tail).z
+    r_lift_f28 = ak_r_f28 - ak_r_f1
+    print(f"  F028 (R Swing Step 0): L ankle Z={ak_l_f28:.4f}m (stance), R ankle Z={ak_r_f28:.4f}m (lift={r_lift_f28*1000:.1f}mm)")
+    if r_lift_f28 < 0.020:
+        print("  FAILED: Right foot did not lift during swing phase")
+        gait_checks_passed = False
+
+    # F54: Step 1 mid-swing (Left foot swinging forward, Right foot grounded in stance)
+    scene.frame_set(54)
+    bpy.context.view_layer.update()
+    ak_l_f54 = (arm.matrix_world @ arm.pose.bones["shin.L"].tail).z
+    ak_r_f54 = (arm.matrix_world @ arm.pose.bones["shin.R"].tail).z
+    l_lift_f54 = ak_l_f54 - ak_l_f1
+    print(f"  F054 (L Swing Step 1): L ankle Z={ak_l_f54:.4f}m (lift={l_lift_f54*1000:.1f}mm), R ankle Z={ak_r_f54:.4f}m (stance)")
+    if l_lift_f54 < 0.020:
+        print("  FAILED: Left foot did not lift during swing phase")
+        gait_checks_passed = False
+
+    # F78: Step 2 mid-swing (Right foot swinging forward, Left foot grounded in stance)
+    scene.frame_set(78)
+    bpy.context.view_layer.update()
+    ak_l_f78 = (arm.matrix_world @ arm.pose.bones["shin.L"].tail).z
+    ak_r_f78 = (arm.matrix_world @ arm.pose.bones["shin.R"].tail).z
+    r_lift_f78 = ak_r_f78 - ak_r_f1
+    print(f"  F078 (R Swing Step 2): L ankle Z={ak_l_f78:.4f}m (stance), R ankle Z={ak_r_f78:.4f}m (lift={r_lift_f78*1000:.1f}mm)")
+    if r_lift_f78 < 0.020:
+        print("  FAILED: Right foot did not lift during swing phase")
+        gait_checks_passed = False
+
+    # 4. Stance foot locking (< 0.05 mm drift)
+    print("\n[Check 4] Stance foot stability (drift < 0.05 mm)")
+    # During frames 15..35 (Step 0), Left foot is strictly locked in stance
+    scene.frame_set(15)
+    bpy.context.view_layer.update()
+    l_ankle_15 = (arm.matrix_world @ arm.pose.bones["shin.L"].tail).copy()
+
+    scene.frame_set(35)
+    bpy.context.view_layer.update()
+    l_ankle_35 = (arm.matrix_world @ arm.pose.bones["shin.L"].tail).copy()
+
+    drift_l = (l_ankle_35 - l_ankle_15).length * 1000.0
+    print(f"  Left stance ankle drift across 20 frames (F15->F35): {drift_l:.4f} mm (expected < 0.05 mm)")
+
+    # During frames 45..60 (Step 1), Right foot is strictly locked in stance
+    scene.frame_set(45)
+    bpy.context.view_layer.update()
+    r_ankle_45 = (arm.matrix_world @ arm.pose.bones["shin.R"].tail).copy()
+
+    scene.frame_set(60)
+    bpy.context.view_layer.update()
+    r_ankle_60 = (arm.matrix_world @ arm.pose.bones["shin.R"].tail).copy()
+
+    drift_r = (r_ankle_60 - r_ankle_45).length * 1000.0
+    print(f"  Right stance ankle drift across 15 frames (F45->F60): {drift_r:.4f} mm (expected < 0.05 mm)")
+
+    drift_passed = (drift_l < 0.050 and drift_r < 0.050)
+
+    # 5. Contralateral arm swing
+    print("\n[Check 5] Contralateral arm swing coordination")
+    scene.frame_set(28)
+    bpy.context.view_layer.update()
+    arm_l_rot_28 = arm.pose.bones["upper_arm.L"].rotation_euler.x
+    arm_r_rot_28 = arm.pose.bones["upper_arm.R"].rotation_euler.x
+
+    scene.frame_set(54)
+    bpy.context.view_layer.update()
+    arm_l_rot_54 = arm.pose.bones["upper_arm.L"].rotation_euler.x
+    arm_r_rot_54 = arm.pose.bones["upper_arm.R"].rotation_euler.x
+
+    diff_28 = math.degrees(arm_l_rot_28 - arm_r_rot_28)
+    diff_54 = math.degrees(arm_l_rot_54 - arm_r_rot_54)
+    print(f"  F028 Arm angle difference (L - R): {diff_28:.2f} deg")
+    print(f"  F054 Arm angle difference (L - R): {diff_54:.2f} deg")
+    arm_swing_passed = (diff_28 * diff_54 < 0.0)
+
+    # 6. Visual Contact Markers dynamic keyframing
+    print("\n[Check 6] Visual contact markers dynamic visibility")
+    anchor_L = bpy.data.objects.get("Marker_Anchor_foot_L")
+    anchor_R = bpy.data.objects.get("Marker_Anchor_foot_R")
+    markers_passed = True
+    if anchor_L is None or anchor_R is None:
+        print("  FAILED: Foot contact markers not found in scene")
+        markers_passed = False
+    else:
+        # F1: double stance -> both active
+        scene.frame_set(1)
+        bpy.context.view_layer.update()
+        scale_l_1 = anchor_L.scale.x
+        scale_r_1 = anchor_R.scale.x
+
+        # F28: Step 0 (L stance active, R swing hidden)
+        scene.frame_set(28)
+        bpy.context.view_layer.update()
+        scale_l_28 = anchor_L.scale.x
+        scale_r_28 = anchor_R.scale.x
+
+        # F54: Step 1 (R stance active, L swing hidden)
+        scene.frame_set(54)
+        bpy.context.view_layer.update()
+        scale_l_54 = anchor_L.scale.x
+        scale_r_54 = anchor_R.scale.x
+
+        # F78: Step 2 (L stance active, R swing hidden)
+        scene.frame_set(78)
+        bpy.context.view_layer.update()
+        scale_l_78 = anchor_L.scale.x
+        scale_r_78 = anchor_R.scale.x
+
+        print(f"  F001 (Double Stance): L_scale={scale_l_1:.2f}, R_scale={scale_r_1:.2f} (expected 1.0, 1.0)")
+        print(f"  F028 (L Stance / R Swing): L_scale={scale_l_28:.2f}, R_scale={scale_r_28:.2f} (expected 1.0, 0.0)")
+        print(f"  F054 (R Stance / L Swing): L_scale={scale_l_54:.2f}, R_scale={scale_r_54:.2f} (expected 0.0, 1.0)")
+        print(f"  F078 (L Stance / R Swing): L_scale={scale_l_78:.2f}, R_scale={scale_r_78:.2f} (expected 1.0, 0.0)")
+
+        if not (scale_l_1 > 0.5 and scale_r_1 > 0.5):
+            markers_passed = False
+        if not (scale_l_28 > 0.5 and scale_r_28 < 0.1):
+            markers_passed = False
+        if not (scale_l_54 < 0.1 and scale_r_54 > 0.5):
+            markers_passed = False
+        if not (scale_l_78 > 0.5 and scale_r_78 < 0.1):
+            markers_passed = False
+
+    all_passed = (gait_checks_passed and drift_passed and arm_swing_passed and markers_passed)
+    print(f"\nScene A Walk Integration Acceptance: {'PASSED' if all_passed else 'FAILED'}")
+    return all_passed
+
+
+# =============================================================================
+# Test 17: Scene B - Multi-Limb Obstacle Contact Acceptance
+# =============================================================================
+def test_17_scene_b_obstacle_integration_acceptance() -> bool:
+    print("\n--- Test 17: Scene B - Multi-Limb Obstacle Contact Acceptance ---")
+    blend_path = os.path.join(PROJECT_ROOT, "output", "contact_obstacle_integration.blend")
+    if not os.path.exists(blend_path):
+        print(f"FAILED: Scene B obstacle blend file not found at: {blend_path}")
+        return False
+
+    file_size_kb = os.path.getsize(blend_path) / 1024.0
+    print(f"Inspecting Scene B obstacle blend ({file_size_kb:.1f} KB): {blend_path}")
+
+    bpy.ops.wm.open_mainfile(filepath=blend_path)
+    scene = bpy.context.scene
+    arm = bpy.data.objects.get("CharacterArmature")
+    root = bpy.data.objects.get("CharacterRoot")
+
+    if arm is None or root is None:
+        print("FAILED: CharacterArmature or CharacterRoot not found")
+        return False
+
+    # 1. Facing alignment with obstacles (+Y) across all 5 clips
     facing_checks_passed = True
     print("\n[Check 1: Facing alignment with obstacles (+Y)]")
     sample_frames = [
         (15, "Double Stance"),
-        (45, "Single Stance"),
-        (75, "Vault Touch"),
-        (105, "Foot on Wall"),
-        (135, "Ledge Hang"),
-        (165, "Flight Phase"),
+        (45, "Vault Touch"),
+        (75, "Foot on Wall"),
+        (105, "Ledge Hang"),
+        (135, "Flight Phase"),
     ]
     for f, name in sample_frames:
         scene.frame_set(f)
@@ -652,30 +838,25 @@ def test_16_visual_prototype_integration_acceptance() -> bool:
         dot = facing.dot(Vector((0, 1, 0)))
         angle_deg = math.degrees(math.acos(max(-1.0, min(1.0, dot))))
         ok = (dot >= 0.98)
-        print(f"  Segment {name:15s} (F{f:3d}): Facing=({facing.x:.3f}, {facing.y:.3f}, {facing.z:.3f}) | dot={dot:.4f} | angle={angle_deg:.2f} deg -> {'OK' if ok else 'FAIL'}")
+        print(f"  Clip {name:15s} (F{f:3d}): Facing=({facing.x:.3f}, {facing.y:.3f}, {facing.z:.3f}) | dot={dot:.4f} | angle={angle_deg:.2f} deg -> {'OK' if ok else 'FAIL'}")
         if not ok:
             facing_checks_passed = False
 
-    # 2. Standing hand height (wrists hanging down, not horizontal)
-    standing_hand_passed = True
-    print("\n[Check 2: Natural standing hand drop (wrists >= 0.40m below shoulders)]")
-    for f, name in [(15, "Double Stance"), (45, "Single Stance")]:
-        scene.frame_set(f)
-        bpy.context.view_layer.update()
-        sh_l = arm.matrix_world @ arm.pose.bones["upper_arm.L"].head
-        wr_l = arm.matrix_world @ arm.pose.bones["forearm.L"].tail
-        sh_r = arm.matrix_world @ arm.pose.bones["upper_arm.R"].head
-        wr_r = arm.matrix_world @ arm.pose.bones["forearm.R"].tail
-        drop_l = sh_l.z - wr_l.z
-        drop_r = sh_r.z - wr_r.z
-        ok = (drop_l >= 0.40 and drop_r >= 0.40 and abs(wr_l.x) <= 0.35 and abs(wr_r.x) <= 0.35)
-        print(f"  {name:15s}: L drop={drop_l:.3f}m, R drop={drop_r:.3f}m, L_wrist_x={wr_l.x:.2f}, R_wrist_x={wr_r.x:.2f} -> {'OK' if ok else 'FAIL'}")
-        if not ok:
-            standing_hand_passed = False
+    # 2. Standing hand drop (wrists >= 0.40m below shoulders)
+    print("\n[Check 2: Natural standing hand drop in double stance]")
+    scene.frame_set(15)
+    bpy.context.view_layer.update()
+    sh_l = arm.matrix_world @ arm.pose.bones["upper_arm.L"].head
+    wr_l = arm.matrix_world @ arm.pose.bones["forearm.L"].tail
+    sh_r = arm.matrix_world @ arm.pose.bones["upper_arm.R"].head
+    wr_r = arm.matrix_world @ arm.pose.bones["forearm.R"].tail
+    drop_l = sh_l.z - wr_l.z
+    drop_r = sh_r.z - wr_r.z
+    standing_hand_passed = (drop_l >= 0.40 and drop_r >= 0.40 and abs(wr_l.x) <= 0.35 and abs(wr_r.x) <= 0.35)
+    print(f"  Double Stance: L drop={drop_l:.3f}m, R drop={drop_r:.3f}m, L_wrist_x={wr_l.x:.2f}, R_wrist_x={wr_r.x:.2f} -> {'OK' if standing_hand_passed else 'FAIL'}")
 
-    # 3. Morphological pose differentiation across the 6 segments
-    pose_diff_passed = True
-    print("\n[Check 3: Morphological joint angle differentiation]")
+    # 3. Morphological pose differentiation across 5 clips
+    print("\n[Check 3: Morphological joint angle differentiation across 5 clips]")
     pose_rotations: List[List[float]] = []
     monitored_bones = ["spine", "thigh.L", "shin.L", "thigh.R", "shin.R", "upper_arm.L", "forearm.L", "upper_arm.R", "forearm.R"]
     from src.motion.joint_limits import extract_evaluated_bone_rotation_rad
@@ -695,13 +876,11 @@ def test_16_visual_prototype_integration_acceptance() -> bool:
             diff = math.sqrt(sum((a - b) ** 2 for a, b in zip(pose_rotations[i], pose_rotations[j])))
             if diff < min_diff_deg:
                 min_diff_deg = diff
-    print(f"  Minimum pairwise joint angle difference across 6 segments: {min_diff_deg:.2f} deg (expected >= 20.0 deg)")
-    if min_diff_deg < 20.0:
-        pose_diff_passed = False
+    print(f"  Minimum pairwise joint angle difference across 5 clips: {min_diff_deg:.2f} deg (expected >= 20.0 deg)")
+    pose_diff_passed = (min_diff_deg >= 20.0)
 
-    # 4. Contact anchor accuracy on environment surfaces
-    contact_acc_passed = True
-    print("\n[Check 4: Contact anchor accuracy on environment surfaces]")
+    # 4. Obstacle contact precision
+    print("\n[Check 4: Obstacle contact precision (< 10 mm error)]")
     # Double stance (F15)
     scene.frame_set(15)
     bpy.context.view_layer.update()
@@ -711,41 +890,40 @@ def test_16_visual_prototype_integration_acceptance() -> bool:
     err_fr = abs(ak_r.z - 0.07)
     print(f"  Double Stance ground ankles: L_err={err_fl*1000:.2f}mm, R_err={err_fr*1000:.2f}mm")
 
-    # Vault touch (F75)
-    scene.frame_set(75)
+    # Vault touch (F45)
+    scene.frame_set(45)
     bpy.context.view_layer.update()
     wr_r = arm.matrix_world @ arm.pose.bones["forearm.R"].tail
     err_vault = math.sqrt((wr_r.z - 1.05) ** 2 + (wr_r.y - (-5.75)) ** 2)
     print(f"  Vault Touch right wrist on box top: err={err_vault*1000:.2f}mm (target Z=1.05m, Y=-5.75m)")
 
-    # Foot on wall (F105)
-    scene.frame_set(105)
+    # Foot on wall (F75)
+    scene.frame_set(75)
     bpy.context.view_layer.update()
-    ak_r = arm.matrix_world @ arm.pose.bones["shin.R"].tail
-    err_wall = math.sqrt((ak_r.y - (-4.07)) ** 2 + (ak_r.z - 0.45) ** 2)
+    ak_r_wall = arm.matrix_world @ arm.pose.bones["shin.R"].tail
+    err_wall = math.sqrt((ak_r_wall.y - (-4.07)) ** 2 + (ak_r_wall.z - 0.45) ** 2)
     print(f"  Foot on Wall right ankle against wall: err={err_wall*1000:.2f}mm (target Y=-4.07m, Z=0.45m)")
 
-    # Ledge hang (F135)
-    scene.frame_set(135)
+    # Ledge hang (F105)
+    scene.frame_set(105)
     bpy.context.view_layer.update()
     wr_l = arm.matrix_world @ arm.pose.bones["forearm.L"].tail
     wr_r = arm.matrix_world @ arm.pose.bones["forearm.R"].tail
     err_bar = max(abs(wr_l.z - 1.95), abs(wr_r.z - 1.95))
     print(f"  Ledge Hang wrists grasping bar: err={err_bar*1000:.2f}mm (target Z=1.95m)")
 
-    if max(err_fl, err_fr, err_vault, err_wall, err_bar) > 0.010:  # 10 mm
-        contact_acc_passed = False
+    max_err = max(err_fl, err_fr, err_vault, err_wall, err_bar)
+    contact_acc_passed = (max_err <= 0.010)
 
-    # 5. Hold phase anchor stability (drift < 1.0 mm)
-    drift_passed = True
-    print("\n[Check 5: Hold phase contact anchor stability (drift < 1.0 mm)]")
-    hold_checks = [
-        ("Double Stance", 15, 25, "shin.L", "tail"),
-        ("Vault Touch", 75, 85, "forearm.R", "tail"),
-        ("Foot on Wall", 105, 115, "shin.R", "tail"),
-        ("Ledge Hang", 135, 145, "forearm.L", "tail"),
-    ]
-    for name, f0, f1, b_name, end in hold_checks:
+    # 5. Station hold stability (zero drift within clip)
+    print("\n[Check 5] Station hold stability within clips (drift < 0.1 mm)")
+    hold_passed = True
+    for f0, f1, b_name, end, name in [
+        (10, 25, "shin.L", "tail", "Double Stance L foot"),
+        (40, 55, "forearm.R", "tail", "Vault Touch R hand"),
+        (70, 85, "shin.R", "tail", "Wall Touch R foot"),
+        (100, 115, "forearm.L", "tail", "Ledge Hang L hand"),
+    ]:
         scene.frame_set(f0)
         bpy.context.view_layer.update()
         p0 = (arm.matrix_world @ getattr(arm.pose.bones[b_name], end)).copy()
@@ -755,40 +933,49 @@ def test_16_visual_prototype_integration_acceptance() -> bool:
         p1 = (arm.matrix_world @ getattr(arm.pose.bones[b_name], end)).copy()
 
         drift_mm = (p1 - p0).length * 1000.0
-        ok = (drift_mm <= 1.0)
-        print(f"  {name:15s} (F{f0}->F{f1}): Drift = {drift_mm:.3f} mm -> {'OK' if ok else 'FAIL'}")
+        ok = (drift_mm <= 0.10)
+        print(f"  {name:22s} (F{f0}->F{f1}): Drift = {drift_mm:.4f} mm -> {'OK' if ok else 'FAIL'}")
         if not ok:
-            drift_passed = False
+            hold_passed = False
 
-    # 6. Motion smoothness / continuity across entire timeline
-    smooth_passed = True
-    print("\n[Check 6: Motion continuity across frames 1..180 (max step <= 0.40m)]")
-    max_step = 0.0
-    prev_pos = None
-    for f in range(1, 181):
-        scene.frame_set(f)
-        pos = root.matrix_world.translation.copy()
-        if prev_pos is not None:
-            step = (pos - prev_pos).length
-            if step > max_step:
-                max_step = step
-        prev_pos = pos
+    # 6. Contact marker activation per clip
+    print("\n[Check 6] Contact marker activation matching clip requirements")
+    markers_ok = True
+    scene.frame_set(45)
+    bpy.context.view_layer.update()
+    m_hr = bpy.data.objects.get("Marker_Anchor_hand_R")
+    m_fl = bpy.data.objects.get("Marker_Anchor_foot_L")
+    m_hl = bpy.data.objects.get("Marker_Anchor_hand_L")
+    m_fr = bpy.data.objects.get("Marker_Anchor_foot_R")
+    if not (m_hr and m_fl and m_hl and m_fr):
+        markers_ok = False
+    else:
+        if not (m_hr.scale.x > 0.5 and m_fl.scale.x > 0.5 and m_hl.scale.x < 0.1 and m_fr.scale.x < 0.1):
+            print(f"  FAILED: Vault Touch marker scales: hr={m_hr.scale.x}, fl={m_fl.scale.x}, hl={m_hl.scale.x}, fr={m_fr.scale.x}")
+            markers_ok = False
+        else:
+            print("  Vault Touch active markers (hand_R, foot_L): OK")
 
-    print(f"  Maximum single-frame root displacement: {max_step*1000:.2f} mm (expected <= 400 mm)")
-    if max_step > 0.40:
-        smooth_passed = False
+    # Flight phase (F135): all 4 markers hidden
+    scene.frame_set(135)
+    bpy.context.view_layer.update()
+    if m_hr and m_fl and m_hl and m_fr:
+        if max(m_hr.scale.x, m_fl.scale.x, m_hl.scale.x, m_fr.scale.x) > 0.1:
+            print("  FAILED: Flight phase has active contact markers")
+            markers_ok = False
+        else:
+            print("  Flight Phase zero markers (all 4 hidden): OK")
 
-    # Summary
-    all_ok = (
+    all_passed = (
         facing_checks_passed
         and standing_hand_passed
         and pose_diff_passed
         and contact_acc_passed
-        and drift_passed
-        and smooth_passed
+        and hold_passed
+        and markers_ok
     )
-    print(f"\nVisual Prototype Integration Acceptance: {'PASSED' if all_ok else 'FAILED'}")
-    return all_ok
+    print(f"\nScene B Obstacle Integration Acceptance: {'PASSED' if all_passed else 'FAILED'}")
+    return all_passed
 
 
 # =============================================================================
@@ -815,7 +1002,8 @@ def run_all_tests() -> int:
         ("Test 13: WholeBodyController Evaluated Pose Compatibility", test_13_whole_body_controller_pose_compatibility()),
         ("Test 14: MotionState Legacy Adapter Compatibility", test_14_motion_state_legacy_adapter_compatibility()),
         ("Test 15: Core Regression Verification Suite", test_15_core_regression_suite()),
-        ("Test 16: Visual Prototype Integration Acceptance Suite", test_16_visual_prototype_integration_acceptance()),
+        ("Test 16: Scene A - Continuous Walking Integration Acceptance", test_16_scene_a_walk_integration_acceptance()),
+        ("Test 17: Scene B - Multi-Limb Obstacle Contact Acceptance", test_17_scene_b_obstacle_integration_acceptance()),
     ]
 
     print("\n================================================================================")

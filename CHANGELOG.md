@@ -3,7 +3,36 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
-## [2026-10-20] 任务 6G-C：多部位接触几何、约束与支撑状态系统（目视验收返工与全面修复）
+## [2026-10-20] 任务 6G-C：多部位接触几何、约束与支撑状态系统（第二次工程级返工与双原型交付）
+
+### 修复 (Fixed)
+* **彻底根除单腿抬起刚体平移伪造行走的架构缺陷**：
+  * **根因查明**：原调试脚本脱离了 `MotionPlanner` 和 `StartStopWalkAction` 步态调度状态机，错误地在离散姿态目标之间使用数学平滑插值直接平移根节点，导致角色在单腿悬空状态下沿 +Y 平移 2.15 米，呈现出“抬起单腿整体滑行”的荒诞姿态。
+  * **架构解耦重构**：将演示任务彻底拆分为两套职责清晰、互不干扰的独立工程与 Blender 视口文件：
+    1. **场景 A (`output/contact_walk_integration.blend` / `run_contact_walk_integration.py`)**：专注于真实连续人类步态与接触系统的实时闭环。100% 沿用 Task 5C / 6A 验证的步态调度机制（`StartStopWalkAction`），呈现 204 帧完整的起步-加速-交替步态行走-减速-合拢停步全过程；四肢交替抬腿跨步（Z 抬升 100~137 mm），支撑脚微米级锁定（漂移 < 0.005 mm），对侧手臂协调摆动；`ContactModel` 实时逐帧评估双脚接触并驱动绿色八面体标记物在支撑相激活、摆动相熄灭。
+    2. **场景 B (`output/contact_obstacle_integration.blend` / `run_contact_obstacle_integration.py`)**：专注于多部位障碍物接触（Double Stance, Vault Touch, Foot on Wall, Ledge Hang, Flight Phase）。采用 5 个清晰分段的独立观察片段（Hold Clips），角色严格正对目标障碍物（朝向点积 1.0000，夹角 0.00 deg），自然垂臂，接触贴合精度达到微米级（误差严格 < 0.05 mm），彻底杜绝在障碍物之间伪造虚假单腿滑行。
+
+### 新增 (Added)
+* **工程架构审计报告 (`docs/MOTION_INTEGRATION_AUDIT.md`)**：
+  * 完整梳理 Task 3 到 6G 历史运动能力全景总览表；
+  * 深度分析 `StartStopWalkAction`、`ForwardWalkAction`、`SprintStartAction`、`SprintBrakeAction` 输入输出、步态状态机与支撑相/摆动相判定逻辑；
+  * 绘制 `MotionPlanner -> MotionAction -> MotionState -> WholeBodyController -> ContactModel` 闭环数据流；
+  * 彻底剖析单腿滑行根因，确立解耦返工方案与双原型设计边界。
+* **场景 A 真实连续行走与接触系统集成原型 (`run_contact_walk_integration.py`)**：
+  * 生成 `output/contact_walk_integration.blend`（206.8 KB）；
+  * 204 帧完整平滑连续位移（总位移 $1.2600\text{ m}$，峰值速度 $0.2400\text{ m/s}$）；
+  * 支撑类型动态实时切换：`double_stance` (24 帧)、`single_stance_l` (108 帧)、`single_stance_r` (72 帧)；
+  * 绿色接触八面体与外法线箭头指示器随脚部触地/离地动态点亮与熄灭。
+* **场景 B 多部位障碍物接触与支撑状态原型 (`run_contact_obstacle_integration.py`)**：
+  * 生成 `output/contact_obstacle_integration.blend`（165.3 KB）；
+  * 包含 5 个 30 帧独立观察片段（F1..150）：双脚站立、单手撑跳箱、脚蹬垂直墙面、双手抓杆悬垂、空中腾空飞跃；
+  * 身体严格正对障碍物，双手自然垂直下垂（腕部低于肩部 $0.560\text{ m}$），接触锚点误差 $< 0.05\text{ mm}$。
+* **扩展 17 项全量自动化测试套件 (`tests/verify_task6gc_contact_model.py`)**：
+  * 包含 14 项接触几何、生命周期、刚体协变数学测试；
+  * 包含历史 6 大核心回归套件（Task 6G-B, 6G-A, 6F-D, 6F-C, 6F-B, 6F-A），100% 保持全绿；
+  * 新增 `Test 16`（场景 A 连续行走集成验收：位移、交替抬腿、防滑锁定、臂摆与标记物切换）；
+  * 新增 `Test 17`（场景 B 障碍物接触验收：朝向、垂臂、形态差异、接触精度、保持稳定度）；
+  * 17/17 项测试全部通过（退出码 `0`）。
 
 ### 修复 (Fixed)
 * **可视化验收三大严重缺陷根因排查与全面修复 (`run_contact_model_prototype.py`)**：
