@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成任务 6G-C（多部位接触几何、约束与支撑状态系统），等待用户指示开启下一阶段（Task 6G-D 质心平衡、接触动量与简化接触动力学，或特技动作）。
+完成任务 6G-C（多部位接触几何、约束与支撑状态系统）返工与目视验收修复，通过 16 项自动化验证，等待用户在 Blender 中目视复验。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -29,8 +29,8 @@
   * 6 大多表面支撑状态拓扑分类（双脚支撑、单脚站立、手撑台面、蹬墙接触、抓杆悬垂、腾空飞跃）。
   * 共面 2D 凸包支撑多边形求解（物理免责声明：不代表 ZMP 或动态稳定性）。
   * `enrich_motion_state_with_contacts` 向后兼容 `ContactPointState`。
-  * `tests/verify_task6gc_contact_model.py`：自动化验证套件（15 项测试全部通过）。
-  * `run_contact_model_prototype.py`：生成独立视口验收工程 `output/contact_model_debug.blend`（144 KB）。
+  * `run_contact_model_prototype.py`：全面排查根因并修复，采用 `WholeBodyController` 正确世界转局部变换驱动，重构为 6 个清晰独立的 30 帧调试片段（总时长 180 帧，生成 `output/contact_model_debug.blend` 187.7 KB）。
+  * `tests/verify_task6gc_contact_model.py`：新增 Test 16 视口集成自动化验收测试，覆盖朝向夹角、下垂高度、形态差异、贴合精度、漂移稳定性与运动平滑度等 6 大量化指标。
   * 录入 `[DEC-022]`。
 
 ## 3. 已验证
@@ -42,7 +42,7 @@
 * 环境物体刚体旋转平移协变更新误差严格为 0.00e+00 m。
 * WholeBodyController 与 MotionState 姿态完全兼容（末端追踪误差 $< 0.015\text{ mm}$）。
 * 全量回归测试：Task 6G-B、6G-A、6F-D、6F-C、6F-B、6F-A 核心测试全部 100% 回归通过。
-* 生成并实际验证 `output/contact_model_debug.blend` 文件存在且在 Blender 中正常播放。
+* 生成并实际验证 `output/contact_model_debug.blend` 文件（187.7 KB），通过 Test 16 自动化视口集成验收，待用户 Blender 目视复验。
 
 ## 4. 当前文件
 * 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`
