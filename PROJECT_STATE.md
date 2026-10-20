@@ -1,13 +1,32 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-20  
-> **当前阶段**：任务 6G-B（刚体连杆惯性张量与全身角动量模型完成）  
+> **当前阶段**：任务 6G-C（多部位接触几何、约束与支撑状态系统完成）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-C 多部位接触几何、约束与支撑状态系统 (`contact_model.py` / `output/contact_model_debug.blend`)**：
+  * 在 [`src/motion/contact_model.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py) 中实现多部位接触类型（UNILATERAL / GRASP / FREE）、生命周期状态机（CANDIDATE / ESTABLISHED / RELEASED / BROKEN）、几何约束误差量化、6 类多表面支撑状态分类、共面 2D 凸包支撑多边形与环境刚体协变更新。
+  * 由 [`tests/verify_task6gc_contact_model.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gc_contact_model.py) 自动化测试套件（15 项严苛测试）完整验证。
+  * 由 [`run_contact_model_prototype.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_contact_model_prototype.py) 成功生成独立 Blender 交互视口验收工程 [`output/contact_model_debug.blend`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/contact_model_debug.blend)（144 KB），包含 4 类环境几何体、120 帧 6 阶段连续时间线与着色接触锚点/外法线指示器。
+  * **实测关键指标**：
+    * **解剖接触锚点与骨骼原点严格解耦**：脚底偏置 $(0, 0.077, -0.070)\text{ m}$，手掌偏置 $(0, 0.050, -0.015)\text{ m}$，局部到世界矩阵变换绝对误差严格为 **`0.00e+00 m`**。
+    * **外法线单位模长与外侧约定**：任意 3D 法线经单位化后模长误差严格为 **`0.00e+00`**，且严格指向环境外侧。
+    * **单向推力 vs 双向抓握约束严格区分**：单向接触拉开 $+50\text{ mm}$ 准确报 `EXCESSIVE_GAP`，下压穿透 $-30\text{ mm}$ 准确报 `EXCESSIVE_PENETRATION`；抓握约束对 3D 偏移超过公差（$35\text{ mm} > 20\text{ mm}$）准确报 `GRASP_DISPLACEMENT`。
+    * **6 大支撑状态准确分类与拓扑识别**：
+      - `double_stance`：双脚同时接地，共面支撑多边形有效生成；
+      - `single_stance_l`：左脚支撑，右脚摆动释放；
+      - `multi_surface`：脚在地面，单手撑跳台顶面；
+      - `wall_foot_stance`：地面 (+Z) 与垂直墙面 (-Y) 多法线非共面状态（准确拒绝生成 2D 凸包）；
+      - `ledge_hang`：双手抓握横杆悬垂，双脚离地悬空；
+      - `flight`：腾空飞跃，0 活跃接触，空支撑多边形。
+    * **量化几何误差分析精确性**：穿透深度（$20.00\text{ mm}$，误差 $4.47 \times 10^{-10}\text{ m}$）、切向滑移（$50.00\text{ mm}$，误差 $4.77 \times 10^{-8}\text{ m}$）、总位移偏差（$53.85\text{ mm}$，误差 $4.44 \times 10^{-8}\text{ m}$）。
+    * **环境物体变换协变性**：环境物体发生旋转/平移后，更新所得世界接触点误差为 **`0.00e+00 m`**，法线逆转置矩阵协变更新误差为 **`0.00e+00`**。
+    * **WholeBodyController 与 MotionState 姿态兼容**：控制器求解姿态四肢末端平均追踪误差 $< 0.015\text{ mm}$，`enrich_motion_state_with_contacts` 无损注入兼容 `ContactPointState` 与遥测字典。
+    * **核心全量回归验证**：Task 6G-B、6G-A、6F-D、6F-C、6F-B、6F-A 核心测试套件 100% 全绿（全部退出码 `0`）。
 * **任务 6G-B 刚体连杆惯性张量与全身角动量模型 (`InertiaTensor` / `WholeBodyInertiaState`)**：
   * 在 [`src/motion/body_inertia.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/body_inertia.py) 中实现分段几何惯性建模、3D 平行轴定理全身惯性张量合成与多连杆角动量（Spin/Orbital 解耦求和），经由 [`tests/verify_task6gb_body_inertia.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gb_body_inertia.py) 自动化测试套件（13 项严苛测试）完整验证。
   * **实测关键指标**：
@@ -79,6 +98,7 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证。
 
 ### [已实现]
+* 多部位接触几何、约束与支撑状态系统：`src/motion/contact_model.py`、`run_contact_model_prototype.py`、`tests/verify_task6gc_contact_model.py`、`output/contact_model_debug.blend`
 * 刚体连杆惯性张量与全身角动量模型：`src/motion/body_inertia.py`、`tests/verify_task6gb_body_inertia.py`
 * 连续身体运动状态与速度学基础：`src/motion/body_kinematics.py`、`tests/verify_task6ga_body_kinematics.py`
 * 统一全身控制接口与最小协调器：`src/motion/whole_body_controller.py`、`tests/verify_task6fd_whole_body_controller.py`

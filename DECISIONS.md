@@ -312,3 +312,37 @@
   - 13 项严苛自动化验证全部通过，所有分段局部张量对称正定、解析几何公式完全匹配、平移旋转协变性精准、静止角动量严格为 0、四肢运动物理分解清晰、历史回归全绿；
   - 为未来支撑多边形与动态平衡补偿（Task 6G-C/Task 7）提供了坚实可靠的多刚体惯性物理底座。
 
+---
+
+### [DEC-022] 多部位接触几何约束与支撑状态架构规范 (Task 6G-C)
+* **状态**：已采纳并实测验证 (Accepted & Verified)
+* **日期**：2026-10-20
+* **背景**：在完成多刚体运动学（Task 6G-A）与惯性角动量（Task 6G-B）后，跑酷动画进入接触与多表面支撑阶段。现有系统仅有简化的双脚地面锁定，缺乏针对手部支撑、单手撑跳（Vault）、墙面蹬踏（Wall run/kick）、悬垂抓握（Ledge hang）和腾空（Flight）的通用接触描述。严禁将本阶段升级为动力学平衡补偿器（ZMP/Capture Point），核心任务是建立纯几何与运动学约束的接触状态机、误差量化和支撑多边形系统。
+* **决策**：
+  1. **接触类型与生命周期正交状态机**：
+     - 在 [`src/motion/contact_model.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py) 中定义 `ContactType`（`UNILATERAL`: 单向推力/不能拉力，`GRASP`: 双向全自由度抓握，`FREE`: 自由状态）与 `ContactLifecycle`（`CANDIDATE` $\rightarrow$ `ESTABLISHED` $\rightarrow$ `RELEASED` / `BROKEN`）。
+     - 支持四肢通用端点（`foot_L`, `foot_R`, `hand_L`, `hand_R`），具备扩展至膝/肘等解剖接触点的通用架构。
+  2. **骨骼原点与接触局部锚点严格解耦**：
+     - 明确骨骼关节原点（踝关节 $Z=0.07\text{ m}$，腕关节 $Z=0.98\text{ m}$）与解剖表面接触锚点的几何偏置（脚底中心偏置 $(0, 0.077, -0.070)\text{ m}$，手掌接触偏置 $(0, 0.050, -0.015)\text{ m}$）。
+     - 接触判定严格基于身体接触点（Body Anchor）与环境接触点（World Anchor）的相对位移，杜绝直接将踝关节/腕关节当做接触面接触点。
+  3. **环境变换协变性与外法线统一约定**：
+     - 环境表面 `EnvironmentalSurface` 具有局部接触点与局部表面法线，当环境物体发生世界变换矩阵 $\mathbf{M}$ 更新时，世界接触点 $\mathbf{p}_{\text{world}} = \mathbf{M} \mathbf{p}_{\text{local}}$，外法线 $\mathbf{n}_{\text{world}} = (\mathbf{M}^{-T} \mathbf{n}_{\text{local}})^{\circ}$ 自动协变更新。
+     - 外法线严格保证指向环境外侧且单位模长误差 $< 10^{-6}$。
+  4. **量化约束误差计算与严格判定准则**：
+     - 法向位移分解：$d_n = (\mathbf{p}_{\text{actual}} - \mathbf{p}_{\text{contact}}) \cdot \hat{\mathbf{n}}$；切向滑移：$\mathbf{d}_t = (\mathbf{p}_{\text{actual}} - \mathbf{p}_{\text{contact}}) - d_n \hat{\mathbf{n}}$。
+     - `UNILATERAL` 类型：$d_n > 0$ 为间隙（Separation Gap），$d_n < 0$ 为穿透（Penetration Depth）。拉拔离开或过度穿透均触发约束违规。
+     - `GRASP` 类型：进行 3D 欧式全向位移校验，超出抓握公差即报告违规。
+  5. **多表面支撑状态分类与共面投影多边形**：
+     - 自动依据当前有效接触组合分类为 6 类支撑状态：`DOUBLE_STANCE`、`SINGLE_STANCE_L/R`、`MULTI_SURFACE`（如手撑台面）、`WALL_FOOT_STANCE`（脚蹬垂直墙）、`LEDGE_HANG`（双手抓横杆悬垂）、`FLIGHT`（腾空无接触）。
+     - 当所有支撑接触法线严格一致且共面时，计算 2D 凸包支撑多边形；一旦出现多法线（如地脚+蹬墙）或非共面接触（如手撑+脚地），明确输出非共面标记并拒绝虚假生成 2D 支撑多边形。
+     - 明确物理免责声明：静态支撑多边形仅代表接触几何凸包，绝不代表动态稳定性或 ZMP。
+  6. **零破坏双向适配与可视化交付**：
+     - 提供 `enrich_motion_state_with_contacts`，向后兼容现有 `MotionState.contacts`（`ContactPointState`）及遥测数据。
+     - 与 `WholeBodyController` 全身姿态完全兼容；
+     - 交付独立视口验收工程 `output/contact_model_debug.blend`，在 120 帧连续时间线上清晰展示 6 种支撑状态切换与着色标记。
+* **影响**：
+  - 跑酷动画系统获得了统一、结构化、几何严谨的多肢体接触与支撑状态感知能力；
+  - 15 项自动化验证全数通过，历史 6 大核心回归套件 100% 保持全绿；
+  - 为 Task 6G-D 质心平衡、接触动量与简化接触动力学奠定了清晰的几何约束接口。
+
+

@@ -3,6 +3,50 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-20] 任务 6G-C：多部位接触几何、约束与支撑状态系统
+
+### 新增 (Added)
+* **通用多部位接触模型与支撑状态机 (`src/motion/contact_model.py`)**：
+  * 构建核心数据结构与枚举：
+    * `ContactType`：定义单向推力接触（`UNILATERAL`，单向支撑且受拉分离，不承受粘附拉力）、双向全自由度抓握（`GRASP`，承受 3D 任意方向约束力）与自由腾空状态（`FREE`）。
+    * `ContactLifecycle`：离散生命周期状态机，包含预备进入（`CANDIDATE`）、生效锁定（`ESTABLISHED`）、计划性主动脱离（`RELEASED`）与非受控破坏断开（`BROKEN`）。
+    * `SupportType`：多接触模式拓扑分类（`DOUBLE_STANCE` 双脚支撑、`SINGLE_STANCE_L/R` 单脚支撑、`MULTI_SURFACE` 多表面手脚接触、`WALL_FOOT_STANCE` 地面加垂直蹬墙、`LEDGE_HANG` 双手抓握横杆悬垂、`FLIGHT` 腾空飞跃无接触）。
+    * `ContactRecord`：单部位接触全量记录（部位标识、接触表面名、接触类型、生命周期、世界空间接触点、表面外法线、摩擦系数、法向间隙公差、法向穿透公差、切向滑移公差与抓握公差）。
+    * `GeometricConstraintResult`：纯几何与运动学约束校验反馈（是否合规、法向位移、切向滑移、总几何偏差、违规分类及描述）。
+    * `MultiContactState`：全身多部位接触聚合容器，提供支撑分类、共面 2D 凸包支撑多边形求解（`Graham Scan` 凸包算法）、接触几何校验与状态转换接口。
+    * `EnvironmentalSurface`：支持刚体变换协变的环境表面定义，当物体变换矩阵更新时，接触点与外法线（逆转置变换与归一化）自动协变更新。
+  * 核心接口与函数：
+    * `DEFAULT_LIMB_LOCAL_ANCHORS`：将骨骼关节原点与解剖表面接触锚点解耦（脚底偏置 $(0, 0.077, -0.070)\text{ m}$，手掌偏置 $(0, 0.050, -0.015)\text{ m}$）。
+    * `evaluate_limb_contacts_from_armature`：基于 Blender Armature 评估骨骼世界矩阵计算接触锚点并进行接触几何校验。
+    * `contact_record_to_legacy_contact_point` 与 `legacy_contact_point_to_contact_record`：双向无损兼容既有 `ContactPointState`。
+    * `enrich_motion_state_with_contacts`：将接触拓扑分类、有效支撑肢体列表、共面支撑多边形等信息无缝注入 `MotionState.params` 与 `MotionState.contacts`。
+* **可视化验收工程与原型脚本 (`run_contact_model_prototype.py`)**：
+  * 生成独立视口可观察验收工程 `output/contact_model_debug.blend`（144 KB）。
+  * 包含 4 类环境障碍物：大面积地面（Z=0）、撑跳箱体（Z=0.85）、垂直蹬踏墙面（面向 -Y）、抓握横杆（Z=1.80）。
+  * 在 120 帧连续时间线上完整演示 6 种支撑状态（双脚站立、单脚站立、手撑台面、蹬墙接触、抓杆悬垂、腾空飞跃），配备清晰着色的接触锚点与外法线箭头指示器。
+* **自动化测试套件 (`tests/verify_task6gc_contact_model.py`)**：
+  * 15 项严苛测试 100% 全部通过：
+    1. 骨骼局部锚点到世界坐标的仿射变换严格吻合（误差 $0.00\text{ m}$）。
+    2. 外法线单位模长检验（误差 $0.00\text{ m}$）与指向环境外侧约定。
+    3. 单向接触（推/拉判定）与双向抓握约束严格区分。
+    4. 双脚地面接触激活与共面支撑多边形计算。
+    5. 单脚站立与摆动脚平滑释放。
+    6. 单手撑台与手脚多表面支撑判定。
+    7. 地面 (+Z) 与垂直墙面 (-Y) 多法线非共面状态分类（拒绝错误生成 2D 凸包）。
+    8. 双手抓握横杆悬垂状态分类。
+    9. 腾空飞跃零接触与空多边形判定。
+    10. 接触生命周期（Candidate -> Established -> Broken/Released）状态流转。
+    11. 量化误差分解（法向间隙、穿透深度、切向滑移、总几何位移）。
+    12. 环境物体世界变换协变性（位置与法线逆转置矩阵协变更新）。
+    13. WholeBodyController 姿态兼容性与接触评估集成。
+    14. MotionState 双向适配与遥测数据注入兼容性。
+    15. 核心历史回归测试套件（Task 6G-B、6G-A、6F-D、6F-C、6F-B、6F-A）全绿。
+* **架构决策与导出**：
+  * 录入决策 `[DEC-022]`。
+  * 在 `src/motion/__init__.py` 中导出所有多接触数据结构与接口。
+
+
+
 ## [2026-10-20] 任务 6G-B：刚体连杆惯性张量与全身角动量模型
 
 ### 新增 (Added)

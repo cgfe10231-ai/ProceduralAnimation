@@ -105,6 +105,20 @@ from src.motion.body_inertia import (
     compute_whole_body_inertia_from_snapshots,
     enrich_motion_state_with_inertia,
 )
+from src.motion.contact_model import (
+    ContactLifecycle,
+    ContactRecord,
+    ContactType,
+    DEFAULT_LIMB_LOCAL_ANCHORS,
+    EnvironmentalSurface,
+    GeometricConstraintResult,
+    MultiContactState,
+    SupportType,
+    contact_record_to_legacy_contact_point,
+    enrich_motion_state_with_contacts,
+    evaluate_limb_contacts_from_armature,
+    legacy_contact_point_to_contact_record,
+)
 
 
 def apply_motion(config: PipelineConfig, rig_obj=None):
@@ -200,5 +214,17 @@ __all__ = [
     "compute_whole_body_inertia",
     "compute_whole_body_inertia_from_snapshots",
     "enrich_motion_state_with_inertia",
+    "ContactType",
+    "ContactLifecycle",
+    "SupportType",
+    "ContactRecord",
+    "MultiContactState",
+    "GeometricConstraintResult",
+    "EnvironmentalSurface",
+    "enrich_motion_state_with_contacts",
+    "contact_record_to_legacy_contact_point",
+    "legacy_contact_point_to_contact_record",
+    "evaluate_limb_contacts_from_armature",
+    "DEFAULT_LIMB_LOCAL_ANCHORS",
 ]
 

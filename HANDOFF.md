@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成任务 6G-B（刚体连杆惯性张量与全身角动量模型），等待用户指示开启下一阶段（Task 6G-C/Task 7 支撑多边形与动态平衡补偿，或特技动作）。
+完成任务 6G-C（多部位接触几何、约束与支撑状态系统），等待用户指示开启下一阶段（Task 6G-D 质心平衡、接触动量与简化接触动力学，或特技动作）。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -20,39 +20,36 @@
 * 完成关节自由度（DOF）与生理活动范围（ROM）约束系统（Task 6F-C）。
 * 完成统一全身控制接口与最小协调器（Task 6F-D）。
 * 完成连续身体运动状态与速度学基础（Task 6G-A）。
-* 完成刚体连杆惯性张量与全身角动量模型（Task 6G-B）：
-  * `src/motion/body_inertia.py`：`InertiaTensor`、`SegmentGeometrySpec`、`BodyInertiaModel`、`SegmentInertiaState`、`WholeBodyInertiaState`。
-  * 15 刚体质量分段局部惯性张量（对称且正定），支持椭球体、圆柱体、椭圆柱体与长方体几何近似。
-  * 3D 平行轴定理（Steiner's Theorem）统一合成全身相对于 CoM 的惯性张量。
-  * 全身空间平移严格不变性与刚体旋转张量变换协变性（$\mathbf{Q} \mathbf{I} \mathbf{Q}^T$）。
-  * 多连杆全身角动量解耦求和（自转 Spin 与轨道 Orbital 项）。
-  * 刚性旋转下多连杆角动量严格等于单刚体解析解 $\mathbf{I}_{\text{body}} \boldsymbol{\omega}$（相对误差 $< 10^{-7}$）。
-  * 四肢展开与紧收姿态偏航惯性差异比达 2.540 倍。
-  * `enrich_motion_state_with_inertia` 无缝注入 `MotionState.params`。
-  * `tests/verify_task6gb_body_inertia.py`：自动化验证套件（13 项测试全部通过）。
-  * 录入 `[DEC-021]`。
+* 完成刚体连杆惯性张量与全身角动量模型（Task 6G-B）。
+* 完成多部位接触几何、约束与支撑状态系统（Task 6G-C）：
+  * `src/motion/contact_model.py`：`ContactType`、`ContactLifecycle`、`SupportType`、`ContactRecord`、`GeometricConstraintResult`、`MultiContactState`、`EnvironmentalSurface`。
+  * 接触类型区分：单向推力（UNILATERAL）、全向抓握（GRASP）与自由状态（FREE）。
+  * 骨骼关节原点与身体接触局部锚点解耦（脚底偏置 $(0, 0.077, -0.070)\text{ m}$，手掌偏置 $(0, 0.050, -0.015)\text{ m}$）。
+  * 环境物体刚体变换协变性（位置与外法线逆转置矩阵自动协变更新）。
+  * 6 大多表面支撑状态拓扑分类（双脚支撑、单脚站立、手撑台面、蹬墙接触、抓杆悬垂、腾空飞跃）。
+  * 共面 2D 凸包支撑多边形求解（物理免责声明：不代表 ZMP 或动态稳定性）。
+  * `enrich_motion_state_with_contacts` 向后兼容 `ContactPointState`。
+  * `tests/verify_task6gc_contact_model.py`：自动化验证套件（15 项测试全部通过）。
+  * `run_contact_model_prototype.py`：生成独立视口验收工程 `output/contact_model_debug.blend`（144 KB）。
+  * 录入 `[DEC-022]`。
 
 ## 3. 已验证
-* 分段局部惯性张量对称且正定：15 分段主惯量全正（$0.00025 \sim 0.61690\text{ kg}\cdot\text{m}^2$）。
-* 几何闭式公式绝对匹配：圆柱、椭球、椭圆柱、长方体公式误差 $< 3 \times 10^{-17}$。
-* 3D 平行轴定理数值正确：与独立解析值误差仅 $4.77 \times 10^{-8}$。
-* 空间平移不变性：位移 $(12.5, -45.0, 3.2)\text{ m}$，相对 CoM 惯性差 Frobenius 范数仅 $8.96 \times 10^{-6}\text{ kg}\cdot\text{m}^2$。
-* 刚体旋转协变性：绕任意轴旋转 $40^\circ$，与 $\mathbf{Q} \mathbf{I} \mathbf{Q}^T$ 误差仅 $7.06 \times 10^{-6}\text{ kg}\cdot\text{m}^2$。
-* 中立站姿对称合理：$I_{xy} = I_{xz} = 0.00000$，$I_{xx} = 13.46, I_{yy} = 14.21, I_{zz} = 1.08\text{ kg}\cdot\text{m}^2$。
-* 单臂侧平举响应灵敏：$I_{zz}$ 增加 $+0.65442\text{ kg}\cdot\text{m}^2$（$+60.7\%$），$I_{xy} = 0.10313\text{ kg}\cdot\text{m}^2$。
-* 四肢收展惯性比显著：展开 $2.403\text{ kg}\cdot\text{m}^2$ vs 收束 $0.946\text{ kg}\cdot\text{m}^2$，比值 $2.540$ 倍。
-* 静止全身角动量严格为零：模长 $0.00000000\text{ kg}\cdot\text{m}^2/\text{s}$。
-* 刚性旋转角动量一致性：与 $\mathbf{I}_{\text{body}} \boldsymbol{\omega}$ 误差仅 $1.07 \times 10^{-6}\text{ kg}\cdot\text{m}^2/\text{s}$。
-* 四肢独立运动物理分解：Spin 与 Orbital 各自贡献清晰量化。
-* 框架无损集成：CoM 误差 $0.00\text{ m}$，快照与骨架计算差异 $7.33 \times 10^{-7}\text{ kg}\cdot\text{m}^2$。
-* 全量回归测试：Task 6G-A、6F-D、6F-C、6F-B、6F-A 及 6D 全部 100% 回归通过。
+* 骨骼局部锚点到世界坐标变换绝对误差严格为 0.00e+00 m。
+* 外法线单位化模长误差严格为 0.00e+00，且始终指向环境外侧。
+* 单向推力（拉开间隙违规、下压穿透违规）与双向抓握（3D 偏移违规）严格区分。
+* 6 种支撑状态准确分类与拓扑识别（含垂直墙面非共面拒绝虚假 2D 凸包与腾空 0 接触）。
+* 量化几何误差分解精确（穿透误差 $4.47 \times 10^{-10}\text{ m}$，切向滑移误差 $4.77 \times 10^{-8}\text{ m}$）。
+* 环境物体刚体旋转平移协变更新误差严格为 0.00e+00 m。
+* WholeBodyController 与 MotionState 姿态完全兼容（末端追踪误差 $< 0.015\text{ mm}$）。
+* 全量回归测试：Task 6G-B、6G-A、6F-D、6F-C、6F-B、6F-A 核心测试全部 100% 回归通过。
+* 生成并实际验证 `output/contact_model_debug.blend` 文件存在且在 Blender 中正常播放。
 
 ## 4. 当前文件
 * 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`
 * 规范与状态文档：`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md`、`PROJECT_STATE.md`、`CHANGELOG.md`、`README.md`
 * 核心源码：`src/`（`config.py`、`pipeline.py`、`scene/`、`camera/`、`lighting/`、`render/`、`validation/`、`character/`、`rig/`、`motion/`）
-* 管线入口：`run_sprint_brake_prototype.py`、`run_sprint_prototype.py`、`run_pipeline.py`、`run_pipeline.ps1`
-* 测试套件：`tests/`（`verify_task6gb_body_inertia.py`、`verify_task6ga_body_kinematics.py`、`verify_task6fd_whole_body_controller.py` 等）
+* 管线入口：`run_contact_model_prototype.py`、`run_arm_ik_prototype.py`、`run_sprint_brake_prototype.py`、`run_sprint_prototype.py`、`run_pipeline.py`、`run_pipeline.ps1`
+* 测试套件：`tests/`（`verify_task6gc_contact_model.py`、`verify_task6gb_body_inertia.py`、`verify_task6ga_body_kinematics.py`、`verify_task6fd_whole_body_controller.py` 等）
 * 运行产物：`output/`（受 `.gitignore` 忽略）
 
 ## 5. 已知问题
