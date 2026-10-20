@@ -5,8 +5,8 @@
 * **任务状态**：已验证（经 `tests/verify_task6gc_contact_model.py` 17 项全量测试 100% 验证，含 14 项数学模型测试、核心历史全量回归、场景 A 连续行走验收与场景 B 障碍物接触验收；`output/contact_walk_integration.blend` 206.8 KB 与 `output/contact_obstacle_integration.blend` 165.3 KB 生成完毕，待用户 Blender 目视复验）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：待提交 (即将在本次提交后同步 SHA)
-  * **未提交文件**：待暂存相关任务文件进行局部提交
+  * **最新 Commit SHA**：`8582bc3`
+  * **未提交文件**：无（所有 Task 6G-C 第二次工程级返工代码、审计文档、原型脚本与测试已完整提交本地 Git）
 
 ---
 
