@@ -3,6 +3,41 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-20] 任务 6G-C-R3B-1：统一架构规范修订与最小兼容桥接层 (Task 6G-C-R3B-1 Bridge Layer)
+
+### 规范修订与强化 (Specifications & Rules)
+* **修订权威系统架构规范 (`ARCHITECTURE.md` v2.1 & `ARCHITECTURE_SYNC.md` v2.1)**：
+  * 确立 10 大架构设计原则（MotionAction 规划驱动、WBC 独占姿态协调、开环运动学+事后只读物理遥测、防伪造真实失败汇报、零退化等）；
+  * 绘制三层架构演化视图（当前断裂点现状 -> R3B 统一桥接落地 -> 未来 6G-D/6H/7A 物理平衡闭环）；
+  * 确立统一单帧 6 阶段执行协议表（Phase 1 规划 -> Phase 2 接触防滑锁定 -> Phase 3 WBC 统一求解 -> Phase 4 真实 ROM 校验 -> Phase 5 事后只读遥测丰富 -> Phase 6 状态提交）；
+  * 梳理 12 大核心模块契约表与 6 大历史动作复用矩阵；
+  * 同步永久规则 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`，严密规约阶段接入、调用链、防独立脚本拼凑与真实验证。
+
+### 新增与实现 (Added & Implemented)
+* **实现最小兼容桥接层 (`src/motion/kinematic_bridge.py`)**：
+  * `KinematicPlannedPose`：统一结构化运动规划输入容器，涵盖浮动基座、骨盆、躯干 FK、足部目标与世界锁定标记、手部 IK/FK 模式；
+  * `convert_planned_pose_to_wbc_targets`：将运动规划无损映射为 `WholeBodyControlTargets`，并显式仲裁手臂 FK/IK 模式；
+  * `KinematicBridgeExecutor`：严格编排单帧 6-Phase 生命周期，统筹 `foot_contact` 接地世界锚定锁定、`WholeBodyController` 独占姿态求解、`JointModel` ROM 与到达性诚实验证、事后只读物理遥测丰富（CoM、速度、惯性张量、角动量、接触模型）及 `MotionState` 状态提交；
+  * 在 `src/motion/__init__.py` 中统一对外导出。
+* **升级 WholeBodyController (`src/motion/whole_body_controller.py`)**：
+  * 感知足部 `is_locked` 标记，当足部锁定时协同 `lock_foot_contact` 保持世界空间接地锚定，严禁解绑或破坏锁定状态；
+  * 增强 ROM 截断后的到达性二次复核，严禁以伪造姿态迎合阈值。
+
+### 验证 (Verification)
+* **编写并 100% 通过自动化严苛测试套件 (`tests/verify_task6gc_r3b1_bridge.py`)**：
+  * Test 01：Lossless Input Mapping（100% 空间与运动学字段无损转换）；
+  * Test 02：FK/IK Arbitration & Control Ownership（显式手部仲裁，腕部追踪误差 0.041 mm）；
+  * Test 03：Stance Foot Ground Anchor Preservation（控制器漂移 0.000000 mm，骨骼漂移 0.246 mm）；
+  * Test 04：Truthful ROM & Reach Failure Reporting（超限及越界严格诚实汇报 `success=False`）；
+  * Test 05：Quantitative Pose Equivalence（桥接与历史动作姿态在骨盆、左踝、右踝误差严格为 **0.0000 mm**）；
+  * Test 06：Immutability of Historical Gait Curves（历史 7 步排期、0.24 m/s 稳态速度、1.26 m 总位移 100% 不可变）；
+  * Test 07：Data Types, Units & Coordinate Consistency（+Z Up，地面 Z=0.0，双支撑标识完全兼容）；
+  * Test 08：Duplicate Write Conflict Prevention（WBC 与 foot_contact 独占写所有权零冲突）；
+  * Test 09：Full Single-Frame 6-Phase Pipeline Execution（5 帧完整 6 阶段流水线执行，关键帧正确写入）；
+  * Test 10：Core Historical Regression Suite（历史 6 大核心模块回归测试 100% 全绿：WBC、Joint Limits、Rigid Link、Arm IK、Kinematics、Inertia）。
+
+
+
 ## [2026-10-20] 任务 6G-C-R3A：系统架构深度审计与规范锁定 (Task 6G-C-R3A Architecture Audit)
 
 ### 审计与规范 (Audit & Specifications)

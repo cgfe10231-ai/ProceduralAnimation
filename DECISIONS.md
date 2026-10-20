@@ -379,5 +379,26 @@
   - 确立了权威、不可漂移的统一架构蓝图与调用合同；
   - 明确了 R3B 合流阶段的具体实施路径，彻底封堵静态姿态冒充连续动作的工程漏洞。
 
+---
+
+### [DEC-025] 统一架构规范修订与最小兼容桥接层 (Task 6G-C-R3B-1 Architecture Specification & Compatibility Bridge)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-20
+* **背景**：在 Task 6G-C-R3A 审计中明确了系统存在三套分立管线与控制器双轨制的问题。为确保后续动作、接触和物理系统全部沿统一架构演进，同时不破坏经过严苛验证的历史步态曲线（Walk/Run/Sprint/Brake），必须建立权威的单帧 6 阶段执行协议与最小兼容桥接层。
+* **决策**：
+  1. **架构规范权威修订 (v2.1)**：在 `ARCHITECTURE.md` 与 `ARCHITECTURE_SYNC.md` 中确立 10 大架构设计原则、三层架构演进视图（当前/R3B统一/未来6G-D/6H/7A）、单帧 6 阶段执行协议表、12 大模块契约清单与 6 大历史动作复用表。
+  2. **实现最小兼容桥接层 (`src/motion/kinematic_bridge.py`)**：
+     - 提供结构化输入容器 `KinematicPlannedPose`（包含根节点、骨盆位姿、躯干 FK、左右脚足部目标与锁定标记、左右手 IK/FK 目标）；
+     - 实现 `convert_planned_pose_to_wbc_targets`：执行精确的目标映射、手部 FK/IK 显式仲裁与足部锁定标记传递；
+     - 实现 `KinematicBridgeExecutor`：严格依照 Phase 1 至 Phase 6 编排单帧生命周期，协调 `foot_contact` 物理锁定、`WholeBodyController` 独占求解、`JointModel` ROM 真实校验、事后只读物理遥测丰富（CoM、速度、惯性张量、角动量、接触模型）与 `MotionState` 状态提交。
+  3. **严格所有权与防冲突纪律**：
+     - 足部接地防滑锁定由 `src/rig/foot_contact.py` 独占管理（解除父级并锁定世界坐标）；WBC 在求解时感知 `is_locked`，严禁解绑或覆盖。
+     - 手部显式仲裁：`enabled=False` 时 arm IK 约束 influence 归零，由 FK 关节角完全主导；`enabled=True` 时 arm IK 接管，保证双臂摆动与抓握各得其所。
+  4. **真实失败汇报机制**：ROM 截断后重新评估末端到达性，若发生超限或 ROM 违背，`execute_frame` 严格诚实汇报 `success=False`，绝对禁止伪造通过。
+* **影响**：
+  - 经 `tests/verify_task6gc_r3b1_bridge.py` 10 项严苛测试验证，桥接输出与历史姿态函数在骨盆与双踝位置差异达到微米级（**0.0000 mm** 完全一致）；
+  - 历史动作曲线与步态排期完全不可变；历史 6 大核心测试套件 100% 保持全绿；
+  - 为 R3B-2 历史动作无损迁移至统一桥接架构提供了标准执行骨架。
+
 
 

@@ -119,6 +119,14 @@ from src.motion.contact_model import (
     evaluate_limb_contacts_from_armature,
     legacy_contact_point_to_contact_record,
 )
+from src.motion.kinematic_bridge import (
+    BridgeExecutionResult,
+    KinematicBridgeExecutor,
+    KinematicPlannedPose,
+    PlannedFootTarget,
+    PlannedHandTarget,
+    convert_planned_pose_to_wbc_targets,
+)
 
 
 def apply_motion(config: PipelineConfig, rig_obj=None):
@@ -226,5 +234,11 @@ __all__ = [
     "legacy_contact_point_to_contact_record",
     "evaluate_limb_contacts_from_armature",
     "DEFAULT_LIMB_LOCAL_ANCHORS",
+    "KinematicPlannedPose",
+    "PlannedFootTarget",
+    "PlannedHandTarget",
+    "convert_planned_pose_to_wbc_targets",
+    "KinematicBridgeExecutor",
+    "BridgeExecutionResult",
 ]
 

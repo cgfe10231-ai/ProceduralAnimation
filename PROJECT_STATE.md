@@ -1,13 +1,34 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-20  
-> **当前阶段**：任务 6G-C-R3A（架构审计阶段完成：全仓库源码审计、梳理三套分立管线、建立权威 ARCHITECTURE.md v2.0、创建永久架构卡片 ARCHITECTURE_SYNC.md、同步永久项目规则、回答 6 大物理模块真实调用质询，等待 R3B 执行合流修复）  
+> **当前阶段**：任务 6G-C-R3B-1（统一架构规范修订与最小兼容桥接层已完成并 100% 验证通过；等待进入 R3B-2 执行历史动作向统一桥接层的无损迁移）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-C-R3B-1 统一架构规范修订与最小兼容桥接层 (Task 6G-C-R3B-1 Bridge Layer)**：
+  * **规范修订 (ARCHITECTURE.md v2.1 & ARCHITECTURE_SYNC.md v2.1)**：
+    * 确立 10 大架构设计原则、三层架构演进图（当前断裂点现状 -> R3B 统一桥接落地 -> 未来 6G-D/6H/7A 物理平衡闭环）；
+    * 确立单帧 6 阶段执行协议表（Phase 1 规划 -> Phase 2 接触防滑锁定 -> Phase 3 WBC 统一求解 -> Phase 4 真实 ROM 校验 -> Phase 5 事后只读遥测丰富 -> Phase 6 状态提交）；
+    * 梳理 12 大核心模块契约表与 6 大历史动作复用矩阵；
+    * 同步更新 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`，确立防伪造与阶段接入纪律。
+  * **最小兼容桥接层实现 (`src/motion/kinematic_bridge.py`)**：
+    * 实现 `KinematicPlannedPose`、`PlannedFootTarget`、`PlannedHandTarget` 结构化输入模型；
+    * 实现 `convert_planned_pose_to_wbc_targets`：手部 FK/IK 显式仲裁，足部接地锁定标记无损转发；
+    * 实现 `KinematicBridgeExecutor`：严格编排 6-Phase 生命周期，统筹 `foot_contact` 接地世界锚定锁定、`WholeBodyController` 独占姿态求解、`JointModel` ROM 与到达性诚实验证、事后只读物理遥测丰富（CoM、速度、惯性张量、角动量、接触模型）及 `MotionState` 状态提交。
+  * **自动化测试套件 (`tests/verify_task6gc_r3b1_bridge.py`) 10/10 项全绿**：
+    * Test 01：输入字段无损映射（100% 空间与运动学字段无损转换）；
+    * Test 02：FK/IK 仲裁与手臂控制所有权（腕部追踪误差 0.041 mm）；
+    * Test 03：支撑脚地面锚定保护（控制器漂移 0.000000 mm，骨骼漂移 0.246 mm）；
+    * Test 04：真实 ROM 与到达性失败汇报（超限及越界严格诚实汇报 `success=False`）；
+    * Test 05：定量姿态等价性（桥接与历史动作姿态在骨盆、左踝、右踝误差严格为 **0.0000 mm**）；
+    * Test 06：历史步态曲线不可变性（7 步排期、0.24 m/s 稳态速度、1.26 m 总位移 100% 完整保留）；
+    * Test 07：数据类型、单位与坐标系一致性（+Z Up，地面 Z=0.0，双支撑标识完全兼容）；
+    * Test 08：重复写冲突杜绝（WBC 与 foot_contact 独占写所有权零冲突）；
+    * Test 09：单帧 6 阶段流水线全流程执行（5 连续帧正确写入，动画关键帧生成）；
+    * Test 10：历史 6 大核心模块全量回归（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）100% 通过（退出码 `0`）。
 * **任务 6G-C-R3A 架构审计与规范锁定 (Task 6G-C-R3A: Architecture Audit & Specification Protocol)**：
   * **全仓库源码与调用链深度审计**：系统性审计 `src/motion/`、`src/rig/` 及测试与运行脚本，彻底澄清当前工程中真实存在的三套分立管线（历史动作管线、物理分析与全身控制工具链、演示原型脚本），并以源码证明障碍物原型（`run_contact_obstacle_integration.py`）之所以呈现 30 帧僵硬片段，是因为它在各片段中循环对完全相同的静态目标执行 `execute_frame`，缺乏连续步态调度和时间轴运动学。
   * **更新权威架构文档 (`ARCHITECTURE.md` v2.0)**：补充世界坐标统一约定、当前真实架构 Mermaid 流程图、目标生产级架构图、11 大模块数据流合同全表、6 大历史动作复用矩阵及架构断裂点审计。
@@ -109,6 +130,7 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证。
 
 ### [已实现]
+* 最小兼容桥接层与单帧 6 阶段流水线执行器：`src/motion/kinematic_bridge.py`、`tests/verify_task6gc_r3b1_bridge.py`
 * 多部位接触几何、约束与支撑状态系统：`src/motion/contact_model.py`、`run_contact_model_prototype.py`、`tests/verify_task6gc_contact_model.py`、`output/contact_model_debug.blend`
 * 刚体连杆惯性张量与全身角动量模型：`src/motion/body_inertia.py`、`tests/verify_task6gb_body_inertia.py`
 * 连续身体运动状态与速度学基础：`src/motion/body_kinematics.py`、`tests/verify_task6ga_body_kinematics.py`
@@ -128,12 +150,14 @@
 * `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* 高难度特技动作：急转弯（Sharp Turn）、跑跳（Running Jump）、翻滚（Roll）、滑铲（Slide）、撑越障碍（Vault）与环境障碍物射线几何避障。
+* 历史动作（Walk/Run/Sprint/Brake）向统一 `KinematicBridgeExecutor` 的全面重构迁移（定于 Task 6G-C-R3B-2 执行）。
+* 障碍物连续跑酷动作类（如 `VaultTouchAction`）与射线几何避障。
+* 高难度特技动作：急转弯（Sharp Turn）、跑跳（Running Jump）、翻滚（Roll）、滑铲（Slide）。
 
 ### [已知缺陷与遗留说明]
-1. **架构断裂点 1（控制器双轨制）**：`WholeBodyController` 作为姿态求解器未接入历史成熟动作（`StartStopWalkAction`、`RunAction` 等仍使用私有姿态函数与 `ContactConstraintAdapter`）。
-2. **架构断裂点 2（接触模型脱离接地锁定）**：`ContactModel` 接触状态机未与 `src/rig/foot_contact.py` 物理层接地锁定机制打通，两者处于脱节状态。
-3. **架构断裂点 3（障碍物跑酷动作缺失）**：系统中缺乏针对障碍物交互的连续 `MotionAction` 实现，导致之前的障碍物集成出现静态姿态连续插帧摆拍的僵硬假象。
+1. **历史动作尚未切换至桥接执行器**：虽然 `KinematicBridgeExecutor` 已建立并实现 0.0000 mm 等价姿态求解，但 `StartStopWalkAction`、`RunAction` 等历史动作内部目前仍调用私有姿态函数，将在 R3B-2 中逐一无损迁移。
+2. **架构断裂点 2（接触模型脱离接地锁定）**：`ContactModel` 接触状态机在桥接层中已可作为 Phase 5 遥测提取，但与 `src/rig/foot_contact.py` 物理层接地锁定的双向动态映射仍待 R3B 后续深化。
+3. **架构断裂点 3（障碍物跑酷动作缺失）**：系统中缺乏针对障碍物交互的连续 `MotionAction` 实现，需要专门的跑酷动作生成器。
 4. **架构断裂点 4（物理无闭环）**：质心、角动量、速度学和接触模型均为事后单向只读遥测，无闭环平衡控制反馈。
 5. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
 
@@ -143,8 +167,8 @@
 ---
 
 ## 2. 下一步建议
-等待用户确认 Task 6G-C-R3A 架构审计成果后，进入 **Task 6G-C-R3B（架构合流与连续运动修复）**：
-1. 重构底层动作调用链，使 `StartStopWalkAction`、`RunAction` 等统一经由 `WholeBodyController` 落地；
-2. 将 `foot_contact.py` 的世界锁定与 `ContactModel` 接触生命周期打通；
-3. 构建真正的连续障碍物动作类（如 `VaultTouchAction`），彻底替换静态姿态摆拍脚本；
+进入 **Task 6G-C-R3B-2（历史动作向统一桥接层无损迁移）**：
+1. 保持历史步态曲线、速度曲线和步态排期 100% 不变；
+2. 将 `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 的姿态落地调用统一替换为 `KinematicBridgeExecutor.execute_frame`；
+3. 执行全量历史验证，确保历史位移、防滑漂移、抬腿高度零退化；
 4. 严禁直接进入 Task 6G-D。

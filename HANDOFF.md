@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-C-R3A（系统架构深度审计与规范锁定阶段），全面梳理当前仓库分立管线、只读遥测本质及障碍物僵硬成因，锁定目标生产架构与模块调用合同，等待用户指示进入 Task 6G-C-R3B 执行架构合流与连续运动修复。
+完成 Task 6G-C-R3B-1（统一架构规范修订与最小兼容桥接层），建立统一的单帧 6 阶段执行协议与无损桥接层，经严苛测试（10/10通过）验证 0.0000 mm 姿态等价性与历史步态曲线不可变性，为后续 Task 6G-C-R3B-2 历史动作无损迁移奠定统一骨干基石。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -22,46 +22,42 @@
 * 完成连续身体运动状态与速度学基础（Task 6G-A）。
 * 完成刚体连杆惯性张量与全身角动量模型（Task 6G-B）。
 * 完成多部位接触几何、约束与支撑状态系统（Task 6G-C）。
-* **完成 Task 6G-C-R3A 系统架构深度审计与规范锁定**：
-  * 全面审计全部源码，查清当前真实存在的三套分立管线；
-  * 证明物理数学模块（CoM、速度追踪器、惯性张量、角动量、接触模型）均为事后只读遥测，无闭环平衡控制；
-  * 证明 `WholeBodyController` 未被历史成熟动作调用；
-  * 查明 `run_contact_obstacle_integration.py` 呈现 30 帧僵硬切片的根因是缺乏障碍物 `MotionAction`、在循环中对完全相同静态目标重复 `execute_frame`；
-  * 更新权威 `ARCHITECTURE.md` (v2.0)；
-  * 创建永久架构同步卡片 `ARCHITECTURE_SYNC.md`（12 项必填章节）；
-  * 更新永久规则 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`（新增第 8 节架构对齐与防伪造纪律）；
-  * 录入 `[DEC-024]`。
+* 完成 Task 6G-C-R3A 系统架构深度审计与规范锁定。
+* **完成 Task 6G-C-R3B-1 统一架构规范修订与最小兼容桥接层**：
+  * 修订 `ARCHITECTURE.md` (v2.1) 与 `ARCHITECTURE_SYNC.md` (v2.1)，锁定 10 大架构设计原则、三层架构演化视图、单帧 6-Phase 执行协议表与 12 大模块合同；
+  * 同步永久规则 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`（阶段接入、防伪造、真实失败汇报）；
+  * 实现最小兼容桥接层 `src/motion/kinematic_bridge.py`（`KinematicPlannedPose`、`convert_planned_pose_to_wbc_targets`、`KinematicBridgeExecutor`）；
+  * 确立足部接地锁定由 `foot_contact.py` 独占世界空间管理、WBC 感知 `is_locked` 严禁解绑覆盖；
+  * 确立手臂显式 FK/IK 仲裁机制；
+  * 确立 ROM 与到达性真实校验，超限严格诚实返回 `success=False`；
+  * 录入 `[DEC-025]`。
 
 ## 3. 已验证
-* 架构审计结论经磁盘源码全文搜索严格核实，无任何虚假推断。
-* 权威架构文档、架构同步卡片与三大规则文件已就位并相互一致。
-* 历史全量测试套件（Task 6G-C 17 项测试、6G-B 13 项、6G-A 10 项、6F-D 10 项）保持全绿。
-* 状态标定为：Task 6G-C-R3A 架构审计完成，等待 R3B 集成修复。
+* `tests/verify_task6gc_r3b1_bridge.py` 10/10 项测试全部通过：
+  * 输入无损映射、FK/IK 仲裁、接地锚定保持、真实失败汇报、0.0000 mm 姿态定量等价、历史步态曲线不可变、类型单位规范、重复写杜绝、单帧 6 阶段流水线完整执行、历史 6 大核心模块回归（WBC、Joint Limits、Rigid Link、Arm IK、Kinematics、Inertia）。
+* 状态标定为：Task 6G-C-R3B-1 已验证通过，工作区干净，等待进入 R3B-2。
 
 ## 4. 当前文件
 * 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`ARCHITECTURE_SYNC.md`
 * 规范与状态文档：`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md`、`PROJECT_STATE.md`、`CHANGELOG.md`、`README.md`
-* 核心源码：`src/`（`config.py`、`pipeline.py`、`scene/`、`camera/`、`lighting/`、`render/`、`validation/`、`character/`、`rig/`、`motion/`）
-* 管线入口：`run_contact_walk_integration.py`、`run_contact_obstacle_integration.py`、`run_contact_model_prototype.py` 等
-* 测试套件：`tests/`（`verify_task6gc_contact_model.py`、`verify_task6gb_body_inertia.py` 等）
-* 运行产物：`output/`（受 `.gitignore` 忽略）
+* 核心源码：`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py` 等
+* 测试套件：`tests/verify_task6gc_r3b1_bridge.py` 等
 
 ## 5. 已知问题
-* 控制器双轨制：历史动作未接入 `WholeBodyController`。
-* 接触模型脱节：`contact_model.py` 未与 `foot_contact.py` 接地锁定打通。
-* 障碍物动作缺失：系统中尚未实现针对障碍物交互的 `MotionAction` 连续动作类。
-* 物理无闭环：CoM 与角动量均为只读遥测。
+* 历史成熟动作（Walk/Run/Sprint/Brake）尚未迁移接入 `KinematicBridgeExecutor`（定于 R3B-2 开展）。
+* 障碍物连续动作类尚未实现。
+* 物理闭环未接入。
 
 ## 6. 下一步
-* 等待用户指示开启 Task 6G-C-R3B（架构合流与连续运动修复）。严禁跳入 Task 6G-D。
+* 进入 **Task 6G-C-R3B-2（历史动作向统一桥接层无损迁移）**。严禁跳入 Task 6G-D。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。
 * **严禁虚报测试结果**，严格执行 6 态划分。
 * **以磁盘代码和实际测试结果为事实第一依据**。
 * **严禁编写独立脚本拼凑动画冒充连续动作**。
-* **严禁在 R3A 阶段编写新动作或修改 rig**。
+* **严禁直接进入 Task 6G-D**。
 
 ## 8. 最近重要决策
-* [DEC-001] ~ [DEC-023] 保持有效。
-* [DEC-024] 系统架构合流基准与反伪造工程纪律 (Task 6G-C-R3A)。
+* [DEC-001] ~ [DEC-024] 保持有效。
+* [DEC-025] 统一架构规范修订与最小兼容桥接层 (Task 6G-C-R3B-1)。

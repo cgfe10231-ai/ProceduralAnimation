@@ -46,7 +46,13 @@ from src.rig.arm_ik import (
     set_hand_ik_target,
     setup_arm_ik,
 )
+from src.rig.foot_contact import (
+    evaluate_foot_support,
+    lock_foot_contact,
+    unlock_foot_contact,
+)
 from src.rig.ik import (
+    IK_TARGET_NAMES,
     MAX_LEG_REACH,
     MIN_LEG_REACH,
     get_leg_ik_state,
@@ -372,14 +378,31 @@ class WholeBodyController:
         leg_targets = [("L", targets.foot_L), ("R", targets.foot_R)]
         for side, foot_tgt in leg_targets:
             if foot_tgt is not None and foot_tgt.enabled and foot_tgt.weight > 0.0:
-                set_foot_ik_target(
-                    arm,
-                    side,
-                    world_xyz=foot_tgt.target_world_xyz,
-                    foot_rotation_deg=foot_tgt.target_rotation_deg,
-                    clamp_reach=foot_tgt.clamp_reach,
-                    clamp_ground=True,
-                )
+                ik_name = IK_TARGET_NAMES.get(side)
+                ik_obj = bpy.data.objects.get(ik_name) if ik_name else None
+                was_locked = bool(ik_obj.get("is_locked", False)) if ik_obj is not None else False
+
+                if foot_tgt.is_locked:
+                    if not was_locked:
+                        lock_foot_contact(
+                            arm,
+                            side,
+                            contact_world_xyz=foot_tgt.target_world_xyz,
+                            target_rotation_deg=foot_tgt.target_rotation_deg,
+                        )
+                    else:
+                        evaluate_foot_support(arm, side)
+                else:
+                    if was_locked:
+                        unlock_foot_contact(arm, side, reparent_to_root=False)
+                    set_foot_ik_target(
+                        arm,
+                        side,
+                        world_xyz=foot_tgt.target_world_xyz,
+                        foot_rotation_deg=foot_tgt.target_rotation_deg,
+                        clamp_reach=foot_tgt.clamp_reach,
+                        clamp_ground=True,
+                    )
 
         # ---------------------------------------------------------------------
         # 4. Hand IK Dispatch (Left and Right)
@@ -566,6 +589,21 @@ class WholeBodyController:
                 if hand_tgt is not None and hand_tgt.enabled:
                     arm_st = get_arm_ik_state(arm, side)
                     new_pos_err = float(arm_st["target_error"])
+                    if new_pos_err > tolerance_position_m:
+                        unmet_constraints.append(
+                            UnmetConstraint(
+                                category="ROM_CONFLICT",
+                                target_name=eff_id,
+                                description=f"End effector '{eff_id}' cannot satisfy target under anatomical ROM limits (conflict error = {new_pos_err*1000:.2f} mm)",
+                                error_amount=new_pos_err,
+                            )
+                        )
+
+            for side, foot_tgt in leg_targets:
+                eff_id = f"foot_{side}"
+                if foot_tgt is not None and foot_tgt.enabled:
+                    leg_st = get_leg_ik_state(arm, side)
+                    new_pos_err = float(leg_st["target_error"])
                     if new_pos_err > tolerance_position_m:
                         unmet_constraints.append(
                             UnmetConstraint(
