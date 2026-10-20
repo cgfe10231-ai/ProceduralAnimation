@@ -5,7 +5,7 @@
 * **任务状态**：已验证（经 `tests/verify_task6gc_contact_model.py` 15 项测试完整验证；Task 6G-B/6G-A/6F-D/6F-C/6F-B/6F-A 全部回归通过；`output/contact_model_debug.blend` 实际生成且在 Blender 中可正常播放交互）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：`[待提交本地 Commit]`
+  * **最新 Commit SHA**：`85e69b5`
   * **未提交文件**：无（工作区干净，所有 Task 6G-C 源码、测试、原型与文档已完整提交）
 
 ---
