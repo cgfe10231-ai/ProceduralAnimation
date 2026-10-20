@@ -5,7 +5,7 @@
 * **任务状态**：已验证（经 `tests/verify_task6gc_contact_model.py` 16 项测试完整验证，含数学模型、核心历史回归与视口集成验收；`output/contact_model_debug.blend` 187.7 KB 重新生成，待用户 Blender 目视复验）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **最新 Commit SHA**：`[待提交本地 Commit]`
+  * **最新 Commit SHA**：`ca34a7c`
   * **未提交文件**：无（工作区干净，所有 Task 6G-C 返工修复源码、测试、原型与文档已完整提交）
 
 ---
