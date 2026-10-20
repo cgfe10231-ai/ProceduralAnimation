@@ -36,11 +36,13 @@
   1. 读取项目规则 (`GEMINI.md` / `AGENTS.md`)。
   2. 读取 `PROJECT_SPEC.md`。
   3. 读取 `ARCHITECTURE.md`。
-  4. 读取 `DECISIONS.md`。
-  5. 读取 `PROJECT_STATE.md`。
-  6. 读取 `HANDOFF.md`。
-  7. 执行 `git status --short`，检查已有修改并严格保留现场，确认用户当前任务是否与已有工作冲突。
-  8. 检查当前相关代码与依赖。
+  4. 读取 `ARCHITECTURE_SYNC.md`。
+  5. 读取 `DECISIONS.md`。
+  6. 读取 `PROJECT_STATE.md`。
+  7. 读取 `HANDOFF.md`。
+  8. 读取 `AI_SYNC.md`。
+  9. 执行 `git status --short`，检查已有修改并严格保留现场，确认用户当前任务是否与已有工作冲突。
+  10. 检查当前相关代码与依赖。
 * **每次结束任何任务前**：
   1. 检查实际修改内容与新增文件差异（`git status --short` / `git diff`）。
   2. 执行适当的真实验证。
@@ -86,4 +88,12 @@
   * **严禁执行 `git reset --hard`**、强制清理（`git clean -fd` 破坏未审查文件）、强制推送（`git push --force`）。
   * **禁止擅自 `git commit --amend`、`git rebase` 或以任何方式改写已有提交历史**。
 * **交接卡片透明化**：在最终生成的 `AI_SYNC.md` 及报告中，必须明确记录当前本地 Git 状态、最新 commit SHA 以及是否有未提交文件或遗留变动。
+
+## 8. 架构对齐与防伪造纪律 (Architecture Alignment & Anti-Fabrication Rules)
+* **严禁重复造轮子**：严禁重复实现已存在的运动学、物理计算、IK 或控制能力，任何新功能必须基于现有架构模块扩展。
+* **强制接入主数据流**：新增功能必须明确接入现有主数据流（`MotionPlanner` -> `MotionAction` -> `WholeBodyController` -> `Blender Armature` -> 物理遥测 -> `MotionState`）的具体位置，严禁建立孤立执行分支或分立管线。
+* **禁止独立脚本拼凑演示**：禁止用独立的 Blender 脚本或硬编码静态姿态目标拼凑演示，所有动画生成必须通过统一管线或官方认可的连续动作生成器生成，必须具备连续运动学时间轴。
+* **历史测试与动作零退化**：每次迭代后必须保证历史测试用例和动作（Walk/Run/Sprint/Brake）不退化，提交前必须运行历史验证用例。
+* **架构不一致暂停报告**：发现架构不一致、模块未打通或存在虚假集成风险时，必须暂停并向用户明确报告，不得自行选择静默绕过或制造虚假闭环。
+
 

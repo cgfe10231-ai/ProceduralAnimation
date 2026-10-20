@@ -3,7 +3,27 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
-## [2026-10-20] 任务 6G-C：多部位接触几何、约束与支撑状态系统（第二次工程级返工与双原型交付）
+## [2026-10-20] 任务 6G-C-R3A：系统架构深度审计与规范锁定 (Task 6G-C-R3A Architecture Audit)
+
+### 审计与规范 (Audit & Specifications)
+* **全仓库代码与调用链深度审计**：
+  * 系统性排查 `src/motion/`、`src/rig/` 及测试与运行脚本，彻底澄清当前工程中真实存在的三套分立管线：
+    1. 历史动作管线（`StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction`）：使用私有姿态函数与 `ContactConstraintAdapter` 直接驱动骨架，未接入 `WholeBodyController`。
+    2. 物理分析与全身控制工具链（`WholeBodyController`、`JointModel`、`rigid_link`、`body_kinematics`、`body_inertia`、`contact_model`）：作为事后只读遥测存在，未被历史动作调用，无物理闭环。
+    3. 演示原型脚本（`run_contact_obstacle_integration.py`）：脱离动作系统，通过在 30 帧循环中重复执行完全相同的静态目标硬编码摆拍，导致画面呈现僵硬切片。
+  * 源码级核实 6 大物理数学模块（CoM、速度追踪器、惯性张量/角动量、接触模型、WBC、开环/闭环）：均为单向只读遥测，无力矩/平衡闭环。
+* **更新权威架构文档 (`ARCHITECTURE.md` v2.0)**：
+  * 确立统一物理世界坐标约定（$+Z$ 向上，$+X$ 向右，$+Y$ 向前，地面 $Z=0$）；
+  * 绘制当前真实架构 Mermaid 流程图与目标生产级单流向架构图；
+  * 建立 11 大模块数据流合同全表与 6 大历史动作复用矩阵；
+  * 明确 4 大架构断裂点（控制器双轨制、接触模型脱节、障碍物动作缺失、物理无闭环）与 R3B 合流路径。
+* **创建架构同步卡片 (`ARCHITECTURE_SYNC.md`)**：
+  * 包含 12 项必填章节，确立后续开发任务必须遵从的官方数据流、模块分类清单、使用权限与禁止绕过规范。
+* **强化永久项目规则 (`AGENTS.md` / `GEMINI.md` / `.agents/rules/project_rules.md`)**：
+  * 在第 4 节加入前置必读 `ARCHITECTURE_SYNC.md`；
+  * 新增第 8 节“架构对齐与防伪造纪律”，严禁重复造轮子、强制接入主数据流、禁止独立脚本拼凑动画、历史测试零退化、架构不一致暂停报告。
+
+
 
 ### 修复 (Fixed)
 * **彻底根除单腿抬起刚体平移伪造行走的架构缺陷**：

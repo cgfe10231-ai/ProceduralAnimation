@@ -1,13 +1,20 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-20  
-> **当前阶段**：任务 6G-C（第二次工程级返工完成：输出 MOTION_INTEGRATION_AUDIT.md 架构审计、交付双独立 Blender 原型、17 项全量测试 100% 通过，待用户 Blender 目视复验）  
+> **当前阶段**：任务 6G-C-R3A（架构审计阶段完成：全仓库源码审计、梳理三套分立管线、建立权威 ARCHITECTURE.md v2.0、创建永久架构卡片 ARCHITECTURE_SYNC.md、同步永久项目规则、回答 6 大物理模块真实调用质询，等待 R3B 执行合流修复）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-C-R3A 架构审计与规范锁定 (Task 6G-C-R3A: Architecture Audit & Specification Protocol)**：
+  * **全仓库源码与调用链深度审计**：系统性审计 `src/motion/`、`src/rig/` 及测试与运行脚本，彻底澄清当前工程中真实存在的三套分立管线（历史动作管线、物理分析与全身控制工具链、演示原型脚本），并以源码证明障碍物原型（`run_contact_obstacle_integration.py`）之所以呈现 30 帧僵硬片段，是因为它在各片段中循环对完全相同的静态目标执行 `execute_frame`，缺乏连续步态调度和时间轴运动学。
+  * **更新权威架构文档 (`ARCHITECTURE.md` v2.0)**：补充世界坐标统一约定、当前真实架构 Mermaid 流程图、目标生产级架构图、11 大模块数据流合同全表、6 大历史动作复用矩阵及架构断裂点审计。
+  * **创建永久架构卡片 (`ARCHITECTURE_SYNC.md`)**：完整包含 12 项必填章节（设计思想、依赖图、官方数据流、动作矩阵、WBC 定位、IK/ROM 边界、物理遥测时机、模块分类、断裂点、使用与绕过纪律、基准 Git SHA、变更日志与维护规则）。
+  * **更新永久项目规则 (`AGENTS.md` / `GEMINI.md` / `.agents/rules/project_rules.md`)**：在第 4 节加入前置必读 `ARCHITECTURE_SYNC.md`，新增第 8 节“架构对齐与防伪造纪律”，严禁重复造轮子、强制接入主数据流、禁止独立脚本拼凑动画、历史测试零退化、架构不一致暂停报告。
+  * **完成 6 大物理数学模块代码级质询**：严格以代码行号和引用证明 `rigid_link.py`、`body_kinematics.py`、`body_inertia.py`、`contact_model.py` 均为纯只读事后遥测，无闭环驱动或姿态修正；证明 `WholeBodyController` 未被历史动作调用；证明系统为开环解析运动学驱动。
+  * **状态结论**：R3A 架构审计全面完成，禁止编写新动作算法或修改 rig，等待 R3B 执行合流修复。
 * **任务 6G-C 多部位接触几何、约束与支撑状态系统（第二次工程级返工交付）**：
   * **工程架构审计与根因分析**：编写 [`docs/MOTION_INTEGRATION_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/MOTION_INTEGRATION_AUDIT.md)（13.4 KB），系统性梳理 Task 3 到 6G 历史运动能力，剖析 6G-C 初次实现中脱离步态调度、使用数学插值平移根节点导致“单腿悬空滑行”的根本原因，确立解耦返工方案与双原型设计边界。
   * **场景 A：真实连续行走与接触系统集成原型 (`output/contact_walk_integration.blend` / `run_contact_walk_integration.py`)**：
@@ -124,7 +131,11 @@
 * 高难度特技动作：急转弯（Sharp Turn）、跑跳（Running Jump）、翻滚（Roll）、滑铲（Slide）、撑越障碍（Vault）与环境障碍物射线几何避障。
 
 ### [已知缺陷与遗留说明]
-1. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
+1. **架构断裂点 1（控制器双轨制）**：`WholeBodyController` 作为姿态求解器未接入历史成熟动作（`StartStopWalkAction`、`RunAction` 等仍使用私有姿态函数与 `ContactConstraintAdapter`）。
+2. **架构断裂点 2（接触模型脱离接地锁定）**：`ContactModel` 接触状态机未与 `src/rig/foot_contact.py` 物理层接地锁定机制打通，两者处于脱节状态。
+3. **架构断裂点 3（障碍物跑酷动作缺失）**：系统中缺乏针对障碍物交互的连续 `MotionAction` 实现，导致之前的障碍物集成出现静态姿态连续插帧摆拍的僵硬假象。
+4. **架构断裂点 4（物理无闭环）**：质心、角动量、速度学和接触模型均为事后单向只读遥测，无闭环平衡控制反馈。
+5. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
@@ -132,4 +143,8 @@
 ---
 
 ## 2. 下一步建议
-等待用户指示后进入 Task 7 或高难度特技运动扩展（如跑跳 Running Jump、障碍撑越 Vault 或急转弯 Sharp Turn）。
+等待用户确认 Task 6G-C-R3A 架构审计成果后，进入 **Task 6G-C-R3B（架构合流与连续运动修复）**：
+1. 重构底层动作调用链，使 `StartStopWalkAction`、`RunAction` 等统一经由 `WholeBodyController` 落地；
+2. 将 `foot_contact.py` 的世界锁定与 `ContactModel` 接触生命周期打通；
+3. 构建真正的连续障碍物动作类（如 `VaultTouchAction`），彻底替换静态姿态摆拍脚本；
+4. 严禁直接进入 Task 6G-D。

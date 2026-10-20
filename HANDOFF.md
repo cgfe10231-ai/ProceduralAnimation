@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成任务 6G-C（多部位接触几何、约束与支撑状态系统）第二次工程级返工与交付，通过 17 项全量自动化测试，等待用户在 Blender 5.1.1 中目视复验场景 A 与场景 B 两个独立 `.blend` 文件。
+完成 Task 6G-C-R3A（系统架构深度审计与规范锁定阶段），全面梳理当前仓库分立管线、只读遥测本质及障碍物僵硬成因，锁定目标生产架构与模块调用合同，等待用户指示进入 Task 6G-C-R3B 执行架构合流与连续运动修复。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -21,43 +21,47 @@
 * 完成统一全身控制接口与最小协调器（Task 6F-D）。
 * 完成连续身体运动状态与速度学基础（Task 6G-A）。
 * 完成刚体连杆惯性张量与全身角动量模型（Task 6G-B）。
-* 完成多部位接触几何、约束与支撑状态系统第二次工程级返工（Task 6G-C）：
-  * 输出 `docs/MOTION_INTEGRATION_AUDIT.md`（13.4 KB）工程架构审计报告，全面剖析单腿滑行根因，确立解耦返工方案；
-  * 实现场景 A 独立原型 `run_contact_walk_integration.py` $\rightarrow$ `output/contact_walk_integration.blend`（206.8 KB），真实 204 帧交替步态行走，支撑脚锁定防滑（漂移 $< 0.005\text{ mm}$），摆腿明确离地抬升（$100\sim 138\text{ mm}$），对侧手臂摆动，ContactModel 驱动绿色标记物在支撑相激活、摆动相熄灭；
-  * 实现场景 B 独立原型 `run_contact_obstacle_integration.py` $\rightarrow$ `output/contact_obstacle_integration.blend`（165.3 KB），5 个清晰独立 hold 片段展示 Double Stance、Vault Touch、Foot on Wall、Ledge Hang、Flight Phase，严格正对障碍物，自然垂臂，接触贴合误差 $< 0.05\text{ mm}$，杜绝单腿滑行；
-  * 更新 `tests/verify_task6gc_contact_model.py` 为 17 项全量测试，含场景 A 步态集成验收与场景 B 障碍物接触验收，17/17 项测试 100% 通过；
-  * 录入 `[DEC-023]`。
+* 完成多部位接触几何、约束与支撑状态系统（Task 6G-C）。
+* **完成 Task 6G-C-R3A 系统架构深度审计与规范锁定**：
+  * 全面审计全部源码，查清当前真实存在的三套分立管线；
+  * 证明物理数学模块（CoM、速度追踪器、惯性张量、角动量、接触模型）均为事后只读遥测，无闭环平衡控制；
+  * 证明 `WholeBodyController` 未被历史成熟动作调用；
+  * 查明 `run_contact_obstacle_integration.py` 呈现 30 帧僵硬切片的根因是缺乏障碍物 `MotionAction`、在循环中对完全相同静态目标重复 `execute_frame`；
+  * 更新权威 `ARCHITECTURE.md` (v2.0)；
+  * 创建永久架构同步卡片 `ARCHITECTURE_SYNC.md`（12 项必填章节）；
+  * 更新永久规则 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`（新增第 8 节架构对齐与防伪造纪律）；
+  * 录入 `[DEC-024]`。
 
 ## 3. 已验证
-* 场景 A 真实行走集成：204 帧连续平滑行走，总位移 $1.2600\text{ m}$，支撑相锁定漂移 $< 0.005\text{ mm}$，摆动相抬腿 $100\sim 138\text{ mm}$，对侧手臂反向摆动，接触标记物实时准确切换。
-* 场景 B 障碍物接触：5 场景朝向点积严格为 $1.0000$（夹角 $0.00^\circ$），垂臂高度 $0.560\text{ m}$，两两姿态差异 $\ge 70.06^\circ$，接触锚点误差 $< 0.05\text{ mm}$，片段内保持漂移严格为 $0.0000\text{ mm}$。
-* 数学与模型：骨骼局部锚点到世界坐标变换绝对误差严格为 0.00e+00 m；外法线模长误差严格为 0.00e+00；单向推力与双向抓握严格区分；6 种支撑状态准确拓扑分类；环境刚体协变更新误差严格为 0.00e+00 m。
-* 全量回归测试：Task 6G-B、6G-A、6F-D、6F-C、6F-B、6F-A 核心测试全部 100% 回归通过。
-* 生成并实际验证 `output/contact_walk_integration.blend`（206.8 KB）与 `output/contact_obstacle_integration.blend`（165.3 KB），待用户 Blender 目视复验。坚决不进入 Task 6G-D。
+* 架构审计结论经磁盘源码全文搜索严格核实，无任何虚假推断。
+* 权威架构文档、架构同步卡片与三大规则文件已就位并相互一致。
+* 历史全量测试套件（Task 6G-C 17 项测试、6G-B 13 项、6G-A 10 项、6F-D 10 项）保持全绿。
+* 状态标定为：Task 6G-C-R3A 架构审计完成，等待 R3B 集成修复。
 
 ## 4. 当前文件
-* 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`
+* 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`ARCHITECTURE_SYNC.md`
 * 规范与状态文档：`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md`、`PROJECT_STATE.md`、`CHANGELOG.md`、`README.md`
 * 核心源码：`src/`（`config.py`、`pipeline.py`、`scene/`、`camera/`、`lighting/`、`render/`、`validation/`、`character/`、`rig/`、`motion/`）
-* 管线入口：`run_contact_model_prototype.py`、`run_arm_ik_prototype.py`、`run_sprint_brake_prototype.py`、`run_sprint_prototype.py`、`run_pipeline.py`、`run_pipeline.ps1`
-* 测试套件：`tests/`（`verify_task6gc_contact_model.py`、`verify_task6gb_body_inertia.py`、`verify_task6ga_body_kinematics.py`、`verify_task6fd_whole_body_controller.py` 等）
+* 管线入口：`run_contact_walk_integration.py`、`run_contact_obstacle_integration.py`、`run_contact_model_prototype.py` 等
+* 测试套件：`tests/`（`verify_task6gc_contact_model.py`、`verify_task6gb_body_inertia.py` 等）
 * 运行产物：`output/`（受 `.gitignore` 忽略）
 
 ## 5. 已知问题
-* 无代码阻碍。
-* 终点附近场景存在圆柱体块，当前原型聚焦于平地动力学，未接入几何避障。
+* 控制器双轨制：历史动作未接入 `WholeBodyController`。
+* 接触模型脱节：`contact_model.py` 未与 `foot_contact.py` 接地锁定打通。
+* 障碍物动作缺失：系统中尚未实现针对障碍物交互的 `MotionAction` 连续动作类。
+* 物理无闭环：CoM 与角动量均为只读遥测。
 
 ## 6. 下一步
-* 等待用户指示开启 Task 6G-C（支撑多边形与动态平衡补偿）或高难度特技运动扩展。
+* 等待用户指示开启 Task 6G-C-R3B（架构合流与连续运动修复）。严禁跳入 Task 6G-D。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。
 * **严禁虚报测试结果**，严格执行 6 态划分。
-* **以磁盘代码和实际测试结果为事实第一依据**，`HANDOFF.md` 与 `AI_SYNC.md` 仅为摘要。
-* **重大变更必须事先获得用户批准**。
-* **禁止未经指示擅自开始制作角色或正式动画**。
+* **以磁盘代码和实际测试结果为事实第一依据**。
+* **严禁编写独立脚本拼凑动画冒充连续动作**。
+* **严禁在 R3A 阶段编写新动作或修改 rig**。
 
 ## 8. 最近重要决策
-* [DEC-001] ~ [DEC-020] 保持有效。
-* [DEC-021] 刚体连杆分段惯性张量与多连杆全身角动量模型架构规范。
-
+* [DEC-001] ~ [DEC-023] 保持有效。
+* [DEC-024] 系统架构合流基准与反伪造工程纪律 (Task 6G-C-R3A)。
