@@ -1,7 +1,7 @@
 # ARCHITECTURE: 全程序化 3D 动画系统架构与工程规范蓝图
 
-> **最新架构审计版本**：v2.2 (Task 6G-C-R3B-1-Final 桥接层接口补全与自动化同步规范)  
-> **审计基准 Git SHA**：`892116c` / `a8987ac`  
+> **最新架构审计版本**：v2.3 (Task 6G-C-R3B-2 历史四大动作向统一桥接层无损迁移完成)  
+> **审计基准 Git SHA**：`d76f035` / `339c38a`  
 > **核心原则**：磁盘源码与真实可运行调用链是唯一事实标准。严禁将“设计目标”或“仅存在于测试/独立脚本中的调用”描述为已经完成集成的生产架构。严格区分当前真实架构、R3B 逐步集成架构与未来规划能力。
 
 ---
@@ -422,10 +422,10 @@ flowchart TD
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Walk Cycle** | Task 5A | `src/motion/walk_cycle.py` $\rightarrow$ `generate_walk_cycle` | 固定循环周期（36 帧/步），归一化相位 $u \in [0, 1)$ | 两骨腿部 IK（`FootIK.L/R`）；双臂固定正弦波 FK | 每步半周期足部锁定；摆动期正弦抬升 | 直接调用 `set_foot_ik_target` + `set_bone_rotation` 插帧 | **独立原型算法**（未封装为 MotionAction） |
 | **Forward Walk** | Task 5B | `src/motion/forward_walk.py` $\rightarrow$ `generate_forward_walk` | 沿 $+Y$ 直线匀速前向跨步，步幅累加调度 | 两骨腿部 IK；上身前倾与骨盆起伏经验 FK | `lock_foot_contact` 锁定支撑脚；摆腿跨步 | 直接调用 `move_character_root_with_support` 插帧 | **独立原型算法**（未封装为 MotionAction） |
-| **StartStopWalkAction** | Task 5C / 6A | `src/motion/start_stop_walk.py` $\rightarrow$ `generate_start_stop_walk`<br/>`src/motion/framework.py` $\rightarrow$ `StartStopWalkAction` | `build_step_schedule`（7 个协调半步）；余弦平滑 $C^1$ 速度曲线 $v(\tau)$（0 $\rightarrow$ 0.24 $\rightarrow$ 0 m/s） | 两骨腿部 IK；骨盆下沉、躯干倾角与反向摆臂经验 FK | `lock_foot_contact` 世界锁定，漂移 $< 0.05\text{ mm}$；摆动相正弦抬升 | 通过 `ContactConstraintAdapter` + `BlenderPoseApplicator` 插帧 | **已完全封装为标准 MotionAction** |
-| **RunAction** | Task 6B | `src/motion/run_cycle.py` $\rightarrow$ `RunAction` | 腾空相步态调度（半步 12 帧，支撑 7 帧，单腾空 5 帧）；高速周期 $v = 1.0\text{ m/s}$ | 两骨腿部 IK；跑动大幅屈肘与大摆幅手臂 FK | 支撑期足底锁定；双脚同时离地进入 `flight` 状态 | 通过 `ContactConstraintAdapter` 驱动双腿 IK 与根节点位移 | **已完全封装为标准 MotionAction** |
-| **SprintStartAction** | Task 6C | `src/motion/sprint_start.py` $\rightarrow$ `SprintStartAction` | 三阶段爆发式起跑调度（准备预备 12 帧 $\rightarrow$ 蹬地起步 24 帧 $\rightarrow$ 冲刺加速）；峰值 $v = 3.6\text{ m/s}$ | 两骨腿部 IK；大幅躯干前倾与大步幅交替摆臂 FK | 强力后蹬锁定；长步幅腾空迈步 | 通过 `contact_adapter` 驱动并平滑过渡到稳态冲刺 | **已完全封装为标准 MotionAction** |
-| **SprintBrakeAction** | Task 6D | `src/motion/sprint_brake.py` $\rightarrow$ `SprintBrakeAction` | 4 阶段主动急停制动调度（后仰缓冲 $\rightarrow$ 强力前掌滑移制动 $\rightarrow$ 步幅收束 $\rightarrow$ 停步）；加速度达 $-6.0\text{ m/s}^2$ | 两骨腿部 IK；躯干向后反向倾角抵消惯性 | 允许受控前向滑移制动；最终平稳合拢双足锁定 | 通过 `contact_adapter` 驱动受控减速与停止锁定 | **已完全封装为标准 MotionAction** |
+| **StartStopWalkAction** | Task 5C / 6A | `src/motion/start_stop_walk.py` $\rightarrow$ `generate_start_stop_walk`<br/>`src/motion/framework.py` $\rightarrow$ `StartStopWalkAction` | `build_step_schedule`（7 个协调半步）；余弦平滑 $C^1$ 速度曲线 $v(\tau)$（0 $\rightarrow$ 0.24 $\rightarrow$ 0 m/s） | 两骨腿部 IK；骨盆下沉、躯干倾角与反向摆臂经验 FK | `lock_foot_contact` 世界锁定，漂移 $< 0.05\text{ mm}$；摆动相正弦抬升 | **已无损迁移至 KinematicBridgeExecutor $\rightarrow$ WholeBodyController**，淘汰旧私有写入 | **生产已集成 (R3B-2 已验证)** |
+| **RunAction** | Task 6B | `src/motion/run_cycle.py` $\rightarrow$ `RunAction` | 腾空相步态调度（半步 12 帧，支撑 7 帧，单腾空 5 帧）；高速周期 $v = 1.0\text{ m/s}$ | 两骨腿部 IK；跑动大幅屈肘与大摆幅手臂 FK；生理踝俯仰调制 | 支撑期足底锁定；双脚同时离地进入 `flight` 状态 | **已无损迁移至 KinematicBridgeExecutor $\rightarrow$ WholeBodyController**，淘汰旧私有写入 | **生产已集成 (R3B-2 已验证)** |
+| **SprintStartAction** | Task 6C | `src/motion/sprint_start.py` $\rightarrow$ `SprintStartAction` | 三阶段爆发式起跑调度（准备预备 12 帧 $\rightarrow$ 蹬地起步 24 帧 $\rightarrow$ 冲刺加速）；峰值 $v = 3.6\text{ m/s}$ | 两骨腿部 IK；大幅躯干前倾与大步幅交替摆臂 FK；冲刺踝俯仰调制 | 强力后蹬锁定；长步幅腾空迈步 | **已无损迁移至 KinematicBridgeExecutor $\rightarrow$ WholeBodyController**，淘汰旧私有写入 | **生产已集成 (R3B-2 已验证)** |
+| **SprintBrakeAction** | Task 6D | `src/motion/sprint_brake.py` $\rightarrow$ `SprintBrakeAction` | 4 阶段主动急停制动调度（后仰缓冲 $\rightarrow$ 强力前掌滑移制动 $\rightarrow$ 步幅收束 $\rightarrow$ 停步）；加速度达 $-6.0\text{ m/s}^2$ | 两骨腿部 IK；躯干向后反向倾角抵消惯性；制动踝俯仰调制 | 允许受控前向滑移制动；最终平稳合拢双足锁定 | **已无损迁移至 KinematicBridgeExecutor $\rightarrow$ WholeBodyController**，淘汰旧私有写入 | **生产已集成 (R3B-2 已验证)** |
 
 ---
 
@@ -441,7 +441,7 @@ flowchart TD
 5. `MotionPlanner` 能够按顺序串联上述动作，并在动作边界无缝衔接位移与速度。
 
 ### 6.2 仅通过适配器连接或单向只读的部分 (Connected via Adapter / Read-Only Only)
-1. **`WholeBodyController` 未接入现有动作**：`WholeBodyController` 作为 Task 6F-D 的成果，理论上具备同时调度双臂 IK、双腿 IK、骨盆与躯干的能力，但**所有现有的 `MotionAction` 根本没有调用它**，仍然通过旧有的 `ContactConstraintAdapter` 和硬编码私有上身函数工作。
+1. **`WholeBodyController` 全身姿态协调落地 (R3B-2 已解决)**：历史 4 大动作已全部通过 `KinematicBridgeExecutor` 接入 `WholeBodyController`，由 WBC 独占执行根节点、双腿 IK、双臂 FK/IK 和解剖 ROM 校验，彻底废除了旧有各自为政的控制器双轨制。
 2. **`ContactModel` 仅在事后做几何检测**：`src/motion/contact_model.py` 拥有完善的接触记录（`ContactRecord`）、生命周期（`ContactLifecycle`）和支撑状态机（`SupportType`），但**它目前完全不参与前向控制**，既不负责锁定脚部，也不向上层传递法向推力约束，仅在每一帧姿态生成完毕后，计算一下当前脚底离地面的距离与滑移量。
 3. **CoM、惯性与动量未参与姿态平衡**：`rigid_link.py`、`body_kinematics.py`、`body_inertia.py` 能够极其精确地计算全身质心位置、线速度、空间角速度、惯性张量与自转/轨道角动量，但这些物理量仅仅被写入 `MotionState.params` 作为日志和字典数据存储，**没有任何控制器读取质心来调整躯干倾角，没有任何反作用力反馈**。
 

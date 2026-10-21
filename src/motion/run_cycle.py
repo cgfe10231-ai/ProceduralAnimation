@@ -34,6 +34,12 @@ from src.motion.framework import (
     MotionState,
     forward_unit_vector_from_yaw,
 )
+from src.motion.kinematic_bridge import (
+    KinematicBridgeExecutor,
+    KinematicPlannedPose,
+    PlannedFootTarget,
+    PlannedHandTarget,
+)
 from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET
 from src.rig.pose import set_bone_location, set_bone_rotation
 
@@ -138,6 +144,7 @@ class RunAction(MotionAction):
             MotionMode.WALK,
             MotionMode.RUN,
             MotionMode.ACCELERATE,
+            MotionMode.STOP,
         )
 
     def estimate_duration_frames(self, initial_state: MotionState, config: PipelineConfig) -> int:
@@ -155,9 +162,15 @@ class RunAction(MotionAction):
 
         config = context.config
         scene = context.scene
-        contact_adapter = context.contact_adapter
-        pose_applicator = context.pose_applicator
-        arm = context.armature_obj
+
+        bridge_executor = getattr(context, "bridge_executor", None)
+        if bridge_executor is None:
+            bridge_executor = KinematicBridgeExecutor(
+                armature_obj=context.armature_obj,
+                root_obj=context.root_obj,
+                environment=context.environment,
+                default_fps=config.fps,
+            )
 
         cycles = self._cycles if self._cycles is not None else config.run_cycles
         cycle_frames = config.run_cycle_frames          # 24
@@ -218,8 +231,38 @@ class RunAction(MotionAction):
             ground_z = context.environment.ground_height_at(start_x, root_y)
             root_world = (start_x, root_y, ground_z)
 
-            contact_adapter.move_root_preserving_locks(root_world)
-            pelvis_dz, torso_lean, arm_l_rx, arm_r_rx = apply_run_upper_body_pose(arm, config, u)
+            theta = 2.0 * math.pi * u
+            sin_t = math.sin(theta)
+            sin_2t = math.sin(2.0 * theta)
+            cos_2t = math.cos(2.0 * theta)
+
+            pelvis_dx = -config.run_pelvis_sway_amp * sin_t
+            pelvis_dz = config.run_pelvis_base_z - config.run_pelvis_bounce_amp * sin_2t
+            pelvis_rx = -2.5 - 1.2 * cos_2t
+            pelvis_ry = config.run_pelvis_yaw_deg * sin_t
+            pelvis_rz = config.run_pelvis_roll_deg * sin_t
+
+            spine_rx = -config.run_torso_lean_deg + 1.0 * cos_2t
+            spine_ry = -config.run_torso_yaw_deg * sin_t
+            spine_rz = -0.6 * pelvis_rz
+
+            total_rx = pelvis_rx + spine_rx
+            total_ry = pelvis_ry + spine_ry
+            total_rz = pelvis_rz + spine_rz
+            neck_rot = (-0.45 * total_rx, -0.45 * total_ry, -0.45 * total_rz)
+            head_rot = (-0.45 * total_rx, -0.45 * total_ry, -0.45 * total_rz)
+
+            arm_l_rx = config.run_arm_swing_deg * sin_t
+            arm_r_rx = -config.run_arm_swing_deg * sin_t
+            elbow_l_rx = config.run_elbow_base_deg + config.run_elbow_swing_deg * max(0.0, sin_t)
+            elbow_r_rx = config.run_elbow_base_deg + config.run_elbow_swing_deg * max(0.0, -sin_t)
+
+            fk_rotations = {
+                "upper_arm.L": (arm_l_rx, 0.0, -5.0),
+                "forearm.L": (elbow_l_rx, 0.0, 0.0),
+                "upper_arm.R": (arm_r_rx, 0.0, 5.0),
+                "forearm.R": (elbow_r_rx, 0.0, 0.0),
+            }
 
             if k % 2 == 0:
                 # Even half-step: Left Stance (local_f = 0..6) -> Flight 1 (local_f = 7..11)
@@ -227,16 +270,15 @@ class RunAction(MotionAction):
                     cycle_phase_name = "stance_L"
                     st_y_l = _stance_y_for_step(k)
                     z_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, st_y_l)
-                    if local_f == 0:
-                        state_l, contact_l = contact_adapter.lock_foot(
-                            "L",
-                            contact_world_xyz=(start_x - HIP_X_OFFSET, st_y_l, z_l),
-                            target_rotation_deg=(0.0, 0.0, yaw_deg),
-                        )
-                    else:
-                        state_l, contact_l = contact_adapter.evaluate_locked_foot("L")
+                    foot_tgt_l = PlannedFootTarget(
+                        world_xyz=(start_x - HIP_X_OFFSET, st_y_l, z_l + ANKLE_REST_Z),
+                        is_locked=True,
+                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        contact_intent=True,
+                    )
                     phase_l = "stance"
                     phase_r = "swing"
+                    is_flight = False
                 else:
                     cycle_phase_name = "flight_1"
                     # Left foot unlocked in early swing (j_l = 1..5 of 18)
@@ -248,14 +290,17 @@ class RunAction(MotionAction):
                         s_l,
                         step_height,
                     )
+                    pitch_l = -10.0 * math.sin(math.pi * s_l)
                     z_g_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, y_sw_l)
-                    state_l, contact_l = contact_adapter.set_swing_foot_target(
-                        "L",
-                        ankle_world_xyz=(start_x - HIP_X_OFFSET, y_sw_l, z_g_l + ANKLE_REST_Z + z_lift_l),
-                        foot_rotation_deg=(0.0, 0.0, yaw_deg),
+                    foot_tgt_l = PlannedFootTarget(
+                        world_xyz=(start_x - HIP_X_OFFSET, y_sw_l, z_g_l + ANKLE_REST_Z + z_lift_l),
+                        is_locked=False,
+                        rotation_deg=(pitch_l, 0.0, yaw_deg),
+                        contact_intent=False,
                     )
                     phase_l = "flight"
                     phase_r = "flight"
+                    is_flight = True
 
                 # Right foot is in mid-to-late swing across all local_f = 0..11 (j_r = 6..17 of 18)
                 j_r = (half_step - (stance_frames - 1)) + local_f
@@ -266,11 +311,13 @@ class RunAction(MotionAction):
                     s_r,
                     step_height,
                 )
+                pitch_r = -10.0 * math.sin(math.pi * s_r)
                 z_g_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, y_sw_r)
-                state_r, contact_r = contact_adapter.set_swing_foot_target(
-                    "R",
-                    ankle_world_xyz=(start_x + HIP_X_OFFSET, y_sw_r, z_g_r + ANKLE_REST_Z + z_lift_r),
-                    foot_rotation_deg=(0.0, 0.0, yaw_deg),
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(start_x + HIP_X_OFFSET, y_sw_r, z_g_r + ANKLE_REST_Z + z_lift_r),
+                    is_locked=False,
+                    rotation_deg=(pitch_r, 0.0, yaw_deg),
+                    contact_intent=False,
                 )
 
             else:
@@ -279,16 +326,15 @@ class RunAction(MotionAction):
                     cycle_phase_name = "stance_R"
                     st_y_r = _stance_y_for_step(k)
                     z_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, st_y_r)
-                    if local_f == 0:
-                        state_r, contact_r = contact_adapter.lock_foot(
-                            "R",
-                            contact_world_xyz=(start_x + HIP_X_OFFSET, st_y_r, z_r),
-                            target_rotation_deg=(0.0, 0.0, yaw_deg),
-                        )
-                    else:
-                        state_r, contact_r = contact_adapter.evaluate_locked_foot("R")
+                    foot_tgt_r = PlannedFootTarget(
+                        world_xyz=(start_x + HIP_X_OFFSET, st_y_r, z_r + ANKLE_REST_Z),
+                        is_locked=True,
+                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        contact_intent=True,
+                    )
                     phase_r = "stance"
                     phase_l = "swing"
+                    is_flight = False
                 else:
                     cycle_phase_name = "flight_2"
                     # Right foot unlocked in early swing (j_r = 1..5 of 18)
@@ -300,14 +346,17 @@ class RunAction(MotionAction):
                         s_r,
                         step_height,
                     )
+                    pitch_r = -10.0 * math.sin(math.pi * s_r)
                     z_g_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, y_sw_r)
-                    state_r, contact_r = contact_adapter.set_swing_foot_target(
-                        "R",
-                        ankle_world_xyz=(start_x + HIP_X_OFFSET, y_sw_r, z_g_r + ANKLE_REST_Z + z_lift_r),
-                        foot_rotation_deg=(0.0, 0.0, yaw_deg),
+                    foot_tgt_r = PlannedFootTarget(
+                        world_xyz=(start_x + HIP_X_OFFSET, y_sw_r, z_g_r + ANKLE_REST_Z + z_lift_r),
+                        is_locked=False,
+                        rotation_deg=(pitch_r, 0.0, yaw_deg),
+                        contact_intent=False,
                     )
                     phase_r = "flight"
                     phase_l = "flight"
+                    is_flight = True
 
                 # Left foot is in mid-to-late swing across all local_f = 0..11 (j_l = 6..17 of 18)
                 j_l = (half_step - (stance_frames - 1)) + local_f
@@ -318,63 +367,105 @@ class RunAction(MotionAction):
                     s_l,
                     step_height,
                 )
+                pitch_l = -10.0 * math.sin(math.pi * s_l)
                 z_g_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, y_sw_l)
-                state_l, contact_l = contact_adapter.set_swing_foot_target(
-                    "L",
-                    ankle_world_xyz=(start_x - HIP_X_OFFSET, y_sw_l, z_g_l + ANKLE_REST_Z + z_lift_l),
-                    foot_rotation_deg=(0.0, 0.0, yaw_deg),
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(start_x - HIP_X_OFFSET, y_sw_l, z_g_l + ANKLE_REST_Z + z_lift_l),
+                    is_locked=False,
+                    rotation_deg=(pitch_l, 0.0, yaw_deg),
+                    contact_intent=False,
                 )
 
-            if not state_l["is_reachable"] or not state_l["strictly_in_reach"]:
+            planned_pose = KinematicPlannedPose(
+                frame=frame,
+                time_seconds=(frame - 1) / fps,
+                root_position=root_world,
+                root_yaw_deg=yaw_deg,
+                speed_mps=speed_mps,
+                accel_mps2=0.0,
+                motion_mode=MotionMode.RUN,
+                dt=1.0 / fps,
+                pelvis_location=(pelvis_dx, pelvis_dz, 0.0),
+                pelvis_rotation_deg=(pelvis_rx, pelvis_ry, pelvis_rz),
+                spine_rotation_deg=(spine_rx, spine_ry, spine_rz),
+                neck_rotation_deg=neck_rot,
+                head_rotation_deg=head_rot,
+                foot_L=foot_tgt_l,
+                foot_R=foot_tgt_r,
+                hand_L=PlannedHandTarget(world_xyz=(0.0, 0.0, 0.0), enabled=False, contact_intent=False),
+                hand_R=PlannedHandTarget(world_xyz=(0.0, 0.0, 0.0), enabled=False, contact_intent=False),
+                fk_joint_rotations_deg=fk_rotations,
+                active_step_index=k,
+                gait_phase=u,
+                is_flight=is_flight,
+            )
+
+            bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
+
+            eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
+            eff_r = bridge_res.wbc_result.end_effectors.get("foot_R")
+
+            if eff_l and (not eff_l.is_reachable or not eff_l.strictly_in_reach):
                 unreachable_events.append({
                     "frame": frame,
                     "side": "L",
                     "phase": phase_l,
-                    "dist": round(state_l["hip_to_target_dist"], 5),
+                    "dist": round(eff_l.reach_distance_m, 5),
                 })
-            if not state_r["is_reachable"] or not state_r["strictly_in_reach"]:
+            if eff_r and (not eff_r.is_reachable or not eff_r.strictly_in_reach):
                 unreachable_events.append({
                     "frame": frame,
                     "side": "R",
                     "phase": phase_r,
-                    "dist": round(state_r["hip_to_target_dist"], 5),
+                    "dist": round(eff_r.reach_distance_m, 5),
                 })
 
-            pose_applicator.keyframe_current_frame(frame)
+            if not bridge_res.success:
+                for uc in bridge_res.unmet_constraints:
+                    unreachable_events.append({
+                        "frame": frame,
+                        "category": uc.category,
+                        "target": uc.target_name,
+                        "error": uc.error_amount,
+                        "desc": uc.description,
+                    })
 
-            is_airborne = not (contact_l.is_locked or contact_r.is_locked)
-            vel_world = (fx * speed_mps, fy * speed_mps, 0.0)
-            acc_world = (0.0, 0.0, 0.0)
-
-            contacts_map: Dict[str, ContactPointState] = {
-                "foot_L": contact_l,
-                "foot_R": contact_r,
+            state_l = {
+                "target_world": eff_l.requested_world_xyz if eff_l else (0.0, 0.0, 0.0),
+                "actual_world": eff_l.actual_world_xyz if eff_l else (0.0, 0.0, 0.0),
+                "is_reachable": eff_l.is_reachable if eff_l else True,
+                "strictly_in_reach": eff_l.strictly_in_reach if eff_l else True,
+                "hip_to_target_dist": eff_l.reach_distance_m if eff_l else 0.0,
+                "position_error_m": eff_l.position_error_m if eff_l else 0.0,
+                "ankle_bone_drift": eff_l.position_error_m if eff_l else 0.0,
+                "mesh_center_drift": eff_l.position_error_m if eff_l else 0.0,
+            }
+            state_r = {
+                "target_world": eff_r.requested_world_xyz if eff_r else (0.0, 0.0, 0.0),
+                "actual_world": eff_r.actual_world_xyz if eff_r else (0.0, 0.0, 0.0),
+                "is_reachable": eff_r.is_reachable if eff_r else True,
+                "strictly_in_reach": eff_r.strictly_in_reach if eff_r else True,
+                "hip_to_target_dist": eff_r.reach_distance_m if eff_r else 0.0,
+                "position_error_m": eff_r.position_error_m if eff_r else 0.0,
+                "ankle_bone_drift": eff_r.position_error_m if eff_r else 0.0,
+                "mesh_center_drift": eff_r.position_error_m if eff_r else 0.0,
             }
 
-            motion_state = MotionState(
-                frame=frame,
-                time_sec=(frame - 1) / fps,
-                position=root_world,
-                orientation_deg=initial_state.orientation_deg,
-                velocity=vel_world,
-                acceleration=acc_world,
-                mode=MotionMode.RUN,
-                gait_phase=u,
-                contacts=contacts_map,
-                is_airborne=is_airborne,
-                params={
-                    "tau": tau,
-                    "cycle_idx": tau // cycle_frames,
-                    "step_k": k,
-                    "local_f": local_f,
-                    "cycle_phase": cycle_phase_name,
-                    "pelvis_dz": round(pelvis_dz, 5),
-                    "torso_lean_deg": round(torso_lean, 3),
-                    "arm_l_rx": round(arm_l_rx, 2),
-                    "arm_r_rx": round(arm_r_rx, 2),
-                },
-            )
-            states.append(motion_state)
+            ms = bridge_res.motion_state
+            ms_params = dict(ms.params)
+            ms_params.update({
+                "tau": tau,
+                "cycle_idx": tau // cycle_frames,
+                "step_k": k,
+                "local_f": local_f,
+                "cycle_phase": cycle_phase_name,
+                "pelvis_dz": round(pelvis_dz, 5),
+                "torso_lean_deg": round(-(pelvis_rx + spine_rx), 3),
+                "arm_l_rx": round(arm_l_rx, 2),
+                "arm_r_rx": round(arm_r_rx, 2),
+            })
+            ms = ms.clone_with(params=ms_params)
+            states.append(ms)
 
             frame_records.append({
                 "frame": frame,
@@ -385,11 +476,11 @@ class RunAction(MotionAction):
                 "u": round(u, 4),
                 "cycle_phase": cycle_phase_name,
                 "mode": MotionMode.RUN.value,
-                "is_airborne": is_airborne,
+                "is_airborne": is_flight,
                 "root_y": round(root_y, 5),
                 "speed_mps": round(speed_mps, 5),
                 "pelvis_dz": round(pelvis_dz, 5),
-                "torso_lean_deg": round(torso_lean, 3),
+                "torso_lean_deg": round(-(pelvis_rx + spine_rx), 3),
                 "phase_l": phase_l,
                 "phase_r": phase_r,
                 "state_l": state_l,

@@ -408,6 +408,7 @@ class MotionRuntimeContext:
     environment: EnvironmentQuery
     contact_adapter: ContactConstraintAdapter
     pose_applicator: BlenderPoseApplicator
+    bridge_executor: Optional[Any] = None
 
 
 # ============================================================================
@@ -520,8 +521,21 @@ class StartStopWalkAction(MotionAction):
 
         config = context.config
         scene = context.scene
-        contact_adapter = context.contact_adapter
-        pose_applicator = context.pose_applicator
+
+        from src.motion.kinematic_bridge import (
+            KinematicBridgeExecutor,
+            KinematicPlannedPose,
+            PlannedFootTarget,
+            PlannedHandTarget,
+        )
+        bridge_executor = getattr(context, "bridge_executor", None)
+        if bridge_executor is None:
+            bridge_executor = KinematicBridgeExecutor(
+                armature_obj=context.armature_obj,
+                root_obj=context.root_obj,
+                environment=context.environment,
+                default_fps=config.fps,
+            )
 
         start_frame = initial_state.frame
         total_frames = config.start_stop_total_frames
@@ -563,55 +577,87 @@ class StartStopWalkAction(MotionAction):
             if 6 <= tau <= 18:
                 prep_shift_x = -0.008 * _smooth_bell01((tau - 6) / 12.0)
 
-            contact_adapter.move_root_preserving_locks(root_world)
-            pelvis_dz, torso_lean, arm_l_rx, arm_r_rx = (
-                pose_applicator.apply_upper_body_locomotion_pose(
-                    u=u,
-                    gait_amp=gait_amp,
-                    crouch_env=crouch_env,
-                    trans_drop=trans_drop,
-                    trans_lean_deg=trans_lean_deg,
-                    prep_shift_x=prep_shift_x,
-                )
+            # Analytical Upper Body FK Posture
+            theta = 2.0 * math.pi * u
+            sin_t = math.sin(theta)
+            cos_2t = math.cos(2.0 * theta)
+
+            pelvis_dx = -config.walk_pelvis_sway_amp * sin_t * gait_amp + prep_shift_x
+            pelvis_dz = (
+                config.forward_walk_pelvis_crouch * crouch_env
+                - config.walk_pelvis_bob_amp * cos_2t * gait_amp
+                + trans_drop
+            )
+            pelvis_rx = (-1.5 * crouch_env) + (1.0 * cos_2t * gait_amp)
+            pelvis_ry = config.walk_pelvis_yaw_deg * sin_t * gait_amp
+            pelvis_rz = config.walk_pelvis_roll_deg * sin_t * gait_amp
+
+            spine_rx = (
+                -config.walk_torso_lean_deg * gait_amp
+                - 0.8 * cos_2t * gait_amp
+                - trans_lean_deg
+            )
+            spine_ry = -config.walk_torso_yaw_deg * sin_t * gait_amp
+            spine_rz = -0.6 * pelvis_rz
+
+            total_rx = pelvis_rx + spine_rx
+            total_ry = pelvis_ry + spine_ry
+            total_rz = pelvis_rz + spine_rz
+            neck_rot = (-0.45 * total_rx, -0.45 * total_ry, -0.45 * total_rz)
+            head_rot = (-0.45 * total_rx, -0.45 * total_ry, -0.45 * total_rz)
+
+            arm_l_rx = config.walk_arm_swing_deg * sin_t * gait_amp
+            arm_r_rx = -config.walk_arm_swing_deg * sin_t * gait_amp
+            elbow_l_rx = (
+                config.walk_elbow_base_deg * crouch_env
+                + config.walk_elbow_swing_deg * max(0.0, sin_t) * gait_amp
+            )
+            elbow_r_rx = (
+                config.walk_elbow_base_deg * crouch_env
+                + config.walk_elbow_swing_deg * max(0.0, -sin_t) * gait_amp
             )
 
+            fk_rotations = {
+                "upper_arm.L": (arm_l_rx, 0.0, -4.0),
+                "forearm.L": (elbow_l_rx, 0.0, 0.0),
+                "upper_arm.R": (arm_r_rx, 0.0, 4.0),
+                "forearm.R": (elbow_r_rx, 0.0, 0.0),
+            }
+
+            # Lower Body Foot Targets
             if tau < t_s:
-                if tau == 0:
-                    z_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, start_y)
-                    z_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, start_y)
-                    state_l, contact_l = contact_adapter.lock_foot(
-                        "L",
-                        contact_world_xyz=(start_x - HIP_X_OFFSET, start_y, z_l),
-                        target_rotation_deg=(0.0, 0.0, yaw_deg),
-                    )
-                    state_r, contact_r = contact_adapter.lock_foot(
-                        "R",
-                        contact_world_xyz=(start_x + HIP_X_OFFSET, start_y, z_r),
-                        target_rotation_deg=(0.0, 0.0, yaw_deg),
-                    )
-                else:
-                    state_l, contact_l = contact_adapter.evaluate_locked_foot("L")
-                    state_r, contact_r = contact_adapter.evaluate_locked_foot("R")
+                z_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, start_y)
+                z_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, start_y)
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(start_x - HIP_X_OFFSET, start_y, z_l + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw_deg),
+                    contact_intent=True,
+                )
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(start_x + HIP_X_OFFSET, start_y, z_r + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw_deg),
+                    contact_intent=True,
+                )
                 phase_l, phase_r = "stance", "stance"
                 step_idx = -1
 
             elif tau >= t_d:
-                if tau == t_d:
-                    z_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, stop_y)
-                    z_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, stop_y)
-                    state_l, contact_l = contact_adapter.lock_foot(
-                        "L",
-                        contact_world_xyz=(start_x - HIP_X_OFFSET, stop_y, z_l),
-                        target_rotation_deg=(0.0, 0.0, yaw_deg),
-                    )
-                    state_r, contact_r = contact_adapter.lock_foot(
-                        "R",
-                        contact_world_xyz=(start_x + HIP_X_OFFSET, stop_y, z_r),
-                        target_rotation_deg=(0.0, 0.0, yaw_deg),
-                    )
-                else:
-                    state_l, contact_l = contact_adapter.evaluate_locked_foot("L")
-                    state_r, contact_r = contact_adapter.evaluate_locked_foot("R")
+                z_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, stop_y)
+                z_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, stop_y)
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(start_x - HIP_X_OFFSET, stop_y, z_l + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw_deg),
+                    contact_intent=True,
+                )
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(start_x + HIP_X_OFFSET, stop_y, z_r + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw_deg),
+                    contact_intent=True,
+                )
                 phase_l, phase_r = "stance", "stance"
                 step_idx = len(schedule)
 
@@ -627,97 +673,129 @@ class StartStopWalkAction(MotionAction):
                 )
 
                 if active_step["stance_side"] == "L":
-                    if tau == active_step["tau_start"]:
-                        z_st = context.environment.ground_height_at(
-                            start_x - HIP_X_OFFSET, active_step["stance_y"]
-                        )
-                        state_l, contact_l = contact_adapter.lock_foot(
-                            "L",
-                            contact_world_xyz=(start_x - HIP_X_OFFSET, active_step["stance_y"], z_st),
-                            target_rotation_deg=(0.0, 0.0, yaw_deg),
-                        )
-                    else:
-                        state_l, contact_l = contact_adapter.evaluate_locked_foot("L")
-
+                    z_st = context.environment.ground_height_at(
+                        start_x - HIP_X_OFFSET, active_step["stance_y"]
+                    )
+                    foot_tgt_l = PlannedFootTarget(
+                        world_xyz=(start_x - HIP_X_OFFSET, active_step["stance_y"], z_st + ANKLE_REST_Z),
+                        is_locked=True,
+                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        contact_intent=True,
+                    )
                     z_sw_ground = context.environment.ground_height_at(start_x + HIP_X_OFFSET, y_swing)
-                    state_r, contact_r = contact_adapter.set_swing_foot_target(
-                        "R",
-                        ankle_world_xyz=(start_x + HIP_X_OFFSET, y_swing, z_sw_ground + ANKLE_REST_Z + z_lift),
-                        foot_rotation_deg=(0.0, 0.0, yaw_deg),
+                    foot_tgt_r = PlannedFootTarget(
+                        world_xyz=(start_x + HIP_X_OFFSET, y_swing, z_sw_ground + ANKLE_REST_Z + z_lift),
+                        is_locked=False,
+                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        contact_intent=False,
                     )
                     phase_l, phase_r = "stance", "swing"
                 else:
-                    if tau == active_step["tau_start"]:
-                        z_st = context.environment.ground_height_at(
-                            start_x + HIP_X_OFFSET, active_step["stance_y"]
-                        )
-                        state_r, contact_r = contact_adapter.lock_foot(
-                            "R",
-                            contact_world_xyz=(start_x + HIP_X_OFFSET, active_step["stance_y"], z_st),
-                            target_rotation_deg=(0.0, 0.0, yaw_deg),
-                        )
-                    else:
-                        state_r, contact_r = contact_adapter.evaluate_locked_foot("R")
-
+                    z_st = context.environment.ground_height_at(
+                        start_x + HIP_X_OFFSET, active_step["stance_y"]
+                    )
+                    foot_tgt_r = PlannedFootTarget(
+                        world_xyz=(start_x + HIP_X_OFFSET, active_step["stance_y"], z_st + ANKLE_REST_Z),
+                        is_locked=True,
+                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        contact_intent=True,
+                    )
                     z_sw_ground = context.environment.ground_height_at(start_x - HIP_X_OFFSET, y_swing)
-                    state_l, contact_l = contact_adapter.set_swing_foot_target(
-                        "L",
-                        ankle_world_xyz=(start_x - HIP_X_OFFSET, y_swing, z_sw_ground + ANKLE_REST_Z + z_lift),
-                        foot_rotation_deg=(0.0, 0.0, yaw_deg),
+                    foot_tgt_l = PlannedFootTarget(
+                        world_xyz=(start_x - HIP_X_OFFSET, y_swing, z_sw_ground + ANKLE_REST_Z + z_lift),
+                        is_locked=False,
+                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        contact_intent=False,
                     )
                     phase_l, phase_r = "swing", "stance"
 
-            if not state_l["is_reachable"] or not state_l["strictly_in_reach"]:
+            mode = STAGE_TO_MOTION_MODE.get(stage, MotionMode.WALK)
+            planned_pose = KinematicPlannedPose(
+                frame=frame,
+                time_seconds=(frame - 1) / fps,
+                root_position=root_world,
+                root_yaw_deg=yaw_deg,
+                speed_mps=speed_mps,
+                accel_mps2=accel_mps2,
+                motion_mode=mode,
+                dt=1.0 / fps,
+                pelvis_location=(pelvis_dx, pelvis_dz, 0.0),
+                pelvis_rotation_deg=(pelvis_rx, pelvis_ry, pelvis_rz),
+                spine_rotation_deg=(spine_rx, spine_ry, spine_rz),
+                neck_rotation_deg=neck_rot,
+                head_rotation_deg=head_rot,
+                foot_L=foot_tgt_l,
+                foot_R=foot_tgt_r,
+                hand_L=PlannedHandTarget(world_xyz=(0.0, 0.0, 0.0), enabled=False, contact_intent=False),
+                hand_R=PlannedHandTarget(world_xyz=(0.0, 0.0, 0.0), enabled=False, contact_intent=False),
+                fk_joint_rotations_deg=fk_rotations,
+                active_step_index=step_idx,
+                gait_phase=u,
+                is_flight=False,
+            )
+
+            bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
+
+            eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
+            eff_r = bridge_res.wbc_result.end_effectors.get("foot_R")
+
+            if eff_l and (not eff_l.is_reachable or not eff_l.strictly_in_reach):
                 unreachable_events.append({
                     "frame": frame,
                     "side": "L",
                     "phase": phase_l,
-                    "dist": round(state_l["hip_to_target_dist"], 5),
+                    "dist": round(eff_l.reach_distance_m, 5),
                 })
-            if not state_r["is_reachable"] or not state_r["strictly_in_reach"]:
+            if eff_r and (not eff_r.is_reachable or not eff_r.strictly_in_reach):
                 unreachable_events.append({
                     "frame": frame,
                     "side": "R",
                     "phase": phase_r,
-                    "dist": round(state_r["hip_to_target_dist"], 5),
+                    "dist": round(eff_r.reach_distance_m, 5),
                 })
 
-            pose_applicator.keyframe_current_frame(frame)
+            if not bridge_res.success:
+                for uc in bridge_res.unmet_constraints:
+                    unreachable_events.append({
+                        "frame": frame,
+                        "category": uc.category,
+                        "target": uc.target_name,
+                        "error": uc.error_amount,
+                        "desc": uc.description,
+                    })
 
-            mode = STAGE_TO_MOTION_MODE.get(stage, MotionMode.WALK)
-            vel_world = (fx * speed_mps, fy * speed_mps, 0.0)
-            acc_world = (fx * accel_mps2, fy * accel_mps2, 0.0)
-
-            contacts_map: Dict[str, ContactPointState] = {
-                "foot_L": contact_l,
-                "foot_R": contact_r,
+            state_l = {
+                "target_world": eff_l.requested_world_xyz if eff_l else (0.0, 0.0, 0.0),
+                "actual_world": eff_l.actual_world_xyz if eff_l else (0.0, 0.0, 0.0),
+                "is_reachable": eff_l.is_reachable if eff_l else True,
+                "strictly_in_reach": eff_l.strictly_in_reach if eff_l else True,
+                "hip_to_target_dist": eff_l.reach_distance_m if eff_l else 0.0,
+                "position_error_m": eff_l.position_error_m if eff_l else 0.0,
             }
-            is_airborne = not (contact_l.is_locked or contact_r.is_locked)
+            state_r = {
+                "target_world": eff_r.requested_world_xyz if eff_r else (0.0, 0.0, 0.0),
+                "actual_world": eff_r.actual_world_xyz if eff_r else (0.0, 0.0, 0.0),
+                "is_reachable": eff_r.is_reachable if eff_r else True,
+                "strictly_in_reach": eff_r.strictly_in_reach if eff_r else True,
+                "hip_to_target_dist": eff_r.reach_distance_m if eff_r else 0.0,
+                "position_error_m": eff_r.position_error_m if eff_r else 0.0,
+            }
 
-            motion_state = MotionState(
-                frame=frame,
-                time_sec=(frame - 1) / fps,
-                position=root_world,
-                orientation_deg=initial_state.orientation_deg,
-                velocity=vel_world,
-                acceleration=acc_world,
-                mode=mode,
-                gait_phase=u,
-                contacts=contacts_map,
-                is_airborne=is_airborne,
-                params={
-                    "tau": tau,
-                    "stage": stage,
-                    "step_k": step_idx,
-                    "gait_amp": round(gait_amp, 4),
-                    "crouch_env": round(crouch_env, 4),
-                    "pelvis_dz": round(pelvis_dz, 5),
-                    "torso_lean_deg": round(torso_lean, 3),
-                    "arm_l_rx": round(arm_l_rx, 2),
-                    "arm_r_rx": round(arm_r_rx, 2),
-                },
-            )
-            states.append(motion_state)
+            ms = bridge_res.motion_state
+            ms_params = dict(ms.params)
+            ms_params.update({
+                "tau": tau,
+                "stage": stage,
+                "step_k": step_idx,
+                "gait_amp": round(gait_amp, 4),
+                "crouch_env": round(crouch_env, 4),
+                "pelvis_dz": round(pelvis_dz, 5),
+                "torso_lean_deg": round(-(pelvis_rx + spine_rx), 3),
+                "arm_l_rx": round(arm_l_rx, 2),
+                "arm_r_rx": round(arm_r_rx, 2),
+            })
+            ms = ms.clone_with(params=ms_params)
+            states.append(ms)
 
             frame_records.append({
                 "frame": frame,
@@ -731,7 +809,7 @@ class StartStopWalkAction(MotionAction):
                 "speed_mps": round(speed_mps, 5),
                 "accel_mps2": round(accel_mps2, 5),
                 "pelvis_dz": round(pelvis_dz, 5),
-                "torso_lean_deg": round(torso_lean, 3),
+                "torso_lean_deg": round(-(pelvis_rx + spine_rx), 3),
                 "phase_l": phase_l,
                 "phase_r": phase_r,
                 "state_l": state_l,
@@ -873,6 +951,13 @@ class MotionPlanner:
 
         contact_adapter = ContactConstraintAdapter(arm, self.environment)
         pose_applicator = BlenderPoseApplicator(arm, root_obj, self.config)
+        from src.motion.kinematic_bridge import KinematicBridgeExecutor
+        bridge_executor = KinematicBridgeExecutor(
+            armature_obj=arm,
+            root_obj=root_obj,
+            environment=self.environment,
+            default_fps=self.config.fps,
+        )
         context = MotionRuntimeContext(
             config=self.config,
             armature_obj=arm,
@@ -881,6 +966,7 @@ class MotionPlanner:
             environment=self.environment,
             contact_adapter=contact_adapter,
             pose_applicator=pose_applicator,
+            bridge_executor=bridge_executor,
         )
 
         all_states: List[MotionState] = []

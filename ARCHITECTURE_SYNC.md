@@ -1,8 +1,8 @@
 # ARCHITECTURE_SYNC: 架构同步与模块调用规范卡片
 
-> **最新架构审计基准版本**：v2.2 (Task 6G-C-R3B-1-Final 桥接层接口补全与自动化同步规范)  
-> **审计基准 Git SHA**：`892116c` / `a8987ac`  
-> **当前状态**：统一架构规范修订完成，最小兼容桥接层就位，历史动作待逐步迁移，严禁进入 6G-D  
+> **最新架构审计基准版本**：v2.3 (Task 6G-C-R3B-2 历史动作向统一桥接层与全身控制架构无损迁移完成)  
+> **审计基准 Git SHA**：`d76f035` / `339c38a`  
+> **当前状态**：历史 4 大动作（Walk/Run/Sprint/Brake）已 100% 无损迁移至 KinematicBridgeExecutor 与 WholeBodyController，通过全部验证，严禁进入 6G-D，等待用户 Blender 视口验收  
 > **核心原则**：磁盘代码与真实运行调用链是唯一事实依据。杜绝只读指标伪装闭环控制，严格区分当前架构、R3B 集成架构与未来规划。
 
 ---
@@ -140,10 +140,10 @@ flowchart TD
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Walk Cycle** | Task 5A | `src/motion/walk_cycle.py` | `generate_walk_cycle(armature, frames=72)` | 固定原地循环周期（36 帧/步），归一化相位 $u \in [0, 1)$ | 历史原型（保持回归） |
 | **Forward Walk** | Task 5B | `src/motion/forward_walk.py` | `generate_forward_walk(armature, steps=4)` | 沿 $+Y$ 直线前向跨步，步幅累加调度 | 历史原型（保持回归） |
-| **StartStopWalkAction** | Task 5C / 6A | `src/motion/start_stop_walk.py`<br/>`src/motion/framework.py` | `StartStopWalkAction(steps=7, step_duration=12)`<br/>`generate_start_stop_walk(...)` | 7 个连续步态调度；$C^1$ 速度曲线（0 $\rightarrow$ 0.24 $\rightarrow$ 0 m/s）；世界空间零漂移锁定 | 待 R3B-2 迁移至桥接层 |
-| **RunAction** | Task 6B | `src/motion/run_cycle.py` | `RunAction(cycles=4, half_period_frames=12)` | 具备双脚离地单腾空相（支撑 7 帧，腾空 5 帧）；速度 $1.0\text{ m/s}$；跑动屈肘 | 待 R3B-2 迁移至桥接层 |
-| **SprintStartAction** | Task 6C | `src/motion/sprint_start.py` | `SprintStartAction(prep_frames=12, drive_frames=24)` | 三阶段爆发式起跑；躯干深俯；峰值速度 $3.6\text{ m/s}$ | 待 R3B-2 迁移至桥接层 |
-| **SprintBrakeAction** | Task 6D | `src/motion/sprint_brake.py` | `SprintBrakeAction(target_stop_pos=...)` | 4 阶段主动急停；躯干后仰制动；峰值减速度 $-6.0\text{ m/s}^2$ | 待 R3B-2 迁移至桥接层 |
+| **StartStopWalkAction** | Task 5C / 6A | `src/motion/start_stop_walk.py`<br/>`src/motion/framework.py` | `StartStopWalkAction(steps=7, step_duration=12)`<br/>`generate_start_stop_walk(...)` | 7 个连续步态调度；$C^1$ 速度曲线（0 $\rightarrow$ 0.24 $\rightarrow$ 0 m/s）；世界空间零漂移锁定 | **已迁移至统一桥接层 (已验证)** |
+| **RunAction** | Task 6B | `src/motion/run_cycle.py` | `RunAction(cycles=4, half_period_frames=12)` | 具备双脚离地单腾空相（支撑 7 帧，腾空 5 帧）；速度 $1.0\text{ m/s}$；跑动屈肘；生理踝俯仰 | **已迁移至统一桥接层 (已验证)** |
+| **SprintStartAction** | Task 6C | `src/motion/sprint_start.py` | `SprintStartAction(prep_frames=12, drive_frames=24)` | 三阶段爆发式起跑；躯干深俯；峰值速度 $3.6\text{ m/s}$；冲刺踝俯仰 | **已迁移至统一桥接层 (已验证)** |
+| **SprintBrakeAction** | Task 6D | `src/motion/sprint_brake.py` | `SprintBrakeAction(target_stop_pos=...)` | 4 阶段主动急停；躯干后仰制动；峰值减速度 $-6.0\text{ m/s}^2$；制动踝俯仰 | **已迁移至统一桥接层 (已验证)** |
 
 ---
 
@@ -196,8 +196,8 @@ flowchart TD
   - `src/motion/body_kinematics.py`：事后微分运动学速度分析器
   - `src/motion/body_inertia.py`：事后惯性张量与全身体角动量分析器
   - `src/motion/contact_model.py`：事后多部位接触几何与支撑分类器
-* **7.3 待合流迁移历史动作 (Pending Migration Actions)**：
-  - `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction`（将在 R3B-2 中统一接入桥接层与 WBC）。
+* **7.3 统一桥接层已迁移历史动作 (Migrated Historical Actions via KinematicBridgeExecutor)**：
+  - `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 已 100% 接入 `KinematicBridgeExecutor` 与 `WholeBodyController`，经独立回归套件及统一 462 帧连续动画管线验证通过。
 
 ---
 
@@ -218,7 +218,6 @@ flowchart TD
 
 ## 9. 本次同步依据的 Git Commit SHA
 
-* **底层基准 Commit**：`892116c`
-* **首轮桥接 Commit**：`a8987ac`
-* **当前任务**：Task 6G-C-R3B-1-Final
+* **底层基准 Commit**：`d76f035`
+* **当前任务**：Task 6G-C-R3B-2（历史动作无损迁移至统一桥接层与全身控制架构）
 * **工作树状态**：干净、严格受版本控制。

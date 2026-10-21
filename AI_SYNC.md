@@ -1,57 +1,47 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-C-R3B-1-Final（架构漏洞修补与 GitHub 自动同步）
-* **任务状态**：已验证（时间步长 dt 动态校验、手部 IK/接触语义彻底解耦、Phase 5 惯性张量与全身体角动量遥测闭环集成，14 项严苛测试 100% 通过，历史 6 大核心测试 100% 全绿；永久 GitHub 自动化同步协议确立并推送完成）
+* **当前任务编号**：任务 6G-C-R3B-2（历史四大动作向统一桥接层与全身控制架构无损迁移）
+* **任务状态**：已验证（四大历史连续动作 Walk/Run/Sprint/Brake 100% 迁移至 KinematicBridgeExecutor 与 WholeBodyController；独立动作验证 100% 全绿，桥接 14 项严苛测试及历史 6 大核心模块回归 100% 全绿；成功生成 462 帧连续平滑运动验收文件 output/unified_motion_integration.blend；严格停止等待用户 Blender 视口目视验收，严禁擅自进入 6G-D）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **基准 Commit SHA**：`a8987ac`
-  * **本任务提交 Commit SHA**：`339c38a`
+  * **基准 Commit SHA**：`d76f035`
+  * **本任务提交 Commit SHA**：待提交并自动推送后记录
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件**：无（收尾精准提交后）
 
 ---
 
-### 1. R3B-1-Final 架构漏洞修补与同步机制成果
-* **时间步长 (dt) 动态支持与物理缩放 (`src/motion/kinematic_bridge.py`)**：
-  * `KinematicPlannedPose` 引入可选 `dt`，`KinematicBridgeExecutor.execute_frame` 支持显式 `dt` 传入或由 `time_seconds` 自动差分计算；
-  * 引入严格单调递增时间戳与正数步长校验（`dt > 0.0`，反向或零时间戳抛出 `ValueError`）；
-  * 有限差分速度与惯性张量物理缩放完全一致，默认维持 24 FPS 标准兼容。
-* **手部 IK 与接触语义彻底解耦 (`src/motion/kinematic_bridge.py`)**：
-  * 在 `PlannedFootTarget` 与 `PlannedHandTarget` 中显式分离 IK 目标激活（`enabled`）、接触意图（`contact_intent`）、世界锁定（`is_locked`）、接触类型与表面 ID；
-  * 自由空间伸手（`contact_intent=False`）绝不产生虚假接触，维持正常双足或单足支撑分类；
-  * 接触合规性校验：对声明接触意图的肢体，通过 `ContactModel` 校验与环境表面的几何间隙、穿透与法向容差，超差真实报警 `success=False`；
-  * 支撑足地面锚点在局部坐标上依据踝关节原点 $(x, y, z - 0.070\text{ m})$ 精准对齐地面 $Z=0$，消除足底中心人为滑移。
-* **Phase 5 惯性张量与全身体角动量遥测集成 (`src/motion/kinematic_bridge.py`)**：
-  * 在 Phase 5 姿态解算完成后，直接调用 `compute_whole_body_inertia`，基于已评估的 Armature 姿态与 `kin_result.velocity` 计算全身体惯性张量、自转角动量与质心轨道角动量，并注入 `MotionState.params`；保持纯只读物理遥测。
-* **永久 GitHub 自动化安全同步协议确立 (`AGENTS.md` / `GEMINI.md` / `.agents/rules/project_rules.md`)**：
-  * 任务完成并通过全部验证后，自动精确暂存、本地 commit，并自动执行 `git push origin master`，校验远程 SHA 与本地 HEAD 一致。
+### 1. R3B-2 历史四大动作无损迁移成果
+* **顺序无损迁移与步态零退化 (`src/motion/`)**：
+  * **StartStopWalkAction (`src/motion/framework.py`)**：通过 `KinematicBridgeExecutor.execute_frame()` 执行，完整保留 204 帧连续平滑步态、7 个协调半步、0.24 m/s 稳态峰值速度与 1.2600 m 理论位移；
+  * **RunAction (`src/motion/run_cycle.py`)**：通过统一桥接层执行，再现 96 帧跑动、40 帧真实空中腾空相、0.90 m/s 恒速前进；在 `WholeBodyController` 中修复足部解锁重新绑定至 `CharacterRoot`（`reparent_to_root=True`），消除局部坐标系旋转漂移；引入解剖踝关节摆动俯仰调制（`pitch = -10.0 * sin(pi * s)`）；
+  * **SprintStartAction (`src/motion/sprint_start.py`)**：通过统一桥接层执行，再现 114 帧起跑预备、蹬地起跑、加速冲刺、49 帧空中腾空相、2.00 m/s 峰值速度；引入冲刺摆动相踝俯仰调制（`pitch = -18.0 * sin(pi * s)`），完美契合极端屈膝屈髋下的真实解剖 ROM，0 次超程；
+  * **SprintBrakeAction (`src/motion/sprint_brake.py`)**：通过统一桥接层执行，再现 48 帧主动急停制动、前掌受控滑移制动、双足并立停步锁定；引入制动踝俯仰调制（`pitch = -12.0 * sin(pi * s)`）；
+  * **打通急停后切入跑步的物理连续性**：在 `RunAction.can_start_from()` 中补充 `MotionMode.STOP`。
+* **物理指标与控制语义严格区分**：
+  * `MotionState` 严格区分规划速度 `planned_linear_velocity`、根节点差分测量速度 `root_derived_linear_velocity` 与全身体质心速度 `com_linear_velocity`；
+  * 接触意图 `contact_intent`、接触建立与世界坐标锁定 `is_locked` 及环境表面几何间隙合规性严格区分；
+  * 任何 IK、ROM 或接触几何超差由 `bridge_res.success` 严格真实拦截报错，严禁静默放行。
+* **统一动画集成场景与验收生成器 (`run_unified_motion_pipeline.py`)**：
+  * 自动顺序串联 `StartStopWalkAction` $\rightarrow$ `SprintStartAction` $\rightarrow$ `SprintBrakeAction` $\rightarrow$ `RunAction(cycles=4)`；
+  * 产物：`output/unified_motion_integration.blend`（296,509 字节，1..462 帧连续动画，总位移 12.9058 m，0 次不可达事件）；
+  * 配备完整地面参考平面、视口阳光以及全程平滑跟随角色移动的 `PipelineCamera` 运镜跟踪。
 
 ---
 
-### 2. 验证结果清单 (`tests/verify_task6gc_r3b1_bridge.py` 14/14 全绿)
-1. **Test 01: Lossless Input Mapping**：100% 空间与运动学字段无损转换。
-2. **Test 02: FK/IK Arbitration & Control Ownership**：显式手部仲裁，腕部追踪误差仅 0.041 mm。
-3. **Test 03: Stance Foot Ground Anchor Preservation**：控制器漂移 0.000000 mm，骨骼漂移 0.246 mm。
-4. **Test 04: Truthful ROM & Reach Failure Reporting**：超限及越界严格诚实汇报 `success=False`。
-5. **Test 05: Quantitative Pose Equivalence**：桥接与历史动作姿态在骨盆、左踝、右踝误差严格为 **0.0000 mm**。
-6. **Test 06: Immutability of Historical Gait Curves**：历史 7 步排期、0.24 m/s 稳态速度、1.26 m 总位移 100% 完整保留。
-7. **Test 07: Data Types, Units & Coordinate Consistency**：+Z Up，地面 Z=0.0，双支撑标识完全兼容。
-8. **Test 08: Duplicate Write Conflict Prevention**：WBC 与 foot_contact 独占写所有权零冲突。
-9. **Test 09: Full Single-Frame 6-Phase Pipeline Execution**：5 帧完整 6 阶段流水线执行，关键帧正确写入。
-10. **Test 10: Variable Time Step (dt) & Kinematic Scaling**：0.01s 100FPS 与 0.04s 25FPS 速度换算精确吻合，非法步长与反向时间戳异常拦截成功。
-11. **Test 11: Hand IK vs Contact Intent Decoupling**：自由空间抓空与主动表面接触精准区分，越界接触真实报警 `success=False`。
-12. **Test 12: Whole-Body Inertia & Angular Momentum Telemetry**：静态姿态角动量严格为 0.0，运动状态惯性张量正定且质量 > 50 kg。
-13. **Test 13: Historical Motion Actions Intactness & Planning**：Walk 7 步、Run 24 帧周期、SprintStart 36 帧、SprintBrake 26 帧动作完全完好。
-14. **Test 14: Core Historical Regression Suite**：历史 6 大核心模块回归测试 100% 全绿（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）。
+### 2. 验证结果清单
+1. **Walk Action 回归 (`tests/verify_r3b2_walk_action.py`)**：单动作 204 帧与双动作级联 408 帧通过，位移严格符合理论（1.2600m / 2.5200m），0 次超程违规。
+2. **Run Action 回归 (`tests/verify_r3b2_run_action.py`)**：单动作 96 帧与 Walk->Run 级联 252 帧通过，40 腾空帧，速度 0.90 m/s，0 次超程违规。
+3. **Sprint Start 回归 (`tests/verify_r3b2_sprint_start.py`)**：单动作 114 帧与 Walk->SprintStart 级联 318 帧通过，49 腾空帧，峰值 2.00 m/s，位移 6.5833m，0 次超程违规。
+4. **Sprint Brake 回归 (`tests/verify_r3b2_sprint_brake.py`)**：SprintStart->SprintBrake 级联 162 帧通过，减速至 0.0 m/s，双脚稳态锁定，0 次超程违规。
+5. **统一集成文件验证 (`tests/verify_unified_motion_integration.py`)**：检验 `output/unified_motion_integration.blend`，1..462 帧连续平滑执行，关键里程碑位移误差严格 0.0000 m，全骨骼姿态数据无 NaN/Inf。
+6. **桥接层 14 项严苛测试 (`tests/verify_task6gc_r3b1_bridge.py`)**：14/14 全绿，历史 6 大核心模块全量回归（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）100% 全绿。
 
 ---
 
 ### 3. 下一步建议与禁止事项
-* **下一步**：严格停止，等待用户指示。后续进入 **Task 6G-C-R3B-2（历史动作向统一桥接层无损迁移）**：
-  * 将 `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 的底层姿态落地重构调用 `KinematicBridgeExecutor.execute_frame`；
-  * 保持步态生成、速度曲线与步态排期 100% 零修改；
-  * 彻底废除控制器双轨制。
+* **下一步**：**严格停止，等待用户在 Blender 中打开 `output/unified_motion_integration.blend` 进行视口目视验收**。
 * **禁止事项**：
   * 严禁跳入 Task 6G-D。
   * 严禁重写成熟历史步态曲线。

@@ -3,6 +3,36 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-21] 任务 6G-C-R3B-2：历史四大动作无损迁移至统一桥接层与全身控制架构 (Task 6G-C-R3B-2)
+
+### 迁移与重构 (Migration & Refactoring)
+* **无损迁移四大历史连续动作至统一桥接执行器 (`KinematicBridgeExecutor.execute_frame`)**：
+  * **StartStopWalkAction (`src/motion/framework.py`)**：构建标准 `KinematicPlannedPose` 并调用 `bridge_executor.execute_frame` 写入关键帧，淘汰旧有 `BlenderPoseApplicator` 与经验上身姿态函数；7 步调度、0.24 m/s 峰值速度与 1.2600 m 理论位移 100% 保持；
+  * **RunAction (`src/motion/run_cycle.py`)**：重构接入桥接层，完美再现 4 周期 96 帧跑动、40 帧双足离地腾空相（`flight`）、0.90 m/s 稳态跑速；在 `WholeBodyController` 中修复足部解锁重新绑定至 `CharacterRoot`（`reparent_to_root=True`），彻底杜绝局部坐标系旋转漂移；引入解剖踝关节摆动俯仰调制（`pitch = -10.0 * sin(pi * s)`）；
+  * **SprintStartAction (`src/motion/sprint_start.py`)**：重构接入桥接层，涵盖 114 帧起跑预备、蹬地起跑、加速冲刺、49 帧空中腾空相、2.00 m/s 峰值速度；引入冲刺摆动相踝俯仰调制（`pitch = -18.0 * sin(pi * s)`），完美契合极端屈膝屈髋下的真实解剖 ROM，0 次超程；
+  * **SprintBrakeAction (`src/motion/sprint_brake.py`)**：重构接入桥接层，涵盖 48 帧主动急停制动、前掌受控滑移制动、双足并立停步锁定；引入制动踝俯仰调制（`pitch = -12.0 * sin(pi * s)`），微米级稳定合拢停步；
+  * **允许 RunAction 从 STOP 模式启动**：在 `RunAction.can_start_from()` 中补充 `MotionMode.STOP`，打通急停或停步后直接切入跑步的物理连续性。
+* **物理指标与控制语义严格区分**：
+  * `MotionState` 严格区分规划速度 `planned_linear_velocity`、根节点差分测量速度 `root_derived_linear_velocity` 与全身体质心速度 `com_linear_velocity`；
+  * 接触意图 `contact_intent`、接触建立与世界坐标锁定 `is_locked` 及环境表面几何间隙合规性严格区分；
+  * 任何 IK、ROM 或接触几何超差由 `bridge_res.success` 严格真实拦截报错，严禁静默放行。
+* **统一动画集成场景与验收生成器 (`run_unified_motion_pipeline.py`)**：
+  * 自动顺序串联 `StartStopWalkAction` $\rightarrow$ `SprintStartAction` $\rightarrow$ `SprintBrakeAction` $\rightarrow$ `RunAction(cycles=4)`；
+  * 生成 `output/unified_motion_integration.blend`（462 帧连续平滑动画，总位移 12.9058 m，0 次不可达违规）；
+  * 配备完整地面平面、视口阳光以及全程平滑跟随角色移动的 `PipelineCamera` 运镜跟踪。
+
+### 验证 (Verification)
+* **独立动作验证套件 100% 通过**：
+  * `tests/verify_r3b2_walk_action.py`：单动作 204 帧与双动作级联 408 帧通过（位移 1.2600m / 2.5200m，0 次超程）；
+  * `tests/verify_r3b2_run_action.py`：单动作 96 帧与 Walk->Run 级联 252 帧通过（40 腾空帧，0.90 m/s，0 次超程）；
+  * `tests/verify_r3b2_sprint_start.py`：单动作 114 帧与 Walk->SprintStart 级联 318 帧通过（49 腾空帧，2.00 m/s，0 次超程）；
+  * `tests/verify_r3b2_sprint_brake.py`：SprintStart->SprintBrake 级联 162 帧通过（制动至 0.0 m/s，双脚稳态锁定，0 次超程）；
+* **统一集成文件全量验证套件 100% 通过**：
+  * `tests/verify_unified_motion_integration.py`：检验 `output/unified_motion_integration.blend`，1..462 帧、对象结构完整、里程碑位移与理论值误差严格 0.0000 m、姿态数据无 NaN/Inf；
+* **桥接 14 项严苛测试与历史核心回归全绿**：
+  * `tests/verify_task6gc_r3b1_bridge.py` 14/14 全绿，涵盖 WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia 核心历史回归。
+
+
 ## [2026-10-21] 任务 6G-C-R3B-1-Final：桥接层漏洞修补与永久 GitHub 自动同步 (Task 6G-C-R3B-1-Final)
 
 ### 修复与补全 (Fixes & Gaps Resolved)

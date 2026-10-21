@@ -43,6 +43,12 @@ from src.motion.framework import (
     MotionState,
     forward_unit_vector_from_yaw,
 )
+from src.motion.kinematic_bridge import (
+    KinematicBridgeExecutor,
+    KinematicPlannedPose,
+    PlannedFootTarget,
+    PlannedHandTarget,
+)
 from src.motion.run_cycle import compute_run_swing_point
 from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET, IK_TARGET_NAMES
 from src.rig.pose import set_bone_location, set_bone_rotation
@@ -168,9 +174,16 @@ class SprintBrakeAction(MotionAction):
 
         config = context.config
         scene = context.scene
-        adapter = context.contact_adapter
-        pose = context.pose_applicator
-        arm = context.armature_obj
+
+        bridge_executor = getattr(context, "bridge_executor", None)
+        if bridge_executor is None:
+            bridge_executor = KinematicBridgeExecutor(
+                armature_obj=context.armature_obj,
+                root_obj=context.root_obj,
+                environment=context.environment,
+                default_fps=config.fps,
+            )
+
         env = context.environment
         fps = float(config.fps)
 
@@ -201,17 +214,6 @@ class SprintBrakeAction(MotionAction):
         states: List[MotionState] = []
         records: List[dict] = []
 
-        def set_swing(side: str, y_from: float, y_to: float, s: float, hgt: float, frame: int):
-            y, lift = compute_run_swing_point(y_from, y_to, s, hgt)
-            zg = env.ground_height_at(x_of[side], y)
-            req = (x_of[side], y, zg + ANKLE_REST_Z + lift)
-            raw, cp = adapter.set_swing_foot_target(side, req, foot_rotation_deg=(0.0, 0.0, yaw))
-            applied = bpy.data.objects[IK_TARGET_NAMES[side]].matrix_world.translation
-            err = max(abs(applied[i] - req[i]) for i in range(3))
-            if err > 1e-4:
-                clamp_events.append({"frame": frame, "side": side, "err": round(err, 5)})
-            return raw, cp
-
         for tau in range(t_total):
             frame = start_frame + tau
             scene.frame_set(frame)
@@ -221,120 +223,219 @@ class SprintBrakeAction(MotionAction):
             root_y = sy + disp
             root_world = (sx, root_y, env.ground_height_at(sx, root_y))
 
-            adapter.move_root_preserving_locks(root_world)
-            pelvis_dz, torso_pitch, arm_l, arm_r = apply_brake_pose(
-                arm, config, tau, t_brake, t_total, speed, v0
-            )
-
-            # Foot contact schedule:
-            # tau < 3: R stance (holding from 6C), L swinging to land at tau=3
-            # tau in [3, 12): L stance at y_l1, R swinging to land at tau=12
-            # tau in [12, 24): R stance at y_r1, L swinging to land at tau=24
-            # tau in [24, 34): L stance at y_l2, R swinging to land at tau=34
-            # tau >= 34: Both feet locked at final_y in stable bilateral stance
-            if tau < 3:
-                if tau == 0:
-                    raw_r, cp_r = adapter.lock_foot(
-                        "R",
-                        (x_of["R"], y_r0, env.ground_height_at(x_of["R"], y_r0)),
-                        (0.0, 0.0, yaw),
-                    )
-                else:
-                    raw_r, cp_r = adapter.evaluate_locked_foot("R")
-                ph_r = "stance"
-
-                s_l = (tau + 8) / 11.0
-                raw_l, cp_l = set_swing("L", init_l_pos[1] - 0.77, y_l1, s_l, 0.10, frame)
-                ph_l = "swing"
-            elif tau < 12:
-                if tau == 3:
-                    raw_l, cp_l = adapter.lock_foot(
-                        "L",
-                        (x_of["L"], y_l1, env.ground_height_at(x_of["L"], y_l1)),
-                        (0.0, 0.0, yaw),
-                    )
-                else:
-                    raw_l, cp_l = adapter.evaluate_locked_foot("L")
-                ph_l = "stance"
-
-                s_r = (tau - 3) / 9.0
-                raw_r, cp_r = set_swing("R", y_r0, y_r1, s_r, 0.08, frame)
-                ph_r = "swing"
-            elif tau < 24:
-                if tau == 12:
-                    raw_r, cp_r = adapter.lock_foot(
-                        "R",
-                        (x_of["R"], y_r1, env.ground_height_at(x_of["R"], y_r1)),
-                        (0.0, 0.0, yaw),
-                    )
-                else:
-                    raw_r, cp_r = adapter.evaluate_locked_foot("R")
-                ph_r = "stance"
-
-                s_l = (tau - 12) / 12.0
-                raw_l, cp_l = set_swing("L", y_l1, y_l2, s_l, 0.06, frame)
-                ph_l = "swing"
-            elif tau < 34:
-                if tau == 24:
-                    raw_l, cp_l = adapter.lock_foot(
-                        "L",
-                        (x_of["L"], y_l2, env.ground_height_at(x_of["L"], y_l2)),
-                        (0.0, 0.0, yaw),
-                    )
-                else:
-                    raw_l, cp_l = adapter.evaluate_locked_foot("L")
-                ph_l = "stance"
-
-                s_r = (tau - 24) / 10.0
-                raw_r, cp_r = set_swing("R", y_r1, y_r2, s_r, 0.04, frame)
-                ph_r = "swing"
+            x_total = min(1.0, tau / float(t_total))
+            if tau <= 14:
+                crouch = _lerp(-0.08038, -0.115, _smoothstep01(tau / 14.0))
+                torso_pitch = _lerp(15.091, -6.0, _smoothstep01(tau / 14.0))
+            elif tau <= t_brake:
+                crouch = _lerp(-0.115, -0.010, _smoothstep01((tau - 14.0) / (t_total - 14.0)))
+                torso_pitch = _lerp(-6.0, 0.0, _smoothstep01((tau - 14.0) / (t_brake - 14.0)))
             else:
-                if tau == 34:
-                    raw_r, cp_r = adapter.lock_foot(
-                        "R",
-                        (x_of["R"], y_r2, env.ground_height_at(x_of["R"], y_r2)),
-                        (0.0, 0.0, yaw),
-                    )
-                else:
-                    raw_r, cp_r = adapter.evaluate_locked_foot("R")
-                raw_l, cp_l = adapter.evaluate_locked_foot("L")
+                crouch = _lerp(-0.115, -0.010, _smoothstep01((tau - 14.0) / (t_total - 14.0)))
+                torso_pitch = 0.0
+
+            speed_factor = max(0.0, speed / v0) if v0 > 1e-4 else 0.0
+
+            pelvis_dz = crouch
+            pelvis_loc = (0.0, pelvis_dz, 0.0)
+            pelvis_rx = -0.3 * torso_pitch
+            spine_rx = -0.7 * torso_pitch
+            neck_rot = (0.5 * torso_pitch, 0.0, 0.0)
+            head_rot = (0.5 * torso_pitch, 0.0, 0.0)
+
+            arm_swing = 18.0 * speed_factor * math.cos(math.pi * tau / 10.0)
+            arm_l = arm_swing
+            arm_r = -arm_swing
+            elbow = _lerp(config.run_elbow_base_deg, 10.0, _smoothstep01(x_total))
+
+            fk_rotations = {
+                "upper_arm.L": (arm_l, 0.0, -5.0),
+                "forearm.L": (elbow, 0.0, 0.0),
+                "upper_arm.R": (arm_r, 0.0, 5.0),
+                "forearm.R": (elbow, 0.0, 0.0),
+            }
+
+            # Foot contact schedule
+            if tau < 3:
+                zg_r = env.ground_height_at(x_of["R"], y_r0)
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(x_of["R"], y_r0, zg_r + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw),
+                    contact_intent=True,
+                )
+                s_l = (tau + 8) / 11.0
+                y_l, lift_l = compute_run_swing_point(init_l_pos[1] - 0.77, y_l1, s_l, 0.10)
+                pitch_l = -12.0 * math.sin(math.pi * max(0.0, min(1.0, s_l)))
+                zg_l = env.ground_height_at(x_of["L"], y_l)
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(x_of["L"], y_l, zg_l + ANKLE_REST_Z + lift_l),
+                    is_locked=False,
+                    rotation_deg=(pitch_l, 0.0, yaw),
+                    contact_intent=False,
+                )
+                ph_r, ph_l = "stance", "swing"
+            elif tau < 12:
+                zg_l = env.ground_height_at(x_of["L"], y_l1)
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(x_of["L"], y_l1, zg_l + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw),
+                    contact_intent=True,
+                )
+                s_r = (tau - 3) / 9.0
+                y_r, lift_r = compute_run_swing_point(y_r0, y_r1, s_r, 0.08)
+                pitch_r = -12.0 * math.sin(math.pi * max(0.0, min(1.0, s_r)))
+                zg_r = env.ground_height_at(x_of["R"], y_r)
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(x_of["R"], y_r, zg_r + ANKLE_REST_Z + lift_r),
+                    is_locked=False,
+                    rotation_deg=(pitch_r, 0.0, yaw),
+                    contact_intent=False,
+                )
+                ph_l, ph_r = "stance", "swing"
+            elif tau < 24:
+                zg_r = env.ground_height_at(x_of["R"], y_r1)
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(x_of["R"], y_r1, zg_r + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw),
+                    contact_intent=True,
+                )
+                s_l = (tau - 12) / 12.0
+                y_l, lift_l = compute_run_swing_point(y_l1, y_l2, s_l, 0.06)
+                pitch_l = -12.0 * math.sin(math.pi * max(0.0, min(1.0, s_l)))
+                zg_l = env.ground_height_at(x_of["L"], y_l)
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(x_of["L"], y_l, zg_l + ANKLE_REST_Z + lift_l),
+                    is_locked=False,
+                    rotation_deg=(pitch_l, 0.0, yaw),
+                    contact_intent=False,
+                )
+                ph_r, ph_l = "stance", "swing"
+            elif tau < 34:
+                zg_l = env.ground_height_at(x_of["L"], y_l2)
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(x_of["L"], y_l2, zg_l + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw),
+                    contact_intent=True,
+                )
+                s_r = (tau - 24) / 10.0
+                y_r, lift_r = compute_run_swing_point(y_r1, y_r2, s_r, 0.04)
+                pitch_r = -12.0 * math.sin(math.pi * max(0.0, min(1.0, s_r)))
+                zg_r = env.ground_height_at(x_of["R"], y_r)
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(x_of["R"], y_r, zg_r + ANKLE_REST_Z + lift_r),
+                    is_locked=False,
+                    rotation_deg=(pitch_r, 0.0, yaw),
+                    contact_intent=False,
+                )
+                ph_l, ph_r = "stance", "swing"
+            else:
+                zg_r = env.ground_height_at(x_of["R"], y_r2)
+                zg_l = env.ground_height_at(x_of["L"], y_l2)
+                foot_tgt_r = PlannedFootTarget(
+                    world_xyz=(x_of["R"], y_r2, zg_r + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw),
+                    contact_intent=True,
+                )
+                foot_tgt_l = PlannedFootTarget(
+                    world_xyz=(x_of["L"], y_l2, zg_l + ANKLE_REST_Z),
+                    is_locked=True,
+                    rotation_deg=(0.0, 0.0, yaw),
+                    contact_intent=True,
+                )
                 ph_l = ph_r = "stance"
-
-            for side, raw, ph in (("L", raw_l, ph_l), ("R", raw_r, ph_r)):
-                if not raw["is_reachable"] or not raw["strictly_in_reach"]:
-                    unreachable.append({
-                        "frame": frame,
-                        "side": side,
-                        "phase": ph,
-                        "dist": round(raw["hip_to_target_dist"], 5),
-                    })
-
-            pose.keyframe_current_frame(frame)
 
             stage = "brake" if tau < t_brake else "stop"
             mode = MotionMode.DECELERATE if tau < t_brake else MotionMode.STOP
-            airborne = not (cp_l.is_locked or cp_r.is_locked)
+            gait_phase = 0.0 if stage == "stop" else ((tau / float(t_brake)) % 1.0)
 
-            ms = MotionState(
+            planned_pose = KinematicPlannedPose(
                 frame=frame,
-                time_sec=(frame - 1) / fps,
-                position=root_world,
-                orientation_deg=initial_state.orientation_deg,
-                velocity=(fx * speed, fy * speed, 0.0),
-                acceleration=(fx * accel, fy * accel, 0.0),
-                mode=mode,
-                gait_phase=0.0 if stage == "stop" else ((tau / float(t_brake)) % 1.0),
-                contacts={"foot_L": cp_l, "foot_R": cp_r},
-                is_airborne=airborne,
-                params={
-                    "tau": tau,
-                    "stage": stage,
-                    "speed": round(speed, 5),
-                    "pelvis_dz": round(pelvis_dz, 5),
-                    "torso_pitch_deg": round(torso_pitch, 3),
-                },
+                time_seconds=(frame - 1) / fps,
+                root_position=root_world,
+                root_yaw_deg=yaw,
+                speed_mps=speed,
+                accel_mps2=accel,
+                motion_mode=mode,
+                dt=1.0 / fps,
+                pelvis_location=pelvis_loc,
+                pelvis_rotation_deg=(pelvis_rx, 0.0, 0.0),
+                spine_rotation_deg=(spine_rx, 0.0, 0.0),
+                neck_rotation_deg=neck_rot,
+                head_rotation_deg=head_rot,
+                foot_L=foot_tgt_l,
+                foot_R=foot_tgt_r,
+                hand_L=PlannedHandTarget(world_xyz=(0.0, 0.0, 0.0), enabled=False, contact_intent=False),
+                hand_R=PlannedHandTarget(world_xyz=(0.0, 0.0, 0.0), enabled=False, contact_intent=False),
+                fk_joint_rotations_deg=fk_rotations,
+                active_step_index=0,
+                gait_phase=gait_phase,
+                is_flight=False,
             )
+
+            bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
+
+            eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
+            eff_r = bridge_res.wbc_result.end_effectors.get("foot_R")
+
+            if eff_l and (not eff_l.is_reachable or not eff_l.strictly_in_reach):
+                unreachable.append({
+                    "frame": frame,
+                    "side": "L",
+                    "phase": ph_l,
+                    "dist": round(eff_l.reach_distance_m, 5),
+                })
+            if eff_r and (not eff_r.is_reachable or not eff_r.strictly_in_reach):
+                unreachable.append({
+                    "frame": frame,
+                    "side": "R",
+                    "phase": ph_r,
+                    "dist": round(eff_r.reach_distance_m, 5),
+                })
+
+            if not bridge_res.success:
+                for uc in bridge_res.unmet_constraints:
+                    unreachable.append({
+                        "frame": frame,
+                        "category": uc.category,
+                        "target": uc.target_name,
+                        "error": uc.error_amount,
+                        "desc": uc.description,
+                    })
+
+            raw_l = {
+                "target_world": eff_l.requested_world_xyz if eff_l else (0.0, 0.0, 0.0),
+                "actual_world": eff_l.actual_world_xyz if eff_l else (0.0, 0.0, 0.0),
+                "is_reachable": eff_l.is_reachable if eff_l else True,
+                "strictly_in_reach": eff_l.strictly_in_reach if eff_l else True,
+                "hip_to_target_dist": eff_l.reach_distance_m if eff_l else 0.0,
+                "position_error_m": eff_l.position_error_m if eff_l else 0.0,
+            }
+            raw_r = {
+                "target_world": eff_r.requested_world_xyz if eff_r else (0.0, 0.0, 0.0),
+                "actual_world": eff_r.actual_world_xyz if eff_r else (0.0, 0.0, 0.0),
+                "is_reachable": eff_r.is_reachable if eff_r else True,
+                "strictly_in_reach": eff_r.strictly_in_reach if eff_r else True,
+                "hip_to_target_dist": eff_r.reach_distance_m if eff_r else 0.0,
+                "position_error_m": eff_r.position_error_m if eff_r else 0.0,
+            }
+
+            ms = bridge_res.motion_state
+            ms_params = dict(ms.params)
+            ms_params.update({
+                "tau": tau,
+                "stage": stage,
+                "speed": round(speed, 5),
+                "pelvis_dz": round(pelvis_dz, 5),
+                "torso_pitch_deg": round(torso_pitch, 3),
+            })
+            ms = ms.clone_with(params=ms_params)
             states.append(ms)
+
             records.append({
                 "frame": frame,
                 "tau": tau,

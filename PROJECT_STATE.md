@@ -1,13 +1,30 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-21  
-> **当前阶段**：任务 6G-C-R3B-1-Final（统一架构规范修订与桥接层接口补全完成，14/14 项严苛测试 100% 验证通过；永久 GitHub 自动同步协议确立并推送完成；严格停止，等待用户指示，严禁擅自进入 R3B-2 或 6G-D）  
+> **当前阶段**：任务 6G-C-R3B-2（历史四大动作无损迁移至统一 KinematicBridgeExecutor 与 WholeBodyController 架构已完成并通过全部验证；成功生成 462 帧连续平滑运动验收文件 output/unified_motion_integration.blend；严格停止等待用户 Blender 视口目视验收，严禁擅自进入 6G-D）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-C-R3B-2 历史四大动作向统一 KinematicBridgeExecutor 与 WholeBodyController 架构的无损迁移 (Task 6G-C-R3B-2)**：
+  * **按规范顺序依次完成四大动作无损迁移**：
+    1. `StartStopWalkAction`（`src/motion/framework.py`）：迁移至 `bridge_executor.execute_frame()`，204 帧连续平滑步态、7 个协调半步、0.24 m/s 稳态峰值速度、1.2600 m 理论位移保持 100% 零退化（`tests/verify_r3b2_walk_action.py` 100% 通过）；
+    2. `RunAction`（`src/motion/run_cycle.py`）：迁移至统一桥接层，96 帧跑动步态、4 个周期、40 帧真实空中腾空相、0.90 m/s 恒速前进保持 100% 零退化；在 `WholeBodyController` 中修复足部解锁重新绑定到 `CharacterRoot`（`reparent_to_root=True`），彻底杜绝踝关节局部旋转伪偏移；增加生理踝关节摆动俯仰调制（`pitch = -10.0 * sin(pi * s)`）（`tests/verify_r3b2_run_action.py` 100% 通过）；
+    3. `SprintStartAction`（`src/motion/sprint_start.py`）：迁移至统一桥接层，114 帧爆发式起跑、49 帧空中腾空相、2.00 m/s 峰值速度、6.5833 m 位移保持 100% 零退化；增加冲刺摆动相踝俯仰调制（`pitch = -18.0 * sin(pi * s)`），完美契合极端屈膝屈髋下的真实解剖 ROM，0 次超程（`tests/verify_r3b2_sprint_start.py` 100% 通过）；
+    4. `SprintBrakeAction`（`src/motion/sprint_brake.py`）：迁移至统一桥接层，48 帧主动急停制动、从 2.0 m/s 减速至 0.0 m/s、双脚稳态并立锁定保持 100% 零退化；增加制动踝俯仰调制（`pitch = -12.0 * sin(pi * s)`）（`tests/verify_r3b2_sprint_brake.py` 100% 通过）。
+  * **三大物理核心指标与控制语义严格校验**：
+    1. `MotionState` 中严格区分规划期望速度 `planned_linear_velocity`、根节点差分测量速度 `root_derived_linear_velocity` 与全身体物理质心速度 `com_linear_velocity`，绝不混淆；
+    2. 接触意图 `contact_intent`、接触建立与世界坐标锁定 `is_locked` 及环境表面几何间隙合规性严格区分；
+    3. 任何 IK、ROM 或接触几何超差由 `bridge_res.success` 严格真实拦截报错，严禁静默放行。
+  * **直接生成可播放统一连续动画 Blender 验收文件**：
+    * 运行 `run_unified_motion_pipeline.py`，完整顺序串联 `StartStopWalkAction` $\rightarrow$ `SprintStartAction` $\rightarrow$ `SprintBrakeAction` $\rightarrow$ `RunAction(cycles=4)`；
+    * 产物：`output/unified_motion_integration.blend`（296,509 字节，1..462 帧连续动画，总位移 12.9058 m，0 次不可达事件）；
+    * 包含完整的骨架 19 骨骼、13 占位网格、地面参考平板、视口阳光以及全程平滑跟随角色移动的 `PipelineCamera` 运镜跟踪；
+    * 编写并执行专用验收脚本 `tests/verify_unified_motion_integration.py`，全量检验骨架姿态数据（无 NaN/Inf）与关键里程碑位移（误差严格 0.0000 m），100% 通过。
+  * **全量回归套件保持 100% 全绿**：
+    * 运行 14 项桥接层严苛套件（`tests/verify_task6gc_r3b1_bridge.py`）及 6 大历史核心测试套件（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia），100% 全绿通过（退出码 0）。
 * **任务 6G-C-R3B-1-Final 统一架构规范修订、桥接层漏洞修补与永久 GitHub 自动同步 (Task 6G-C-R3B-1-Final)**：
   * **规范修订与永久同步协议 (`ARCHITECTURE.md` v2.2, `ARCHITECTURE_SYNC.md` v2.2, `AGENTS.md`, `GEMINI.md`, `.agents/rules/project_rules.md`)**：
     * 确立 10 大架构设计原则、三层架构演进图（当前断裂点现状 -> R3B 统一桥接落地 -> 未来 6G-D/6H/7A 物理平衡闭环）；

@@ -427,3 +427,28 @@
   - `tests/verify_task6gc_r3b1_bridge.py` 全部 14 项测试（含历史 6 大回归套件）100% 通过；
   - 桥接层与统一 6 阶段执行协议全面补齐，历史动作完全完好，为 R3B-2 动作迁移奠定了坚实基础；
   - 项目确立了本地到 GitHub 远程仓库的自动化闭环同步。
+
+---
+
+### [DEC-027] 历史四大连续动作向统一 KinematicBridgeExecutor 与 WholeBodyController 架构的无损迁移 (Task 6G-C-R3B-2)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-21
+* **背景**：在 Task 6G-C-R3B-1-Final 完成统一架构规范与兼容桥接层之后，历史四大动作（`StartStopWalkAction`, `RunAction`, `SprintStartAction`, `SprintBrakeAction`）仍各自通过旧的 `ContactConstraintAdapter` 和经验上身姿态函数绕过 WBC 直接操作底层物体，系统内仍存在生产执行双轨制。为实现 100% 架构归一化，必须按规范顺序将 4 大动作无损重构迁移至 `KinematicBridgeExecutor.execute_frame()`。
+* **决策**：
+  1. **按顺序依次无损迁移**：
+     - `StartStopWalkAction`（204 帧）：构建 `KinematicPlannedPose`（根位姿、骨盆、脊柱、颈头、左右脚足部目标与锁定标记、手臂 FK），通过 `bridge_executor.execute_frame` 写入关键帧，保持原有 7 步调度与 $C^1$ 速度曲线 100% 不变。
+     - `RunAction`（96 帧）：构建包含腾空相（`flight`）、单脚支撑锁定、摆动脚正弦抬升的规划位姿，接入统一桥接层；在 `WholeBodyController` 中修复足部解锁时的父级重新绑定（`reparent_to_root=True`），消除局部坐标旋转漂移。
+     - `SprintStartAction`（114 帧）：构建起跑深蹲、蹬地与加速冲刺的规划位姿，接入统一桥接层；引入平滑摆动脚解剖踝俯仰调制（$\theta_{\text{pitch}} = -18.0^\circ \sin(\pi s)$），消除深屈膝时由于强制水平足底导致的 ROM 超限。
+     - `SprintBrakeAction`（48 帧）：构建高速切入、受控前滑与双足稳态合拢停步的规划位姿，接入统一桥接层；引入制动踝俯仰调制（$-12.0^\circ \sin(\pi s)$），实现微米级无冲突停步锁定。
+  2. **速度指标与接触意图严格解耦与非混淆保障**：
+     - 严格区分 `MotionState.planned_linear_velocity`（规划期望速度）、`MotionState.root_derived_linear_velocity`（根节点差分测量速度）与 `MotionState.com_linear_velocity`（全身体物理质心线速度），绝不互相覆盖或混淆。
+     - 严格区分接触意图（`contact_intent`）、世界锁定（`is_locked`）与几何合规性校验。
+     - 任何 IK、ROM 或接触几何违规均由 `bridge_res.success` 真实拦截，严禁静默放行。
+  3. **直接生成可播放统一连续动画 Blender 验收文件**：
+     - 编写 `run_unified_motion_pipeline.py`，顺序串联 4 大动作（行走 $\rightarrow$ 冲刺起跑 $\rightarrow$ 急停制动 $\rightarrow$ 连续跑步），生成 462 帧连续无缝动画文件 `output/unified_motion_integration.blend`（总位移 $12.9058\text{ m}$，峰值速度 $2.0000\text{ m/s}$，0 次超程违规）。
+     - 设置平滑运镜摄像机（`PipelineCamera`）与视口阳光，便于用户直接在 Blender 中视口播放验收。
+* **影响**：
+  - 彻底淘汰了动作层直接调用旧 `BlenderPoseApplicator` 和经验上身姿态函数的历史双轨制；
+  - 4 大动作 100% 统一运行于 `KinematicBridgeExecutor` $\rightarrow$ `WholeBodyController` $\rightarrow$ `Blender Pose` $\rightarrow$ 物理遥测流水线；
+  - 经过 5 个自动化验证套件（`verify_r3b2_walk_action.py`, `verify_r3b2_run_action.py`, `verify_r3b2_sprint_start.py`, `verify_r3b2_sprint_brake.py`, `verify_unified_motion_integration.py`）及 14 项桥接回归套件全量检验，100% 全绿通过；
+  - 奠定了后续 Task 6G-D 动力学闭环与多部位障碍物接触的统一基座。

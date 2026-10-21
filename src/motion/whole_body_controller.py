@@ -383,7 +383,9 @@ class WholeBodyController:
                 was_locked = bool(ik_obj.get("is_locked", False)) if ik_obj is not None else False
 
                 if foot_tgt.is_locked:
-                    if not was_locked:
+                    cur_locked_pt = tuple(ik_obj.get("contact_world_xyz", ())) if ik_obj is not None else ()
+                    loc_diff = math.dist(cur_locked_pt, foot_tgt.target_world_xyz) if len(cur_locked_pt) == 3 else 999.0
+                    if not was_locked or loc_diff > 0.001:
                         lock_foot_contact(
                             arm,
                             side,
@@ -394,7 +396,7 @@ class WholeBodyController:
                         evaluate_foot_support(arm, side)
                 else:
                     if was_locked:
-                        unlock_foot_contact(arm, side, reparent_to_root=False)
+                        unlock_foot_contact(arm, side, reparent_to_root=True)
                     set_foot_ik_target(
                         arm,
                         side,
@@ -485,7 +487,7 @@ class WholeBodyController:
                 position_error_m=pos_err,
                 requested_rotation_deg=foot_tgt.target_rotation_deg,
                 is_reachable=is_reach,
-                strictly_in_reach=(req_dist_from_hip < MAX_LEG_REACH - 1e-4),
+                strictly_in_reach=(req_dist_from_hip <= MAX_LEG_REACH + 1e-4),
                 reach_distance_m=actual_dist_from_hip,
                 max_reach_m=MAX_LEG_REACH,
             )

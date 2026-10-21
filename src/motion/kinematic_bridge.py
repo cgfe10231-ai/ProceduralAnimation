@@ -56,6 +56,7 @@ from src.motion.framework import (
     WORLD_FORWARD_AXIS,
     WORLD_RIGHT_AXIS,
     WORLD_UP_AXIS,
+    forward_unit_vector_from_yaw,
 )
 from src.motion.joint_limits import JointModel
 from src.motion.rigid_link import compute_whole_body_com
@@ -117,6 +118,7 @@ class KinematicPlannedPose:
     root_position: Tuple[float, float, float]
     root_yaw_deg: float = 0.0
     speed_mps: float = 0.0
+    accel_mps2: float = 0.0
     motion_mode: MotionMode = MotionMode.WALK
     dt: Optional[float] = None  # Optional explicit frame duration in seconds
 
@@ -540,13 +542,16 @@ class KinematicBridgeExecutor:
             )
 
         root_world = root.location.to_tuple() if root is not None else (0.0, 0.0, 0.0)
+        fx, fy, _ = forward_unit_vector_from_yaw(planned.root_yaw_deg)
+        planned_vel = (fx * planned.speed_mps, fy * planned.speed_mps, 0.0)
+        planned_acc = (fx * planned.accel_mps2, fy * planned.accel_mps2, 0.0)
         motion_state = MotionState(
             frame=frame,
             time_sec=planned.time_seconds,
             position=root_world,
             orientation_deg=(0.0, 0.0, planned.root_yaw_deg),
-            velocity=(0.0, planned.speed_mps, 0.0),
-            acceleration=(0.0, 0.0, 0.0),
+            velocity=planned_vel,
+            acceleration=planned_acc,
             mode=planned.motion_mode,
             gait_phase=planned.gait_phase,
             contacts=contact_states,
@@ -558,7 +563,7 @@ class KinematicBridgeExecutor:
                 "tracking_errors_m": tracking_errors,
                 "has_rom_violation": wbc_res.has_rom_violation,
                 "dt_seconds": effective_dt,
-                "planned_linear_velocity": (0.0, planned.speed_mps, 0.0),
+                "planned_linear_velocity": planned_vel,
             },
         )
 
