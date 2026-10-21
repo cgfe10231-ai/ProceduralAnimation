@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-C-R3B-1（统一架构规范修订与最小兼容桥接层），建立统一的单帧 6 阶段执行协议与无损桥接层，经严苛测试（10/10通过）验证 0.0000 mm 姿态等价性与历史步态曲线不可变性，为后续 Task 6G-C-R3B-2 历史动作无损迁移奠定统一骨干基石。
+完成 Task 6G-C-R3B-1-Final（桥接层接口漏洞修补与永久 GitHub 自动同步），补齐动态时间步长校验、手部 IK 与接触语义彻底解耦、Phase 5 惯性张量与全身体角动量遥测闭环集成，经严苛测试（14/14 通过，含历史 6 大回归套件）验证，确立自动化 GitHub 安全同步推送协议。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -23,19 +23,19 @@
 * 完成刚体连杆惯性张量与全身角动量模型（Task 6G-B）。
 * 完成多部位接触几何、约束与支撑状态系统（Task 6G-C）。
 * 完成 Task 6G-C-R3A 系统架构深度审计与规范锁定。
-* **完成 Task 6G-C-R3B-1 统一架构规范修订与最小兼容桥接层**：
-  * 修订 `ARCHITECTURE.md` (v2.1) 与 `ARCHITECTURE_SYNC.md` (v2.1)，锁定 10 大架构设计原则、三层架构演化视图、单帧 6-Phase 执行协议表与 12 大模块合同；
-  * 同步永久规则 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`（阶段接入、防伪造、真实失败汇报）；
-  * 实现最小兼容桥接层 `src/motion/kinematic_bridge.py`（`KinematicPlannedPose`、`convert_planned_pose_to_wbc_targets`、`KinematicBridgeExecutor`）；
-  * 确立足部接地锁定由 `foot_contact.py` 独占世界空间管理、WBC 感知 `is_locked` 严禁解绑覆盖；
-  * 确立手臂显式 FK/IK 仲裁机制；
-  * 确立 ROM 与到达性真实校验，超限严格诚实返回 `success=False`；
-  * 录入 `[DEC-025]`。
+* 完成 Task 6G-C-R3B-1 统一架构规范修订与最小兼容桥接层初版。
+* **完成 Task 6G-C-R3B-1-Final 架构漏洞修补与 GitHub 自动同步**：
+  * 补齐 `dt` 动态支持与时间戳推导，单调递增时间保护，统一物理时间尺度；
+  * 彻底解耦手部 IK 激活与接触语义，结合 `ContactModel` 校验几何合规性，消除自由空间伪造接触；
+  * 足部地面锚点在局部坐标上依据踝关节原点 $(x, y, z - 0.070\text{ m})$ 精准对齐地面 $Z=0$，消除人工滑移；
+  * 闭环集成 Phase 5 `compute_whole_body_inertia`，纯只读注入 `MotionState.params`；
+  * 在规则中确立自动化 GitHub 安全同步协议（测试通过 -> 文档更新 -> commit -> auto `git push origin master` -> SHA 校验）；
+  * 录入 `[DEC-026]`。
 
 ## 3. 已验证
-* `tests/verify_task6gc_r3b1_bridge.py` 10/10 项测试全部通过：
-  * 输入无损映射、FK/IK 仲裁、接地锚定保持、真实失败汇报、0.0000 mm 姿态定量等价、历史步态曲线不可变、类型单位规范、重复写杜绝、单帧 6 阶段流水线完整执行、历史 6 大核心模块回归（WBC、Joint Limits、Rigid Link、Arm IK、Kinematics、Inertia）。
-* 状态标定为：Task 6G-C-R3B-1 已验证通过，工作区干净，等待进入 R3B-2。
+* `tests/verify_task6gc_r3b1_bridge.py` 14/14 项测试全部通过：
+  * 输入无损映射、FK/IK 仲裁、接地锚定保持、真实失败汇报、0.0000 mm 姿态定量等价、历史步态曲线不可变、类型单位规范、重复写杜绝、单帧 6 阶段流水线完整执行、变量 dt 物理缩放、手部 IK/接触解耦、全身体惯性与角动量遥测、历史 4 大动作规划完好、历史 6 大核心模块回归（WBC、Joint Limits、Rigid Link、Arm IK、Kinematics、Inertia）。
+* 状态标定为：Task 6G-C-R3B-1-Final 已验证通过，远程自动推送完成，工作区干净，严格停止，等待用户指示。
 
 ## 4. 当前文件
 * 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`ARCHITECTURE_SYNC.md`
@@ -61,3 +61,4 @@
 ## 8. 最近重要决策
 * [DEC-001] ~ [DEC-024] 保持有效。
 * [DEC-025] 统一架构规范修订与最小兼容桥接层 (Task 6G-C-R3B-1)。
+* [DEC-026] 桥接层接口补全、多部位接触语义解耦与 GitHub 自动化安全同步机制 (Task 6G-C-R3B-1-Final)。

@@ -52,7 +52,7 @@
   6. 有重要新决策时更新 `DECISIONS.md`。
   7. 更新 `HANDOFF.md`。
   8. 更新 `AI_SYNC.md`（并在交接卡片中包含 Git 状态、commit SHA 及未提交文件说明）。
-  9. **Git 自动收尾提交**：任务完成并通过验证后，针对本任务相关的源代码、测试、必要配置与文档创建本地 Git commit。
+  9. **Git 自动收尾提交与远程同步**：任务完成并通过验证后，针对本任务相关的源代码、测试、必要配置与文档创建本地 Git commit，随后自动安全推送到远程仓库（`git push origin master`），验证远程分支 HEAD 与本地 commit SHA 一致，并在 `AI_SYNC.md` 记录最终同步状态。
 * **中断与失败一致性**：若任务中断或验证失败，严禁伪装成功提交；必须保留现场并如实报告失败/中断状态。
 
 ## 5. 防止项目状态漂移原则 (Anti-Drift Principles)
@@ -77,10 +77,10 @@
 * **验证通过后方可提交**：只有当所有验证实际通过、产物核实无误且 `PROJECT_STATE.md`、`AI_SYNC.md` 等文档已更新后，方可创建本地 commit。
 * **规范提交信息**：提交信息必须明确标注任务编号及简要改动内容（例如 `feat(task-6b): implement procedural running action in unified motion framework`）。
 * **失败与中断严禁提交**：测试未通过、运行报错或任务中断时，绝对禁止创建虚假成功提交；必须如实记录真实失败状态并保留工作现场。
-* **严格本地操作与历史保护**：
-  * 默认只在本地仓库进行 `git commit`，**禁止自动执行 `git push`**。
-  * **严禁执行 `git reset --hard`**、强制清理（`git clean -fd` 破坏未审查文件）、强制推送（`git push --force`）。
-  * **禁止擅自 `git commit --amend`、`git rebase` 或以任何方式改写已有提交历史**。
+* **自动化安全同步推送与历史保护**：
+  * **自动化安全远程同步**：在所有验证通过并创建本地规范 commit 后，**必须自动执行 `git push origin master`** 将更改同步至 GitHub 远程仓库，并立即验证远程最新 commit SHA 与本地 HEAD 一致。严禁遗漏远程推送。
+  * **严禁强制推送与破坏性清理**：**严禁执行 `git push --force`**、**严禁执行 `git reset --hard`**、强制清理（`git clean -fd` 破坏未审查文件）。
+  * **禁止擅自改写历史**：**禁止擅自 `git commit --amend`、`git rebase` 或以任何方式改写已有提交历史**。
 * **交接卡片透明化**：在最终生成的 `AI_SYNC.md` 及报告中，必须明确记录当前本地 Git 状态、最新 commit SHA 以及是否有未提交文件或遗留变动。
 
 ## 8. 架构对齐与防伪造纪律 (Architecture Alignment & Anti-Fabrication Rules)

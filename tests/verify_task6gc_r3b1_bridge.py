@@ -28,14 +28,19 @@ from mathutils import Euler, Matrix, Vector
 
 from src.character.builder import build_character
 from src.config import PipelineConfig
+from src.motion.body_inertia import compute_whole_body_inertia
+from src.motion.contact_model import ContactLifecycle, ContactType, EnvironmentalSurface
 from src.motion.framework import (
     ContactPointState,
     EnvironmentQuery,
     MotionMode,
+    MotionPlanner,
     MotionState,
+    StartStopWalkAction,
     WORLD_FORWARD_AXIS,
     WORLD_RIGHT_AXIS,
     WORLD_UP_AXIS,
+    create_initial_motion_state,
 )
 from src.motion.joint_limits import JointModel
 from src.motion.kinematic_bridge import (
@@ -46,6 +51,9 @@ from src.motion.kinematic_bridge import (
     PlannedHandTarget,
     convert_planned_pose_to_wbc_targets,
 )
+from src.motion.run_cycle import RunAction
+from src.motion.sprint_brake import SprintBrakeAction
+from src.motion.sprint_start import SprintStartAction
 from src.motion.start_stop_walk import (
     _apply_start_stop_upper_body_pose,
     _evaluate_gait_phase_and_envelopes,
@@ -536,16 +544,283 @@ def test_09_full_6phase_pipeline_execution() -> bool:
     assert "com_world" in results[-1].motion_state.params
     assert "support_type" in results[-1].motion_state.params
     assert results[-1].support_type == "single_stance_l", f"Expected single_stance_l, got {results[-1].support_type}"
+    assert "inertia_tensor_com" in results[-1].motion_state.params, "inertia_tensor_com missing from params"
+    assert "angular_momentum_com" in results[-1].motion_state.params, "angular_momentum_com missing from params"
+    assert results[-1].inertia_state is not None, "Inertia state missing from BridgeExecutionResult"
 
-    print(f"  -> 5 frames executed via 6-phase pipeline: keyframing active, support_type={results[-1].support_type}.")
+    print(f"  -> 5 frames executed via 6-phase pipeline: keyframing active, support_type={results[-1].support_type}, inertia evaluated.")
     return True
 
 
 # =============================================================================
-# Test 10: Core Historical Regression Suite
+# Test 10: Variable Time Step (dt) & Kinematic Scaling
 # =============================================================================
-def test_10_core_historical_regression_suite() -> bool:
-    print("\n--- Test 10: Core Historical Regression Suite ---")
+def test_10_variable_dt_and_kinematic_scaling() -> bool:
+    print("\n--- Test 10: Variable Time Step (dt) & Kinematic Scaling ---")
+    arm, root = _clean_scene()
+    bridge = KinematicBridgeExecutor(armature_obj=arm, root_obj=root)
+
+    # 1. Test explicit dt = 0.01s (100 FPS) vs dt = 0.05s (20 FPS)
+    # Frame 1: start at Y = -8.0
+    p1 = KinematicPlannedPose(
+        frame=1,
+        time_seconds=0.0,
+        root_position=(0.0, -8.0, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+    )
+    bridge.execute_frame(p1, keyframe=False, dt=0.01)
+
+    # Frame 2: move Y by +0.02m with dt = 0.01s -> expected v_y = 0.02 / 0.01 = 2.0 m/s
+    p2 = KinematicPlannedPose(
+        frame=2,
+        time_seconds=0.01,
+        root_position=(0.0, -7.98, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -7.98, ANKLE_REST_Z), is_locked=False),
+    )
+    res2 = bridge.execute_frame(p2, keyframe=False, dt=0.01)
+    derived_vy_100fps = res2.motion_state.params["root_derived_linear_velocity"][1]
+    assert math.isclose(derived_vy_100fps, 2.0, abs_tol=1e-3), f"Expected 2.0 m/s at dt=0.01, got {derived_vy_100fps}"
+
+    # Frame 3: move Y by another +0.02m with dt = 0.04s -> expected v_y = 0.02 / 0.04 = 0.5 m/s
+    p3 = KinematicPlannedPose(
+        frame=3,
+        time_seconds=0.05,
+        root_position=(0.0, -7.96, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -7.96, ANKLE_REST_Z), is_locked=False),
+    )
+    res3 = bridge.execute_frame(p3, keyframe=False, dt=0.04)
+    derived_vy_25fps = res3.motion_state.params["root_derived_linear_velocity"][1]
+    assert math.isclose(derived_vy_25fps, 0.5, abs_tol=1e-3), f"Expected 0.5 m/s at dt=0.04, got {derived_vy_25fps}"
+
+    # 2. Test timestamp-derived dt (p4 with time_seconds=0.09 -> delta_t = 0.04s)
+    p4 = KinematicPlannedPose(
+        frame=4,
+        time_seconds=0.09,
+        root_position=(0.0, -7.94, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -7.94, ANKLE_REST_Z), is_locked=False),
+    )
+    res4 = bridge.execute_frame(p4, keyframe=False)  # dt derived from time_seconds
+    assert math.isclose(res4.motion_state.params["dt_seconds"], 0.04, abs_tol=1e-5), "Derived dt mismatch"
+
+    # 3. Test illegal inputs: zero dt, negative dt, backward timestamps
+    illegal_dt_caught = False
+    try:
+        bridge.execute_frame(p4, keyframe=False, dt=0.0)
+    except ValueError:
+        illegal_dt_caught = True
+    assert illegal_dt_caught, "dt=0.0 must raise ValueError"
+
+    backward_time_caught = False
+    try:
+        p_back = KinematicPlannedPose(
+            frame=5,
+            time_seconds=0.05,  # <= previous 0.09
+            root_position=(0.0, -7.94, 0.0),
+        )
+        bridge.execute_frame(p_back, keyframe=False)
+    except ValueError:
+        backward_time_caught = True
+    assert backward_time_caught, "Backward timestamp must raise ValueError"
+
+    print("  -> Variable dt scaling & invalid timestamp protections verified.")
+    return True
+
+
+# =============================================================================
+# Test 11: Decoupling Hand IK vs Contact Intent & Geometric Constraints
+# =============================================================================
+def test_11_hand_ik_vs_contact_intent_decoupling() -> bool:
+    print("\n--- Test 11: Hand IK vs Contact Intent Decoupling ---")
+    arm, root = _clean_scene()
+    bridge = KinematicBridgeExecutor(armature_obj=arm, root_obj=root)
+
+    # Case A: Ordinary reaching hand IK (enabled=True, but contact_intent=False, is_locked=False)
+    planned_reach = KinematicPlannedPose(
+        frame=1,
+        time_seconds=0.0,
+        root_position=(0.0, -8.0, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        hand_L=PlannedHandTarget(
+            world_xyz=(-0.24, -7.65, 1.35),
+            enabled=True,
+            weight=1.0,
+            contact_intent=False,  # Reaching in free space!
+            is_locked=False,
+        ),
+    )
+    res_reach = bridge.execute_frame(planned_reach, keyframe=False)
+    assert res_reach.success is True, f"Reaching frame failed: {res_reach.unmet_constraints}"
+    # Must NOT produce fake contact!
+    assert res_reach.support_type == "double_stance", f"Expected double_stance, got {res_reach.support_type}"
+    ms_reach = res_reach.motion_state
+    assert ms_reach.params["support_type"] == "double_stance"
+
+    # Case B: Hand contact with explicit intent and lock (e.g. grasping a bar or vault surface)
+    vault_surface = EnvironmentalSurface(
+        surface_id="vault_box",
+        surface_type="box",
+        center_world=(-0.24, -7.65, 1.35),
+        normal_world=(0.0, 0.0, 1.0),
+    )
+    bridge_vault = KinematicBridgeExecutor(armature_obj=arm, root_obj=root, surfaces=[vault_surface])
+    planned_vault = KinematicPlannedPose(
+        frame=2,
+        time_seconds=0.04167,
+        root_position=(0.0, -8.0, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -8.0, ANKLE_REST_Z), is_locked=False),
+        hand_L=PlannedHandTarget(
+            world_xyz=(-0.24, -7.65, 1.35),
+            enabled=True,
+            weight=1.0,
+            contact_intent=True,
+            is_locked=True,
+            surface_id="vault_box",
+            contact_type=ContactType.UNILATERAL,
+        ),
+    )
+    res_vault = bridge_vault.execute_frame(planned_vault, keyframe=False)
+    assert res_vault.support_type == "multi_surface", f"Expected multi_surface, got {res_vault.support_type}"
+
+    # Case C: Geometric constraint compliance failure truthfully reported
+    # Place hand contact target far away from actual surface
+    bad_surface = EnvironmentalSurface(
+        surface_id="far_wall",
+        surface_type="wall",
+        center_world=(0.0, -5.0, 1.5),
+        normal_world=(0.0, -1.0, 0.0),
+    )
+    bridge_bad = KinematicBridgeExecutor(armature_obj=arm, root_obj=root, surfaces=[bad_surface])
+    planned_bad = KinematicPlannedPose(
+        frame=3,
+        time_seconds=0.08333,
+        root_position=(0.0, -8.0, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        hand_L=PlannedHandTarget(
+            world_xyz=(-0.24, -5.0, 1.5),  # 3 meters away from character!
+            enabled=True,
+            contact_intent=True,
+            is_locked=True,
+            surface_id="far_wall",
+        ),
+    )
+    res_bad = bridge_bad.execute_frame(planned_bad, keyframe=False)
+    # Must report unmet constraint or failure
+    assert res_bad.success is False, "Geometric contact violation must report success=False"
+    has_contact_or_reach_fail = any(u.category in ("REACHABILITY", "CONTACT_GEOMETRY") for u in res_bad.unmet_constraints)
+    assert has_contact_or_reach_fail, f"Expected contact/reach failure, got {res_bad.unmet_constraints}"
+
+    print("  -> Contact semantics decoupled: clean distinction between free IK and active contacts verified.")
+    return True
+
+
+# =============================================================================
+# Test 12: Whole-Body Inertia & Angular Momentum Telemetry in Bridge
+# =============================================================================
+def test_12_whole_body_inertia_and_angular_momentum_telemetry() -> bool:
+    print("\n--- Test 12: Whole-Body Inertia & Angular Momentum Telemetry ---")
+    arm, root = _clean_scene()
+    bridge = KinematicBridgeExecutor(armature_obj=arm, root_obj=root)
+
+    # Frame 1: Static neutral pose
+    p1 = KinematicPlannedPose(
+        frame=1,
+        time_seconds=0.0,
+        root_position=(0.0, -8.0, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+    )
+    res1 = bridge.execute_frame(p1, keyframe=False)
+
+    params1 = res1.motion_state.params
+    assert "inertia_tensor_com" in params1, "inertia_tensor_com missing"
+    assert "angular_momentum_com" in params1, "angular_momentum_com missing"
+    assert "spin_angular_momentum" in params1, "spin_angular_momentum missing"
+    assert "orbital_angular_momentum" in params1, "orbital_angular_momentum missing"
+
+    # Static posture: derived velocities are zero -> total angular momentum must be 0.0
+    h1 = params1["angular_momentum_com"]
+    h1_mag = math.sqrt(h1[0]**2 + h1[1]**2 + h1[2]**2)
+    assert math.isclose(h1_mag, 0.0, abs_tol=1e-5), f"Static angular momentum must be 0, got {h1_mag}"
+
+    # Inertia tensor components must be positive on diagonal
+    I_mat = params1["inertia_tensor_com"]
+    assert I_mat[0][0] > 0.0 and I_mat[1][1] > 0.0 and I_mat[2][2] > 0.0, "Principal inertias must be positive"
+
+    # Frame 2: Translate forward (+Y)
+    p2 = KinematicPlannedPose(
+        frame=2,
+        time_seconds=0.04167,
+        root_position=(0.0, -7.96, 0.0),
+        pelvis_location=(0.0, -0.02, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -7.96, ANKLE_REST_Z), is_locked=False),
+    )
+    res2 = bridge.execute_frame(p2, keyframe=False)
+    params2 = res2.motion_state.params
+    assert res2.inertia_state is not None
+    assert res2.inertia_state.total_mass_kg > 50.0, f"Expected total mass > 50 kg, got {res2.inertia_state.total_mass_kg}"
+
+    print(f"  -> Inertia tensor and angular momentum telemetry verified (I_zz={I_mat[2][2]:.4f} kg*m^2, static H={h1_mag:.6f}).")
+    return True
+
+
+# =============================================================================
+# Test 13: Historical Motion Actions Intactness & Planning
+# =============================================================================
+def test_13_historical_actions_intactness() -> bool:
+    print("\n--- Test 13: Historical Actions Intactness & Planning ---")
+    config = PipelineConfig()
+    start_pos = config.character_path_points[0]
+
+    # 1. WalkAction schedule & displacement
+    walk_sched = build_step_schedule(config, start_pos[1])
+    assert len(walk_sched) == 7, f"Expected 7 walk steps, got {len(walk_sched)}"
+
+    # 2. RunAction cycle structure
+    run_act = RunAction(cycles=1)
+    assert run_act.name == "run"
+    init_state = create_initial_motion_state(config, start_frame=1)
+    dur_run = run_act.estimate_duration_frames(init_state, config)
+    assert dur_run == 24, f"RunAction cycle must be 24 frames, got {dur_run}"
+
+    # 3. SprintStartAction
+    sprint_act = SprintStartAction()
+    assert sprint_act.name == "sprint_start"
+    dur_sprint = sprint_act.estimate_duration_frames(init_state, config)
+    assert dur_sprint == config.sprint_total_frames, "SprintStart frames mismatch"
+
+    # 4. SprintBrakeAction
+    sprint_end_state = MotionState(
+        frame=114,
+        time_sec=114.0/24.0,
+        position=(0.0, -1.4167, 0.0),
+        orientation_deg=(0.0, 0.0, 0.0),
+        velocity=(0.0, 2.0, 0.0),
+        acceleration=(0.0, 0.0, 0.0),
+        mode=MotionMode.SPRINT,
+        gait_phase=0.0,
+    )
+    brake_act = SprintBrakeAction()
+    assert brake_act.name == "sprint_brake"
+    dur_brake = brake_act.estimate_duration_frames(sprint_end_state, config)
+    assert dur_brake == config.sprint_brake_total_frames, "SprintBrake frames mismatch"
+
+    print("  -> Walk, Run, SprintStart, SprintBrake actions intact and plan successfully.")
+    return True
+
+
+# =============================================================================
+# Test 14: Core Historical Regression Suite
+# =============================================================================
+def test_14_core_historical_regression_suite() -> bool:
+    print("\n--- Test 14: Core Historical Regression Suite ---")
     python_exe = sys.executable
 
     test_scripts = [
@@ -562,7 +837,6 @@ def test_10_core_historical_regression_suite() -> bool:
             print(f"  [SKIP] {script} not found")
             continue
         print(f"  Running regression: {script}...")
-        # Since this script runs inside Blender, we can execute the regression scripts via bpy run or subprocess
         blender_exe = bpy.app.binary_path
         cmd = [blender_exe, "-b", "-P", script]
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -580,7 +854,7 @@ def test_10_core_historical_regression_suite() -> bool:
 # =============================================================================
 def run_all_tests() -> bool:
     print("=" * 80)
-    print("TASK 6G-C-R3B-1: MINIMAL COMPATIBILITY BRIDGE LAYER VERIFICATION")
+    print("TASK 6G-C-R3B-1-FINAL: ARCHITECTURAL GAP FIXING & BRIDGE VERIFICATION")
     print("=" * 80)
 
     tests = [
@@ -593,7 +867,11 @@ def run_all_tests() -> bool:
         ("Test 07: Data Types, Units & Coordinate Consistency", test_07_data_types_units_and_coordinate_consistency),
         ("Test 08: Duplicate Write Conflict Prevention", test_08_duplicate_write_conflict_prevention),
         ("Test 09: Full Single-Frame 6-Phase Pipeline Execution", test_09_full_6phase_pipeline_execution),
-        ("Test 10: Core Historical Regression Suite", test_10_core_historical_regression_suite),
+        ("Test 10: Variable Time Step (dt) & Kinematic Scaling", test_10_variable_dt_and_kinematic_scaling),
+        ("Test 11: Hand IK vs Contact Intent Decoupling", test_11_hand_ik_vs_contact_intent_decoupling),
+        ("Test 12: Whole-Body Inertia & Angular Momentum Telemetry", test_12_whole_body_inertia_and_angular_momentum_telemetry),
+        ("Test 13: Historical Motion Actions Intactness & Planning", test_13_historical_actions_intactness),
+        ("Test 14: Core Historical Regression Suite", test_14_core_historical_regression_suite),
     ]
 
     all_passed = True
@@ -615,7 +893,7 @@ def run_all_tests() -> bool:
 
     print("\n" + "=" * 80)
     if all_passed:
-        print("RESULT: ALL 10 TASK 6G-C-R3B-1 VERIFICATION TESTS PASSED SUCCESSFULLY!")
+        print("RESULT: ALL 14 TASK 6G-C-R3B-1-FINAL VERIFICATION TESTS PASSED SUCCESSFULLY!")
     else:
         print("RESULT: ONE OR MORE TESTS FAILED!")
     print("=" * 80)

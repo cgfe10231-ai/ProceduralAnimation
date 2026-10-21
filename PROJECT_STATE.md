@@ -1,24 +1,25 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-20  
-> **当前阶段**：任务 6G-C-R3B-1（统一架构规范修订与最小兼容桥接层已完成并 100% 验证通过；等待进入 R3B-2 执行历史动作向统一桥接层的无损迁移）  
+> **记录时间**：2026-10-21  
+> **当前阶段**：任务 6G-C-R3B-1-Final（统一架构规范修订与桥接层接口补全完成，14/14 项严苛测试 100% 验证通过；永久 GitHub 自动同步协议确立并推送完成；严格停止，等待用户指示，严禁擅自进入 R3B-2 或 6G-D）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 6G-C-R3B-1 统一架构规范修订与最小兼容桥接层 (Task 6G-C-R3B-1 Bridge Layer)**：
-  * **规范修订 (ARCHITECTURE.md v2.1 & ARCHITECTURE_SYNC.md v2.1)**：
+* **任务 6G-C-R3B-1-Final 统一架构规范修订、桥接层漏洞修补与永久 GitHub 自动同步 (Task 6G-C-R3B-1-Final)**：
+  * **规范修订与永久同步协议 (`ARCHITECTURE.md` v2.2, `ARCHITECTURE_SYNC.md` v2.2, `AGENTS.md`, `GEMINI.md`, `.agents/rules/project_rules.md`)**：
     * 确立 10 大架构设计原则、三层架构演进图（当前断裂点现状 -> R3B 统一桥接落地 -> 未来 6G-D/6H/7A 物理平衡闭环）；
     * 确立单帧 6 阶段执行协议表（Phase 1 规划 -> Phase 2 接触防滑锁定 -> Phase 3 WBC 统一求解 -> Phase 4 真实 ROM 校验 -> Phase 5 事后只读遥测丰富 -> Phase 6 状态提交）；
     * 梳理 12 大核心模块契约表与 6 大历史动作复用矩阵；
-    * 同步更新 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`，确立防伪造与阶段接入纪律。
-  * **最小兼容桥接层实现 (`src/motion/kinematic_bridge.py`)**：
-    * 实现 `KinematicPlannedPose`、`PlannedFootTarget`、`PlannedHandTarget` 结构化输入模型；
-    * 实现 `convert_planned_pose_to_wbc_targets`：手部 FK/IK 显式仲裁，足部接地锁定标记无损转发；
-    * 实现 `KinematicBridgeExecutor`：严格编排 6-Phase 生命周期，统筹 `foot_contact` 接地世界锚定锁定、`WholeBodyController` 独占姿态求解、`JointModel` ROM 与到达性诚实验证、事后只读物理遥测丰富（CoM、速度、惯性张量、角动量、接触模型）及 `MotionState` 状态提交。
-  * **自动化测试套件 (`tests/verify_task6gc_r3b1_bridge.py`) 10/10 项全绿**：
+    * 确立永久自动化 GitHub 同步机制：每次任务完成并通过全量验证后，自动精确暂存、commit 并 `git push origin master`，校验远程与本地 HEAD 一致。
+  * **最小兼容桥接层深度补全 (`src/motion/kinematic_bridge.py`)**：
+    * `KinematicPlannedPose` 引入可选 `dt`，支持显式步长与时间戳自动差分推导（`dt > 0.0` 严格单调递增保护），确保有限差分速度与惯性张量物理时间缩放一致；
+    * 彻底解耦手部 IK 激活与接触语义（`enabled` vs `contact_intent` vs `is_locked`），自由空间伸手抓空绝不产生伪造接触；支持结合 `ContactModel` 进行接触表面几何间隙与穿透容差合规性校验，超差真实报警 `success=False`；
+    * 足部地面锚点在局部坐标上依据踝关节原点 $(x, y, z - 0.070\text{ m})$ 精准对齐地面 $Z=0$，与 `foot_contact.py` 世界锁定严格吻合，消除足底人为滑移；
+    * Phase 5 姿态后处理闭环集成 `compute_whole_body_inertia`，基于已评估 Armature 姿态与速度状态计算惯性张量与自转/轨道角动量，纯只读注入 `MotionState.params`。
+  * **自动化测试套件 (`tests/verify_task6gc_r3b1_bridge.py`) 14/14 项全部通过**：
     * Test 01：输入字段无损映射（100% 空间与运动学字段无损转换）；
     * Test 02：FK/IK 仲裁与手臂控制所有权（腕部追踪误差 0.041 mm）；
     * Test 03：支撑脚地面锚定保护（控制器漂移 0.000000 mm，骨骼漂移 0.246 mm）；
@@ -28,7 +29,11 @@
     * Test 07：数据类型、单位与坐标系一致性（+Z Up，地面 Z=0.0，双支撑标识完全兼容）；
     * Test 08：重复写冲突杜绝（WBC 与 foot_contact 独占写所有权零冲突）；
     * Test 09：单帧 6 阶段流水线全流程执行（5 连续帧正确写入，动画关键帧生成）；
-    * Test 10：历史 6 大核心模块全量回归（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）100% 通过（退出码 `0`）。
+    * Test 10：Variable dt & Kinematic Scaling（0.01s 100FPS 与 0.04s 25FPS 速度换算精确吻合，非法步长与反向时间戳异常拦截成功）；
+    * Test 11：Hand IK vs Contact Intent Decoupling（自由空间抓空与主动表面接触精准区分，越界接触真实报警 `success=False`）；
+    * Test 12：Whole-Body Inertia & Angular Momentum Telemetry（静态姿态角动量严格为 0.0，运动状态惯性张量正定且质量 > 50 kg）；
+    * Test 13：Historical Motion Actions Intactness & Planning（Walk 7 步、Run 24 帧周期、SprintStart 36 帧、SprintBrake 26 帧动作完全完好）；
+    * Test 14：历史 6 大核心模块全量回归（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）100% 通过（退出码 `0`）。
 * **任务 6G-C-R3A 架构审计与规范锁定 (Task 6G-C-R3A: Architecture Audit & Specification Protocol)**：
   * **全仓库源码与调用链深度审计**：系统性审计 `src/motion/`、`src/rig/` 及测试与运行脚本，彻底澄清当前工程中真实存在的三套分立管线（历史动作管线、物理分析与全身控制工具链、演示原型脚本），并以源码证明障碍物原型（`run_contact_obstacle_integration.py`）之所以呈现 30 帧僵硬片段，是因为它在各片段中循环对完全相同的静态目标执行 `execute_frame`，缺乏连续步态调度和时间轴运动学。
   * **更新权威架构文档 (`ARCHITECTURE.md` v2.0)**：补充世界坐标统一约定、当前真实架构 Mermaid 流程图、目标生产级架构图、11 大模块数据流合同全表、6 大历史动作复用矩阵及架构断裂点审计。

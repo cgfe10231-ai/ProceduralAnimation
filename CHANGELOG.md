@@ -3,6 +3,33 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-21] 任务 6G-C-R3B-1-Final：桥接层漏洞修补与永久 GitHub 自动同步 (Task 6G-C-R3B-1-Final)
+
+### 修复与补全 (Fixes & Gaps Resolved)
+* **时间步长 (dt) 动态支持与物理缩放 (`src/motion/kinematic_bridge.py`)**：
+  * 在 `KinematicPlannedPose` 中增加可选 `dt: Optional[float] = None`，`KinematicBridgeExecutor.execute_frame` 支持显式 `dt` 传入或由 `time_seconds` 自动差分计算；
+  * 引入严格单调递增时间戳与正数步长校验（`dt > 0.0`，反向或零时间戳抛出 `ValueError`）；
+  * 有限差分速度与惯性张量物理缩放完全一致，默认维持 24 FPS 标准兼容。
+* **手部 IK 与接触语义彻底解耦 (`src/motion/kinematic_bridge.py`)**：
+  * 在 `PlannedFootTarget` 与 `PlannedHandTarget` 中显式分离 IK 目标激活（`enabled`）、接触意图（`contact_intent`）、世界锁定（`is_locked`）、接触类型与表面 ID；
+  * 自由空间伸手（`contact_intent=False`）绝不产生虚假接触，维持正常双足或单足支撑分类；
+  * 接触合规性校验：对声明接触意图的肢体，通过 `ContactModel` 校验与环境表面的几何间隙、穿透与法向容差，超差真实报警 `success=False`；
+  * 支撑足地面锚点在局部坐标上依据踝关节原点 $(x, y, z - 0.070\text{ m})$ 精准对齐地面 $Z=0$，消除足底中心人为滑移。
+* **Phase 5 惯性张量与全身体角动量遥测集成 (`src/motion/kinematic_bridge.py`)**：
+  * 在 Phase 5 姿态解算完成后，直接调用 `compute_whole_body_inertia`，基于已评估的 Armature 姿态与 `kin_result.velocity` 计算全身体惯性张量、自转角动量与质心轨道角动量，并注入 `MotionState.params`；保持纯只读物理遥测。
+* **永久 GitHub 自动化安全同步协议确立 (`AGENTS.md` / `GEMINI.md` / `.agents/rules/project_rules.md`)**：
+  * 修改 Section 4 与 Section 7：每次开发任务完成并通过全部验证后，自动精确暂存、本地 commit，并自动执行 `git push origin master`，校验远程 SHA 与本地 HEAD 一致并记录于 `AI_SYNC.md`。
+
+### 验证 (Verification)
+* **扩展并 100% 通过 14 项严苛测试 (`tests/verify_task6gc_r3b1_bridge.py`)**：
+  * Test 01 - Test 09：桥接无损转换、FK/IK 仲裁、支撑脚锁定、真实 ROM 报错、微米级等价性（0.0000 mm）、步态曲线不可变、坐标系规范、写入防冲突、6 阶段流水线全绿；
+  * Test 10：Variable dt & Kinematic Scaling（0.01s 100FPS 与 0.04s 25FPS 速度换算精确吻合，非法步长与反向时间戳异常拦截成功）；
+  * Test 11：Hand IK vs Contact Intent Decoupling（自由空间抓空与主动表面接触精准区分，越界接触真实报警 `success=False`）；
+  * Test 12：Whole-Body Inertia & Angular Momentum Telemetry（静态姿态角动量严格为 0.0，运动状态惯性张量正定且质量 > 50 kg）；
+  * Test 13：Historical Motion Actions Intactness & Planning（Walk 7 步、Run 24 帧周期、SprintStart 36 帧、SprintBrake 26 帧动作完全完好）；
+  * Test 14：Core Historical Regression Suite（历史 6 大核心测试套件 100% 全绿：WBC、Joint Limits、Rigid Link、Arm IK、Kinematics、Inertia）。
+
+
 ## [2026-10-20] 任务 6G-C-R3B-1：统一架构规范修订与最小兼容桥接层 (Task 6G-C-R3B-1 Bridge Layer)
 
 ### 规范修订与强化 (Specifications & Rules)

@@ -27,13 +27,22 @@ import bpy
 from mathutils import Euler, Matrix, Vector
 
 from src.config import PipelineConfig
-from src.motion.body_inertia import compute_whole_body_inertia, enrich_motion_state_with_inertia
+from src.motion.body_inertia import (
+    DEFAULT_15_SEGMENT_INERTIA_MODEL,
+    BodyInertiaModel,
+    WholeBodyInertiaState,
+    compute_whole_body_inertia,
+    enrich_motion_state_with_inertia,
+)
 from src.motion.body_kinematics import BodyKinematicsTracker, enrich_motion_state_with_kinematics
 from src.motion.contact_model import (
     ContactLifecycle,
     ContactRecord,
     ContactType,
+    DEFAULT_LIMB_LOCAL_ANCHORS,
     EnvironmentalSurface,
+    GeometricConstraintResult,
+    LIMB_TO_BONE_NAME,
     MultiContactState,
     SupportType,
     enrich_motion_state_with_contacts,
@@ -77,6 +86,12 @@ class PlannedFootTarget:
     rotation_deg: Tuple[float, float, float] = (0.0, 0.0, 0.0)
     clamp_reach: bool = True
 
+    # Contact semantics: distinct from IK target positioning
+    contact_intent: bool = True  # In locomotion actions, foot targets a surface (ground)
+    surface_id: str = "ground"
+    contact_type: ContactType = ContactType.UNILATERAL
+    normal_world: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+
 
 @dataclass
 class PlannedHandTarget:
@@ -85,6 +100,13 @@ class PlannedHandTarget:
     rotation_deg: Optional[Tuple[float, float, float]] = None
     enabled: bool = False  # False = hand in FK mode; True = hand in IK mode
     weight: float = 1.0
+
+    # Explicit contact intent and locking fields (decoupling IK from contact)
+    contact_intent: bool = False  # True only if action specifically intends surface contact
+    is_locked: bool = False       # True if hand contact is established & locked in world space
+    surface_id: Optional[str] = None  # Targeted surface ID (e.g. "vault_box", "bar", "wall")
+    contact_type: ContactType = ContactType.FREE  # UNILATERAL, GRASP, or FREE
+    normal_world: Tuple[float, float, float] = (0.0, 0.0, 1.0)
 
 
 @dataclass
@@ -96,6 +118,7 @@ class KinematicPlannedPose:
     root_yaw_deg: float = 0.0
     speed_mps: float = 0.0
     motion_mode: MotionMode = MotionMode.WALK
+    dt: Optional[float] = None  # Optional explicit frame duration in seconds
 
     # Floating base & axial FK posture
     pelvis_location: Tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -226,6 +249,8 @@ class BridgeExecutionResult:
     rom_violations: Dict[str, Any]
     com_world: Tuple[float, float, float]
     support_type: str
+    inertia_state: Optional[WholeBodyInertiaState] = None
+    contact_geometry_errors: Dict[str, GeometricConstraintResult] = field(default_factory=dict)
 
 
 class KinematicBridgeExecutor:
@@ -237,8 +262,10 @@ class KinematicBridgeExecutor:
         root_obj: Optional[bpy.types.Object] = None,
         controller: Optional[WholeBodyController] = None,
         kinematics_tracker: Optional[BodyKinematicsTracker] = None,
+        inertia_model: Optional[BodyInertiaModel] = None,
         environment: Optional[EnvironmentQuery] = None,
         surfaces: Optional[Sequence[Any]] = None,
+        default_fps: float = 24.0,
     ) -> None:
         self.armature_obj = armature_obj
         self.root_obj = root_obj or armature_obj.parent or bpy.data.objects.get("CharacterRoot")
@@ -248,20 +275,54 @@ class KinematicBridgeExecutor:
             root_obj=self.root_obj,
             mass_distribution=self.controller.mass_distribution,
         )
+        self.inertia_model = inertia_model or DEFAULT_15_SEGMENT_INERTIA_MODEL
         self.environment = environment or EnvironmentQuery()
         self.surfaces = surfaces
+        self.default_fps = float(default_fps)
+        self._last_time_sec: Optional[float] = None
+        self._last_frame: Optional[int] = None
+
+    def reset(self) -> None:
+        """Reset internal sequential state tracker and differential kinematics cache."""
+        self._last_time_sec = None
+        self._last_frame = None
+        if hasattr(self.kinematics_tracker, "reset"):
+            self.kinematics_tracker.reset()
 
     def execute_frame(
         self,
         planned: KinematicPlannedPose,
         keyframe: bool = True,
         enforce_rom_clamping: bool = False,
+        dt: Optional[float] = None,
     ) -> BridgeExecutionResult:
         """Execute a single frame according to the official 6-phase pipeline protocol."""
         arm = self.armature_obj
         root = self.root_obj
         frame = planned.frame
-        dt = 1.0 / 24.0  # 24 FPS standard
+
+        # ---------------------------------------------------------------------
+        # Time Step Resolution & Validation
+        # ---------------------------------------------------------------------
+        if dt is not None:
+            if dt <= 0.0:
+                raise ValueError(f"Explicit dt={dt} must be strictly positive (> 0.0)")
+            effective_dt = float(dt)
+        elif planned.dt is not None:
+            if planned.dt <= 0.0:
+                raise ValueError(f"Planned dt={planned.dt} must be strictly positive (> 0.0)")
+            effective_dt = float(planned.dt)
+        else:
+            if self._last_time_sec is not None:
+                calc_dt = planned.time_seconds - self._last_time_sec
+                if calc_dt <= 1e-9:
+                    raise ValueError(
+                        f"Non-positive time step detected: current time_seconds={planned.time_seconds} "
+                        f"<= previous time_seconds={self._last_time_sec} (dt={calc_dt})"
+                    )
+                effective_dt = calc_dt
+            else:
+                effective_dt = 1.0 / self.default_fps
 
         # ---------------------------------------------------------------------
         # Phase 1: Planning / Target Packaging
@@ -304,11 +365,21 @@ class KinematicBridgeExecutor:
         kin_result = self.kinematics_tracker.sample_and_update(
             time_sec=planned.time_seconds,
             frame=frame,
-            dt=dt,
+            dt=effective_dt,
         )
 
-        # Telemetry C: Multi-Limb Contact State
-        surfaces = self.surfaces or [
+        # Telemetry C: Rigid Link Inertia Tensor & Whole-Body Angular Momentum
+        inertia_state = compute_whole_body_inertia(
+            armature_obj=arm,
+            velocity_state=kin_result.velocity,
+            inertia_model=self.inertia_model,
+            update_scene=False,
+            time_sec=planned.time_seconds,
+            frame=frame,
+        )
+
+        # Telemetry D: Multi-Limb Contact State & Decoupled Semantics
+        surfaces = list(self.surfaces) if self.surfaces else [
             EnvironmentalSurface(
                 surface_id="ground",
                 surface_type="ground",
@@ -316,37 +387,118 @@ class KinematicBridgeExecutor:
                 normal_world=(0.0, 0.0, 1.0),
             )
         ]
-        active_limb_targets = {
-            "foot_L": {
-                "surface_id": "ground",
-                "target_world": (planned.foot_L.world_xyz[0], planned.foot_L.world_xyz[1], 0.0),
-                "contact_type": ContactType.UNILATERAL,
-                "lifecycle": ContactLifecycle.ESTABLISHED if planned.foot_L.is_locked else ContactLifecycle.RELEASED,
-            },
-            "foot_R": {
-                "surface_id": "ground",
-                "target_world": (planned.foot_R.world_xyz[0], planned.foot_R.world_xyz[1], 0.0),
-                "contact_type": ContactType.UNILATERAL,
-                "lifecycle": ContactLifecycle.ESTABLISHED if planned.foot_R.is_locked else ContactLifecycle.RELEASED,
-            },
-            "hand_L": {
-                "surface_id": "hand_L_target" if (planned.hand_L and planned.hand_L.enabled) else "free",
-                "target_world": planned.hand_L.world_xyz if (planned.hand_L and planned.hand_L.enabled) else (0.0, 0.0, 0.0),
-                "contact_type": ContactType.UNILATERAL if (planned.hand_L and planned.hand_L.enabled) else ContactType.FREE,
-                "lifecycle": ContactLifecycle.ESTABLISHED if (planned.hand_L and planned.hand_L.enabled) else ContactLifecycle.RELEASED,
-            },
-            "hand_R": {
-                "surface_id": "hand_R_target" if (planned.hand_R and planned.hand_R.enabled) else "free",
-                "target_world": planned.hand_R.world_xyz if (planned.hand_R and planned.hand_R.enabled) else (0.0, 0.0, 0.0),
-                "contact_type": ContactType.UNILATERAL if (planned.hand_R and planned.hand_R.enabled) else ContactType.FREE,
-                "lifecycle": ContactLifecycle.ESTABLISHED if (planned.hand_R and planned.hand_R.enabled) else ContactLifecycle.RELEASED,
-            },
-        }
+
+        active_limb_targets: Dict[str, Dict[str, Any]] = {}
+
+        # Foot contact intent & locking
+        for side, ft in [("L", planned.foot_L), ("R", planned.foot_R)]:
+            limb_key = f"foot_{side}"
+            if ft.is_locked:
+                active_limb_targets[limb_key] = {
+                    "surface_id": ft.surface_id,
+                    "target_world": (ft.world_xyz[0], ft.world_xyz[1], 0.0),
+                    "normal_world": ft.normal_world,
+                    "contact_type": ft.contact_type,
+                    "lifecycle": ContactLifecycle.ESTABLISHED,
+                }
+            elif ft.contact_intent:
+                active_limb_targets[limb_key] = {
+                    "surface_id": ft.surface_id,
+                    "target_world": ft.world_xyz,
+                    "normal_world": ft.normal_world,
+                    "contact_type": ft.contact_type,
+                    "lifecycle": ContactLifecycle.RELEASED,
+                }
+            else:
+                active_limb_targets[limb_key] = {
+                    "surface_id": "free",
+                    "target_world": ft.world_xyz,
+                    "normal_world": (0.0, 0.0, 1.0),
+                    "contact_type": ContactType.FREE,
+                    "lifecycle": ContactLifecycle.RELEASED,
+                }
+
+        # Hand contact intent & locking: clean separation between IK enablement and contact intent
+        for side, ht in [("L", planned.hand_L), ("R", planned.hand_R)]:
+            limb_key = f"hand_{side}"
+            if ht is not None and ht.enabled:
+                if ht.is_locked:
+                    c_type = ht.contact_type if ht.contact_type != ContactType.FREE else ContactType.UNILATERAL
+                    active_limb_targets[limb_key] = {
+                        "surface_id": ht.surface_id or f"{limb_key}_target",
+                        "target_world": ht.world_xyz,
+                        "normal_world": ht.normal_world,
+                        "contact_type": c_type,
+                        "lifecycle": ContactLifecycle.ESTABLISHED,
+                    }
+                elif ht.contact_intent:
+                    # Intends contact with an environmental surface
+                    p_hand = arm.pose.bones.get(f"hand.{side}")
+                    actual_hand_p = (arm.matrix_world @ p_hand.head) if p_hand else Vector(ht.world_xyz)
+                    dist = (actual_hand_p - Vector(ht.world_xyz)).length
+                    c_type = ht.contact_type if ht.contact_type != ContactType.FREE else ContactType.UNILATERAL
+                    active_limb_targets[limb_key] = {
+                        "surface_id": ht.surface_id or f"{limb_key}_target",
+                        "target_world": ht.world_xyz,
+                        "normal_world": ht.normal_world,
+                        "contact_type": c_type,
+                        "lifecycle": ContactLifecycle.ESTABLISHED if dist <= 0.015 else ContactLifecycle.TOUCHDOWN,
+                    }
+                else:
+                    # Pure reaching / waving IK: zero contact intent!
+                    active_limb_targets[limb_key] = {
+                        "surface_id": "free",
+                        "target_world": ht.world_xyz,
+                        "normal_world": (0.0, 0.0, 1.0),
+                        "contact_type": ContactType.FREE,
+                        "lifecycle": ContactLifecycle.RELEASED,
+                    }
+            else:
+                active_limb_targets[limb_key] = {
+                    "surface_id": "free",
+                    "target_world": (0.0, 0.0, 0.0),
+                    "normal_world": (0.0, 0.0, 1.0),
+                    "contact_type": ContactType.FREE,
+                    "lifecycle": ContactLifecycle.RELEASED,
+                }
+
         multi_contact = evaluate_limb_contacts_from_armature(
             armature_obj=arm,
             surfaces=surfaces,
             active_limb_targets=active_limb_targets,
         )
+
+        # Contact Geometric Compliance Checking
+        contact_geom_errors: Dict[str, GeometricConstraintResult] = {}
+        actual_positions: Dict[str, Tuple[float, float, float]] = {}
+        for side in ("L", "R"):
+            p_shin = arm.pose.bones.get(f"shin.{side}")
+            if p_shin:
+                ankle_world = arm.matrix_world @ p_shin.tail
+                actual_positions[f"foot_{side}"] = (ankle_world.x, ankle_world.y, ankle_world.z - ANKLE_REST_Z)
+            p_hand = arm.pose.bones.get(f"hand.{side}")
+            if p_hand:
+                wrist_world = arm.matrix_world @ p_hand.head
+                actual_positions[f"hand_{side}"] = (wrist_world.x, wrist_world.y, wrist_world.z)
+
+        geom_compliance = multi_contact.check_all_contacts(actual_positions)
+        for limb, geom_res in geom_compliance.items():
+            rec = multi_contact.contacts.get(limb)
+            if rec is not None and rec.is_active and not geom_res.is_valid:
+                contact_geom_errors[limb] = geom_res
+                unmet.append(
+                    UnmetConstraint(
+                        category="CONTACT_GEOMETRY",
+                        target_name=limb,
+                        description=geom_res.violation_reason or f"Geometric contact violation on {limb}",
+                        error_amount=geom_res.total_position_error_m,
+                        details={
+                            "gap_m": geom_res.distance_normal_m,
+                            "slip_m": geom_res.tangential_slip_m,
+                            "penetration_m": geom_res.penetration_depth_m,
+                        },
+                    )
+                )
 
         # ---------------------------------------------------------------------
         # Phase 6: State Commit & Keyframing
@@ -405,14 +557,23 @@ class KinematicBridgeExecutor:
                 "support_type": multi_contact.support_type.value,
                 "tracking_errors_m": tracking_errors,
                 "has_rom_violation": wbc_res.has_rom_violation,
+                "dt_seconds": effective_dt,
+                "planned_linear_velocity": (0.0, planned.speed_mps, 0.0),
             },
         )
 
         motion_state = enrich_motion_state_with_kinematics(motion_state, kin_result)
         motion_state = enrich_motion_state_with_contacts(motion_state, multi_contact)
+        motion_state = enrich_motion_state_with_inertia(motion_state, inertia_state)
+
+        # Update internal temporal progression
+        self._last_time_sec = planned.time_seconds
+        self._last_frame = frame
+
+        overall_success = wbc_res.success and (len(unmet) == 0)
 
         return BridgeExecutionResult(
-            success=wbc_res.success,
+            success=overall_success,
             frame=frame,
             wbc_result=wbc_res,
             motion_state=motion_state,
@@ -421,4 +582,6 @@ class KinematicBridgeExecutor:
             rom_violations=rom_viols,
             com_world=com_world,
             support_type=multi_contact.support_type.value,
+            inertia_state=inertia_state,
+            contact_geometry_errors=contact_geom_errors,
         )

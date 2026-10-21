@@ -1,7 +1,7 @@
 # ARCHITECTURE: 全程序化 3D 动画系统架构与工程规范蓝图
 
-> **最新架构审计版本**：v2.1 (Task 6G-C-R3B-1 架构规范修订与最小桥接更新)  
-> **审计基准 Git SHA**：`d283ba8` / `c0782bd`  
+> **最新架构审计版本**：v2.2 (Task 6G-C-R3B-1-Final 桥接层接口补全与自动化同步规范)  
+> **审计基准 Git SHA**：`892116c` / `a8987ac`  
 > **核心原则**：磁盘源码与真实可运行调用链是唯一事实标准。严禁将“设计目标”或“仅存在于测试/独立脚本中的调用”描述为已经完成集成的生产架构。严格区分当前真实架构、R3B 逐步集成架构与未来规划能力。
 
 ---
@@ -115,9 +115,11 @@ flowchart TD
 ### 3.2 阶段二：R3B 逐步集成架构 (R3B Integrated Architecture with Bridge Layer)
 在 Task 6G-C-R3B 中，引入**最小兼容桥接层 (`KinematicBridge`)**，消除历史动作与 WBC 之间的调用鸿沟：
 * 历史动作（`StartStopWalkAction` 等）保持自身步态调度与解析运动学不变；
-* 桥接层将历史动作中的根节点位移、骨盆偏移、躯干倾角、双脚世界目标、接地锁定状态及双臂 FK 姿态，**无损打包为 `WholeBodyControlTargets`**；
+* 桥接层支持显式时间步长与时间戳自动推导（`dt > 0.0`，严格单调递增），保证数值微分与惯性计算的物理时间尺度一致；
+* 彻底解耦手部 IK 激活与接触意图（`enabled` vs `contact_intent` vs `is_locked`），自由空间伸手抓空绝不产生虚假环境接触；
+* 桥接层将历史动作中的根节点位移、骨盆偏移、躯干倾角、双脚世界目标、接地锁定状态及双臂姿态，**无损打包为 `WholeBodyControlTargets`**；
 * 由 `WholeBodyController` 独占 Blender 骨架与控制器写入权，统一调用 `foot_contact.py` 维持支撑锁定，驱动 LegIK / ArmIK，执行 ROM 校验与真实冲突检测；
-* 姿态解算完成后，统一进行只读遥测并写入 `MotionState`。
+* 姿态解算完成后，在 Phase 5 自动整合连杆质心、速度差分、全身体惯性张量与自转/轨道角动量遥测，统一写入不可变 `MotionState`。
 
 ```mermaid
 flowchart TD

@@ -402,3 +402,28 @@
 
 
 
+
+---
+
+### [DEC-026] 桥接层接口补全、多部位接触语义解耦与 GitHub 自动化安全同步机制 (Task 6G-C-R3B-1-Final)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-21
+* **背景**：在 Task 6G-C-R3B-1 首轮完成后，审计发现桥接层存在三个关键接口漏洞：时间步长固定硬编码、自由空间手部 IK 容易与接触语义混淆、惯性张量与角动量尚未闭环接入 Phase 5 姿态后处理；同时项目规则中原有的“禁止自动 git push”已不能满足 GitHub 远程仓库建立后的实时自动化同步需求。
+* **决策**：
+  1. **显式与时间戳推导步长支持 (`dt`)**：
+     - `KinematicPlannedPose` 引入可选 `dt: Optional[float]`，`KinematicBridgeExecutor.execute_frame` 支持显式 `dt` 传入或由 `time_seconds` 自动差分计算；
+     - 严格校验 `dt > 0.0`，禁止非正数或倒流时间戳；
+     - 驱动有限差分速度与惯性张量物理时间缩放一致，默认无缝兼容 24 FPS 标准时间线。
+  2. **手部 IK 与环境接触意图解耦**：
+     - 在 `PlannedFootTarget` 与 `PlannedHandTarget` 中显式分离 IK 目标激活（`enabled`）、接触意图（`contact_intent`）、世界锁定（`is_locked`）、接触类型与表面 ID；
+     - 自由空间伸手（`contact_intent=False`）绝不产生虚假接触；有接触意图时由 `ContactModel` 进行几何穿透/间隙/法向容差合规性校验，超差真实报警 `success=False`；
+     - 支撑相足部地面锚点在局部坐标上依据踝关节原点 $(x, y, z - 0.070\text{ m})$ 精准对齐地面 $Z=0$，与 `foot_contact.py` 世界锁定严格吻合，消除足底中心人为滑移。
+  3. **Phase 5 惯性张量与全身体角动量遥测集成**：
+     - 在 Phase 5 姿态解算完成后，直接调用 `compute_whole_body_inertia`，基于已评估的 Armature 姿态与 `kin_result.velocity` 计算全身体惯性张量、自转角动量与质心轨道角动量，并注入 `MotionState.params`；保持纯只读物理遥测，绝不引入伪造力矩驱动。
+  4. **建立永久自动化 GitHub 同步机制**：
+     - 在项目规则 `AGENTS.md`、`GEMINI.md` 与 `.agents/rules/project_rules.md` 的 Section 4 与 Section 7 确立自动化安全同步推送机制：测试通过 -> 文档更新 -> 精确暂存 -> commit -> 自动 `git push origin master` -> 验证远程 SHA == 本地 HEAD -> 在 `AI_SYNC.md` 记录同步卡片。
+     - 取消“禁止自动 git push”限制，改为“必须自动执行安全同步推送，严禁 force push，严格保留历史保护”。
+* **影响**：
+  - `tests/verify_task6gc_r3b1_bridge.py` 全部 14 项测试（含历史 6 大回归套件）100% 通过；
+  - 桥接层与统一 6 阶段执行协议全面补齐，历史动作完全完好，为 R3B-2 动作迁移奠定了坚实基础；
+  - 项目确立了本地到 GitHub 远程仓库的自动化闭环同步。
