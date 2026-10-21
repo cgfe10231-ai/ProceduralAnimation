@@ -349,7 +349,7 @@ class SprintStartAction(MotionAction):
                     s = (tau - e) / (t_land - e) if t_land > e else 0.0
                     hgt = steps[max(k, 0)]["step_height"]
                     y, lift = compute_run_swing_point(stance_y(k), stance_y(k + 2), s, hgt)
-                    pitch = -18.0 * math.sin(math.pi * max(0.0, min(1.0, s)))
+                    pitch = -36.0 * math.sin(math.pi * max(0.0, min(1.0, s)))
                     zg = env.ground_height_at(x_of[st_side], y)
                     foot_tgt_st = PlannedFootTarget(
                         world_xyz=(x_of[st_side], y, zg + ANKLE_REST_Z + lift),
@@ -365,7 +365,7 @@ class SprintStartAction(MotionAction):
                 s_ot = (tau - e_ot) / (t_land_ot - e_ot) if t_land_ot > e_ot else 0.0
                 hgt_ot = steps[max(k - 1, 0)]["step_height"]
                 y_ot, lift_ot = compute_run_swing_point(stance_y(k - 1), stance_y(k + 1), s_ot, hgt_ot)
-                pitch_ot = -18.0 * math.sin(math.pi * max(0.0, min(1.0, s_ot)))
+                pitch_ot = -36.0 * math.sin(math.pi * max(0.0, min(1.0, s_ot)))
                 zg_ot = env.ground_height_at(x_of[ot_side], y_ot)
                 foot_tgt_ot = PlannedFootTarget(
                     world_xyz=(x_of[ot_side], y_ot, zg_ot + ANKLE_REST_Z + lift_ot),

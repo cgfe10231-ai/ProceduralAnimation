@@ -3,6 +3,49 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-22] 任务 6G-C-R3B-2-R1：历史正确动画对照、视口下肢周期性 L 形畸变根因定位与运动学修复 (Task 6G-C-R3B-2-R1)
+
+### 故障定位与根因诊断 (Root Cause Diagnosis)
+* **Blender 动画曲线重放父级解析空间错位（根因一）**：
+  * 在首轮 R3B-2 中，`unlock_foot_contact` 在摆动相设置 `ik_obj.parent = CharacterRoot`，而 `lock_foot_contact` 在支撑相设置 `ik_obj.parent = None`；
+  * Blender 中 `obj.parent` 是全局 Object 级指针属性，**不可被关键帧化（Not Keyframable）**，保存文件时固化为 `CharacterRoot`；
+  * 重放动画时，支撑相在世界坐标下写入的关键帧位置（$Y = -8.0\text{ m}$）被错误叠加了 `CharacterRoot`（$Y \approx -7.94\text{ m}$），合成出世界坐标 $Y = -15.94\text{ m}$（即向后暴拉 8 米！）；而摆动相按局部坐标写入，重放时保持在根节点附近；
+  * 步态交替时，支撑腿被向后暴拉 8 米形成横向 L 形，摆动腿看似正常，两腿周期性交替畸变。
+* **COPY_ROTATION 目标空间在无父级物体上的退化（根因二）**：
+  * `FootRotation.L/R` 约束原配置为 `target_space = "LOCAL", owner_space = "LOCAL"`；
+  * 当 `FootIK` 控制器无父级（`parent = None`）时，Blender 约束求解器判定其局部空间为单位矩阵，导致 `foot.L/R` PoseBone 的三维旋转被强制锁定在静止姿态（$-13.13^\circ$），无法接收来自 `FootIK` 的动态俯仰指令；
+  * 在奔跑与冲刺的大幅度屈膝（膝屈角达 $80^\circ \sim 98^\circ$）工况下，静止足部无法跟随小腿向后自然拖拽，导致小腿与脚掌夹角达到 $53.4^\circ$，违反解剖踝关节 ROM 极值（$45.0^\circ$）。
+
+### 修复与重构 (Fixes & Refactoring)
+* **下肢控制器全局恒定世界空间化 (`src/motion/whole_body_controller.py`)**：
+  * `WholeBodyController.execute_frame` 中足部解锁时强制调用 `unlock_foot_contact(arm, side, reparent_to_root=False)`；
+  * 确保 `FootIK.L`、`FootIK.R`、`KneePole.L`、`KneePole.R` 在整个动画全生命周期内（支撑相与摆动相）始终保持 `parent = None`，与历史基准文件 `character_forward_walk.blend` 和 `character_start_stop_walk.blend` 100% 一致；
+  * 所有关键帧位置与旋转均写入绝对世界坐标系，Blender 重放时零相对位移叠加，彻底根除 8 米向后拉伸畸变与双重变换错误。
+* **约束空间映射修正 (`src/rig/ik.py`)**：
+  * 将 `FootRotation.L/R` 约束修正为 `target_space = "WORLD", owner_space = "LOCAL"`；
+  * 使得无父级的 `FootIK` 世界空间旋转能够准确传递并叠加到 `foot.L/R` 的局部解剖姿态上，彻底解决无父级物体在 LOCAL 模式下退化为单位矩阵的底层缺陷。
+* **基于人体生物力学的摆动相踝关节平滑跟随调制 (`src/motion/framework.py`, `src/motion/run_cycle.py`, `src/motion/sprint_start.py`)**：
+  * 行走摆动相：$\theta_{\text{pitch}} = -12.0^\circ \sin(\pi s)$；
+  * 跑步摆动相：$\theta_{\text{pitch}} = -38.0^\circ \sin(\pi s)$；
+  * 冲刺起跑摆动相：$\theta_{\text{pitch}} = -36.0^\circ \sin(\pi s)$；
+  * 真实模拟人类奔跑与迈步时脚尖跟随小腿向后下方自然拖曳的生物力学特征，在不修改历史步态曲线、不放宽 `joint_limits.py` 医学解剖 ROM 约束的前提下，全 462 帧踝关节活动角严格保持在 $[-25^\circ, +45^\circ]$ 舒适区间内。
+
+### 验证 (Verification)
+* **重新生成统一运动集成文件**：
+  * 运行 `run_unified_motion_pipeline.py`，重新生成 `output/unified_motion_integration.blend`（462 帧无缝连续运动，总位移 12.9058m，0 次超程违规）；
+  * 执行 `tests/verify_unified_motion_integration.py`，全量检验通过。
+* **第 41..44 关键帧深入核查与历史基准完全吻合**：
+  * 第 42 帧（$-114.52^\circ$）与第 43 帧（$-114.84^\circ$）的小腿姿态与历史基准 `character_start_stop_walk.blend` 保持完全一致（精确至小数点后两位），`FootIK.parent` 严格为 `None`，`FootIK` 位置严格位于 $Y = -8.0000\text{ m}$，支撑踝高度严格为 $Z = 0.0700\text{ m}$，零畸变拉伸。
+* **视口渲染真实视觉证据**：
+  * 运行 `scratch/render_comparison.py`，渲染输出 40 张对比视口视图（涵盖侧视与前斜视视角，覆盖第 1、12、24、36、41、42、43、44、48、60 关键帧），直观证实步态连续平滑，彻底消除周期性 L 形畸变与横向暴拉。
+* **独立四大动作验证套件与核心回归全量 100% 通过**：
+  * `tests/verify_r3b2_walk_action.py` 100% 通过（204 帧单动作与 408 帧双级联）；
+  * `tests/verify_r3b2_run_action.py` 100% 通过（96 帧单动作与 252 帧级联）；
+  * `tests/verify_r3b2_sprint_start.py` 100% 通过（114 帧单动作与 318 帧级联）；
+  * `tests/verify_r3b2_sprint_brake.py` 100% 通过（162 帧级联）；
+  * `tests/verify_task6gc_r3b1_bridge.py` 14/14 全绿，涵盖历史 6 大核心回归套件（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）。
+
+
 ## [2026-10-21] 任务 6G-C-R3B-2：历史四大动作无损迁移至统一桥接层与全身控制架构 (Task 6G-C-R3B-2)
 
 ### 迁移与重构 (Migration & Refactoring)

@@ -486,9 +486,16 @@ class JointModel:
         if armature_obj is None or armature_obj.type != "ARMATURE":
             raise RuntimeError("Valid CharacterArmature object not found")
 
+        if use_evaluated_ik:
+            dg = bpy.context.evaluated_depsgraph_get()
+            dg.update()
+            eval_arm = armature_obj.evaluated_get(dg)
+        else:
+            eval_arm = armature_obj
+
         rot_dict_rad: Dict[str, Tuple[float, float, float]] = {}
         for bone_name in self.joints:
-            pb = armature_obj.pose.bones.get(bone_name)
+            pb = eval_arm.pose.bones.get(bone_name)
             if pb is None:
                 continue
 

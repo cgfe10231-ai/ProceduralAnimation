@@ -396,7 +396,7 @@ class WholeBodyController:
                         evaluate_foot_support(arm, side)
                 else:
                     if was_locked:
-                        unlock_foot_contact(arm, side, reparent_to_root=True)
+                        unlock_foot_contact(arm, side, reparent_to_root=False)
                     set_foot_ik_target(
                         arm,
                         side,

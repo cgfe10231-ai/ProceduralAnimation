@@ -672,6 +672,8 @@ class StartStopWalkAction(MotionAction):
                     active_step["step_height"],
                 )
 
+                pitch_sw = -12.0 * math.sin(math.pi * max(0.0, min(1.0, s)))
+
                 if active_step["stance_side"] == "L":
                     z_st = context.environment.ground_height_at(
                         start_x - HIP_X_OFFSET, active_step["stance_y"]
@@ -686,7 +688,7 @@ class StartStopWalkAction(MotionAction):
                     foot_tgt_r = PlannedFootTarget(
                         world_xyz=(start_x + HIP_X_OFFSET, y_swing, z_sw_ground + ANKLE_REST_Z + z_lift),
                         is_locked=False,
-                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        rotation_deg=(pitch_sw, 0.0, yaw_deg),
                         contact_intent=False,
                     )
                     phase_l, phase_r = "stance", "swing"
@@ -704,7 +706,7 @@ class StartStopWalkAction(MotionAction):
                     foot_tgt_l = PlannedFootTarget(
                         world_xyz=(start_x - HIP_X_OFFSET, y_swing, z_sw_ground + ANKLE_REST_Z + z_lift),
                         is_locked=False,
-                        rotation_deg=(0.0, 0.0, yaw_deg),
+                        rotation_deg=(pitch_sw, 0.0, yaw_deg),
                         contact_intent=False,
                     )
                     phase_l, phase_r = "swing", "stance"

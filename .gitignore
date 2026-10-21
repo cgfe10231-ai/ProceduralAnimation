@@ -15,6 +15,7 @@ output/
 renders/
 tests/output/
 *.log
+scratch/
 
 # OS & Editor specific files
 .DS_Store

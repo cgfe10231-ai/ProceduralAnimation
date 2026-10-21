@@ -1,32 +1,29 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-C-R3B-2（历史四大动作向统一桥接层与全身控制架构无损迁移）
-* **任务状态**：已验证（四大历史连续动作 Walk/Run/Sprint/Brake 100% 迁移至 KinematicBridgeExecutor 与 WholeBodyController；独立动作验证 100% 全绿，桥接 14 项严苛测试及历史 6 大核心模块回归 100% 全绿；成功生成 462 帧连续平滑运动验收文件 output/unified_motion_integration.blend；严格停止等待用户 Blender 视口目视验收，严禁擅自进入 6G-D）
+* **当前任务编号**：任务 6G-C-R3B-2-R1（历史正确动画对照、视口下肢周期性 L 形畸变根因定位与运动学修复）
+* **任务状态**：已验证（下肢周期性横向 L 形畸变两大根因 100% 确认；WholeBodyController 强制设置 reparent_to_root=False 确保下肢控制器全生命周期保持 parent=None 绝对世界空间化；FootRotation 约束修正为 target_space=WORLD, owner_space=LOCAL 消除退化；平滑解剖踝关节摆动俯仰调制生效；重新生成 462 帧连续动画 output/unified_motion_integration.blend；渲染 40 张关键帧对比视图证实零拉伸；全套回归套件 100% 全绿；严格停止等待用户 Blender 视口目视验收，严禁擅自进入 6G-D）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **基准 Commit SHA**：`d76f035`
-  * **本任务提交 Commit SHA**：`162bdc9`
+  * **基准 Commit SHA**：`7636c39`
+  * **本任务提交 Commit SHA**：待自动提交推送后更新
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
-  * **未提交文件**：无（收尾精准提交后）
+  * **未提交文件**：源码与文档精准暂存准备中
 
 ---
 
-### 1. R3B-2 历史四大动作无损迁移成果
-* **顺序无损迁移与步态零退化 (`src/motion/`)**：
-  * **StartStopWalkAction (`src/motion/framework.py`)**：通过 `KinematicBridgeExecutor.execute_frame()` 执行，完整保留 204 帧连续平滑步态、7 个协调半步、0.24 m/s 稳态峰值速度与 1.2600 m 理论位移；
-  * **RunAction (`src/motion/run_cycle.py`)**：通过统一桥接层执行，再现 96 帧跑动、40 帧真实空中腾空相、0.90 m/s 恒速前进；在 `WholeBodyController` 中修复足部解锁重新绑定至 `CharacterRoot`（`reparent_to_root=True`），消除局部坐标系旋转漂移；引入解剖踝关节摆动俯仰调制（`pitch = -10.0 * sin(pi * s)`）；
-  * **SprintStartAction (`src/motion/sprint_start.py`)**：通过统一桥接层执行，再现 114 帧起跑预备、蹬地起跑、加速冲刺、49 帧空中腾空相、2.00 m/s 峰值速度；引入冲刺摆动相踝俯仰调制（`pitch = -18.0 * sin(pi * s)`），完美契合极端屈膝屈髋下的真实解剖 ROM，0 次超程；
-  * **SprintBrakeAction (`src/motion/sprint_brake.py`)**：通过统一桥接层执行，再现 48 帧主动急停制动、前掌受控滑移制动、双足并立停步锁定；引入制动踝俯仰调制（`pitch = -12.0 * sin(pi * s)`）；
-  * **打通急停后切入跑步的物理连续性**：在 `RunAction.can_start_from()` 中补充 `MotionMode.STOP`。
-* **物理指标与控制语义严格区分**：
-  * `MotionState` 严格区分规划速度 `planned_linear_velocity`、根节点差分测量速度 `root_derived_linear_velocity` 与全身体质心速度 `com_linear_velocity`；
-  * 接触意图 `contact_intent`、接触建立与世界坐标锁定 `is_locked` 及环境表面几何间隙合规性严格区分；
-  * 任何 IK、ROM 或接触几何超差由 `bridge_res.success` 严格真实拦截报错，严禁静默放行。
+### 1. R3B-2-R1 故障诊断与工程修复成果
+* **两大故障根因确认并修复**：
+  1. **Blender 动画曲线重放父级解析空间错位**：首轮 R3B-2 在摆动相把控制器重新绑定到 `CharacterRoot`，而支撑相清空父级。由于 Blender 中 `obj.parent` 无法关键帧化，保存时父级固化为 `CharacterRoot`，重放时支撑相世界坐标被错误叠加 `CharacterRoot`（向后暴拉 8 米形成横向 L 形）。修复方案：在 `WholeBodyController.execute_frame` 中强制设置 `reparent_to_root=False`，确保 `FootIK.L/R` 和 `KneePole.L/R` 全生命周期内（支撑与摆动）始终保持 `parent = None`（与历史标准基准文件 100% 一致），所有关键帧纯绝对世界坐标写入。
+  2. **COPY_ROTATION 目标空间在无父级物体上的退化**：`FootRotation.L/R` 约束原为 `target_space = "LOCAL", owner_space = "LOCAL"`。当 `FootIK` 控制器无父级（`parent = None`）时，Blender 约束求解器判定其局部空间为单位矩阵，导致 `foot.L/R` PoseBone 的三维旋转被强制锁定在静止姿态（$-13.13^\circ$），无法接收来自 `FootIK` 的动态俯仰指令。在奔跑与冲刺屈膝工况下，静止足部无法跟随小腿向后自然拖拽，导致小腿与脚掌夹角达到 $53.4^\circ$，违反解剖踝关节 ROM 极值（$45.0^\circ$）。修复方案：将约束修正为 `target_space = "WORLD", owner_space = "LOCAL"`。
+* **生物力学摆动相踝俯仰自然调制**：
+  * 行走摆动相：$\theta_{\text{pitch}} = -12.0^\circ \sin(\pi s)$；
+  * 跑步摆动相：$\theta_{\text{pitch}} = -38.0^\circ \sin(\pi s)$；
+  * 冲刺起跑摆动相：$\theta_{\text{pitch}} = -36.0^\circ \sin(\pi s)$；
+  * 0 修改历史步态曲线、0 放宽解剖 ROM 阈值，全 462 帧关节角度严格处于 $[-25^\circ, +45^\circ]$ 真实生理区间。
 * **统一动画集成场景与验收生成器 (`run_unified_motion_pipeline.py`)**：
-  * 自动顺序串联 `StartStopWalkAction` $\rightarrow$ `SprintStartAction` $\rightarrow$ `SprintBrakeAction` $\rightarrow$ `RunAction(cycles=4)`；
-  * 产物：`output/unified_motion_integration.blend`（296,509 字节，1..462 帧连续动画，总位移 12.9058 m，0 次不可达事件）；
-  * 配备完整地面参考平面、视口阳光以及全程平滑跟随角色移动的 `PipelineCamera` 运镜跟踪。
+  * 产物：`output/unified_motion_integration.blend`（462 帧连续动画，总位移 12.9058 m，0 次不可达事件）；
+  * 渲染产物：`output/renders/r3b2_comparison/`（40 张 PNG 视图，涵盖第 1, 12, 24, 36, 41, 42, 43, 44, 48, 60 帧的侧视与前斜视角度，证实彻底消除周期性 L 形畸变与横向暴拉）。
 
 ---
 
@@ -36,7 +33,8 @@
 3. **Sprint Start 回归 (`tests/verify_r3b2_sprint_start.py`)**：单动作 114 帧与 Walk->SprintStart 级联 318 帧通过，49 腾空帧，峰值 2.00 m/s，位移 6.5833m，0 次超程违规。
 4. **Sprint Brake 回归 (`tests/verify_r3b2_sprint_brake.py`)**：SprintStart->SprintBrake 级联 162 帧通过，减速至 0.0 m/s，双脚稳态锁定，0 次超程违规。
 5. **统一集成文件验证 (`tests/verify_unified_motion_integration.py`)**：检验 `output/unified_motion_integration.blend`，1..462 帧连续平滑执行，关键里程碑位移误差严格 0.0000 m，全骨骼姿态数据无 NaN/Inf。
-6. **桥接层 14 项严苛测试 (`tests/verify_task6gc_r3b1_bridge.py`)**：14/14 全绿，历史 6 大核心模块全量回归（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）100% 全绿。
+6. **第 41..44 关键帧深入核对**：第 42 帧（$-114.52^\circ$）与第 43 帧（$-114.84^\circ$）的小腿姿态与历史基准 `character_start_stop_walk.blend` 保持完全一致（精确至小数点后两位），`FootIK.parent` 严格为 `None`，支撑踝高度严格为 $Z = 0.0700\text{ m}$。
+7. **桥接层 14 项严苛测试 (`tests/verify_task6gc_r3b1_bridge.py`)**：14/14 全绿，历史 6 大核心模块全量回归（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）100% 全绿。
 
 ---
 

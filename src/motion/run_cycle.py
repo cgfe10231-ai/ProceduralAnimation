@@ -290,7 +290,7 @@ class RunAction(MotionAction):
                         s_l,
                         step_height,
                     )
-                    pitch_l = -10.0 * math.sin(math.pi * s_l)
+                    pitch_l = -38.0 * math.sin(math.pi * s_l)
                     z_g_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, y_sw_l)
                     foot_tgt_l = PlannedFootTarget(
                         world_xyz=(start_x - HIP_X_OFFSET, y_sw_l, z_g_l + ANKLE_REST_Z + z_lift_l),
@@ -311,7 +311,7 @@ class RunAction(MotionAction):
                     s_r,
                     step_height,
                 )
-                pitch_r = -10.0 * math.sin(math.pi * s_r)
+                pitch_r = -38.0 * math.sin(math.pi * s_r)
                 z_g_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, y_sw_r)
                 foot_tgt_r = PlannedFootTarget(
                     world_xyz=(start_x + HIP_X_OFFSET, y_sw_r, z_g_r + ANKLE_REST_Z + z_lift_r),
@@ -346,7 +346,7 @@ class RunAction(MotionAction):
                         s_r,
                         step_height,
                     )
-                    pitch_r = -10.0 * math.sin(math.pi * s_r)
+                    pitch_r = -38.0 * math.sin(math.pi * s_r)
                     z_g_r = context.environment.ground_height_at(start_x + HIP_X_OFFSET, y_sw_r)
                     foot_tgt_r = PlannedFootTarget(
                         world_xyz=(start_x + HIP_X_OFFSET, y_sw_r, z_g_r + ANKLE_REST_Z + z_lift_r),
@@ -367,7 +367,7 @@ class RunAction(MotionAction):
                     s_l,
                     step_height,
                 )
-                pitch_l = -10.0 * math.sin(math.pi * s_l)
+                pitch_l = -38.0 * math.sin(math.pi * s_l)
                 z_g_l = context.environment.ground_height_at(start_x - HIP_X_OFFSET, y_sw_l)
                 foot_tgt_l = PlannedFootTarget(
                     world_xyz=(start_x - HIP_X_OFFSET, y_sw_l, z_g_l + ANKLE_REST_Z + z_lift_l),
@@ -428,6 +428,7 @@ class RunAction(MotionAction):
                         "target": uc.target_name,
                         "error": uc.error_amount,
                         "desc": uc.description,
+                        "details": str(uc.details),
                     })
 
             state_l = {

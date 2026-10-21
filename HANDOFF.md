@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-C-R3B-2（历史动作向统一桥接层与全身控制架构无损迁移），将 `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 100% 迁移至 `KinematicBridgeExecutor` 与 `WholeBodyController`，消除执行双轨制，确保步态零退化，生成 462 帧连续动画文件 `output/unified_motion_integration.blend`，严格停止等待用户 Blender 视口目视验收。
+完成 Task 6G-C-R3B-2-R1（历史正确动画对照、视口下肢周期性 L 形畸变根因定位与修复），修复 Blender 动画曲线重放父级解析空间错位及 FootRotation 约束空间缺陷，重新生成 462 帧连续动画文件 `output/unified_motion_integration.blend` 并渲染生成关键帧视口比对视图，严格停止等待用户 Blender 视口目视验收，严禁擅自进入 6G-D。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -25,14 +25,15 @@
 * 完成 Task 6G-C-R3A 系统架构深度审计与规范锁定。
 * 完成 Task 6G-C-R3B-1 统一架构规范修订与最小兼容桥接层初版。
 * 完成 Task 6G-C-R3B-1-Final 架构漏洞修补与 GitHub 自动化安全同步机制。
-* **完成 Task 6G-C-R3B-2 历史四大动作向统一桥接层与全身控制架构无损迁移**：
-  * `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 依次迁移至 `bridge_executor.execute_frame()`；
-  * `WholeBodyController` 修复足部解锁重新绑定至 `CharacterRoot`（`reparent_to_root=True`），消除局部旋转伪漂移；
-  * 引入生物力学摆动脚/制动脚解剖踝俯仰调制（`-10.0` 至 `-18.0 * sin(pi * s)`），自然满足极端屈膝屈髋下的真实 ROM；
-  * `RunAction.can_start_from()` 支持 `MotionMode.STOP`，打通急停后切入跑步的连续物理链；
-  * `MotionState` 严格区分规划速度、测量速度与质心速度；
-  * 编写 `run_unified_motion_pipeline.py`，生成 462 帧连续动画文件 `output/unified_motion_integration.blend`（位移 12.9058 m，0 次不可达违规）；
-  * 录入 `[DEC-027]`。
+* 完成 Task 6G-C-R3B-2 历史四大动作向统一桥接层与全身控制架构无损迁移。
+* **完成 Task 6G-C-R3B-2-R1 历史正确动画对照、视口下肢周期性 L 形畸变根因定位与运动学修复**：
+  * 定位两大根因：Blender 动画曲线重放父级解析空间错位（保存为 CharacterRoot 导致支撑相世界坐标叠加暴拉 8 米）；`FootRotation` 在无父级目标时 LOCAL 模式退化为单位矩阵导致足部旋转冻结并引发 ROM 超限；
+  * 在 `WholeBodyController` 中强制 `reparent_to_root = False`，确保下肢 IK/Pole 控制器全生命周期恒定保持 `parent = None`（与历史标准基准文件 100% 一致）；
+  * 修正 `FootRotation` 约束空间为 `target_space = "WORLD", owner_space = "LOCAL"`；
+  * 引入生物力学自然摆动踝俯仰调制（行走 $-12^\circ$、跑步 $-38^\circ$、冲刺 $-36^\circ \cdot \sin(\pi s)$），0 改动步态曲线、0 放宽解剖 ROM 约束；
+  * 重新运行流水线生成 `output/unified_motion_integration.blend`（462 帧，总位移 12.9058m，0 超程）；
+  * 渲染生成 40 张关键帧对比视图（`output/renders/r3b2_comparison/`）；
+  * 录入 `[DEC-028]`。
 
 ## 3. 已验证
 * 独立动作迁移回归套件 100% 通过：
@@ -42,8 +43,9 @@
   * `tests/verify_r3b2_sprint_brake.py`（162 帧级联，减速至 0.0 m/s，双脚稳态锁定，0 超程）；
 * 统一集成产物验证套件 100% 通过：
   * `tests/verify_unified_motion_integration.py`（462 帧、对象结构完整、位移与理论值严格误差 0.0000 m、骨骼数据无 NaN/Inf）；
+* 第 41..44 关键帧定量深入核对：第 42 帧（$-114.52^\circ$）与第 43 帧（$-114.84^\circ$）的小腿姿态与历史基准 `character_start_stop_walk.blend` 保持完全一致（精确至小数点后两位），`FootIK.parent` 严格为 `None`，支撑踝高度严格为 $Z = 0.0700\text{ m}$；
 * 桥接层 14 项严苛测试及历史 6 大核心模块回归（WBC, Joint Limits, Rigid Link, Arm IK, Kinematics, Inertia）100% 全绿通过（退出码 0）。
-* 状态标定为：Task 6G-C-R3B-2 已验证通过，严格停止，等待用户 Blender 视口目视验收。
+* 状态标定为：Task 6G-C-R3B-2-R1 已验证通过，严格停止，等待用户 Blender 视口目视验收。
 
 ## 4. 当前文件
 * 核心规则与交接：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`ARCHITECTURE_SYNC.md`

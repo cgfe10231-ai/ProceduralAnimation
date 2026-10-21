@@ -120,7 +120,6 @@ def setup_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> Dict[str, b
     for side, sign in (("L", -1.0), ("R", 1.0)):
         ik_name = IK_TARGET_NAMES[side]
         pole_name = POLE_TARGET_NAMES[side]
-
         ik_obj = _get_or_create_empty(
             name=ik_name,
             display_type="CUBE",
@@ -188,7 +187,7 @@ def setup_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> Dict[str, b
         rot_con = p_foot.constraints.new(type="COPY_ROTATION")
         rot_con.name = FOOT_ROT_CONSTRAINT_NAMES[side]
         rot_con.target = ik_obj
-        rot_con.target_space = "LOCAL"
+        rot_con.target_space = "WORLD"
         rot_con.owner_space = "LOCAL"
         rot_con.mix_mode = "REPLACE"
 
