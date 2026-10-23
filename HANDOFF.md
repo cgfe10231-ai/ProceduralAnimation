@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-PRE-P1-R1（统一测试运行器严格验收修复与单元测试落地）：修复 SKIPPED 虚假成功漏洞，显式支持 is_optional 区分必需与可选测试；完善 fail-fast 停机并自动将未执行测试标为 NOT_RUN 纳入报告与退出码判定；实施 expected_artifacts 存在与非空强制校验；交付 `tests/test_runner_unit.py` 涵盖 10 项核心机制纯 Python 毫秒级回归；实测 quick 4/4、motion 5/5、physics 8/8 100% 全绿通过。**零生产代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-PRE-P2（可视化动力学训练场与统一环境查询基础）：交付 `src/scene/environment_query.py` 实现包含 21 个解析表面的 `OrientedSurface` 与 `DynamicsEnvironmentQuery`，支持平地、5级台阶、上下斜坡、垂直墙、高台与调试区 6 大功能分区；实现闭式法线、接触点投影、有符号距离与垂直面空间三维查询；对 `EnvironmentQuery` 保持 100% 向后兼容；升级 `src/scene/builder.py` 与 `run_dynamics_playground.py` 导出生成 `output/dynamics_playground.blend` 场景并配备法线指示箭头与参考轴；实测 quick 5/5、physics 10/10、motion 5/5 全绿通过。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -29,21 +29,25 @@
 * 完成 Task 6G-C-R3B-2-R1 历史正确动画对照、视口下肢周期性 L 形畸变根因定位与修复（用户已目视验收通过）。
 * 完成 Task 6G-D-PRE-P0 全工程架构审计与后续开发准备（交付 `docs/ENGINEERING_AUDIT.md`）。
 * 完成 Task 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁（交付 `docs/ARCHITECTURE_CHANGE_GATE.md`）。
-* **完成 Task 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地**：
-  * 修复 SKIPPED 虚假成功：支持 `is_optional` 标记，必需测试遇到依赖缺失或配置异常坚决判定为 FAILED，`required_skipped_count > 0` 导致整体退出码为 1；
-  * 健全 fail-fast 完整性：首个失败触发停机后，自动追加剩余用例为 `NOT_RUN`，在 JSON/MD 报告中完整显示 `total_planned`, `total_executed`, `not_run_count`；
-  * 强制执行 `expected_artifacts` 存在与非空（>0 字节）校验；
-  * 交付纯 Python 专用单元测试 `tests/test_runner_unit.py`，完整覆盖 10 项核心机制并实现毫秒级（0.94s）全绿通过；
-  * 支持 PowerShell 命令行参数风格（`-tier` / `-test-id` 等单横杠别名）；
-  * 0 生产代码修改，0 步态曲线变动，0 历史文件删除。
+* 完成 Task 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地（交付 `tests/test_runner_unit.py` 10/10 单元测试）。
+* **完成 Task 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础**：
+  * 构建纯 Python 解析几何与环境查询系统 `src/scene/environment_query.py`，支持 21 个闭式解析表面；
+  * 支持 6 大标准分区：平坦地面、5级标准台阶、上下连续斜坡、垂直障碍墙、跳箱与单杠、遥测调试区；
+  * 支持有符号距离（Signed Distance，间隙 >0，穿透 <0）、外向单位法线、表面边界欧几里得距离与垂直墙面定向查询；
+  * 保持对 `EnvironmentQuery` 的 100% 向后兼容性（`ground_height_at` 与 `surface_normal_at` 契约无损）；
+  * 升级场景生成器 `src/scene/builder.py` 与入口 `run_dynamics_playground.py`，生成 `output/dynamics_playground.blend`；
+  * 配备 21 个表面法线指示箭头、世界坐标系红绿蓝指示轴、1m 参考立方体、双视角调试摄像机与日光系统；
+  * 交付纯 Python 几何测试 `tests/verify_task6gd_dynamics_playground.py` 与 Blender 场景检验脚本 `tests/verify_task6gd_playground_blend.py`，注册进入测试表。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `runner_unit_tests`：10/10 项纯 Python 单元测试全绿（0.94s，退出码 0）；
-  * `quick` Tier：4/4 项通过（4.85s，退出码 0）；
-  * `motion` Tier：5/5 项通过（15.35s，退出码 0），`integration_unified_motion` 准确标定为 `AUTOMATED_PASS (Visual Inspection Required)`；
-  * `physics` Tier：8/8 项通过（53.94s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-PRE-P1-R1 已完成并验证，严格停止。
+  * `dynamics_environment_query`：11/11 项数学定理全绿（0.12s，退出码 0）；
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.29s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `runner_unit_tests`：10/10 项测试全绿（1.00s，退出码 0）；
+  * `quick` Tier：5/5 项通过（5.11s，退出码 0）；
+  * `motion` Tier：5/5 项通过（15.46s，退出码 0），历史步态 100% 零退化；
+  * `physics` Tier：10/10 项通过（56.58s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-PRE-P2 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`

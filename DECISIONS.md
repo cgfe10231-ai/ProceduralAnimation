@@ -508,3 +508,32 @@
   - 新增权威规范：`docs/ARCHITECTURE_CHANGE_GATE.md`；
   - 实测验证全绿：`quick` (3/3), `motion` (5/5), `physics` (8/8) 全部 100% 通过（退出码 0）；
   - 零生产代码修改，零步态曲线变动。
+
+---
+
+### [DEC-030] 动力学训练场几何标准与三维环境查询体系 (Task 6G-D-PRE-P2)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-23
+* **背景**：进入 Task 6G-D 动力学接触与反力控制前，系统现存 `EnvironmentQuery` 仅支持单一平地高度与法线（$Z=0.0\text{ m}$），无法提供台阶、斜坡、障碍墙、高台等复杂三维地表接触几何，且无法对垂直立面（无法用 $z(x, y)$ 高度场表示）进行接触距离与法线分析。
+* **决策与方案**：
+  1. **纯 Python 解析几何与环境查询系统 (`src/scene/environment_query.py`)**：
+     - 构建 `OrientedSurface` 统一闭式表面模型，严格涵盖中心、单位外向法线、切向基底、半尺寸、摩擦系数与支撑属性；
+     - 构建 `DynamicsEnvironmentQuery`，支持水平平地、5级标准台阶、上下连续斜坡、垂直障碍墙、跳箱平台、悬挂单杠以及遥测调试区 6 大功能分区（共 21 个解析几何表面）；
+     - 支持闭式法线、最近投影点、有符号距离（Signed Distance，间隙 >0，穿透 <0）、摩擦系数及普通支撑可行性判断；
+     - 针对无法用 $(x, y)$ 高度场表示的垂直立面提供 `query_surface_at_point` 与 `query_spatial_surface` 空间三维查询接口；
+     - 对原有 `EnvironmentQuery` 保持 100% 向后兼容性（`ground_height_at` 与 `surface_normal_at` 契约完全无损）。
+  2. **程序化训练场场景生成器升级 (`src/scene/builder.py` / `run_dynamics_playground.py`)**：
+     - 实现 `build_dynamics_playground`，在 Blender 中根据解析几何生成真实实体网格；
+     - 赋予区分明显的材质颜色（平地灰色、台阶天蓝色、斜坡金橙色、墙面砖红色、跳箱紫色、单杠钢青色、调试区明黄色）；
+     - 为每个解析表面在法线方向生成直观的可视化指示箭头（`NormalArrow_<surface_id>`）；
+     - 配备世界坐标轴指示（红X、绿Y、蓝Z）、1m 参考单位立方体、双视角调试摄像机与三点日光照明系统；
+     - 生成可直接在 Blender 中打开检查的场景文件 `output/dynamics_playground.blend`。
+  3. **单元验证与统一注册**：
+     - 编写纯 Python 几何测试 `tests/verify_task6gd_dynamics_playground.py`（毫秒级验证 11 项数学定理）；
+     - 编写 Blender 场景检验脚本 `tests/verify_task6gd_playground_blend.py`（验证 45 个对象与材质绑定完整性）；
+     - 注册进入 `tests/test_registry.py`，纳管至 `quick`、`physics` 与 `full` 层级。
+* **影响与产物**：
+  - 新增/更新代码：`src/scene/environment_query.py`、`src/scene/builder.py`、`src/scene/__init__.py`、`src/motion/framework.py`、`src/motion/__init__.py`、`run_dynamics_playground.py`；
+  - 产物文件：`output/dynamics_playground.blend`（116,933 字节，保存在本地受 `.gitignore` 规则保护）；
+  - 实测回归全绿：`quick` (5/5), `physics` (10/10), `motion` (5/5) 保持 100% 零退化（退出码 0）；
+  - 零生产运动代码修改，零步态曲线变动。

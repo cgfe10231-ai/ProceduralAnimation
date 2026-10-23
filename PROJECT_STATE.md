@@ -1,13 +1,32 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-PRE-P1-R1（统一测试运行器严格验收修复与单元测试落地；修复 SKIPPED 虚假成功漏洞，显式支持 is_optional 区分必需与可选测试；完善 fail-fast 停机并自动将未执行测试标为 NOT_RUN 纳入报告与退出码判定；实施 expected_artifacts 存在与非空强制校验；交付 tests/test_runner_unit.py 涵盖 10 项核心机制纯 Python 毫秒级回归；实测 quick 4/4、motion 5/5、physics 8/8 100% 全绿通过；0 生产代码修改，0 步态变动；严格停止，坚决不擅自进入 P2 或 6G-D-A）  
+> **当前阶段**：任务 6G-D-PRE-P2（可视化动力学训练场与统一环境查询基础；交付 src/scene/environment_query.py 实现包含 21 个解析表面的 OrientedSurface 与 DynamicsEnvironmentQuery，支持平地、5级台阶、上下斜坡、垂直墙、高台与调试区 6 大功能分区；实现有符号距离、闭式法线、接触点投影与垂直面三维查询；对 EnvironmentQuery 保持 100% 向后兼容；升级 src/scene/builder.py 与 run_dynamics_playground.py 生成 output/dynamics_playground.blend 场景并配备法线指示箭头与参考轴；实测 quick 5/5、physics 10/10、motion 5/5 全绿通过；0 生产运动代码修改，0 步态变动；严格停止，坚决不擅自进入 6G-D-A）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础 (Task 6G-D-PRE-P2)**：
+  * **纯 Python 解析几何与环境查询系统就绪 (`src/scene/environment_query.py`)**：
+    * 建立 `OrientedSurface` 统一闭式表面模型，严格涵盖中心、单位外向法线、切向基底、半尺寸、摩擦系数与支撑属性；
+    * 构建 `DynamicsEnvironmentQuery`，支持平坦地面、5级标准台阶、上下连续斜坡、垂直障碍墙、跳箱高台、单杠与调试区 6 大功能分区（共 21 个解析几何表面）；
+    * 支持闭式法线、最近投影点、有符号距离（Signed Distance，间隙 >0，穿透 <0）、摩擦系数及普通支撑可行性判断；
+    * 针对无法用 $(x, y)$ 高度场表示的垂直立面提供 `query_surface_at_point` 与 `query_spatial_surface` 空间三维查询接口；
+    * 对原有 `EnvironmentQuery` 保持 100% 向后兼容性（`ground_height_at` 与 `surface_normal_at` 契约完全无损）。
+  * **程序化训练场场景生成器就绪 (`src/scene/builder.py` / `run_dynamics_playground.py`)**：
+    * 实现 `build_dynamics_playground`，在 Blender 中根据解析几何生成真实实体网格；
+    * 赋予区分明显的材质颜色（平地灰色、台阶天蓝色、斜坡金橙色、墙面砖红色、跳箱紫色、单杠钢青色、调试区明黄色）；
+    * 为 21 个表面生成直观的外向法线指示箭头（`NormalArrow_<surface_id>`）；
+    * 配备世界坐标轴指示（红X、绿Y、蓝Z）、1m 参考单位立方体、双视角调试摄像机（`PlaygroundOverviewCam`, `PlaygroundCloseUpCam`）与三点日光照明系统；
+    * 导出生成可直接在 Blender 中打开检查的场景文件 `output/dynamics_playground.blend`（116,933 字节，保存在本地磁盘受 `.gitignore` 保护）。
+  * **单元验证与统一注册全绿**：
+    * 纯 Python 几何测试 `tests/verify_task6gd_dynamics_playground.py` 11/11 项数学定理全绿通过（0.12s）；
+    * Blender 场景检验脚本 `tests/verify_task6gd_playground_blend.py` 45 个对象与材质完整性全量通过（1.29s）；
+    * 注册进入 `tests/test_registry.py`，纳管至 `quick`、`physics` 与 `full` 层级；
+    * 分层回归套件验证保持 100% 零退化：`quick` (5/5), `physics` (10/10), `motion` (5/5) 全部通过（退出码 0）。
+  * **执行纪律遵守**：0 生产运动代码修改，0 步态曲线变动，0 历史文件删除，严格停止。
 * **任务 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地 (Task 6G-D-PRE-P1-R1)**：
   * **根除 SKIPPED 虚假成功风险**：
     * `TestDefinition` 引入 `is_optional: bool = False`，所有必需测试遇到依赖缺失、脚本缺失或配置错误时一律判定为 `status="FAILED"`（退出码 -1），绝不伪报 `SKIPPED`；

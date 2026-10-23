@@ -271,26 +271,12 @@ class MotionState:
 # 3. Environment Query, Contact Adapter & Blender Pose Applicator
 # ============================================================================
 
-class EnvironmentQuery:
-    """Lightweight environment geometry query interface.
-
-    Defaults to a flat ground plane at `Z = 0.0 m` with normal `(0, 0, 1)`.
-    Provides an explicit extension seam for future slopes, ledges, walls, and obstacles
-    without coupling locomotion actions directly to Blender mesh raycasts.
-    """
-
-    def __init__(self, ground_z: float = 0.0) -> None:
-        self.ground_z = float(ground_z)
-
-    def ground_height_at(self, x: float, y: float) -> float:
-        """Return ground surface Z elevation (m) at World `(x, y)`."""
-        _ = (x, y)
-        return self.ground_z
-
-    def surface_normal_at(self, x: float, y: float) -> Tuple[float, float, float]:
-        """Return unit surface normal vector in World Space at `(x, y)`."""
-        _ = (x, y)
-        return WORLD_UP_AXIS
+from src.scene.environment_query import (
+    EnvironmentQuery,
+    DynamicsEnvironmentQuery,
+    SurfaceQueryResult,
+    SurfaceGeometryType,
+)
 
 
 class ContactConstraintAdapter:

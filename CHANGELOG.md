@@ -3,7 +3,38 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
-## [2026-10-23] 任务 6G-D-PRE-P1-R1：统一测试运行器严格验收修复与单元测试落地 (Task 6G-D-PRE-P1-R1)
+## [2026-10-23] 任务 6G-D-PRE-P2：可视化动力学训练场与统一环境查询基础 (Task 6G-D-PRE-P2)
+
+### 纯 Python 解析几何与环境查询系统 (`src/scene/environment_query.py`)
+* **统一闭式表面模型 (`OrientedSurface`)**：
+  * 构建包含中心、单位外向法线、切向基底（$\mathbf{u} \times \mathbf{v} = \mathbf{n}$）、半尺寸、摩擦系数与支撑属性的解析表面定义；
+  * 提供精确闭式计算：最近投影点、有符号距离（Signed Distance，间隙 >0，穿透 <0）、外向单位法线与表面边界外欧几里得距离。
+* **六大标准功能分区注册 (21 个解析几何表面)**：
+  1. 平坦走跑区 (`flat_ground`, $Z=0.0\text{m}$, $\mu=0.70$)；
+  2. 交替台阶区 (5 级标准台阶，踏面深 $0.3\text{m}$，踢面高 $0.15\text{m}$，总高度 $+0.75\text{m}$，带顶部过渡平台)；
+  3. 连续斜坡区 ($+15^\circ$ 上坡段、过渡高台、$-20^\circ$ 下坡段，倾斜法线模长精确为 1.0)；
+  4. 垂直障碍墙区 (高度 $2.5\text{m}$，厚度 $0.4\text{m}$，前立面法线 $(0, -1, 0)$，不允许普通脚底支撑)；
+  5. 跳箱与高台区 ($0.9\text{m}$ 跳箱平台与 $2.2\text{m}$ 悬挂单杠横梁)；
+  6. 遥测调试区 (原点旁 $0.05\text{m}$ 参考板、3D 坐标原点轴与 1m 标准立方体)。
+* **环境查询引擎 (`DynamicsEnvironmentQuery`) 与向后兼容性**：
+  * 支持 2.5D 高度场查询（`ground_height_at`, `surface_normal_at`），对历史动作完全无损兼容；
+  * 支持 3D 空间点查询与垂直墙面定向查询（`query_surface_at_point`, `query_spatial_surface`）；
+  * 返回标准化数据结构 `SurfaceQueryResult`（表面 ID、类型、投影点、法线、有符号距离、摩擦力与支撑有效性）。
+
+### 动力学训练场 Blender 场景构建 (`src/scene/builder.py` / `run_dynamics_playground.py`)
+* **程序化实体网格生成**：
+  * 实现 `build_dynamics_playground`，根据解析几何在 Blender 中自动构建 6 大分区实体碰撞体网格；
+  * 赋予区分度极高的专用材质（灰色地面、天蓝色台阶、金橙色斜坡、砖红色墙面、紫色跳箱、钢青色单杠、黄色调试区）；
+  * 为 21 个表面生成直观的外向法线指示箭头（`NormalArrow_<surface_id>`）；
+  * 建立三轴世界坐标参考（红X、绿Y、蓝Z）、1m 标尺方块、双视角摄像机（`PlaygroundOverviewCam`, `PlaygroundCloseUpCam`）与三点日光照明系统；
+  * 导出生成可直接用 Blender 视口打开检查的独立场景文件 `output/dynamics_playground.blend`（116,933 字节，仅保存在本地受到 `.gitignore` 规则保护）。
+
+### 验证套件实施与统一测试注册
+* **交付纯 Python 数学验证 (`tests/verify_task6gd_dynamics_playground.py`)**：11/11 项数学与几何定理全绿通过（耗时 0.12s）；
+* **交付 Blender 场景结构验证 (`tests/verify_task6gd_playground_blend.py`)**：45 个场景对象、材质与法线箭头全量通过（耗时 1.29s）；
+* **统一测试注册表纳管 (`tests/test_registry.py`)**：分别登记入 `quick`、`physics` 与 `full` 层级；
+* **回归验证保持 100% 零退化**：`quick` (5/5), `physics` (10/10), `motion` (5/5) 全绿通过（退出码 0）。
+* **纪律声明**：0 生产运动代码修改，0 步态变动，未模拟虚假人体动力学反力，严格停止。
 
 ### 测试套件调度器严格安全修复 (Test Suite Strict Acceptance Fixes)
 * **根除 SKIPPED 虚假成功漏洞**：

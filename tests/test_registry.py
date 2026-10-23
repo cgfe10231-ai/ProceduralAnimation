@@ -79,6 +79,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=15.0,
         description="Validates procedural layout generator, clearance buffers, and corridor math in headless Blender.",
     ),
+    "dynamics_environment_query": TestDefinition(
+        test_id="dynamics_environment_query",
+        name="Dynamics Environment Query & 3D Surface Geometry",
+        script_path="tests/verify_task6gd_dynamics_playground.py",
+        runner_type=RunnerType.PYTHON,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=15.0,
+        description="Validates closed-form 3D surface queries, normal vectors, signed distance, step/slope/wall geometry, and EnvironmentQuery compatibility.",
+    ),
     "runner_unit_tests": TestDefinition(
         test_id="runner_unit_tests",
         name="Test Suite Runner Unit Tests",
@@ -163,6 +172,17 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         tiers=[TestTier.PHYSICS, TestTier.FULL],
         timeout_sec=120.0,
         description="Full 14-test regression verifying lossless mapping, ownership, dt scaling, and 6 core modules.",
+    ),
+    "dynamics_playground_blend": TestDefinition(
+        test_id="dynamics_playground_blend",
+        name="Dynamics Playground Blender Scene Artifact Verification",
+        script_path="tests/verify_task6gd_playground_blend.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        expected_artifacts=["output/dynamics_playground.blend"],
+        is_visual_acceptance=True,
+        description="Reopens dynamics_playground.blend in headless Blender to verify 6-zone meshes, materials, normal arrows, and cameras.",
     ),
 
     # -------------------------------------------------------------------------
