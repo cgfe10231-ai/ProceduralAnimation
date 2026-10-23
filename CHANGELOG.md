@@ -3,6 +3,46 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-B：多接触力逆向求解与约束分配系统 (Task 6G-D-B)
+
+### 核心接触力求解器实现 (`src/motion/contact_force_solver.py`)
+* **多接触力分配数学架构**：
+  * 构建线性接触抓取映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$（$\mathbf{A} \in \mathbb{R}^{6 \times 3N}$），包含力平衡单位块 $\mathbf{I}_3$ 与绕质心力矩叉乘斜对称矩阵块 $[\mathbf{r}_i]_\times$；
+  * 实现基于任意法向 $\hat{\mathbf{n}}$ 的精确 3D 圆形库仑摩擦锥闭式欧几里得正交投影算法 `project_to_friction_cone`，杜绝八棱锥线性多面体近似带来的方向偏置；
+  * 双引擎优化架构：支持 SciPy SLSQP（高精度二阶锥非线性规划）与原生 SPG（谱投影梯度动力学，Barzilai-Borwein 自适应步长，零外部依赖，100% 兼容 Blender 内置 Python）；
+  * 状态机与物理残差判定：定义 `ContactSolverStatus`（`SOLVED`, `APPROXIMATE`, `INFEASIBLE`, `INVALID_INPUT`, `NUMERICAL_FAILURE`），输出力残差范数 (N)、力矩残差范数 (N·m) 及法向/切向约束违规值；
+  * 物理反向到正向桥接：实现 `solution_to_multi_contact_dynamics()`，将分配力转化为标准 `MultiContactDynamics` 进行双向物理验算；
+  * 环境与训练场绑定：实现 `create_contact_constraint_from_environment()`，无缝支持 `DynamicsPlayground` 几何与摩擦参数抽取。
+* **统一模块导出与测试注册**：
+  * 在 `src/motion/__init__.py` 完整导出求解器数据结构与核心函数；
+  * 在 `tests/test_registry.py` 注册 `contact_force_solver`（覆盖 QUICK, PHYSICS, FULL 分级）。
+
+### 测试验证与架构状态
+* **独立单元测试套件 (`tests/verify_task6gd_contact_force_solver.py`)**：
+  * 17/17 项严苛数学与物理测试全部通过（耗时 0.403s）：
+    * Test 1: 单点垂直重力支撑 (70kg -> $686.7\text{ N}$)
+    * Test 2: 双足对称支撑均分 ($343.35\text{ N}$ each)
+    * Test 3: CoM 偏移负荷分配 (2:1 比例分担与多边形外不平衡拦截)
+    * Test 4: 单点力矩自由度亏缺拦截 (无法产生平行于力臂的偏航力矩)
+    * Test 5: 脱离接触零力约束 (非接触点受力为零，非零目标判定不可行)
+    * Test 6: 无摩擦地表打滑检测 ($\mu=0$ 无法产生切向剪切力)
+    * Test 7: 库仑摩擦锥严格截断 (圆锥边界内 SOLVED，超出边界精确截断并报残差)
+    * Test 8: 15° 斜坡法向/切向力分配 (结合真实 DynamicsPlayground 几何)
+    * Test 9: 垂直墙面单向推力分配 (只允许推力，拉力严格拒绝)
+    * Test 10: 地面+斜坡+墙面多异构法向联合接触分配
+    * Test 11: 独立力矩交叉验算 (与 `MultiContactDynamics.total_torque_about_com` 100% 吻合)
+    * Test 12: 绝对不可行拉力拦截 (单侧接触下拉地表被判定为 `INFEASIBLE`)
+    * Test 13: 退化输入与非法数值拦截 (NaN, Inf, 零法向, 负质量)
+    * Test 14: 排列不变性验证 (打乱触点顺序物理求解结果严格一致)
+    * Test 15: 确定性与可复现性验证 (重复调用输出完全一致)
+    * Test 16: 向后兼容性测试 (未破坏 6G-D-A/R1/R2 数据契约)
+    * Test 17: 线性接触抓取映射矩阵 $\mathbf{A}\mathbf{f}=\mathbf{w}$ 数学合同验证
+* **自动化回归测试验证**：
+  * `quick` Tier：7/7 项测试全绿通过（7.11s，退出码 0）；
+  * `physics` Tier：12/12 项测试全绿通过（59.77s，退出码 0）；
+  * 零历史步态修改，零 Rig/IK/WBC 篡改，零训练场重建。
+
+
 ## [2026-10-23] 任务 6G-D-A-R2：MultiContactDynamics 时间步长更新原子性与状态不可变保全 (Task 6G-D-A-R2)
 
 ### 多触点系统时间步长更新失败原子性与事务回滚 (`src/motion/contact_dynamics.py`)

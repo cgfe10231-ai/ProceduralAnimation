@@ -1,13 +1,26 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-A-R2（MultiContactDynamics 时间步长更新原子性与状态不可变保全；重构 MultiContactDynamics.set_dt() 实现严格失败原子性；update_contacts=False 预校验全触点兼容性，失配立即抛错且 100% 保持系统与触点原值不变；update_contacts=True 引入状态快照与事务回滚，彻底杜绝中途异常导致的部分更新裂脑中间态；空系统合法更新且非法数值全拦截；SingleContactDynamics 增加 __setattr__ 动态防御；tests/verify_task6gd_contact_dynamics.py 扩充至 18 项全绿；实测 quick 6/6、physics 11/11 全绿通过；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-B）  
+> **当前阶段**：任务 6G-D-B（多接触力逆向求解与约束分配系统；建立线性接触抓取映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$；实现任意法向下的真实 3D 圆形库仑摩擦锥闭式欧几里得正交投影算子 project_to_friction_cone；构建 SLSQP + 原生 SPG 双引擎凸优化架构，Barzilai-Borwein 自适应步长，零外部依赖 100% 兼容 Blender 内置 Python；完善 ContactSolverStatus 状态机与物理残差判定；提供 solution_to_multi_contact_dynamics() 与正向动力学双向物理验算；实现 create_contact_constraint_from_environment() 与 DynamicsPlayground 深度绑定；tests/verify_task6gd_contact_force_solver.py 17/17 全绿；实测 quick 7/7、physics 12/12 全绿通过；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-B 多接触力逆向求解与约束分配系统 (Task 6G-D-B)**：
+  * **多接触力分配数学与优化架构 (`src/motion/contact_force_solver.py`)**：
+    * 建立线性接触抓取映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$（$\mathbf{A} \in \mathbb{R}^{6 \times 3N}$），包含力平衡单位块 $\mathbf{I}_3$ 与绕质心力矩叉乘斜对称矩阵块 $[\mathbf{r}_i]_\times$；
+    * 实现基于任意接触法向 $\hat{\mathbf{n}}$ 的精确 3D 圆形库仑摩擦锥闭式欧几里得正交投影算法 `project_to_friction_cone`，杜绝八棱锥线性多面体近似带来的方向偏置；
+    * 双引擎优化架构：支持 SciPy SLSQP（高精度二阶锥非线性规划）与原生 SPG（谱投影梯度动力学，Barzilai-Borwein 自适应步长，零外部依赖，100% 兼容 Blender 内置 Python）；
+    * 状态机与物理残差判定：定义 `ContactSolverStatus`（`SOLVED`, `APPROXIMATE`, `INFEASIBLE`, `INVALID_INPUT`, `NUMERICAL_FAILURE`），输出力残差范数 (N)、力矩残差范数 (N·m) 及法向/切向约束违规值；
+    * 物理反向到正向桥接：实现 `solution_to_multi_contact_dynamics()`，将分配力转化为标准 `MultiContactDynamics` 进行双向物理验算；
+    * 环境与训练场绑定：实现 `create_contact_constraint_from_environment()`，无缝支持 `DynamicsPlayground` 几何与摩擦参数抽取。
+  * **单元验证与统一注册全绿**：
+    * `tests/verify_task6gd_contact_force_solver.py` 17/17 项严苛数学定理纯 Python 全绿通过（耗时 0.403s）；
+    * 注册进入 `tests/test_registry.py`，纳管至 `quick`、`physics` 与 `full` 层级；
+    * 分层回归套件实测全绿：`quick` (7/7 项通过，7.11s), `physics` (12/12 项通过，59.77s)；
+    * 0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
 * **任务 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全 (Task 6G-D-A-R2)**：
   * **失败原子性与预校验门禁重构 (`src/motion/contact_dynamics.py`)**：
     * 引入 `_validate_dt_value()`，在修改任何状态前强行校验 `new_dt` 数值合法性（有限正浮点数，严格拦截 0、负数、NaN、Inf 与非法类型）；

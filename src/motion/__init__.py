@@ -8,6 +8,19 @@ from src.motion.contact_dynamics import (
     SingleContactDynamics,
     create_contact_dynamics_from_environment,
 )
+from src.motion.contact_force_solver import (
+    ContactConstraintSpec,
+    ContactForceSolution,
+    ContactSolverConfig,
+    ContactSolverStatus,
+    ContactWrenchTarget,
+    build_contact_mapping_matrix,
+    contact_mapping_multiply,
+    create_contact_constraint_from_environment,
+    project_to_friction_cone,
+    solution_to_multi_contact_dynamics,
+    solve_contact_forces,
+)
 
 # Optional Blender-dependent modules (require bpy)
 try:
@@ -264,5 +277,16 @@ __all__ = [
     "FrictionConeStatus",
     "FrictionConstraintEvaluation",
     "create_contact_dynamics_from_environment",
+    "ContactSolverStatus",
+    "ContactConstraintSpec",
+    "ContactWrenchTarget",
+    "ContactSolverConfig",
+    "ContactForceSolution",
+    "build_contact_mapping_matrix",
+    "contact_mapping_multiply",
+    "project_to_friction_cone",
+    "solve_contact_forces",
+    "create_contact_constraint_from_environment",
+    "solution_to_multi_contact_dynamics",
 ]
 

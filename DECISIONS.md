@@ -638,3 +638,30 @@
   - 扩充测试：`tests/verify_task6gd_contact_dynamics.py` 补充完善 Test 16 状态验证，并新增 Test 18 深度覆盖 10 大失败原子性定理（匹配成功、失配抛错、系统不变、触点不变、同步更新、冲量缩放一致、空容器更新、非法数值全拦截、多触点中途故障事务回滚、`add_contact` 零退化）；测试总数扩充至 18 项（纯 Python 0.002s 全绿）；
   - 实测回归全绿：`quick` (6/6), `physics` (11/11) 保持 100% 零退化（退出码 0）；
   - 彻底消除了接触动力学系统在时间步长重配置中的状态污染与不一致隐患。
+
+---
+
+### [DEC-035] 多接触力逆向求解与约束分配系统架构 (Task 6G-D-B)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-23
+* **背景**：在 6G-D-A/A-R1/A-R2 完成了接触动力学正向计算（已知接触力求合力、合力矩、冲量、动量变化与库仑锥有效性检验）之后，系统需要反向分配能力：从高层运动规划或全身牛顿-欧拉方程给出的期望合外力与绕质心合力矩 $\mathbf{w}_{\text{target}} = [\mathbf{F}_{\text{target}}, \boldsymbol{\tau}_{\text{target}}]^T \in \mathbb{R}^6$，以及足端/手端与环境表面接触几何与摩擦参数，反解出各个接触点上的 3D 接触力 $\mathbf{F}_i$。
+* **决策与方案**：
+  1. **线性接触抓取映射矩阵 (Contact Grasp Mapping Matrix)**：
+     - 构建严格的线性映射 $\mathbf{A} \mathbf{f} = \mathbf{w}$，其中矩阵 $\mathbf{A} \in \mathbb{R}^{6 \times 3N}$。对于第 $i$ 个接触点，前 3 行为单位矩阵 $\mathbf{I}_3$（力矢量累加），后 3 行为叉乘斜对称矩阵 $[\mathbf{r}_i]_\times$（其中 $\mathbf{r}_i = \mathbf{p}_i - \mathbf{p}_{\text{com}}$ 为接触点相对全身质心的位置矢量）。
+  2. **精确 3D 圆形库仑摩擦锥闭式投影与欧氏非膨胀算子**：
+     - 摒弃了误差较大且具有方向偏置的多面体/八棱锥离散线性化近似，实现了任意接触法向 $\hat{\mathbf{n}}$ 下的真实 3D 圆形库仑摩擦锥闭式欧几里得正交投影算法 `project_to_friction_cone`；
+     - 严格处理四类几何区域：原点锥顶外侧投影至原点（拉力与逆锥截断）、锥内保持不变、锥外正交投影至圆锥母线侧面（保证法向非负且切向模长严格位于边界圆周）、以及法向力上限 $F_{n,\max}$ 的平顶截断。
+  3. **双引擎凸优化架构 (Dual-Engine Optimization: SLSQP + SPG)**：
+     - 针对开发机独立 Python（含 SciPy）与 Blender 内置 Python（无 SciPy）的环境异构，构建了双引擎架构：
+       * **Engine 1 (SLSQP)**：在具有 SciPy 的独立环境中作为高精度二阶约束优化求解器，直接优化加权外力残差与能耗目标，并施加平滑二阶锥不等式约束 $\mu F_{n,i} - \|\mathbf{F}_{t,i}\| \ge 0$；
+       * **Engine 2 (SPG Native)**：在无 SciPy 的环境（如 Blender 命令行/内嵌 Python）下自动无缝退化到谱投影梯度法（Spectral Projected Gradient, SPG）。SPG 利用闭式圆锥投影与 Barzilai-Borwein 自适应步长进行投影梯度动力学寻优，100% 原生自包含，零外部数学库依赖。
+  4. **完备解状态判定与独立物理验算契约**：
+     - 求解器返回详尽的 `ContactSolverStatus`（`SOLVED`, `APPROXIMATE`, `INFEASIBLE`, `INVALID_INPUT`, `NUMERICAL_FAILURE`）；
+     - 输出物理残差标量（力残差范数 N、力矩残差范数 N·m）与最大法向/切向约束违规值；
+     - 提供 `solution_to_multi_contact_dynamics()`，将解向量无缝转化为标准 `MultiContactDynamics`，并可与正向动力学进行全维度互相验算；
+     - 具备与 `DynamicsPlayground` 的无缝几何绑定能力（`create_contact_constraint_from_environment`）。
+* **影响与产物**：
+  - 新增核心模块：`src/motion/contact_force_solver.py`；
+  - 导出接口：更新 `src/motion/__init__.py`；
+  - 新增完备测试：`tests/verify_task6gd_contact_force_solver.py`（17 项全面覆盖单点支撑、双足均分、CoM 偏置分配、力矩自由度不可控检测、脱离接触零力约束、无摩擦打滑检测、库仑摩擦锥边界截断、斜坡 15° 分配、垂直墙面单向推力分配、多表面异构法向联合接触、独立力矩验算、不可行拉力拦截、数值容错、排列不变性、时间步长与正向动力学契约）；
+  - 注册统一测试入口：在 `tests/test_registry.py` 注册 `contact_force_solver`（覆盖 QUICK, PHYSICS, FULL 分级）。

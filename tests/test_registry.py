@@ -97,6 +97,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=15.0,
         description="Validates 3D contact forces, torques about CoM, linear/angular impulses, Coulomb friction cone, and playground contract.",
     ),
+    "contact_force_solver": TestDefinition(
+        test_id="contact_force_solver",
+        name="Multi-Contact Force Solver & Constraint Allocation",
+        script_path="tests/verify_task6gd_contact_force_solver.py",
+        runner_type=RunnerType.PYTHON,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=30.0,
+        description="Validates multi-contact force solver, QP/SPG contact wrench allocation, friction cone constraints, DynamicsPlayground integration, and feasibility detection.",
+    ),
     "runner_unit_tests": TestDefinition(
         test_id="runner_unit_tests",
         name="Test Suite Runner Unit Tests",

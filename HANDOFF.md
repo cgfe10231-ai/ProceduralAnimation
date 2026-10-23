@@ -5,11 +5,13 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-A-R2（MultiContactDynamics 时间步长更新原子性与状态不可变保全）：
-1. 修复失败原子性：重构 `MultiContactDynamics.set_dt(new_dt, update_contacts=False)`，在变更系统 `dt` 前遍历全部子接触点校验兼容性，失配立即抛错，系统与子接触点严格保持原值不变；
-2. 事务级批量同步与异常回滚：重构 `set_dt(new_dt, update_contacts=True)`，预先记录系统与触点快照，中途任意异常自动回滚，坚决杜绝“部分更新”中间态；
-3. 空系统与防御加固：空系统支持合法新 `dt` 并拒绝非法输入，`SingleContactDynamics` 增加 `__setattr__` 动态防御；
-4. 交付 `tests/verify_task6gd_contact_dynamics.py` 扩充至 18 项纯 Python 全绿通过；分层回归 `quick` (6/6), `physics` (11/11) 保持 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-B（多接触力逆向求解与约束分配系统）：
+1. 建立精确的接触抓取线性映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$（$\mathbf{A} \in \mathbb{R}^{6 \times 3N}$），解耦力累加与力矩叉乘斜对称矩阵；
+2. 实现任意法向下的真实 3D 圆形库仑摩擦锥闭式欧几里得正交投影算法 `project_to_friction_cone`，杜绝八棱锥线性近似的方向偏置；
+3. 构建 SLSQP + 原生 SPG 双引擎优化架构，具备 Barzilai-Borwein 自适应步长，零外部依赖 100% 兼容 Blender 内置 Python 环境；
+4. 实现详尽的状态机与物理残差判定（`ContactSolverStatus`），提供 N 和 N·m 残差与约束违规度；
+5. 提供 `solution_to_multi_contact_dynamics()` 与正向动力学双向物理验算，实现 `create_contact_constraint_from_environment()` 与 DynamicsPlayground 深度绑定；
+6. 交付 `tests/verify_task6gd_contact_force_solver.py` 17/17 项纯 Python 全绿通过；分层回归 `quick` (7/7), `physics` (12/12) 保持 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -38,43 +40,45 @@
 * 完成 Task 6G-D-PRE-P2-R1 环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁。
 * 完成 Task 6G-D-A 接触动力学基础与冲量动量系统（交付纯数学模块与 15 项数学几何测试）。
 * 完成 Task 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复（交付 17 项测试与环境接触间隙门禁）。
-* **完成 Task 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全**：
-  * 重构 `MultiContactDynamics.set_dt()` 实现严格失败原子性；
-  * `update_contacts=False` 模式预校验全触点兼容性，失配立即抛错，系统与触点原值绝对不变；
-  * `update_contacts=True` 模式支持快照与事务回滚，杜绝部分更新中间态；
-  * `SingleContactDynamics` 增加 `__setattr__` 动态防御拦截非法 `dt`；
-  * `tests/verify_task6gd_contact_dynamics.py` 扩充 Test 18（18/18 项测试纯 Python 全绿通过）；
-  * 分层回归套件实测全绿：`quick` (6/6), `physics` (11/11)。
+* 完成 Task 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全。
+* **完成 Task 6G-D-B 多接触力逆向求解与约束分配系统**：
+  * 实现核心求解器模块 `src/motion/contact_force_solver.py`；
+  * 线性映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$ 与叉乘斜对称矩阵构建；
+  * 任意法向 $\hat{\mathbf{n}}$ 下的真实 3D 圆形库仑摩擦锥闭式欧几里得正交投影算子 `project_to_friction_cone`；
+  * SLSQP + 原生 SPG 双引擎凸优化架构，Barzilai-Borwein 自适应谱步长；
+  * 完备状态判定（`ContactSolverStatus`）与残差向量输出；
+  * 独立测试套件 `tests/verify_task6gd_contact_force_solver.py` 17/17 全绿；
+  * 统一测试注册 `contact_force_solver`；分层回归套件 `quick` 7/7, `physics` 12/12 实测全绿。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.12s，退出码 0）；
+  * `contact_force_solver`：17/17 项数学与物理定理全绿（0.403s，退出码 0）；
+  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.78s，退出码 0）；
   * `dynamics_environment_query`：13/13 项数学定理全绿（0.12s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.32s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：6/6 项通过（5.36s，退出码 0）；
-  * `physics` Tier：11/11 项通过（57.83s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-A-R2 已完成并验证，严格停止。
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.34s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `quick` Tier：7/7 项通过（7.11s，退出码 0）；
+  * `physics` Tier：12/12 项通过（59.77s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-B 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-034]`)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-035]`)
 * 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
-* 核心源码：`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
+* 核心源码：`src/motion/contact_force_solver.py`、`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
 * 核心生成与产物：`output/dynamics_playground.blend`、`output/unified_motion_integration.blend`
 
 ## 5. 已知问题与未实现功能清单 (Unimplemented Features)
-* 接触力求解器（根据全身加速度或外部扰动自动分配脚底 GRF 和接触反力）：尚未实现（Task 6G-D-B 规划）；
-* 接触冲量与动力学平衡闭环（根据 GRF 冲量主动调节 CoM 加速度与动量）：尚未实现（Task 6G-D-C 规划）；
+* 接触冲量与动力学平衡闭环（根据分配力在时间步长内更新角动量与质心运动）：尚未实现（Task 6G-D-C 规划）；
 * 动态视觉验收（Blender 视口播放接触反力动画）：尚未进行（本轮为纯数学与接口契约基础）。
 
 ## 6. 下一步
-* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-B 接触力求解与分配）**。
-* **严禁自动进入 Task 6G-D-B 或 6H**。
+* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-C 接触平衡动力学闭环）**。
+* **严禁自动进入 Task 6G-D-C 或 6H**。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。
 * **严禁虚报测试结果**，严格执行 6 态划分。
 * **以磁盘代码和实际测试结果为事实第一依据**。
 * **严禁编写独立脚本拼凑动画冒充连续动作**。
-* **严禁擅自进入 Task 6G-D-B**。
+* **严禁擅自进入 Task 6G-D-C**。
