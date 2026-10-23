@@ -37,7 +37,24 @@ class SurfaceGeometryType(str, Enum):
 
 @dataclass
 class SurfaceQueryResult:
-    """Standardized output structure for environmental surface queries."""
+    """Standardized output structure for environmental surface queries.
+
+    Attributes:
+        surface_id: Unique string identifier of the queried surface ('none' if not found).
+        surface_type: Categorical string identifier from SurfaceGeometryType.
+        contact_point_world: Projected contact point coordinates (x, y, z) in meters.
+        surface_normal_world: Unit outward surface normal vector (nx, ny, nz).
+        signed_distance: Strictly signed distance relative to surface outward normal.
+            > 0: query point is in outward free space (gap).
+            0.0: query point is exactly on the surface plane.
+            < 0: query point is in inward half-space (penetration).
+        friction_coeff: Static friction coefficient of the surface (0.0 if not found).
+        allows_regular_support: True if eligible for foot weight support; False for walls/ledges.
+        success: True if a matching surface was identified within max_distance; False otherwise.
+        ray_hit_distance: Non-negative Euclidean distance traveled along ray to reach intersection
+            (>= 0.0 in meters). Evaluates to None for closest-point / spatial non-ray queries.
+        error_reason: Human-readable diagnostic description when success is False (None on success).
+    """
     surface_id: str
     surface_type: str                   # From SurfaceGeometryType
     contact_point_world: Tuple[float, float, float]
@@ -46,6 +63,7 @@ class SurfaceQueryResult:
     friction_coeff: float               # Static friction coefficient (e.g. 0.60..0.70)
     allows_regular_support: bool        # True if human foot can stand; False for vertical walls
     success: bool                       # True if a valid surface was found within range
+    ray_hit_distance: Optional[float] = None  # Non-negative Euclidean hit distance along ray; None if point query
     error_reason: Optional[str] = None
 
 
@@ -228,6 +246,20 @@ class EnvironmentQuery:
         surface_type_filter: Optional[str] = None,
     ) -> SurfaceQueryResult:
         """Baseline 3D query against the infinite ground plane."""
+        if surface_type_filter and surface_type_filter != SurfaceGeometryType.HORIZONTAL_GROUND.value:
+            return SurfaceQueryResult(
+                surface_id="none",
+                surface_type="none",
+                contact_point_world=(0.0, 0.0, 0.0),
+                surface_normal_world=(0.0, 0.0, 1.0),
+                signed_distance=float("inf"),
+                friction_coeff=0.0,
+                allows_regular_support=False,
+                success=False,
+                ray_hit_distance=None,
+                error_reason=f"No surface matching filter '{surface_type_filter}' found in base ground",
+            )
+
         px, py, pz = point_world
         signed_dist = pz - self.ground_z
         abs_d = abs(signed_dist)
@@ -241,6 +273,7 @@ class EnvironmentQuery:
                 friction_coeff=0.0,
                 allows_regular_support=False,
                 success=False,
+                ray_hit_distance=None,
                 error_reason=f"Point beyond max_distance={max_distance}m from ground",
             )
         return SurfaceQueryResult(
@@ -252,6 +285,8 @@ class EnvironmentQuery:
             friction_coeff=0.70,
             allows_regular_support=True,
             success=True,
+            ray_hit_distance=None,
+            error_reason=None,
         )
 
     def query_spatial_surface(
@@ -259,9 +294,82 @@ class EnvironmentQuery:
         point_world: Tuple[float, float, float],
         ray_direction: Optional[Tuple[float, float, float]] = None,
         max_distance: float = 10.0,
+        surface_type_filter: Optional[str] = None,
     ) -> SurfaceQueryResult:
         """Baseline spatial query delegating to ground plane."""
-        return self.query_surface_at_point(point_world, max_distance=max_distance)
+        if ray_direction is None:
+            return self.query_surface_at_point(
+                point_world, max_distance=max_distance, surface_type_filter=surface_type_filter
+            )
+
+        if surface_type_filter and surface_type_filter != SurfaceGeometryType.HORIZONTAL_GROUND.value:
+            return SurfaceQueryResult(
+                surface_id="none",
+                surface_type="none",
+                contact_point_world=(0.0, 0.0, 0.0),
+                surface_normal_world=(0.0, 0.0, 1.0),
+                signed_distance=float("inf"),
+                friction_coeff=0.0,
+                allows_regular_support=False,
+                success=False,
+                ray_hit_distance=float("inf"),
+                error_reason=f"No surface matching filter '{surface_type_filter}' found in base ground",
+            )
+
+        rx, ry, rz = ray_direction
+        r_len = math.sqrt(rx * rx + ry * ry + rz * rz)
+        if r_len < 1e-8:
+            return self.query_surface_at_point(
+                point_world, max_distance=max_distance, surface_type_filter=surface_type_filter
+            )
+
+        dz = rz / r_len
+        px, py, pz = point_world
+        signed_dist = pz - self.ground_z
+
+        if abs(dz) < 1e-6:
+            return SurfaceQueryResult(
+                surface_id="none",
+                surface_type="none",
+                contact_point_world=(0.0, 0.0, 0.0),
+                surface_normal_world=(0.0, 0.0, 1.0),
+                signed_distance=float("inf"),
+                friction_coeff=0.0,
+                allows_regular_support=False,
+                success=False,
+                ray_hit_distance=float("inf"),
+                error_reason=f"Ray is parallel to ground plane within {max_distance}m",
+            )
+
+        t = (self.ground_z - pz) / dz
+        if 0.0 <= t <= max_distance:
+            dx = rx / r_len
+            dy = ry / r_len
+            return SurfaceQueryResult(
+                surface_id="default_ground",
+                surface_type=SurfaceGeometryType.HORIZONTAL_GROUND.value,
+                contact_point_world=(px + t * dx, py + t * dy, self.ground_z),
+                surface_normal_world=(0.0, 0.0, 1.0),
+                signed_distance=signed_dist,
+                friction_coeff=0.70,
+                allows_regular_support=True,
+                success=True,
+                ray_hit_distance=t,
+                error_reason=None,
+            )
+
+        return SurfaceQueryResult(
+            surface_id="none",
+            surface_type="none",
+            contact_point_world=(0.0, 0.0, 0.0),
+            surface_normal_world=(0.0, 0.0, 1.0),
+            signed_distance=float("inf"),
+            friction_coeff=0.0,
+            allows_regular_support=False,
+            success=False,
+            ray_hit_distance=float("inf"),
+            error_reason=f"No surface intersected along ray within {max_distance}m",
+        )
 
     def get_surface_by_id(self, surface_id: str) -> Optional[OrientedSurface]:
         """Lookup surface definition by ID (always None on default ground)."""
@@ -373,20 +481,30 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
         """
         px, py, pz = point_world
 
-        # Base fallback candidate: global flat ground at ground_z
-        best_surface_id = "default_ground"
-        best_surface_type = SurfaceGeometryType.HORIZONTAL_GROUND.value
-        best_proj = (px, py, self.ground_z)
-        best_normal = (0.0, 0.0, 1.0)
-        best_dist = abs(pz - self.ground_z)
-        best_signed_dist = pz - self.ground_z
-        best_friction = 0.70
-        best_support = True
-        found_any = True
+        best_surface_id: Optional[str] = None
+        best_surface_type: Optional[str] = None
+        best_proj: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+        best_normal: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+        min_abs_dist: float = float("inf")
+        best_signed_dist: float = float("inf")
+        best_friction: float = 0.0
+        best_support: bool = False
+        found_any: bool = False
+
+        # Base fallback candidate: global flat ground at ground_z ONLY if filter allows horizontal_ground
+        if surface_type_filter in (None, "", SurfaceGeometryType.HORIZONTAL_GROUND.value):
+            default_dist = abs(pz - self.ground_z)
+            min_abs_dist = default_dist
+            best_surface_id = "default_ground"
+            best_surface_type = SurfaceGeometryType.HORIZONTAL_GROUND.value
+            best_proj = (px, py, self.ground_z)
+            best_normal = (0.0, 0.0, 1.0)
+            best_signed_dist = pz - self.ground_z
+            best_friction = 0.70
+            best_support = True
+            found_any = True
 
         # Check registered surfaces
-        min_abs_dist = best_dist
-
         for s in self._surfaces.values():
             if surface_type_filter and s.surface_type.value != surface_type_filter:
                 continue
@@ -400,22 +518,29 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
                 best_surface_type = s.surface_type.value
                 best_proj = proj
                 best_normal = norm
-                best_dist = abs_d
                 best_signed_dist = s_dist
                 best_friction = s.friction_coeff
                 best_support = s.allows_regular_support
+                found_any = True
 
-        if min_abs_dist > max_distance:
+        if (not found_any) or (min_abs_dist > max_distance):
+            filter_msg = f" matching filter '{surface_type_filter}'" if surface_type_filter else ""
+            if not found_any:
+                reason = f"No surface{filter_msg} registered in environment"
+            else:
+                reason = f"No surface{filter_msg} found within max_distance={max_distance}m (closest: {min_abs_dist:.3f}m)"
+
             return SurfaceQueryResult(
                 surface_id="none",
                 surface_type="none",
                 contact_point_world=(0.0, 0.0, 0.0),
                 surface_normal_world=(0.0, 0.0, 1.0),
-                signed_distance=min_abs_dist,
+                signed_distance=min_abs_dist if math.isfinite(min_abs_dist) else float("inf"),
                 friction_coeff=0.0,
                 allows_regular_support=False,
                 success=False,
-                error_reason=f"No surface found within max_distance={max_distance}m (closest: {min_abs_dist:.3f}m)",
+                ray_hit_distance=None,
+                error_reason=reason,
             )
 
         return SurfaceQueryResult(
@@ -427,6 +552,7 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
             friction_coeff=best_friction,
             allows_regular_support=best_support,
             success=True,
+            ray_hit_distance=None,
             error_reason=None,
         )
 
@@ -435,20 +561,40 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
         point_world: Tuple[float, float, float],
         ray_direction: Optional[Tuple[float, float, float]] = None,
         max_distance: float = 10.0,
+        surface_type_filter: Optional[str] = None,
     ) -> SurfaceQueryResult:
-        """Query spatial surface along a specific direction or find nearest non-ground obstacle.
+        """Query spatial surface along a specific direction or find nearest obstacle.
 
         Specifically designed for wall touch, vaulting, and multi-surface contacts.
+
+        Args:
+            point_world: (x, y, z) 3D coordinate in world space.
+            ray_direction: Optional (dx, dy, dz) vector. If None, queries nearest non-ground obstacle
+                or nearest surface matching filter.
+            max_distance: Maximum search or ray propagation distance.
+            surface_type_filter: Optional filter to restrict query (e.g. 'vertical_wall').
+
+        Returns:
+            SurfaceQueryResult where:
+            - `signed_distance` is strictly the query point's signed distance relative to the
+              surface outward normal (>0: gap/front, 0.0: on surface, <0: penetration/behind).
+            - `ray_hit_distance` is the non-negative Euclidean distance traveled along the ray
+              to hit the surface (None if not a directional ray query).
         """
         if ray_direction is None:
-            # Query nearest non-ground surface
+            # Point query: nearest surface (excluding default horizontal ground if no filter given)
             px, py, pz = point_world
             best_res: Optional[SurfaceQueryResult] = None
             min_dist = float("inf")
 
             for s in self._surfaces.values():
-                if s.surface_type == SurfaceGeometryType.HORIZONTAL_GROUND:
-                    continue
+                if surface_type_filter:
+                    if s.surface_type.value != surface_type_filter:
+                        continue
+                else:
+                    if s.surface_type == SurfaceGeometryType.HORIZONTAL_GROUND:
+                        continue
+
                 proj, s_dist, norm = s.query_closest_point(px, py, pz)
                 abs_d = abs(s_dist)
                 if abs_d < min_dist and abs_d <= max_distance:
@@ -462,19 +608,25 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
                         friction_coeff=s.friction_coeff,
                         allows_regular_support=s.allows_regular_support,
                         success=True,
+                        ray_hit_distance=None,
+                        error_reason=None,
                     )
 
             if best_res is not None:
                 return best_res
 
             # Fallback to general query
-            return self.query_surface_at_point(point_world, max_distance=max_distance)
+            return self.query_surface_at_point(
+                point_world, max_distance=max_distance, surface_type_filter=surface_type_filter
+            )
 
         # Directional ray query
         rx, ry, rz = ray_direction
         r_len = math.sqrt(rx * rx + ry * ry + rz * rz)
         if r_len < 1e-8:
-            return self.query_surface_at_point(point_world, max_distance=max_distance)
+            return self.query_surface_at_point(
+                point_world, max_distance=max_distance, surface_type_filter=surface_type_filter
+            )
         dir_unit = (rx / r_len, ry / r_len, rz / r_len)
 
         px, py, pz = point_world
@@ -483,13 +635,17 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
         best_t = float("inf")
         best_surface: Optional[OrientedSurface] = None
         best_proj = (0.0, 0.0, 0.0)
+        best_signed_dist = float("inf")
 
         for s in self._surfaces.values():
+            if surface_type_filter and s.surface_type.value != surface_type_filter:
+                continue
+
             cx, cy, cz = s.center
             nx, ny, nz = s.normal
 
             denom = dx * nx + dy * ny + dz * nz
-            # Check ray is pointing towards the surface front (denom < 0) or through it
+            # Check ray is not parallel to the surface plane
             if abs(denom) < 1e-6:
                 continue
 
@@ -505,6 +661,8 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
                     best_t = t
                     best_surface = s
                     best_proj = (ix, iy, iz)
+                    # Normal signed distance of query point relative to surface outward normal
+                    best_signed_dist = (px - cx) * nx + (py - cy) * ny + (pz - cz) * nz
 
         if best_surface is not None:
             return SurfaceQueryResult(
@@ -512,12 +670,15 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
                 surface_type=best_surface.surface_type.value,
                 contact_point_world=best_proj,
                 surface_normal_world=best_surface.normal,
-                signed_distance=best_t,
+                signed_distance=best_signed_dist,
                 friction_coeff=best_surface.friction_coeff,
                 allows_regular_support=best_surface.allows_regular_support,
                 success=True,
+                ray_hit_distance=best_t,
+                error_reason=None,
             )
 
+        filter_msg = f" matching filter '{surface_type_filter}'" if surface_type_filter else ""
         return SurfaceQueryResult(
             surface_id="none",
             surface_type="none",
@@ -527,7 +688,8 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
             friction_coeff=0.0,
             allows_regular_support=False,
             success=False,
-            error_reason=f"No surface intersected along ray within {max_distance}m",
+            ray_hit_distance=float("inf"),
+            error_reason=f"No surface{filter_msg} intersected along ray within {max_distance}m",
         )
 
 

@@ -537,3 +537,27 @@
   - 产物文件：`output/dynamics_playground.blend`（116,933 字节，保存在本地受 `.gitignore` 规则保护）；
   - 实测回归全绿：`quick` (5/5), `physics` (10/10), `motion` (5/5) 保持 100% 零退化（退出码 0）；
   - 零生产运动代码修改，零步态曲线变动。
+
+---
+
+### [DEC-031] 环境查询过滤约束、距离语义统一与动力学训练场单一 SSOT 规范 (Task 6G-D-PRE-P2-R1)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-23
+* **背景**：在 P2 审查中发现：1) `query_surface_at_point()` 当指定 `surface_type_filter`（如 `vertical_wall`）时，若近处无匹配物体，可能错误命中默认全局地表 `default_ground`；2) 射线查询中命中距离与法向有符号距离语义混淆，斜向射线与背面射线无法区分沿射线欧几里得距离与垂直于面的有符号距离；3) 缺少明确的门禁规范来锁定 `output/dynamics_playground.blend` 作为后续动力学任务的统一标准训练场，存在子任务各自建造分立场景与手工摆设虚假力学箭头的架构漂移风险。
+* **决策与方案**：
+  1. **查询过滤与默认地面强隔离约束**：
+     - 在 `DynamicsEnvironmentQuery` 与基类 `EnvironmentQuery` 的点查询与空间查询中，仅当 `surface_type_filter in (None, "", "horizontal_ground")` 时才允许将全局默认地面作为候选；当过滤其他类型（如 `vertical_wall`, `sloped_ramp`）时，严格屏蔽默认地面，若无匹配表面则严谨返回 `success=False`、`surface_id="none"`。
+  2. **物理距离语义严格分离 (`ray_hit_distance` vs `signed_distance`)**：
+     - 在 `SurfaceQueryResult` 中新增 `ray_hit_distance: Optional[float] = None` 字段；
+     - `signed_distance` 严格专属于法向有符号距离（沿外向法线：>0 为间隙/正方，0.0 在表面，<0 为穿透/负方）；
+     - `ray_hit_distance` 严格表示沿射线方向行进的非负欧几里得距离（>=0.0m）；非射线点查询时为 `None`，射线未命中时严格为 `float("inf")`；
+     - 彻底解耦斜向射线的较长欧几里得击中距离与垂直墙面的法向有符号净距。
+  3. **标准动力学训练场单一权威基准指定与防伪门禁 (SSOT Gate)**：
+     - 将 `output/dynamics_playground.blend` 确立为 Task 6G-D、6H、7A 的唯一标准训练场（SSOT）；
+     - 增订永久架构清规：严禁任何子模块独立私造第二套分立场景；严禁修改 6 大基础功能区网格；力学可视化箭头必须 100% 绑定物理计算真实输出，严禁手工摆拍装饰性假箭头；
+     - 同步更新权威门禁 [`docs/ARCHITECTURE_CHANGE_GATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ARCHITECTURE_CHANGE_GATE.md) 第 6 节，并将十大绝对清规同步写入 `AGENTS.md`、`GEMINI.md` 与 `.agents/rules/project_rules.md`。
+* **影响与产物**：
+  - 更新代码：`src/scene/environment_query.py`、`tests/verify_task6gd_dynamics_playground.py`（扩充为 13 项单元测试）；
+  - 更新门禁与清规：`docs/ARCHITECTURE_CHANGE_GATE.md`、`AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`；
+  - 实测回归全绿：`quick` (5/5), `motion` (5/5), `dynamics_environment_query` (13/13) 全绿通过（退出码 0）；
+  - 零生产代码修改，零步态曲线变动，零 Blend 文件重构。

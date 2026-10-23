@@ -291,6 +291,152 @@ class TestDynamicsEnvironmentQuery(unittest.TestCase):
         self.assertEqual(self.query.ground_height_at(0.0, 0.0), 0.0)
         self.assertEqual(self.query.surface_normal_at(0.0, 0.0), (0.0, 0.0, 1.0))
 
+    def test_12_surface_type_filter_strictness(self):
+        """Req 12: surface_type_filter must strictly govern all candidate selections (Task 6G-D-PRE-P2-R1)."""
+        # 1. At (0, 0, 1.0), ground is 1.0m away.
+        # Querying with vertical_wall filter must NEVER return default_ground or flat_ground.
+        res_near_ground = self.query.query_surface_at_point(
+            (0.0, 0.0, 1.0),
+            max_distance=5.0,
+            surface_type_filter="vertical_wall",
+        )
+        self.assertFalse(res_near_ground.success)
+        self.assertEqual(res_near_ground.surface_id, "none")
+        self.assertEqual(res_near_ground.surface_type, "none")
+        self.assertIsNotNone(res_near_ground.error_reason)
+        self.assertIn("vertical_wall", res_near_ground.error_reason)
+
+        # 2. With large max_distance=30.0m, vertical wall at Y=23.8m must be returned, NOT ground.
+        res_wall_found = self.query.query_surface_at_point(
+            (0.0, 0.0, 1.0),
+            max_distance=30.0,
+            surface_type_filter="vertical_wall",
+        )
+        self.assertTrue(res_wall_found.success)
+        self.assertEqual(res_wall_found.surface_id, "vertical_wall_front")
+        self.assertEqual(res_wall_found.surface_type, SurfaceGeometryType.VERTICAL_WALL.value)
+        self.assertAlmostEqual(res_wall_found.contact_point_world[1], 23.8, places=4)
+
+        # 3. In front of wall (0, 23.5, 1.5), query filtering for 'sloped_ramp' with max_distance=1.0m
+        # (closest ramp_down edge is at Y=21.68, ~2.36m away) must NOT return wall or ground, must return success=False.
+        res_ramp_filter = self.query.query_surface_at_point(
+            (0.0, 23.5, 1.5),
+            max_distance=1.0,
+            surface_type_filter="sloped_ramp",
+        )
+        self.assertFalse(res_ramp_filter.success)
+        self.assertEqual(res_ramp_filter.surface_id, "none")
+        self.assertIn("sloped_ramp", res_ramp_filter.error_reason)
+
+        # 4. Base EnvironmentQuery filtering for vertical_wall must return success=False.
+        base_env = EnvironmentQuery(ground_z=0.0)
+        res_base_wall = base_env.query_surface_at_point(
+            (0.0, 0.0, 0.5),
+            surface_type_filter="vertical_wall",
+        )
+        self.assertFalse(res_base_wall.success)
+        self.assertEqual(res_base_wall.surface_id, "none")
+
+        # 5. Base EnvironmentQuery filtering for horizontal_ground succeeds.
+        res_base_ground = base_env.query_surface_at_point(
+            (0.0, 0.0, 0.5),
+            surface_type_filter="horizontal_ground",
+        )
+        self.assertTrue(res_base_ground.success)
+        self.assertEqual(res_base_ground.surface_id, "default_ground")
+
+    def test_13_ray_query_distance_semantics(self):
+        """Req 13: Unify distance semantics across forward, oblique, backside and missed ray queries (Task 6G-D-PRE-P2-R1)."""
+        # 1. Forward-facing ray query (正向射线)
+        # Point in front of wall at (0, 20.0, 1.5), shoot along +Y (0, 1, 0) towards wall at Y=23.8
+        res_fwd = self.query.query_spatial_surface(
+            point_world=(0.0, 20.0, 1.5),
+            ray_direction=(0.0, 1.0, 0.0),
+            max_distance=10.0,
+        )
+        self.assertTrue(res_fwd.success)
+        self.assertEqual(res_fwd.surface_id, "vertical_wall_front")
+        self.assertIsNotNone(res_fwd.ray_hit_distance)
+        self.assertAlmostEqual(res_fwd.ray_hit_distance, 3.80, places=4)
+        self.assertGreater(res_fwd.signed_distance, 0.0)
+        self.assertAlmostEqual(res_fwd.signed_distance, 3.80, places=4)
+        self.assertAlmostEqual(res_fwd.contact_point_world[1], 23.80, places=4)
+
+        # 2. Oblique ray query (斜向射线)
+        # Point at (-1.0, 20.0, 1.5), shoot obliquely towards (0.0, 23.8, 1.5)
+        # Delta: dX=+1.0, dY=+3.8, dZ=0.0. Euclidean ray hit distance = sqrt(1^2 + 3.8^2) = sqrt(15.44) ~= 3.9294m
+        # Normal signed distance from point to wall (facing -Y) is strictly +3.80m.
+        res_oblique = self.query.query_spatial_surface(
+            point_world=(-1.0, 20.0, 1.5),
+            ray_direction=(1.0, 3.8, 0.0),
+            max_distance=10.0,
+        )
+        self.assertTrue(res_oblique.success)
+        self.assertEqual(res_oblique.surface_id, "vertical_wall_front")
+        expected_ray_hit_dist = math.sqrt(1.0 + 3.8 * 3.8)
+        self.assertAlmostEqual(res_oblique.ray_hit_distance, expected_ray_hit_dist, places=4)
+        self.assertAlmostEqual(res_oblique.signed_distance, 3.80, places=4)
+        # Verify strict distinction between ray_hit_distance and signed_distance
+        self.assertGreater(res_oblique.ray_hit_distance, res_oblique.signed_distance)
+        self.assertAlmostEqual(res_oblique.contact_point_world[0], 0.0, places=4)
+        self.assertAlmostEqual(res_oblique.contact_point_world[1], 23.8, places=4)
+
+        # 3. Backside ray query (背面射线)
+        # Point behind the wall at (0.0, 24.5, 1.5). Normal is (0, -1, 0).
+        # Signed distance is (24.5 - 23.8) * (-1.0) = -0.70m (negative penetration / inside).
+        # Shoot ray towards wall from behind along -Y (0, -1, 0).
+        res_back = self.query.query_spatial_surface(
+            point_world=(0.0, 24.5, 1.5),
+            ray_direction=(0.0, -1.0, 0.0),
+            max_distance=5.0,
+        )
+        self.assertTrue(res_back.success)
+        self.assertEqual(res_back.surface_id, "vertical_wall_front")
+        self.assertAlmostEqual(res_back.ray_hit_distance, 0.70, places=4)
+        self.assertLess(res_back.signed_distance, 0.0)
+        self.assertAlmostEqual(res_back.signed_distance, -0.70, places=4)
+        self.assertAlmostEqual(res_back.contact_point_world[1], 23.8, places=4)
+
+        # 4. Missed ray query (未击中射线)
+        # Shoot away from wall into open space along -Y
+        res_miss = self.query.query_spatial_surface(
+            point_world=(0.0, 20.0, 1.5),
+            ray_direction=(0.0, -1.0, 0.0),
+            max_distance=2.0,
+            surface_type_filter="vertical_wall",
+        )
+        self.assertFalse(res_miss.success)
+        self.assertEqual(res_miss.surface_id, "none")
+        self.assertTrue(math.isinf(res_miss.ray_hit_distance))
+        self.assertTrue(math.isinf(res_miss.signed_distance))
+
+        # 5. Non-ray point query must have ray_hit_distance evaluate to None
+        res_pt = self.query.query_surface_at_point((0.0, -2.0, 1.5))
+        self.assertTrue(res_pt.success)
+        self.assertIsNone(res_pt.ray_hit_distance)
+        self.assertAlmostEqual(res_pt.signed_distance, 1.50, places=4)
+
+        # 6. Base EnvironmentQuery ray hit & ray miss semantics
+        base_env = EnvironmentQuery(ground_z=0.0)
+        res_base_hit = base_env.query_spatial_surface(
+            point_world=(0.0, 0.0, 2.0),
+            ray_direction=(0.0, 0.0, -1.0),
+            max_distance=5.0,
+        )
+        self.assertTrue(res_base_hit.success)
+        self.assertEqual(res_base_hit.surface_id, "default_ground")
+        self.assertAlmostEqual(res_base_hit.ray_hit_distance, 2.0, places=4)
+        self.assertAlmostEqual(res_base_hit.signed_distance, 2.0, places=4)
+
+        res_base_miss = base_env.query_spatial_surface(
+            point_world=(0.0, 0.0, 2.0),
+            ray_direction=(0.0, 0.0, 1.0),
+            max_distance=5.0,
+        )
+        self.assertFalse(res_base_miss.success)
+        self.assertTrue(math.isinf(res_base_miss.ray_hit_distance))
+        self.assertTrue(math.isinf(res_base_miss.signed_distance))
+
 
 if __name__ == "__main__":
     unittest.main()

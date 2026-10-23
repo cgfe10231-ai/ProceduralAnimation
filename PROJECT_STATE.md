@@ -1,13 +1,33 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-PRE-P2（可视化动力学训练场与统一环境查询基础；交付 src/scene/environment_query.py 实现包含 21 个解析表面的 OrientedSurface 与 DynamicsEnvironmentQuery，支持平地、5级台阶、上下斜坡、垂直墙、高台与调试区 6 大功能分区；实现有符号距离、闭式法线、接触点投影与垂直面三维查询；对 EnvironmentQuery 保持 100% 向后兼容；升级 src/scene/builder.py 与 run_dynamics_playground.py 生成 output/dynamics_playground.blend 场景并配备法线指示箭头与参考轴；实测 quick 5/5、physics 10/10、motion 5/5 全绿通过；0 生产运动代码修改，0 步态变动；严格停止，坚决不擅自进入 6G-D-A）  
+> **当前阶段**：任务 6G-D-PRE-P2-R1（环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁；修复 query_surface_at_point 中 surface_type_filter 未约束默认地面的缺陷；统一 signed_distance 为法向有符号距离并将射线命中距离解耦为 ray_hit_distance；将 DynamicsPlayground 正式确定为 Task 6G-D/6H/7A 统一标准训练场并增补 ACG 规范与十大绝对清规；新增 test_12 与 test_13 单元测试扩充至 13 项断言全绿；实测 quick 5/5、motion 5/5、dynamics_environment_query 13/13 全绿通过；0 生产运动代码修改，0 步态变动，0 训练场场景重构；严格停止，坚决不擅自进入 6G-D-A）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-PRE-P2-R1 环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁 (Task 6G-D-PRE-P2-R1)**：
+  * **查询过滤与默认地面强隔离已修复 (`src/scene/environment_query.py`)**：
+    * 修复点查询与空间查询中默认全局地面无条件作为候选的逻辑缺陷；
+    * 仅当 `surface_type_filter in (None, "", "horizontal_ground")` 时才允许评估全局地面；过滤垂直墙或斜坡等非平地类型时严格隔离默认地面，未命中时严谨返回 `success=False`、`surface_id="none"` 与明确错误原因。
+  * **物理距离语义严格解耦 (`ray_hit_distance` vs `signed_distance`)**：
+    * `SurfaceQueryResult` 引入 `ray_hit_distance: Optional[float] = None` 字段；
+    * `signed_distance` 严格锁定为法向有符号距离（>0 间隙，0.0 表面，<0 穿透）；
+    * `ray_hit_distance` 严格锁定为沿射线方向行进的欧几里得距离（>=0.0m）；非射线点查询时为 `None`，射线未命中时严格为 `float("inf")`；
+    * 彻底解耦斜向射线行进距离（斜边）与垂直平面的法向有符号净距。
+  * **动力学训练场单一 SSOT 权威门禁与十大绝对清规**：
+    * 在 [`docs/ARCHITECTURE_CHANGE_GATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ARCHITECTURE_CHANGE_GATE.md) 增订第 6 节《标准动力学训练场基准场景复用与可视化门禁》；
+    * 确立 `output/dynamics_playground.blend` 为 6G-D、6H 与 7A 单一基准场景（SSOT）；严禁子模块私造重复分立场景；环境基础网格严格只读不可变；
+    * 颁布防伪门禁：动力学遥测箭头必须 100% 绑定真实物理计算输出，严禁手工摆设伪造箭头；
+    * 同步修订 `AGENTS.md`、`GEMINI.md` 与 `.agents/rules/project_rules.md` 第 8 节，确立十大绝对清规。
+  * **单元测试与分层回归全绿**：
+    * `tests/verify_task6gd_dynamics_playground.py` 扩充 `test_12_surface_type_filter_strictness` 与 `test_13_ray_query_distance_semantics`，13/13 项纯 Python 数学断言全绿通过（0.001s）；
+    * `quick` Tier：5/5 全绿通过（5.11s，退出码 0）；
+    * `motion` Tier：5/5 全绿通过（15.81s，退出码 0），历史步态 100% 零退化；
+    * `dynamics_playground_blend`：45 个场景对象结构完整性通过（1.31s，退出码 0）；
+    * 0 生产运动代码修改，0 步态曲线变动，0 场景重复构建，严格停止。
 * **任务 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础 (Task 6G-D-PRE-P2)**：
   * **纯 Python 解析几何与环境查询系统就绪 (`src/scene/environment_query.py`)**：
     * 建立 `OrientedSurface` 统一闭式表面模型，严格涵盖中心、单位外向法线、切向基底、半尺寸、摩擦系数与支撑属性；

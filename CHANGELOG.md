@@ -3,6 +3,40 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-PRE-P2-R1：环境查询过滤修复、距离语义统一与训练场 SSOT 门禁 (Task 6G-D-PRE-P2-R1)
+
+### 3D 环境查询引擎关键语义修复与扩展 (`src/scene/environment_query.py`)
+* **查询过滤与默认地面强隔离**：
+  * 修复 `query_surface_at_point` 与 `query_spatial_surface` 中默认地面无条件入选缺陷；
+  * 显式约束：仅当 `surface_type_filter in (None, "", "horizontal_ground")` 时才允许评估全局默认平坦地面；当指定其他类型过滤（如 `vertical_wall`, `sloped_ramp`）时，严格隔离默认地面，未命中时严谨返回 `success=False` 与 `surface_id="none"`。
+* **物理距离语义严格解耦 (`ray_hit_distance` vs `signed_distance`)**：
+  * `SurfaceQueryResult` 引入 `ray_hit_distance: Optional[float] = None`；
+  * `signed_distance` 严格锁定为法向有符号距离（>0 间隙，0.0 在表面，<0 穿透）；
+  * `ray_hit_distance` 严格锁定为沿射线方向行进的欧几里得距离（>=0.0m）；非射线点查询时返回 `None`，未击中时返回 `float("inf")`；
+  * 彻底区分斜向射线行进距离（斜边）与法向垂直净距。
+* **100% 保持基类 `EnvironmentQuery` 向后兼容**：
+  * 保持原有 2.5D 高度场契约无损，同时基类三维空间接口具备完全一致的过滤与距离语义。
+
+### 永久架构门禁与单一标准训练场规程升级
+* **权威门禁确立单一基准训练场 (SSOT)**：
+  * 在 [`docs/ARCHITECTURE_CHANGE_GATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ARCHITECTURE_CHANGE_GATE.md) 增补第 6 节《标准动力学训练场基准场景复用与可视化门禁》；
+  * 明确 `output/dynamics_playground.blend` 为后续 6G-D、6H 及 7A 的单一权威标准场景；
+  * 颁布三大硬约束：严禁子模块私造重复分立场景；环境基础网格严格不可变（只读）；遥测力学箭头必须 100% 绑定真实物理计算输出，严禁手工摆设伪造箭头。
+* **十大绝对清规同步落实**：
+  * 同步修订 `AGENTS.md`、`GEMINI.md` 与 `.agents/rules/project_rules.md` 第 8 节，将八大清规升级为十大绝对清规（增补第 9 条与第 10 条）。
+
+### 单元验证与回归套件执行
+* **单元测试套件扩充 (`tests/verify_task6gd_dynamics_playground.py`)**：
+  * 新增 `test_12_surface_type_filter_strictness`（过滤严格性检验，5 个子测试点全绿）；
+  * 新增 `test_13_ray_query_distance_semantics`（正向、斜向、背面、未命中及基类射线距离语义，6 个子测试点全绿）；
+  * 13/13 项纯 Python 数学断言全绿通过（耗时 0.001s）。
+* **自动化回归套件实测全绿**：
+  * `quick` Tier：5/5 全绿通过（耗时 5.11s，退出码 0）；
+  * `motion` Tier：5/5 全绿通过（耗时 15.81s，退出码 0），历史步态 100% 零退化；
+  * `dynamics_playground_blend`：45 个场景对象结构完整性通过（耗时 1.31s，退出码 0）。
+* **零生产运动代码修改，零步态曲线变动，零场景重新生成，严格停止**。
+
+
 ## [2026-10-23] 任务 6G-D-PRE-P2：可视化动力学训练场与统一环境查询基础 (Task 6G-D-PRE-P2)
 
 ### 纯 Python 解析几何与环境查询系统 (`src/scene/environment_query.py`)

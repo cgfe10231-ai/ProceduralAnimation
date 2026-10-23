@@ -43,7 +43,7 @@
 
 ## 3. 架构绝对禁止清规 (Strict Prohibitions)
 
-所有 Agent 与开发者在任何开发过程中，必须无条件遵守以下 8 大清规：
+所有 Agent 与开发者在任何开发过程中，必须无条件遵守以下 10 大清规：
 
 1. **严禁绕开统一控制器**：禁止在业务脚本或动作类中通过 `bpy.ops` 或直接赋值修改骨骼欧拉角/位置，所有姿态解算必须统一由 `WholeBodyController` 分配。
 2. **严禁私造并立执行管线**：禁止编写绕开 `KinematicBridgeExecutor` 的独立动作执行器，禁止制造孤立演示分支。
@@ -53,6 +53,8 @@
 6. **严禁放宽医学解剖 ROM 阈值**：禁止为了迎合局部测试通过而擅自放宽 `joint_limits.py` 中的解剖生理活动角上下限。
 7. **严禁动态切换物体父级指针**：下肢与上肢控制器（`FootIK.L/R`、`KneePole.L/R`）在动画全生命周期内必须恒定保持在绝对世界空间（`parent = None`），禁止任何跨帧动态 reparent 行为。
 8. **严禁未实际运行声称完成**：严禁在未实际执行命令、未核对返回码与输出产物前宣称任务“已完成”或“已验证”。
+9. **严禁私造孤立动力学训练场**：`output/dynamics_playground.blend` 为 6G-D、6H 及 7A 阶段的单一基准场景（SSOT），严禁为孤立模块重复制造第二套或分立训练场。
+10. **严禁摆设虚假动力学遥测箭头**：场景中呈现的所有接触力、法向反作用力、力矩与角动量可视化几何体，必须 100% 绑定来自真实物理模型解算的数值输出，严禁摆设无物理计算支撑的静态伪造几何体。
 
 ---
 
@@ -78,3 +80,24 @@
 2. **目视验收防线分离**：
    - 自动化测试通过只能标定为 `Automated Pass`；
    - 任何涉及视觉姿态自然度、步态交替协调性的功能，必须经由用户在 Blender 中目视检查，并由用户明确批准后方可最终关闭任务。
+
+---
+
+## 6. 标准动力学训练场基准场景复用与可视化门禁 (Dynamics Playground Gate)
+
+> **核心原则**：统一基准、场景唯一、环境只读、物理真实、分级验证。
+
+1. **单一标准动力学基准场景权威指定 (SSOT)**：
+   - `output/dynamics_playground.blend`（由 `run_dynamics_playground.py` 与 `src/scene/builder.py:build_dynamics_playground` 构建，解析内核为 `src/scene/environment_query.py`）正式确立为 Task 6G-D（多表面接触自适应）、Task 6H（全身平衡与动量控制）及 Task 7A（复杂地形与多接触运动生成）的**唯一标准基准场景 (Single Source of Truth, SSOT)**。
+2. **严禁重复建造训练场 (Anti-Duplication Constraint)**：
+   - 严禁任何子模块（例如斜坡步行、台阶踏步、墙体支撑、手部支撑跳跃、天花板抓握悬挂等）在代码或脚本中独立生成第二套分立场景、临时台阶或孤立障碍物。
+   - 所有环境交互算法必须通过 `DynamicsEnvironmentQuery`（`src/scene/environment_query.py`）统一获取几何与法向参数，并统一部署在 `output/dynamics_playground.blend` 的 6 大标准功能区进行验证。
+3. **视觉调试 Collection 隔离与环境不可变原则 (Debug Collection Isolation)**：
+   - 后续动力学开发产生的任何调试几何体（例如接触法向箭头、反作用力矢量、ZMP 投影、零动量面轨迹等），必须写入独立的专用 Blender Collection（例如 `Playground_Telemetry_Debug`）。
+   - **绝对严禁直接修改、移动、删除或覆盖 `Playground_Surfaces`、`Playground_Visuals` 原有 6 大区域的环境网格物体**。原始训练场几何与视觉布局属于已通过视觉验收的保护对象。
+4. **真实物理遥测与严禁伪造动力学箭头 (Physical Telemetry vs Fake Decorative Visuals)**：
+   - 场景中呈现的任何接触力矢量（Contact Force）、法向反作用力（Normal Reaction）、关节力矩（Joint Torques）及角动量（Angular Momentum）可视化 Empty/Mesh，其长度、方向与作用点必须**100% 绑定自物理计算模块的真实输出**（如 `ContactModel`、`WholeBodyInertia`、`DifferentialKinematics`）。
+   - **绝对严禁为了视觉美观或应付验收，在场景中手工摆放、硬编码静态装饰性箭头来伪报或冒充动力学计算**。未接入计算的静态摆拍一律视为伪造。
+5. **单元测试与集成验收分级复用规范 (Tiered Verification Reuse)**：
+   - 算法底层的纯数学单元测试（如四元数旋转、射线求交、投影点截断），允许使用最小合成数值或独立参数运行纯 Python 测试以保证毫秒级反馈。
+   - **凡涉及多表面步态、障碍自适应、力学平衡或场景集成的正式验收（`physics`、`motion`、`full` 级别），必须统一部署并运行于标准 `DynamicsPlayground` 之上**。
