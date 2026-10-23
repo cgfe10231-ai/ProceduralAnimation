@@ -480,3 +480,31 @@
   - 重新生成 `output/unified_motion_integration.blend`（462 帧无缝连续运动，总位移 12.9058m，0 次超程违规）；
   - 渲染生成 40 张对比视口视图（侧视与前斜视角度，覆盖第 1、12、24、36、41、42、43、44、48、60 关键帧），直观证实步态连续平滑；
   - 独立四大动作验证套件（Walk, Run, SprintStart, SprintBrake）及桥接 14 项测试全量 100% 全绿通过。
+
+---
+
+### [DEC-029] 统一测试执行调度器、回归资产管理与永久架构门禁 (Task 6G-D-PRE-P1)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-23
+* **背景**：Task 6G-D-PRE-P0 全工程架构审计暴露出全仓库 27 个测试脚本高度碎片化、执行命令依赖文件名猜测、每次测试需频繁申请终端审批导致用户负担严重、缺乏 Windows 进程树硬超时清理机制，以及缺乏统一的永久架构准入审查机制。
+* **决策与方案**：
+  1. **建立显式测试注册表 (`tests/test_registry.py`)**：
+     - 显式登记 26 项受控测试用例，杜绝通配符扫描推测；
+     - 划定 `quick` (3项)、`physics` (8项)、`motion` (5项)、`full` (14项去重并集) 与 `legacy` (13项) 五类分级体系；
+     - 每项测试明确声明 `RunnerType`（`python` / `blender_headless` / `blender_with_blend`）、超时限制、依赖文件与 `is_visual_acceptance` 标记。
+  2. **建立单入口测试调度器与包装器 (`tests/run_test_suite.py` / `run_tests.ps1`)**：
+     - 单一外层命令（如 `.\run_tests.ps1 -tier quick`）调度多测试串行执行，将 N 次子命令收敛为一次受控调度，彻底消除用户反复审批负担；
+     - 动态自动解析 Blender 5.1.1 与系统真实 Python 路径，避开 Windows Store 零字节假别名；
+     - 引入 Windows 深度进程树清理机制（`taskkill /F /T /PID`），杜绝超时悬挂 Blender 僵尸进程；
+     - 实施严格多层判定：非零退出码、硬超时、产物缺失以及 stdout/stderr 中的 `[FAIL]`/`AssertionError` 模式反查，严禁“伪绿”放行；
+     - 结构化输出 `tests/output/test_report.json` 与 `test_report.md`。
+  3. **目视验收防线严格分离**：
+     - 涉及 Blender 视口姿态自然度的测试（如 `integration_unified_motion`）在自动化测试通过时仅标记为 `AUTOMATED_PASS (Visual Inspection Required)`，严禁未人工目视直接标记为 Visual Pass。
+  4. **确立单一权威来源永久架构门禁 (`docs/ARCHITECTURE_CHANGE_GATE.md`)**：
+     - 制定 11 项前置准入审查清单与 8 大绝对禁止行为清规，规范架构偏差事前审批流程；
+     - `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 同步引用并锚定该规范，杜绝版本漂移。
+* **影响与产物**：
+  - 新增核心测试文件：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`；
+  - 新增权威规范：`docs/ARCHITECTURE_CHANGE_GATE.md`；
+  - 实测验证全绿：`quick` (3/3), `motion` (5/5), `physics` (8/8) 全部 100% 通过（退出码 0）；
+  - 零生产代码修改，零步态曲线变动。

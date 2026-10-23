@@ -1,13 +1,33 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-PRE-P0（全工程架构审计与后续开发准备完成；穿透审计全仓库 28 个核心源码、30 个测试与 19 个运行入口；交付 docs/ENGINEERING_AUDIT.md 权威审计报告；锁定生产执行链与状态独占所有权；建立 13 项历史运动与物理能力防退化基线；登记关键 Blender 文件仅本地存在且受 .gitignore 保护的事实；完成 P1 统一测试调度系统与 P2 简易动力学训练场实施方案设计；确立永久架构门禁 ACG 11 项清单与 8 大清规；0 生产代码修改；严格停止，坚决不擅自进入 P1、P2 或 6G-D-A）  
+> **当前阶段**：任务 6G-D-PRE-P1（统一测试执行接口、回归资产管理与永久架构门禁落地完成；建立 tests/test_registry.py 显式注册表涵盖 26 项受控测试；交付 tests/run_test_suite.py 与 run_tests.ps1 单命令调度器，彻底根除用户反复终端审批疲劳；实测 quick 3/3、motion 5/5、physics 8/8 全绿通过；建立 docs/ARCHITECTURE_CHANGE_GATE.md 单一权威规范来源并同步更新 AGENTS.md/GEMINI.md/.agents/rules/project_rules.md；0 生产代码修改；严格停止，坚决不擅自进入 P2 或 6G-D-A）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁 (Task 6G-D-PRE-P1)**：
+  * **显式测试注册表就绪 (`tests/test_registry.py`)**：
+    * 登记 26 项真实受控测试用例，覆盖 `quick` (3项)、`physics` (8项)、`motion` (5项)、`full` (14项去重并集) 与 `legacy` (13项)；
+    * 严谨区分 `RunnerType.PYTHON`、`BLENDER_HEADLESS` 与 `BLENDER_WITH_BLEND`，配置超时限制与依赖资源；
+    * 建立 `is_visual_acceptance` 标记，严格区分自动化通过与人工视口目视验收。
+  * **单入口统一调度器就绪 (`tests/run_test_suite.py` / `run_tests.ps1`)**：
+    * 单命令外层调度（如 `.\run_tests.ps1 -tier quick`），将 N 次子命令执行收敛为单次受控调度，彻底消除用户反复审批终端的负担；
+    * 自动安全解析 Blender 5.1.1 与系统真实 Python 路径，避开 Windows Store 零字节假别名；
+    * 引入 Windows 深度进程树清理机制（`taskkill /F /T /PID`），杜绝超时悬挂 Blender 僵尸进程；
+    * 实施多层失败判定：非零退出码、硬超时、产物缺失以及 stdout/stderr 中的 `[FAIL]`/`AssertionError` 模式反查，严禁“伪绿”放行；
+    * 结构化自动生成 `tests/output/test_report.json` 与 `test_report.md`。
+  * **分层回归测试验证全绿**：
+    * `quick` Tier：3/3 项通过（耗时 3.94s，退出码 0）；
+    * `motion` Tier：5/5 项通过（耗时 16.16s，退出码 0），其中 `integration_unified_motion` 严格标定为 `AUTOMATED_PASS (Visual Inspection Required)`；
+    * `physics` Tier：8/8 项通过（耗时 53.90s，退出码 0），底层运动学、WBC、ROM、CoM、惯性张量与桥接 14 项测试保持 100% 零退化。
+  * **永久架构门禁制度确立**：
+    * 交付单一权威规范来源 [`docs/ARCHITECTURE_CHANGE_GATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ARCHITECTURE_CHANGE_GATE.md)；
+    * 同步更新 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 第 8 节；
+    * 确立 11 项前置准入清单与 8 大绝对清规，规范架构偏差事前审批流程。
+  * **执行纪律遵守**：0 生产代码修改，0 步态曲线变动，0 历史文件删除，严格停止。
 * **任务 6G-D-PRE-P0 全工程架构审计与后续开发准备 (Task 6G-D-PRE-P0)**：
   * **全工程代码与资产穿透式审计**：
     * 覆盖 `src/` 下全部 28 个 Python 源码、`tests/` 下全部 30 个测试脚本、根目录下全部 19 个运行入口以及所有项目文档；

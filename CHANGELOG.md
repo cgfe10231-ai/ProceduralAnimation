@@ -3,6 +3,32 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-PRE-P1：统一测试执行接口、回归资产管理与永久架构门禁 (Task 6G-D-PRE-P1)
+
+### 统一测试注册表与单入口调度器实施 (Unified Test Registry & Runner)
+* **创建显式测试注册表 (`tests/test_registry.py`)**：
+  * 登记 26 项真实测试用例，覆盖 `quick` (3项)、`physics` (8项)、`motion` (5项)、`full` (14项去重并集) 与 `legacy` (13项)；
+  * 严谨区分 `RunnerType.PYTHON`、`BLENDER_HEADLESS` 与 `BLENDER_WITH_BLEND`，配置超时限制与依赖资源；
+  * 建立 `is_visual_acceptance` 标记，严格区分自动化通过与人工视口目视验收。
+* **创建单入口统一调度器与包装器 (`tests/run_test_suite.py` / `run_tests.ps1`)**：
+  * 单命令外层调度（如 `.\run_tests.ps1 -tier quick`），将 N 次子命令执行收敛为单次受控调度，彻底消除用户反复审批终端的负担；
+  * 自动安全解析 Blender 5.1.1 与系统真实 Python 路径，避开 Windows Store 零字节假别名；
+  * 引入 Windows 深度进程树清理机制（`taskkill /F /T /PID`），杜绝超时悬挂 Blender 僵尸进程；
+  * 实施多层失败判定：非零退出码、硬超时、产物缺失以及 stdout/stderr 中的 `[FAIL]`/`AssertionError` 模式反查，严禁“伪绿”放行；
+  * 结构化自动生成 `tests/output/test_report.json` 与 `test_report.md`。
+
+### 历史回归套件实测验证 (Regression Verification)
+* **`quick` Tier**：3/3 项通过（耗时 3.94s，退出码 0）；
+* **`motion` Tier**：5/5 项通过（耗时 16.16s，退出码 0），其中 `integration_unified_motion` 严格标定为 `AUTOMATED_PASS (Visual Inspection Required)`；
+* **`physics` Tier**：8/8 项通过（耗时 53.90s，退出码 0），底层运动学、WBC、ROM、CoM、惯性张量与桥接 14 项测试保持 100% 零退化。
+
+### 永久架构门禁制度确立 (Architecture Change Gate)
+* 交付权威单一规范来源 [`docs/ARCHITECTURE_CHANGE_GATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ARCHITECTURE_CHANGE_GATE.md)；
+* 同步更新 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 第 8 节；
+* 确立 11 项前置准入清单与 8 大绝对清规，规范架构偏差事前审批流程；
+* 严格遵守执行纪律：0 生产代码修改，0 步态曲线变动，0 历史文件删除，严格停止。
+
+
 ## [2026-10-23] 任务 6G-D-PRE-P0：全工程架构审计与后续开发准备 (Task 6G-D-PRE-P0)
 
 ### 全工程架构审计与事实基线锁定 (Architecture Audit & Baseline)

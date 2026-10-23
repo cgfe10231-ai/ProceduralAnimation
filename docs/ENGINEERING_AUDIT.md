@@ -336,6 +336,24 @@ class TestDefinition:
 > **权限诚实性声明**：
 > 本设计**绝对不是、也绝不可能绕过** Antigravity 或操作系统的终端安全授权机制。它的本质是**将 N 次分散的子命令执行，收敛为一次由 Python 测试运行器统筹调度的顶层命令**。用户只需点击一次批准，即可让宿主测试器在后台受控完成全套 30 项测试的串行调度。
 
+### 5.3 P1 落地实施与验证成果 (Task 6G-D-PRE-P1 Execution Status)
+Task 6G-D-PRE-P1 已完整落地实施上述方案：
+1. **测试注册表已就绪 (`tests/test_registry.py`)**：
+   - 登记 26 项受控测试用例，涵盖 `quick` (3 项)、`physics` (8 项)、`motion` (5 项)、`full` (14 项去重并集) 与 `legacy` (13 项)；
+   - 包含明确超时限制、Runner 类别判定与依赖资产校验。
+2. **统一调度运行器已就绪 (`tests/run_test_suite.py` / `run_tests.ps1`)**：
+   - 支持自动解析 Blender 5.1.1 与真实 Python 路径，隔离 Windows Store 假别名；
+   - 支持 Windows 深度进程树清理 (`taskkill /F /T /PID`)；
+   - 实现 stdout/stderr 失败关键字反向排查与退出码一票否决；
+   - 自动生成 `tests/output/test_report.json` 与 `test_report.md`。
+3. **分层回归验证通过**：
+   - `quick` Tier：3 项测试全绿 (3.94s)；
+   - `motion` Tier：5 项测试全绿 (16.16s)，其中 `integration_unified_motion` 正确标定为 `AUTOMATED_PASS (Visual Inspection Required)`；
+   - `physics` Tier：8 项测试全绿 (53.90s)，底层运动学、WBC、ROM、CoM、惯性张量与桥接 14 项测试保持 100% 零退化。
+4. **永久架构门禁确立**：
+   - 交付权威规范 [`docs/ARCHITECTURE_CHANGE_GATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ARCHITECTURE_CHANGE_GATE.md) 作为唯一标准来源 (SSOT)；
+   - 同步更新 `.agents/rules/project_rules.md`、`AGENTS.md`、`GEMINI.md` 第 8 节。
+
 ---
 
 ## 6. 场景系统现状审计与 P2 动力学训练场规划
