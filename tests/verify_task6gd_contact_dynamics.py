@@ -19,6 +19,8 @@ Core Test Categories:
 13. Standard DynamicsPlayground contract: Sloped ramps (+15 deg up, -20 deg down, mu=0.65).
 14. Standard DynamicsPlayground contract: Vertical wall (normal=(0,-1,0), mu=0.60, push reaction).
 15. Standard DynamicsPlayground contract: Out-of-bounds and illegal contact handling.
+16. Multi-contact time step (dt) consistency enforcement and mismatch rejection.
+17. Contact clearance validity contract and non-contact force violation.
 
 Pure Python implementation (fast, reproducible, no heavy scene dependencies).
 """
@@ -584,6 +586,148 @@ class TestContactDynamics(unittest.TestCase):
                 surface_type_filter="vertical_wall",
                 max_search_distance=2.0,
             )
+
+    # -------------------------------------------------------------------------
+    # 5. Task 6G-D-A-R1 Contract Additions: dt Consistency & Contact Validity
+    # -------------------------------------------------------------------------
+
+    def test_16_multi_contact_dt_consistency_enforcement(self):
+        """Req 16: MultiContactDynamics owns unified dt; rejects contact dt mismatch."""
+        dt_sys = 0.02
+        com = (0.0, 0.0, 1.0)
+        c1 = SingleContactDynamics(
+            contact_id="foot_L",
+            contact_point_world=(-0.1, 0.0, 0.0),
+            contact_force_world=(0.0, 0.0, 300.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=dt_sys,
+        )
+        c2 = SingleContactDynamics(
+            contact_id="foot_R",
+            contact_point_world=(0.1, 0.0, 0.0),
+            contact_force_world=(0.0, 0.0, 300.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=dt_sys,
+        )
+        c_mismatch = SingleContactDynamics(
+            contact_id="hand_R",
+            contact_point_world=(0.2, 0.0, 0.8),
+            contact_force_world=(0.0, 0.0, 50.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=0.04,  # Mismatched dt!
+        )
+
+        # 1. Matching contacts initialize cleanly
+        multi = MultiContactDynamics(contacts=[c1, c2], com_world=com, dt=dt_sys)
+        self.assertEqual(len(multi.contacts), 2)
+        self.assertAlmostEqual(multi.total_linear_impulse[2], (300.0 + 300.0) * dt_sys, places=5)
+        self.assertAlmostEqual(
+            multi.total_linear_impulse[2],
+            c1.linear_impulse[2] + c2.linear_impulse[2],
+            places=5,
+        )
+
+        # 2. Rejects contact with mismatched dt during constructor initialization
+        with self.assertRaises(ValueError) as ctx:
+            MultiContactDynamics(contacts=[c1, c_mismatch], com_world=com, dt=dt_sys)
+        self.assertIn("Time step mismatch", str(ctx.exception))
+
+        # 3. Rejects contact with mismatched dt during add_contact
+        with self.assertRaises(ValueError) as ctx:
+            multi.add_contact(c_mismatch)
+        self.assertIn("Time step mismatch", str(ctx.exception))
+
+        # 4. set_dt with update_contacts=True synchronizes all child contacts
+        multi.set_dt(0.05, update_contacts=True)
+        self.assertAlmostEqual(multi.dt, 0.05, places=5)
+        self.assertAlmostEqual(c1.dt, 0.05, places=5)
+        self.assertAlmostEqual(c2.dt, 0.05, places=5)
+
+        # 5. set_dt with update_contacts=False raises if contacts don't match
+        with self.assertRaises(ValueError):
+            multi.set_dt(0.01, update_contacts=False)
+
+    def test_17_contact_validity_and_clearance_tolerance(self):
+        """Req 17: Physical contact validity vs proximity binding, tolerance, and force violation."""
+        com = (0.0, 0.0, 1.0)
+        tolerance = 0.02  # 20mm tolerance
+
+        # 1. Exact surface contact (Z=0.0 on flat ground): valid physical contact
+        pt_exact = (0.0, 0.0, 0.0)
+        c_exact = create_contact_dynamics_from_environment(
+            env_query=self.playground_query,
+            contact_point_world=pt_exact,
+            contact_force_world=(0.0, 0.0, 400.0),
+            com_world=com,
+            contact_tolerance=tolerance,
+            require_contact=True,
+        )
+        self.assertTrue(c_exact.is_in_contact)
+        self.assertAlmostEqual(c_exact.surface_distance, 0.0, places=4)
+        eval_exact = c_exact.evaluate_friction_constraint()
+        self.assertTrue(eval_exact.is_valid)
+
+        # 2. Within tolerance (Z=0.015m, 15mm clearance <= 20mm): valid physical contact
+        pt_close = (0.0, 0.0, 0.015)
+        c_close = create_contact_dynamics_from_environment(
+            env_query=self.playground_query,
+            contact_point_world=pt_close,
+            contact_force_world=(0.0, 0.0, 400.0),
+            com_world=com,
+            contact_tolerance=tolerance,
+            require_contact=True,
+        )
+        self.assertTrue(c_close.is_in_contact)
+        self.assertAlmostEqual(c_close.surface_distance, 0.015, places=4)
+
+        # 3. Separated contact (Z=0.05m, 50mm clearance > 20mm):
+        pt_separated = (0.0, 0.0, 0.05)
+
+        # 3a. require_contact=True strictly rejects separated contact
+        with self.assertRaises(ValueError) as ctx:
+            create_contact_dynamics_from_environment(
+                env_query=self.playground_query,
+                contact_point_world=pt_separated,
+                contact_force_world=(0.0, 0.0, 400.0),
+                com_world=com,
+                contact_tolerance=tolerance,
+                require_contact=True,
+            )
+        self.assertIn("Contact validity violation", str(ctx.exception))
+
+        # 3b. require_contact=False allows geometric proximity binding with is_in_contact=False
+        c_prox = create_contact_dynamics_from_environment(
+            env_query=self.playground_query,
+            contact_point_world=pt_separated,
+            contact_force_world=(0.0, 0.0, 100.0),  # Non-zero force on separated point
+            com_world=com,
+            contact_tolerance=tolerance,
+            require_contact=False,
+        )
+        self.assertFalse(c_prox.is_in_contact)
+        self.assertAlmostEqual(c_prox.surface_distance, 0.05, places=4)
+
+        # 3c. Non-zero force on separated point triggers NON_CONTACT_FORCE_VIOLATION
+        eval_violation = c_prox.evaluate_friction_constraint()
+        self.assertFalse(eval_violation.is_valid)
+        self.assertEqual(eval_violation.status, FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION)
+        self.assertIn("NON_CONTACT_FORCE_VIOLATION", eval_violation.violation_reason)
+
+        # 3d. Zero force on separated point evaluates to SEPARATED (valid)
+        c_prox_zero = create_contact_dynamics_from_environment(
+            env_query=self.playground_query,
+            contact_point_world=pt_separated,
+            contact_force_world=(0.0, 0.0, 0.0),  # Zero force on separated point
+            com_world=com,
+            contact_tolerance=tolerance,
+            require_contact=False,
+        )
+        eval_separated = c_prox_zero.evaluate_friction_constraint()
+        self.assertTrue(eval_separated.is_valid)
+        self.assertEqual(eval_separated.status, FrictionConeStatus.SEPARATED)
 
 
 if __name__ == "__main__":

@@ -588,3 +588,29 @@
   - 注册登记：`tests/test_registry.py`（加入 `contact_dynamics_math` 纳管至 `quick`、`physics` 与 `full`）；
   - 实测回归全绿：`quick` (6/6), `physics` (11/11), `motion` (5/5) 保持 100% 零退化（退出码 0）；
   - 零生产动作修改，零步态曲线变动，零 Blender 场景重复构建。
+
+---
+
+### [DEC-033] 接触动力学统一时间步长契约与物理接触有效性解耦 (Task 6G-D-A-R1)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-23
+* **背景**：在 6G-D-A 接触动力学基础实现验收后，进行深入源码契约审查发现两项潜在隐患：
+  1. `MultiContactDynamics` 与各个 `SingleContactDynamics` 的时间步长 `dt` 未建立强一致性验证约束，若多触点传入不同 `dt`，可能导致线冲量、角冲量与汇总动量变化的时间区间错乱，或发生静默覆盖；
+  2. `create_contact_dynamics_from_environment()` 通过环境表面查询可以获取临近表面的法向和摩擦系数，但当接触点在几何上远离表面时，若不加区分地构造接触动力学对象并允许施加接触力，在物理上等同于“悬空接触”，违反了单侧物理接触的几何接触间隙前提。
+* **决策与方案**：
+  1. **多触点统一时间步长所有权与一致性门禁**：
+     - `MultiContactDynamics` 确立对系统时间步长 `self.dt` 的唯一所有权；
+     - 在 `__post_init__` 与 `add_contact()` 中强行执行 `_validate_contact_dt(contact)`，若 `contact.dt` 与系统 `self.dt` 差异超过容差（1e-6s），严格抛出 `ValueError` 并拒绝接入，绝对禁止静默使用其中一方；
+     - 新增 `set_dt(new_dt, update_contacts=False)`，提供显式批量同步通道。
+  2. **物理接触有效性与几何贴靠显式分离**：
+     - 在 `SingleContactDynamics` 中扩展 `surface_id: str`、`surface_distance: float`（来自查询的 `signed_distance`）以及 `contact_tolerance: float = 0.02`（默认 20mm 物理接触间隙容差）；
+     - 定义 `is_in_contact: bool` 属性（`abs(surface_distance) <= contact_tolerance`）；
+     - 在 `evaluate_friction_constraint()` 中新增清规约束：若 `not is_in_contact` 且施加了非零接触力（$\|\mathbf{F}\| > \epsilon$），严格拒绝并判定为 `FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION`（零力时正常判定为 `SEPARATED`）；
+     - 在 `create_contact_dynamics_from_environment()` 中新增参数 `contact_tolerance: float = 0.02` 与 `require_contact: bool = True`：
+       * 默认 `require_contact=True`：当点与最近表面间距超过容差时，严格抛出 `ValueError` 阻断非物理接触构造；
+       * 允许 `require_contact=False`：用于纯几何邻域探测或近地状态追踪，绑定表面几何属性但标记 `is_in_contact=False`，防止悬空受力。
+* **影响与产物**：
+  - 更新代码：`src/motion/contact_dynamics.py`；
+  - 扩充测试：`tests/verify_task6gd_contact_dynamics.py` 新增 Test 16（dt 强一致性验证与冲突拒绝）与 Test 17（物理接触有效性、间隙容差与非接触受力违规拦截），测试总数由 15 项增至 17 项；
+  - 实测回归全绿：`quick` (6/6), `physics` (11/11) 保持 100% 零退化通过（退出码 0）；
+  - 彻底阻断非物理悬空受力与时间步长紊乱，为 6G-D-B 接触力求解器提供了坚实无瑕的物理数据契约。

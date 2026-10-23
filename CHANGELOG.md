@@ -3,6 +3,37 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-A-R1：接触动力学时间步长一致性与物理接触有效性契约修复 (Task 6G-D-A-R1)
+
+### 多触点统一时间步长所有权与强一致性门禁 (`src/motion/contact_dynamics.py`)
+* **统一系统时间步长所有权 (`MultiContactDynamics`)**：
+  * `MultiContactDynamics` 确立对系统时间步长 `dt` 的唯一所有权；
+  * 在构造器初始化 `__post_init__` 与动态添加触点 `add_contact()` 中强行加入 `_validate_contact_dt(contact)` 门禁；
+  * 若触点 `contact.dt` 与系统 `self.dt` 差异大于 `1e-6`，严格抛出 `ValueError` 并拒绝加入，杜绝静默采用或覆盖；
+  * 提供 `set_dt(new_dt, update_contacts=False)` 方法，显式支持全触点同步，若不显式请求同步且触点 `dt` 不匹配时同样抛出 `ValueError` 报错。
+
+### 物理接触有效性与几何贴靠显式分离 (`src/motion/contact_dynamics.py`)
+* **接触几何间隙容差与状态定义 (`SingleContactDynamics`)**：
+  * 新增 `surface_id: str = ""`、`surface_distance: float = 0.0` 与 `contact_tolerance: float = 0.02`（默认 20mm 物理接触间隙容差）；
+  * 新增只读属性 `is_in_contact`（当且仅当 `abs(surface_distance) <= contact_tolerance` 时为真）；
+  * 新增非接触受力违规状态 `FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION`；
+  * 更新 `evaluate_friction_constraint()`：当 `not is_in_contact` 且施加了非零接触力（$\|\mathbf{F}\| > \epsilon$）时，严禁判定为有效接触力，直接返回 `is_valid=False` 并附带详细违规诊断；若接触力为零则判定为 `SEPARATED`。
+* **环境查询接触构造契约升级 (`create_contact_dynamics_from_environment`)**：
+  * 引入 `contact_tolerance: float = 0.02` 与 `require_contact: bool = True` 参数；
+  * 默认 `require_contact=True`：当查询点的 `signed_distance` 超过容差时，严格抛出 `ValueError` 拦截非物理悬空接触创建；
+  * 允许 `require_contact=False`：用于纯几何邻域探测或近地状态追踪，将地表几何参数与有符号净距绑定至触点，同时保持 `is_in_contact=False` 防止非法受力。
+
+### 测试验证与架构状态
+* **单元测试扩充 (`tests/verify_task6gd_contact_dynamics.py`)**：
+  * 新增 `test_16_multi_contact_dt_consistency_enforcement`：覆盖系统 dt 一致性、冲量累加等价性、构造器与 `add_contact` 不一致抛错拒绝、`set_dt` 批量同步与冲突拦截；
+  * 新增 `test_17_contact_validity_and_clearance_tolerance`：覆盖精确地表接触、20mm 容差内轻微浮动、超容差悬空点在 `require_contact=True` 下的抛错拦截、在 `require_contact=False` 下的 `NON_CONTACT_FORCE_VIOLATION` 拦截以及零受力下的 `SEPARATED` 合法评估；
+  * 17/17 项断言纯 Python 100% 通过（耗时 0.001s）。
+* **自动化回归测试验证**：
+  * `quick` Tier：6/6 项测试全绿通过（5.3s，退出码 0）；
+  * `physics` Tier：11/11 项测试全绿通过（57.84s，退出码 0）；
+  * 零历史步态修改，零 Rig/IK/WBC 篡改，零训练场重建。
+
+
 ## [2026-10-23] 任务 6G-D-A：接触动力学基础与冲量动量系统 (Task 6G-D-A)
 
 ### 纯数学接触动力学模块与冲量动量系统 (`src/motion/contact_dynamics.py`)

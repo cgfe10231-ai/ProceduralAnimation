@@ -119,6 +119,7 @@ class FrictionConeStatus(str, Enum):
     SLIP_VIOLATION = "slip_violation"         # Tangential force exceeds static limit: ||F_t|| > mu * F_n
     TENSION_VIOLATION = "tension_violation"   # Normal force is negative: F_n < 0 (unilateral adhesive pull)
     SEPARATED = "separated"                   # Zero contact normal force and zero tangential force
+    NON_CONTACT_FORCE_VIOLATION = "non_contact_force_violation"  # Non-zero force applied to separated/non-contact point
 
 
 @dataclass(frozen=True)
@@ -179,6 +180,9 @@ class SingleContactDynamics:
     surface_normal_world: Vec3
     friction_coeff: float = 0.65
     dt: float = 1.0 / 24.0
+    surface_id: str = ""
+    surface_distance: float = 0.0
+    contact_tolerance: float = 0.02
 
     def __post_init__(self):
         # Validate inputs and sanitize vectors
@@ -193,6 +197,17 @@ class SingleContactDynamics:
 
         if math.isnan(self.dt) or math.isinf(self.dt) or self.dt <= 0.0:
             raise ValueError(f"dt must be strictly positive and finite, got {self.dt}")
+
+        if math.isnan(self.surface_distance) or math.isinf(self.surface_distance):
+            raise ValueError(f"surface_distance must be finite, got {self.surface_distance}")
+
+        if math.isnan(self.contact_tolerance) or math.isinf(self.contact_tolerance) or self.contact_tolerance <= 0.0:
+            raise ValueError(f"contact_tolerance must be strictly positive and finite, got {self.contact_tolerance}")
+
+    @property
+    def is_in_contact(self) -> bool:
+        """True if contact point is within contact_tolerance of the surface plane."""
+        return abs(self.surface_distance) <= self.contact_tolerance
 
     # -------------------------------------------------------------------------
     # Relative Lever Arm & Torques
@@ -278,7 +293,44 @@ class SingleContactDynamics:
         n = self.surface_normal_world
         f_len = vec3_length(F)
 
-        # Handle fully separated/zero-force contact
+        # Check physical contact clearance condition:
+        # A body point that is separated from the surface cannot transmit or receive contact forces.
+        if not self.is_in_contact:
+            if f_len > eps:
+                f_n = vec3_dot(F, n)
+                f_n_vec = vec3_scale(n, f_n)
+                f_t_vec = vec3_sub(F, f_n_vec)
+                f_t = vec3_length(f_t_vec)
+                reason = (
+                    f"NON_CONTACT_FORCE_VIOLATION: Non-zero contact force ||F||={f_len:.3f}N applied to contact "
+                    f"'{self.contact_id}' separated from surface '{self.surface_id}' by {self.surface_distance:.3f}m "
+                    f"(exceeds contact tolerance {self.contact_tolerance:.3f}m)"
+                )
+                return FrictionConstraintEvaluation(
+                    is_valid=False,
+                    status=FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION,
+                    normal_force_n=f_n,
+                    tangential_force_n=f_t,
+                    friction_limit_n=0.0,
+                    friction_margin_n=-f_t,
+                    normal_force_vector=f_n_vec,
+                    tangential_force_vector=f_t_vec,
+                    violation_reason=reason,
+                )
+            else:
+                return FrictionConstraintEvaluation(
+                    is_valid=True,
+                    status=FrictionConeStatus.SEPARATED,
+                    normal_force_n=0.0,
+                    tangential_force_n=0.0,
+                    friction_limit_n=0.0,
+                    friction_margin_n=0.0,
+                    normal_force_vector=(0.0, 0.0, 0.0),
+                    tangential_force_vector=(0.0, 0.0, 0.0),
+                    violation_reason=None,
+                )
+
+        # Handle fully separated/zero-force contact in contact zone
         if f_len < eps:
             return FrictionConstraintEvaluation(
                 is_valid=True,
@@ -374,10 +426,34 @@ class MultiContactDynamics:
         self.com_world = _to_vec3(self.com_world, "com_world")
         if math.isnan(self.dt) or math.isinf(self.dt) or self.dt <= 0.0:
             raise ValueError(f"dt must be strictly positive and finite, got {self.dt}")
+        for c in self.contacts:
+            self._validate_contact_dt(c)
+
+    def _validate_contact_dt(self, contact: SingleContactDynamics) -> None:
+        """Enforce strict time step consistency across all contacts in this system."""
+        if abs(contact.dt - self.dt) > 1e-6:
+            raise ValueError(
+                f"Time step mismatch: contact '{contact.contact_id}' has dt={contact.dt:.6f}s, "
+                f"which does not match MultiContactDynamics system dt={self.dt:.6f}s. "
+                f"All contacts in a multi-contact system must share a unified time interval."
+            )
 
     def add_contact(self, contact: SingleContactDynamics) -> None:
-        """Add a single contact dynamics instance, synchronizing CoM and dt if necessary."""
+        """Add a single contact dynamics instance, verifying unified time step."""
+        self._validate_contact_dt(contact)
         self.contacts.append(contact)
+
+    def set_dt(self, new_dt: float, update_contacts: bool = False) -> None:
+        """Update system time step. If update_contacts=True, synchronizes all child contacts."""
+        if math.isnan(new_dt) or math.isinf(new_dt) or new_dt <= 0.0:
+            raise ValueError(f"new_dt must be strictly positive and finite, got {new_dt}")
+        self.dt = float(new_dt)
+        if update_contacts:
+            for c in self.contacts:
+                c.dt = self.dt
+        else:
+            for c in self.contacts:
+                self._validate_contact_dt(c)
 
     # -------------------------------------------------------------------------
     # Net External Forces & Torques
@@ -485,6 +561,8 @@ def create_contact_dynamics_from_environment(
     contact_id: str = "env_contact",
     surface_type_filter: Optional[str] = None,
     max_search_distance: float = 1.0,
+    contact_tolerance: float = 0.02,
+    require_contact: bool = True,
 ) -> SingleContactDynamics:
     """Instantiate a SingleContactDynamics with surface normal and friction derived from environment.
 
@@ -497,12 +575,18 @@ def create_contact_dynamics_from_environment(
         contact_id: Descriptive label for this contact point.
         surface_type_filter: Optional filter restriction (e.g. 'vertical_wall', 'sloped_ramp').
         max_search_distance: Maximum distance to query environmental surface patch.
+        contact_tolerance: Allowable clearance gap/penetration threshold (meters) for physical contact.
+        require_contact: If True, raises ValueError if the contact point is separated from the surface
+            by more than contact_tolerance. If False, binds geometric surface attributes without
+            requiring active physical contact (useful for proximity tracking).
 
     Returns:
-        SingleContactDynamics populated with the true surface outward normal and friction coefficient.
+        SingleContactDynamics populated with the true surface outward normal, friction coefficient,
+        surface identifier, clearance distance, and contact state.
 
     Raises:
-        ValueError: If environment query fails to locate a matching surface within search radius.
+        ValueError: If environment query fails to locate a matching surface within search radius,
+            or if require_contact is True and separation exceeds contact_tolerance.
     """
     pt = _to_vec3(contact_point_world, "contact_point_world")
     res: SurfaceQueryResult = env_query.query_surface_at_point(
@@ -516,7 +600,16 @@ def create_contact_dynamics_from_environment(
             f"Failed to bind contact dynamics at point {pt} to environment: {reason}"
         )
 
-    # Use actual analytical surface normal and static friction coefficient
+    # Physical contact validity check
+    is_in_contact = abs(res.signed_distance) <= contact_tolerance
+    if require_contact and not is_in_contact:
+        raise ValueError(
+            f"Contact validity violation: point {pt} is separated from surface '{res.surface_id}' "
+            f"by {res.signed_distance:.3f}m, exceeding allowable contact tolerance {contact_tolerance:.3f}m. "
+            f"Point is not in physical contact. (Set require_contact=False for geometric proximity binding)."
+        )
+
+    # Use actual analytical surface normal, friction, surface ID and clearance
     return SingleContactDynamics(
         contact_id=contact_id,
         contact_point_world=pt,
@@ -525,4 +618,7 @@ def create_contact_dynamics_from_environment(
         surface_normal_world=res.surface_normal_world,
         friction_coeff=res.friction_coeff,
         dt=dt,
+        surface_id=res.surface_id,
+        surface_distance=res.signed_distance,
+        contact_tolerance=contact_tolerance,
     )

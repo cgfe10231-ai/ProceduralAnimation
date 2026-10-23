@@ -5,7 +5,11 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-A（接触动力学基础与冲量动量系统）：交付纯数学模块 `src/motion/contact_dynamics.py`，建立 `SingleContactDynamics` 与 `MultiContactDynamics` 数据结构；实现世界空间接触点、接触力、质心位矢、接触力矩、线/角冲量与动量变化计算；严格区分力（N）、力矩（N*m）、冲量（N*s）、动量（kg*m/s）与质心/原点参考点；实现单侧法向 $F_n \ge 0$ 与库仑摩擦锥 $\|\mathbf{F}_t\| \le \mu F_n$ 约束校验；接口契约 100% 绑定标准训练场 `DynamicsEnvironmentQuery` 真实平地、斜坡与垂直墙几何参数；交付 `tests/verify_task6gd_contact_dynamics.py` 15 项数学与契约断言全绿；纳管注册 `tests/test_registry.py`；实测 quick 6/6、physics 11/11、motion 5/5 全绿通过。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-A-R1（接触动力学时间步长一致性与物理接触有效性契约修复）：
+1. 修复多触点时间步长一致性：`MultiContactDynamics` 确立对系统 `dt` 的唯一所有权，构造与添加触点时强行校验一致性，杜绝静默采用或覆盖；
+2. 明确物理接触有效性：`SingleContactDynamics` 扩展 `surface_id`、`surface_distance` 与 `contact_tolerance: float = 0.02`，只读属性 `is_in_contact` 区分几何邻近绑定与物理接触；当未处于有效接触且施加非零接触力时判定为 `FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION`；
+3. 升级 `create_contact_dynamics_from_environment`：新增 `contact_tolerance` 与 `require_contact` 契约，超容差悬空点默认抛出 `ValueError`，同时保留 `require_contact=False` 的几何邻域探测能力；
+4. 交付 `tests/verify_task6gd_contact_dynamics.py` 扩充至 17 项断言纯 Python 全绿通过；分层回归 `quick` (6/6), `physics` (11/11) 保持 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -32,30 +36,28 @@
 * 完成 Task 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地（交付 `tests/test_runner_unit.py` 10/10 单元测试）。
 * 完成 Task 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础（交付 21 个表面与 `output/dynamics_playground.blend`）。
 * 完成 Task 6G-D-PRE-P2-R1 环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁。
-* **完成 Task 6G-D-A 接触动力学基础与冲量动量系统**：
-  * 构建纯数学接触动力学模块 `src/motion/contact_dynamics.py`；
-  * 实现 `SingleContactDynamics` 与 `MultiContactDynamics`，支持接触力、质心力矩、线冲量、角冲量与动量变化；
-  * 证明并验证 6 大数学定理（零力、质心力、偏心力、平移不变、旋转协变、冲量动量等价）；
-  * 严格区分绕质心力矩/角动量与绕世界原点力矩/角动量；
-  * 实现单侧法向力（$F_n \ge 0$）与库仑摩擦锥（$\|\mathbf{F}_t\| \le \mu F_n$）合规性校验；
-  * 绑定标准训练场 `DynamicsEnvironmentQuery` 真实地表（平地、斜坡、垂直墙）法线与摩擦系数；
-  * 交付纯 Python 测试套件 `tests/verify_task6gd_contact_dynamics.py`（15/15 项数学与契约断言全绿通过）；
-  * 登记入 `tests/test_registry.py`，分层回归 `quick` (6/6), `physics` (11/11), `motion` (5/5) 全绿通过。
+* 完成 Task 6G-D-A 接触动力学基础与冲量动量系统（交付纯数学模块与 15 项数学几何测试）。
+* **完成 Task 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复**：
+  * `MultiContactDynamics` 确立对系统 `dt` 的唯一所有权与一致性强校验；
+  * `SingleContactDynamics` 扩展 `surface_id`、`surface_distance`、`contact_tolerance` 与 `is_in_contact`；
+  * 新增 `NON_CONTACT_FORCE_VIOLATION` 拦截悬空受力；
+  * `create_contact_dynamics_from_environment` 增加 `contact_tolerance` 与 `require_contact` 参数；
+  * `tests/verify_task6gd_contact_dynamics.py` 扩充 Test 16 与 Test 17（17/17 项测试纯 Python 全绿通过）；
+  * 分层回归套件实测全绿：`quick` (6/6), `physics` (11/11)。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `contact_dynamics_math`：15/15 项数学与契约定理全绿（0.12s，退出码 0）；
-  * `dynamics_environment_query`：13/13 项数学定理全绿（0.11s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.28s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：6/6 项通过（8.13s，退出码 0）；
-  * `physics` Tier：11/11 项通过（56.09s，退出码 0），历史物理模块 100% 零退化；
-  * `motion` Tier：5/5 项通过（15.29s，退出码 0），历史步态 100% 零退化；
-* 状态标定为：Task 6G-D-A 已完成并验证，严格停止。
+  * `contact_dynamics_math`：17/17 项数学与契约定理全绿（0.13s，退出码 0）；
+  * `dynamics_environment_query`：13/13 项数学定理全绿（0.12s，退出码 0）；
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.33s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `quick` Tier：6/6 项通过（5.3s，退出码 0）；
+  * `physics` Tier：11/11 项通过（57.84s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-A-R1 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-032]`)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-033]`)
 * 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
 * 核心源码：`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
 * 核心生成与产物：`output/dynamics_playground.blend`、`output/unified_motion_integration.blend`
@@ -74,4 +76,4 @@
 * **严禁虚报测试结果**，严格执行 6 态划分。
 * **以磁盘代码和实际测试结果为事实第一依据**。
 * **严禁编写独立脚本拼凑动画冒充连续动作**。
-* **严禁直接进入 Task 6G-D**。
+* **严禁擅自进入 Task 6G-D-B**。

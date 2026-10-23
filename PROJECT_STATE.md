@@ -1,13 +1,32 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-A（接触动力学基础与冲量动量系统；交付纯数学模块 src/motion/contact_dynamics.py，建立 SingleContactDynamics 与 MultiContactDynamics 数据结构；实现世界空间接触点、接触力、质心位矢、接触力矩、线/角冲量与动量变化计算；严格区分力 N、力矩 N*m、冲量 N*s、动量 kg*m/s 与质心/原点参考点；实现单侧法向 F_n >= 0 与库仑摩擦锥 ||F_t|| <= mu*F_n 约束校验；接口契约 100% 绑定标准训练场 DynamicsEnvironmentQuery 真实平地、斜坡与垂直墙几何参数；交付 tests/verify_task6gd_contact_dynamics.py 15 项数学与契约断言全绿；纳管注册 tests/test_registry.py；实测 quick 6/6、physics 11/11、motion 5/5 全绿通过；0 生产动作代码修改，0 步态变动，0 训练场场景重构；严格停止，坚决不擅自进入 6G-D-B）  
+> **当前阶段**：任务 6G-D-A-R1（接触动力学时间步长一致性与物理接触有效性契约修复；修复 MultiContactDynamics 系统 dt 强一致性门禁与冲突抛错拒绝；扩展 SingleContactDynamics 增加 surface_id、surface_distance 与 contact_tolerance；定义 is_in_contact 属性；新增 FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION 拦截悬空受力；升级 create_contact_dynamics_from_environment 增加 contact_tolerance 与 require_contact 物理契约；tests/verify_task6gd_contact_dynamics.py 扩充至 17 项全绿；实测 quick 6/6、physics 11/11 全绿通过；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-B）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复 (Task 6G-D-A-R1)**：
+  * **多触点统一时间步长所有权与强一致性门禁 (`src/motion/contact_dynamics.py`)**：
+    * `MultiContactDynamics` 确立对系统时间步长 `dt` 的唯一所有权；
+    * 构造器 `__post_init__` 与 `add_contact()` 中强行执行 `_validate_contact_dt(contact)`；
+    * 若触点 `contact.dt` 与系统 `self.dt` 差异大于 `1e-6`，严格抛出 `ValueError` 并拒绝加入，杜绝静默采用或覆盖；
+    * 新增 `set_dt(new_dt, update_contacts=False)`，提供显式批量同步通道。
+  * **物理接触有效性与几何贴靠显式分离 (`src/motion/contact_dynamics.py`)**：
+    * `SingleContactDynamics` 扩展 `surface_id: str`、`surface_distance: float`（来自查询的 `signed_distance`）以及 `contact_tolerance: float = 0.02`（默认 20mm 物理接触间隙容差）；
+    * 定义只读属性 `is_in_contact: bool`（当且仅当 `abs(surface_distance) <= contact_tolerance` 时为真）；
+    * 新增非接触受力违规状态 `FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION`；
+    * 更新 `evaluate_friction_constraint()`：当 `not is_in_contact` 且施加了非零接触力（$\|\mathbf{F}\| > \epsilon$）时，严禁判定为有效接触力，直接返回 `is_valid=False` 并附带详细违规诊断；若接触力为零则判定为 `SEPARATED`。
+  * **环境查询接触构造契约升级 (`create_contact_dynamics_from_environment`)**：
+    * 引入 `contact_tolerance: float = 0.02` 与 `require_contact: bool = True` 参数；
+    * 默认 `require_contact=True`：当查询点的 `signed_distance` 超过容差时，严格抛出 `ValueError` 拦截非物理悬空接触创建；
+    * 允许 `require_contact=False`：用于纯几何邻域探测或近地状态追踪，将地表几何参数与有符号净距绑定至触点，同时保持 `is_in_contact=False` 防止非法受力。
+  * **单元验证与统一注册全绿**：
+    * `tests/verify_task6gd_contact_dynamics.py` 扩充 Test 16 与 Test 17，17/17 项数学与契约定理纯 Python 全绿通过（耗时 0.001s）；
+    * 分层回归套件实测全绿：`quick` (6/6 项通过，5.3s), `physics` (11/11 项通过，57.84s)；
+    * 0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
 * **任务 6G-D-A 接触动力学基础与冲量动量系统 (Task 6G-D-A)**：
   * **纯数学接触动力学计算模块就绪 (`src/motion/contact_dynamics.py`)**：
     * 建立 `SingleContactDynamics` 数据结构，封装世界空间接触点 $\mathbf{p}_c$、接触力 $\mathbf{F}$、质心相对位矢 $\mathbf{r} = \mathbf{p}_c - \mathbf{p}_{\text{com}}$；
