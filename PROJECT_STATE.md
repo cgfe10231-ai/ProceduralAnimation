@@ -1,13 +1,24 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-A-R1（接触动力学时间步长一致性与物理接触有效性契约修复；修复 MultiContactDynamics 系统 dt 强一致性门禁与冲突抛错拒绝；扩展 SingleContactDynamics 增加 surface_id、surface_distance 与 contact_tolerance；定义 is_in_contact 属性；新增 FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION 拦截悬空受力；升级 create_contact_dynamics_from_environment 增加 contact_tolerance 与 require_contact 物理契约；tests/verify_task6gd_contact_dynamics.py 扩充至 17 项全绿；实测 quick 6/6、physics 11/11 全绿通过；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-B）  
+> **当前阶段**：任务 6G-D-A-R2（MultiContactDynamics 时间步长更新原子性与状态不可变保全；重构 MultiContactDynamics.set_dt() 实现严格失败原子性；update_contacts=False 预校验全触点兼容性，失配立即抛错且 100% 保持系统与触点原值不变；update_contacts=True 引入状态快照与事务回滚，彻底杜绝中途异常导致的部分更新裂脑中间态；空系统合法更新且非法数值全拦截；SingleContactDynamics 增加 __setattr__ 动态防御；tests/verify_task6gd_contact_dynamics.py 扩充至 18 项全绿；实测 quick 6/6、physics 11/11 全绿通过；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-B）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全 (Task 6G-D-A-R2)**：
+  * **失败原子性与预校验门禁重构 (`src/motion/contact_dynamics.py`)**：
+    * 引入 `_validate_dt_value()`，在修改任何状态前强行校验 `new_dt` 数值合法性（有限正浮点数，严格拦截 0、负数、NaN、Inf 与非法类型）；
+    * `update_contacts=False` 模式：先遍历检查全部子接触点与新 `dt` 的一致性，一旦失配立即抛错，系统 `self.dt` 与触点 `c.dt` 绝对不发生修改，彻底解决先改后抛破坏一致性的隐患；
+    * `update_contacts=True` 模式：建立快照并提供事务回滚机制，若中途任何触点抛出异常，自动恢复所有触点与系统 `dt` 至调用前快照，杜绝“部分更新”中间态；
+    * 空系统（`len(contacts) == 0`）：支持合法重设 `dt`，非法值拒绝且系统 `dt` 保持不变；
+    * `SingleContactDynamics` 引入 `__setattr__` 动态防御，防止非正或非有限 `dt` 注入。
+  * **单元验证与统一注册全绿**：
+    * `tests/verify_task6gd_contact_dynamics.py` 扩充 Test 18（覆盖 10 项严苛失败原子性与状态不变性定理），完善 Test 16 状态断言；18/18 项数学与契约定理纯 Python 全绿通过（耗时 0.002s）；
+    * 分层回归套件实测全绿：`quick` (6/6 项通过，5.36s), `physics` (11/11 项通过，57.83s)；
+    * 0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
 * **任务 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复 (Task 6G-D-A-R1)**：
   * **多触点统一时间步长所有权与强一致性门禁 (`src/motion/contact_dynamics.py`)**：
     * `MultiContactDynamics` 确立对系统时间步长 `dt` 的唯一所有权；

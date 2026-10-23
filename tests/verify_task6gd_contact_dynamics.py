@@ -21,6 +21,7 @@ Core Test Categories:
 15. Standard DynamicsPlayground contract: Out-of-bounds and illegal contact handling.
 16. Multi-contact time step (dt) consistency enforcement and mismatch rejection.
 17. Contact clearance validity contract and non-contact force violation.
+18. MultiContactDynamics set_dt failure atomicity, rollback, and state invariance.
 
 Pure Python implementation (fast, reproducible, no heavy scene dependencies).
 """
@@ -646,9 +647,12 @@ class TestContactDynamics(unittest.TestCase):
         self.assertAlmostEqual(c1.dt, 0.05, places=5)
         self.assertAlmostEqual(c2.dt, 0.05, places=5)
 
-        # 5. set_dt with update_contacts=False raises if contacts don't match
+        # 5. set_dt with update_contacts=False raises if contacts don't match (and leaves states untouched)
         with self.assertRaises(ValueError):
             multi.set_dt(0.01, update_contacts=False)
+        self.assertAlmostEqual(multi.dt, 0.05, places=5)
+        self.assertAlmostEqual(c1.dt, 0.05, places=5)
+        self.assertAlmostEqual(c2.dt, 0.05, places=5)
 
     def test_17_contact_validity_and_clearance_tolerance(self):
         """Req 17: Physical contact validity vs proximity binding, tolerance, and force violation."""
@@ -728,6 +732,159 @@ class TestContactDynamics(unittest.TestCase):
         eval_separated = c_prox_zero.evaluate_friction_constraint()
         self.assertTrue(eval_separated.is_valid)
         self.assertEqual(eval_separated.status, FrictionConeStatus.SEPARATED)
+
+    def test_18_multi_contact_set_dt_failure_atomicity_and_consistency(self):
+        """Req 18 (Task 6G-D-A-R2): Strict transactional failure atomicity of set_dt().
+
+        Validates all 10 core failure atomicity requirements:
+        1. update_contacts=False with matching dt succeeds.
+        2. update_contacts=False with mismatched dt raises ValueError.
+        3. System dt is strictly unchanged after exception.
+        4. All child contact dt are strictly unchanged after exception.
+        5. update_contacts=True synchronously updates system dt and all contact dt.
+        6. Impulses before and after match their respective dt values.
+        7. Empty MultiContactDynamics allows valid updates and rejects invalid dt without state change.
+        8. Illegal dt (0, negative, NaN, Inf, non-numeric) preserves states without modification.
+        9. Transactional rollback ensures zero partial update when a child contact fails mid-way.
+        10. add_contact() dt validation remains strictly unregressed.
+        """
+        com = (0.0, 0.0, 1.0)
+        dt_init = 0.02
+        c1 = SingleContactDynamics(
+            contact_id="foot_L",
+            contact_point_world=(-0.1, 0.0, 0.0),
+            contact_force_world=(0.0, 0.0, 300.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=dt_init,
+        )
+        c2 = SingleContactDynamics(
+            contact_id="foot_R",
+            contact_point_world=(0.1, 0.0, 0.0),
+            contact_force_world=(0.0, 0.0, 200.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=dt_init,
+        )
+        multi = MultiContactDynamics(contacts=[c1, c2], com_world=com, dt=dt_init)
+
+        # 1. update_contacts=False & matching dt succeeds
+        multi.set_dt(dt_init, update_contacts=False)
+        self.assertAlmostEqual(multi.dt, dt_init, places=6)
+        self.assertAlmostEqual(c1.dt, dt_init, places=6)
+        self.assertAlmostEqual(c2.dt, dt_init, places=6)
+
+        # 2, 3, 4. update_contacts=False & mismatched dt raises ValueError; states stay intact
+        with self.assertRaises(ValueError) as ctx:
+            multi.set_dt(0.04, update_contacts=False)
+        self.assertIn("without updating contacts", str(ctx.exception))
+        self.assertAlmostEqual(multi.dt, dt_init, places=6, msg="System dt MUST remain unchanged on failure")
+        self.assertAlmostEqual(c1.dt, dt_init, places=6, msg="c1.dt MUST remain unchanged on failure")
+        self.assertAlmostEqual(c2.dt, dt_init, places=6, msg="c2.dt MUST remain unchanged on failure")
+
+        # 5, 6. update_contacts=True synchronously updates system and all contacts, impulses scale consistently
+        # Before update at dt=0.02
+        self.assertAlmostEqual(c1.linear_impulse[2], 300.0 * dt_init, places=5)
+        self.assertAlmostEqual(c2.linear_impulse[2], 200.0 * dt_init, places=5)
+        self.assertAlmostEqual(multi.total_linear_impulse[2], (300.0 + 200.0) * dt_init, places=5)
+
+        dt_new = 0.05
+        multi.set_dt(dt_new, update_contacts=True)
+        self.assertAlmostEqual(multi.dt, dt_new, places=6)
+        self.assertAlmostEqual(c1.dt, dt_new, places=6)
+        self.assertAlmostEqual(c2.dt, dt_new, places=6)
+        # After update at dt=0.05
+        self.assertAlmostEqual(c1.linear_impulse[2], 300.0 * dt_new, places=5)
+        self.assertAlmostEqual(c2.linear_impulse[2], 200.0 * dt_new, places=5)
+        self.assertAlmostEqual(multi.total_linear_impulse[2], (300.0 + 200.0) * dt_new, places=5)
+        self.assertAlmostEqual(
+            multi.total_linear_impulse[2],
+            c1.linear_impulse[2] + c2.linear_impulse[2],
+            places=5,
+        )
+
+        # 7. Empty MultiContactDynamics handles valid updates and rejects invalid dt without state change
+        empty_multi = MultiContactDynamics(contacts=[], com_world=com, dt=0.04)
+        empty_multi.set_dt(0.02, update_contacts=False)
+        self.assertAlmostEqual(empty_multi.dt, 0.02, places=6)
+        empty_multi.set_dt(0.03, update_contacts=True)
+        self.assertAlmostEqual(empty_multi.dt, 0.03, places=6)
+
+        with self.assertRaises(ValueError):
+            empty_multi.set_dt(-0.01, update_contacts=False)
+        self.assertAlmostEqual(empty_multi.dt, 0.03, places=6, msg="Empty system dt unchanged on invalid dt")
+        with self.assertRaises(ValueError):
+            empty_multi.set_dt(0.0, update_contacts=True)
+        self.assertAlmostEqual(empty_multi.dt, 0.03, places=6, msg="Empty system dt unchanged on zero dt")
+
+        # 8. Illegal dt (0, negative, NaN, Inf, non-numeric) preserves states without modification
+        curr_dt = multi.dt  # 0.05
+        illegal_dts = [0.0, -0.01, -100.0, float("nan"), float("inf"), float("-inf"), "invalid_str", None]
+        for bad_dt in illegal_dts:
+            for upd in (False, True):
+                with self.assertRaises(ValueError):
+                    multi.set_dt(bad_dt, update_contacts=upd)
+                self.assertAlmostEqual(multi.dt, curr_dt, places=6, msg=f"System dt corrupted by {bad_dt} (upd={upd})")
+                self.assertAlmostEqual(c1.dt, curr_dt, places=6, msg=f"c1.dt corrupted by {bad_dt} (upd={upd})")
+                self.assertAlmostEqual(c2.dt, curr_dt, places=6, msg=f"c2.dt corrupted by {bad_dt} (upd={upd})")
+
+        # 9. Multiple contacts: verify ZERO partial update when a child contact fails mid-way
+        class SimulatedFailingContact(SingleContactDynamics):
+            """Simulates a contact whose dt update fails (e.g. read-only constraint or sensor crash)."""
+            def __setattr__(self, name, value):
+                if name == "dt" and getattr(self, "_armed_to_fail", False):
+                    raise RuntimeError("Simulated mid-update sensor failure on contact")
+                super().__setattr__(name, value)
+
+        cfail = SimulatedFailingContact(
+            contact_id="failing_sensor_contact",
+            contact_point_world=(0.2, 0.0, 0.0),
+            contact_force_world=(0.0, 0.0, 100.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=curr_dt,
+        )
+        test_contacts = [c1, cfail]
+        multi_tx = MultiContactDynamics(contacts=test_contacts, com_world=com, dt=curr_dt)
+
+        # Arm contact 2 to fail upon dt mutation
+        cfail._armed_to_fail = True
+
+        with self.assertRaises(RuntimeError) as rx:
+            multi_tx.set_dt(0.01, update_contacts=True)
+        self.assertIn("Simulated mid-update sensor failure", str(rx.exception))
+
+        # Check transactional atomicity: c1 was reached first in the loop, but must be rolled back!
+        self.assertAlmostEqual(multi_tx.dt, curr_dt, places=6, msg="System dt must be restored after partial failure")
+        self.assertAlmostEqual(c1.dt, curr_dt, places=6, msg="c1.dt must be rolled back to original after c2 failure")
+        self.assertAlmostEqual(cfail.dt, curr_dt, places=6, msg="cfail.dt must remain at original")
+
+        # 10. Confirm original add_contact() dt validation has not regressed
+        c_mismatch = SingleContactDynamics(
+            contact_id="mismatch_contact",
+            contact_point_world=(0.0, 0.1, 0.0),
+            contact_force_world=(0.0, 0.0, 50.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=0.999,  # Mismatched dt
+        )
+        pre_count = len(multi.contacts)
+        with self.assertRaises(ValueError) as ctx:
+            multi.add_contact(c_mismatch)
+        self.assertIn("Time step mismatch", str(ctx.exception))
+        self.assertEqual(len(multi.contacts), pre_count, "Failed add_contact must not alter contact list")
+
+        # Clean add_contact with matching dt succeeds
+        c_valid = SingleContactDynamics(
+            contact_id="valid_add_contact",
+            contact_point_world=(0.0, 0.1, 0.0),
+            contact_force_world=(0.0, 0.0, 50.0),
+            com_world=com,
+            surface_normal_world=(0.0, 0.0, 1.0),
+            dt=multi.dt,
+        )
+        multi.add_contact(c_valid)
+        self.assertEqual(len(multi.contacts), pre_count + 1)
 
 
 if __name__ == "__main__":

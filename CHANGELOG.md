@@ -3,6 +3,28 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-A-R2：MultiContactDynamics 时间步长更新原子性与状态不可变保全 (Task 6G-D-A-R2)
+
+### 多触点系统时间步长更新失败原子性与事务回滚 (`src/motion/contact_dynamics.py`)
+* **`MultiContactDynamics.set_dt()` 失败原子性重构**：
+  * 引入 `_validate_dt_value()`：预先严格校验 `new_dt` 数值合法性（有限正浮点数，严格拒绝 0、负数、NaN、Inf 与非法类型），在输入非法时 100% 保持系统原状态不变；
+  * `update_contacts=False` 模式（不更新子接触点）：在变更系统 `self.dt` 前，先遍历全部子接触点检查兼容性，若存在任何 `c.dt` 与新 `dt` 不一致，立即抛出明确异常，系统 `dt` 与子接触点 `dt` 严格保持原值，彻底消除修改系统后抛错导致的状态不一致缺陷；
+  * `update_contacts=True` 模式（事务级同步重配置）：预先捕获原始系统 `dt` 与全触点 `c.dt` 状态快照，统一推进状态修改；若在更新过程中遭遇任何异常，自动触发事务回滚，将所有已变更状态 100% 恢复至快照原值，坚决杜绝“部分更新”中间态；
+  * 空多接触系统（`len(contacts) == 0`）：允许合法设置新 `dt`，非法 `dt` 坚决拒绝且不改变原有系统状态。
+* **单接触点属性防御性防护 (`SingleContactDynamics`)**：
+  * 引入 `__setattr__` 对 `dt` 属性赋值进行动态强类型与生理正数门禁校验，防止非法数值注入。
+
+### 测试验证与架构状态
+* **单元测试扩充 (`tests/verify_task6gd_contact_dynamics.py`)**：
+  * 完善 `test_16_multi_contact_dt_consistency_enforcement`：增加抛错后的系统与触点状态不变性断言；
+  * 新增 `test_18_multi_contact_set_dt_failure_atomicity_and_consistency`：系统覆盖 10 项严苛原子性定理（匹配成功、失配抛错、系统不变、触点不变、同步更新、冲量缩放一致、空容器更新、非法数值全拦截、多触点中途故障事务回滚、`add_contact` 零退化）；
+  * 18/18 项断言纯 Python 100% 通过（耗时 0.002s）。
+* **自动化回归测试验证**：
+  * `quick` Tier：6/6 项测试全绿通过（5.36s，退出码 0）；
+  * `physics` Tier：11/11 项测试全绿通过（57.83s，退出码 0）；
+  * 零历史步态修改，零 Rig/IK/WBC 篡改，零训练场重建。
+
+
 ## [2026-10-23] 任务 6G-D-A-R1：接触动力学时间步长一致性与物理接触有效性契约修复 (Task 6G-D-A-R1)
 
 ### 多触点统一时间步长所有权与强一致性门禁 (`src/motion/contact_dynamics.py`)

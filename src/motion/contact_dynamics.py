@@ -204,6 +204,17 @@ class SingleContactDynamics:
         if math.isnan(self.contact_tolerance) or math.isinf(self.contact_tolerance) or self.contact_tolerance <= 0.0:
             raise ValueError(f"contact_tolerance must be strictly positive and finite, got {self.contact_tolerance}")
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "dt":
+            try:
+                v = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"dt must be a valid numeric float, got {value!r}") from exc
+            if math.isnan(v) or math.isinf(v) or v <= 0.0:
+                raise ValueError(f"dt must be strictly positive and finite, got {value}")
+            value = v
+        super().__setattr__(name, value)
+
     @property
     def is_in_contact(self) -> bool:
         """True if contact point is within contact_tolerance of the surface plane."""
@@ -422,10 +433,20 @@ class MultiContactDynamics:
     com_world: Vec3 = (0.0, 0.0, 1.0)
     dt: float = 1.0 / 24.0
 
+    @staticmethod
+    def _validate_dt_value(dt: Any, name: str = "dt") -> float:
+        """Validate that a dt value is a finite and strictly positive float."""
+        try:
+            val = float(dt)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be a valid numeric float, got {dt!r}") from exc
+        if math.isnan(val) or math.isinf(val) or val <= 0.0:
+            raise ValueError(f"{name} must be strictly positive and finite, got {val}")
+        return val
+
     def __post_init__(self):
         self.com_world = _to_vec3(self.com_world, "com_world")
-        if math.isnan(self.dt) or math.isinf(self.dt) or self.dt <= 0.0:
-            raise ValueError(f"dt must be strictly positive and finite, got {self.dt}")
+        self.dt = self._validate_dt_value(self.dt, "dt")
         for c in self.contacts:
             self._validate_contact_dt(c)
 
@@ -444,16 +465,61 @@ class MultiContactDynamics:
         self.contacts.append(contact)
 
     def set_dt(self, new_dt: float, update_contacts: bool = False) -> None:
-        """Update system time step. If update_contacts=True, synchronizes all child contacts."""
-        if math.isnan(new_dt) or math.isinf(new_dt) or new_dt <= 0.0:
-            raise ValueError(f"new_dt must be strictly positive and finite, got {new_dt}")
-        self.dt = float(new_dt)
-        if update_contacts:
+        """Update system time step with strict transactional failure atomicity.
+
+        Parameters:
+            new_dt: New simulation time step (seconds), must be finite and > 0.
+            update_contacts:
+                - If False: Requires all existing contacts in self.contacts to already
+                  have dt matching new_dt (within 1e-6). If any contact differs, raises
+                  ValueError and preserves the exact original system and contact dt values
+                  with zero side effects.
+                - If True: Explicitly reconfigures the unified time interval across the
+                  system and all child contacts. Atomically updates self.dt and all
+                  contact.dt. If any failure occurs, restores all states to their original
+                  values prior to the call.
+
+        Raises:
+            ValueError: If new_dt is non-finite, <= 0, or incompatible with contacts.
+        """
+        val = self._validate_dt_value(new_dt, "new_dt")
+
+        if not update_contacts:
+            # Case A: Check compatibility of all existing contacts before touching self.dt.
             for c in self.contacts:
-                c.dt = self.dt
+                if abs(c.dt - val) > 1e-6:
+                    raise ValueError(
+                        f"Cannot update system dt from {self.dt:.6f}s to {val:.6f}s without updating contacts: "
+                        f"contact '{c.contact_id}' has dt={c.dt:.6f}s (mismatch > 1e-6). "
+                        f"System dt remains {self.dt:.6f}s and all contacts remain unchanged. "
+                        f"Set update_contacts=True to explicitly synchronize child contacts."
+                    )
+            # All contacts match new_dt (or system has no contacts); update system dt
+            self.dt = val
         else:
+            # Case B: Synchronously reconfigure unified time interval across system and all child contacts.
             for c in self.contacts:
-                self._validate_contact_dt(c)
+                if not hasattr(c, "dt"):
+                    raise TypeError(
+                        f"Contact '{getattr(c, 'contact_id', repr(c))}' is missing required 'dt' attribute"
+                    )
+
+            orig_system_dt = self.dt
+            orig_contacts_dt = [(c, c.dt) for c in self.contacts]
+
+            try:
+                for c in self.contacts:
+                    c.dt = val
+                self.dt = val
+            except Exception as exc:
+                # Transactional rollback: restore all modified states to pre-call values
+                for c, old_c_dt in orig_contacts_dt:
+                    try:
+                        c.dt = old_c_dt
+                    except Exception:
+                        pass
+                self.dt = orig_system_dt
+                raise exc
 
     # -------------------------------------------------------------------------
     # Net External Forces & Torques

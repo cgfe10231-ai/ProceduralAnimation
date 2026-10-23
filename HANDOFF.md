@@ -5,11 +5,11 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-A-R1（接触动力学时间步长一致性与物理接触有效性契约修复）：
-1. 修复多触点时间步长一致性：`MultiContactDynamics` 确立对系统 `dt` 的唯一所有权，构造与添加触点时强行校验一致性，杜绝静默采用或覆盖；
-2. 明确物理接触有效性：`SingleContactDynamics` 扩展 `surface_id`、`surface_distance` 与 `contact_tolerance: float = 0.02`，只读属性 `is_in_contact` 区分几何邻近绑定与物理接触；当未处于有效接触且施加非零接触力时判定为 `FrictionConeStatus.NON_CONTACT_FORCE_VIOLATION`；
-3. 升级 `create_contact_dynamics_from_environment`：新增 `contact_tolerance` 与 `require_contact` 契约，超容差悬空点默认抛出 `ValueError`，同时保留 `require_contact=False` 的几何邻域探测能力；
-4. 交付 `tests/verify_task6gd_contact_dynamics.py` 扩充至 17 项断言纯 Python 全绿通过；分层回归 `quick` (6/6), `physics` (11/11) 保持 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-A-R2（MultiContactDynamics 时间步长更新原子性与状态不可变保全）：
+1. 修复失败原子性：重构 `MultiContactDynamics.set_dt(new_dt, update_contacts=False)`，在变更系统 `dt` 前遍历全部子接触点校验兼容性，失配立即抛错，系统与子接触点严格保持原值不变；
+2. 事务级批量同步与异常回滚：重构 `set_dt(new_dt, update_contacts=True)`，预先记录系统与触点快照，中途任意异常自动回滚，坚决杜绝“部分更新”中间态；
+3. 空系统与防御加固：空系统支持合法新 `dt` 并拒绝非法输入，`SingleContactDynamics` 增加 `__setattr__` 动态防御；
+4. 交付 `tests/verify_task6gd_contact_dynamics.py` 扩充至 18 项纯 Python 全绿通过；分层回归 `quick` (6/6), `physics` (11/11) 保持 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -37,27 +37,28 @@
 * 完成 Task 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础（交付 21 个表面与 `output/dynamics_playground.blend`）。
 * 完成 Task 6G-D-PRE-P2-R1 环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁。
 * 完成 Task 6G-D-A 接触动力学基础与冲量动量系统（交付纯数学模块与 15 项数学几何测试）。
-* **完成 Task 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复**：
-  * `MultiContactDynamics` 确立对系统 `dt` 的唯一所有权与一致性强校验；
-  * `SingleContactDynamics` 扩展 `surface_id`、`surface_distance`、`contact_tolerance` 与 `is_in_contact`；
-  * 新增 `NON_CONTACT_FORCE_VIOLATION` 拦截悬空受力；
-  * `create_contact_dynamics_from_environment` 增加 `contact_tolerance` 与 `require_contact` 参数；
-  * `tests/verify_task6gd_contact_dynamics.py` 扩充 Test 16 与 Test 17（17/17 项测试纯 Python 全绿通过）；
+* 完成 Task 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复（交付 17 项测试与环境接触间隙门禁）。
+* **完成 Task 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全**：
+  * 重构 `MultiContactDynamics.set_dt()` 实现严格失败原子性；
+  * `update_contacts=False` 模式预校验全触点兼容性，失配立即抛错，系统与触点原值绝对不变；
+  * `update_contacts=True` 模式支持快照与事务回滚，杜绝部分更新中间态；
+  * `SingleContactDynamics` 增加 `__setattr__` 动态防御拦截非法 `dt`；
+  * `tests/verify_task6gd_contact_dynamics.py` 扩充 Test 18（18/18 项测试纯 Python 全绿通过）；
   * 分层回归套件实测全绿：`quick` (6/6), `physics` (11/11)。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `contact_dynamics_math`：17/17 项数学与契约定理全绿（0.13s，退出码 0）；
+  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.12s，退出码 0）；
   * `dynamics_environment_query`：13/13 项数学定理全绿（0.12s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.33s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：6/6 项通过（5.3s，退出码 0）；
-  * `physics` Tier：11/11 项通过（57.84s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-A-R1 已完成并验证，严格停止。
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.32s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `quick` Tier：6/6 项通过（5.36s，退出码 0）；
+  * `physics` Tier：11/11 项通过（57.83s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-A-R2 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-033]`)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-034]`)
 * 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
 * 核心源码：`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
 * 核心生成与产物：`output/dynamics_playground.blend`、`output/unified_motion_integration.blend`
