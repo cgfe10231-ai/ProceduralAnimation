@@ -136,13 +136,14 @@ class TestExecutionResult:
     name: str
     tier_names: List[str]
     runner_type: str
-    status: str  # PASSED, AUTOMATED_PASS, FAILED, TIMEOUT, SKIPPED
+    status: str  # PASSED, AUTOMATED_PASS, FAILED, SKIPPED, NOT_RUN
     exit_code: Optional[int]
     duration_sec: float
     stdout: str
     stderr: str
     failure_reason: Optional[str] = None
     is_visual_acceptance: bool = False
+    is_optional: bool = False
 
 
 class TestSuiteRunner:
@@ -169,38 +170,87 @@ class TestSuiteRunner:
         full_script = os.path.join(PROJECT_ROOT, test.script_path)
         effective_timeout = test.timeout_sec * self.timeout_multiplier
 
-        # Build command based on runner type
+        # 1. Pre-flight checks: script path existence
+        if not os.path.isfile(full_script):
+            if not test.is_optional:
+                print(f"  [FAIL] Required test script missing: {test.script_path}")
+                return TestExecutionResult(
+                    test_id=test.test_id,
+                    name=test.name,
+                    tier_names=[t.value for t in test.tiers],
+                    runner_type=test.runner_type.value,
+                    status="FAILED",
+                    exit_code=-1,
+                    duration_sec=0.0,
+                    stdout="",
+                    stderr=f"Required test script not found: {test.script_path}",
+                    failure_reason=f"Required test script missing: {test.script_path}",
+                    is_visual_acceptance=test.is_visual_acceptance,
+                    is_optional=test.is_optional,
+                )
+            else:
+                print(f"  [SKIPPED] Optional test script missing: {test.script_path}")
+                return TestExecutionResult(
+                    test_id=test.test_id,
+                    name=test.name,
+                    tier_names=[t.value for t in test.tiers],
+                    runner_type=test.runner_type.value,
+                    status="SKIPPED",
+                    exit_code=-1,
+                    duration_sec=0.0,
+                    stdout="",
+                    stderr=f"Optional test script not found: {test.script_path}",
+                    failure_reason=f"Test script missing: {test.script_path}",
+                    is_visual_acceptance=test.is_visual_acceptance,
+                    is_optional=test.is_optional,
+                )
+
+        # 2. Build command based on runner type
         if test.runner_type == RunnerType.PYTHON:
             cmd = [self.python_bin, full_script]
         elif test.runner_type == RunnerType.BLENDER_HEADLESS:
             cmd = [self.blender_bin, "-b", "-P", full_script]
         elif test.runner_type == RunnerType.BLENDER_WITH_BLEND:
             if not test.target_blend:
+                fail_status = "FAILED" if not test.is_optional else "SKIPPED"
+                reason = "Configuration error: target_blend required"
+                print(f"  [{fail_status}] {reason}")
                 return TestExecutionResult(
                     test_id=test.test_id,
                     name=test.name,
                     tier_names=[t.value for t in test.tiers],
                     runner_type=test.runner_type.value,
-                    status="SKIPPED",
+                    status=fail_status,
                     exit_code=-1,
                     duration_sec=0.0,
                     stdout="",
-                    stderr="Missing target_blend definition",
-                    failure_reason="Configuration error: target_blend required",
+                    stderr=reason,
+                    failure_reason=reason,
+                    is_visual_acceptance=test.is_visual_acceptance,
+                    is_optional=test.is_optional,
                 )
             full_blend = os.path.join(PROJECT_ROOT, test.target_blend)
             if not os.path.isfile(full_blend):
+                fail_status = "FAILED" if not test.is_optional else "SKIPPED"
+                reason = (
+                    f"Required target blend not found: {test.target_blend}"
+                    if not test.is_optional
+                    else f"Target blend file missing: {test.target_blend}"
+                )
+                print(f"  [{fail_status}] {reason}")
                 return TestExecutionResult(
                     test_id=test.test_id,
                     name=test.name,
                     tier_names=[t.value for t in test.tiers],
                     runner_type=test.runner_type.value,
-                    status="SKIPPED",
+                    status=fail_status,
                     exit_code=-1,
                     duration_sec=0.0,
                     stdout="",
-                    stderr=f"Required target blend not found: {test.target_blend}",
-                    failure_reason=f"Target blend file missing: {test.target_blend}",
+                    stderr=reason,
+                    failure_reason=reason,
+                    is_visual_acceptance=test.is_visual_acceptance,
+                    is_optional=test.is_optional,
                 )
             cmd = [self.blender_bin, "-b", full_blend, "-P", full_script]
         else:
@@ -234,7 +284,7 @@ class TestSuiteRunner:
 
         duration = round(time.time() - start_time, 2)
 
-        # Evaluate Pass / Fail state
+        # 3. Evaluate Pass / Fail state
         if timed_out:
             status = "FAILED"
             fail_reason = f"Execution timed out after {effective_timeout:.1f}s"
@@ -251,14 +301,33 @@ class TestSuiteRunner:
                 fail_reason = output_err
                 print(f"  [FAIL] {fail_reason} (exit_code was 0, but failure pattern detected) ({duration}s)")
             else:
-                if test.is_visual_acceptance:
-                    status = "AUTOMATED_PASS"
-                    fail_reason = None
-                    print(f"  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) ({duration}s)")
+                # Check expected artifacts
+                artifact_err = None
+                for art in test.expected_artifacts:
+                    full_art = os.path.join(PROJECT_ROOT, art)
+                    if not os.path.exists(full_art):
+                        artifact_err = f"Required expected artifact missing: {art}"
+                        break
+                    elif not os.path.isfile(full_art):
+                        artifact_err = f"Required expected artifact is not a file: {art}"
+                        break
+                    elif os.path.getsize(full_art) == 0:
+                        artifact_err = f"Required expected artifact is empty (0 bytes): {art}"
+                        break
+
+                if artifact_err:
+                    status = "FAILED"
+                    fail_reason = artifact_err
+                    print(f"  [FAIL] {fail_reason} ({duration}s)")
                 else:
-                    status = "PASSED"
-                    fail_reason = None
-                    print(f"  [PASS] Test completed successfully ({duration}s)")
+                    if test.is_visual_acceptance:
+                        status = "AUTOMATED_PASS"
+                        fail_reason = None
+                        print(f"  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) ({duration}s)")
+                    else:
+                        status = "PASSED"
+                        fail_reason = None
+                        print(f"  [PASS] Test completed successfully ({duration}s)")
 
         return TestExecutionResult(
             test_id=test.test_id,
@@ -272,16 +341,34 @@ class TestSuiteRunner:
             stderr=stderr_str,
             failure_reason=fail_reason,
             is_visual_acceptance=test.is_visual_acceptance,
+            is_optional=test.is_optional,
         )
 
     def run_suite(self, tests: List[TestDefinition]) -> List[TestExecutionResult]:
         """Execute a collection of tests in sequence, supporting fail-fast."""
         results: List[TestExecutionResult] = []
-        for test in tests:
+        for idx, test in enumerate(tests):
             res = self.execute_test(test)
             results.append(res)
             if self.fail_fast and res.status == "FAILED":
                 print(f"\n[FAIL-FAST] Halting test suite execution after failure on '{test.test_id}'.")
+                for remaining_test in tests[idx + 1:]:
+                    results.append(
+                        TestExecutionResult(
+                            test_id=remaining_test.test_id,
+                            name=remaining_test.name,
+                            tier_names=[t.value for t in remaining_test.tiers],
+                            runner_type=remaining_test.runner_type.value,
+                            status="NOT_RUN",
+                            exit_code=None,
+                            duration_sec=0.0,
+                            stdout="",
+                            stderr="",
+                            failure_reason=f"Skipped due to fail-fast after failure on '{test.test_id}'",
+                            is_visual_acceptance=remaining_test.is_visual_acceptance,
+                            is_optional=remaining_test.is_optional,
+                        )
+                    )
                 break
         return results
 
@@ -293,11 +380,23 @@ class TestSuiteRunner:
     ) -> Tuple[str, str]:
         """Generate structured JSON and Markdown summary reports."""
         timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        total_executed = sum(1 for r in results if r.status != "NOT_RUN")
+        not_run_count = sum(1 for r in results if r.status == "NOT_RUN")
         passed_count = sum(1 for r in results if r.status in ("PASSED", "AUTOMATED_PASS"))
+        auto_pass_count = sum(1 for r in results if r.status == "AUTOMATED_PASS")
         failed_count = sum(1 for r in results if r.status == "FAILED")
         skipped_count = sum(1 for r in results if r.status == "SKIPPED")
-        auto_pass_count = sum(1 for r in results if r.status == "AUTOMATED_PASS")
+        required_skipped_count = sum(1 for r in results if r.status == "SKIPPED" and not r.is_optional)
+        optional_skipped_count = sum(1 for r in results if r.status == "SKIPPED" and r.is_optional)
         total_time = round(sum(r.duration_sec for r in results), 2)
+
+        all_success = (
+            failed_count == 0
+            and required_skipped_count == 0
+            and not_run_count == 0
+            and (passed_count + optional_skipped_count == total_planned)
+            and total_planned > 0
+        )
 
         # 1. JSON Report
         json_path = os.path.join(self.output_dir, "test_report.json")
@@ -306,13 +405,16 @@ class TestSuiteRunner:
                 "generated_at": timestamp_str,
                 "tier": tier_label,
                 "total_planned": total_planned,
-                "total_executed": len(results),
+                "total_executed": total_executed,
                 "passed_count": passed_count,
                 "automated_pass_count": auto_pass_count,
                 "failed_count": failed_count,
                 "skipped_count": skipped_count,
+                "required_skipped_count": required_skipped_count,
+                "optional_skipped_count": optional_skipped_count,
+                "not_run_count": not_run_count,
                 "total_duration_sec": total_time,
-                "all_success": (failed_count == 0),
+                "all_success": all_success,
             },
             "results": [
                 {
@@ -325,6 +427,7 @@ class TestSuiteRunner:
                     "duration_sec": r.duration_sec,
                     "failure_reason": r.failure_reason,
                     "is_visual_acceptance": r.is_visual_acceptance,
+                    "is_optional": r.is_optional,
                     "stdout_tail": r.stdout[-1500:] if r.stdout else "",
                     "stderr_tail": r.stderr[-1500:] if r.stderr else "",
                 }
@@ -340,8 +443,8 @@ class TestSuiteRunner:
             "# ProceduralAnimation Test Execution Report",
             f"\n> **Execution Date**: {timestamp_str}  ",
             f"> **Target Tier**: `{tier_label}`  ",
-            f"> **Overall Result**: {'**ALL PASSED**' if failed_count == 0 else '**FAILED**'}  ",
-            f"> **Execution Summary**: Total: {len(results)}/{total_planned} | Passed: {passed_count} (Automated Pass: {auto_pass_count}) | Failed: {failed_count} | Skipped: {skipped_count} | Duration: {total_time:.2f}s",
+            f"> **Overall Result**: {'**ALL PASSED**' if all_success else '**FAILED**'}  ",
+            f"> **Execution Summary**: Total Planned: {total_planned} | Executed: {total_executed} | Passed: {passed_count} (Automated Pass: {auto_pass_count}) | Failed: {failed_count} | Skipped: {skipped_count} (Req: {required_skipped_count}, Opt: {optional_skipped_count}) | Not Run: {not_run_count} | Duration: {total_time:.2f}s",
             "\n---",
             "\n## Test Results Table\n",
             "| Test ID | Test Name | Runner | Status | Duration | Failure / Notes |",
@@ -350,17 +453,25 @@ class TestSuiteRunner:
 
         for r in results:
             note = r.failure_reason if r.failure_reason else ("Visual Inspection Required" if r.is_visual_acceptance else "-")
-            status_badge = f"**{r.status}**" if r.status in ("PASSED", "AUTOMATED_PASS") else f"<span style='color:red;'>**{r.status}**</span>"
+            if r.status in ("PASSED", "AUTOMATED_PASS"):
+                status_badge = f"**{r.status}**"
+            elif r.status == "NOT_RUN":
+                status_badge = f"<span style='color:orange;'>**{r.status}**</span>"
+            elif r.status == "SKIPPED":
+                status_badge = f"<span style='color:gray;'>**{r.status}**</span>"
+            else:
+                status_badge = f"<span style='color:red;'>**{r.status}**</span>"
+
             md_lines.append(
                 f"| `{r.test_id}` | {r.name} | `{r.runner_type}` | {status_badge} | {r.duration_sec}s | {note} |"
             )
 
-        if failed_count > 0:
-            md_lines.append("\n## Failure Details\n")
+        if failed_count > 0 or not_run_count > 0 or required_skipped_count > 0:
+            md_lines.append("\n## Failure & Exception Details\n")
             for r in results:
-                if r.status == "FAILED":
-                    md_lines.append(f"### `{r.test_id}`: {r.name}")
-                    md_lines.append(f"- **Failure Reason**: {r.failure_reason}")
+                if r.status in ("FAILED", "NOT_RUN", "SKIPPED") and (r.status == "FAILED" or not r.is_optional or r.status == "NOT_RUN"):
+                    md_lines.append(f"### `{r.test_id}`: {r.name} ({r.status})")
+                    md_lines.append(f"- **Reason / Note**: {r.failure_reason}")
                     md_lines.append(f"- **Exit Code**: {r.exit_code}")
                     md_lines.append(f"- **Duration**: {r.duration_sec}s")
                     if r.stderr:
@@ -382,26 +493,45 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="ProceduralAnimation Unified Test Runner (Task 6G-D-PRE-P1)")
     parser.add_argument(
         "--tier",
+        "-tier",
         type=str,
         default="quick",
         choices=["quick", "physics", "motion", "full", "legacy"],
         help="Target test tier category to execute.",
     )
-    parser.add_argument("--test-id", type=str, default=None, help="Execute a single specific test by its unique ID.")
-    parser.add_argument("--fail-fast", action="store_true", help="Stop execution immediately upon first failure.")
+    parser.add_argument(
+        "--test-id",
+        "-test-id",
+        type=str,
+        default=None,
+        help="Execute a single specific test by its unique ID.",
+    )
+    parser.add_argument(
+        "--fail-fast",
+        "-fail-fast",
+        action="store_true",
+        help="Stop execution immediately upon first failure.",
+    )
     parser.add_argument(
         "--timeout-multiplier",
+        "-timeout-multiplier",
         type=float,
         default=1.0,
         help="Multiplier for per-test timeout durations (default: 1.0).",
     )
     parser.add_argument(
         "--output-dir",
+        "-output-dir",
         type=str,
         default=os.path.join(PROJECT_ROOT, "tests", "output"),
         help="Directory to save test_report.json and test_report.md.",
     )
-    parser.add_argument("--dry-run", action="store_true", help="Print selected tests without executing them.")
+    parser.add_argument(
+        "--dry-run",
+        "-dry-run",
+        action="store_true",
+        help="Print selected tests without executing them.",
+    )
 
     args = parser.parse_args()
 
@@ -453,20 +583,30 @@ def main() -> int:
     json_rep, md_rep = runner.generate_reports(tier_label, results, len(tests_to_run))
 
     # 5. Print Summary
+    total_executed = sum(1 for r in results if r.status != "NOT_RUN")
+    not_run_count = sum(1 for r in results if r.status == "NOT_RUN")
     passed_count = sum(1 for r in results if r.status in ("PASSED", "AUTOMATED_PASS"))
     failed_count = sum(1 for r in results if r.status == "FAILED")
     skipped_count = sum(1 for r in results if r.status == "SKIPPED")
+    required_skipped_count = sum(1 for r in results if r.status == "SKIPPED" and not r.is_optional)
     total_time = round(sum(r.duration_sec for r in results), 2)
+
+    all_success = (
+        failed_count == 0
+        and required_skipped_count == 0
+        and not_run_count == 0
+        and (len(tests_to_run) > 0)
+    )
 
     print("\n" + "=" * 80)
     print(f"TEST SUITE EXECUTION COMPLETED IN {total_time}s")
-    print(f"Total: {len(results)} | Passed: {passed_count} | Failed: {failed_count} | Skipped: {skipped_count}")
+    print(f"Planned: {len(tests_to_run)} | Executed: {total_executed} | Passed: {passed_count} | Failed: {failed_count} | Skipped: {skipped_count} | Not Run: {not_run_count}")
     print(f"Reports Written:")
     print(f"  - JSON: {json_rep}")
     print(f"  - Markdown: {md_rep}")
     print("=" * 80)
 
-    return 0 if failed_count == 0 else 1
+    return 0 if all_success else 1
 
 
 if __name__ == "__main__":

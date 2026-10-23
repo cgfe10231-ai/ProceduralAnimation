@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-PRE-P1（统一测试执行接口、回归资产管理与永久架构门禁），建立显式测试注册表 `tests/test_registry.py`，实现单命令多层级统一测试调度器 `tests/run_test_suite.py` 与 `run_tests.ps1`，彻底根除用户终端反复审批负担；确立 `docs/ARCHITECTURE_CHANGE_GATE.md` 唯一权威来源并同步更新三大规则文件；完成 quick、motion、physics 全量实测回归验证。**零功能与算法开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-PRE-P1-R1（统一测试运行器严格验收修复与单元测试落地）：修复 SKIPPED 虚假成功漏洞，显式支持 is_optional 区分必需与可选测试；完善 fail-fast 停机并自动将未执行测试标为 NOT_RUN 纳入报告与退出码判定；实施 expected_artifacts 存在与非空强制校验；交付 `tests/test_runner_unit.py` 涵盖 10 项核心机制纯 Python 毫秒级回归；实测 quick 4/4、motion 5/5、physics 8/8 100% 全绿通过。**零生产代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -28,22 +28,22 @@
 * 完成 Task 6G-C-R3B-2 历史四大动作向统一桥接层与全身控制架构无损迁移。
 * 完成 Task 6G-C-R3B-2-R1 历史正确动画对照、视口下肢周期性 L 形畸变根因定位与修复（用户已目视验收通过）。
 * 完成 Task 6G-D-PRE-P0 全工程架构审计与后续开发准备（交付 `docs/ENGINEERING_AUDIT.md`）。
-* **完成 Task 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁**：
-  * 建立 `tests/test_registry.py`，注册 26 项真实测试，支持 `quick`、`physics`、`motion`、`full`、`legacy` 五级分类；
-  * 交付单命令测试调度器 `tests/run_test_suite.py` 与 PowerShell 包装器 `run_tests.ps1`，彻底根除用户反复终端审批负担；
-  * 实现动态解析 Blender 5.1.1 与真实 Python 路径，隔离 Windows Store 虚假别名；
-  * 实现 Windows 进程树硬超时自动清理（`taskkill /F /T /PID`）；
-  * 实现非零退出码与 stdout/stderr 错误反查多层失败判定；
-  * 实现 `is_visual_acceptance` 标记，严格区分 `AUTOMATED_PASS` 与人工目视验收；
-  * 交付单一权威规范来源 `docs/ARCHITECTURE_CHANGE_GATE.md`，同步更新 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 第 8 节；
+* 完成 Task 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁（交付 `docs/ARCHITECTURE_CHANGE_GATE.md`）。
+* **完成 Task 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地**：
+  * 修复 SKIPPED 虚假成功：支持 `is_optional` 标记，必需测试遇到依赖缺失或配置异常坚决判定为 FAILED，`required_skipped_count > 0` 导致整体退出码为 1；
+  * 健全 fail-fast 完整性：首个失败触发停机后，自动追加剩余用例为 `NOT_RUN`，在 JSON/MD 报告中完整显示 `total_planned`, `total_executed`, `not_run_count`；
+  * 强制执行 `expected_artifacts` 存在与非空（>0 字节）校验；
+  * 交付纯 Python 专用单元测试 `tests/test_runner_unit.py`，完整覆盖 10 项核心机制并实现毫秒级（0.94s）全绿通过；
+  * 支持 PowerShell 命令行参数风格（`-tier` / `-test-id` 等单横杠别名）；
   * 0 生产代码修改，0 步态曲线变动，0 历史文件删除。
 
 ## 3. 已验证
-* 统一测试系统实测全绿：
-  * `quick` Tier：3/3 项通过（3.94s，退出码 0）；
-  * `motion` Tier：5/5 项通过（16.16s，退出码 0），`integration_unified_motion` 准确标定为 `AUTOMATED_PASS (Visual Inspection Required)`；
-  * `physics` Tier：8/8 项通过（53.90s，退出码 0），底层运动学、WBC、ROM、CoM、惯性张量与桥接 14 项测试保持 100% 零退化；
-* 状态标定为：Task 6G-D-PRE-P1 已完成并验证，严格停止。
+* 单元测试与分层回归套件实测全绿：
+  * `runner_unit_tests`：10/10 项纯 Python 单元测试全绿（0.94s，退出码 0）；
+  * `quick` Tier：4/4 项通过（4.85s，退出码 0）；
+  * `motion` Tier：5/5 项通过（15.35s，退出码 0），`integration_unified_motion` 准确标定为 `AUTOMATED_PASS (Visual Inspection Required)`；
+  * `physics` Tier：8/8 项通过（53.94s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-PRE-P1-R1 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`

@@ -3,7 +3,44 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
-## [2026-10-23] 任务 6G-D-PRE-P1：统一测试执行接口、回归资产管理与永久架构门禁 (Task 6G-D-PRE-P1)
+## [2026-10-23] 任务 6G-D-PRE-P1-R1：统一测试运行器严格验收修复与单元测试落地 (Task 6G-D-PRE-P1-R1)
+
+### 测试套件调度器严格安全修复 (Test Suite Strict Acceptance Fixes)
+* **根除 SKIPPED 虚假成功漏洞**：
+  * 在 `TestDefinition` 中引入显式 `is_optional: bool = False` 属性；
+  * `execute_test` 判定重构：凡非可选（必需）测试遇到测试脚本缺失、`target_blend` 缺失或配置异常时，严格判定为 `status="FAILED"`（退出码 -1），绝不伪报 `SKIPPED`；
+  * 报告与汇总逻辑中，`required_skipped_count > 0` 严格否决整体测试，整体退出码返回 1；
+  * 仅当注册表中显式标记 `is_optional=True` 时才允许安全跳过。
+* **健全 fail-fast 报告完整性与 `NOT_RUN` 追踪**：
+  * 启用 `--fail-fast` 在首个测试失败立即停机时，自动将后续剩余全部待测用例追加为 `status="NOT_RUN"`、`exit_code=None`、`duration_sec=0.0`；
+  * 报告结构（JSON 与 Markdown）完整呈现 `total_planned`、`total_executed` 与 `not_run_count`；
+  * `NOT_RUN` 严格不计入 `passed_count`，且导致整体退出码为 1。
+* **强制执行期望产物校验 (`expected_artifacts`)**：
+  * 在测试进程正常退出（exit 0）且输出无异常后，自动深度检验 `test.expected_artifacts`；
+  * 任何声明的产物若不存在或文件大小为 0 字节，直接判定为 `status="FAILED"`；
+  * 为 `integration_unified_motion` 及 11 项历史 Blend 验证用例补齐 `expected_artifacts`。
+* **PowerShell 命令行参数双向兼容**：
+  * 在 `tests/run_test_suite.py` 中为参数增加 `-tier`、`-test-id`、`-fail-fast` 等单横杠别名，无缝支持 PowerShell 原生调用风格。
+
+### 专用单元测试套件交付 (`tests/test_runner_unit.py`)
+* **10 项核心机制纯 Python 毫秒级回归验证**：
+  1. 正常执行与全绿通过 (`status="PASSED"`, `exit_code=0`)；
+  2. 非零退出码真实捕获 (`status="FAILED"`, `exit_code=42`)；
+  3. stdout 显式 `[FAIL]` 模式捕获（即使退出码为 0）；
+  4. 必需依赖文件缺失判为失败，可选依赖缺失才标记跳过；
+  5. 期望产物缺失或 0 字节文件判为失败，有效产物通过；
+  6. 硬超时终止与 Windows 深度进程树清理机制；
+  7. fail-fast 停止与剩余测试状态追加；
+  8. `NOT_RUN` 状态正确记录且不计入 PASS；
+  9. JSON 报告中 `all_success` 状态矩阵逻辑；
+  10. 最终统一调度器退出码判定逻辑。
+* **实测结果**：10/10 单元测试全绿通过，耗时 0.94s。
+
+### 分层回归与零退化声明
+* `quick` Tier：4/4 项全部通过（耗时 4.85s，退出码 0）；
+* `motion` Tier：5/5 项全部通过（耗时 15.35s，退出码 0）；
+* `physics` Tier：8/8 项全部通过（耗时 53.94s，退出码 0）；
+* 生产代码 0 修改，历史步态 0 变动，完全符合执行纪律。
 
 ### 统一测试注册表与单入口调度器实施 (Unified Test Registry & Runner)
 * **创建显式测试注册表 (`tests/test_registry.py`)**：

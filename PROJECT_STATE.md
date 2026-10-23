@@ -1,13 +1,33 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-PRE-P1（统一测试执行接口、回归资产管理与永久架构门禁落地完成；建立 tests/test_registry.py 显式注册表涵盖 26 项受控测试；交付 tests/run_test_suite.py 与 run_tests.ps1 单命令调度器，彻底根除用户反复终端审批疲劳；实测 quick 3/3、motion 5/5、physics 8/8 全绿通过；建立 docs/ARCHITECTURE_CHANGE_GATE.md 单一权威规范来源并同步更新 AGENTS.md/GEMINI.md/.agents/rules/project_rules.md；0 生产代码修改；严格停止，坚决不擅自进入 P2 或 6G-D-A）  
+> **当前阶段**：任务 6G-D-PRE-P1-R1（统一测试运行器严格验收修复与单元测试落地；修复 SKIPPED 虚假成功漏洞，显式支持 is_optional 区分必需与可选测试；完善 fail-fast 停机并自动将未执行测试标为 NOT_RUN 纳入报告与退出码判定；实施 expected_artifacts 存在与非空强制校验；交付 tests/test_runner_unit.py 涵盖 10 项核心机制纯 Python 毫秒级回归；实测 quick 4/4、motion 5/5、physics 8/8 100% 全绿通过；0 生产代码修改，0 步态变动；严格停止，坚决不擅自进入 P2 或 6G-D-A）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地 (Task 6G-D-PRE-P1-R1)**：
+  * **根除 SKIPPED 虚假成功风险**：
+    * `TestDefinition` 引入 `is_optional: bool = False`，所有必需测试遇到依赖缺失、脚本缺失或配置错误时一律判定为 `status="FAILED"`（退出码 -1），绝不伪报 `SKIPPED`；
+    * 运行器汇报中只要存在未标记为可选的跳过测试（`required_skipped_count > 0`），整体即判定为不成功，最终退出码返回 1。
+  * **健全 fail-fast 报告完整性与 `NOT_RUN` 追踪**：
+    * 当 `--fail-fast` 在首个测试失败停机时，自动将后续剩余全部待测用例追加为 `status="NOT_RUN"`（`exit_code=None`, `duration_sec=0.0`）；
+    * 报告（JSON 与 Markdown）完整呈现 `total_planned`、`total_executed` 与 `not_run_count`；
+    * `NOT_RUN` 严格不计入 `passed_count`，且导致整体退出码为 1。
+  * **强制执行期望产物校验 (`expected_artifacts`)**：
+    * 在测试进程正常退出（exit 0）且输出无异常后，自动深度检验 `test.expected_artifacts`；
+    * 任何声明的产物若不存在或文件大小为 0 字节，直接判定为 `status="FAILED"`；
+    * 为 `integration_unified_motion` 及 11 项历史 Blend 验证用例补齐 `expected_artifacts`。
+  * **交付专用纯 Python 单元测试套件 (`tests/test_runner_unit.py`)**：
+    * 覆盖 10 项核心机制：正常通过、非零退出码、stdout 模式反查、必需 vs 可选缺失、期望产物缺失/0字节、硬超时与进程树终止、fail-fast 停机、NOT_RUN 报告追踪、all_success 状态矩阵逻辑、最终退出码判定；
+    * 10/10 单元测试全绿通过，耗时 0.94s。
+  * **分层回归测试验证全绿**：
+    * `quick` Tier：4/4 项通过（耗时 4.85s，退出码 0）；
+    * `motion` Tier：5/5 项通过（耗时 15.35s，退出码 0），其中 `integration_unified_motion` 严格标定为 `AUTOMATED_PASS (Visual Inspection Required)`；
+    * `physics` Tier：8/8 项通过（耗时 53.94s，退出码 0），历史物理模块 100% 零退化。
+  * **执行纪律遵守**：0 生产代码修改，0 步态曲线变动，0 历史文件删除，严格停止。
 * **任务 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁 (Task 6G-D-PRE-P1)**：
   * **显式测试注册表就绪 (`tests/test_registry.py`)**：
     * 登记 26 项真实受控测试用例，覆盖 `quick` (3项)、`physics` (8项)、`motion` (5项)、`full` (14项去重并集) 与 `legacy` (13项)；
