@@ -665,3 +665,23 @@
   - 导出接口：更新 `src/motion/__init__.py`；
   - 新增完备测试：`tests/verify_task6gd_contact_force_solver.py`（17 项全面覆盖单点支撑、双足均分、CoM 偏置分配、力矩自由度不可控检测、脱离接触零力约束、无摩擦打滑检测、库仑摩擦锥边界截断、斜坡 15° 分配、垂直墙面单向推力分配、多表面异构法向联合接触、独立力矩验算、不可行拉力拦截、数值容错、排列不变性、时间步长与正向动力学契约）；
   - 注册统一测试入口：在 `tests/test_registry.py` 注册 `contact_force_solver`（覆盖 QUICK, PHYSICS, FULL 分级）。
+
+---
+
+### [DEC-036] 有界摩擦锥欧几里得正交投影与接触力求解可靠性加固 (Task 6G-D-B-R1)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-23
+* **背景**：Task 6G-D-B 交付后，经独立源码审查发现了 4 项核心数学与状态契约问题：
+  1. `project_to_friction_cone` 在有限最大法向力 $F_{n,\max}$ 下，对处于无限圆锥内但超法向界限的力向量采用等比例缩小切向力，偏离了欧几里得最近点（反例 $F=(1,0,10), n=(0,0,1), \mu=0.5, \max=5$ 应投影为 $(1,0,5)$ 而非 $(0.5,0,5)$）；
+  2. 求解器终止状态与底层优化器（SLSQP/SPG）实际迭代次数、收敛标志及报错原因未完全透传解耦，可能导致假收敛或异常掩盖；
+  3. `_check_a_priori_infeasibility` 采用 `normal_z > 0.5` 启发式粗暴拦截向下合力，但在高摩擦大倾角斜坡或多表面支撑下，沿斜面切向分力完全可在保持法向正压力下提供负 $Z$ 净力；
+  4. `solution_to_multi_contact_dynamics` 使用硬编码的 $0.05\text{ m}$ 占位净距冒充真实几何测量，制造了伪测量值。
+* **决策与方案**：
+  1. **有界摩擦锥闭式凸多边形正交投影**：将 3D 旋转对称投影严格降维为子午平面 $(F_n, f_t)$ 上针对凸多边形可行域 $\Omega$ 的欧几里得距离解析极小化。构建母线边界、上法向盖、下法向盖、底轴 4 组闭式投影候选点进行欧氏距离解析极值优选，严格满足有限上下界、$\mu=0$、零向量、幂等性 $P(P(F))=P(F)$ 与欧氏最近点最优性；
+  2. **收敛状态机与优化诊断解耦透传**：`ContactForceSolution` 扩充 `solver_engine`, `optimizer_converged`, `optimizer_message`, `fallback_occurred` 等字段；严格要求约束检验、残差判定、优化器收敛三重独立合格方可标定 `SOLVED`；达到迭代上限明确标定 `APPROXIMATE` 并报告实际迭代；SLSQP 异常触发 SPG 明确标定 `fallback_occurred=True`；
+  3. **严格收紧不可行性预判**：废除 `normal_z > 0.5` 启发式规则；仅对严格水平地表（所有触点外法线完全为 $(0,0,1)$）且拉力为负、或无触点而目标非零等可证明不可行场景报 `INFEASIBLE`；倾斜斜坡与复杂工况 100% 交由优化器真实求解；
+  4. **真实接触几何间隙保真契约**：`ContactConstraintSpec` 与 `SingleContactDynamics` 均扩展 `surface_distance: Optional[float] = None` 与 `is_in_contact_override`；存在环境测量时 100% 传递真实有符号净距，无测量时明确标记为未知（`None`），严禁凭空构造伪数值。
+* **影响与产物**：
+  - 更新代码：`src/motion/contact_force_solver.py`, `src/motion/contact_dynamics.py`；
+  - 扩充测试：`tests/verify_task6gd_contact_force_solver.py` 新增 Test 18 至 Test 31（共 31 项测试全部通过）；
+  - 实测回归全绿：Blender 无 SciPy 环境下通过 SPG 30/30 项全绿通过（1 项跳过）；独立 Python 全量环境 31/31 项全绿通过；`quick` (7/7), `physics` (12/12) 零退化。

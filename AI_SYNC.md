@@ -1,42 +1,40 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-D-B（多接触力逆向求解与约束分配系统）
-* **任务状态**：已验证（建立线性接触抓取映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$；实现任意法向下的真实 3D 圆形库仑摩擦锥闭式欧几里得正交投影算子 `project_to_friction_cone`；构建 SLSQP + 原生 SPG 双引擎凸优化架构，Barzilai-Borwein 自适应步长，零外部依赖 100% 兼容 Blender 内置 Python；完善 `ContactSolverStatus` 状态机与物理残差判定；提供 `solution_to_multi_contact_dynamics()` 与正向动力学双向物理验算；实现 `create_contact_constraint_from_environment()` 与 DynamicsPlayground 深度绑定；tests/verify_task6gd_contact_force_solver.py 17/17 全绿；实测 quick 7/7、physics 12/12 全绿通过；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）
+* **当前任务编号**：任务 6G-D-B-R1（接触力求解器数值可靠性与状态契约修复）
+* **任务状态**：已验证（精确有界三维摩擦锥欧几里得正交投影重构；底层优化诊断与迭代信息完整透传；废除 normal_z > 0.5 启发式预判并新增高摩擦斜坡反例；接触几何距离信息保真无伪造；tests/verify_task6gd_contact_force_solver.py 扩充至 31 项全绿通过；Blender 无 SciPy SPG 引擎 30 项全绿通过；quick 7/7、physics 12/12 保持零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **基准 Commit SHA**：`fd9c43f74dee41ca12d9dd2159c7166f1c1d9295`
-  * **本任务提交 Commit SHA**：`8861bab3643e5da702ceed743642ecc464e3ab41`
+  * **基准 Commit SHA**：`61741c6ff277deb884432341ea423f520a213075`
+  * **本任务提交 Commit SHA**：`PENDING_COMMIT`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
 ---
 
-### 1. 6G-D-B 实施核心成果
+### 1. 6G-D-B-R1 实施核心成果
 * **交付物清单**：
   1. [`src/motion/contact_force_solver.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_force_solver.py)：
-     - 接触抓取映射矩阵构建 `build_contact_mapping_matrix` 与乘法算子 `contact_mapping_multiply`；
-     - 任意法向真实 3D 圆形库仑摩擦锥闭式欧几里得正交投影算子 `project_to_friction_cone`；
-     - SLSQP + SPG 双引擎优化求解器 `solve_contact_forces`；
-     - 结构化状态与残差数据结构：`ContactSolverStatus`, `ContactConstraintSpec`, `ContactWrenchTarget`, `ContactSolverConfig`, `ContactForceSolution`；
-     - 环境地表几何与摩擦参数抽取绑定 `create_contact_constraint_from_environment`；
-     - 正向动力学反向验算桥接 `solution_to_multi_contact_dynamics`；
-  2. [`src/motion/__init__.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/__init__.py)：
-     - 完整导出求解器核心类与工具函数；
+     - `project_to_friction_cone` 重构：闭式解析 4 候选点欧氏正交投影，解决有限最大法向力下切向力缩放偏离最近点的缺陷（反例 $(1,0,10) \rightarrow (1,0,5)$ 最优解）；
+     - `ContactForceSolution` 增加诊断与状态透传字段：`solver_engine`, `optimizer_converged`, `optimizer_message`, `fallback_occurred`；
+     - `solve_contact_forces` 状态机重构：独立判定物理约束与残差，SLSQP/SPG 底层状态与外力残差解耦，严禁假收敛虚报 `SOLVED`，达到迭代上限明确标定 `APPROXIMATE`；
+     - `_check_a_priori_infeasibility` 废除 `normal_z > 0.5` 启发式规则，仅保留严格水平地表负法向拉力与零触点等数学不可行定理；
+     - `ContactConstraintSpec` 增加 `surface_id`, `surface_distance`, `contact_tolerance`；
+     - `create_contact_constraint_from_environment` 与 `solution_to_multi_contact_dynamics` 彻底消除硬编码虚假占位净距（0.05m / 0.0m）。
+  2. [`src/motion/contact_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_dynamics.py)：
+     - `SingleContactDynamics` 支持 `surface_distance: Optional[float] = None` 与 `is_in_contact_override`；
+     - 保持原有向后兼容正向计算合同。
   3. [`tests/verify_task6gd_contact_force_solver.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_contact_force_solver.py)：
-     - 17 项严苛数学与物理测试（单点垂直支撑、双足均分、CoM 偏置分担、力矩亏缺拦截、脱离接触零受力、无摩擦打滑、摩擦锥边界截断、15° 斜坡、垂直墙面推力、多法向联合接触、独立力矩验算、不可行拉力拦截、非法参数过滤、排列不变性、确定性、向后兼容性、映射矩阵合同）；
-  4. [`tests/test_registry.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_registry.py)：
-     - 注册 `contact_force_solver` 至 `QUICK`, `PHYSICS`, `FULL` 分级；
-  5. 架构与决策文档：
-     - [`DECISIONS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/DECISIONS.md) 增订 `[DEC-035]`；
+     - 扩充至 31 项单元测试（覆盖反例最近点、内点不变性、有限上下界、$\mu=0$、幂等性、约束可行性、距离极小性、SPG 迭代上限、SLSQP 诊断、回退报告、高摩擦斜坡、已知不可行、几何保真等全部 15 项指标）。
+  4. 架构与决策文档：
+     - [`DECISIONS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/DECISIONS.md) 录入 `[DEC-036]`；
      - 更新 [`CHANGELOG.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/CHANGELOG.md)、[`PROJECT_STATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/PROJECT_STATE.md)、[`HANDOFF.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/HANDOFF.md)。
 * **分层实测回归成果**：
-  * **`contact_force_solver`**：17 项数学与物理定理全绿通过，耗时 0.403s，退出码 0；
-  * **`contact_dynamics_math`**：18 项数学定理与契约断言全绿通过，耗时 0.78s，退出码 0；
+  * **`contact_force_solver`**：31 项测试全绿通过（独立 Python 0.406s；Blender 无头 SPG 30/30 项全绿通过，1 项优雅跳过，0.087s）；
+  * **`contact_dynamics_math`**：18 项数学与契约定理全绿通过，耗时 0.76s，退出码 0；
   * **`dynamics_environment_query`**：13 项数学定理全绿通过，耗时 0.12s，退出码 0；
-  * **`dynamics_playground_blend`**：45 个场景对象结构完整性通过，耗时 1.34s，退出码 0；
-  * **`quick` Tier**：7 项测试全绿，耗时 7.11s，退出码 0；
-  * **`physics` Tier**：12 项测试全绿，耗时 59.77s，退出码 0，物理系统 100% 零退化。
+  * **`quick` Tier**：7 项测试全绿通过，耗时 7.13s，退出码 0；
+  * **`physics` Tier**：12 项测试全绿通过，耗时 62.09s，退出码 0，物理系统 100% 零退化。
 
 ---
 

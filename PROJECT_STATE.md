@@ -1,13 +1,31 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-B（多接触力逆向求解与约束分配系统；建立线性接触抓取映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$；实现任意法向下的真实 3D 圆形库仑摩擦锥闭式欧几里得正交投影算子 project_to_friction_cone；构建 SLSQP + 原生 SPG 双引擎凸优化架构，Barzilai-Borwein 自适应步长，零外部依赖 100% 兼容 Blender 内置 Python；完善 ContactSolverStatus 状态机与物理残差判定；提供 solution_to_multi_contact_dynamics() 与正向动力学双向物理验算；实现 create_contact_constraint_from_environment() 与 DynamicsPlayground 深度绑定；tests/verify_task6gd_contact_force_solver.py 17/17 全绿；实测 quick 7/7、physics 12/12 全绿通过；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）  
+> **当前阶段**：任务 6G-D-B-R1（接触力求解器数值可靠性与状态契约修复；精确有界三维摩擦锥欧几里得正交投影重构；底层优化诊断与迭代信息完整透传；废除 normal_z > 0.5 启发式预判并新增高摩擦斜坡反例；接触几何距离信息保真无伪造；tests/verify_task6gd_contact_force_solver.py 扩充至 31 项全绿通过；Blender 无 SciPy SPG 引擎 30 项全绿通过；quick 7/7、physics 12/12 保持零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-B-R1 接触力求解器数值可靠性与状态契约修复 (Task 6G-D-B-R1)**：
+  * **有界三维摩擦锥精确欧几里得投影重构 (`project_to_friction_cone`)**：
+    * 消除原先有限最大法向力下切向力等比例缩小导致的偏离反例（$F=(1,0,10), n=(0,0,1), \mu=0.5, \max=5$ 精确正交投影为 $(1,0,5)$，距离为 5.0，优于缩放点 $(0.5,0,5)$ 的 5.025）；
+    * 构建母线、上法向盖、下法向盖、底轴 4 组闭式投影候选点，通过欧几里得距离解析极小化确保全局最优性；
+    * 严格保证 $\mu=0$、内部点不变性、幂等性 $P(P(F))=P(F)$ 与切向方向保真。
+  * **求解状态机与底层优化诊断透传 (`ContactForceSolution`)**：
+    * 新增 `solver_engine`, `optimizer_converged`, `optimizer_message`, `fallback_occurred` 诊断字段；
+    * 独立评估物理约束可行性与外力残差，严禁仅凭优化器 `success=True` 虚报 `SOLVED`，达到迭代上限明确标定 `APPROXIMATE` 并报告实际迭代；
+    * 记录 SLSQP 到 SPG 的容错回退机制（`fallback_occurred=True`）。
+  * **收紧不可行性预判 (`_check_a_priori_infeasibility`)**：
+    * 废除 `normal_z > 0.5` 启发式规则，仅对严格水平地表（法向均为 $(0,0,1)$）且拉力为负、或无触点且目标非零等可证明场景报 `INFEASIBLE`；倾斜斜坡（含高摩擦负 $Z$ 切向推力）交由优化器真实求解。
+  * **真实接触几何间隙保真 (`ContactConstraintSpec`, `SingleContactDynamics`)**：
+    * 扩展 `surface_distance: Optional[float] = None` 与 `is_in_contact_override`；
+    * 存在环境测量时 100% 传递真实有符号净距，无测量时明确标记为未知（`None`），严禁凭空构造伪数值（如 $0.05\text{ m}$）。
+  * **单元验证与统一注册全绿**：
+    * `tests/verify_task6gd_contact_force_solver.py` 扩充至 31 项测试（新增 Test 18 至 Test 31）；独立 Python 全量环境 31/31 项测试全部通过（0.406s）；Blender 无 SciPy 无头环境 30/30 项测试全部通过（1 项 SLSQP 测试优雅跳过，0.087s）；
+    * 分层回归套件实测全绿：`quick` (7/7 项通过，7.13s), `physics` (12/12 项通过，62.09s)；
+    * 0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
 * **任务 6G-D-B 多接触力逆向求解与约束分配系统 (Task 6G-D-B)**：
   * **多接触力分配数学与优化架构 (`src/motion/contact_force_solver.py`)**：
     * 建立线性接触抓取映射矩阵 $\mathbf{A} \mathbf{f} = \mathbf{w}$（$\mathbf{A} \in \mathbb{R}^{6 \times 3N}$），包含力平衡单位块 $\mathbf{I}_3$ 与绕质心力矩叉乘斜对称矩阵块 $[\mathbf{r}_i]_\times$；

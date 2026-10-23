@@ -181,8 +181,9 @@ class SingleContactDynamics:
     friction_coeff: float = 0.65
     dt: float = 1.0 / 24.0
     surface_id: str = ""
-    surface_distance: float = 0.0
+    surface_distance: Optional[float] = None
     contact_tolerance: float = 0.02
+    is_in_contact_override: Optional[bool] = None
 
     def __post_init__(self):
         # Validate inputs and sanitize vectors
@@ -198,8 +199,9 @@ class SingleContactDynamics:
         if math.isnan(self.dt) or math.isinf(self.dt) or self.dt <= 0.0:
             raise ValueError(f"dt must be strictly positive and finite, got {self.dt}")
 
-        if math.isnan(self.surface_distance) or math.isinf(self.surface_distance):
-            raise ValueError(f"surface_distance must be finite, got {self.surface_distance}")
+        if self.surface_distance is not None:
+            if math.isnan(self.surface_distance) or math.isinf(self.surface_distance):
+                raise ValueError(f"surface_distance must be finite when provided, got {self.surface_distance}")
 
         if math.isnan(self.contact_tolerance) or math.isinf(self.contact_tolerance) or self.contact_tolerance <= 0.0:
             raise ValueError(f"contact_tolerance must be strictly positive and finite, got {self.contact_tolerance}")
@@ -217,8 +219,12 @@ class SingleContactDynamics:
 
     @property
     def is_in_contact(self) -> bool:
-        """True if contact point is within contact_tolerance of the surface plane."""
-        return abs(self.surface_distance) <= self.contact_tolerance
+        """True if contact point is in physical contact with surface."""
+        if self.surface_distance is not None:
+            return abs(self.surface_distance) <= self.contact_tolerance
+        if self.is_in_contact_override is not None:
+            return self.is_in_contact_override
+        return True
 
     # -------------------------------------------------------------------------
     # Relative Lever Arm & Torques
@@ -312,9 +318,10 @@ class SingleContactDynamics:
                 f_n_vec = vec3_scale(n, f_n)
                 f_t_vec = vec3_sub(F, f_n_vec)
                 f_t = vec3_length(f_t_vec)
+                dist_str = f"{self.surface_distance:.3f}m" if self.surface_distance is not None else "unknown clearance"
                 reason = (
                     f"NON_CONTACT_FORCE_VIOLATION: Non-zero contact force ||F||={f_len:.3f}N applied to contact "
-                    f"'{self.contact_id}' separated from surface '{self.surface_id}' by {self.surface_distance:.3f}m "
+                    f"'{self.contact_id}' separated from surface '{self.surface_id}' by {dist_str} "
                     f"(exceeds contact tolerance {self.contact_tolerance:.3f}m)"
                 )
                 return FrictionConstraintEvaluation(

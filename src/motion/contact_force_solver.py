@@ -104,6 +104,9 @@ class ContactConstraintSpec:
     - allows_regular_support: Informational indicator of foot-support viability (e.g. ground vs wall).
     - min_normal_force: Minimum required normal force F_n >= min_normal_force >= 0 (N).
     - max_normal_force: Maximum allowable normal force F_n <= max_normal_force (N).
+    - surface_id: Unique identifier of environmental surface if bound, or empty string.
+    - surface_distance: True measured signed distance to surface (m) if available, or None if unmeasured.
+    - contact_tolerance: Permissible clearance gap or penetration threshold for contact (m).
     """
     contact_id: str
     contact_point_world: Vec3
@@ -113,6 +116,9 @@ class ContactConstraintSpec:
     allows_regular_support: bool = True
     min_normal_force: float = 0.0
     max_normal_force: float = float("inf")
+    surface_id: str = ""
+    surface_distance: Optional[float] = None
+    contact_tolerance: float = 0.02
 
     def __post_init__(self):
         # Validate spatial coordinates and vectors
@@ -136,6 +142,13 @@ class ContactConstraintSpec:
             raise ValueError(
                 f"max_normal_force ({self.max_normal_force}) cannot be less than min_normal_force ({self.min_normal_force})"
             )
+
+        if self.surface_distance is not None:
+            if math.isnan(self.surface_distance) or math.isinf(self.surface_distance):
+                raise ValueError(f"surface_distance must be finite when provided, got {self.surface_distance}")
+
+        if math.isnan(self.contact_tolerance) or math.isinf(self.contact_tolerance) or self.contact_tolerance <= 0.0:
+            raise ValueError(f"contact_tolerance must be strictly positive and finite, got {self.contact_tolerance}")
 
 
 @dataclass(frozen=True)
@@ -249,6 +262,10 @@ class ContactForceSolution:
     computation_time_sec: float
     is_physically_valid: bool
     message: str
+    solver_engine: str = "none"
+    optimizer_converged: bool = False
+    optimizer_message: str = ""
+    fallback_occurred: bool = False
 
 
 # =============================================================================
@@ -354,38 +371,67 @@ def project_to_friction_cone(
     Properties:
     - 100% exact closed-form Euclidean projection (no polyhedral approximation).
     - Preserves tangency direction and handles mu == 0 seamlessly.
-    - Guaranteed non-expansive, continuous, and strictly satisfies F_n >= min_normal_force >= 0.
+    - True orthogonal closest point under finite normal lower and upper bounds.
+    - Guaranteed non-expansive, continuous, idempotent (P(P(x)) = P(x)),
+      and strictly satisfies F_n in [min_normal_force, max_normal_force].
     """
     n = surface_normal
     fn = vec3_dot(F, n)
     ft_vec = vec3_sub(F, vec3_scale(n, fn))
     ft = vec3_length(ft_vec)
 
-    # 1. Point is already inside the cone
-    if ft <= friction_coeff * fn and fn >= min_normal_force:
-        fn_clamped = min(fn, max_normal_force)
-        if fn > 1e-12:
-            scale = fn_clamped / fn
-            return vec3_add(vec3_scale(ft_vec, scale), vec3_scale(n, fn_clamped))
-        return (0.0, 0.0, 0.0)
+    mu = max(0.0, float(friction_coeff))
+    min_fn = max(0.0, float(min_normal_force))
+    max_fn = max(min_fn, float(max_normal_force))
 
-    # 2. Point is in the polar/dual cone behind the apex
-    if fn + friction_coeff * ft <= 0.0:
-        if min_normal_force > 0.0:
-            return vec3_scale(n, min_normal_force)
-        return (0.0, 0.0, 0.0)
+    # 1. Point is already strictly inside the feasible bounded cone
+    if min_fn <= fn <= max_fn and ft <= mu * fn:
+        return F
 
-    # 3. Point projects onto the active friction boundary
-    denom = 1.0 + friction_coeff * friction_coeff
-    fn_star = (fn + friction_coeff * ft) / denom
-    fn_star = max(min_normal_force, min(fn_star, max_normal_force))
-    ft_star = friction_coeff * fn_star
+    # 2. Candidate projections onto boundary segments of the convex planar region
+    #    Omega = { (f_n, f_t) | f_n in [min_fn, max_fn], 0 <= f_t <= mu * f_n }
+    candidates: List[Tuple[float, float]] = []
 
-    if ft > 1e-12:
-        dir_t = vec3_scale(ft_vec, 1.0 / ft)
-        return vec3_add(vec3_scale(dir_t, ft_star), vec3_scale(n, fn_star))
+    # Candidate A: Slant boundary f_t = mu * f_n for f_n in [min_fn, max_fn]
+    if mu > 0.0:
+        denom = 1.0 + mu * mu
+        fn_slant = (fn + mu * ft) / denom
+        fn_slant_clamped = max(min_fn, min(fn_slant, max_fn))
+        ft_slant_clamped = mu * fn_slant_clamped
+        candidates.append((fn_slant_clamped, ft_slant_clamped))
     else:
-        return vec3_scale(n, fn_star)
+        # mu == 0: slant line is the segment [min_fn, max_fn] on the f_n axis (f_t = 0)
+        fn_clamped = max(min_fn, min(fn, max_fn))
+        candidates.append((fn_clamped, 0.0))
+
+    # Candidate B: Upper normal cap f_n = max_fn for f_t in [0, mu * max_fn]
+    if not math.isinf(max_fn):
+        ft_upper = max(0.0, min(ft, mu * max_fn))
+        candidates.append((max_fn, ft_upper))
+
+    # Candidate C: Lower normal cap f_n = min_fn for f_t in [0, mu * min_fn]
+    ft_lower = max(0.0, min(ft, mu * min_fn))
+    candidates.append((min_fn, ft_lower))
+
+    # Candidate D: Bottom axis f_t = 0 for f_n in [min_fn, max_fn]
+    fn_axis = max(min_fn, min(fn, max_fn))
+    candidates.append((fn_axis, 0.0))
+
+    # Select candidate (best_fn, best_ft) minimizing Euclidean distance (fn - c_fn)^2 + (ft - c_ft)^2
+    best_fn, best_ft = candidates[0]
+    best_dist_sq = (fn - best_fn) ** 2 + (ft - best_ft) ** 2
+    for c_fn, c_ft in candidates[1:]:
+        dist_sq = (fn - c_fn) ** 2 + (ft - c_ft) ** 2
+        if dist_sq < best_dist_sq:
+            best_dist_sq = dist_sq
+            best_fn, best_ft = c_fn, c_ft
+
+    # Reconstruct 3D force vector preserving tangential direction
+    if ft > 1e-12 and best_ft > 1e-12:
+        dir_t = vec3_scale(ft_vec, 1.0 / ft)
+        return vec3_add(vec3_scale(dir_t, best_ft), vec3_scale(n, best_fn))
+    else:
+        return vec3_scale(n, best_fn)
 
 
 # =============================================================================
@@ -486,14 +532,17 @@ def _solve_with_slsqp(
         )
         sol_dict[c.contact_id] = fi_proj
 
-    return sol_dict, int(opt_res.nit), bool(opt_res.success)
+    nit = int(getattr(opt_res, "nit", 0))
+    success = bool(getattr(opt_res, "success", False))
+    msg = str(getattr(opt_res, "message", ""))
+    return sol_dict, nit, success, msg
 
 
 def _solve_with_spg(
     target: ContactWrenchTarget,
     active_contacts: Sequence[ContactConstraintSpec],
     config: ContactSolverConfig,
-) -> Tuple[Dict[str, Vec3], int, bool]:
+) -> Tuple[Dict[str, Vec3], int, bool, str]:
     """Solve constrained allocation QP using Native Spectral Projected Gradient (SPG).
 
     Pure Python/NumPy implementation:
@@ -625,7 +674,13 @@ def _solve_with_spg(
     for i, c in enumerate(active_contacts):
         sol_dict[c.contact_id] = forces[i]
 
-    return sol_dict, it + 1, converged
+    iters_done = it + 1
+    if converged:
+        spg_msg = f"SPG converged in {iters_done} iterations (res_F={res_F:.4f}N, res_tau={res_tau:.4f}N*m)"
+    else:
+        spg_msg = f"SPG reached maximum iteration limit ({config.max_iterations}) without reaching tolerance (res_F={res_F:.4f}N, res_tau={res_tau:.4f}N*m)"
+
+    return sol_dict, iters_done, converged, spg_msg
 
 
 # =============================================================================
@@ -637,7 +692,7 @@ def _check_a_priori_infeasibility(
     active_contacts: Sequence[ContactConstraintSpec],
     tol: float = 1e-4,
 ) -> Optional[Tuple[ContactSolverStatus, str]]:
-    """Detect mathematically or physically provable infeasibilities before solving."""
+    """Detect strictly mathematically or physically provable infeasibilities before solving."""
     # 1. Zero contacts but non-zero target wrench
     if len(active_contacts) == 0:
         f_len = vec3_length(target.target_force_world)
@@ -649,22 +704,23 @@ def _check_a_priori_infeasibility(
             f"Zero active contacts cannot produce non-zero wrench: ||F||={f_len:.3f}N, ||tau||={tau_len:.3f}N*m"
         )
 
-    # 2. Upward ground contacts cannot provide tensile downward pull
-    # If all contact normals point upwards (n_z > 0.5) and target force requires downward pull F_z < -tol
-    if all(c.surface_normal_world[2] > 0.5 for c in active_contacts):
+    # 2. Strictly horizontal upward ground contacts cannot provide tensile downward pull
+    # When ALL contact normals are strictly vertical (n = [0, 0, 1]), normal force F_n = F_z >= 0,
+    # and all tangential friction forces lie strictly in the horizontal X-Y plane (t_z == 0).
+    # Thus F_z_total = sum(F_n_i) >= 0 is mathematically non-negative.
+    # Note: If any contact has an inclined normal (e.g. slope, ramp, wall), tangential friction forces
+    # can possess negative Z components (e.g. high friction downhill pushing), which is not provably
+    # infeasible a priori; those are deferred to the numerical optimizer.
+    if all(
+        abs(c.surface_normal_world[0]) < 1e-6 and
+        abs(c.surface_normal_world[1]) < 1e-6 and
+        c.surface_normal_world[2] > 0.999
+        for c in active_contacts
+    ):
         if target.target_force_world[2] < -tol:
             return (
                 ContactSolverStatus.INFEASIBLE,
-                f"Tensile pull violation: upward contact surfaces cannot pull downwards (F_target_z={target.target_force_world[2]:.3f}N < 0)"
-            )
-
-    # 3. All frictionless contacts (mu == 0) with vertical normals cannot produce horizontal forces
-    if all(c.friction_coeff < 1e-6 and abs(c.surface_normal_world[2]) > 0.99 for c in active_contacts):
-        h_force = math.sqrt(target.target_force_world[0]**2 + target.target_force_world[1]**2)
-        if h_force > tol:
-            return (
-                ContactSolverStatus.APPROXIMATE,
-                f"Frictionless ground (mu=0) cannot produce horizontal shear force: ||F_horizontal||={h_force:.3f}N > 0"
+                f"Tensile pull violation: strictly horizontal upward ground contacts cannot pull downwards (F_target_z={target.target_force_world[2]:.3f}N < 0)"
             )
 
     return None
@@ -718,6 +774,10 @@ def solve_contact_forces(
             computation_time_sec=time.perf_counter() - t0,
             is_physically_valid=False,
             message=f"INVALID_INPUT: {exc}",
+            solver_engine="none",
+            optimizer_converged=False,
+            optimizer_message=str(exc),
+            fallback_occurred=False,
         )
 
     # -------------------------------------------------------------------------
@@ -737,6 +797,7 @@ def solve_contact_forces(
         f_len = vec3_length(target.target_force_world)
         tau_len = vec3_length(target.target_torque_world)
         status = ContactSolverStatus.SOLVED if (f_len <= config.force_tolerance_n and tau_len <= config.torque_tolerance_nm) else ContactSolverStatus.INFEASIBLE
+        msg = "No active contacts. All contact forces set to zero." if status == ContactSolverStatus.SOLVED else "INFEASIBLE: Non-zero target wrench with zero active contacts."
         return ContactForceSolution(
             status=status,
             contact_forces={c.contact_id: (0.0, 0.0, 0.0) for c in contacts},
@@ -751,7 +812,11 @@ def solve_contact_forces(
             iterations=0,
             computation_time_sec=time.perf_counter() - t0,
             is_physically_valid=True,
-            message="No active contacts. All contact forces set to zero." if status == ContactSolverStatus.SOLVED else "INFEASIBLE: Non-zero target wrench with zero active contacts.",
+            message=msg,
+            solver_engine="none",
+            optimizer_converged=(status == ContactSolverStatus.SOLVED),
+            optimizer_message=msg,
+            fallback_occurred=False,
         )
 
     # -------------------------------------------------------------------------
@@ -760,23 +825,26 @@ def solve_contact_forces(
     use_slsqp = (config.method == "slsqp") or (config.method == "auto" and HAVE_SCIPY)
     iterations = 0
     solved_forces: Dict[str, Vec3] = {}
+    engine_used = "none"
+    fallback_occurred = False
+    opt_converged = False
+    opt_message = ""
 
-    try:
-        if use_slsqp:
-            solved_forces, iterations, _ = _solve_with_slsqp(
+    if use_slsqp:
+        engine_used = "slsqp"
+        try:
+            solved_forces, iterations, opt_converged, opt_message = _solve_with_slsqp(
                 target, active_contacts_sorted, config
             )
-        else:
-            solved_forces, iterations, _ = _solve_with_spg(
-                target, active_contacts_sorted, config
-            )
-    except Exception as exc:
-        # Fallback to Native SPG if SLSQP fails
-        if use_slsqp:
+        except Exception as exc:
+            # Fallback to Native SPG if SLSQP fails
+            fallback_occurred = True
+            engine_used = "spg"
             try:
-                solved_forces, iterations, _ = _solve_with_spg(
+                solved_forces, iterations, opt_converged, opt_message = _solve_with_spg(
                     target, active_contacts_sorted, config
                 )
+                opt_message = f"Fallback from SLSQP error ({exc}) to SPG: {opt_message}"
             except Exception as exc2:
                 return ContactForceSolution(
                     status=ContactSolverStatus.NUMERICAL_FAILURE,
@@ -792,9 +860,19 @@ def solve_contact_forces(
                     iterations=iterations,
                     computation_time_sec=time.perf_counter() - t0,
                     is_physically_valid=False,
-                    message=f"NUMERICAL_FAILURE: {exc2}",
+                    message=f"NUMERICAL_FAILURE: SLSQP failed ({exc}); SPG fallback failed ({exc2})",
+                    solver_engine="spg",
+                    optimizer_converged=False,
+                    optimizer_message=f"SLSQP error: {exc}; SPG error: {exc2}",
+                    fallback_occurred=True,
                 )
-        else:
+    else:
+        engine_used = "spg"
+        try:
+            solved_forces, iterations, opt_converged, opt_message = _solve_with_spg(
+                target, active_contacts_sorted, config
+            )
+        except Exception as exc:
             return ContactForceSolution(
                 status=ContactSolverStatus.NUMERICAL_FAILURE,
                 contact_forces={c.contact_id: (0.0, 0.0, 0.0) for c in contacts},
@@ -809,7 +887,11 @@ def solve_contact_forces(
                 iterations=iterations,
                 computation_time_sec=time.perf_counter() - t0,
                 is_physically_valid=False,
-                message=f"NUMERICAL_FAILURE: {exc}",
+                message=f"NUMERICAL_FAILURE: SPG failed ({exc})",
+                solver_engine="spg",
+                optimizer_converged=False,
+                optimizer_message=f"SPG error: {exc}",
+                fallback_occurred=False,
             )
 
     # -------------------------------------------------------------------------
@@ -888,14 +970,23 @@ def solve_contact_forces(
         status = ContactSolverStatus.INFEASIBLE
         msg = f"INFEASIBLE: {infeasible_check[1]}"
     elif res_F <= config.force_tolerance_n and res_tau <= config.torque_tolerance_nm:
-        status = ContactSolverStatus.SOLVED
-        msg = (
-            f"SOLVED: Converged in {iterations} iters. "
-            f"res_F={res_F:.4f}N (tol={config.force_tolerance_n:.4f}N), "
-            f"res_tau={res_tau:.4f}N*m (tol={config.torque_tolerance_nm:.4f}N*m)."
-        )
+        # Check if optimizer actually confirmed convergence or hit iteration limit
+        if not opt_converged and iterations >= config.max_iterations:
+            status = ContactSolverStatus.APPROXIMATE
+            msg = (
+                f"APPROXIMATE: Residuals nominally within tolerance, but optimizer reached max iterations "
+                f"({iterations}/{config.max_iterations}) without convergence confirmation ({opt_message})."
+            )
+        else:
+            status = ContactSolverStatus.SOLVED
+            msg = (
+                f"SOLVED: Converged via {engine_used} in {iterations} iters. "
+                f"res_F={res_F:.4f}N (tol={config.force_tolerance_n:.4f}N), "
+                f"res_tau={res_tau:.4f}N*m (tol={config.torque_tolerance_nm:.4f}N*m)."
+            )
     else:
-        # Check if target is provably infeasible (e.g. yaw torque on single point contact, or CoM outside base)
+        # Check if target is limited by single-contact lever arm geometry
+        status = ContactSolverStatus.APPROXIMATE
         if len(active_contacts_sorted) == 1:
             r1 = (
                 active_contacts_sorted[0].contact_point_world[0] - com_x,
@@ -904,36 +995,30 @@ def solve_contact_forces(
             )
             r1_len = vec3_length(r1)
             if r1_len > 1e-4:
-                # Torque parallel to r1 cannot be generated
                 parallel_tau = abs(vec3_dot(target.target_torque_world, vec3_scale(r1, 1.0 / r1_len)))
                 if parallel_tau > config.torque_tolerance_nm:
-                    status = ContactSolverStatus.APPROXIMATE
                     msg = (
                         f"APPROXIMATE: Single contact point cannot produce torque parallel to lever arm "
                         f"(parallel tau={parallel_tau:.3f}N*m). Hard physical constraints satisfied."
                     )
-                    return ContactForceSolution(
-                        status=status,
-                        contact_forces=all_forces,
-                        total_contact_force=total_F,
-                        total_contact_torque_about_com=total_tau,
-                        force_error_vector=e_F,
-                        force_residual_n=res_F,
-                        torque_error_vector=e_tau,
-                        torque_residual_nm=res_tau,
-                        max_normal_violation_n=max_norm_violation,
-                        max_friction_violation_n=max_fric_violation,
-                        iterations=iterations,
-                        computation_time_sec=time.perf_counter() - t0,
-                        is_physically_valid=is_physically_valid,
-                        message=msg,
+                else:
+                    msg = (
+                        f"APPROXIMATE: Physical constraints satisfied, but target wrench residual exceeds tolerance "
+                        f"({opt_message}): res_F={res_F:.4f}N (tol={config.force_tolerance_n:.4f}N), "
+                        f"res_tau={res_tau:.4f}N*m (tol={config.torque_tolerance_nm:.4f}N*m)."
                     )
-        status = ContactSolverStatus.APPROXIMATE
-        msg = (
-            f"APPROXIMATE: Physical constraints satisfied, but target wrench residual exceeds tolerance: "
-            f"res_F={res_F:.4f}N (tol={config.force_tolerance_n:.4f}N), "
-            f"res_tau={res_tau:.4f}N*m (tol={config.torque_tolerance_nm:.4f}N*m)."
-        )
+            else:
+                msg = (
+                    f"APPROXIMATE: Physical constraints satisfied, but target wrench residual exceeds tolerance "
+                    f"({opt_message}): res_F={res_F:.4f}N (tol={config.force_tolerance_n:.4f}N), "
+                    f"res_tau={res_tau:.4f}N*m (tol={config.torque_tolerance_nm:.4f}N*m)."
+                )
+        else:
+            msg = (
+                f"APPROXIMATE: Physical constraints satisfied, but target wrench residual exceeds tolerance "
+                f"({opt_message}): res_F={res_F:.4f}N (tol={config.force_tolerance_n:.4f}N), "
+                f"res_tau={res_tau:.4f}N*m (tol={config.torque_tolerance_nm:.4f}N*m)."
+            )
 
     return ContactForceSolution(
         status=status,
@@ -950,6 +1035,10 @@ def solve_contact_forces(
         computation_time_sec=time.perf_counter() - t0,
         is_physically_valid=is_physically_valid,
         message=msg,
+        solver_engine=engine_used,
+        optimizer_converged=opt_converged,
+        optimizer_message=opt_message,
+        fallback_occurred=fallback_occurred,
     )
 
 
@@ -969,7 +1058,7 @@ def create_contact_constraint_from_environment(
 ) -> ContactConstraintSpec:
     """Construct a ContactConstraintSpec by querying the 3D analytical environment.
 
-    Directly extracts outward surface normal, friction coefficient, and support properties
+    Directly extracts outward surface normal, friction coefficient, and true signed distance
     from standard DynamicsPlayground surface patches (Zone 1 Flat Ground, Zone 3 Sloped Ramps,
     Zone 4 Vertical Walls).
     """
@@ -996,6 +1085,9 @@ def create_contact_constraint_from_environment(
         allows_regular_support=res.allows_regular_support,
         min_normal_force=min_normal_force,
         max_normal_force=max_normal_force,
+        surface_id=res.surface_id,
+        surface_distance=res.signed_distance,
+        contact_tolerance=contact_tolerance,
     )
 
 
@@ -1007,8 +1099,8 @@ def solution_to_multi_contact_dynamics(
 ) -> MultiContactDynamics:
     """Convert a ContactForceSolution into an independent verified MultiContactDynamics instance.
 
-    Enforces the complete data contract integration pass:
-    ContactForceSolution -> SingleContactDynamics (per contact) -> MultiContactDynamics.
+    Preserves true measured surface_distance from upstream contact specs without fabricating
+    arbitrary placeholder clearances.
     """
     single_contacts: List[SingleContactDynamics] = []
     for c in contacts:
@@ -1021,9 +1113,10 @@ def solution_to_multi_contact_dynamics(
             surface_normal_world=c.surface_normal_world,
             friction_coeff=c.friction_coeff,
             dt=dt,
-            surface_id=c.contact_id,
-            surface_distance=0.0 if c.is_in_contact else 0.05,
-            contact_tolerance=0.02,
+            surface_id=c.surface_id or c.contact_id,
+            surface_distance=c.surface_distance,
+            contact_tolerance=c.contact_tolerance,
+            is_in_contact_override=c.is_in_contact,
         )
         single_contacts.append(single_c)
 

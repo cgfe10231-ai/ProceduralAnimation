@@ -3,6 +3,48 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-B-R1：接触力求解器数值可靠性与状态契约修复 (Task 6G-D-B-R1)
+
+### 有界摩擦锥欧氏正交投影与状态契约修复 (`src/motion/contact_force_solver.py`, `src/motion/contact_dynamics.py`)
+* **有界摩擦锥正交投影重构 (`project_to_friction_cone`)**：
+  * 针对有限最大法向力 $F_{n,\max}$ 和最小法向力 $F_{n,\min}$，消除原先等比缩放切向力导致的偏离反例（$F=(1,0,10), n=(0,0,1), \mu=0.5, \max=5$ 精确投影到最近点 $(1,0,5)$，距离为 $5.0$，优于原缩放点 $(0.5,0,5)$ 的 $5.025$）；
+  * 构建母线、上法向盖、下法向盖、底轴 4 组闭式投影候选点，通过欧几里得距离解析极小化确保全局最优性；
+  * 严格保证 $\mu=0$、内部点不变性、幂等性 $P(P(F))=P(F)$ 与切向方向保真。
+* **求解状态机与底层优化诊断透传 (`ContactForceSolution`)**：
+  * 新增 `solver_engine`, `optimizer_converged`, `optimizer_message`, `fallback_occurred` 诊断字段；
+  * 独立评估物理约束可行性与外力残差，严禁仅凭优化器 `success=True` 虚报 `SOLVED`，达到迭代上限明确标定 `APPROXIMATE` 并报告实际迭代；
+  * 记录 SLSQP 到 SPG 的容错回退机制（`fallback_occurred=True`）。
+* **收紧不可行性预判 (`_check_a_priori_infeasibility`)**：
+  * 废除 `normal_z > 0.5` 启发式规则，仅对严格水平地表（法向均为 $(0,0,1)$）且拉力为负、或无触点且目标非零等可证明场景报 `INFEASIBLE`；倾斜斜坡（含高摩擦负 $Z$ 切向推力）交由优化器真实求解。
+* **真实接触几何间隙保真 (`ContactConstraintSpec`, `SingleContactDynamics`)**：
+  * 扩展 `surface_distance: Optional[float] = None` 与 `is_in_contact_override`；
+  * 存在环境测量时 100% 传递真实有符号净距，无测量时明确标记为未知（`None`），严禁凭空构造伪数值（如 $0.05\text{ m}$）。
+
+### 测试验证与架构状态
+* **独立单元测试套件扩充 (`tests/verify_task6gd_contact_force_solver.py`)**：
+  * 测试套件由 17 项扩充至 31 项（新增 Test 18 至 Test 31）：
+    * Test 18: 有界摩擦锥最近点反例（$(1,0,10) \rightarrow (1,0,5)$）
+    * Test 19: 有界摩擦锥内点不变性
+    * Test 20: 有限法向上下界截断
+    * Test 21: $\mu=0$ 无摩擦地表截断
+    * Test 22: 投影幂等性 $P(P(F))=P(F)$
+    * Test 23: 投影后约束严格可行性
+    * Test 24: 投影点欧氏距离极小性验证
+    * Test 25: SPG 迭代上限终止与状态报告
+    * Test 26: SLSQP 终止诊断与迭代透传（无 SciPy 时优雅跳过）
+    * Test 27: SLSQP 到 SPG 容错回退报告与记录
+    * Test 28: 数值失败与约束违规不虚报 SOLVED
+    * Test 29: 高摩擦斜坡向下推力可行性反例（不虚报 INFEASIBLE）
+    * Test 30: 已知数学不可行目标严格拦截
+    * Test 31: 真实地表距离信息保真（消除虚假占位值）
+  * 独立 Python 全量环境：31/31 项测试全部通过（0.443s）；
+  * Blender 无 SciPy 无头环境：30/30 项测试全部通过（1 项 SLSQP 测试优雅跳过，0.091s）。
+* **自动化回归测试验证**：
+  * `quick` Tier：7/7 项测试全绿通过（7.76s，退出码 0）；
+  * `physics` Tier：12/12 项测试全绿通过（62.09s，退出码 0）；
+  * 零历史步态修改，零 Rig/IK/WBC 篡改，零训练场重建。
+
+
 ## [2026-10-23] 任务 6G-D-B：多接触力逆向求解与约束分配系统 (Task 6G-D-B)
 
 ### 核心接触力求解器实现 (`src/motion/contact_force_solver.py`)

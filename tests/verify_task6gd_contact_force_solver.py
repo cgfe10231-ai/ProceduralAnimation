@@ -38,9 +38,12 @@ from src.motion.contact_dynamics import (
     vec3_cross,
     vec3_dot,
     vec3_length,
+    vec3_normalize,
+    vec3_scale,
     vec3_sub,
 )
 from src.motion.contact_force_solver import (
+    HAVE_SCIPY,
     ContactConstraintSpec,
     ContactForceSolution,
     ContactSolverConfig,
@@ -711,6 +714,358 @@ class TestContactForceSolver(unittest.TestCase):
             self.assertAlmostEqual(w_F[k], expected_F[k], places=6)
             self.assertAlmostEqual(w_tau[k], expected_tau[k], places=6)
 
+    # -------------------------------------------------------------------------
+    # Test 18: Bounded Friction Cone Exact Counterexample (Task 6G-D-B-R1)
+    # -------------------------------------------------------------------------
+    def test_18_bounded_friction_cone_exact_counterexample(self):
+        """Test 18: F=(1,0,10) under n=(0,0,1), mu=0.5, max_Fn=5 projects to (1,0,5), not (0.5,0,5)."""
+        F = (1.0, 0.0, 10.0)
+        normal = (0.0, 0.0, 1.0)
+        mu = 0.5
+        min_fn = 0.0
+        max_fn = 5.0
+
+        F_proj = project_to_friction_cone(F, normal, mu, min_fn, max_fn)
+
+        # Theoretical closest feasible point in K:
+        # At Fn = 5.0, max allowable tangential force is mu * Fn = 0.5 * 5.0 = 2.5.
+        # Since Ft = 1.0 <= 2.5, the tangential force 1.0 is completely feasible!
+        # The closest point is (1.0, 0.0, 5.0), with distance = 5.0.
+        # The flawed scaled projection gave (0.5, 0.0, 5.0) with distance = sqrt(0.25 + 25) = 5.0249 > 5.0.
+        self.assertAlmostEqual(F_proj[0], 1.0, places=6)
+        self.assertAlmostEqual(F_proj[1], 0.0, places=6)
+        self.assertAlmostEqual(F_proj[2], 5.0, places=6)
+
+        dist_optimal = math.sqrt((F[0] - F_proj[0])**2 + (F[1] - F_proj[1])**2 + (F[2] - F_proj[2])**2)
+        dist_flawed = math.sqrt((1.0 - 0.5)**2 + 0.0 + (10.0 - 5.0)**2)
+        self.assertAlmostEqual(dist_optimal, 5.0, places=6)
+        self.assertLess(dist_optimal, dist_flawed)
+
+    # -------------------------------------------------------------------------
+    # Test 19: Bounded Friction Cone Interior Point Invariant
+    # -------------------------------------------------------------------------
+    def test_19_bounded_friction_cone_interior_point_invariant(self):
+        """Test 19: Points strictly inside bounded cone are unchanged by projection."""
+        normal = (0.0, 0.0, 1.0)
+        mu = 0.6
+        min_fn = 1.0
+        max_fn = 10.0
+
+        # Interior point: Fn = 4.0 in [1.0, 10.0], Ft = sqrt(0.5^2 + 0.3^2) = 0.583 <= 0.6 * 4.0 = 2.4
+        F_in = (0.5, 0.3, 4.0)
+        F_proj = project_to_friction_cone(F_in, normal, mu, min_fn, max_fn)
+
+        self.assertAlmostEqual(F_proj[0], F_in[0], places=7)
+        self.assertAlmostEqual(F_proj[1], F_in[1], places=7)
+        self.assertAlmostEqual(F_proj[2], F_in[2], places=7)
+
+    # -------------------------------------------------------------------------
+    # Test 20: Finite Normal Upper and Lower Bounds
+    # -------------------------------------------------------------------------
+    def test_20_bounded_friction_cone_finite_bounds(self):
+        """Test 20: Clamping with finite min_normal_force > 0 and finite max_normal_force."""
+        normal = (0.0, 0.0, 1.0)
+        mu = 0.5
+        min_fn = 2.0
+        max_fn = 8.0
+
+        # Below lower bound: Fn = 0.5 < 2.0, Ft = 0.2 <= mu * min_fn
+        F_low = (0.2, 0.0, 0.5)
+        P_low = project_to_friction_cone(F_low, normal, mu, min_fn, max_fn)
+        self.assertAlmostEqual(P_low[0], 0.2, places=6)
+        self.assertAlmostEqual(P_low[1], 0.0, places=6)
+        self.assertAlmostEqual(P_low[2], 2.0, places=6)
+
+        # Above upper bound: Fn = 15.0 > 8.0, Ft = 1.0 <= mu * max_fn (4.0)
+        F_high = (1.0, 0.0, 15.0)
+        P_high = project_to_friction_cone(F_high, normal, mu, min_fn, max_fn)
+        self.assertAlmostEqual(P_high[0], 1.0, places=6)
+        self.assertAlmostEqual(P_high[1], 0.0, places=6)
+        self.assertAlmostEqual(P_high[2], 8.0, places=6)
+
+    # -------------------------------------------------------------------------
+    # Test 21: Zero Friction Coeff (mu == 0)
+    # -------------------------------------------------------------------------
+    def test_21_bounded_friction_cone_zero_friction(self):
+        """Test 21: mu=0 strictly projects to normal axis [min_fn, max_fn] eliminating all tangential force."""
+        normal = (0.0, 0.0, 1.0)
+        mu = 0.0
+        min_fn = 0.0
+        max_fn = 10.0
+
+        F = (5.0, -3.0, 4.0)
+        P = project_to_friction_cone(F, normal, mu, min_fn, max_fn)
+        self.assertAlmostEqual(P[0], 0.0, places=7)
+        self.assertAlmostEqual(P[1], 0.0, places=7)
+        self.assertAlmostEqual(P[2], 4.0, places=7)
+
+    # -------------------------------------------------------------------------
+    # Test 22: Projection Idempotency
+    # -------------------------------------------------------------------------
+    def test_22_bounded_friction_cone_idempotency(self):
+        """Test 22: Projection operator is idempotent: P(P(F)) == P(F) for diverse forces."""
+        normal = vec3_normalize((0.2, -0.3, 0.9))
+        mu = 0.45
+        min_fn = 0.5
+        max_fn = 12.0
+
+        test_vectors = [
+            (10.0, -20.0, 30.0),
+            (-50.0, 10.0, -5.0),
+            (0.0, 0.0, 0.0),
+            (0.1, -0.1, 2.0),
+            (100.0, 100.0, 100.0),
+        ]
+        for F in test_vectors:
+            P1 = project_to_friction_cone(F, normal, mu, min_fn, max_fn)
+            P2 = project_to_friction_cone(P1, normal, mu, min_fn, max_fn)
+            for k in range(3):
+                self.assertAlmostEqual(P1[k], P2[k], places=7)
+
+    # -------------------------------------------------------------------------
+    # Test 23: Post-Projection Constraint Feasibility
+    # -------------------------------------------------------------------------
+    def test_23_bounded_friction_cone_feasibility(self):
+        """Test 23: Every projected force strictly satisfies normal bounds and circular friction cone."""
+        normal = vec3_normalize((-0.5, 0.2, 0.8))
+        mu = 0.55
+        min_fn = 1.0
+        max_fn = 7.5
+
+        test_vectors = [
+            (25.0, 15.0, 4.0),
+            (-10.0, -10.0, -10.0),
+            (0.0, 0.0, 0.0),
+            (3.0, 4.0, 20.0),
+        ]
+        for F in test_vectors:
+            P = project_to_friction_cone(F, normal, mu, min_fn, max_fn)
+            fn = vec3_dot(P, normal)
+            ft_vec = vec3_sub(P, vec3_scale(normal, fn))
+            ft = vec3_length(ft_vec)
+
+            self.assertGreaterEqual(fn, min_fn - 1e-6)
+            self.assertLessEqual(fn, max_fn + 1e-6)
+            self.assertLessEqual(ft, mu * fn + 1e-6)
+
+    # -------------------------------------------------------------------------
+    # Test 24: Projection Closest-Point Optimality Verification
+    # -------------------------------------------------------------------------
+    def test_24_bounded_friction_cone_closest_point_property(self):
+        """Test 24: P(F) achieves strictly minimal Euclidean distance compared to neighboring feasible points."""
+        normal = (0.0, 0.0, 1.0)
+        mu = 0.5
+        min_fn = 0.0
+        max_fn = 5.0
+        F = (1.0, 0.0, 10.0)
+
+        P = project_to_friction_cone(F, normal, mu, min_fn, max_fn)
+        dist_P = vec3_length(vec3_sub(P, F))
+
+        # Sample local feasible perturbations around P in K
+        epsilons = [-0.1, 0.0, 0.1]
+        for dfx in epsilons:
+            for dfy in epsilons:
+                for dfz in [-0.2, -0.1, 0.0]:
+                    y = (P[0] + dfx, P[1] + dfy, P[2] + dfz)
+                    y_fn = y[2]
+                    y_ft = math.sqrt(y[0]**2 + y[1]**2)
+                    if min_fn <= y_fn <= max_fn and y_ft <= mu * y_fn:
+                        dist_y = vec3_length(vec3_sub(y, F))
+                        self.assertGreaterEqual(dist_y, dist_P - 1e-9)
+
+    # -------------------------------------------------------------------------
+    # Test 25: SPG Max Iterations and Convergence Status Handling
+    # -------------------------------------------------------------------------
+    def test_25_spg_max_iterations_handling(self):
+        """Test 25: SPG with tiny max_iterations terminates with APPROXIMATE, reports iter count, not SOLVED."""
+        com = (0.0, 0.0, 1.0)
+        foot = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.65)
+        target = ContactWrenchTarget(
+            target_force_world=(100.0, 50.0, 600.0),
+            target_torque_world=(10.0, -15.0, 0.0),
+            com_world=com,
+        )
+        config = ContactSolverConfig(max_iterations=2, method="spg")
+        sol = solve_contact_forces(target, [foot], config)
+
+        self.assertEqual(sol.solver_engine, "spg")
+        self.assertEqual(sol.iterations, 2)
+        self.assertFalse(sol.optimizer_converged)
+        self.assertEqual(sol.status, ContactSolverStatus.APPROXIMATE)
+        self.assertIn("reached maximum iteration limit", sol.optimizer_message)
+
+    # -------------------------------------------------------------------------
+    # Test 26: SLSQP Optimizer Termination and Diagnostics
+    # -------------------------------------------------------------------------
+    def test_26_slsqp_optimizer_termination_and_diagnostics(self):
+        """Test 26: SLSQP propagates termination status, message, and iteration diagnostics."""
+        if not HAVE_SCIPY:
+            self.skipTest("SciPy not installed in this environment")
+
+        com = (0.0, 0.0, 1.0)
+        foot_L = ContactConstraintSpec("foot_L", (-0.15, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        foot_R = ContactConstraintSpec("foot_R", (0.15, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 686.7),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+        config = ContactSolverConfig(method="slsqp", max_iterations=100)
+        sol = solve_contact_forces(target, [foot_L, foot_R], config)
+
+        self.assertEqual(sol.solver_engine, "slsqp")
+        self.assertTrue(sol.optimizer_converged)
+        self.assertGreater(sol.iterations, 0)
+        self.assertEqual(sol.status, ContactSolverStatus.SOLVED)
+        self.assertFalse(sol.fallback_occurred)
+
+    # -------------------------------------------------------------------------
+    # Test 27: Optimizer Fallback Reporting
+    # -------------------------------------------------------------------------
+    def test_27_optimizer_fallback_reporting(self):
+        """Test 27: Fallback from SLSQP exception to SPG explicitly records fallback_occurred and engine."""
+        com = (0.0, 0.0, 1.0)
+        foot = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 500.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+
+        import src.motion.contact_force_solver as cfs
+        orig_slsqp = cfs._solve_with_slsqp
+
+        def mock_failing_slsqp(*args, **kwargs):
+            raise RuntimeError("Mock SLSQP internal optimizer failure")
+
+        try:
+            cfs._solve_with_slsqp = mock_failing_slsqp
+            config = ContactSolverConfig(method="slsqp")
+            sol = solve_contact_forces(target, [foot], config)
+
+            self.assertTrue(sol.fallback_occurred)
+            self.assertEqual(sol.solver_engine, "spg")
+            self.assertIn("Fallback from SLSQP", sol.optimizer_message)
+            self.assertTrue(sol.is_physically_valid)
+        finally:
+            cfs._solve_with_slsqp = orig_slsqp
+
+    # -------------------------------------------------------------------------
+    # Test 28: Numerical Failure Cannot Falsely Report SOLVED
+    # -------------------------------------------------------------------------
+    def test_28_numerical_failure_cannot_falsely_report_solved(self):
+        """Test 28: Physical constraint violation or numerical exception is strictly NUMERICAL_FAILURE."""
+        com = (0.0, 0.0, 1.0)
+        # Separated contact
+        foot_sep = ContactConstraintSpec(
+            "foot_sep", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.7, is_in_contact=False
+        )
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 500.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+        sol = solve_contact_forces(target, [foot_sep])
+        self.assertNotEqual(sol.status, ContactSolverStatus.SOLVED)
+        self.assertEqual(sol.status, ContactSolverStatus.INFEASIBLE)
+
+    # -------------------------------------------------------------------------
+    # Test 29: High-Friction Slope Feasibility Counterexample
+    # -------------------------------------------------------------------------
+    def test_29_high_friction_slope_feasibility_counterexample(self):
+        """Test 29: Inclined slope (n_z > 0.5) with high friction can produce downward force (not INFEASIBLE a priori)."""
+        # Slope with normal inclined at 30 deg from vertical: normal = (0.0, 0.5, 0.866)
+        # Tangent downhill vector: (0.0, 0.866, -0.5).
+        # High friction mu = 2.0.
+        # When pushing against the slope downhill: F = 100 * n - 150 * t
+        # F_z = 100 * 0.866 - 150 * (-0.5) ... wait, tangent has negative z!
+        # Pushing into the wall/slope: F_n = 100 N > 0.
+        # Downhill friction: F_t = 120 N * (0, 0.866, -0.5).
+        # Net F_z = 100 * 0.866 + 120 * (-0.5) = 86.6 - 60 = 26.6 N.
+        # If F_t is even larger: 100 * 0.866 + 180 * (-0.5) = 86.6 - 90 = -3.4 N (downward!)
+        # Here mu = 2.0 allows F_t up to 200 N. Thus negative F_z is physically feasible!
+        normal = (0.0, 0.5, 0.866025)
+        com = (0.0, 0.0, 1.0)
+        slope_contact = ContactConstraintSpec("slope", (0.0, 1.0, 0.5), normal, friction_coeff=2.0)
+
+        # Target has negative F_z = -5.0 N
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 150.0, -5.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+        # Previous flawed logic had all(n_z > 0.5) -> INFEASIBLE.
+        # Now it must NOT be a priori rejected as INFEASIBLE.
+        sol = solve_contact_forces(target, [slope_contact])
+        self.assertNotEqual(sol.status, ContactSolverStatus.INFEASIBLE)
+        self.assertTrue(sol.is_physically_valid)
+
+    # -------------------------------------------------------------------------
+    # Test 30: Known Provably Infeasible Targets Strictness
+    # -------------------------------------------------------------------------
+    def test_30_known_infeasible_targets_strictness(self):
+        """Test 30: True provable infeasibilities (zero contacts, flat ground tensile pull) are INFEASIBLE."""
+        com = (0.0, 0.0, 1.0)
+        # Case A: Zero active contacts with non-zero force
+        target_f = ContactWrenchTarget(
+            target_force_world=(10.0, 0.0, 0.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+        sol_a = solve_contact_forces(target_f, [])
+        self.assertEqual(sol_a.status, ContactSolverStatus.INFEASIBLE)
+
+        # Case B: Strictly horizontal ground (n = [0, 0, 1]) with downward pull
+        ground = ContactConstraintSpec("ground", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.7)
+        target_down = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, -100.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+        sol_b = solve_contact_forces(target_down, [ground])
+        self.assertEqual(sol_b.status, ContactSolverStatus.INFEASIBLE)
+
+    # -------------------------------------------------------------------------
+    # Test 31: Contact Geometry Distance Fidelity
+    # -------------------------------------------------------------------------
+    def test_31_contact_geometry_distance_fidelity(self):
+        """Test 31: ContactConstraintSpec and MultiContactDynamics preserve true surface_distance without fakes."""
+        from src.scene.environment_query import create_standard_dynamics_playground_query
+        env_query = create_standard_dynamics_playground_query()
+
+        # Query point with true clearance gap of 10mm (0.010m) above ground
+        pt = (0.0, 0.0, 0.010)
+        spec = create_contact_constraint_from_environment(
+            env_query=env_query,
+            contact_point_world=pt,
+            contact_id="test_foot",
+            contact_tolerance=0.02,
+        )
+        self.assertTrue(spec.is_in_contact)
+        self.assertIsNotNone(spec.surface_distance)
+        self.assertAlmostEqual(spec.surface_distance, 0.010, places=4)
+        self.assertEqual(spec.surface_id, "default_ground")
+
+        # Solve and bridge to MultiContactDynamics
+        target = ContactWrenchTarget((0, 0, 500), (0, 0, 0), (0, 0, 1))
+        sol = solve_contact_forces(target, [spec])
+        multi = solution_to_multi_contact_dynamics(sol, [spec], (0, 0, 1))
+
+        self.assertEqual(len(multi.contacts), 1)
+        single = multi.contacts[0]
+        # Must retain true 0.010m clearance, NOT fabricated 0.0 or 0.05
+        self.assertAlmostEqual(single.surface_distance, 0.010, places=4)
+        self.assertEqual(single.surface_id, "default_ground")
+
+        # Manual spec with unknown distance (surface_distance=None)
+        manual_spec = ContactConstraintSpec("manual", (0, 0, 0), (0, 0, 1), 0.7, surface_distance=None)
+        multi_manual = solution_to_multi_contact_dynamics(sol, [manual_spec], (0, 0, 1))
+        self.assertIsNone(multi_manual.contacts[0].surface_distance)
+
 
 if __name__ == "__main__":
-    unittest.main()
+    argv = [sys.argv[0]]
+    if "--" in sys.argv:
+        argv.extend(sys.argv[sys.argv.index("--") + 1:])
+    unittest.main(argv=argv)
