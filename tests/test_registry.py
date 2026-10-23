@@ -88,6 +88,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=15.0,
         description="Validates closed-form 3D surface queries, normal vectors, signed distance, step/slope/wall geometry, and EnvironmentQuery compatibility.",
     ),
+    "contact_dynamics_math": TestDefinition(
+        test_id="contact_dynamics_math",
+        name="Contact Dynamics Foundation & Momentum Impulse",
+        script_path="tests/verify_task6gd_contact_dynamics.py",
+        runner_type=RunnerType.PYTHON,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=15.0,
+        description="Validates 3D contact forces, torques about CoM, linear/angular impulses, Coulomb friction cone, and playground contract.",
+    ),
     "runner_unit_tests": TestDefinition(
         test_id="runner_unit_tests",
         name="Test Suite Runner Unit Tests",

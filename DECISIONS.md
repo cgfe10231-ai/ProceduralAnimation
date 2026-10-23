@@ -561,3 +561,30 @@
   - 更新门禁与清规：`docs/ARCHITECTURE_CHANGE_GATE.md`、`AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md`；
   - 实测回归全绿：`quick` (5/5), `motion` (5/5), `dynamics_environment_query` (13/13) 全绿通过（退出码 0）；
   - 零生产代码修改，零步态曲线变动，零 Blend 文件重构。
+
+---
+
+### [DEC-032] 接触动力学数学模型、冲量动量关系与环境查询契约 (Task 6G-D-A)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-23
+* **背景**：进入 Task 6G-D 接触动力学阶段，系统已有几何接触模型 `contact_model.py`、质心 `rigid_link.py`、惯量 `body_inertia.py` 与训练场查询 `environment_query.py`，但缺乏世界空间接触力、力矩、冲量、动量变化以及单侧正向与库仑摩擦锥的数学定义和计算契约。
+* **决策与方案**：
+  1. **纯数学接触动力学模块 (`src/motion/contact_dynamics.py`)**：
+     - 构建 `SingleContactDynamics`，严格支持世界空间接触点 $\mathbf{p}_c$、接触力 $\mathbf{F}$、质心相对位矢 $\mathbf{r} = \mathbf{p}_c - \mathbf{p}_{\text{com}}$、绕质心力矩 $\boldsymbol{\tau}_{\text{com}} = \mathbf{r} \times \mathbf{F}$、线冲量 $\mathbf{J} = \mathbf{F}\Delta t$、角冲量 $\mathbf{H}_{\text{impulse}} = \boldsymbol{\tau}_{\text{com}}\Delta t$、线动量变化 $\Delta \mathbf{P} = \mathbf{J}$、角动量变化 $\Delta \mathbf{L}_{\text{com}} = \mathbf{H}_{\text{impulse}}$；
+     - 严格区分力（$\text{N}$）、力矩（$\text{N}\cdot\text{m}$）、冲量（$\text{N}\cdot\text{s}$）、动量（$\text{kg}\cdot\text{m/s}$），严格区分绕质心力矩/角冲量与绕世界原点力矩/角冲量；
+     - 验证 6 大数学定理：零力零动量变化、质心作用力零力矩、偏心力右手定则力矩、世界坐标平移不变性、$\mathrm{SO}(3)$ 刚体旋转协变性、冲量-动量等价性。
+  2. **单侧法向与库仑摩擦约束评估 (`FrictionConstraintEvaluation`)**：
+     - 单侧法向约束：$F_n = \mathbf{F} \cdot \hat{\mathbf{n}} \ge 0$，张力/粘附力（$F_n < 0$）严格判定为 `TENSION_VIOLATION`；
+     - 库仑摩擦锥约束：切向力 $\mathbf{F}_t = \mathbf{F} - F_n \hat{\mathbf{n}}$，$\|\mathbf{F}_t\| \le \mu F_n$，超限判定为 `SLIP_VIOLATION`；
+  3. **多接触点动力学聚合 (`MultiContactDynamics`)**：
+     - 支持合外力、合外力矩、总线冲量、总角冲量与多接触点摩擦锥完备性校验；
+  4. **标准训练场环境查询接口契约绑定 (`create_contact_dynamics_from_environment`)**：
+     - 直接与 `DynamicsEnvironmentQuery`（`src/scene/environment_query.py`）无缝对接，法向 $\hat{\mathbf{n}}$ 与摩擦系数 $\mu$ 100% 绑定自实际地表解析参数（平地 $\mu=0.70$、斜坡 $\mu=0.65$、垂直墙 $\mu=0.60$）；
+     - 零虚假摆拍，零独立训练场。
+* **影响与产物**：
+  - 新增模块：`src/motion/contact_dynamics.py`；
+  - 导出并更新：`src/motion/__init__.py`（增加 bpy 容错隔离保护纯 Python 运行环境）；
+  - 交付测试套件：`tests/verify_task6gd_contact_dynamics.py`（15/15 项数学与契约断言全绿通过）；
+  - 注册登记：`tests/test_registry.py`（加入 `contact_dynamics_math` 纳管至 `quick`、`physics` 与 `full`）；
+  - 实测回归全绿：`quick` (6/6), `physics` (11/11), `motion` (5/5) 保持 100% 零退化（退出码 0）；
+  - 零生产动作修改，零步态曲线变动，零 Blender 场景重复构建。

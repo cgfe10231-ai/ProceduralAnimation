@@ -5,7 +5,7 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-PRE-P2-R1（环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁）：修复 `query_surface_at_point()` 中 `surface_type_filter` 未约束默认地面的缺陷；统一 `signed_distance` 物理语义并将射线命中距离解耦表示为 `ray_hit_distance`；将 `output/dynamics_playground.blend` 确立为 Task 6G-D/6H/7A 统一标准训练场并增补 ACG 规范与十大绝对清规；新增 `test_12` 与 `test_13` 测试扩充至 13 项纯 Python 数学断言全绿；实测 quick 5/5、motion 5/5、playground_blend 1/1 全绿通过。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-A（接触动力学基础与冲量动量系统）：交付纯数学模块 `src/motion/contact_dynamics.py`，建立 `SingleContactDynamics` 与 `MultiContactDynamics` 数据结构；实现世界空间接触点、接触力、质心位矢、接触力矩、线/角冲量与动量变化计算；严格区分力（N）、力矩（N*m）、冲量（N*s）、动量（kg*m/s）与质心/原点参考点；实现单侧法向 $F_n \ge 0$ 与库仑摩擦锥 $\|\mathbf{F}_t\| \le \mu F_n$ 约束校验；接口契约 100% 绑定标准训练场 `DynamicsEnvironmentQuery` 真实平地、斜坡与垂直墙几何参数；交付 `tests/verify_task6gd_contact_dynamics.py` 15 项数学与契约断言全绿；纳管注册 `tests/test_registry.py`；实测 quick 6/6、physics 11/11、motion 5/5 全绿通过。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -31,45 +31,43 @@
 * 完成 Task 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁（交付 `docs/ARCHITECTURE_CHANGE_GATE.md`）。
 * 完成 Task 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地（交付 `tests/test_runner_unit.py` 10/10 单元测试）。
 * 完成 Task 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础（交付 21 个表面与 `output/dynamics_playground.blend`）。
-* **完成 Task 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础**：
-  * 构建纯 Python 解析几何与环境查询系统 `src/scene/environment_query.py`，支持 21 个闭式解析表面；
-  * 支持 6 大标准分区：平坦地面、5级标准台阶、上下连续斜坡、垂直障碍墙、跳箱与单杠、遥测调试区；
-  * 支持有符号距离（Signed Distance，间隙 >0，穿透 <0）、外向单位法线、表面边界欧几里得距离与垂直墙面定向查询；
-  * 保持对 `EnvironmentQuery` 的 100% 向后兼容性（`ground_height_at` 与 `surface_normal_at` 契约无损）；
-  * 升级场景生成器 `src/scene/builder.py` 与入口 `run_dynamics_playground.py`，生成 `output/dynamics_playground.blend`；
-  * 配备 21 个表面法线指示箭头、世界坐标系红绿蓝指示轴、1m 参考立方体、双视角调试摄像机与日光系统；
-  * 交付纯 Python 几何测试 `tests/verify_task6gd_dynamics_playground.py` 与 Blender 场景检验脚本 `tests/verify_task6gd_playground_blend.py`，注册进入测试表。
-* **完成 Task 6G-D-PRE-P2-R1 环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁**：
-  * 修复 `query_surface_at_point` 与 `query_spatial_surface` 中 `surface_type_filter` 过滤非水平地表时误中默认全局平地的逻辑漏洞；
-  * 解耦 `ray_hit_distance`（欧几里得射线行进距离）与 `signed_distance`（法向有符号距离），实现对斜向与背面射线的严格物理距离刻画；
-  * 确立 `output/dynamics_playground.blend` 为 6G-D、6H、7A 单一标准训练场（SSOT），禁止私造分立场景，禁止手工摆设虚假力学箭头，写入 ACG 权威门禁；
-  * 修订 `AGENTS.md`、`GEMINI.md` 与 `.agents/rules/project_rules.md`，确立十大绝对清规；
-  * 扩充 `tests/verify_task6gd_dynamics_playground.py`（13/13 项纯 Python 数学断言全绿通过）；
-  * 执行 `quick` (5/5) 与 `motion` (5/5) 分层回归全绿通过，历史动作 100% 零退化。
+* 完成 Task 6G-D-PRE-P2-R1 环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁。
+* **完成 Task 6G-D-A 接触动力学基础与冲量动量系统**：
+  * 构建纯数学接触动力学模块 `src/motion/contact_dynamics.py`；
+  * 实现 `SingleContactDynamics` 与 `MultiContactDynamics`，支持接触力、质心力矩、线冲量、角冲量与动量变化；
+  * 证明并验证 6 大数学定理（零力、质心力、偏心力、平移不变、旋转协变、冲量动量等价）；
+  * 严格区分绕质心力矩/角动量与绕世界原点力矩/角动量；
+  * 实现单侧法向力（$F_n \ge 0$）与库仑摩擦锥（$\|\mathbf{F}_t\| \le \mu F_n$）合规性校验；
+  * 绑定标准训练场 `DynamicsEnvironmentQuery` 真实地表（平地、斜坡、垂直墙）法线与摩擦系数；
+  * 交付纯 Python 测试套件 `tests/verify_task6gd_contact_dynamics.py`（15/15 项数学与契约断言全绿通过）；
+  * 登记入 `tests/test_registry.py`，分层回归 `quick` (6/6), `physics` (11/11), `motion` (5/5) 全绿通过。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `dynamics_environment_query`：13/13 项数学定理全绿（0.001s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.31s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `runner_unit_tests`：10/10 项测试全绿（1.05s，退出码 0）；
-  * `quick` Tier：5/5 项通过（5.11s，退出码 0）；
-  * `motion` Tier：5/5 项通过（15.81s，退出码 0），历史步态 100% 零退化；
-* 状态标定为：Task 6G-D-PRE-P2-R1 已完成并验证，严格停止。
+  * `contact_dynamics_math`：15/15 项数学与契约定理全绿（0.12s，退出码 0）；
+  * `dynamics_environment_query`：13/13 项数学定理全绿（0.11s，退出码 0）；
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.28s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `quick` Tier：6/6 项通过（8.13s，退出码 0）；
+  * `physics` Tier：11/11 项通过（56.09s，退出码 0），历史物理模块 100% 零退化；
+  * `motion` Tier：5/5 项通过（15.29s，退出码 0），历史步态 100% 零退化；
+* 状态标定为：Task 6G-D-A 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-031]`)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-032]`)
 * 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
-* 核心源码：`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
+* 核心源码：`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
 * 核心生成与产物：`output/dynamics_playground.blend`、`output/unified_motion_integration.blend`
 
-## 5. 已知问题与限制
-* 动力学遥测目前为纯只读开环，未接入受力闭环控制（留待 Task 6G-D 规划）。
+## 5. 已知问题与未实现功能清单 (Unimplemented Features)
+* 接触力求解器（根据全身加速度或外部扰动自动分配脚底 GRF 和接触反力）：尚未实现（Task 6G-D-B 规划）；
+* 接触冲量与动力学平衡闭环（根据 GRF 冲量主动调节 CoM 加速度与动量）：尚未实现（Task 6G-D-C 规划）；
+* 动态视觉验收（Blender 视口播放接触反力动画）：尚未进行（本轮为纯数学与接口契约基础）。
 
 ## 6. 下一步
-* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-A 接触力与动力学平衡闭环）**。
-* **严禁自动进入 Task 6G-D-A**。
+* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-B 接触力求解与分配）**。
+* **严禁自动进入 Task 6G-D-B 或 6H**。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。

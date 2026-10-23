@@ -3,6 +3,41 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-A：接触动力学基础与冲量动量系统 (Task 6G-D-A)
+
+### 纯数学接触动力学模块与冲量动量系统 (`src/motion/contact_dynamics.py`)
+* **单接触点动力学状态 (`SingleContactDynamics`)**：
+  * 构建世界空间接触点 $\mathbf{p}_c$、作用力 $\mathbf{F}$、质心相对位矢 $\mathbf{r} = \mathbf{p}_c - \mathbf{p}_{\text{com}}$；
+  * 实现力矩计算：严格遵循右手定则计算绕质心力矩 $\boldsymbol{\tau}_{\text{com}} = \mathbf{r} \times \mathbf{F}$（$\text{N}\cdot\text{m}$），严谨区分绕世界原点力矩 $\boldsymbol{\tau}_{\text{origin}} = \mathbf{p}_c \times \mathbf{F}$；
+  * 实现冲量与动量变化计算：线冲量 $\mathbf{J} = \mathbf{F}\Delta t$（$\text{N}\cdot\text{s}$）、角冲量 $\mathbf{H}_{\text{impulse}} = \boldsymbol{\tau}_{\text{com}}\Delta t$（$\text{N}\cdot\text{m}\cdot\text{s}$），严格等价于线动量变化 $\Delta \mathbf{P}$ 与角动量变化 $\Delta \mathbf{L}_{\text{com}}$；
+  * 证明并验证 6 大数学定理：零力零动量变化、质心作用力零力矩、偏心力右手定则力矩、世界坐标平移不变性、$\mathrm{SO}(3)$ 刚体旋转协变性、冲量-动量等价性。
+* **单侧正向与库仑摩擦锥约束评估 (`FrictionConstraintEvaluation`)**：
+  * 正交分解接触力为法向力 $\mathbf{F}_n = (\mathbf{F} \cdot \hat{\mathbf{n}})\hat{\mathbf{n}}$ 与切向摩擦力 $\mathbf{F}_t = \mathbf{F} - \mathbf{F}_n$；
+  * 单侧非粘附约束检查：$F_n \ge 0$，负法向拉力严谨标记为 `TENSION_VIOLATION`；
+  * 库仑摩擦锥检查：$\|\mathbf{F}_t\| \le \mu F_n$，计算摩擦余量 $m = \mu F_n - \|\mathbf{F}_t\|$，严谨分类 `STICK`、`SLIP_LIMIT` 与 `SLIP_VIOLATION`。
+* **多接触点聚合体系 (`MultiContactDynamics`)**：
+  * 聚合多接触点合外力 $\sum \mathbf{F}_i$、合外力矩 $\sum \mathbf{r}_i \times \mathbf{F}_i$、总线冲量、总角冲量与净动量变化；
+  * 提供多接触点摩擦锥完备性判据 `is_all_friction_valid`。
+* **标准训练场环境查询接口契约绑定 (`create_contact_dynamics_from_environment`)**：
+  * 100% 绑定 `DynamicsEnvironmentQuery`（`src/scene/environment_query.py`），从标准训练场（平地、斜坡、垂直墙）真实提取外向法线 $\hat{\mathbf{n}}$ 与摩擦系数 $\mu$；
+  * 严禁私造孤立训练场，严禁手工摆设伪造装饰箭头。
+* **环境兼容性增强 (`src/motion/__init__.py`)**：
+  * 为 Blender 依赖模块增加 `try: ... except ImportError:` 容错隔离，保证纯 Python 测试执行时无需 `bpy` 即可毫秒级运行。
+
+### 自动化验证与测试注册
+* **交付独立单元测试套件 (`tests/verify_task6gd_contact_dynamics.py`)**：
+  * 覆盖 15 项数学与几何定理（零力、质心力、偏心力、平移不变、旋转协变、冲量动量等价、原点vs质心区分、单侧约束、库仑摩擦锥、多接触聚合、非法输入拒绝、平地/斜坡/垂直墙训练场契约、越界与过滤拦截）；
+  * 15/15 项断言纯 Python 全绿通过（耗时 0.001s）。
+* **纳管至统一测试注册表 (`tests/test_registry.py`)**：
+  * 登记 `contact_dynamics_math` 纳管至 `quick`、`physics` 与 `full` 层级。
+* **分层回归测试验证**：
+  * `quick` Tier：6/6 项全绿（8.13s，退出码 0）；
+  * `physics` Tier：11/11 项全绿（56.09s，退出码 0）；
+  * `motion` Tier：5/5 项全绿（15.29s，退出码 0），历史步态 100% 零退化；
+  * `dynamics_playground_blend`：45 个场景对象结构完整性通过（1.28s，退出码 0）。
+* **纪律声明**：0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
+
+
 ## [2026-10-23] 任务 6G-D-PRE-P2-R1：环境查询过滤修复、距离语义统一与训练场 SSOT 门禁 (Task 6G-D-PRE-P2-R1)
 
 ### 3D 环境查询引擎关键语义修复与扩展 (`src/scene/environment_query.py`)

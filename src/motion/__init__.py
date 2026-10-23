@@ -1,140 +1,153 @@
 """Procedural motion generation package (Task 5A, Task 5B, Task 5C, Task 6A, 6B, Task 6C & Task 6D)."""
 
 from src.config import PipelineConfig
-from src.motion.forward_walk import compute_forward_swing_point, generate_forward_walk
-from src.motion.framework import (
-    ActionExecutionResult,
-    BlenderPoseApplicator,
-    ContactConstraintAdapter,
-    ContactPointState,
-    EnvironmentQuery,
-    DynamicsEnvironmentQuery,
-    SurfaceQueryResult,
-    SurfaceGeometryType,
-    MotionAction,
-    MotionMode,
-    MotionPlanner,
-    MotionRuntimeContext,
-    MotionState,
-    StartStopWalkAction,
-    create_initial_motion_state,
-    forward_unit_vector_from_yaw,
-    right_unit_vector_from_yaw,
-    root_local_to_world_vector,
-    run_task5c_via_motion_framework,
-    world_to_root_local_vector,
-)
-from src.motion.run_cycle import (
-    RunAction,
-    apply_run_upper_body_pose,
-    compute_run_swing_point,
-    run_task6b_via_motion_framework,
-)
-from src.motion.sprint_brake import (
-    SprintBrakeAction,
-    apply_brake_pose,
-    evaluate_brake_root_kinematics,
-    run_task6d_via_motion_framework,
-)
-from src.motion.sprint_start import (
-    SprintStartAction,
-    build_sprint_schedule,
-    evaluate_sprint_root_kinematics,
-    run_task6c_via_motion_framework,
-)
-from src.motion.start_stop_walk import (
-    build_step_schedule,
-    evaluate_root_kinematics,
-    generate_start_stop_walk,
-)
-from src.motion.walk_cycle import compute_swing_trajectory, generate_walk_cycle
-from src.motion.rigid_link import (
-    BodyMassDistribution,
-    DEFAULT_HUMAN_TOTAL_MASS_KG,
-    DEMPSTER_13_SEGMENT_MODEL,
-    DEMPSTER_WINTER_15_SEGMENT_MODEL,
-    RigidSegmentSpec,
-    SegmentCoMResult,
-    WholeBodyCoMResult,
-    compute_whole_body_com,
-    create_custom_mass_distribution,
-)
-from src.motion.joint_limits import (
-    ConstraintMode,
-    AxisViolation,
-    JointViolation,
-    JointValidationResult,
-    AxisModification,
-    JointModification,
-    JointClampResult,
-    JointLimitSpec,
-    JointModel,
-    DEFAULT_HUMANOID_ROM_MODEL,
-    create_custom_joint_model,
-    extract_evaluated_bone_rotation_rad,
-    normalize_angle_deg,
-    normalize_angle_rad,
-)
-from src.motion.whole_body_controller import (
-    EndEffectorFeedback,
-    EndEffectorTarget,
-    UnmetConstraint,
-    WholeBodyControlResult,
-    WholeBodyControlTargets,
-    WholeBodyController,
-)
-from src.motion.body_kinematics import (
-    BodyKinematicsTracker,
-    BodyMotionState,
-    BodyPoseSnapshot,
-    BodyVelocityState,
-    compute_differential_velocity,
-    create_zero_velocity_state,
-    enrich_motion_state_with_kinematics,
-    relative_angular_velocity,
-    relative_rotation_vector,
-    sample_body_pose_from_controller_result,
-    sample_body_pose_snapshot,
-)
-from src.motion.body_inertia import (
-    BodyInertiaModel,
-    DEFAULT_13_SEGMENT_INERTIA_MODEL,
-    DEFAULT_15_SEGMENT_INERTIA_MODEL,
-    InertiaTensor,
-    SegmentGeometrySpec,
-    SegmentInertiaState,
-    WholeBodyInertiaState,
-    compute_whole_body_inertia,
-    compute_whole_body_inertia_from_snapshots,
-    enrich_motion_state_with_inertia,
-)
-from src.motion.contact_model import (
-    ContactLifecycle,
-    ContactRecord,
-    ContactType,
-    DEFAULT_LIMB_LOCAL_ANCHORS,
-    EnvironmentalSurface,
-    GeometricConstraintResult,
-    MultiContactState,
-    SupportType,
-    contact_record_to_legacy_contact_point,
-    enrich_motion_state_with_contacts,
-    evaluate_limb_contacts_from_armature,
-    legacy_contact_point_to_contact_record,
-)
-from src.motion.kinematic_bridge import (
-    BridgeExecutionResult,
-    KinematicBridgeExecutor,
-    KinematicPlannedPose,
-    PlannedFootTarget,
-    PlannedHandTarget,
-    convert_planned_pose_to_wbc_targets,
+from src.motion.contact_dynamics import (
+    FrictionConeStatus,
+    FrictionConstraintEvaluation,
+    MultiContactDynamics,
+    SingleContactDynamics,
+    create_contact_dynamics_from_environment,
 )
 
+# Optional Blender-dependent modules (require bpy)
+try:
+    from src.motion.forward_walk import compute_forward_swing_point, generate_forward_walk
+    from src.motion.framework import (
+        ActionExecutionResult,
+        BlenderPoseApplicator,
+        ContactConstraintAdapter,
+        ContactPointState,
+        EnvironmentQuery,
+        DynamicsEnvironmentQuery,
+        SurfaceQueryResult,
+        SurfaceGeometryType,
+        MotionAction,
+        MotionMode,
+        MotionPlanner,
+        MotionRuntimeContext,
+        MotionState,
+        StartStopWalkAction,
+        create_initial_motion_state,
+        forward_unit_vector_from_yaw,
+        right_unit_vector_from_yaw,
+        root_local_to_world_vector,
+        run_task5c_via_motion_framework,
+        world_to_root_local_vector,
+    )
+    from src.motion.run_cycle import (
+        RunAction,
+        apply_run_upper_body_pose,
+        compute_run_swing_point,
+        run_task6b_via_motion_framework,
+    )
+    from src.motion.sprint_brake import (
+        SprintBrakeAction,
+        apply_brake_pose,
+        evaluate_brake_root_kinematics,
+        run_task6d_via_motion_framework,
+    )
+    from src.motion.sprint_start import (
+        SprintStartAction,
+        build_sprint_schedule,
+        evaluate_sprint_root_kinematics,
+        run_task6c_via_motion_framework,
+    )
+    from src.motion.start_stop_walk import (
+        build_step_schedule,
+        evaluate_root_kinematics,
+        generate_start_stop_walk,
+    )
+    from src.motion.walk_cycle import compute_swing_trajectory, generate_walk_cycle
+    from src.motion.rigid_link import (
+        BodyMassDistribution,
+        DEFAULT_HUMAN_TOTAL_MASS_KG,
+        DEMPSTER_13_SEGMENT_MODEL,
+        DEMPSTER_WINTER_15_SEGMENT_MODEL,
+        RigidSegmentSpec,
+        SegmentCoMResult,
+        WholeBodyCoMResult,
+        compute_whole_body_com,
+        create_custom_mass_distribution,
+    )
+    from src.motion.joint_limits import (
+        ConstraintMode,
+        AxisViolation,
+        JointViolation,
+        JointValidationResult,
+        AxisModification,
+        JointModification,
+        JointClampResult,
+        JointLimitSpec,
+        JointModel,
+        DEFAULT_HUMANOID_ROM_MODEL,
+        create_custom_joint_model,
+        extract_evaluated_bone_rotation_rad,
+        normalize_angle_deg,
+        normalize_angle_rad,
+    )
+    from src.motion.whole_body_controller import (
+        EndEffectorFeedback,
+        EndEffectorTarget,
+        UnmetConstraint,
+        WholeBodyControlResult,
+        WholeBodyControlTargets,
+        WholeBodyController,
+    )
+    from src.motion.body_kinematics import (
+        BodyKinematicsTracker,
+        BodyMotionState,
+        BodyPoseSnapshot,
+        BodyVelocityState,
+        compute_differential_velocity,
+        create_zero_velocity_state,
+        enrich_motion_state_with_kinematics,
+        relative_angular_velocity,
+        relative_rotation_vector,
+        sample_body_pose_from_controller_result,
+        sample_body_pose_snapshot,
+    )
+    from src.motion.body_inertia import (
+        BodyInertiaModel,
+        DEFAULT_13_SEGMENT_INERTIA_MODEL,
+        DEFAULT_15_SEGMENT_INERTIA_MODEL,
+        InertiaTensor,
+        SegmentGeometrySpec,
+        SegmentInertiaState,
+        WholeBodyInertiaState,
+        compute_whole_body_inertia,
+        compute_whole_body_inertia_from_snapshots,
+        enrich_motion_state_with_inertia,
+    )
+    from src.motion.contact_model import (
+        ContactLifecycle,
+        ContactRecord,
+        ContactType,
+        DEFAULT_LIMB_LOCAL_ANCHORS,
+        EnvironmentalSurface,
+        GeometricConstraintResult,
+        MultiContactState,
+        SupportType,
+        contact_record_to_legacy_contact_point,
+        enrich_motion_state_with_contacts,
+        evaluate_limb_contacts_from_armature,
+        legacy_contact_point_to_contact_record,
+    )
+    from src.motion.kinematic_bridge import (
+        BridgeExecutionResult,
+        KinematicBridgeExecutor,
+        KinematicPlannedPose,
+        PlannedFootTarget,
+        PlannedHandTarget,
+        convert_planned_pose_to_wbc_targets,
+    )
 
-def apply_motion(config: PipelineConfig, rig_obj=None):
-    """Apply procedural walk cycle keyframes to the character rig."""
-    return generate_walk_cycle(config, armature_obj=rig_obj)
+    def apply_motion(config: PipelineConfig, rig_obj=None):
+        """Apply procedural walk cycle keyframes to the character rig."""
+        return generate_walk_cycle(config, armature_obj=rig_obj)
+
+except ImportError:
+    # Running outside Blender without bpy - pure-Python modules remain fully functional
+    pass
 
 
 __all__ = [
@@ -246,5 +259,10 @@ __all__ = [
     "convert_planned_pose_to_wbc_targets",
     "KinematicBridgeExecutor",
     "BridgeExecutionResult",
+    "SingleContactDynamics",
+    "MultiContactDynamics",
+    "FrictionConeStatus",
+    "FrictionConstraintEvaluation",
+    "create_contact_dynamics_from_environment",
 ]
 
