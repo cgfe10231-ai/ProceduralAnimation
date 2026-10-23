@@ -3,6 +3,33 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-23] 任务 6G-D-PRE-P0：全工程架构审计与后续开发准备 (Task 6G-D-PRE-P0)
+
+### 全工程架构审计与事实基线锁定 (Architecture Audit & Baseline)
+* **穿透式审计全仓库**：
+  * 深入检查 `src/` 下全部 28 个 Python 源码、`tests/` 下全部 30 个测试脚本、根目录下全部 19 个运行入口以及所有项目文档；
+  * 确立官方唯一合法主生产调用链：`MotionPlanner` $\to$ `MotionAction` $\to$ `KinematicBridgeExecutor` $\to$ `WholeBodyController` $\to$ `Blender Rig/IK` $\to$ 物理遥测 $\to$ `MotionState`；
+  * 明确 12 大关键环节唯一所有权矩阵，确认 `WholeBodyController` 独占骨架与控制器写入权，控制器全生命周期保持 `parent = None`（世界空间）；
+  * 梳理全工程资产四态分类（Active / Reusable / Legacy / Orphan），排查出 `BlenderPoseApplicator` 与 `ContactConstraintAdapter` 历史废弃类，排查出 `run_pipeline.py` 与 `src/pipeline.py` 仍滞留在 Task 3 静态场景的问题；
+  * 真实核查登记关键 Blender 文件：`character_forward_walk.blend`、`character_start_stop_walk.blend` 与 `unified_motion_integration.blend` 仅保存在本地磁盘 `output/` 目录下，受 `.gitignore` 规则保护未跟踪且未推送到 GitHub。所有生成源码 100% 在 GitHub 上可完全复现；
+  * 建立 13 项历史运动与物理能力防退化基线矩阵（涵盖 ForwardWalk, StartStopWalk, Run, SprintStart, SprintBrake, Leg IK, Arm IK, WBC, CoM, ROM, Kinematics, Inertia, ContactModel, Unified Motion Integration）。
+
+### 下一阶段实施方案设计 (Implementation Design for P1 & P2)
+* **P1 统一测试调度系统 (Unified Test Runner) 设计**：
+  * 提出 `test_registry.py` 测试注册表与 `quick` / `physics` / `motion` / `full` 四级执行分层机制；
+  * 提出外层单命令调度机制（`python tests/run_test_suite.py --tier ...`），将 30 项测试收敛为单次执行，彻底消除用户频繁点击授权终端的审批疲劳；
+  * 严明非零退出码绝对失败纪律，分离自动化数学测试通过与 Blender 人工目视验收。
+* **P2 简易动力学训练场 (Dynamics Playground) 设计**：
+  * 确立几何、环境查询、动力学模型与动画控制器四层严格解耦；
+  * 规划平地、交替台阶、连续斜坡、垂直障碍墙、跳箱平台、遥测可视化 6 大标准化分区规格。
+* **永久架构门禁 (ACG) 制度设计**：
+  * 确立 11 项前置准入审查清单与 8 大绝对禁止行为清规，规范架构偏差事前审批流程。
+
+### 交付文档与执行纪律 (Deliverable & Discipline)
+* 交付权威审计报告 [`docs/ENGINEERING_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ENGINEERING_AUDIT.md)；
+* 严格遵守执行纪律：0 生产代码修改，0 测试阈值放宽，0 历史文件删除，严格停止。
+
+
 ## [2026-10-22] 任务 6G-C-R3B-2-R1：历史正确动画对照、视口下肢周期性 L 形畸变根因定位与运动学修复 (Task 6G-C-R3B-2-R1)
 
 ### 故障定位与根因诊断 (Root Cause Diagnosis)

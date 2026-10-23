@@ -1,13 +1,26 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-22  
-> **当前阶段**：任务 6G-C-R3B-2-R1（历史正确动画对照、视口下肢周期性 L 形畸变根因定位与修复完成；Blender 动画曲线重放父级约束修复；FootRotation 约束空间由 LOCAL 修正为 WORLD->LOCAL；全 462 帧连续平滑运动验收文件 output/unified_motion_integration.blend 重新生成并通过全部验证；渲染生成 40 张关键帧对比视图证实零拉伸；严格停止等待用户 Blender 视口目视验收，严禁擅自进入 6G-D）  
+> **记录时间**：2026-10-23  
+> **当前阶段**：任务 6G-D-PRE-P0（全工程架构审计与后续开发准备完成；穿透审计全仓库 28 个核心源码、30 个测试与 19 个运行入口；交付 docs/ENGINEERING_AUDIT.md 权威审计报告；锁定生产执行链与状态独占所有权；建立 13 项历史运动与物理能力防退化基线；登记关键 Blender 文件仅本地存在且受 .gitignore 保护的事实；完成 P1 统一测试调度系统与 P2 简易动力学训练场实施方案设计；确立永久架构门禁 ACG 11 项清单与 8 大清规；0 生产代码修改；严格停止，坚决不擅自进入 P1、P2 或 6G-D-A）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-PRE-P0 全工程架构审计与后续开发准备 (Task 6G-D-PRE-P0)**：
+  * **全工程代码与资产穿透式审计**：
+    * 覆盖 `src/` 下全部 28 个 Python 源码、`tests/` 下全部 30 个测试脚本、根目录下全部 19 个运行入口以及所有项目文档；
+    * 建立官方唯一合法主生产调用链：`MotionPlanner` $\to$ `MotionAction` $\to$ `KinematicBridgeExecutor` $\to$ `WholeBodyController` $\to$ `Blender Rig/IK` $\to$ 物理遥测 $\to$ `MotionState`；
+    * 确立 12 大关键环节唯一所有权矩阵，确认 `WholeBodyController` 独占骨架与控制器写入权，控制器全生命周期保持 `parent = None`（世界空间）；
+    * 梳理全工程资产四态分类（Active / Reusable / Legacy / Orphan），排查出 `BlenderPoseApplicator` 与 `ContactConstraintAdapter` 历史废弃类，排查出 `run_pipeline.py` 与 `src/pipeline.py` 仍滞留在 Task 3 静态场景的问题；
+    * 真实核查登记关键 Blender 文件：`character_forward_walk.blend`、`character_start_stop_walk.blend` 与 `unified_motion_integration.blend` 仅保存在本地磁盘 `output/` 目录下，受 `.gitignore` 规则保护未跟踪且未推送到 GitHub。所有生成源码 100% 在 GitHub 上可完全复现；
+    * 建立 13 项历史运动与物理能力防退化基线矩阵（涵盖 ForwardWalk, StartStopWalk, Run, SprintStart, SprintBrake, Leg IK, Arm IK, WBC, CoM, ROM, Kinematics, Inertia, ContactModel, Unified Motion Integration）；
+    * 完成 P1 统一测试调度系统（`tests/run_test_suite.py` + `test_registry.py`，支持 `quick`/`physics`/`motion`/`full` 四级分层，单命令外层调度彻底根除用户反复审批疲劳，非零退出码绝对失败纪律）实施设计方案；
+    * 完成 P2 简易动力学训练场（几何、环境查询、动力学模型与动画控制器四层严格解耦，平地、台阶、斜坡、障碍墙、跳箱平台、遥测可视化 6 大功能分区）实施设计方案；
+    * 确立永久架构门禁（ACG）11 项前置准入清单与 8 大绝对禁止行为清规，规范架构偏差事前审批流程；
+    * 交付 [`docs/ENGINEERING_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ENGINEERING_AUDIT.md) 权威审计报告；
+    * 遵守执行纪律：0 生产代码修改，0 测试阈值放宽，0 历史文件删除，严格停止。
 * **任务 6G-C-R3B-2-R1 历史正确动画对照、下肢视口故障定位与运动学修复 (Task 6G-C-R3B-2-R1)**：
   * **根因定位完成并获得数学与工程级 100% 证实**：
     1. **Blender 动画曲线父级解析空间错位（根因一）**：在首轮 R3B-2 中，`WholeBodyController.execute_frame` 的摆动相设置 `ik_obj.parent = CharacterRoot`，而支撑相设置 `ik_obj.parent = None`。因为 Blender 中 `obj.parent` 是全局对象级指针属性，**不可逐帧关键帧化（Not Keyframable）**。当保存动画文件时，`FootIK` 的父级指针被固化为 `CharacterRoot`。动画重放时，支撑相在世界坐标下写入的关键帧位置（如 $Y = -8.0\text{ m}$）被 Blender 误解析为相对于 `CharacterRoot`（$Y \approx -7.94\text{ m}$）的局部坐标，合成出世界坐标 $Y = -7.94 + (-8.0) = -15.94\text{ m}$（即向后暴拉 8 米！）。而摆动相按局部坐标写入，重放时保持在根节点附近。导致步态交替时，支撑腿被向后暴拉 8 米形成横向 L 形，摆动腿看似正常，两腿周期性交替畸变。
