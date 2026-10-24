@@ -710,3 +710,33 @@
   - 扩充测试：`tests/verify_task6gd_contact_force_solver.py`（37 项测试全绿通过）；
   - 实测回归全绿：`quick` (7/7), `physics` (12/12) 保持 100% 零退化（退出码 0）；
   - 彻底消除了求解器状态伪报漏洞，确保了动力学控制上层获取的接触力状态 100% 具备数学与物理真实性。
+
+---
+
+### [DEC-038] 纯数学前向动力学单步积分内核与刚体物理状态解耦 (Task 6G-D-C1-A)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-24
+* **背景**：在完成接触动力学正向计算（6G-D-A/R1/R2）与接触力逆向优化求解（6G-D-B/R1/R2）后，系统需要进入动力学时间步进闭环，即由合外力与绕质心合力矩驱动全身质心线运动与刚体等效转动状态前向时间积分。既往工程中部分物理计算耦合了 Blender 的 `bpy` 或刚体物理引擎，无法在独立无头 Python 环境纯粹运行，且缺乏不可变状态防污染机制及目标值与实际积分状态的严格解耦。此外，接触力求解器输入若包含重复 `contact_id` 会造成字典键静默覆盖。
+* **决策与方案**：
+  1. **接触力求解器重复 ID 严格防御契约**：
+     - 在 `solve_contact_forces` 输入校验阶段增加 `contact_id` 唯一性集合检查，发现重复 ID 一票否决返回 `ContactSolverStatus.INVALID_INPUT`，杜绝静默覆盖；
+     - 在 `solution_to_multi_contact_dynamics` 中同步加入重复 ID 校验并抛出 `ValueError`。
+  2. **100% 独立纯 Python 6-DOF 刚体动力学状态容器 (`ForwardDynamicsState`)**：
+     - 使用 `@dataclass(frozen=True)` 冻结不可变对象，杜绝单步积分异常或失败时部分修改输入状态（严格保障失败原子性）；
+     - 显式定义世界坐标系约定（+Z Up, Ground Z=0.0m）及 SI 单位制（m, kg, s, N, N·m, rad/s, kg·m²）；
+     - 明确姿态四元数采用 Hamilton 格式 `(w, x, y, z)`，表示从刚体局部坐标到世界坐标的主动旋转 $\mathbf{v}_{\text{world}} = R(q) \mathbf{v}_{\text{body}}$；
+     - 明确刚体自身坐标系惯性张量 $I_{\text{body}}$ 在刚体旋转中保持不变，世界坐标系惯性张量满足严格协变张量变换 $I_{\text{world}} = R(q) I_{\text{body}} R(q)^T$。
+  3. **牛顿-欧拉 6-DOF 精确时间步进与指数映射姿态积分**：
+     - 线运动积分采用 Velocity Verlet 形式（假定单步内合外力恒定）：$\mathbf{a} = \mathbf{F}_{\text{net}} / m$，$\mathbf{v}_{k+1} = \mathbf{v}_k + \mathbf{a} \Delta t$，$\mathbf{p}_{k+1} = \mathbf{p}_k + \mathbf{v}_k \Delta t + \frac{1}{2} \mathbf{a} \Delta t^2$（解析零截断误差）；
+     - 角动量积分采用外力矩冲量更新：$\mathbf{L}_{k+1} = \mathbf{L}_k + \boldsymbol{\tau}_{\text{net}} \Delta t$；
+     - 姿态积分采用中点角速度与 $SO(3)$ 李代数四元数指数映射 $\Delta q = \exp(\frac{1}{2} \boldsymbol{\omega}_{\text{mid}} \Delta t)$，保证在常角速度下旋转解析精确且模长严格保 1；
+     - 惯性张量正定性与良态检查采用 Sylvester 充要准则，奇异或病态张量安全熔断返回 `SINGULAR_INERTIA`。
+  4. **实际物理状态与参考目标值严格分离**：
+     - 积分器输出纯粹由真实合外力驱动的实际状态（`state_next`），参考目标加速度与角动量变化率仅作为独立诊断字段（`target_linear_acceleration_world`, `linear_acceleration_tracking_error`）输出，绝对禁止将目标值直接写入实际物理状态。
+* **影响与产物**：
+  - 新增核心模块：`src/motion/forward_dynamics.py`；
+  - 加固已有模块：`src/motion/contact_force_solver.py`（补充重复 ID 校验）；
+  - 导出接口：更新 `src/motion/__init__.py`；
+  - 新增完备测试：`tests/verify_task6gd_forward_dynamics.py`（17 项分析测试全部通过）；
+  - 注册统一测试入口：在 `tests/test_registry.py` 注册 `forward_dynamics`（纳入 QUICK, PHYSICS, FULL 分级）；
+  - 实测回归全绿：纯 Python 与 Blender Headless 双环境通过，`quick` (8/8) 保持 100% 零退化。

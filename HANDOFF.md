@@ -5,12 +5,13 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-B-R2（接触力求解器终止状态契约与优化收敛真值解耦）：
-1. 强化 `SOLVED` 状态准入准则：严格满足有限数值、硬物理约束可行、合力合力矩残差满足容差、且底层优化器明确确认收敛（`opt_converged=True`）或属于解析零解路径；
-2. 消除状态契约漏洞：未收敛终止（`not opt_converged`）哪怕残差达标，一律标定为 `APPROXIMATE`，严禁伪报 `SOLVED`，并完整保留候选解、实际残差与底层诊断信息；
-3. SLSQP 异常与 `success == False` 容错回退：自动回退至 Native SPG，置 `fallback_occurred=True`，记录完整回退原因，双引擎均失败时严格标定 `APPROXIMATE`；
-4. 非数值（NaN/Inf）与异常防御：装配与评估阶段严格拦截非数值，一票否决标定为 `NUMERICAL_FAILURE`；
-5. 交付 `tests/verify_task6gd_contact_force_solver.py` 扩充至 37 项测试全部通过（独立 Python 37/37，Blender SPG 36/36），分层回归 `quick` (7/7), `physics` (12/12) 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-C1-A（前向动力学单步积分内核与刚体物理状态解耦）：
+1. 接触力求解器输入契约加固：强制拒绝同一次求解请求中重复的 `contact_id`，防止字典覆盖；
+2. 纯数学单步动力学内核：100% 独立纯 Python / 零 `bpy` 依赖，不可变状态容器 `ForwardDynamicsState`；
+3. 牛顿-欧拉 6-DOF 时间步进：Velocity Verlet 解析线运动积分与李代数四元数指数映射姿态积分；
+4. 惯性张量与姿态坐标变换严格解耦：明确刚体自身坐标系惯性张量与世界系协变变换，Sylvester 充要准则正定性校验；
+5. 实际物理状态与参考目标值严格分离；
+6. 交付 `tests/verify_task6gd_forward_dynamics.py` 17 项测试全绿，`verify_task6gd_contact_force_solver.py` 38 项全绿，分层回归 `quick` (8/8), `physics` (13/13) 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -42,22 +43,25 @@
 * 完成 Task 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全。
 * 完成 Task 6G-D-B 多接触力逆向求解与约束分配系统。
 * 完成 Task 6G-D-B-R1 接触力求解器数值可靠性与状态契约修复。
-* **完成 Task 6G-D-B-R2 接触力求解器终止状态契约与优化收敛真值解耦**：
-  * 确立 `SOLVED` 严格五重准入门禁；
-  * 优化器未收敛哪怕残差达标一律标定 `APPROXIMATE`，绝不伪报 `SOLVED`；
-  * SLSQP 退出且 `success == False` 触发 SPG 容错回退并累加迭代与状态；
-  * 非数值与异常防御性截断为 `NUMERICAL_FAILURE`；
-  * 单元测试扩充至 37 项全绿通过；分层回归套件 `quick` 7/7, `physics` 12/12 实测全绿。
+* 完成 Task 6G-D-B-R2 接触力求解器终止状态契约与优化收敛真值解耦。
+* **完成 Task 6G-D-C1-A 前向动力学单步积分内核与刚体物理状态解耦**：
+  * 接触力求解器强制拦截重复 `contact_id`，防止字典覆盖；
+  * 100% 独立纯 Python 刚体动力学状态容器 `ForwardDynamicsState`，不可变设计保障失败原子性；
+  * 严格区分刚体自身坐标系惯性张量与世界系协变变换；
+  * Newton-Euler 6-DOF Velocity Verlet 解析线积分与李代数指数映射姿态积分；
+  * 实际物理状态与参考目标值严格分离；
+  * 单元测试 17 项全绿通过；分层回归套件 `quick` 8/8, `physics` 13/13 实测全绿。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `contact_force_solver`：37/37 项测试全绿通过（独立 Python 0.414s；Blender 无头 SPG 36/36 项全绿通过，1 项优雅跳过，0.086s）；
-  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.78s，退出码 0）；
+  * `forward_dynamics`：17/17 项解析与状态测试全绿通过（纯 Python 0.003s，Blender 0.002s）；
+  * `contact_force_solver`：38/38 项测试全绿通过（纯 Python 0.430s，Blender 0.087s）；
+  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.80s，退出码 0）；
   * `dynamics_environment_query`：13/13 项数学定理全绿（0.13s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.34s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：7/7 项通过（7.35s，退出码 0）；
-  * `physics` Tier：12/12 项通过（60.23s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-B-R2 已完成并验证，严格停止。
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.30s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `quick` Tier：8/8 项通过（8.07s，退出码 0）；
+  * `physics` Tier：13/13 项通过（60.99s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-C1-A 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`

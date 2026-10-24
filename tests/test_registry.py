@@ -106,6 +106,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=30.0,
         description="Validates multi-contact force solver, QP/SPG contact wrench allocation, friction cone constraints, DynamicsPlayground integration, and feasibility detection.",
     ),
+    "forward_dynamics": TestDefinition(
+        test_id="forward_dynamics",
+        name="Forward Dynamics Single-Step Integration Kernel",
+        script_path="tests/verify_task6gd_forward_dynamics.py",
+        runner_type=RunnerType.PYTHON,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=15.0,
+        description="Validates 6-DOF forward dynamics single-step kernel, Newton-Euler equations, momentum/angular momentum integration, quaternion attitude updates, and failure atomicity.",
+    ),
     "runner_unit_tests": TestDefinition(
         test_id="runner_unit_tests",
         name="Test Suite Runner Unit Tests",

@@ -1,13 +1,31 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-24  
-> **当前阶段**：任务 6G-D-B-R2（接触力求解器终止状态契约与优化收敛真值解耦；严格 SOLVED 五重准入门禁；优化器未收敛但残差达标严格标定 APPROXIMATE 绝不虚报 SOLVED；SLSQP success=False 容错回退 Native SPG 与完整原因透传；非数值 NaN/Inf 与优化异常一票否决标定 NUMERICAL_FAILURE；tests/verify_task6gd_contact_force_solver.py 扩充至 37 项全绿通过；Blender 无 SciPy SPG 引擎 36 项全绿通过；quick 7/7、physics 12/12 保持零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）  
+> **当前阶段**：任务 6G-D-C1-A（前向动力学单步积分内核与刚体物理状态解耦；接触力求解器重复 contact_id 强制拒绝契约；100% 独立纯 Python 6-DOF 刚体动力学状态容器；Newton-Euler 方程 Velocity Verlet 线积分与李代数指数映射姿态积分；实际物理状态与参考目标值严格分离；tests/verify_task6gd_forward_dynamics.py 17 项全绿；tests/verify_task6gd_contact_force_solver.py 38 项全绿；quick 8/8、physics 13/13 保持零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C1-B）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-C1-A 前向动力学单步积分内核与刚体物理状态解耦 (Task 6G-D-C1-A)**：
+  * **接触力求解器输入重复 contact_id 拒绝契约 (`src/motion/contact_force_solver.py`)**：
+    * `solve_contact_forces` 输入校验增加唯一性检查，发现重复 ID 一票否决返回 `ContactSolverStatus.INVALID_INPUT`；
+    * `solution_to_multi_contact_dynamics` 同步强制唯一性校验，杜绝字典覆盖；
+    * `tests/verify_task6gd_contact_force_solver.py` 扩充至 38 项测试全绿通过。
+  * **纯数学单步前向动力学内核实现 (`src/motion/forward_dynamics.py`)**：
+    * 100% 独立纯 Python / 零 `bpy` 依赖架构，不可变（frozen）状态容器保障失败原子性；
+    * 显式定义世界坐标系约定（+Z Up, Ground Z=0.0m）及 SI 单位制；
+    * 姿态四元数采用 Hamilton `(w, x, y, z)` 主动旋转约定（$\mathbf{v}_{\text{world}} = R(q) \mathbf{v}_{\text{body}}$）；
+    * 严格区分刚体局部惯性张量 $I_{\text{body}}$（旋转不变量）与世界坐标系惯性张量 $I_{\text{world}} = R(q) I_{\text{body}} R(q)^T$；
+    * 质心线运动采用 Velocity Verlet 解析积分，角动量通过外力矩冲量更新，姿态通过中点角速度指数映射 $\Delta q = \exp(\frac{1}{2} \boldsymbol{\omega}_{\text{mid}} \Delta t)$ 精确更新；
+    * 惯性张量正定性与良态检查采用 Sylvester 充要准则，奇异张量安全熔断返回 `SINGULAR_INERTIA`；
+    * 实际物理状态与参考目标值严格分离，目标加速度与角动量变化率仅作为诊断输出。
+  * **单元验证与统一注册全绿**：
+    * `tests/verify_task6gd_forward_dynamics.py` 17/17 项解析测试全部通过（0.003s）；
+    * 统一注册进入 `tests/test_registry.py`，纳管至 `quick`、`physics` 与 `full` 层级；
+    * 分层回归套件实测全绿：`quick` (8/8 项通过，8.07s), `physics` (13/13 项通过，60.99s)；
+    * 0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
 * **任务 6G-D-B-R2 接触力求解器终止状态契约与优化收敛真值解耦 (Task 6G-D-B-R2)**：
   * **严格的 `SOLVED` 五重充要条件准入准则 (`src/motion/contact_force_solver.py`)**：
     * 废除提前非成功终止下若残差巧合达标误报 `SOLVED` 的漏洞；

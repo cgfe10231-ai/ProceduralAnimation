@@ -3,6 +3,40 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-24] 任务 6G-D-C1-A：前向动力学单步积分内核与刚体物理状态解耦 (Task 6G-D-C1-A)
+
+### 接触力求解器输入契约加固 (`src/motion/contact_force_solver.py`)
+* **重复 contact_id 强制拒绝契约**：
+  * 在 `solve_contact_forces` 输入校验中增加 `contact_id` 唯一性集合检查，同一次求解请求中发现重复 ID 时一票否决返回 `ContactSolverStatus.INVALID_INPUT`，杜绝字典键静默覆盖；
+  * 在 `solution_to_multi_contact_dynamics` 中同步强制唯一性校验，存在重复 ID 抛出 `ValueError`；
+  * 新增 Test 38 覆盖重复 ID 拦截，原有 37 项求解器测试保持 100% 零退化通过。
+
+### 纯数学单步前向动力学内核实现 (`src/motion/forward_dynamics.py`)
+* **100% 纯 Python / 零 bpy 依赖架构**：
+  * 彻底解耦 Blender 运行时，在独立 Python 环境下毫秒级执行；
+  * 定义不可变（frozen）状态容器 `ForwardDynamicsState`，严格保障失败原子性（积分失败绝不污染输入状态）；
+  * 显式定义世界坐标空间（+Z Up, Ground Z=0.0m）与全部 SI 单位制；
+  * 姿态四元数采用 Hamilton `(w, x, y, z)` 主动旋转约定（$\mathbf{v}_{\text{world}} = R(q) \mathbf{v}_{\text{body}}$）；
+  * 严格区分刚体局部惯性张量 $I_{\text{body}}$（刚体旋转不变量）与世界坐标系惯性张量 $I_{\text{world}} = R(q) I_{\text{body}} R(q)^T$。
+* **牛顿-欧拉 6-DOF 动力学积分与指数映射姿态更新**：
+  * 支持多接触力、外部力、关于质心的外部力矩与重力加速度；
+  * 质心线运动采用 Velocity Verlet 解析积分：$\mathbf{p}_{k+1} = \mathbf{p}_k + \mathbf{v}_k \Delta t + \frac{1}{2} \mathbf{a} \Delta t^2$（常力下单步零截断误差）；
+  * 角动量通过力矩冲量更新：$\mathbf{L}_{k+1} = \mathbf{L}_k + \boldsymbol{\tau}_{\text{net}} \Delta t$；
+  * 姿态四元数通过中点角速度与 $SO(3)$ 李代数指数映射 $\Delta q = \exp(\frac{1}{2} \boldsymbol{\omega}_{\text{mid}} \Delta t)$ 更新，常角速度下旋转解析精确且模长严格保持 1；
+  * 惯性张量正定性与良态检查采用 Sylvester 充要准则，奇异张量安全熔断返回 `SINGULAR_INERTIA`。
+* **实际物理状态与参考目标值严格分离**：
+  * 输出真实合力积分结果（`state_next`），目标加速度与目标角动量变化率仅作为独立诊断字段输出，严禁将目标值当作实际运动。
+
+### 测试验证与架构状态
+* **独立单元测试套件 (`tests/verify_task6gd_forward_dynamics.py`)**：
+  * 17 项分析测试全部通过（0.003s）：恒定合力线积分、自由落体多步解析对比、无重力无外力动量守恒、动量-冲量定理、70kg 地面静止支撑重力补偿、偏心接触力力矩、外力矩角动量积分、零力矩角动量守恒、正定惯性角速度、奇异非正定张量安全拒绝、四元数 90° 旋转与归一化、零力矩姿态不变性、时间步长收敛阶数、非有限数值拦截、输入状态不可变保全、重复接触 ID 拦截、以及与接触力求解器/接触动力学无缝联动；
+* **回归测试全绿**：
+  * `tests/verify_task6gd_contact_force_solver.py` 扩充至 38 项全绿通过；
+  * 统一测试套件注册进入 `tests/test_registry.py`；
+  * 分层回归套件实测全绿：`quick` (8/8 项通过，8.07s), `physics` (13/13 项通过，60.99s)；
+  * 零历史步态修改，零 Rig/IK/WBC 篡改，零训练场重建。
+
+
 ## [2026-10-24] 任务 6G-D-B-R2：接触力求解器终止状态契约与优化收敛真值解耦 (Task 6G-D-B-R2)
 
 ### 终止状态机与容错回退机制加固 (`src/motion/contact_force_solver.py`)

@@ -21,6 +21,21 @@ from src.motion.contact_force_solver import (
     solution_to_multi_contact_dynamics,
     solve_contact_forces,
 )
+from src.motion.forward_dynamics import (
+    ContactForcePoint,
+    ForwardDynamicsConfig,
+    ForwardDynamicsState,
+    ForwardDynamicsStatus,
+    ForwardDynamicsStepInput,
+    ForwardDynamicsStepResult,
+    InertiaTensor3x3,
+    integrate_forward_dynamics_single_step,
+    quat_from_axis_angle,
+    quat_multiply,
+    quat_normalize,
+    quat_rotate_vector,
+    quat_to_rot_matrix,
+)
 
 # Optional Blender-dependent modules (require bpy)
 try:
