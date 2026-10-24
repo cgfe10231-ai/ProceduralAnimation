@@ -1,6 +1,6 @@
-"""Verification Suite for Forward Dynamics Single-Step Integration Kernel (Task 6G-D-C1-A).
+"""Verification Suite for Forward Dynamics Single-Step Integration Kernel (Task 6G-D-C1-A & C1-A-R1).
 
-Covers 17 Core Analytical and Physical Theorems:
+Covers 22 Core Analytical, Physical Theorems, and Contract Validations:
  1. Constant force linear kinematic position and velocity exact integration.
  2. Free fall multi-step exact analytical trajectory comparison.
  3. Momentum conservation in free space (F_net = 0 => P = const).
@@ -18,6 +18,11 @@ Covers 17 Core Analytical and Physical Theorems:
 15. Failure atomicity: input state is strictly unmodified when step integration fails.
 16. Duplicate contact ID rejection in forward dynamics step inputs.
 17. Zero regression on existing Contact Force Solver and Contact Dynamics modules.
+18. State and step input defensive immutability against external caller list mutations.
+19. Strict vector and quaternion component dimension validation (exact len=3 and len=4).
+20. Non-isotropic rigid body torque-free motion and rotational kinetic energy conservation.
+21. Non-isotropic rigid body constant torque integration and angular momentum tracking.
+22. Rigorous 2nd-order midpoint attitude integration quadratic convergence rate (ratio ~ 4.0).
 """
 
 from __future__ import annotations
@@ -670,6 +675,270 @@ class TestForwardDynamicsSingleStep(unittest.TestCase):
         # Tracking error diagnostics are populated without writing into actual state
         self.assertIsNotNone(res.linear_acceleration_tracking_error)
         self.assertIsNotNone(res.angular_momentum_rate_tracking_error)
+
+    # -------------------------------------------------------------------------
+    # Test 18: State & Step Input Defensive Immutability Against External List Mutation
+    # -------------------------------------------------------------------------
+    def test_18_state_and_input_defensive_immutability(self):
+        """Test 18: External list modification does not corrupt ForwardDynamicsState, StepInput, or ContactPoint."""
+        # 1. ForwardDynamicsState defensive copying
+        pos_list = [1.0, 2.0, 3.0]
+        vel_list = [0.1, 0.2, 0.3]
+        ang_list = [0.4, 0.5, 0.6]
+        quat_list = [1.0, 0.0, 0.0, 0.0]
+
+        state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=70.0,
+            com_position_world=pos_list,  # type: ignore
+            com_velocity_world=vel_list,  # type: ignore
+            angular_momentum_about_com_world=ang_list,  # type: ignore
+            orientation_quat_world=quat_list,  # type: ignore
+            inertia_tensor_body=self.default_inertia,
+        )
+
+        # Mutate the source lists in-place
+        pos_list[0] = 999.0
+        vel_list[1] = 888.0
+        ang_list[2] = 777.0
+        quat_list[0] = 666.0
+
+        # State fields must remain completely unaffected and stored as tuples
+        self.assertEqual(state.com_position_world, (1.0, 2.0, 3.0))
+        self.assertIsInstance(state.com_position_world, tuple)
+        self.assertEqual(state.com_velocity_world, (0.1, 0.2, 0.3))
+        self.assertIsInstance(state.com_velocity_world, tuple)
+        self.assertEqual(state.angular_momentum_about_com_world, (0.4, 0.5, 0.6))
+        self.assertIsInstance(state.angular_momentum_about_com_world, tuple)
+        self.assertEqual(state.orientation_quat_world, (1.0, 0.0, 0.0, 0.0))
+        self.assertIsInstance(state.orientation_quat_world, tuple)
+
+        # 2. ContactForcePoint defensive copying
+        cp_p = [0.1, 0.2, 0.3]
+        cp_f = [10.0, 20.0, 30.0]
+        cp = ContactForcePoint(cp_p, cp_f, "test_cp")  # type: ignore
+        cp_p[0] = -999.0
+        cp_f[2] = 555.0
+        self.assertEqual(cp.contact_point_world, (0.1, 0.2, 0.3))
+        self.assertIsInstance(cp.contact_point_world, tuple)
+        self.assertEqual(cp.contact_force_world, (10.0, 20.0, 30.0))
+        self.assertIsInstance(cp.contact_force_world, tuple)
+
+        # 3. ForwardDynamicsStepInput defensive copying
+        ef_list = [[10.0, 0.0, 0.0], [0.0, 5.0, 0.0]]
+        et_list = [[0.0, 0.0, 2.0]]
+        grav_list = [0.0, 0.0, -9.81]
+        cp_seq = [cp]
+
+        step_in = ForwardDynamicsStepInput(
+            contact_forces=cp_seq,  # type: ignore
+            external_forces_world=ef_list,  # type: ignore
+            external_torques_about_com_world=et_list,  # type: ignore
+            gravity_acceleration_world=grav_list,  # type: ignore
+            dt=0.04,
+        )
+
+        # Mutate the source structures in-place
+        ef_list[0][0] = -888.0
+        ef_list.append([100.0, 100.0, 100.0])
+        et_list[0][2] = 999.0
+        grav_list[2] = 0.0
+        cp_seq.append(ContactForcePoint((1.0, 1.0, 1.0), (0.0, 0.0, 0.0), "extra"))
+
+        # StepInput fields must remain completely unaffected
+        self.assertEqual(step_in.external_forces_world, ((10.0, 0.0, 0.0), (0.0, 5.0, 0.0)))
+        self.assertIsInstance(step_in.external_forces_world, tuple)
+        self.assertIsInstance(step_in.external_forces_world[0], tuple)
+        self.assertEqual(step_in.external_torques_about_com_world, ((0.0, 0.0, 2.0),))
+        self.assertIsInstance(step_in.external_torques_about_com_world, tuple)
+        self.assertIsInstance(step_in.external_torques_about_com_world[0], tuple)
+        self.assertEqual(step_in.gravity_acceleration_world, (0.0, 0.0, -9.81))
+        self.assertIsInstance(step_in.gravity_acceleration_world, tuple)
+        self.assertEqual(len(step_in.contact_forces), 1)
+
+    # -------------------------------------------------------------------------
+    # Test 19: Strict Vector and Quaternion Component Dimension Validation
+    # -------------------------------------------------------------------------
+    def test_19_strict_vector_dimension_validation(self):
+        """Test 19: Strict rejection of vectors without exactly 3 components and quaternions without 4."""
+        # 1. State vector length checks
+        with self.assertRaises(ValueError) as ctx:
+            ForwardDynamicsState(com_position_world=(1.0, 2.0))  # 2 components
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            ForwardDynamicsState(com_velocity_world=(1.0, 2.0, 3.0, 4.0))  # 4 components
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            ForwardDynamicsState(angular_momentum_about_com_world=(1.0,))  # 1 component
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            ForwardDynamicsState(orientation_quat_world=(1.0, 0.0, 0.0))  # 3 components instead of 4
+        self.assertIn("exactly 4 components", str(ctx.exception))
+
+        # 2. ContactForcePoint length checks
+        with self.assertRaises(ValueError) as ctx:
+            ContactForcePoint((1.0, 2.0), (0.0, 0.0, 10.0))
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            ContactForcePoint((1.0, 2.0, 3.0), (0.0, 0.0, 10.0, 5.0))
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+        # 3. StepInput vector length checks
+        with self.assertRaises(ValueError) as ctx:
+            ForwardDynamicsStepInput(gravity_acceleration_world=(0.0, -9.81))
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            ForwardDynamicsStepInput(external_forces_world=((10.0, 20.0),))
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+        with self.assertRaises(ValueError) as ctx:
+            ForwardDynamicsStepInput(external_torques_about_com_world=((1.0, 2.0, 3.0, 4.0),))
+        self.assertIn("exactly 3 components", str(ctx.exception))
+
+    # -------------------------------------------------------------------------
+    # Test 20: Non-Isotropic Rigid Body Torque-Free Motion and Energy Conservation
+    # -------------------------------------------------------------------------
+    def test_20_non_isotropic_torque_free_motion(self):
+        """Test 20: Non-isotropic rigid body (Ixx != Iyy != Izz) conserves L and rotational kinetic energy."""
+        # Non-isotropic principal moments: 2.0, 3.0, 5.0 kg*m^2
+        I_non_iso = InertiaTensor3x3.from_diagonal(2.0, 3.0, 5.0)
+        L0 = (1.5, 2.0, 2.5)  # Not aligned with any principal axis
+        dt = 0.005
+        total_steps = 100
+
+        curr_state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=70.0,
+            com_position_world=(0.0, 0.0, 1.0),
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=L0,
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=I_non_iso,
+        )
+
+        E0 = curr_state.rotational_kinetic_energy
+
+        step_in = ForwardDynamicsStepInput(
+            gravity_acceleration_world=(0.0, 0.0, 0.0),
+            dt=dt,
+        )
+
+        for _ in range(total_steps):
+            res = integrate_forward_dynamics_single_step(curr_state, step_in)
+            self.assertEqual(res.status, ForwardDynamicsStatus.SUCCESS)
+            curr_state = res.state_next
+
+            # Exact angular momentum conservation in free space
+            self.assertAlmostEqual(curr_state.angular_momentum_about_com_world[0], L0[0], places=9)
+            self.assertAlmostEqual(curr_state.angular_momentum_about_com_world[1], L0[1], places=9)
+            self.assertAlmostEqual(curr_state.angular_momentum_about_com_world[2], L0[2], places=9)
+
+        Ef = curr_state.rotational_kinetic_energy
+        rel_energy_drift = abs(Ef - E0) / E0
+        # Energy drift must remain below 1e-4 over 100 steps
+        self.assertLess(rel_energy_drift, 1e-4)
+
+    # -------------------------------------------------------------------------
+    # Test 21: Non-Isotropic Rigid Body Constant Torque Rotation
+    # -------------------------------------------------------------------------
+    def test_21_non_isotropic_constant_torque_rotation(self):
+        """Test 21: Non-isotropic rigid body under constant external torque integrates exact Delta L."""
+        I_non_iso = InertiaTensor3x3.from_diagonal(2.5, 3.5, 4.5)
+        L0 = (0.5, 1.0, -0.5)
+        tau = (10.0, -5.0, 8.0)
+        dt = 0.01
+        steps = 25
+        total_T = steps * dt
+
+        curr_state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=70.0,
+            com_position_world=(0.0, 0.0, 1.0),
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=L0,
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=I_non_iso,
+        )
+
+        step_in = ForwardDynamicsStepInput(
+            external_torques_about_com_world=(tau,),
+            gravity_acceleration_world=(0.0, 0.0, 0.0),
+            dt=dt,
+        )
+
+        for _ in range(steps):
+            res = integrate_forward_dynamics_single_step(curr_state, step_in)
+            self.assertEqual(res.status, ForwardDynamicsStatus.SUCCESS)
+            curr_state = res.state_next
+
+        # Expected final angular momentum
+        L_expected = (
+            L0[0] + tau[0] * total_T,
+            L0[1] + tau[1] * total_T,
+            L0[2] + tau[2] * total_T,
+        )
+        self.assertAlmostEqual(curr_state.angular_momentum_about_com_world[0], L_expected[0], places=9)
+        self.assertAlmostEqual(curr_state.angular_momentum_about_com_world[1], L_expected[1], places=9)
+        self.assertAlmostEqual(curr_state.angular_momentum_about_com_world[2], L_expected[2], places=9)
+
+        # Orientation must maintain unit norm
+        self.assertAlmostEqual(quat_length(curr_state.orientation_quat_world), 1.0, places=9)
+
+    # -------------------------------------------------------------------------
+    # Test 22: Rigorous 2nd-Order Midpoint Attitude Convergence Rate Verification
+    # -------------------------------------------------------------------------
+    def test_22_second_order_midpoint_convergence_rate(self):
+        """Test 22: Midpoint attitude integrator demonstrates quadratic O(dt^2) error reduction."""
+        I_body = InertiaTensor3x3.from_diagonal(2.0, 4.0, 5.0)
+        L0 = (2.0, 1.5, -1.0)
+        tau = (5.0, -3.0, 4.0)
+        T_horizon = 0.04
+
+        def simulate_with_dt(dt_val: float):
+            s = ForwardDynamicsState(
+                mass=70.0,
+                inertia_tensor_body=I_body,
+                angular_momentum_about_com_world=L0,
+                com_velocity_world=(0.0, 0.0, 0.0),
+                com_position_world=(0.0, 0.0, 1.0),
+            )
+            step_count = int(round(T_horizon / dt_val))
+            step_input = ForwardDynamicsStepInput(
+                external_torques_about_com_world=(tau,),
+                gravity_acceleration_world=(0.0, 0.0, 0.0),
+                dt=dt_val,
+            )
+            for _ in range(step_count):
+                s = integrate_forward_dynamics_single_step(s, step_input).state_next
+            return s.orientation_quat_world
+
+        q_dt1 = simulate_with_dt(0.04)
+        q_dt2 = simulate_with_dt(0.02)
+        q_dt3 = simulate_with_dt(0.01)
+        q_dt4 = simulate_with_dt(0.005)
+
+        def quat_diff_norm(qa, qb):
+            return quat_length((qa[0] - qb[0], qa[1] - qb[1], qa[2] - qb[2], qa[3] - qb[3]))
+
+        e12 = quat_diff_norm(q_dt1, q_dt2)
+        e23 = quat_diff_norm(q_dt2, q_dt3)
+        e34 = quat_diff_norm(q_dt3, q_dt4)
+
+        # Monotonic convergence: error strictly decreases as dt is halved
+        self.assertLess(e23, e12)
+        self.assertLess(e34, e23)
+
+        # Convergence ratio: for a 2nd-order method, e(2h) / e(h) ~ 2^2 = 4.0
+        ratio_12_23 = e12 / e23
+        ratio_23_34 = e23 / e34
+
+        self.assertAlmostEqual(ratio_12_23, 4.0, delta=0.2)
+        self.assertAlmostEqual(ratio_23_34, 4.0, delta=0.2)
 
 
 if __name__ == "__main__":

@@ -87,18 +87,65 @@ def vec3_normalize(v: Sequence[float], tol: float = 1e-12) -> Vec3:
     return (float(v[0] * inv), float(v[1] * inv), float(v[2] * inv))
 
 
-def vec3_is_finite(v: Sequence[float]) -> bool:
-    return len(v) == 3 and math.isfinite(v[0]) and math.isfinite(v[1]) and math.isfinite(v[2])
+def vec3_is_finite(v: Any) -> bool:
+    try:
+        return (
+            isinstance(v, (list, tuple))
+            and len(v) == 3
+            and math.isfinite(float(v[0]))
+            and math.isfinite(float(v[1]))
+            and math.isfinite(float(v[2]))
+        )
+    except (ValueError, TypeError):
+        return False
 
 
-def quat_is_finite(q: Sequence[float]) -> bool:
-    return (
-        len(q) == 4
-        and math.isfinite(q[0])
-        and math.isfinite(q[1])
-        and math.isfinite(q[2])
-        and math.isfinite(q[3])
-    )
+def quat_is_finite(q: Any) -> bool:
+    try:
+        return (
+            isinstance(q, (list, tuple))
+            and len(q) == 4
+            and math.isfinite(float(q[0]))
+            and math.isfinite(float(q[1]))
+            and math.isfinite(float(q[2]))
+            and math.isfinite(float(q[3]))
+        )
+    except (ValueError, TypeError):
+        return False
+
+
+def _validate_vec3(v: Any, name: str) -> Vec3:
+    """Validate that v is a sequence of exactly 3 finite floats and return a new float 3-tuple."""
+    if not isinstance(v, (list, tuple)):
+        raise TypeError(f"{name} must be a sequence of 3 floats, got {type(v).__name__}")
+    if len(v) != 3:
+        raise ValueError(f"{name} must contain exactly 3 components, got {len(v)}")
+    try:
+        x, y, z = float(v[0]), float(v[1]), float(v[2])
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"{name} components must be convertible to float: {exc}") from exc
+    if not (math.isfinite(x) and math.isfinite(y) and math.isfinite(z)):
+        raise ValueError(f"{name} components must be finite numbers, got ({x}, {y}, {z})")
+    return (x, y, z)
+
+
+def _validate_quat(q: Any, name: str, tol: float = 1e-12) -> Vec4:
+    """Validate that q is a sequence of exactly 4 finite floats with non-zero norm, and return a normalized 4-tuple."""
+    if not isinstance(q, (list, tuple)):
+        raise TypeError(f"{name} must be a sequence of 4 floats, got {type(q).__name__}")
+    if len(q) != 4:
+        raise ValueError(f"{name} must contain exactly 4 components, got {len(q)}")
+    try:
+        w, x, y, z = float(q[0]), float(q[1]), float(q[2]), float(q[3])
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"{name} components must be convertible to float: {exc}") from exc
+    if not (math.isfinite(w) and math.isfinite(x) and math.isfinite(y) and math.isfinite(z)):
+        raise ValueError(f"{name} components must be finite numbers, got ({w}, {x}, {y}, {z})")
+    norm_sq = w * w + x * x + y * y + z * z
+    if norm_sq < tol * tol:
+        raise ValueError(f"{name} is degenerate with zero norm: ({w}, {x}, {y}, {z})")
+    inv_norm = 1.0 / math.sqrt(norm_sq)
+    return (w * inv_norm, x * inv_norm, y * inv_norm, z * inv_norm)
 
 
 def quat_length(q: Sequence[float]) -> float:
@@ -370,14 +417,11 @@ class ContactForcePoint:
     contact_id: str = ""
 
     def __post_init__(self):
-        p = (float(self.contact_point_world[0]), float(self.contact_point_world[1]), float(self.contact_point_world[2]))
-        f = (float(self.contact_force_world[0]), float(self.contact_force_world[1]), float(self.contact_force_world[2]))
-        if not vec3_is_finite(p):
-            raise ValueError(f"contact_point_world contains non-finite numbers: {self.contact_point_world}")
-        if not vec3_is_finite(f):
-            raise ValueError(f"contact_force_world contains non-finite numbers: {self.contact_force_world}")
+        p = _validate_vec3(self.contact_point_world, "contact_point_world")
+        f = _validate_vec3(self.contact_force_world, "contact_force_world")
         object.__setattr__(self, "contact_point_world", p)
         object.__setattr__(self, "contact_force_world", f)
+        object.__setattr__(self, "contact_id", str(self.contact_id))
 
 
 # =============================================================================
@@ -389,6 +433,7 @@ class ForwardDynamicsState:
     """Rigorous 6-DOF rigid body dynamical state at a single instant in time.
     
     Immutable (frozen) to guarantee failure atomicity and prevent partial mutations.
+    All sequence fields are defensively standardized to immutable float tuples.
     """
     timestamp: float = 0.0
     mass: float = 70.0
@@ -409,24 +454,17 @@ class ForwardDynamicsState:
         if not math.isfinite(self.timestamp) or self.timestamp < 0.0:
             raise ValueError(f"Timestamp must be non-negative and finite, got {self.timestamp}")
 
-        # Validate vectors
-        for name, v in [
-            ("com_position_world", self.com_position_world),
-            ("com_velocity_world", self.com_velocity_world),
-            ("angular_momentum_about_com_world", self.angular_momentum_about_com_world),
-        ]:
-            if not vec3_is_finite(v):
-                raise ValueError(f"{name} must contain finite numbers, got {v}")
+        # Validate & standardize vectors to immutable tuples
+        pos = _validate_vec3(self.com_position_world, "com_position_world")
+        vel = _validate_vec3(self.com_velocity_world, "com_velocity_world")
+        ang_mom = _validate_vec3(self.angular_momentum_about_com_world, "angular_momentum_about_com_world")
 
-        # Validate and normalize quaternion
-        if not quat_is_finite(self.orientation_quat_world):
-            raise ValueError(f"orientation_quat_world must be finite, got {self.orientation_quat_world}")
-        ql = quat_length(self.orientation_quat_world)
-        if ql < 1e-12:
-            raise ValueError(f"orientation_quat_world is degenerate with zero norm: {self.orientation_quat_world}")
-        
-        # Ensure exact unit quaternion is stored
-        q_norm = quat_normalize(self.orientation_quat_world)
+        object.__setattr__(self, "com_position_world", pos)
+        object.__setattr__(self, "com_velocity_world", vel)
+        object.__setattr__(self, "angular_momentum_about_com_world", ang_mom)
+
+        # Validate & standardize quaternion to normalized float tuple
+        q_norm = _validate_quat(self.orientation_quat_world, "orientation_quat_world")
         object.__setattr__(self, "orientation_quat_world", q_norm)
 
         # Validate inertia tensor
@@ -472,7 +510,11 @@ class ForwardDynamicsState:
 
 @dataclass(frozen=True)
 class ForwardDynamicsStepInput:
-    """Complete collection of forces, torques, gravity, and timing for a single step integration."""
+    """Complete collection of forces, torques, gravity, and timing for a single step integration.
+    
+    Immutable (frozen) and all sequence collections are defensively converted into
+    immutable tuples of float 3-tuples.
+    """
     contact_forces: Tuple[ContactForcePoint, ...] = ()
     external_forces_world: Tuple[Vec3, ...] = ()
     external_torques_about_com_world: Tuple[Vec3, ...] = ()
@@ -486,41 +528,45 @@ class ForwardDynamicsStepInput:
         if not math.isfinite(self.dt) or self.dt <= 0.0:
             raise ValueError(f"dt must be strictly positive and finite, got {self.dt}")
 
-        # Validate gravity
-        if not vec3_is_finite(self.gravity_acceleration_world):
-            raise ValueError(f"gravity_acceleration_world must be finite, got {self.gravity_acceleration_world}")
+        # Validate & standardize gravity
+        grav = _validate_vec3(self.gravity_acceleration_world, "gravity_acceleration_world")
+        object.__setattr__(self, "gravity_acceleration_world", grav)
 
-        # Check unique contact_ids in contact forces
+        # Defensive copy and validation of contact_forces
+        if not isinstance(self.contact_forces, (list, tuple)):
+            raise TypeError(f"contact_forces must be a sequence, got {type(self.contact_forces).__name__}")
+        cp_list = []
         seen_ids = set()
-        for cp in self.contact_forces:
+        for i, cp in enumerate(self.contact_forces):
             if not isinstance(cp, ContactForcePoint):
-                raise TypeError(f"contact_forces elements must be ContactForcePoint, got {type(cp)}")
+                raise TypeError(f"contact_forces[{i}] must be ContactForcePoint, got {type(cp).__name__}")
             if cp.contact_id:
                 if cp.contact_id in seen_ids:
                     raise ValueError(f"Duplicate contact_id detected in step input: '{cp.contact_id}'")
                 seen_ids.add(cp.contact_id)
+            cp_list.append(cp)
+        object.__setattr__(self, "contact_forces", tuple(cp_list))
 
-        # Validate external forces
-        for ef in self.external_forces_world:
-            if not vec3_is_finite(ef):
-                raise ValueError(f"external_forces_world element contains non-finite numbers: {ef}")
+        # Defensive copy and validation of external_forces_world
+        if not isinstance(self.external_forces_world, (list, tuple)):
+            raise TypeError(f"external_forces_world must be a sequence, got {type(self.external_forces_world).__name__}")
+        ef_list = [_validate_vec3(ef, f"external_forces_world[{i}]") for i, ef in enumerate(self.external_forces_world)]
+        object.__setattr__(self, "external_forces_world", tuple(ef_list))
 
-        # Validate external torques
-        for et in self.external_torques_about_com_world:
-            if not vec3_is_finite(et):
-                raise ValueError(f"external_torques_about_com_world element contains non-finite numbers: {et}")
+        # Defensive copy and validation of external_torques_about_com_world
+        if not isinstance(self.external_torques_about_com_world, (list, tuple)):
+            raise TypeError(f"external_torques_about_com_world must be a sequence, got {type(self.external_torques_about_com_world).__name__}")
+        et_list = [_validate_vec3(et, f"external_torques_about_com_world[{i}]") for i, et in enumerate(self.external_torques_about_com_world)]
+        object.__setattr__(self, "external_torques_about_com_world", tuple(et_list))
 
         # Validate targets if provided
         if self.target_linear_acceleration_world is not None:
-            if not vec3_is_finite(self.target_linear_acceleration_world):
-                raise ValueError(
-                    f"target_linear_acceleration_world must be finite, got {self.target_linear_acceleration_world}"
-                )
+            t_lin = _validate_vec3(self.target_linear_acceleration_world, "target_linear_acceleration_world")
+            object.__setattr__(self, "target_linear_acceleration_world", t_lin)
+
         if self.target_angular_momentum_rate_world is not None:
-            if not vec3_is_finite(self.target_angular_momentum_rate_world):
-                raise ValueError(
-                    f"target_angular_momentum_rate_world must be finite, got {self.target_angular_momentum_rate_world}"
-                )
+            t_ang = _validate_vec3(self.target_angular_momentum_rate_world, "target_angular_momentum_rate_world")
+            object.__setattr__(self, "target_angular_momentum_rate_world", t_ang)
 
     @classmethod
     def from_solution_and_specs(
@@ -581,6 +627,29 @@ class ForwardDynamicsStepResult:
     computation_time_sec: float = 0.0
     is_physically_valid: bool = True
     message: str = ""
+
+    def __post_init__(self):
+        # Defensively standardize all vector outputs into immutable float tuples
+        for attr in (
+            "net_force_world",
+            "net_torque_about_com_world",
+            "actual_linear_acceleration_world",
+            "actual_angular_momentum_rate_world",
+            "actual_angular_velocity_world",
+        ):
+            val = getattr(self, attr)
+            if isinstance(val, (list, tuple)) and len(val) == 3:
+                object.__setattr__(self, attr, (float(val[0]), float(val[1]), float(val[2])))
+
+        for attr in (
+            "target_linear_acceleration_world",
+            "target_angular_momentum_rate_world",
+            "linear_acceleration_tracking_error",
+            "angular_momentum_rate_tracking_error",
+        ):
+            val = getattr(self, attr)
+            if val is not None and isinstance(val, (list, tuple)) and len(val) == 3:
+                object.__setattr__(self, attr, (float(val[0]), float(val[1]), float(val[2])))
 
 
 # =============================================================================
@@ -816,37 +885,129 @@ def integrate_forward_dynamics_single_step(
             message=f"SINGULAR_INERTIA: Failed to solve angular velocity: {exc}",
         )
 
-    # Midpoint angular momentum for second-order accurate attitude integration
-    L_mid: Vec3 = (
+    # -------------------------------------------------------------------------
+    # 2-Stage Midpoint Attitude & Rotational Dynamics Integration
+    # -------------------------------------------------------------------------
+    # Step 1: omega_curr is already solved above:
+    # omega_curr = I_world_curr.solve_angular_velocity(L_curr)
+
+    # Step 2: Extrapolate half-step attitude q_half:
+    # theta_half = ||omega_curr|| * (dt / 2)
+    # Delta_q_half = exp(0.5 * omega_curr * (dt / 2))
+    # q_half = normalize(Delta_q_half * q_curr)
+    omega_curr_mag = vec3_length(omega_curr)
+    theta_half = omega_curr_mag * (0.5 * dt)
+
+    if theta_half < 1e-12:
+        q_half = q_curr
+    else:
+        half_theta_half = 0.5 * theta_half
+        s_half = math.sin(half_theta_half) / omega_curr_mag
+        c_half = math.cos(half_theta_half)
+        delta_q_half = (c_half, omega_curr[0] * s_half, omega_curr[1] * s_half, omega_curr[2] * s_half)
+        q_half = quat_normalize(quat_multiply(delta_q_half, q_curr))
+
+    # Step 3: Compute midpoint world inertia tensor:
+    # R_half = quat_to_rot_matrix(q_half)
+    # I_world_half = I_body.rotate(R_half)
+    R_half = quat_to_rot_matrix(q_half)
+    I_world_half = I_body.rotate(R_half)
+
+    if not I_world_half.is_positive_definite(tol=cfg.tolerance_positive_definite):
+        return ForwardDynamicsStepResult(
+            status=ForwardDynamicsStatus.SINGULAR_INERTIA,
+            state_next=state,
+            net_force_world=F_net,
+            net_torque_about_com_world=tau_net,
+            actual_linear_acceleration_world=a_actual,
+            actual_angular_momentum_rate_world=L_dot_actual,
+            actual_angular_velocity_world=omega_curr,
+            computation_time_sec=time.perf_counter() - t0,
+            is_physically_valid=False,
+            message=(
+                f"SINGULAR_INERTIA: Midpoint world inertia tensor became singular/non-positive-definite "
+                f"(det={I_world_half.determinant():.4e})"
+            ),
+        )
+
+    # Step 4: Midpoint angular momentum:
+    # L_half = L_curr + 0.5 * tau_net * dt
+    L_half: Vec3 = (
         L_curr[0] + 0.5 * tau_net[0] * dt,
         L_curr[1] + 0.5 * tau_net[1] * dt,
         L_curr[2] + 0.5 * tau_net[2] * dt,
     )
-    omega_mid = I_world_curr.solve_angular_velocity(L_mid, tol=cfg.tolerance_positive_definite)
 
-    # Exponential map quaternion update on SO(3):
-    # theta = ||omega_mid|| * dt
-    # Delta_q = (cos(theta/2), sin(theta/2) * (omega_mid / ||omega_mid||))
-    # q_next = normalize(Delta_q * q_curr)
-    omega_mag = vec3_length(omega_mid)
-    theta = omega_mag * dt
+    # Step 5: Solve midpoint angular velocity:
+    # omega_mid = I_world_half^-1 * L_half
+    try:
+        omega_mid = I_world_half.solve_angular_velocity(L_half, tol=cfg.tolerance_positive_definite)
+    except Exception as exc:
+        return ForwardDynamicsStepResult(
+            status=ForwardDynamicsStatus.SINGULAR_INERTIA,
+            state_next=state,
+            net_force_world=F_net,
+            net_torque_about_com_world=tau_net,
+            actual_linear_acceleration_world=a_actual,
+            actual_angular_momentum_rate_world=L_dot_actual,
+            actual_angular_velocity_world=omega_curr,
+            computation_time_sec=time.perf_counter() - t0,
+            is_physically_valid=False,
+            message=f"SINGULAR_INERTIA: Failed to solve midpoint angular velocity: {exc}",
+        )
 
-    if theta < 1e-12:
-        # Stationary or vanishing rotation: quaternion is strictly invariant
+    # Step 6: Full-step attitude update using midpoint angular velocity:
+    # theta_full = ||omega_mid|| * dt
+    # Delta_q_full = exp(0.5 * omega_mid * dt)
+    # q_next = normalize(Delta_q_full * q_curr)
+    omega_mid_mag = vec3_length(omega_mid)
+    theta_full = omega_mid_mag * dt
+
+    if theta_full < 1e-12:
         q_next = q_curr
     else:
-        half_theta = 0.5 * theta
-        s = math.sin(half_theta) / omega_mag
-        c = math.cos(half_theta)
-        delta_q = (c, omega_mid[0] * s, omega_mid[1] * s, omega_mid[2] * s)
-        # Active world rotation: q_next = delta_q * q_curr
-        q_next_unnorm = quat_multiply(delta_q, q_curr)
-        q_next = quat_normalize(q_next_unnorm)
+        half_theta_full = 0.5 * theta_full
+        s_mid = math.sin(half_theta_full) / omega_mid_mag
+        c_mid = math.cos(half_theta_full)
+        delta_q_full = (c_mid, omega_mid[0] * s_mid, omega_mid[1] * s_mid, omega_mid[2] * s_mid)
+        q_next = quat_normalize(quat_multiply(delta_q_full, q_curr))
 
-    # Re-evaluate next world inertia tensor and next angular velocity
+    # Step 7: Update final world inertia and angular velocity at t_{k+1}:
     R_next = quat_to_rot_matrix(q_next)
     I_world_next = I_body.rotate(R_next)
-    omega_next = I_world_next.solve_angular_velocity(L_next, tol=cfg.tolerance_positive_definite)
+
+    if not I_world_next.is_positive_definite(tol=cfg.tolerance_positive_definite):
+        return ForwardDynamicsStepResult(
+            status=ForwardDynamicsStatus.SINGULAR_INERTIA,
+            state_next=state,
+            net_force_world=F_net,
+            net_torque_about_com_world=tau_net,
+            actual_linear_acceleration_world=a_actual,
+            actual_angular_momentum_rate_world=L_dot_actual,
+            actual_angular_velocity_world=omega_curr,
+            computation_time_sec=time.perf_counter() - t0,
+            is_physically_valid=False,
+            message=(
+                f"SINGULAR_INERTIA: Next world inertia tensor became singular/non-positive-definite "
+                f"(det={I_world_next.determinant():.4e})"
+            ),
+        )
+
+    try:
+        omega_next = I_world_next.solve_angular_velocity(L_next, tol=cfg.tolerance_positive_definite)
+    except Exception as exc:
+        return ForwardDynamicsStepResult(
+            status=ForwardDynamicsStatus.SINGULAR_INERTIA,
+            state_next=state,
+            net_force_world=F_net,
+            net_torque_about_com_world=tau_net,
+            actual_linear_acceleration_world=a_actual,
+            actual_angular_momentum_rate_world=L_dot_actual,
+            actual_angular_velocity_world=omega_curr,
+            computation_time_sec=time.perf_counter() - t0,
+            is_physically_valid=False,
+            message=f"SINGULAR_INERTIA: Failed to solve next angular velocity: {exc}",
+        )
 
     # Check finite numbers on all updated state quantities
     if (

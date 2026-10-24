@@ -740,3 +740,38 @@
   - 新增完备测试：`tests/verify_task6gd_forward_dynamics.py`（17 项分析测试全部通过）；
   - 注册统一测试入口：在 `tests/test_registry.py` 注册 `forward_dynamics`（纳入 QUICK, PHYSICS, FULL 分级）；
   - 实测回归全绿：纯 Python 与 Blender Headless 双环境通过，`quick` (8/8) 保持 100% 零退化。
+
+---
+
+### [DEC-039] 前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正 (Task 6G-D-C1-A-R1)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-24
+* **背景**：在完成 Task 6G-D-C1-A 前向动力学独立单步积分内核后，独立源码审查发现了两项关键数学与数据契约问题：
+  1. **状态不可变性漏洞**：`ForwardDynamicsState` 与 `ForwardDynamicsStepInput` 虽然标记为 `@dataclass(frozen=True)`，但内部序列字段在入参为外部可变列表（list）时未执行防御性深拷贝或不可变元组转换，调用方在积分后若修改原传入列表，将静默修改已冻结状态的内部属性；且向量与四元数维度未严格检验是否恰好为 3 或 4，存在被静默截断或长度不足报错延迟的风险；
+  2. **旋转积分几何精度缺失**：既往姿态积分中，虽然使用了半步角动量 $\mathbf{L}_{\text{half}}$，但求解中点角速度时所使用的世界坐标系惯性矩阵仍直接复用当前时刻姿态的 $I_{\text{world}, k}$，未将刚体惯性张量根据半步姿态协变变换到中点位置 $I_{\text{world, half}} = R(q_{\text{half}}) I_{\text{body}} R(q_{\text{half}})^T$。对于非各向同性刚体（$I_{xx} \ne I_{yy} \ne I_{zz}$），此近似破坏了经典二阶中点旋转积分的几何精度与能量保持性。
+* **决策与方案**：
+  1. **严格的向量维度与防御性元组复制契约**：
+     - 新增 `_validate_vec3(v, name)` 与 `_validate_quat(q, name)`，严格校验向量分量个数必须恰好为 3、四元数分量个数必须恰好为 4，拦截任何长度不匹配输入；
+     - 强制全部数值元素必须为有限实数（`math.isfinite`），四元数严格非退化并归一化；
+     - 校验通过后，通过 `object.__setattr__` 将所有空间向量与集合字段强制转为全新的不可变浮点元组（`tuple`）；
+     - `ContactForcePoint`、`ForwardDynamicsState`、`ForwardDynamicsStepInput`、`ForwardDynamicsStepResult` 全面统一此不可变防御机制，杜绝调用方持有外部可变引用修改状态；
+     - 严格保障失败原子性：单步积分异常或失败时返回的 `state_next` 为原输入 `state` 的完全未修改引用。
+  2. **严格的 2-Stage 中点姿态与角动力学积分流程**：
+     - Step 1: 求解当前角速度 $\boldsymbol{\omega}_k = I_{\text{world}, k}^{-1} \mathbf{L}_k$；
+     - Step 2: 外推半步姿态 $\theta_{\text{half}} = \|\boldsymbol{\omega}_k\| \frac{\Delta t}{2}$，$\Delta q_{\text{half}} = \exp(\frac{1}{2} \boldsymbol{\omega}_k \frac{\Delta t}{2})$，$q_{\text{half}} = \text{normalize}(\Delta q_{\text{half}} \otimes q_k)$；
+     - Step 3: 根据半步姿态严格计算中点世界惯性张量 $R_{\text{half}} = R(q_{\text{half}})$，$I_{\text{world, half}} = I_{\text{body}}.\text{rotate}(R_{\text{half}})$（并检查正定性）；
+     - Step 4: 计算半步角动量 $\mathbf{L}_{\text{half}} = \mathbf{L}_k + \frac{1}{2} \boldsymbol{\tau}_{\text{net}} \Delta t$；
+     - Step 5: 求解中点真实角速度 $\boldsymbol{\omega}_{\text{mid}} = I_{\text{world, half}}^{-1} \mathbf{L}_{\text{half}}$；
+     - Step 6: 利用中点角速度推进整步姿态 $\theta_{\text{full}} = \|\boldsymbol{\omega}_{\text{mid}}\| \Delta t$，$\Delta q_{\text{full}} = \exp(\frac{1}{2} \boldsymbol{\omega}_{\text{mid}} \Delta t)$，$q_{k+1} = \text{normalize}(\Delta q_{\text{full}} \otimes q_k)$；
+     - Step 7: 更新最终角动量 $\mathbf{L}_{k+1} = \mathbf{L}_k + \boldsymbol{\tau}_{\text{net}} \Delta t$ 以及最终角速度 $\boldsymbol{\omega}_{k+1} = I_{\text{world}, k+1}^{-1} \mathbf{L}_{k+1}$。
+  3. **完备的可验证分析测试**：
+     - 在 `tests/verify_task6gd_forward_dynamics.py` 新增 Test 18 至 Test 22（测试总数提升至 22 项）；
+     - Test 18 检验外部列表就地修改无法污染 State、StepInput 与 ContactPoint；
+     - Test 19 严格测试拒绝 2D/4D 向量与 3D/5D 四元数；
+     - Test 20 验证非各向同性刚体自由翻滚的动量与能量守恒（100 步相对能量漂移小于 $1.5 \times 10^{-7}$，角动量绝对漂移为 0.0）；
+     - Test 21 验证非各向同性刚体在常外力矩下的角动量精确追踪；
+     - Test 22 在时间步长二分（$\Delta t \in \{0.04, 0.02, 0.01, 0.005\}$）下实测误差缩减比，测得误差比精确为 $4.01$ 与 $4.00$，严格证明了二阶二次收敛 $O(\Delta t^2)$。
+* **影响与产物**：
+  - 更新代码：`src/motion/forward_dynamics.py`；
+  - 扩充测试：`tests/verify_task6gd_forward_dynamics.py`（22/22 全绿通过）；
+  - 实测回归：`quick` (8/8) 与 `physics` (13/13) 全部通过，保持 100% 零退化。

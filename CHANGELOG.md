@@ -3,6 +3,48 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-24] 任务 6G-D-C1-A-R1：前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正 (Task 6G-D-C1-A-R1)
+
+### 状态不可变性与输入契约修复 (`src/motion/forward_dynamics.py`)
+* **三维向量与四元数维度严格验证**：
+  * 实现 `_validate_vec3` 与 `_validate_quat`，严格要求向量分量长度恰好为 3、四元数分量长度恰好为 4（严禁截断或不足容忍），拦截任何维度不匹配异常；
+  * 强制验证数值元素必须为有限实数（`math.isfinite`），拒绝 NaN 与 Inf；
+  * 验证通过后，将全部空间向量与集合字段通过 `object.__setattr__` 转换为不可变浮点元组（`tuple`）。
+* **序列集合防御性深浅拷贝与防污染隔离**：
+  * `ForwardDynamicsState`：内部 `com_position_world`, `com_velocity_world`, `angular_momentum_about_com_world`, `orientation_quat_world` 全面转换为不可变元组，外部调用方即使就地修改原 list 也不影响状态；
+  * `ContactForcePoint`：`contact_point_world`, `contact_force_world` 强制防御性转换为 float 元组；
+  * `ForwardDynamicsStepInput`：对 `external_forces_world`, `external_torques_about_com_world`, `contact_forces`, `gravity_acceleration_world` 进行全面防御性复制，杜绝通过外部 list 修改已构建的步进输入；
+  * `ForwardDynamicsStepResult`：全部输出向量属性统一防御性标准化为 float 元组；
+  * 严格保证失败原子性：单步积分异常或失败时，返回的 `state_next` 为原输入 `state` 的完全未修改引用。
+
+### 真正的 2-Stage 中点姿态积分流程 (`src/motion/forward_dynamics.py`)
+* **几何对称的世界惯性张量中点更新**：
+  * 修复了既往在求解中点角速度时直接复用当前姿态惯性矩阵 $I_{\text{world}, k}$ 的问题；
+  * 引入完整的 2-Stage 中点积分流程：
+    1. $\boldsymbol{\omega}_k = I_{\text{world}, k}^{-1} \mathbf{L}_k$；
+    2. $\theta_{\text{half}} = \|\boldsymbol{\omega}_k\| \frac{\Delta t}{2}$，$\Delta q_{\text{half}} = \exp(\frac{1}{2} \boldsymbol{\omega}_k \frac{\Delta t}{2})$，$q_{\text{half}} = \text{normalize}(\Delta q_{\text{half}} \otimes q_k)$；
+    3. $R_{\text{half}} = R(q_{\text{half}})$，$I_{\text{world, half}} = I_{\text{body}}.\text{rotate}(R_{\text{half}})$ 并验证正定性；
+    4. $\mathbf{L}_{\text{half}} = \mathbf{L}_k + \frac{1}{2} \boldsymbol{\tau}_{\text{net}} \Delta t$；
+    5. $\boldsymbol{\omega}_{\text{mid}} = I_{\text{world, half}}^{-1} \mathbf{L}_{\text{half}}$；
+    6. $\theta_{\text{full}} = \|\boldsymbol{\omega}_{\text{mid}}\| \Delta t$，$\Delta q_{\text{full}} = \exp(\frac{1}{2} \boldsymbol{\omega}_{\text{mid}} \Delta t)$，$q_{k+1} = \text{normalize}(\Delta q_{\text{full}} \otimes q_k)$；
+    7. $\mathbf{L}_{k+1} = \mathbf{L}_k + \boldsymbol{\tau}_{\text{net}} \Delta t$，$I_{\text{world}, k+1} = I_{\text{body}}.\text{rotate}(R(q_{k+1}))$，$\boldsymbol{\omega}_{k+1} = I_{\text{world}, k+1}^{-1} \mathbf{L}_{k+1}$；
+  * 完美解决了非各向同性刚体（$I_{xx} \ne I_{yy} \ne I_{zz}$）在旋转过程中的惯性协变张量更新与角动量-能量几何保持。
+
+### 测试验证与架构状态
+* **独立单元测试套件扩充 (`tests/verify_task6gd_forward_dynamics.py`)**：
+  * 测试总数由 17 项提升至 22 项，新增：
+    * Test 18：State、StepInput、ContactForcePoint 对外部列表就地修改的防御性隔离；
+    * Test 19：对 2D/4D 向量及 3D/5D 四元数的严格拦截；
+    * Test 20：非各向同性刚体自由翻滚的动量与能量守恒（100 步相对能量漂移 $< 1.5 \times 10^{-7}$，角动量绝对漂移 0.0）；
+    * Test 21：非各向同性刚体常力矩下角动量精确追踪；
+    * Test 22：时间步长二分（$\Delta t \in \{0.04, 0.02, 0.01, 0.005\}$）下的二阶二次收敛率实测，测得误差比精确为 $4.01$ 与 $4.00$（理论值 $2^2 = 4.0$）。
+* **自动化回归套件全绿**：
+  * 单独测试：22/22 项全绿（0.009s）；
+  * Blender Headless 单测：22/22 项全绿；
+  * 分级回归：`quick` (8/8 项全部通过，7.82s)，`physics` (13/13 项全部通过，59.40s)；
+  * 零历史步态修改，零 Rig/IK/WBC 篡改，零训练场重建。
+
+
 ## [2026-10-24] 任务 6G-D-C1-A：前向动力学单步积分内核与刚体物理状态解耦 (Task 6G-D-C1-A)
 
 ### 接触力求解器输入契约加固 (`src/motion/contact_force_solver.py`)
