@@ -179,6 +179,7 @@ class ContactWrenchTarget:
         gravity_z: float = -9.81,
         external_forces: Sequence[Vec3] = (),
         external_torques: Sequence[Vec3] = (),
+        gravity_acceleration_world: Optional[Vec3] = None,
     ) -> ContactWrenchTarget:
         """Construct target contact wrench from desired acceleration, gravity, and external disturbances.
 
@@ -187,8 +188,19 @@ class ContactWrenchTarget:
             dL_com/dt = tau_contact + sum(tau_ext)
 
         Therefore:
-            F_target_contact = m * a_target - F_gravity - sum(F_ext)
+            F_target_contact = m * a_target - m * g - sum(F_ext)
             tau_target_contact = dL_com/dt - sum(tau_ext)
+
+        Parameters:
+            mass: Total system mass m > 0 (kg).
+            target_linear_acc: Desired CoM linear acceleration a_target in World Space (m/s^2).
+            com_world: Reference Center of Mass position in World Space (m).
+            dL_com_dt: Desired rate of change of angular momentum dL/dt about CoM in World Space (N*m).
+            gravity_z: Downward gravitational acceleration along Z (m/s^2, default -9.81). Used if gravity_acceleration_world is None.
+            external_forces: Sequence of external forces F_ext acting on the body (N).
+            external_torques: Sequence of external torques tau_ext about CoM (N*m).
+            gravity_acceleration_world: Full 3D gravitational acceleration vector g in World Space (m/s^2).
+                If provided, overrides gravity_z and computes F_grav = mass * gravity_acceleration_world.
         """
         if math.isnan(mass) or math.isinf(mass) or mass <= 0.0:
             raise ValueError(f"mass must be strictly positive and finite, got {mass}")
@@ -199,8 +211,12 @@ class ContactWrenchTarget:
         dL = _to_vec3(dL_com_dt, "dL_com_dt")
         com = _to_vec3(com_world, "com_world")
 
-        # Gravity force: [0, 0, mass * gravity_z]
-        f_grav: Vec3 = (0.0, 0.0, mass * gravity_z)
+        # Full 3D Gravity force: m * g
+        if gravity_acceleration_world is not None:
+            g_vec = _to_vec3(gravity_acceleration_world, "gravity_acceleration_world")
+            f_grav: Vec3 = vec3_scale(g_vec, mass)
+        else:
+            f_grav = (0.0, 0.0, mass * gravity_z)
 
         # Total required net force: m * a
         f_net: Vec3 = vec3_scale(acc, mass)

@@ -803,3 +803,32 @@
   - 新增测试套件：`tests/verify_task6gd_closed_loop_dynamics.py`（12 项核心场景测试全绿）；
   - 注册统一测试入口：在 `tests/test_registry.py` 注册 `closed_loop_dynamics`（纳入 QUICK, PHYSICS, FULL 分级）；
   - 分层回归全绿：`quick` (9/9 项全部通过，14.52s) 与 `physics` (14/14 项全部通过，68.29s) 保持 100% 零退化。
+
+---
+
+### [DEC-041] 完整三维重力统一、旋转反馈陀螺耦合修正与物理不可行性解耦准入门禁 (Task 6G-D-C1-B-R1)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-24
+* **背景**：源码审查发现 Task 6G-D-C1-B 存在三处关键数学与契约问题：(1) 闭环构造目标扳手时仅传递标量 `gravity_z`，与前向动力学积分使用的完整三维重力向量解耦；(2) 旋转反馈律仅使用 $\boldsymbol{\tau} = I \boldsymbol{\alpha}$，忽略了刚体在世界坐标系下由于惯性张量旋转产生的完整欧拉陀螺力矩项 $\boldsymbol{\omega} \times \mathbf{L}$；(3) 控制器将所有不可行目标（包括空中悬停）统一作为错误冻结物理推进，导致角色在空中未受支撑时异常浮空悬停，未能反映自然重力下落的真实物理演化。
+* **决策与方案**：
+  1. **完整三维重力统一计算**：
+     - 扩展 `ContactWrenchTarget.from_target_motion()` 接口，新增 `gravity_acceleration_world: Optional[Vec3] = None` 参数；
+     - 当传入三维重力时，目标接触力满足严格物理关系 $\mathbf{F}_{\text{contact\_target}} = m \mathbf{a}_{\text{target}} - m \mathbf{g} - \sum \mathbf{F}_{\text{ext}}$；
+     - 未传入三维重力时保持旧 `gravity_z` 默认值与既有调用 100% 兼容；
+     - 闭环协调器向目标接触扳手与单步前向动力学积分器传入同一套 `gravity_acceleration_world`。
+  2. **世界系旋转反馈陀螺耦合项修正**：
+     - 基于完整世界坐标系刚体动力学方程 $\frac{d\mathbf{L}}{dt} = I_{\text{world}} \boldsymbol{\alpha} + \boldsymbol{\omega} \times \mathbf{L}$；
+     - 当存在旋转反馈目标时，将世界角加速度反馈 $\boldsymbol{\alpha}_{\text{fb}}$ 转换为力矩时加入陀螺耦合项：$\boldsymbol{\tau}_{\text{fb}} = I_{\text{world}} \boldsymbol{\alpha}_{\text{fb}} + \boldsymbol{\omega} \times \mathbf{L}$；
+     - 当完全没有旋转反馈目标时，严格保持纯前馈角动量变化率语义不变，避免重复计入陀螺项；
+     - 解析验证了各向同性惯量（$\boldsymbol{\omega} \times \mathbf{L} = \mathbf{0}$）、主轴旋转（$\boldsymbol{\omega} \times \mathbf{L} = \mathbf{0}$）与非主轴旋转（$\boldsymbol{\omega} \times \mathbf{L} \ne \mathbf{0}$）的精确匹配。
+  3. **严格解耦数值失败与控制物理不可行性**：
+     - **数值失败**（非法输入、NaN、求解崩溃）：严格保全原物理状态不变（失败原子性，`state_advanced = False`）；
+     - **控制目标不可行但物理可知**（如空中无接触却要求悬停）：不虚构接触力，以真实物理力（重力 + 零接触力）推进前向积分，物理时间自然演化（`state_advanced = True`，状态标定为 `CONTROL_INFEASIBLE_PHYSICS_ADVANCED`），角色在重力下自然加速坠落；
+     - **约束无法证明有效**（如地面要求拉扯负支撑力）：不得直接积分，严格中止推进（`REJECTED_INFEASIBLE`）；
+     - 在 `ClosedLoopAdmissibilityPolicy` 中保留 `strict_freeze_on_infeasible: bool = False` 作为严格冻结可选配置。
+  4. **接触几何多帧边界界定**：
+     - 明确 `ContactConstraintSpec` 仅代表当前帧即时接触输入；多帧模拟严禁无条件假设静态接触点永久有效；后续 Task 6G-D-C2 须调用环境查询与接触模型动态更新接触点与有效性。
+* **影响与产物**：
+  - 更新代码：`src/motion/contact_force_solver.py`、`src/motion/closed_loop_dynamics.py`；
+  - 扩充测试：`tests/verify_task6gd_closed_loop_dynamics.py` 增至 20 项场景测试全绿通过；
+  - 实测回归：`quick` (9/9, 15.09s) 与 `physics` (14/14, 66.27s) 保持 100% 零退化。

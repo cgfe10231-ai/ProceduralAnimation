@@ -5,12 +5,14 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-C1-B（多帧动力学闭环控制与状态反馈）：
-1. 建立纯 Python 多帧动力学真实因果闭环链路：实际状态 $\to$ 期望参考与 PD 反馈律 $\to$ 目标接触扳手 $\to$ 接触力求解 $\to$ 准入门禁判决 $\to$ 真实分配外力前向动力学积分 $\to$ 新实际状态 $\to$ 逐帧遥测与跟踪误差；
-2. 严禁直接用目标速度或加速度覆盖实际状态，轨迹 100% 由牛顿-欧拉方程经接触反力单步积分演化推进；
-3. 临界阻尼反馈控制律与饱和截断：引入 `DesiredMotionReference`，基于倒立摆物理特性配置临界阻尼增益（$k_p=16.0, k_d=6.0$），姿态跟踪引入 $SO(3)$ 李代数四元数对数误差映射 $\mathbf{e}_{\text{rot}} = \log(q_{\text{tgt}} \otimes q_k^{-1})$；
-4. 严格准入门禁 `ClosedLoopAdmissibilityPolicy`：区分 6 类执行状态，不可行或数值失败时严格保全原状态（失败原子性）；
-5. 交付 `tests/verify_task6gd_closed_loop_dynamics.py` 12 项场景测试全绿，分层回归 `quick` (9/9), `physics` (14/14) 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-C1-B-R1（多帧动力学闭环三维重力统一、旋转反馈陀螺耦合修正与物理不可行性解耦准入门禁）：
+1. 完整三维重力统一：扩展 `ContactWrenchTarget.from_target_motion` 支持传入 `gravity_acceleration_world: Optional[Vec3]`，使目标外力计算与前向动力学积分使用完全相同的 3D 重力向量，保持旧 `gravity_z` 调用兼容；
+2. 修正旋转反馈中的世界坐标陀螺耦合：世界系完整刚体转动动力学为 $\frac{d\mathbf{L}}{dt} = I_{\text{world}} \boldsymbol{\alpha} + \boldsymbol{\omega} \times \mathbf{L}$。反馈角加速度 $\boldsymbol{\alpha}_{\text{fb}}$ 转换为力矩时正确计入陀螺力矩 $\boldsymbol{\tau}_{\text{gyro}} = \boldsymbol{\omega} \times \mathbf{L}$。无旋转反馈目标时严格保留纯前馈语义，避免陀螺项重复计入；
+3. 解耦数值失败与物理不可行性准入门禁：
+   - 数值失败（非法输入、NaN、积分崩溃）：严格保全原状态（失败原子性，`state_advanced = False`）；
+   - 控制目标物理不可实现（如空中要求悬停）：不虚构受力，不把目标写成实际状态，真实物理受力（重力 + 零接触反力）确定时自然前向推进（`state_advanced = True`，标定为 `CONTROL_INFEASIBLE_PHYSICS_ADVANCED`），角色在空中自然受重力下落；保留 `strict_freeze_on_infeasible` 严格停止模式；
+4. 接触几何与多帧仿真边界规范：明确 `ContactConstraintSpec` 为单帧即时输入，后续 Task 6G-D-C2 须接入环境查询与接触模型动态更新接触点与状态；
+5. 交付 `tests/verify_task6gd_closed_loop_dynamics.py` 20 项测试全绿，分层回归 `quick` (9/9), `physics` (14/14) 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -45,24 +47,24 @@
 * 完成 Task 6G-D-B-R2 接触力求解器终止状态契约与优化收敛真值解耦。
 * 完成 Task 6G-D-C1-A 前向动力学单步积分内核与刚体物理状态解耦。
 * 完成 Task 6G-D-C1-A-R1 前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正。
-* **完成 Task 6G-D-C1-B 多帧动力学闭环控制与状态反馈**：
-  * 实现独立多帧动力学闭环协调器 `ClosedLoopDynamicsCoordinator`；
-  * 构建真实物理因果闭环链路，以 Newton-Euler 6-DOF 积分演化推进实际状态；
-  * 引入倒立摆临界阻尼增益与 $SO(3)$ 李代数四元数对数旋转姿态误差向量；
-  * 引入 `ClosedLoopAdmissibilityPolicy`，严格区分 6 类状态，保障失败原子性；
-  * 交付 12 项场景测试全绿通过，分层回归 `quick` (9/9) 与 `physics` (14/14) 100% 零退化。
+* 完成 Task 6G-D-C1-B 多帧动力学闭环控制与状态反馈。
+* **完成 Task 6G-D-C1-B-R1 完整三维重力统一、旋转反馈陀螺耦合修正与物理不可行性解耦准入门禁**：
+  * 扩展 `ContactWrenchTarget.from_target_motion` 支持传入完整 3D 重力向量，保持旧 `gravity_z` 调用兼容；
+  * 修正旋转反馈律计入世界系陀螺耦合力矩 $\boldsymbol{\tau}_{\text{gyro}} = \boldsymbol{\omega} \times \mathbf{L}$，无旋转反馈时保全纯前馈角动量语义；
+  * 解耦数值失败与物理不可行性，空中无接触悬停需求自然受重力下落；
+  * 交付 20 项场景测试全绿通过，分层回归 `quick` (9/9, 15.09s) 与 `physics` (14/14, 66.27s) 100% 零退化。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `closed_loop_dynamics`：12/12 项闭环场景与数学测试全绿通过（纯 Python 6.07s，Blender 0.61s）；
+  * `closed_loop_dynamics`：20/20 项闭环场景与数学测试全绿通过（纯 Python 6.50s，Blender 0.48s）；
   * `forward_dynamics`：22/22 项解析与状态测试全绿通过（纯 Python 0.009s，Blender 0.009s）；
-  * `contact_force_solver`：38/38 项测试全绿通过（纯 Python 0.430s，Blender 0.087s）；
-  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.80s，退出码 0）；
+  * `contact_force_solver`：38/38 项测试全绿通过（纯 Python 0.406s，Blender 0.087s）；
+  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.79s，退出码 0）；
   * `dynamics_environment_query`：13/13 项数学定理全绿（0.13s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.30s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：9/9 项通过（14.52s，退出码 0）；
-  * `physics` Tier：14/14 项通过（68.29s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-C1-B 已完成并验证，严格停止。
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.31s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `quick` Tier：9/9 项通过（15.09s，退出码 0）；
+  * `physics` Tier：14/14 项通过（66.27s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-C1-B-R1 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`

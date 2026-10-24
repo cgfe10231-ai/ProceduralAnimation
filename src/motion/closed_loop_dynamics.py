@@ -1,4 +1,4 @@
-"""Multi-Frame Dynamics Closed-Loop Control & State Feedback (Task 6G-D-C1-B).
+"""Multi-Frame Dynamics Closed-Loop Control & State Feedback (Task 6G-D-C1-B & C1-B-R1).
 
 Implements a mathematically rigorous, decoupled multi-frame closed-loop dynamics
 coordination module for humanoid procedural animation:
@@ -13,10 +13,21 @@ coordination module for humanoid procedural animation:
     through 6-DOF Newton-Euler equations of motion.
 - Strict Admissibility Policies:
     Differentiates between exact solved equilibrium, physically valid approximate solutions,
-    infeasible requests, and numerical failures. Stalls/preserves state safely without corrupted motion.
+    control-infeasible targets, and numerical failures.
+    - Numerical failures (NaN, invalid inputs) preserve state with failure atomicity.
+    - Infeasible control targets (e.g. demanding hover in mid-air) do not freeze physical
+      time by default: true physical forces (gravity, zero contact force) continue to advance
+      natural physical evolution, while clearly reporting control infeasibility.
+- Contact Geometry & Multi-Frame Boundary Contract:
+    - ContactConstraintSpec represents instantaneous contact geometry and friction at the
+      CURRENT time step.
+    - Multi-frame simulation cannot assume static contact points remain valid indefinitely.
+    - Subsequent Task 6G-D-C2 dynamically updates contact locations, clearances, and states
+      via the environment query system (src/scene/environment_query.py) and contact model
+      (src/motion/contact_model.py).
 - Comprehensive Telemetry:
     Every frame records time, current/next state, reference, commanded controls, target wrench,
-    contact forces, solver status, integration status, and diagnostics.
+    contact forces, solver status, integration status, control feasibility, and diagnostics.
 """
 
 from __future__ import annotations
@@ -250,11 +261,21 @@ class FeedbackGainsConfig:
 
 @dataclass(frozen=True)
 class ClosedLoopAdmissibilityPolicy:
-    """Policy rules governing when a solver solution is admitted to advance physical state."""
+    """Policy rules governing when a solver solution is admitted to advance physical state.
+
+    Controls:
+    - allow_approximate_solutions: If True, physically valid solutions with non-zero residual are admitted.
+    - max_allowable_force_residual: Max permitted force residual norm (N) if approximate.
+    - max_allowable_torque_residual: Max permitted torque residual norm (N*m) if approximate.
+    - allow_infeasible_zero_force_fallback: If True, free flight advances naturally under 0 contact force.
+    - strict_freeze_on_infeasible: If True, freezes time whenever control target is physically infeasible.
+    - strict_solved_only: If True, only SOLVED status is admitted; APPROXIMATE is rejected.
+    """
     allow_approximate_solutions: bool = True
     max_allowable_force_residual: float = 250.0  # Max permitted force residual norm (N) if approximate
     max_allowable_torque_residual: float = 150.0  # Max permitted torque residual norm (N*m) if approximate
-    allow_infeasible_zero_force_fallback: bool = False  # If True, free fall continues under 0 contact force
+    allow_infeasible_zero_force_fallback: bool = True  # If True, free fall continues under 0 contact force
+    strict_freeze_on_infeasible: bool = False  # If True, freeze physical time on infeasible control target
     strict_solved_only: bool = False  # If True, only SOLVED status is admitted
 
 
@@ -281,13 +302,14 @@ class ClosedLoopControllerConfig:
 
 class ClosedLoopStepStatus(str, Enum):
     """Detailed outcome classification of a single closed-loop coordination step."""
-    SUCCESS_EXACT = "SUCCESS_EXACT"               # Solver exact SOLVED, physical state advanced
-    SUCCESS_APPROXIMATE = "SUCCESS_APPROXIMATE"   # Solver APPROXIMATE within tolerance, physical state advanced
-    REJECTED_INFEASIBLE = "REJECTED_INFEASIBLE"   # Wrench infeasible, state preserved strictly unmutated
-    REJECTED_APPROXIMATE = "REJECTED_APPROXIMATE" # Residual exceeded tolerance, state preserved
-    SOLVER_INVALID_INPUT = "SOLVER_INVALID_INPUT" # Invalid solver inputs (NaN, corrupt specs)
-    SOLVER_NUMERICAL_FAILURE = "SOLVER_NUMERICAL_FAILURE" # Solver crashed or NaN output
-    INTEGRATION_FAILURE = "INTEGRATION_FAILURE"   # Forward dynamics numerical breakdown
+    SUCCESS_EXACT = "SUCCESS_EXACT"                             # Solver exact SOLVED, physical state advanced
+    SUCCESS_APPROXIMATE = "SUCCESS_APPROXIMATE"                 # Solver APPROXIMATE within tolerance, physical state advanced
+    CONTROL_INFEASIBLE_PHYSICS_ADVANCED = "CONTROL_INFEASIBLE_PHYSICS_ADVANCED" # Control target infeasible, but physics advanced under true valid forces
+    REJECTED_INFEASIBLE = "REJECTED_INFEASIBLE"                 # Infeasible and forces unprovable or strict freeze, state preserved
+    REJECTED_APPROXIMATE = "REJECTED_APPROXIMATE"               # Residual exceeded tolerance and strict freeze, state preserved
+    SOLVER_INVALID_INPUT = "SOLVER_INVALID_INPUT"               # Invalid solver inputs (NaN, corrupt specs), state preserved
+    SOLVER_NUMERICAL_FAILURE = "SOLVER_NUMERICAL_FAILURE"       # Solver crashed or NaN output, state preserved
+    INTEGRATION_FAILURE = "INTEGRATION_FAILURE"                 # Forward dynamics numerical breakdown, state preserved
 
 
 @dataclass(frozen=True)
@@ -314,11 +336,16 @@ class ClosedLoopFrameTelemetry:
     step_status: ClosedLoopStepStatus
     is_physically_valid: bool
     state_advanced: bool
-    tracking_error_position: Optional[Vec3]
-    tracking_error_velocity: Optional[Vec3]
-    tracking_error_linear_acc: Vec3
-    tracking_error_angular_momentum_rate: Vec3
+    is_control_feasible: bool = True
+    tracking_error_position: Optional[Vec3] = None
+    tracking_error_velocity: Optional[Vec3] = None
+    tracking_error_linear_acc: Vec3 = (0.0, 0.0, 0.0)
+    tracking_error_angular_momentum_rate: Vec3 = (0.0, 0.0, 0.0)
     message: str = ""
+
+    @property
+    def control_feasible(self) -> bool:
+        return self.is_control_feasible
 
     @property
     def solver_force_residual_norm(self) -> float:
@@ -365,6 +392,7 @@ class ClosedLoopFrameTelemetry:
             "step_status": self.step_status.value,
             "is_physically_valid": self.is_physically_valid,
             "state_advanced": self.state_advanced,
+            "is_control_feasible": self.is_control_feasible,
             "tracking_error_position": list(self.tracking_error_position) if self.tracking_error_position else None,
             "tracking_error_velocity": list(self.tracking_error_velocity) if self.tracking_error_velocity else None,
             "tracking_error_linear_acc": list(self.tracking_error_linear_acc),
@@ -456,18 +484,28 @@ def compute_commanded_accelerations(
     dL_cmd = reference.target_angular_momentum_rate_world
 
     alpha_fb: Vec3 = (0.0, 0.0, 0.0)
+    has_rotational_feedback = False
+
     if reference.target_orientation_quat_world is not None:
         rot_err = quat_error_rot_vector(reference.target_orientation_quat_world, state.orientation_quat_world)
         alpha_fb = vec3_add(alpha_fb, vec3_scale(rot_err, gains.kp_rot))
+        has_rotational_feedback = True
 
     if reference.target_angular_velocity_world is not None:
         omega_curr = state.angular_velocity_world
         omega_err = vec3_sub(reference.target_angular_velocity_world, omega_curr)
         alpha_fb = vec3_add(alpha_fb, vec3_scale(omega_err, gains.kd_rot))
+        has_rotational_feedback = True
 
-    if vec3_length_sq(alpha_fb) > 1e-12:
+    if has_rotational_feedback:
+        # Full rigid body rotational equation in World coordinates:
+        # dL/dt = I_world * alpha + omega x L
+        # alpha_fb is world-space angular acceleration feedback.
+        # Gyroscopic coupling torque is tau_gyro = omega x L.
         I_world = state.inertia_tensor_world
-        tau_fb = I_world.multiply_vec(alpha_fb)
+        tau_acc = I_world.multiply_vec(alpha_fb)
+        tau_gyro = vec3_cross(state.angular_velocity_world, state.angular_momentum_about_com_world)
+        tau_fb = vec3_add(tau_acc, tau_gyro)
         dL_cmd = vec3_add(dL_cmd, tau_fb)
 
     dL_cmd = vec3_clamp_norm(dL_cmd, gains.max_angular_momentum_rate_cmd)
@@ -516,6 +554,7 @@ def step_closed_loop_dynamics(
         gravity_z=cfg.gravity_acceleration_world[2],
         external_forces=reference.external_forces_world,
         external_torques=reference.external_torques_about_com_world,
+        gravity_acceleration_world=cfg.gravity_acceleration_world,
     )
 
     # 3. Contact Force Optimization Solving
@@ -547,51 +586,33 @@ def step_closed_loop_dynamics(
                 optimizer_converged=True,
                 optimizer_message="Free flight zero contact wrench naturally satisfied",
             )
+            is_control_feasible = True
         else:
-            # Non-zero contact wrench demanded in free air
-            if policy.allow_infeasible_zero_force_fallback:
-                sol = ContactForceSolution(
-                    status=ContactSolverStatus.APPROXIMATE,
-                    contact_forces={},
-                    total_contact_force=(0.0, 0.0, 0.0),
-                    total_contact_torque_about_com=(0.0, 0.0, 0.0),
-                    force_error_vector=target_wrench.target_force_world,
-                    force_residual_n=f_req_norm,
-                    torque_error_vector=target_wrench.target_torque_world,
-                    torque_residual_nm=tau_req_norm,
-                    max_normal_violation_n=0.0,
-                    max_friction_violation_n=0.0,
-                    iterations=0,
-                    computation_time_sec=0.0,
-                    is_physically_valid=True,
-                    message="Zero active contacts: falling back to unassisted ballistic motion",
-                    solver_engine="zero_contact_fallback",
-                    optimizer_converged=False,
-                    optimizer_message="Zero active contacts: falling back to unassisted ballistic motion",
-                )
-            else:
-                sol = ContactForceSolution(
-                    status=ContactSolverStatus.INFEASIBLE,
-                    contact_forces={},
-                    total_contact_force=(0.0, 0.0, 0.0),
-                    total_contact_torque_about_com=(0.0, 0.0, 0.0),
-                    force_error_vector=target_wrench.target_force_world,
-                    force_residual_n=f_req_norm,
-                    torque_error_vector=target_wrench.target_torque_world,
-                    torque_residual_nm=tau_req_norm,
-                    max_normal_violation_n=0.0,
-                    max_friction_violation_n=0.0,
-                    iterations=0,
-                    computation_time_sec=0.0,
-                    is_physically_valid=False,
-                    message="Zero active contacts cannot produce required contact wrench",
-                    solver_engine="zero_contact_check",
-                    optimizer_converged=False,
-                    optimizer_message="Zero active contacts cannot produce required contact wrench",
-                )
+            # Non-zero contact wrench demanded in free air (e.g. hover demanded without contact)
+            is_control_feasible = False
+            sol = ContactForceSolution(
+                status=ContactSolverStatus.INFEASIBLE,
+                contact_forces={},
+                total_contact_force=(0.0, 0.0, 0.0),
+                total_contact_torque_about_com=(0.0, 0.0, 0.0),
+                force_error_vector=target_wrench.target_force_world,
+                force_residual_n=f_req_norm,
+                torque_error_vector=target_wrench.target_torque_world,
+                torque_residual_nm=tau_req_norm,
+                max_normal_violation_n=0.0,
+                max_friction_violation_n=0.0,
+                iterations=0,
+                computation_time_sec=0.0,
+                is_physically_valid=True,  # 0 contact force in air is 100% physically valid
+                message="Zero active contacts cannot produce required contact wrench",
+                solver_engine="zero_contact_check",
+                optimizer_converged=False,
+                optimizer_message="Zero active contacts cannot produce required contact wrench",
+            )
     else:
         # Call Contact Force Solver
         sol = solve_contact_forces(target_wrench, contacts, config=cfg.solver_config)
+        is_control_feasible = (sol.status == ContactSolverStatus.SOLVED)
 
     # 4. Admissibility Gating and Policy Evaluation
     state_next = state_curr
@@ -600,54 +621,85 @@ def step_closed_loop_dynamics(
     message = ""
 
     if sol.status == ContactSolverStatus.INVALID_INPUT:
+        is_control_feasible = False
         step_status = ClosedLoopStepStatus.SOLVER_INVALID_INPUT
         message = f"Solver rejected inputs as invalid: {sol.optimizer_message}"
 
     elif sol.status == ContactSolverStatus.NUMERICAL_FAILURE:
+        is_control_feasible = False
         step_status = ClosedLoopStepStatus.SOLVER_NUMERICAL_FAILURE
         message = f"Solver encountered numerical failure: {sol.optimizer_message}"
 
     elif sol.status == ContactSolverStatus.INFEASIBLE:
-        if policy.allow_infeasible_zero_force_fallback and sol.is_physically_valid:
-            # Advance under fallback forces (e.g. zero force ballistic motion)
-            step_status = ClosedLoopStepStatus.SUCCESS_APPROXIMATE
-            message = "Infeasible target wrench: proceeding under unassisted ballistic motion"
+        is_control_feasible = False
+        if len(active_contacts) == 0:
+            # Free air infeasible wrench (e.g. demanding hover)
+            if policy.strict_freeze_on_infeasible or not policy.allow_infeasible_zero_force_fallback:
+                step_status = ClosedLoopStepStatus.REJECTED_INFEASIBLE
+                message = "Strict policy rejected mid-air hover demand"
+            else:
+                step_status = ClosedLoopStepStatus.CONTROL_INFEASIBLE_PHYSICS_ADVANCED
+                message = "Mid-air hover infeasible: proceeding under natural unassisted free fall"
         else:
-            step_status = ClosedLoopStepStatus.REJECTED_INFEASIBLE
-            message = f"Contact wrench is provably infeasible: {sol.optimizer_message}"
+            # Ground contacts present, but wrench infeasible (e.g. downward suction force)
+            if (
+                policy.strict_freeze_on_infeasible
+                or not policy.allow_infeasible_zero_force_fallback
+                or not sol.is_physically_valid
+            ):
+                step_status = ClosedLoopStepStatus.REJECTED_INFEASIBLE
+                message = f"Contact wrench is provably infeasible: {sol.optimizer_message}"
+            else:
+                step_status = ClosedLoopStepStatus.CONTROL_INFEASIBLE_PHYSICS_ADVANCED
+                message = f"Contact wrench infeasible: proceeding under valid physical forces ({sol.optimizer_message})"
 
     elif sol.status == ContactSolverStatus.APPROXIMATE:
-        if policy.strict_solved_only:
-            step_status = ClosedLoopStepStatus.REJECTED_APPROXIMATE
-            message = "Strict policy rejected APPROXIMATE contact solution"
-        elif (
-            sol.force_residual_n > policy.max_allowable_force_residual
-            or sol.torque_residual_nm > policy.max_allowable_torque_residual
-        ):
-            step_status = ClosedLoopStepStatus.REJECTED_APPROXIMATE
-            message = (
-                f"Residual exceeds policy bounds (F_res={sol.force_residual_n:.1f}N > "
-                f"{policy.max_allowable_force_residual:.1f}N or tau_res={sol.torque_residual_nm:.1f}N*m > "
-                f"{policy.max_allowable_torque_residual:.1f}N*m)"
-            )
-        elif not sol.is_physically_valid:
+        if not sol.is_physically_valid:
+            is_control_feasible = False
             step_status = ClosedLoopStepStatus.SOLVER_NUMERICAL_FAILURE
             message = "Approximate solution violated physical unilateral/cone constraints"
+        elif (
+            sol.force_residual_n <= policy.max_allowable_force_residual
+            and sol.torque_residual_nm <= policy.max_allowable_torque_residual
+        ):
+            if policy.strict_solved_only:
+                is_control_feasible = False
+                step_status = ClosedLoopStepStatus.REJECTED_APPROXIMATE
+                message = "Strict policy rejected APPROXIMATE contact solution"
+            else:
+                is_control_feasible = True
+                step_status = ClosedLoopStepStatus.SUCCESS_APPROXIMATE
+                message = (
+                    f"Admitted physically valid approximate solution (F_res={sol.force_residual_n:.2f}N, "
+                    f"tau_res={sol.torque_residual_nm:.2f}N*m)"
+                )
         else:
-            step_status = ClosedLoopStepStatus.SUCCESS_APPROXIMATE
-            message = (
-                f"Admitted physically valid approximate solution (F_res={sol.force_residual_n:.2f}N, "
-                f"tau_res={sol.torque_residual_nm:.2f}N*m)"
-            )
+            is_control_feasible = False
+            if policy.strict_freeze_on_infeasible:
+                step_status = ClosedLoopStepStatus.REJECTED_APPROXIMATE
+                message = (
+                    f"Residual exceeds policy bounds (F_res={sol.force_residual_n:.1f}N > "
+                    f"{policy.max_allowable_force_residual:.1f}N or tau_res={sol.torque_residual_nm:.1f}N*m > "
+                    f"{policy.max_allowable_torque_residual:.1f}N*m)"
+                )
+            else:
+                step_status = ClosedLoopStepStatus.CONTROL_INFEASIBLE_PHYSICS_ADVANCED
+                message = (
+                    f"Residual exceeded tolerance, but contact forces are physically valid: "
+                    f"proceeding under actual physical forces (F_res={sol.force_residual_n:.1f}N)"
+                )
 
     elif sol.status == ContactSolverStatus.SOLVED:
         if not sol.is_physically_valid:
+            is_control_feasible = False
             step_status = ClosedLoopStepStatus.SOLVER_NUMERICAL_FAILURE
             message = "Solved solution had invalid physical flag"
         else:
+            is_control_feasible = True
             step_status = ClosedLoopStepStatus.SUCCESS_EXACT
             message = "Solved contact forces exactly satisfied physical wrench target"
     else:
+        is_control_feasible = False
         step_status = ClosedLoopStepStatus.SOLVER_NUMERICAL_FAILURE
         message = f"Unhandled solver status: {sol.status}"
 
@@ -659,7 +711,13 @@ def step_closed_loop_dynamics(
     actual_dL: Vec3 = (0.0, 0.0, 0.0)
     is_valid_step = False
 
-    if step_status in (ClosedLoopStepStatus.SUCCESS_EXACT, ClosedLoopStepStatus.SUCCESS_APPROXIMATE):
+    should_integrate = step_status in (
+        ClosedLoopStepStatus.SUCCESS_EXACT,
+        ClosedLoopStepStatus.SUCCESS_APPROXIMATE,
+        ClosedLoopStepStatus.CONTROL_INFEASIBLE_PHYSICS_ADVANCED,
+    )
+
+    if should_integrate:
         # Convert contact forces into ContactForcePoint collection
         step_in = ForwardDynamicsStepInput.from_solution_and_specs(
             solution=sol,
@@ -730,6 +788,7 @@ def step_closed_loop_dynamics(
         step_status=step_status,
         is_physically_valid=is_valid_step,
         state_advanced=state_advanced,
+        is_control_feasible=is_control_feasible,
         tracking_error_position=pos_err,
         tracking_error_velocity=vel_err,
         tracking_error_linear_acc=err_a,

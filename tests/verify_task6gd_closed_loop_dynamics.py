@@ -46,6 +46,7 @@ from src.motion.forward_dynamics import (
     ForwardDynamicsStatus,
     ForwardDynamicsStepInput,
     InertiaTensor3x3,
+    integrate_forward_dynamics_single_step,
     quat_from_axis_angle,
     quat_length,
     quat_normalize,
@@ -378,35 +379,24 @@ class TestClosedLoopDynamics(unittest.TestCase):
     # Scenario 08: Solver Input Failure Preserves State Atomically
     # -------------------------------------------------------------------------
     def test_08_solver_input_failure_preserves_state_atomically(self):
-        """Scenario 08: Invalid solver inputs (e.g. negative tolerance) trigger failure atomicity without corrupting state."""
-        # Create an illegal contact spec that bypasses or triggers INVALID_INPUT in solver
-        bad_contact = ContactConstraintSpec(
-            contact_id="bad",
-            contact_point_world=(0.0, 0.0, 0.0),
-            surface_normal_world=(0.0, 0.0, 1.0),
-            min_normal_force=100.0,
-            max_normal_force=50.0,  # min > max raises in post_init or rejected in solver
-        ) if False else None
-
-        # Directly pass invalid target wrench or corrupted inputs
+        """Scenario 08: Invalid solver inputs (e.g. duplicate contact IDs) trigger failure atomicity without corrupting state."""
         coordinator = ClosedLoopDynamicsCoordinator()
 
-        # Step with corrupted contact spec whose normal is zero
+        # Step with corrupted contact spec whose normal is zero raises ValueError during construction
         with self.assertRaises(ValueError):
             ContactConstraintSpec("c", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
 
-        # Test failure atomicity on step with non-finite reference mass or invalid state
-        corrupted_ref = DesiredMotionReference(
-            target_linear_acceleration_world=(0.0, 0.0, 0.0),
-        )
-        # When integration fails or solver fails, input state is strictly unmutated
+        # Test failure atomicity on step with duplicate contact IDs (rejected as INVALID_INPUT)
+        duplicate_contacts = [self.foot_L, self.foot_L]
         telem = coordinator.step(
             state_curr=self.initial_standing_state,
-            reference=corrupted_ref,
-            contacts=[],  # Zero contacts without fallback
+            reference=DesiredMotionReference(target_linear_acceleration_world=(0.0, 0.0, 0.0)),
+            contacts=duplicate_contacts,
         )
+        self.assertEqual(telem.step_status, ClosedLoopStepStatus.SOLVER_INVALID_INPUT)
         self.assertEqual(telem.state_next, self.initial_standing_state)
         self.assertFalse(telem.state_advanced)
+        self.assertFalse(telem.is_control_feasible)
 
     # -------------------------------------------------------------------------
     # Scenario 09: Deterministic Reproducibility
@@ -531,6 +521,308 @@ class TestClosedLoopDynamics(unittest.TestCase):
         q_neg = (-q_yaw90[0], -q_yaw90[1], -q_yaw90[2], -q_yaw90[3])
         e_neg = quat_error_rot_vector(q_neg, q_curr)
         self.assertAlmostEqual(e_neg[2], math.pi / 2.0, places=7)
+
+    # -------------------------------------------------------------------------
+    # Scenario 13: Full 3D Gravity Target Wrench & Integration
+    # -------------------------------------------------------------------------
+    def test_13_full_3d_gravity_target_wrench_and_integration(self):
+        """Scenario 13: Full 3D gravity vector handling in target wrench and closed-loop integration."""
+        mass = 70.0
+        g_3d = (1.5, -2.0, -9.81)
+        a_target = (0.5, 1.0, 0.0)
+        com = (0.0, 0.0, 1.0)
+        f_ext = (10.0, -5.0, 0.0)
+
+        # 1. Test ContactWrenchTarget.from_target_motion with 3D gravity
+        target_wrench = ContactWrenchTarget.from_target_motion(
+            mass=mass,
+            target_linear_acc=a_target,
+            com_world=com,
+            dL_com_dt=(0.0, 0.0, 0.0),
+            external_forces=[f_ext],
+            gravity_acceleration_world=g_3d,
+        )
+
+        # Analytical expectation: F_target = m * a - m * g - F_ext
+        expected_fx = mass * a_target[0] - mass * g_3d[0] - f_ext[0]  # 35 - 105 - 10 = -80
+        expected_fy = mass * a_target[1] - mass * g_3d[1] - f_ext[1]  # 70 - (-140) - (-5) = 215
+        expected_fz = mass * a_target[2] - mass * g_3d[2] - f_ext[2]  # 0 - (-686.7) - 0 = 686.7
+
+        self.assertAlmostEqual(target_wrench.target_force_world[0], expected_fx, places=9)
+        self.assertAlmostEqual(target_wrench.target_force_world[1], expected_fy, places=9)
+        self.assertAlmostEqual(target_wrench.target_force_world[2], expected_fz, places=9)
+
+        # 2. Test backwards compatibility when only gravity_z is supplied
+        target_wrench_compat = ContactWrenchTarget.from_target_motion(
+            mass=mass,
+            target_linear_acc=(0.0, 0.0, 0.0),
+            com_world=com,
+            gravity_z=-9.81,
+        )
+        self.assertAlmostEqual(target_wrench_compat.target_force_world[0], 0.0, places=9)
+        self.assertAlmostEqual(target_wrench_compat.target_force_world[1], 0.0, places=9)
+        self.assertAlmostEqual(target_wrench_compat.target_force_world[2], mass * 9.81, places=9)
+
+        # 3. Test closed-loop step consistency under 3D gravity in free air
+        cfg_3d = ClosedLoopControllerConfig(
+            gravity_acceleration_world=g_3d,
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(
+                allow_infeasible_zero_force_fallback=True,
+            ),
+        )
+        coord = ClosedLoopDynamicsCoordinator(config=cfg_3d)
+
+        # State in free air
+        state_air = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=mass,
+            com_position_world=(0.0, 0.0, 5.0),
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=(0.0, 0.0, 0.0),
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=self.default_inertia,
+        )
+        ref_zero = DesiredMotionReference(target_linear_acceleration_world=g_3d)
+        telem = coord.step(state_air, ref_zero, contacts=[])
+        self.assertTrue(telem.state_advanced)
+        # Net acceleration should equal g_3d exactly
+        self.assertAlmostEqual(telem.actual_linear_acceleration_world[0], g_3d[0], places=6)
+        self.assertAlmostEqual(telem.actual_linear_acceleration_world[1], g_3d[1], places=6)
+        self.assertAlmostEqual(telem.actual_linear_acceleration_world[2], g_3d[2], places=6)
+
+    # -------------------------------------------------------------------------
+    # Scenario 14: Rotational Gyroscopic Coupling - Isotropic Inertia
+    # -------------------------------------------------------------------------
+    def test_14_rotational_feedback_gyroscopic_coupling_isotropic(self):
+        """Scenario 14: Isotropic inertia produces zero gyroscopic coupling torque (omega x L = 0)."""
+        isotropic_inertia = InertiaTensor3x3.from_diagonal(15.0, 15.0, 15.0)
+        state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=self.com_init,
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=(15.0, 30.0, 45.0),  # L = 15 * (1, 2, 3)
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=isotropic_inertia,
+        )
+        # Target matching current state exactly (alpha_fb = 0)
+        ref = DesiredMotionReference(
+            target_orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            target_angular_velocity_world=(1.0, 2.0, 3.0),
+            target_angular_momentum_rate_world=(0.0, 0.0, 0.0),
+        )
+        cfg = ClosedLoopControllerConfig()
+        _, dL_cmd = compute_commanded_accelerations(state, ref, cfg)
+        # Since I is isotropic, omega x L is identically 0
+        self.assertAlmostEqual(dL_cmd[0], 0.0, places=9)
+        self.assertAlmostEqual(dL_cmd[1], 0.0, places=9)
+        self.assertAlmostEqual(dL_cmd[2], 0.0, places=9)
+
+    # -------------------------------------------------------------------------
+    # Scenario 15: Rotational Gyroscopic Coupling - Principal Axis Rotation
+    # -------------------------------------------------------------------------
+    def test_15_rotational_feedback_gyroscopic_coupling_principal_axis(self):
+        """Scenario 15: Rotation strictly along a principal axis produces zero gyroscopic coupling."""
+        non_iso_inertia = InertiaTensor3x3.from_diagonal(10.0, 20.0, 30.0)
+        # Spin strictly along Y axis (omega_y = 2.0, L_y = 40.0)
+        state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=self.com_init,
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=(0.0, 40.0, 0.0),
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=non_iso_inertia,
+        )
+        ref = DesiredMotionReference(
+            target_orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            target_angular_velocity_world=(0.0, 2.0, 0.0),
+            target_angular_momentum_rate_world=(0.0, 0.0, 0.0),
+        )
+        cfg = ClosedLoopControllerConfig()
+        _, dL_cmd = compute_commanded_accelerations(state, ref, cfg)
+        # omega x L = (0, 2, 0) x (0, 40, 0) = (0, 0, 0)
+        self.assertAlmostEqual(dL_cmd[0], 0.0, places=9)
+        self.assertAlmostEqual(dL_cmd[1], 0.0, places=9)
+        self.assertAlmostEqual(dL_cmd[2], 0.0, places=9)
+
+    # -------------------------------------------------------------------------
+    # Scenario 16: Rotational Gyroscopic Coupling - Non-Principal Axis Exact Match
+    # -------------------------------------------------------------------------
+    def test_16_rotational_feedback_gyroscopic_coupling_non_principal_axis_exact(self):
+        """Scenario 16: Analytical verification of gyroscopic coupling torque tau_gyro = omega x L."""
+        non_iso_inertia = InertiaTensor3x3.from_diagonal(10.0, 20.0, 30.0)
+        # omega = (1.0, 2.0, 3.0), L = (10, 40, 90)
+        state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=self.com_init,
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=(10.0, 40.0, 90.0),
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=non_iso_inertia,
+        )
+        # Analytical tau_gyro:
+        # omega x L = (2*90 - 3*40, 3*10 - 1*90, 1*40 - 2*10) = (60.0, -60.0, 20.0)
+        tau_ff = (5.0, -10.0, 15.0)
+
+        # Case A: On target (alpha_fb = 0), commanded torque equals tau_ff + tau_gyro
+        ref_on_target = DesiredMotionReference(
+            target_orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            target_angular_velocity_world=(1.0, 2.0, 3.0),
+            target_angular_momentum_rate_world=tau_ff,
+        )
+        cfg = ClosedLoopControllerConfig()
+        _, dL_cmd_A = compute_commanded_accelerations(state, ref_on_target, cfg)
+        self.assertAlmostEqual(dL_cmd_A[0], 5.0 + 60.0, places=9)
+        self.assertAlmostEqual(dL_cmd_A[1], -10.0 - 60.0, places=9)
+        self.assertAlmostEqual(dL_cmd_A[2], 15.0 + 20.0, places=9)
+
+        # Case B: Off target (alpha_fb != 0)
+        # Target omega = (2.0, 2.0, 3.0) -> e_omega = (1.0, 0.0, 0.0)
+        # kd_rot = 8.0 -> alpha_fb = (8.0, 0.0, 0.0)
+        # tau_acc = I * alpha_fb = (10 * 8, 0, 0) = (80.0, 0.0, 0.0)
+        # tau_fb = tau_acc + tau_gyro = (80 + 60, -60, 20) = (140.0, -60.0, 20.0)
+        # dL_cmd = tau_ff + tau_fb = (5 + 140, -10 - 60, 15 + 20) = (145.0, -70.0, 35.0)
+        ref_off_target = DesiredMotionReference(
+            target_orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            target_angular_velocity_world=(2.0, 2.0, 3.0),
+            target_angular_momentum_rate_world=tau_ff,
+        )
+        _, dL_cmd_B = compute_commanded_accelerations(state, ref_off_target, cfg)
+        self.assertAlmostEqual(dL_cmd_B[0], 145.0, places=9)
+        self.assertAlmostEqual(dL_cmd_B[1], -70.0, places=9)
+        self.assertAlmostEqual(dL_cmd_B[2], 35.0, places=9)
+
+    # -------------------------------------------------------------------------
+    # Scenario 17: Pure Feedforward Preserved When No Rotational Feedback
+    # -------------------------------------------------------------------------
+    def test_17_rotational_feedback_zero_feedback_preserves_pure_feedforward(self):
+        """Scenario 17: Pure feedforward angular momentum rate is strictly preserved when feedback is omitted."""
+        non_iso_inertia = InertiaTensor3x3.from_diagonal(10.0, 20.0, 30.0)
+        state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=self.com_init,
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=(10.0, 40.0, 90.0),
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=non_iso_inertia,
+        )
+        tau_ff = (12.3, -45.6, 78.9)
+        ref_pure_ff = DesiredMotionReference(
+            target_angular_momentum_rate_world=tau_ff,
+            target_orientation_quat_world=None,
+            target_angular_velocity_world=None,
+        )
+        cfg = ClosedLoopControllerConfig()
+        _, dL_cmd = compute_commanded_accelerations(state, ref_pure_ff, cfg)
+        # Must strictly preserve tau_ff without adding gyro term
+        self.assertEqual(dL_cmd, tau_ff)
+
+    # -------------------------------------------------------------------------
+    # Scenario 18: Gyro Torque Application Preserves Steady Spin in Forward Dynamics
+    # -------------------------------------------------------------------------
+    def test_18_rotational_steady_spin_integration_preserves_angular_velocity(self):
+        """Scenario 18: Applying tau = omega x L maintains constant angular velocity without spurious precession."""
+        non_iso_inertia = InertiaTensor3x3.from_diagonal(10.0, 20.0, 30.0)
+        omega_init = (1.0, 2.0, 3.0)
+        L_init = (10.0, 40.0, 90.0)
+        state = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=self.com_init,
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=L_init,
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=non_iso_inertia,
+        )
+        # Tau_gyro = (60.0, -60.0, 20.0)
+        tau_gyro = (60.0, -60.0, 20.0)
+        step_in = ForwardDynamicsStepInput(
+            dt=0.001,  # fine time step
+            contact_forces=(),
+            external_torques_about_com_world=(tau_gyro,),
+            gravity_acceleration_world=(0.0, 0.0, 0.0),
+        )
+        res = integrate_forward_dynamics_single_step(state, step_in)
+        self.assertEqual(res.status, ForwardDynamicsStatus.SUCCESS)
+        # Angular acceleration d(omega)/dt should be zero
+        omega_next = res.state_next.angular_velocity_world
+        self.assertAlmostEqual(omega_next[0], omega_init[0], places=4)
+        self.assertAlmostEqual(omega_next[1], omega_init[1], places=4)
+        self.assertAlmostEqual(omega_next[2], omega_init[2], places=4)
+
+    # -------------------------------------------------------------------------
+    # Scenario 19: Mid-Air Hover Demand Falls Naturally Under Gravity
+    # -------------------------------------------------------------------------
+    def test_19_mid_air_hover_demand_falls_naturally(self):
+        """Scenario 19: Mid-air hover demand is control-infeasible but physics advances naturally under gravity."""
+        coord = ClosedLoopDynamicsCoordinator()
+        state_air = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=(0.0, 0.0, 5.0),
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=(0.0, 0.0, 0.0),
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=self.default_inertia,
+        )
+        # Controller demands hovering at z=5.0m
+        ref_hover = DesiredMotionReference(
+            target_com_position_world=(0.0, 0.0, 5.0),
+            target_com_velocity_world=(0.0, 0.0, 0.0),
+            target_linear_acceleration_world=(0.0, 0.0, 0.0),
+        )
+        # Execute 5 consecutive frames
+        curr_state = state_air
+        for frame in range(5):
+            telem = coord.step(curr_state, ref_hover, contacts=[], frame_index=frame)
+            # Control is infeasible (hover cannot be sustained in mid-air)
+            self.assertFalse(telem.is_control_feasible)
+            # Physical state MUST advance (character is not frozen in mid-air)
+            self.assertTrue(telem.state_advanced)
+            self.assertEqual(telem.step_status, ClosedLoopStepStatus.CONTROL_INFEASIBLE_PHYSICS_ADVANCED)
+            # Height must decrease each frame
+            self.assertLess(telem.state_next.com_position_world[2], curr_state.com_position_world[2])
+            # Velocity z must become increasingly negative
+            self.assertLess(telem.state_next.com_velocity_world[2], curr_state.com_velocity_world[2])
+            curr_state = telem.state_next
+
+        # Total drop after 5 frames (5 * 1/24s = 0.2083s): drop ~ 0.5 * 9.81 * (0.2083)^2 ~ 0.213m
+        expected_drop = 0.5 * 9.81 * (5.0 * self.dt) ** 2
+        actual_drop = 5.0 - curr_state.com_position_world[2]
+        self.assertAlmostEqual(actual_drop, expected_drop, delta=0.01)
+
+    # -------------------------------------------------------------------------
+    # Scenario 20: Mid-Air Hover With Strict Freeze Option
+    # -------------------------------------------------------------------------
+    def test_20_mid_air_hover_strict_freeze_option(self):
+        """Scenario 20: When strict_freeze_on_infeasible is enabled, state preserves strictly."""
+        config_strict = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(
+                strict_freeze_on_infeasible=True,
+            )
+        )
+        coord = ClosedLoopDynamicsCoordinator(config=config_strict)
+        state_air = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=(0.0, 0.0, 5.0),
+            com_velocity_world=(0.0, 0.0, 0.0),
+            angular_momentum_about_com_world=(0.0, 0.0, 0.0),
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=self.default_inertia,
+        )
+        ref_hover = DesiredMotionReference(
+            target_com_position_world=(0.0, 0.0, 5.0),
+            target_com_velocity_world=(0.0, 0.0, 0.0),
+        )
+        telem = coord.step(state_air, ref_hover, contacts=[])
+        self.assertFalse(telem.is_control_feasible)
+        self.assertFalse(telem.state_advanced)
+        self.assertEqual(telem.step_status, ClosedLoopStepStatus.REJECTED_INFEASIBLE)
+        self.assertEqual(telem.state_next, state_air)
 
 
 if __name__ == "__main__":
