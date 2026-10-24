@@ -6,7 +6,7 @@
 * **Git 状态**：
   * **当前分支**：`master`
   * **基准 Commit SHA**：`bbe8af0b8330ec1dfcba0ca0d19f311b8cda6990`
-  * **本任务核心 Commit SHA**：待提交 (将被本次 commit 生成)
+  * **本任务核心 Commit SHA**：`ff99b5cb22d3b5b15be68c3fc3014e3636f1842d`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
