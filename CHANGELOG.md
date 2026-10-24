@@ -3,6 +3,58 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-24] 任务 6G-D-C1-FINAL：数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御 (Task 6G-D-C1-FINAL)
+
+### 数值闭环集中数学审计与缺陷修复 (`src/motion/closed_loop_dynamics.py`, `src/motion/contact_force_solver.py`, `docs/C1_FINAL_AUDIT.md`)
+* **DEF-001 (近似解准入策略链修复)**：
+  * 在 `step_closed_loop_dynamics()` 的 `APPROXIMATE` 分支中严格连接 `ClosedLoopAdmissibilityPolicy.allow_approximate_solutions`；
+  * 确立清晰优先级：`sol.is_physically_valid == False` 标定为 `SOLVER_NUMERICAL_FAILURE` > `strict_solved_only` 拒绝 > `allow_approximate_solutions=False` 拒绝 > 仅当允许且残差在 `max_allowable_*` 阈值内时准入为 `SUCCESS_APPROXIMATE`；
+  * 残差超限时根据 `strict_freeze_on_infeasible` 决定冻结或以真实物理力自然演化 (`CONTROL_INFEASIBLE_PHYSICS_ADVANCED`)。
+* **DEF-002 (步数统计与物理推进时间彻底解耦)**：
+  * 在 `ClosedLoopSimulationTrajectory` 中区分记录 `requested_steps`、`attempted_steps`、`successful_steps`、`failed_steps`、`requested_duration` 与 `actual_physical_time`；
+  * 约束 `total_time == actual_physical_time`（基于状态实际时间戳差值），杜绝拒绝帧导致的时间虚假累加。
+* **DEF-003 (遥测状态四维正交解耦语义)**：
+  * 新增 4 个清晰正交的布尔状态：
+    1. `is_contact_solution_physically_valid`：接触力求解是否满足物理硬约束；
+    2. `is_policy_admitted`：当前步是否通过策略准入允许前向动力学积分；
+    3. `is_target_satisfied`：控制目标是否完全被满足（`SUCCESS_EXACT` 或合规准入的 `SUCCESS_APPROXIMATE`）；
+    4. `state_advanced`：物理状态与时间戳是否真正单步推进；
+  * 保持既有 `is_physically_valid` 与 `is_control_feasible` 向后兼容。
+* **DEF-004 (遥测深层不可变性与防污染防御)**：
+  * `actual_contact_forces` 在 `ClosedLoopFrameTelemetry` 中统一以只读 `MappingProxyType` 封装，杜绝调用端就地修改污染历史；
+  * `ClosedLoopSimulationTrajectory.frames` 强制转为只读元组（`tuple`）；
+  * `to_dict()` 与 `export_telemetry()` 返回深解耦、纯净的 JSON 可序列化结构。
+* **DEF-005 (配置数值有限性与非负性门禁)**：
+  * 在 `ContactSolverConfig`、`FeedbackGainsConfig` 与 `ClosedLoopAdmissibilityPolicy` 的 `__post_init__` 中加入统一的 `math.isfinite()`、正数和非负数门禁，非法输入立即抛出 `ValueError`。
+
+### 关键数学不变量与二阶收敛阶验证
+* **零重力动量守恒**：自由刚体 100 步模拟中线动量误差 $< 10^{-10}\text{ kg}\cdot\text{m/s}$，角动量误差 $< 10^{-10}\text{ N}\cdot\text{m}\cdot\text{s}$；
+* **旋转动能守恒**：各向异性刚体主轴自由旋转 100 步动能漂移 $< 10^{-6}\text{ J}$；
+* **静态支撑稳定性**：50 步静态站立下陷 $< 10^{-5}\text{ m}$，120 步下陷 $< 5\times 10^{-3}\text{ m}$；
+* **牛顿-欧拉跨模块平衡**：各模块间 $\sum \mathbf{F} = m \mathbf{a}$ 与 $\sum \boldsymbol{\tau} = \dot{\mathbf{L}}$ 匹配精度 $< 10^{-7}$；
+* **二阶步长收敛阶实测**：恒定重力下 Velocity Verlet 无截断误差（$< 10^{-12}\text{ m}$），非线性陀螺旋转实测步长收敛比为 $4.05 \approx 2^2$，确证严格 $O(\Delta t^2)$ 2阶收敛。
+
+### 测试验证与架构状态
+* **测试套件扩充 (`tests/verify_task6gd_closed_loop_dynamics.py`)**：
+  * 测试用例总数扩充至 30 项全绿通过（纯 Python 6.88s，Blender Headless 0.59s）：
+    21. `test_21_policy_disallow_approximate_solutions`；
+    22. `test_22_policy_approximate_solutions_matrix`；
+    23. `test_23_simulate_time_accounting_fail_fast_true_and_false`；
+    24. `test_24_telemetry_orthogonal_status_semantics`；
+    25. `test_25_telemetry_immutability_and_no_pollution`；
+    26. `test_26_config_validation_numerical_gate`；
+    27. `test_27_system_boundary_inactive_contacts_and_ids`；
+    28. `test_28_numerical_invariants_and_analytical_conservation`；
+    29. `test_29_step_size_convergence_order_two`；
+    30. `test_30_cross_module_newton_euler_balance_consistency`。
+* **分层回归全绿**：
+  * `quick` (9/9 项全绿通过，15.81s)；
+  * `physics` (14/14 项全绿通过，67.56s)；
+  * 0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；
+  * 6G-D-C1 阶段验收完成，下一任务锁定为 **Task 6G-D-C2: 在现有 DynamicsPlayground 中集成和验证真实动力学状态**。
+
+
+
 ## [2026-10-24] 任务 6G-D-C1-B-R1：完整三维重力统一、旋转反馈陀螺耦合修正与物理不可行性解耦准入门禁 (Task 6G-D-C1-B-R1)
 
 ### 完整三维重力统一计算 (`src/motion/contact_force_solver.py`, `src/motion/closed_loop_dynamics.py`)

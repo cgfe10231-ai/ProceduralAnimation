@@ -832,3 +832,45 @@
   - 更新代码：`src/motion/contact_force_solver.py`、`src/motion/closed_loop_dynamics.py`；
   - 扩充测试：`tests/verify_task6gd_closed_loop_dynamics.py` 增至 20 项场景测试全绿通过；
   - 实测回归：`quick` (9/9, 15.09s) 与 `physics` (14/14, 66.27s) 保持 100% 零退化。
+
+---
+
+### [DEC-042] 数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御 (Task 6G-D-C1-FINAL)
+* **状态**：已采纳并经实测全绿验证 (Accepted & Fully Verified)
+* **日期**：2026-10-24
+* **背景**：在 6G-D-C1 阶段收尾与进入 6G-D-C2 视口集成之前，执行集中数学审计与契约核验，发现并排查了四项关键接口与时间契约缺陷：
+  1. `ClosedLoopAdmissibilityPolicy.allow_approximate_solutions` 虽在配置中定义，但未在 `step_closed_loop_dynamics()` 的 `APPROXIMATE` 分支中参与判定；
+  2. `ClosedLoopDynamicsCoordinator.simulate()` 中 `total_time` 简单使用 `len(records) * dt` 计算，当存在拒绝推进的停滞帧时混淆了尝试帧数与真实物理时间；
+  3. `ClosedLoopFrameTelemetry` 中布尔标志（`is_physically_valid` 与 `is_control_feasible`）语义交织，未能清晰正交反映接触物理合法性、策略准入、目标满足与状态推进；
+  4. 遥测内部字典 `actual_contact_forces` 返回可变引用，存在调用方就地修改污染历史遥测的风险，且配置参数缺少统一的有限数值门禁。
+* **决策与方案**：
+  1. **策略链准入优先级确立 (DEF-001)**：
+     - `sol.is_physically_valid == False` 标定为 `SOLVER_NUMERICAL_FAILURE`（最高优先级错误）；
+     - `policy.strict_solved_only == True` 无条件拒绝所有近似解（`REJECTED_APPROXIMATE`）；
+     - `not policy.allow_approximate_solutions` 严格拒绝近似解（`REJECTED_APPROXIMATE`）；
+     - 当且仅当 `allow_approximate_solutions == True` 且残差在允许阈值内时准入为 `SUCCESS_APPROXIMATE`；
+     - 残差超限时，若 `strict_freeze_on_infeasible == True` 拒绝推进，若为 `False` 则以真实有效物理力自然推进（`CONTROL_INFEASIBLE_PHYSICS_ADVANCED`）。
+  2. **物理推进时间与模拟步数统计彻底解耦 (DEF-002)**：
+     - 在 `ClosedLoopSimulationTrajectory` 中清晰区分：`requested_steps`、`attempted_steps`、`successful_steps`、`failed_steps`、`requested_duration` 与 `actual_physical_time`；
+     - 强制约束 `total_time == actual_physical_time`（严格等于 `final_state.timestamp - initial_state.timestamp`），杜绝因停滞帧导致的虚假物理时间累加。
+  3. **遥测状态四维正交解耦语义 (DEF-003)**：
+     - `is_contact_solution_physically_valid`：接触力是否满足单侧接触与库仑摩擦锥；
+     - `is_policy_admitted`：当前步是否通过准入策略并允许单步前向动力学积分；
+     - `is_target_satisfied`：控制目标是否完全被满足（`SUCCESS_EXACT` 或合规准入的 `SUCCESS_APPROXIMATE`）；
+     - `state_advanced`：物理状态与时间戳是否真正单步推进；
+     - 严格保留 `is_physically_valid` 与 `is_control_feasible`，杜绝调用端回归中断。
+  4. **遥测深层不可变性防御与配置数值门禁 (DEF-004 / DEF-005)**：
+     - `actual_contact_forces` 在遥测中统一使用只读 `MappingProxyType` 封装，任何原地赋值直接抛出 `TypeError`；
+     - `ClosedLoopSimulationTrajectory.frames` 强制转为只读元组（`tuple`）；
+     - `to_dict()` 与 `export_telemetry()` 返回深解耦的纯净可序列化 JSON 结构；
+     - 在 `ContactSolverConfig`、`FeedbackGainsConfig` 与 `ClosedLoopAdmissibilityPolicy` 的 `__post_init__` 中加入统一的 `math.isfinite()` 与正数/非负数拦截门禁。
+  5. **物理守恒与收敛阶实测验证**：
+     - 零重力线性动量守恒误差 $< 10^{-10}\text{ kg}\cdot\text{m/s}$，角动量守恒误差 $< 10^{-10}\text{ N}\cdot\text{m}\cdot\text{s}$；
+     - 旋转动能漂移 100 帧内 $< 10^{-6}\text{ J}$，50 帧静态下陷 $< 10^{-5}\text{ m}$；
+     - 实测非线性旋转陀螺动力学误差在步长减半时呈严格 $\approx 4.05$ 倍下降，确证 $O(\Delta t^2)$ 二阶数值收敛阶。
+* **影响与产物**：
+  - 更新代码：`src/motion/contact_force_solver.py`、`src/motion/closed_loop_dynamics.py`；
+  - 新增审计文档：`docs/C1_FINAL_AUDIT.md`；
+  - 测试套件扩充：`tests/verify_task6gd_closed_loop_dynamics.py`（20 项扩充至 30 项测试，30/30 PASS）；
+  - 统一测试回归：`quick` (9/9 全绿, 15.81s)，`physics` (14/14 全绿, 67.56s)；
+  - 阶段收尾：6G-D-C1 数值闭环开发与数学审计全部就绪，下一里程碑锁定为 **Task 6G-D-C2: 在现有 DynamicsPlayground 中集成和验证真实动力学状态**。

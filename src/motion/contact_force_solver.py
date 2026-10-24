@@ -252,14 +252,20 @@ class ContactSolverConfig:
     enable_fallback: bool = True           # Allow fallback to SPG on SLSQP failure
 
     def __post_init__(self):
-        if self.force_tolerance_n <= 0.0 or math.isnan(self.force_tolerance_n):
-            raise ValueError(f"force_tolerance_n must be > 0, got {self.force_tolerance_n}")
-        if self.torque_tolerance_nm <= 0.0 or math.isnan(self.torque_tolerance_nm):
-            raise ValueError(f"torque_tolerance_nm must be > 0, got {self.torque_tolerance_nm}")
-        if self.constraint_tolerance < 0.0 or math.isnan(self.constraint_tolerance):
-            raise ValueError(f"constraint_tolerance must be >= 0, got {self.constraint_tolerance}")
-        if self.max_iterations < 1:
-            raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
+        if not math.isfinite(self.force_tolerance_n) or self.force_tolerance_n <= 0.0:
+            raise ValueError(f"force_tolerance_n must be finite and > 0, got {self.force_tolerance_n}")
+        if not math.isfinite(self.torque_tolerance_nm) or self.torque_tolerance_nm <= 0.0:
+            raise ValueError(f"torque_tolerance_nm must be finite and > 0, got {self.torque_tolerance_nm}")
+        if not math.isfinite(self.constraint_tolerance) or self.constraint_tolerance < 0.0:
+            raise ValueError(f"constraint_tolerance must be finite and >= 0, got {self.constraint_tolerance}")
+        if not math.isfinite(self.weight_force) or self.weight_force < 0.0:
+            raise ValueError(f"weight_force must be finite and >= 0, got {self.weight_force}")
+        if not math.isfinite(self.weight_torque) or self.weight_torque < 0.0:
+            raise ValueError(f"weight_torque must be finite and >= 0, got {self.weight_torque}")
+        if not math.isfinite(self.regularization_weight) or self.regularization_weight < 0.0:
+            raise ValueError(f"regularization_weight must be finite and >= 0, got {self.regularization_weight}")
+        if not isinstance(self.max_iterations, int) or self.max_iterations < 1:
+            raise ValueError(f"max_iterations must be integer >= 1, got {self.max_iterations}")
 
 
 @dataclass

@@ -824,6 +824,441 @@ class TestClosedLoopDynamics(unittest.TestCase):
         self.assertEqual(telem.step_status, ClosedLoopStepStatus.REJECTED_INFEASIBLE)
         self.assertEqual(telem.state_next, state_air)
 
+    # -------------------------------------------------------------------------
+    # Scenario 21: Policy Disallow Approximate Solutions
+    # -------------------------------------------------------------------------
+    def test_21_policy_disallow_approximate_solutions(self):
+        """Scenario 21: When allow_approximate_solutions=False, approximate solutions are rejected."""
+        contact = ContactConstraintSpec(
+            contact_id="foot",
+            contact_point_world=(0.0, 0.0, 0.0),
+            surface_normal_world=(0.0, 0.0, 1.0),
+            friction_coeff=0.1,
+        )
+        ref = DesiredMotionReference(
+            target_com_position_world=self.com_init,
+            target_linear_acceleration_world=(2.0, 0.0, 0.0),
+        )
+
+        # 1. With allow_approximate_solutions=True and large allowable residual -> Admitted
+        cfg_allow = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(
+                allow_approximate_solutions=True,
+                max_allowable_force_residual=200.0,
+            )
+        )
+        telem_allow = step_closed_loop_dynamics(self.initial_standing_state, ref, [contact], config=cfg_allow)
+        self.assertEqual(telem_allow.solver_status, ContactSolverStatus.APPROXIMATE)
+        self.assertEqual(telem_allow.step_status, ClosedLoopStepStatus.SUCCESS_APPROXIMATE)
+        self.assertTrue(telem_allow.state_advanced)
+        self.assertTrue(telem_allow.is_target_satisfied)
+        self.assertTrue(telem_allow.is_policy_admitted)
+
+        # 2. With allow_approximate_solutions=False -> Rejected
+        cfg_disallow = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(
+                allow_approximate_solutions=False,
+                max_allowable_force_residual=200.0,
+            )
+        )
+        telem_disallow = step_closed_loop_dynamics(self.initial_standing_state, ref, [contact], config=cfg_disallow)
+        self.assertEqual(telem_disallow.solver_status, ContactSolverStatus.APPROXIMATE)
+        self.assertEqual(telem_disallow.step_status, ClosedLoopStepStatus.REJECTED_APPROXIMATE)
+        self.assertFalse(telem_disallow.state_advanced)
+        self.assertFalse(telem_disallow.is_target_satisfied)
+        self.assertFalse(telem_disallow.is_policy_admitted)
+        self.assertEqual(telem_disallow.state_next, self.initial_standing_state)
+
+    # -------------------------------------------------------------------------
+    # Scenario 22: Admissibility Policy Truth Table Matrix
+    # -------------------------------------------------------------------------
+    def test_22_policy_approximate_solutions_matrix(self):
+        """Scenario 22: Complete truth table for approximate solution admission."""
+        contact = ContactConstraintSpec(
+            contact_id="foot",
+            contact_point_world=(0.0, 0.0, 0.0),
+            surface_normal_world=(0.0, 0.0, 1.0),
+            friction_coeff=0.1,
+        )
+        ref = DesiredMotionReference(
+            target_com_position_world=self.com_init,
+            target_linear_acceleration_world=(2.0, 0.0, 0.0),
+        )
+
+        # Matrix Case 1: strict_solved_only=True overrides allow_approximate_solutions=True
+        cfg1 = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(
+                strict_solved_only=True,
+                allow_approximate_solutions=True,
+                max_allowable_force_residual=200.0,
+            )
+        )
+        t1 = step_closed_loop_dynamics(self.initial_standing_state, ref, [contact], config=cfg1)
+        self.assertEqual(t1.step_status, ClosedLoopStepStatus.REJECTED_APPROXIMATE)
+        self.assertFalse(t1.state_advanced)
+
+        # Matrix Case 2: residual exceeds threshold and strict_freeze_on_infeasible=True
+        cfg2 = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(
+                allow_approximate_solutions=True,
+                max_allowable_force_residual=1.0,
+                strict_freeze_on_infeasible=True,
+            )
+        )
+        t2 = step_closed_loop_dynamics(self.initial_standing_state, ref, [contact], config=cfg2)
+        self.assertEqual(t2.step_status, ClosedLoopStepStatus.REJECTED_APPROXIMATE)
+        self.assertFalse(t2.state_advanced)
+
+        # Matrix Case 3: residual exceeds threshold and strict_freeze_on_infeasible=False -> advances under physics
+        cfg3 = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(
+                allow_approximate_solutions=True,
+                max_allowable_force_residual=1.0,
+                strict_freeze_on_infeasible=False,
+            )
+        )
+        t3 = step_closed_loop_dynamics(self.initial_standing_state, ref, [contact], config=cfg3)
+        self.assertEqual(t3.step_status, ClosedLoopStepStatus.CONTROL_INFEASIBLE_PHYSICS_ADVANCED)
+        self.assertTrue(t3.state_advanced)
+        self.assertFalse(t3.is_target_satisfied)
+        self.assertTrue(t3.is_policy_admitted)
+
+    # -------------------------------------------------------------------------
+    # Scenario 23: Simulation Time and Step Accounting
+    # -------------------------------------------------------------------------
+    def test_23_simulate_time_accounting_fail_fast_true_and_false(self):
+        """Scenario 23: Accurate time accounting distinguishes requested vs actual physical time."""
+        def ref_sched(k, t, s):
+            if k < 2:
+                return DesiredMotionReference(target_com_position_world=self.com_init)
+            else:
+                return DesiredMotionReference(target_com_position_world=(0.0, 0.0, 5.0))
+
+        def contact_sched(k, t, s):
+            if k < 2:
+                return self.standing_contacts
+            else:
+                return []
+
+        # Case A: fail_fast=True with strict_freeze
+        cfg_strict = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(strict_freeze_on_infeasible=True)
+        )
+        coord_strict = ClosedLoopDynamicsCoordinator(config=cfg_strict)
+        traj_ff = coord_strict.simulate(
+            initial_state=self.initial_standing_state,
+            reference_schedule=ref_sched,
+            contact_schedule=contact_sched,
+            num_steps=5,
+            fail_fast=True,
+        )
+
+        self.assertEqual(traj_ff.requested_steps, 5)
+        self.assertEqual(traj_ff.attempted_steps, 3)
+        self.assertEqual(traj_ff.successful_steps, 2)
+        self.assertEqual(traj_ff.failed_steps, 1)
+        self.assertAlmostEqual(traj_ff.requested_duration, 5 * self.dt)
+        self.assertAlmostEqual(traj_ff.actual_physical_time, 2 * self.dt)
+        self.assertAlmostEqual(traj_ff.total_time, traj_ff.actual_physical_time)
+        self.assertFalse(traj_ff.all_advanced)
+
+        # Case B: fail_fast=False with strict_freeze
+        traj_no_ff = coord_strict.simulate(
+            initial_state=self.initial_standing_state,
+            reference_schedule=ref_sched,
+            contact_schedule=contact_sched,
+            num_steps=5,
+            fail_fast=False,
+        )
+
+        self.assertEqual(traj_no_ff.requested_steps, 5)
+        self.assertEqual(traj_no_ff.attempted_steps, 5)
+        self.assertEqual(traj_no_ff.successful_steps, 2)
+        self.assertEqual(traj_no_ff.failed_steps, 3)
+        self.assertAlmostEqual(traj_no_ff.requested_duration, 5 * self.dt)
+        self.assertAlmostEqual(traj_no_ff.actual_physical_time, 2 * self.dt)
+        self.assertAlmostEqual(traj_no_ff.total_time, traj_no_ff.actual_physical_time)
+        self.assertFalse(traj_no_ff.all_advanced)
+
+        # Summary check
+        s = traj_no_ff.summary()
+        self.assertEqual(s["requested_steps"], 5)
+        self.assertEqual(s["attempted_steps"], 5)
+        self.assertEqual(s["successful_steps"], 2)
+        self.assertEqual(s["failed_steps"], 3)
+        self.assertAlmostEqual(s["actual_physical_time_sec"], 2 * self.dt)
+
+    # -------------------------------------------------------------------------
+    # Scenario 24: Telemetry Orthogonal Status Semantics
+    # -------------------------------------------------------------------------
+    def test_24_telemetry_orthogonal_status_semantics(self):
+        """Scenario 24: Validate orthogonal status flags across exact, unadmitted, and fallback frames."""
+        coord = ClosedLoopDynamicsCoordinator()
+
+        # 1. Standing exact solve
+        ref_stand = DesiredMotionReference(target_com_position_world=self.com_init)
+        t_stand = coord.step(self.initial_standing_state, ref_stand, self.standing_contacts)
+        self.assertTrue(t_stand.is_contact_solution_physically_valid)
+        self.assertTrue(t_stand.is_policy_admitted)
+        self.assertTrue(t_stand.is_target_satisfied)
+        self.assertTrue(t_stand.state_advanced)
+
+        # 2. Mid-air hover demand with default physics fallback
+        ref_hover = DesiredMotionReference(target_com_position_world=(0.0, 0.0, 5.0))
+        t_air = coord.step(self.initial_standing_state, ref_hover, contacts=[])
+        self.assertTrue(t_air.is_contact_solution_physically_valid)
+        self.assertTrue(t_air.is_policy_admitted)
+        self.assertFalse(t_air.is_target_satisfied)
+        self.assertTrue(t_air.state_advanced)
+
+        # 3. Mid-air hover demand with strict freeze
+        cfg_strict = ClosedLoopControllerConfig(
+            admissibility_policy=ClosedLoopAdmissibilityPolicy(strict_freeze_on_infeasible=True)
+        )
+        coord_strict = ClosedLoopDynamicsCoordinator(config=cfg_strict)
+        t_freeze = coord_strict.step(self.initial_standing_state, ref_hover, contacts=[])
+        self.assertTrue(t_freeze.is_contact_solution_physically_valid)
+        self.assertFalse(t_freeze.is_policy_admitted)
+        self.assertFalse(t_freeze.is_target_satisfied)
+        self.assertFalse(t_freeze.state_advanced)
+
+    # -------------------------------------------------------------------------
+    # Scenario 25: Telemetry Immutability and No History Mutation
+    # -------------------------------------------------------------------------
+    def test_25_telemetry_immutability_and_no_pollution(self):
+        """Scenario 25: Telemetry properties and exports cannot be mutated in place."""
+        coord = ClosedLoopDynamicsCoordinator()
+        ref = DesiredMotionReference(target_com_position_world=self.com_init)
+        traj = coord.simulate(self.initial_standing_state, ref, self.standing_contacts, num_steps=2)
+
+        t0 = traj.frames[0]
+        # 1. actual_contact_forces is a MappingProxyType (raises TypeError on write)
+        with self.assertRaises(TypeError):
+            t0.actual_contact_forces["c0"] = (100.0, 200.0, 300.0)  # type: ignore
+
+        # 2. Trajectory frames is an immutable tuple
+        self.assertIsInstance(traj.frames, tuple)
+        with self.assertRaises((AttributeError, TypeError)):
+            traj.frames.append(t0)  # type: ignore
+
+        # 3. export_telemetry returns detached copies
+        exported = traj.export_telemetry()
+        exported[0]["actual_net_force"] = [999.0, 999.0, 999.0]
+        exported[0]["actual_contact_forces"]["foot_L"] = [999.0, 999.0, 999.0]
+
+        exported_again = traj.export_telemetry()
+        self.assertNotEqual(exported_again[0]["actual_net_force"], [999.0, 999.0, 999.0])
+        self.assertNotEqual(exported_again[0]["actual_contact_forces"]["foot_L"], [999.0, 999.0, 999.0])
+
+    # -------------------------------------------------------------------------
+    # Scenario 26: Numerical Configuration Validation Gate
+    # -------------------------------------------------------------------------
+    def test_26_config_validation_numerical_gate(self):
+        """Scenario 26: Deterministic validation rejects negative, NaN, or non-positive configurations."""
+        # ContactSolverConfig
+        with self.assertRaises(ValueError):
+            ContactSolverConfig(force_tolerance_n=-1.0)
+        with self.assertRaises(ValueError):
+            ContactSolverConfig(torque_tolerance_nm=float("nan"))
+        with self.assertRaises(ValueError):
+            ContactSolverConfig(max_iterations=0)
+        with self.assertRaises(ValueError):
+            ContactSolverConfig(regularization_weight=-0.1)
+
+        # FeedbackGainsConfig
+        with self.assertRaises(ValueError):
+            FeedbackGainsConfig(kp_pos=-1.0)
+        with self.assertRaises(ValueError):
+            FeedbackGainsConfig(kd_rot=float("inf"))
+        with self.assertRaises(ValueError):
+            FeedbackGainsConfig(max_linear_acceleration_cmd=0.0)
+        with self.assertRaises(ValueError):
+            FeedbackGainsConfig(max_angular_momentum_rate_cmd=-5.0)
+
+        # ClosedLoopAdmissibilityPolicy
+        with self.assertRaises(ValueError):
+            ClosedLoopAdmissibilityPolicy(max_allowable_force_residual=-0.5)
+        with self.assertRaises(ValueError):
+            ClosedLoopAdmissibilityPolicy(max_allowable_torque_residual=float("nan"))
+
+    # -------------------------------------------------------------------------
+    # Scenario 27: System Boundaries, Inactive Contacts, and Contact ID Invariants
+    # -------------------------------------------------------------------------
+    def test_27_system_boundary_inactive_contacts_and_ids(self):
+        """Scenario 27: Empty contacts, duplicate IDs, and single contact boundaries are strictly checked."""
+        # Duplicate contact IDs rejected by solve_contact_forces
+        c1 = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+        c2 = ContactConstraintSpec("foot", (0.1, 0.0, 0.0), (0.0, 0.0, 1.0))
+        wrench = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 100.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=(0.0, 0.0, 1.0),
+        )
+        from src.motion.contact_force_solver import solve_contact_forces
+        sol_dup = solve_contact_forces(wrench, [c1, c2])
+        self.assertEqual(sol_dup.status, ContactSolverStatus.INVALID_INPUT)
+
+        # Inactive contacts (is_in_contact=False)
+        c_inactive = ContactConstraintSpec("foot_air", (0.0, 0.0, 0.5), (0.0, 0.0, 1.0), is_in_contact=False)
+        coord = ClosedLoopDynamicsCoordinator()
+        ref = DesiredMotionReference(target_com_position_world=self.com_init)
+        telem = coord.step(self.initial_standing_state, ref, [c_inactive])
+        self.assertTrue(telem.state_advanced)
+        self.assertEqual(telem.actual_contact_forces["foot_air"], (0.0, 0.0, 0.0))
+
+    # -------------------------------------------------------------------------
+    # Scenario 28: Numerical Invariants and Analytical Conservation Verification
+    # -------------------------------------------------------------------------
+    def test_28_numerical_invariants_and_analytical_conservation(self):
+        """Scenario 28: Zero-g momentum conservation, kinetic energy drift < 1e-6, static sinkage < 1e-5m."""
+        cfg_zero_g = ClosedLoopControllerConfig(
+            gravity_acceleration_world=(0.0, 0.0, 0.0),
+            dt=0.01,
+        )
+        coord_zero_g = ClosedLoopDynamicsCoordinator(config=cfg_zero_g)
+        state_spin = ForwardDynamicsState(
+            timestamp=0.0,
+            mass=self.mass,
+            com_position_world=(0.0, 0.0, 0.0),
+            com_velocity_world=(1.0, 2.0, 3.0),
+            angular_momentum_about_com_world=(5.0, 0.0, 0.0),
+            orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+            inertia_tensor_body=self.default_inertia,
+        )
+        ref_pass = DesiredMotionReference(target_linear_acceleration_world=(0.0, 0.0, 0.0))
+
+        traj_spin = coord_zero_g.simulate(state_spin, ref_pass, contact_schedule=[], num_steps=100)
+        self.assertTrue(traj_spin.all_advanced)
+        f_final = traj_spin.frames[-1].state_next
+
+        # Linear momentum: P = m * v
+        p_init = (self.mass * 1.0, self.mass * 2.0, self.mass * 3.0)
+        p_final = (self.mass * f_final.com_velocity_world[0], self.mass * f_final.com_velocity_world[1], self.mass * f_final.com_velocity_world[2])
+        for i in range(3):
+            self.assertAlmostEqual(p_final[i], p_init[i], delta=1e-10)
+
+        # Angular momentum: L = L_0
+        for i in range(3):
+            self.assertAlmostEqual(f_final.angular_momentum_about_com_world[i], (5.0, 0.0, 0.0)[i], delta=1e-10)
+
+        # Kinetic energy conservation: E_rot = 0.5 * L_x^2 / I_xx
+        e_rot_init = 0.5 * (5.0 ** 2) / 10.0
+        w = f_final.angular_velocity_world
+        e_rot_final = 0.5 * (10.0 * w[0]**2 + 12.0 * w[1]**2 + 15.0 * w[2]**2)
+        self.assertAlmostEqual(e_rot_final, e_rot_init, delta=1e-6)
+
+        # Static standing sinkage over 50 frames
+        coord = ClosedLoopDynamicsCoordinator()
+        ref_stand = DesiredMotionReference(target_com_position_world=self.com_init)
+        traj_stand = coord.simulate(self.initial_standing_state, ref_stand, self.standing_contacts, num_steps=50)
+        z_final = traj_stand.frames[-1].state_next.com_position_world[2]
+        self.assertAlmostEqual(z_final, 1.0, delta=1e-5)
+
+    # -------------------------------------------------------------------------
+    # Scenario 29: Step-Size Convergence Order Verification (O(dt^2))
+    # -------------------------------------------------------------------------
+    def test_29_step_size_convergence_order_two(self):
+        """Scenario 29: Analytical constant-acceleration exactness and O(dt^2) nonlinear rotational convergence."""
+        # Part A: Ballistic constant acceleration under Velocity Verlet has zero truncation error
+        T_total = 0.4
+        g = 9.81
+        z0 = 10.0
+
+        for dt_val in [0.04, 0.02, 0.01]:
+            cfg = ClosedLoopControllerConfig(dt=dt_val)
+            coord = ClosedLoopDynamicsCoordinator(config=cfg)
+            state0 = ForwardDynamicsState(
+                timestamp=0.0,
+                mass=self.mass,
+                com_position_world=(0.0, 0.0, z0),
+                com_velocity_world=(0.0, 0.0, 0.0),
+                angular_momentum_about_com_world=(0.0, 0.0, 0.0),
+                orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+                inertia_tensor_body=self.default_inertia,
+            )
+            ref_free = DesiredMotionReference(
+                target_com_position_world=(0.0, 0.0, z0),
+                target_linear_acceleration_world=(0.0, 0.0, -g),
+            )
+            n_steps = int(round(T_total / dt_val))
+            traj = coord.simulate(state0, ref_free, contact_schedule=[], num_steps=n_steps)
+            z_end = traj.frames[-1].state_next.com_position_world[2]
+            z_exact = z0 - 0.5 * g * (T_total ** 2)
+            # Velocity Verlet integrates constant acceleration with zero truncation error (< 1e-12)
+            self.assertAlmostEqual(z_end, z_exact, delta=1e-12)
+
+        # Part B: Asymmetric rigid body nonlinear rotation exhibits true 2nd-order O(dt^2) convergence
+        dts = [0.04, 0.02, 0.01, 0.001]
+        quats = []
+        for dt_val in dts:
+            cfg_rot = ClosedLoopControllerConfig(dt=dt_val, gravity_acceleration_world=(0.0, 0.0, 0.0))
+            coord_rot = ClosedLoopDynamicsCoordinator(config=cfg_rot)
+            s_rot = ForwardDynamicsState(
+                timestamp=0.0,
+                mass=self.mass,
+                com_position_world=(0.0, 0.0, 0.0),
+                com_velocity_world=(0.0, 0.0, 0.0),
+                angular_momentum_about_com_world=(10.0, 15.0, 20.0),
+                orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+                inertia_tensor_body=InertiaTensor3x3.from_diagonal(5.0, 10.0, 15.0),
+            )
+            ref_zero = DesiredMotionReference(target_linear_acceleration_world=(0.0, 0.0, 0.0))
+            n = int(round(T_total / dt_val))
+            traj_rot = coord_rot.simulate(s_rot, ref_zero, contact_schedule=[], num_steps=n)
+            quats.append(traj_rot.frames[-1].state_next.orientation_quat_world)
+
+        q_ref = quats[-1]
+        errors = [sum((a - b) ** 2 for a, b in zip(q, q_ref)) ** 0.5 for q in quats[:-1]]
+
+        ratio1 = errors[0] / errors[1]
+        ratio2 = errors[1] / errors[2]
+        # Convergence ratio for O(dt^2) with dt halved is (2)^2 = 4.0
+        self.assertAlmostEqual(ratio1, 4.0, delta=0.2)
+        self.assertAlmostEqual(ratio2, 4.0, delta=0.2)
+        self.assertLess(errors[2], errors[1])
+        self.assertLess(errors[1], errors[0])
+
+    # -------------------------------------------------------------------------
+    # Scenario 30: Cross-Module Newton-Euler Balance Consistency
+    # -------------------------------------------------------------------------
+    def test_30_cross_module_newton_euler_balance_consistency(self):
+        """Scenario 30: Sum(F) = m*a and Sum(tau) = dL/dt hold to 1e-7 across modules."""
+        coord = ClosedLoopDynamicsCoordinator()
+        ref = DesiredMotionReference(
+            target_com_position_world=self.com_init,
+            target_linear_acceleration_world=(0.5, 0.2, 0.0),
+        )
+        telem = coord.step(self.initial_standing_state, ref, self.standing_contacts)
+
+        # 1. Newton's 2nd law: Sum(F_contact) + F_ext + m*g = m * a_actual
+        m = self.mass
+        g_vec = coord.config.gravity_acceleration_world
+        f_contact_sum = [0.0, 0.0, 0.0]
+        for f in telem.actual_contact_forces.values():
+            for i in range(3):
+                f_contact_sum[i] += f[i]
+
+        net_force_calc = [
+            f_contact_sum[0] + m * g_vec[0],
+            f_contact_sum[1] + m * g_vec[1],
+            f_contact_sum[2] + m * g_vec[2],
+        ]
+        ma_expected = [
+            m * telem.actual_linear_acceleration_world[0],
+            m * telem.actual_linear_acceleration_world[1],
+            m * telem.actual_linear_acceleration_world[2],
+        ]
+        for i in range(3):
+            self.assertAlmostEqual(net_force_calc[i], ma_expected[i], delta=1e-7)
+
+        # 2. Euler's equation: Net torque about CoM = dL/dt
+        for i in range(3):
+            self.assertAlmostEqual(
+                telem.actual_net_torque_about_com_world[i],
+                telem.actual_angular_momentum_rate_world[i],
+                delta=1e-7,
+            )
+
 
 if __name__ == "__main__":
     argv = [sys.argv[0]]

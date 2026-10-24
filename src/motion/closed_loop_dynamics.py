@@ -36,7 +36,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 import math
 import time
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from types import MappingProxyType
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from src.motion.contact_dynamics import (
     Vec3,
@@ -252,11 +253,15 @@ class FeedbackGainsConfig:
             ("kd_pos", self.kd_pos),
             ("kp_rot", self.kp_rot),
             ("kd_rot", self.kd_rot),
-            ("max_linear_acceleration_cmd", self.max_linear_acceleration_cmd),
-            ("max_angular_momentum_rate_cmd", self.max_angular_momentum_rate_cmd),
         ]:
             if not math.isfinite(val) or val < 0.0:
                 raise ValueError(f"Gain '{name}' must be non-negative and finite, got {val}")
+        for name, val in [
+            ("max_linear_acceleration_cmd", self.max_linear_acceleration_cmd),
+            ("max_angular_momentum_rate_cmd", self.max_angular_momentum_rate_cmd),
+        ]:
+            if not math.isfinite(val) or val <= 0.0:
+                raise ValueError(f"Limit '{name}' must be strictly positive and finite, got {val}")
 
 
 @dataclass(frozen=True)
@@ -277,6 +282,16 @@ class ClosedLoopAdmissibilityPolicy:
     allow_infeasible_zero_force_fallback: bool = True  # If True, free fall continues under 0 contact force
     strict_freeze_on_infeasible: bool = False  # If True, freeze physical time on infeasible control target
     strict_solved_only: bool = False  # If True, only SOLVED status is admitted
+
+    def __post_init__(self):
+        if not math.isfinite(self.max_allowable_force_residual) or self.max_allowable_force_residual < 0.0:
+            raise ValueError(
+                f"max_allowable_force_residual must be finite and non-negative, got {self.max_allowable_force_residual}"
+            )
+        if not math.isfinite(self.max_allowable_torque_residual) or self.max_allowable_torque_residual < 0.0:
+            raise ValueError(
+                f"max_allowable_torque_residual must be finite and non-negative, got {self.max_allowable_torque_residual}"
+            )
 
 
 @dataclass(frozen=True)
@@ -328,7 +343,7 @@ class ClosedLoopFrameTelemetry:
     solver_is_physically_valid: bool
     solver_force_residual_n: float
     solver_torque_residual_nm: float
-    actual_contact_forces: Dict[str, Vec3]
+    actual_contact_forces: Mapping[str, Vec3]
     actual_net_force_world: Vec3
     actual_net_torque_about_com_world: Vec3
     actual_linear_acceleration_world: Vec3
@@ -337,11 +352,20 @@ class ClosedLoopFrameTelemetry:
     is_physically_valid: bool
     state_advanced: bool
     is_control_feasible: bool = True
+    is_contact_solution_physically_valid: bool = True
+    is_policy_admitted: bool = True
+    is_target_satisfied: bool = True
     tracking_error_position: Optional[Vec3] = None
     tracking_error_velocity: Optional[Vec3] = None
     tracking_error_linear_acc: Vec3 = (0.0, 0.0, 0.0)
     tracking_error_angular_momentum_rate: Vec3 = (0.0, 0.0, 0.0)
     message: str = ""
+
+    def __post_init__(self):
+        forces_copy = {}
+        for k, v in self.actual_contact_forces.items():
+            forces_copy[str(k)] = (float(v[0]), float(v[1]), float(v[2]))
+        object.__setattr__(self, "actual_contact_forces", MappingProxyType(forces_copy))
 
     @property
     def control_feasible(self) -> bool:
@@ -380,6 +404,10 @@ class ClosedLoopFrameTelemetry:
             "target_contact_wrench_torque": list(self.target_contact_wrench_torque_world),
             "solver_status": self.solver_status.value,
             "solver_is_physically_valid": self.solver_is_physically_valid,
+            "is_contact_solution_physically_valid": self.is_contact_solution_physically_valid,
+            "is_policy_admitted": self.is_policy_admitted,
+            "is_target_satisfied": self.is_target_satisfied,
+            "is_control_feasible": self.is_control_feasible,
             "solver_force_residual_n": self.solver_force_residual_n,
             "solver_torque_residual_nm": self.solver_torque_residual_nm,
             "solver_force_residual_norm": self.solver_force_residual_n,
@@ -392,7 +420,6 @@ class ClosedLoopFrameTelemetry:
             "step_status": self.step_status.value,
             "is_physically_valid": self.is_physically_valid,
             "state_advanced": self.state_advanced,
-            "is_control_feasible": self.is_control_feasible,
             "tracking_error_position": list(self.tracking_error_position) if self.tracking_error_position else None,
             "tracking_error_velocity": list(self.tracking_error_velocity) if self.tracking_error_velocity else None,
             "tracking_error_linear_acc": list(self.tracking_error_linear_acc),
@@ -410,6 +437,16 @@ class ClosedLoopSimulationTrajectory:
     dt: float
     total_time: float
     all_advanced: bool
+    requested_steps: int = 0
+    attempted_steps: int = 0
+    successful_steps: int = 0
+    failed_steps: int = 0
+    requested_duration: float = 0.0
+    actual_physical_time: float = 0.0
+
+    def __post_init__(self):
+        if not isinstance(self.frames, tuple):
+            object.__setattr__(self, "frames", tuple(self.frames))
 
     def summary(self) -> Dict[str, Any]:
         """Compute aggregate trajectory performance metrics."""
@@ -430,6 +467,12 @@ class ClosedLoopSimulationTrajectory:
 
         return {
             "total_frames": len(self.frames),
+            "requested_steps": self.requested_steps,
+            "attempted_steps": self.attempted_steps,
+            "successful_steps": self.successful_steps,
+            "failed_steps": self.failed_steps,
+            "requested_duration_sec": self.requested_duration,
+            "actual_physical_time_sec": self.actual_physical_time,
             "total_time": self.total_time,
             "all_advanced": self.all_advanced,
             "step_status_counts": step_counts,
@@ -438,7 +481,7 @@ class ClosedLoopSimulationTrajectory:
         }
 
     def export_telemetry(self) -> List[Dict[str, Any]]:
-        """Export full trajectory as a list of dictionaries for JSON persistence / Blender playback."""
+        """Export full trajectory as a list of detached dictionaries for JSON persistence / Blender playback."""
         return [f.to_dict() for f in self.frames]
 
 
@@ -658,21 +701,24 @@ def step_closed_loop_dynamics(
             is_control_feasible = False
             step_status = ClosedLoopStepStatus.SOLVER_NUMERICAL_FAILURE
             message = "Approximate solution violated physical unilateral/cone constraints"
+        elif policy.strict_solved_only:
+            is_control_feasible = False
+            step_status = ClosedLoopStepStatus.REJECTED_APPROXIMATE
+            message = "Strict policy rejected APPROXIMATE contact solution (strict_solved_only=True)"
+        elif not policy.allow_approximate_solutions:
+            is_control_feasible = False
+            step_status = ClosedLoopStepStatus.REJECTED_APPROXIMATE
+            message = "Policy rejected APPROXIMATE contact solution (allow_approximate_solutions=False)"
         elif (
             sol.force_residual_n <= policy.max_allowable_force_residual
             and sol.torque_residual_nm <= policy.max_allowable_torque_residual
         ):
-            if policy.strict_solved_only:
-                is_control_feasible = False
-                step_status = ClosedLoopStepStatus.REJECTED_APPROXIMATE
-                message = "Strict policy rejected APPROXIMATE contact solution"
-            else:
-                is_control_feasible = True
-                step_status = ClosedLoopStepStatus.SUCCESS_APPROXIMATE
-                message = (
-                    f"Admitted physically valid approximate solution (F_res={sol.force_residual_n:.2f}N, "
-                    f"tau_res={sol.torque_residual_nm:.2f}N*m)"
-                )
+            is_control_feasible = True
+            step_status = ClosedLoopStepStatus.SUCCESS_APPROXIMATE
+            message = (
+                f"Admitted physically valid approximate solution (F_res={sol.force_residual_n:.2f}N, "
+                f"tau_res={sol.torque_residual_nm:.2f}N*m)"
+            )
         else:
             is_control_feasible = False
             if policy.strict_freeze_on_infeasible:
@@ -766,6 +812,16 @@ def step_closed_loop_dynamics(
     err_a = vec3_sub(actual_a, a_cmd)
     err_dL = vec3_sub(actual_dL, dL_cmd)
 
+    is_contact_solution_physically_valid = bool(sol.is_physically_valid)
+    is_policy_admitted = bool(should_integrate)
+    is_target_satisfied = bool(
+        is_valid_step
+        and (
+            step_status == ClosedLoopStepStatus.SUCCESS_EXACT
+            or step_status == ClosedLoopStepStatus.SUCCESS_APPROXIMATE
+        )
+    )
+
     return ClosedLoopFrameTelemetry(
         frame_index=frame_index,
         timestamp=state_curr.timestamp,
@@ -789,6 +845,9 @@ def step_closed_loop_dynamics(
         is_physically_valid=is_valid_step,
         state_advanced=state_advanced,
         is_control_feasible=is_control_feasible,
+        is_contact_solution_physically_valid=is_contact_solution_physically_valid,
+        is_policy_admitted=is_policy_admitted,
+        is_target_satisfied=is_target_satisfied,
         tracking_error_position=pos_err,
         tracking_error_velocity=vel_err,
         tracking_error_linear_acc=err_a,
@@ -861,6 +920,8 @@ class ClosedLoopDynamicsCoordinator:
         telemetry_records: List[ClosedLoopFrameTelemetry] = []
         curr_state = initial_state
         all_advanced = True
+        successful_steps = 0
+        failed_steps = 0
 
         for k in range(num_steps):
             t_curr = curr_state.timestamp
@@ -894,12 +955,18 @@ class ClosedLoopDynamicsCoordinator:
 
             if telem.state_advanced:
                 curr_state = telem.state_next
+                successful_steps += 1
             else:
+                failed_steps += 1
                 all_advanced = False
                 if fail_fast:
                     break
 
-        total_time = len(telemetry_records) * dt
+        attempted_steps = len(telemetry_records)
+        requested_steps = num_steps
+        requested_duration = num_steps * dt
+        actual_physical_time = curr_state.timestamp - initial_state.timestamp
+        total_time = actual_physical_time
         return ClosedLoopSimulationTrajectory(
             frames=tuple(telemetry_records),
             initial_state=initial_state,
@@ -907,4 +974,10 @@ class ClosedLoopDynamicsCoordinator:
             dt=dt,
             total_time=total_time,
             all_advanced=all_advanced,
+            requested_steps=requested_steps,
+            attempted_steps=attempted_steps,
+            successful_steps=successful_steps,
+            failed_steps=failed_steps,
+            requested_duration=requested_duration,
+            actual_physical_time=actual_physical_time,
         )
