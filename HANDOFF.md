@@ -5,12 +5,12 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-B-R1（接触力求解器数值可靠性与状态契约修复）：
-1. 修复有界摩擦锥闭式投影：重构 `project_to_friction_cone`，消除超法向界限时切向力等比缩小偏离最近点的缺陷，欧氏距离解析极值优选，保证真实最近可行点；
-2. 修复优化器收敛状态语义：`ContactForceSolution` 增加 `solver_engine`, `optimizer_converged`, `optimizer_message`, `fallback_occurred`，底层状态与残差判定彻底解耦；
-3. 严格收紧不可行性预判：废除 `normal_z > 0.5` 启发式规则，仅保留严格水平地面负法向拉力与零触点等数学不可行定理，斜坡与多触点交由优化器真实求解；
-4. 修复接触几何距离信息丢失：`ContactConstraintSpec` 与 `SingleContactDynamics` 均扩展 `surface_distance` 与 `is_in_contact_override`，消除虚假占位值；
-5. 交付 `tests/verify_task6gd_contact_force_solver.py` 扩充至 31 项测试全部通过（独立 Python 31/31，Blender SPG 30/30），分层回归 `quick` (7/7), `physics` (12/12) 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-B-R2（接触力求解器终止状态契约与优化收敛真值解耦）：
+1. 强化 `SOLVED` 状态准入准则：严格满足有限数值、硬物理约束可行、合力合力矩残差满足容差、且底层优化器明确确认收敛（`opt_converged=True`）或属于解析零解路径；
+2. 消除状态契约漏洞：未收敛终止（`not opt_converged`）哪怕残差达标，一律标定为 `APPROXIMATE`，严禁伪报 `SOLVED`，并完整保留候选解、实际残差与底层诊断信息；
+3. SLSQP 异常与 `success == False` 容错回退：自动回退至 Native SPG，置 `fallback_occurred=True`，记录完整回退原因，双引擎均失败时严格标定 `APPROXIMATE`；
+4. 非数值（NaN/Inf）与异常防御：装配与评估阶段严格拦截非数值，一票否决标定为 `NUMERICAL_FAILURE`；
+5. 交付 `tests/verify_task6gd_contact_force_solver.py` 扩充至 37 项测试全部通过（独立 Python 37/37，Blender SPG 36/36），分层回归 `quick` (7/7), `physics` (12/12) 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -41,22 +41,23 @@
 * 完成 Task 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复（交付 17 项测试与环境接触间隙门禁）。
 * 完成 Task 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全。
 * 完成 Task 6G-D-B 多接触力逆向求解与约束分配系统。
-* **完成 Task 6G-D-B-R1 接触力求解器数值可靠性与状态契约修复**：
-  * 重构 `project_to_friction_cone` 实现有界三维摩擦锥闭式凸多边形正交投影；
-  * `ContactForceSolution` 增加诊断字段，底层状态与终止原因完整透传；
-  * 废除 `normal_z > 0.5` 启发式规则，仅保留严格数学不可行预判；
-  * 接触几何距离保真，消除虚假占位数据；
-  * 单元测试扩充至 31 项全绿通过；分层回归套件 `quick` 7/7, `physics` 12/12 实测全绿。
+* 完成 Task 6G-D-B-R1 接触力求解器数值可靠性与状态契约修复。
+* **完成 Task 6G-D-B-R2 接触力求解器终止状态契约与优化收敛真值解耦**：
+  * 确立 `SOLVED` 严格五重准入门禁；
+  * 优化器未收敛哪怕残差达标一律标定 `APPROXIMATE`，绝不伪报 `SOLVED`；
+  * SLSQP 退出且 `success == False` 触发 SPG 容错回退并累加迭代与状态；
+  * 非数值与异常防御性截断为 `NUMERICAL_FAILURE`；
+  * 单元测试扩充至 37 项全绿通过；分层回归套件 `quick` 7/7, `physics` 12/12 实测全绿。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `contact_force_solver`：31/31 项测试全绿通过（独立 Python 0.406s；Blender 无头 SPG 30/30 项全绿通过，1 项优雅跳过，0.087s）；
-  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.76s，退出码 0）；
-  * `dynamics_environment_query`：13/13 项数学定理全绿（0.12s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.30s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：7/7 项通过（7.13s，退出码 0）；
-  * `physics` Tier：12/12 项通过（62.09s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-B-R1 已完成并验证，严格停止。
+  * `contact_force_solver`：37/37 项测试全绿通过（独立 Python 0.414s；Blender 无头 SPG 36/36 项全绿通过，1 项优雅跳过，0.086s）；
+  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.78s，退出码 0）；
+  * `dynamics_environment_query`：13/13 项数学定理全绿（0.13s，退出码 0）；
+  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.34s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
+  * `quick` Tier：7/7 项通过（7.35s，退出码 0）；
+  * `physics` Tier：12/12 项通过（60.23s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-B-R2 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`

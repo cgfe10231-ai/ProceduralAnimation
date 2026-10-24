@@ -3,6 +3,39 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-24] 任务 6G-D-B-R2：接触力求解器终止状态契约与优化收敛真值解耦 (Task 6G-D-B-R2)
+
+### 终止状态机与容错回退机制加固 (`src/motion/contact_force_solver.py`)
+* **严格的 `SOLVED` 五重充要条件准入准则**：
+  * 废除提前非成功终止下若残差巧合达标误报 `SOLVED` 的漏洞；
+  * `SOLVED` 必须满足：(1) 最终接触力全有限数值（无 NaN/Inf）；(2) 硬物理约束在配置容差内满足；(3) 合力残差 $\le$ `force_tolerance_n`；(4) 合力矩残差 $\le$ `torque_tolerance_nm`；(5) 优化器明确确认正常收敛（`opt_converged=True`）或属于显式单独验证的零触点零外力解析平衡路径（`solver_engine="analytical"`）；
+  * 当优化器未收敛（`opt_converged=False`）时，哪怕残差满足容差，一律如实标定为 `APPROXIMATE`，严禁伪报 `SOLVED`；保全候选解、真实残差、`optimizer_converged=False` 与诊断信息 `optimizer_message`。
+* **SLSQP 非成功结果回退到 SPG 契约 (`enable_fallback=True`)**：
+  * 支持配置 `enable_fallback: bool = True`；
+  * 当 SLSQP 抛出异常或返回 `res.success == False` 时，均自动触发回退到 Native SPG，置 `fallback_occurred=True`，更新 `solver_engine="spg"`；
+  * 记录触发回退的根本原因（原 SLSQP 报错信息与返回码），追加 SPG 最终状态；总迭代次数累计两阶段迭代（`slsqp_iters + spg_iters`）；
+  * 若 SPG 同样未确认收敛，严格返回 `APPROXIMATE`，绝不虚报 `SOLVED`；若关闭回退（`enable_fallback=False`），如实标定未收敛并返回 `APPROXIMATE`。
+* **非数值（NaN/Inf）与异常防御性截断**：
+  * 在装配解向量、计算残差与评估约束违规量各阶段均加入 `math.isfinite` 严格检验；
+  * 任何出现非数值（NaN/Inf）或优化引擎异常中断的情形，一票否决直接标定为 `NUMERICAL_FAILURE`，`is_physically_valid=False`，坚决杜绝非数值被残差比较静默吸纳。
+
+### 测试验证与架构状态
+* **独立单元测试套件扩充 (`tests/verify_task6gd_contact_force_solver.py`)**：
+  * 测试套件由 31 项扩充至 37 项（新增 Test 32 至 Test 37）：
+    * Test 32: 正常优化收敛且残差达标返回 `SOLVED`
+    * Test 33: 优化器非成功终止、但残差“碰巧”达标时明确返回 `APPROXIMATE`，绝不返回 `SOLVED`
+    * Test 34: 优化器非成功终止、且残差超标时返回 `APPROXIMATE` 并带准确诊断
+    * Test 35: SLSQP 提前退出且 `success == False` 时的容错回退与状态记录
+    * Test 36: SLSQP 与 SPG 回退后均失败时的状态正确性（`APPROXIMATE`，绝不 `SOLVED`）
+    * Test 37: 数值异常（NaN/Inf/双异常中断）返回 `NUMERICAL_FAILURE` 与解析零解路径
+  * 独立 Python 全量环境：37/37 项测试全部通过（0.414s）；
+  * Blender 无 SciPy 无头环境：36/36 项测试全部通过（1 项 SLSQP 测试优雅跳过，0.086s）。
+* **自动化回归测试验证**：
+  * `quick` Tier：7/7 项测试全绿通过（7.35s，退出码 0）；
+  * `physics` Tier：12/12 项测试全绿通过（60.23s，退出码 0）；
+  * 零历史步态修改，零 Rig/IK/WBC 篡改，零训练场重建。
+
+
 ## [2026-10-23] 任务 6G-D-B-R1：接触力求解器数值可靠性与状态契约修复 (Task 6G-D-B-R1)
 
 ### 有界摩擦锥欧氏正交投影与状态契约修复 (`src/motion/contact_force_solver.py`, `src/motion/contact_dynamics.py`)

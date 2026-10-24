@@ -233,6 +233,7 @@ class ContactSolverConfig:
     regularization_weight: float = 1e-6    # Minimum-norm force regularization alpha
     max_iterations: int = 1000             # Maximum solver iterations
     method: str = "auto"                   # 'auto', 'slsqp', 'spg'
+    enable_fallback: bool = True           # Allow fallback to SPG on SLSQP failure
 
     def __post_init__(self):
         if self.force_tolerance_n <= 0.0 or math.isnan(self.force_tolerance_n):
@@ -650,6 +651,11 @@ def _solve_with_spg(
 
         grad_next, e_F_next, e_tau_next, res_F_next, res_tau_next = evaluate_gradient(forces_trial)
 
+        # Check for NaN / Inf in residuals
+        if not (math.isfinite(res_F_next) and math.isfinite(res_tau_next)):
+            sol_dict = {c.contact_id: forces_trial[i] for i, c in enumerate(active_contacts)}
+            return sol_dict, it + 1, False, f"SPG encountered non-finite residuals at iteration {it + 1}"
+
         # Barzilai-Borwein spectral step update
         s_dot_y = 0.0
         s_dot_s = 0.0
@@ -813,7 +819,7 @@ def solve_contact_forces(
             computation_time_sec=time.perf_counter() - t0,
             is_physically_valid=True,
             message=msg,
-            solver_engine="none",
+            solver_engine="analytical" if status == ContactSolverStatus.SOLVED else "none",
             optimizer_converged=(status == ContactSolverStatus.SOLVED),
             optimizer_message=msg,
             fallback_occurred=False,
@@ -832,19 +838,33 @@ def solve_contact_forces(
 
     if use_slsqp:
         engine_used = "slsqp"
+        slsqp_failed = False
+        slsqp_fail_reason = ""
+        slsqp_iters = 0
         try:
             solved_forces, iterations, opt_converged, opt_message = _solve_with_slsqp(
                 target, active_contacts_sorted, config
             )
+            slsqp_iters = iterations
+            if not opt_converged:
+                slsqp_failed = True
+                slsqp_fail_reason = opt_message if opt_message else "SLSQP reported success=False"
         except Exception as exc:
-            # Fallback to Native SPG if SLSQP fails
+            slsqp_failed = True
+            slsqp_fail_reason = f"SLSQP raised exception: {exc}"
+
+        if slsqp_failed and config.enable_fallback:
+            # Fallback to Native SPG if SLSQP fails (either exception or success=False)
             fallback_occurred = True
             engine_used = "spg"
             try:
-                solved_forces, iterations, opt_converged, opt_message = _solve_with_spg(
+                spg_forces, spg_iters, spg_converged, spg_message = _solve_with_spg(
                     target, active_contacts_sorted, config
                 )
-                opt_message = f"Fallback from SLSQP error ({exc}) to SPG: {opt_message}"
+                solved_forces = spg_forces
+                iterations = slsqp_iters + spg_iters
+                opt_converged = spg_converged
+                opt_message = f"Fallback from SLSQP ({slsqp_fail_reason}) to SPG: {spg_message}"
             except Exception as exc2:
                 return ContactForceSolution(
                     status=ContactSolverStatus.NUMERICAL_FAILURE,
@@ -857,15 +877,20 @@ def solve_contact_forces(
                     torque_residual_nm=vec3_length(target.target_torque_world),
                     max_normal_violation_n=0.0,
                     max_friction_violation_n=0.0,
-                    iterations=iterations,
+                    iterations=slsqp_iters,
                     computation_time_sec=time.perf_counter() - t0,
                     is_physically_valid=False,
-                    message=f"NUMERICAL_FAILURE: SLSQP failed ({exc}); SPG fallback failed ({exc2})",
+                    message=f"NUMERICAL_FAILURE: SLSQP failed ({slsqp_fail_reason}); SPG fallback failed ({exc2})",
                     solver_engine="spg",
                     optimizer_converged=False,
-                    optimizer_message=f"SLSQP error: {exc}; SPG error: {exc2}",
+                    optimizer_message=f"SLSQP failure: {slsqp_fail_reason}; SPG error: {exc2}",
                     fallback_occurred=True,
                 )
+        elif slsqp_failed and not config.enable_fallback:
+            engine_used = "slsqp"
+            fallback_occurred = False
+            opt_converged = False
+            opt_message = f"SLSQP non-success (fallback disabled): {slsqp_fail_reason}"
     else:
         engine_used = "spg"
         try:
@@ -903,6 +928,35 @@ def solve_contact_forces(
             all_forces[c.contact_id] = solved_forces.get(c.contact_id, (0.0, 0.0, 0.0))
         else:
             all_forces[c.contact_id] = (0.0, 0.0, 0.0)
+
+    # Verify all forces are finite numbers
+    forces_are_finite = True
+    for c_id, F in all_forces.items():
+        if not (math.isfinite(F[0]) and math.isfinite(F[1]) and math.isfinite(F[2])):
+            forces_are_finite = False
+            break
+
+    if not forces_are_finite:
+        return ContactForceSolution(
+            status=ContactSolverStatus.NUMERICAL_FAILURE,
+            contact_forces=all_forces,
+            total_contact_force=(float("nan"), float("nan"), float("nan")),
+            total_contact_torque_about_com=(float("nan"), float("nan"), float("nan")),
+            force_error_vector=(float("nan"), float("nan"), float("nan")),
+            force_residual_n=float("nan"),
+            torque_error_vector=(float("nan"), float("nan"), float("nan")),
+            torque_residual_nm=float("nan"),
+            max_normal_violation_n=float("nan"),
+            max_friction_violation_n=float("nan"),
+            iterations=iterations,
+            computation_time_sec=time.perf_counter() - t0,
+            is_physically_valid=False,
+            message="NUMERICAL_FAILURE: Contact forces contain non-finite numbers (NaN/Inf).",
+            solver_engine=engine_used,
+            optimizer_converged=False,
+            optimizer_message=opt_message if opt_message else "Non-finite values encountered in solution forces",
+            fallback_occurred=fallback_occurred,
+        )
 
     # Calculate actual net force and torque about com
     tot_fx, tot_fy, tot_fz = 0.0, 0.0, 0.0
@@ -952,6 +1006,31 @@ def solve_contact_forces(
     e_tau = vec3_sub(total_tau, target.target_torque_world)
     res_tau = vec3_length(e_tau)
 
+    res_is_finite = math.isfinite(res_F) and math.isfinite(res_tau)
+    violations_are_finite = math.isfinite(max_norm_violation) and math.isfinite(max_fric_violation)
+
+    if not res_is_finite or not violations_are_finite:
+        return ContactForceSolution(
+            status=ContactSolverStatus.NUMERICAL_FAILURE,
+            contact_forces=all_forces,
+            total_contact_force=total_F,
+            total_contact_torque_about_com=total_tau,
+            force_error_vector=e_F,
+            force_residual_n=res_F if math.isfinite(res_F) else float("nan"),
+            torque_error_vector=e_tau,
+            torque_residual_nm=res_tau if math.isfinite(res_tau) else float("nan"),
+            max_normal_violation_n=max_norm_violation if math.isfinite(max_norm_violation) else float("nan"),
+            max_friction_violation_n=max_fric_violation if math.isfinite(max_fric_violation) else float("nan"),
+            iterations=iterations,
+            computation_time_sec=time.perf_counter() - t0,
+            is_physically_valid=False,
+            message=f"NUMERICAL_FAILURE: Non-finite residuals or violations detected (res_F={res_F}, res_tau={res_tau}).",
+            solver_engine=engine_used,
+            optimizer_converged=False,
+            optimizer_message=opt_message if opt_message else "Non-finite residuals detected",
+            fallback_occurred=fallback_occurred,
+        )
+
     is_physically_valid = (
         max_norm_violation <= config.constraint_tolerance and
         max_fric_violation <= config.constraint_tolerance
@@ -970,13 +1049,19 @@ def solve_contact_forces(
         status = ContactSolverStatus.INFEASIBLE
         msg = f"INFEASIBLE: {infeasible_check[1]}"
     elif res_F <= config.force_tolerance_n and res_tau <= config.torque_tolerance_nm:
-        # Check if optimizer actually confirmed convergence or hit iteration limit
-        if not opt_converged and iterations >= config.max_iterations:
+        # Check if optimizer actually confirmed convergence
+        if not opt_converged:
             status = ContactSolverStatus.APPROXIMATE
-            msg = (
-                f"APPROXIMATE: Residuals nominally within tolerance, but optimizer reached max iterations "
-                f"({iterations}/{config.max_iterations}) without convergence confirmation ({opt_message})."
-            )
+            if iterations >= config.max_iterations:
+                msg = (
+                    f"APPROXIMATE: Residuals nominally within tolerance, but optimizer reached max iterations "
+                    f"({iterations}/{config.max_iterations}) without convergence confirmation ({opt_message})."
+                )
+            else:
+                msg = (
+                    f"APPROXIMATE: Residuals nominally within tolerance, but optimizer terminated non-successfully "
+                    f"without convergence confirmation ({opt_message})."
+                )
         else:
             status = ContactSolverStatus.SOLVED
             msg = (
@@ -985,7 +1070,7 @@ def solve_contact_forces(
                 f"res_tau={res_tau:.4f}N*m (tol={config.torque_tolerance_nm:.4f}N*m)."
             )
     else:
-        # Check if target is limited by single-contact lever arm geometry
+        # Residual exceeds tolerance
         status = ContactSolverStatus.APPROXIMATE
         if len(active_contacts_sorted) == 1:
             r1 = (

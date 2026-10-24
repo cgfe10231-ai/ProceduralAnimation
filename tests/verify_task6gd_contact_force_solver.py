@@ -1063,6 +1063,246 @@ class TestContactForceSolver(unittest.TestCase):
         multi_manual = solution_to_multi_contact_dynamics(sol, [manual_spec], (0, 0, 1))
         self.assertIsNone(multi_manual.contacts[0].surface_distance)
 
+    # -------------------------------------------------------------------------
+    # Test 32: Normal Optimizer Convergence Contract
+    # -------------------------------------------------------------------------
+    def test_32_normal_optimizer_convergence_contract(self):
+        """Test 32: Normal convergence yields SOLVED with optimizer_converged=True."""
+        com = (0.0, 0.0, 1.0)
+        foot_L = ContactConstraintSpec("foot_L", (-0.15, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        foot_R = ContactConstraintSpec("foot_R", (0.15, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 686.7),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+        sol = solve_contact_forces(target, [foot_L, foot_R], self.default_config)
+        self.assertEqual(sol.status, ContactSolverStatus.SOLVED)
+        self.assertTrue(sol.optimizer_converged)
+        self.assertTrue(sol.is_physically_valid)
+        self.assertLessEqual(sol.force_residual_n, self.default_config.force_tolerance_n)
+        self.assertLessEqual(sol.torque_residual_nm, self.default_config.torque_tolerance_nm)
+
+    # -------------------------------------------------------------------------
+    # Test 33: Unconverged Termination with Residuals within Tolerance Yields APPROXIMATE
+    # -------------------------------------------------------------------------
+    def test_33_unconverged_with_residuals_within_tolerance_yields_approximate(self):
+        """Test 33: Non-successful termination with residuals within tolerance yields APPROXIMATE, never SOLVED."""
+        com = (0.0, 0.0, 1.0)
+        foot = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 500.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+
+        import src.motion.contact_force_solver as cfs
+        orig_spg = cfs._solve_with_spg
+
+        # Mock SPG returning forces that perfectly match the target, but opt_converged is False
+        def mock_unconverged_spg(*args, **kwargs):
+            forces = {"foot": (0.0, 0.0, 500.0)}
+            return forces, 15, False, "Mock premature termination (singular gradient)"
+
+        try:
+            cfs._solve_with_spg = mock_unconverged_spg
+            config = ContactSolverConfig(method="spg", max_iterations=1000)
+            sol = solve_contact_forces(target, [foot], config)
+
+            # Contract verification:
+            # Even though force_residual_n == 0.0 <= tol and torque_residual_nm == 0.0 <= tol:
+            # Because opt_converged is False, status MUST NOT be SOLVED!
+            self.assertNotEqual(sol.status, ContactSolverStatus.SOLVED)
+            self.assertEqual(sol.status, ContactSolverStatus.APPROXIMATE)
+            self.assertFalse(sol.optimizer_converged)
+            self.assertIn("Mock premature termination", sol.optimizer_message)
+            self.assertEqual(sol.iterations, 15)
+            # Candidate forces and true residuals are preserved
+            self.assertAlmostEqual(sol.force_residual_n, 0.0, places=5)
+            self.assertAlmostEqual(sol.torque_residual_nm, 0.0, places=5)
+            self.assertEqual(sol.contact_forces["foot"], (0.0, 0.0, 500.0))
+        finally:
+            cfs._solve_with_spg = orig_spg
+
+    # -------------------------------------------------------------------------
+    # Test 34: Unconverged Termination with Residuals Exceeding Tolerance Yields APPROXIMATE
+    # -------------------------------------------------------------------------
+    def test_34_unconverged_with_residuals_exceeding_tolerance_yields_approximate(self):
+        """Test 34: Non-successful termination with residuals exceeding tolerance yields APPROXIMATE with diagnostics."""
+        com = (0.0, 0.0, 1.0)
+        foot = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 500.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+
+        import src.motion.contact_force_solver as cfs
+        orig_spg = cfs._solve_with_spg
+
+        # Mock SPG returning forces that do NOT match the target (e.g. 400 N instead of 500 N)
+        def mock_exceeding_spg(*args, **kwargs):
+            forces = {"foot": (0.0, 0.0, 400.0)}
+            return forces, 25, False, "Mock iteration stalled"
+
+        try:
+            cfs._solve_with_spg = mock_exceeding_spg
+            config = ContactSolverConfig(method="spg", max_iterations=1000)
+            sol = solve_contact_forces(target, [foot], config)
+
+            self.assertEqual(sol.status, ContactSolverStatus.APPROXIMATE)
+            self.assertFalse(sol.optimizer_converged)
+            self.assertAlmostEqual(sol.force_residual_n, 100.0, places=4)
+            self.assertIn("Mock iteration stalled", sol.message)
+            self.assertEqual(sol.iterations, 25)
+        finally:
+            cfs._solve_with_spg = orig_spg
+
+    # -------------------------------------------------------------------------
+    # Test 35: SLSQP Unsuccessful Exit Triggers SPG Fallback
+    # -------------------------------------------------------------------------
+    def test_35_slsqp_unsuccessful_exit_triggers_spg_fallback(self):
+        """Test 35: SLSQP early non-success exit code (success=False) triggers SPG fallback and records state."""
+        com = (0.0, 0.0, 1.0)
+        foot = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 500.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+
+        import src.motion.contact_force_solver as cfs
+        orig_slsqp = cfs._solve_with_slsqp
+
+        # Mock SLSQP returning success=False (non-successful termination without exception)
+        def mock_slsqp_fail(*args, **kwargs):
+            forces = {"foot": (0.0, 0.0, 100.0)}
+            return forces, 8, False, "Inequality constraints incompatible"
+
+        try:
+            cfs._solve_with_slsqp = mock_slsqp_fail
+            config = ContactSolverConfig(method="slsqp", enable_fallback=True)
+            sol = solve_contact_forces(target, [foot], config)
+
+            # Contract verification:
+            self.assertTrue(sol.fallback_occurred)
+            self.assertEqual(sol.solver_engine, "spg")
+            self.assertTrue(sol.optimizer_converged)
+            self.assertEqual(sol.status, ContactSolverStatus.SOLVED)
+            # Both failure reason and SPG success are retained
+            self.assertIn("Fallback from SLSQP", sol.optimizer_message)
+            self.assertIn("Inequality constraints incompatible", sol.optimizer_message)
+            # Iterations accumulate SLSQP (8) + SPG iters
+            self.assertGreater(sol.iterations, 8)
+        finally:
+            cfs._solve_with_slsqp = orig_slsqp
+
+    # -------------------------------------------------------------------------
+    # Test 36: Both SLSQP and SPG Failing Yields APPROXIMATE, Never SOLVED
+    # -------------------------------------------------------------------------
+    def test_36_slsqp_and_spg_both_failing_yields_approximate_never_solved(self):
+        """Test 36: When SLSQP and fallback SPG both fail to converge, result is APPROXIMATE, never SOLVED."""
+        com = (0.0, 0.0, 1.0)
+        foot = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 500.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+
+        import src.motion.contact_force_solver as cfs
+        orig_slsqp = cfs._solve_with_slsqp
+        orig_spg = cfs._solve_with_spg
+
+        # Mock SLSQP failure
+        def mock_slsqp_fail(*args, **kwargs):
+            return {"foot": (0.0, 0.0, 500.0)}, 10, False, "SLSQP singular matrix"
+
+        # Mock SPG also failing (even if forces happen to match target)
+        def mock_spg_fail(*args, **kwargs):
+            return {"foot": (0.0, 0.0, 500.0)}, 20, False, "SPG step size vanishing"
+
+        try:
+            cfs._solve_with_slsqp = mock_slsqp_fail
+            cfs._solve_with_spg = mock_spg_fail
+            config = ContactSolverConfig(method="slsqp", enable_fallback=True)
+            sol = solve_contact_forces(target, [foot], config)
+
+            self.assertTrue(sol.fallback_occurred)
+            self.assertEqual(sol.solver_engine, "spg")
+            self.assertFalse(sol.optimizer_converged)
+            self.assertNotEqual(sol.status, ContactSolverStatus.SOLVED)
+            self.assertEqual(sol.status, ContactSolverStatus.APPROXIMATE)
+            self.assertIn("SLSQP singular matrix", sol.optimizer_message)
+            self.assertIn("SPG step size vanishing", sol.optimizer_message)
+            self.assertEqual(sol.iterations, 30)  # 10 + 20
+        finally:
+            cfs._solve_with_slsqp = orig_slsqp
+            cfs._solve_with_spg = orig_spg
+
+    # -------------------------------------------------------------------------
+    # Test 37: Numerical Failures, Non-Finite Values, and Analytical Zero Solution
+    # -------------------------------------------------------------------------
+    def test_37_numerical_exception_nan_and_analytical_zero_solution(self):
+        """Test 37: Non-finite values or unhandled exceptions report NUMERICAL_FAILURE; zero equilibrium reports SOLVED."""
+        com = (0.0, 0.0, 1.0)
+        foot = ContactConstraintSpec("foot", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 0.70)
+        target = ContactWrenchTarget(
+            target_force_world=(0.0, 0.0, 500.0),
+            target_torque_world=(0.0, 0.0, 0.0),
+            com_world=com,
+        )
+
+        import src.motion.contact_force_solver as cfs
+        orig_spg = cfs._solve_with_spg
+
+        # 1. Non-finite value (NaN) returned by optimizer
+        def mock_nan_spg(*args, **kwargs):
+            return {"foot": (0.0, float("nan"), 500.0)}, 5, False, "NaN encountered"
+
+        try:
+            cfs._solve_with_spg = mock_nan_spg
+            config = ContactSolverConfig(method="spg")
+            sol = solve_contact_forces(target, [foot], config)
+            self.assertEqual(sol.status, ContactSolverStatus.NUMERICAL_FAILURE)
+            self.assertFalse(sol.is_physically_valid)
+            self.assertFalse(sol.optimizer_converged)
+        finally:
+            cfs._solve_with_spg = orig_spg
+
+        # 2. Both engines raising exceptions
+        orig_slsqp = cfs._solve_with_slsqp
+
+        def mock_exc_slsqp(*args, **kwargs):
+            raise ArithmeticError("SLSQP floating point error")
+
+        def mock_exc_spg(*args, **kwargs):
+            raise ArithmeticError("SPG floating point error")
+
+        try:
+            cfs._solve_with_slsqp = mock_exc_slsqp
+            cfs._solve_with_spg = mock_exc_spg
+            config = ContactSolverConfig(method="slsqp", enable_fallback=True)
+            sol = solve_contact_forces(target, [foot], config)
+            self.assertEqual(sol.status, ContactSolverStatus.NUMERICAL_FAILURE)
+            self.assertFalse(sol.is_physically_valid)
+            self.assertTrue(sol.fallback_occurred)
+            self.assertIn("SLSQP floating point error", sol.optimizer_message)
+            self.assertIn("SPG floating point error", sol.optimizer_message)
+        finally:
+            cfs._solve_with_slsqp = orig_slsqp
+            cfs._solve_with_spg = orig_spg
+
+        # 3. Analytical zero solution (zero active contacts, zero target wrench)
+        zero_target = ContactWrenchTarget((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), com)
+        sol_zero = solve_contact_forces(zero_target, [])
+        self.assertEqual(sol_zero.status, ContactSolverStatus.SOLVED)
+        self.assertEqual(sol_zero.solver_engine, "analytical")
+        self.assertTrue(sol_zero.optimizer_converged)
+        self.assertTrue(sol_zero.is_physically_valid)
+        self.assertEqual(sol_zero.force_residual_n, 0.0)
+        self.assertEqual(sol_zero.torque_residual_nm, 0.0)
+
 
 if __name__ == "__main__":
     argv = [sys.argv[0]]

@@ -1,13 +1,30 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-23  
-> **当前阶段**：任务 6G-D-B-R1（接触力求解器数值可靠性与状态契约修复；精确有界三维摩擦锥欧几里得正交投影重构；底层优化诊断与迭代信息完整透传；废除 normal_z > 0.5 启发式预判并新增高摩擦斜坡反例；接触几何距离信息保真无伪造；tests/verify_task6gd_contact_force_solver.py 扩充至 31 项全绿通过；Blender 无 SciPy SPG 引擎 30 项全绿通过；quick 7/7、physics 12/12 保持零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）  
+> **记录时间**：2026-10-24  
+> **当前阶段**：任务 6G-D-B-R2（接触力求解器终止状态契约与优化收敛真值解耦；严格 SOLVED 五重准入门禁；优化器未收敛但残差达标严格标定 APPROXIMATE 绝不虚报 SOLVED；SLSQP success=False 容错回退 Native SPG 与完整原因透传；非数值 NaN/Inf 与优化异常一票否决标定 NUMERICAL_FAILURE；tests/verify_task6gd_contact_force_solver.py 扩充至 37 项全绿通过；Blender 无 SciPy SPG 引擎 36 项全绿通过；quick 7/7、physics 12/12 保持零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-B-R2 接触力求解器终止状态契约与优化收敛真值解耦 (Task 6G-D-B-R2)**：
+  * **严格的 `SOLVED` 五重充要条件准入准则 (`src/motion/contact_force_solver.py`)**：
+    * 废除提前非成功终止下若残差巧合达标误报 `SOLVED` 的漏洞；
+    * `SOLVED` 必须满足：(1) 最终接触力全有限数值（无 NaN/Inf）；(2) 硬物理约束在配置容差内满足；(3) 合力残差 $\le$ `force_tolerance_n`；(4) 合力矩残差 $\le$ `torque_tolerance_nm`；(5) 优化器明确确认正常收敛（`opt_converged=True`）或属于显式单独验证的零触点零外力解析平衡路径（`solver_engine="analytical"`）；
+    * 当优化器未收敛（`opt_converged=False`）时，哪怕残差满足容差，一律如实标定为 `APPROXIMATE`，严禁伪报 `SOLVED`；保全候选解、真实残差、`optimizer_converged=False` 与诊断信息 `optimizer_message`。
+  * **SLSQP 非成功结果回退到 SPG 契约 (`enable_fallback=True`)**：
+    * 支持配置 `enable_fallback: bool = True`；
+    * 当 SLSQP 抛出异常或返回 `res.success == False` 时，均自动触发回退到 Native SPG，置 `fallback_occurred=True`，更新 `solver_engine="spg"`；
+    * 记录触发回退的根本原因（原 SLSQP 报错信息与返回码），追加 SPG 最终状态；总迭代次数累计两阶段迭代（`slsqp_iters + spg_iters`）；
+    * 若 SPG 同样未确认收敛，严格返回 `APPROXIMATE`，绝不虚报 `SOLVED`；若关闭回退（`enable_fallback=False`），如实标定未收敛并返回 `APPROXIMATE`。
+  * **非数值（NaN/Inf）与异常防御性截断**：
+    * 在装配解向量、计算残差与评估约束违规量各阶段均加入 `math.isfinite` 严格检验；
+    * 任何出现非数值（NaN/Inf）或优化引擎异常中断的情形，一票否决直接标定为 `NUMERICAL_FAILURE`，`is_physically_valid=False`，坚决杜绝非数值被残差比较静默吸纳。
+  * **单元验证与统一注册全绿**：
+    * `tests/verify_task6gd_contact_force_solver.py` 扩充至 37 项测试（新增 Test 32 至 Test 37）；独立 Python 全量环境 37/37 项测试全部通过（0.414s）；Blender 无 SciPy 无头环境 36/36 项测试全部通过（1 项 SLSQP 测试优雅跳过，0.086s）；
+    * 分层回归套件实测全绿：`quick` (7/7 项通过，7.35s), `physics` (12/12 项通过，60.23s)；
+    * 0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
 * **任务 6G-D-B-R1 接触力求解器数值可靠性与状态契约修复 (Task 6G-D-B-R1)**：
   * **有界三维摩擦锥精确欧几里得投影重构 (`project_to_friction_cone`)**：
     * 消除原先有限最大法向力下切向力等比例缩小导致的偏离反例（$F=(1,0,10), n=(0,0,1), \mu=0.5, \max=5$ 精确正交投影为 $(1,0,5)$，距离为 5.0，优于缩放点 $(0.5,0,5)$ 的 5.025）；

@@ -685,3 +685,28 @@
   - 更新代码：`src/motion/contact_force_solver.py`, `src/motion/contact_dynamics.py`；
   - 扩充测试：`tests/verify_task6gd_contact_force_solver.py` 新增 Test 18 至 Test 31（共 31 项测试全部通过）；
   - 实测回归全绿：Blender 无 SciPy 环境下通过 SPG 30/30 项全绿通过（1 项跳过）；独立 Python 全量环境 31/31 项全绿通过；`quick` (7/7), `physics` (12/12) 零退化。
+
+---
+
+### [DEC-037] 接触力求解器终止状态契约与优化器收敛真值解耦 (Task 6G-D-B-R2)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-24
+* **背景**：在 Task 6G-D-B-R1 强化了优化器状态透传与有界摩擦锥投影后，系统针对 `not opt_converged` 且 `iterations >= config.max_iterations` 进行了 `APPROXIMATE` 标记，但独立源码审查发现了严重的状态契约漏洞：当优化器（SLSQP/SPG）发生提前非成功终止（如奇异矩阵、步长耗尽、迭代终止在非驻点等使得 `opt_converged=False`，且 `iterations < config.max_iterations`），若此时候选解残差由于偶然或初始猜测巧合 $\le$ 设定容差，状态机会错误地返回 `SOLVED`。此外，SLSQP 若未抛出异常但返回 `res.success == False`，原逻辑未能触发到 SPG 的容错回退机制；若解中出现 NaN/Inf 或非数值，也存在被残差比较静默吸纳的风险。
+* **决策与方案**：
+  1. **严格的 `SOLVED` 状态准入准则**：
+     - `SOLVED` 必须满足五重充要条件：(1) 最终接触力全部为有限数值（严格拦截 NaN/Inf）；(2) 硬物理约束在配置容差内满足（$F_n \ge 0, \|\mathbf{F}_t\| \le \mu F_n$）；(3) 合力残差 $\le \text{force\_tolerance\_n}$；(4) 绕质心合力矩残差 $\le \text{torque\_tolerance\_nm}$；(5) 底层优化器明确确认正常收敛（`opt_converged == True`），或属于经过显式验证的零触点/零外力解析平衡路径（`solver_engine="analytical"`）。
+     - 任何未收敛终止（`not opt_converged`）哪怕残差完全达标，绝对严禁返回 `SOLVED`，必须如实标定为 `APPROXIMATE`，同时完整保留候选解、实际残差、底层优化器状态（`optimizer_converged=False`）与诊断信息（`optimizer_message`）。
+  2. **SLSQP 非成功结果回退契约**：
+     - SLSQP 执行无论因抛出异常中断、还是返回 `res.success == False`，在 `enable_fallback=True` 下均自动触发回退到 Native SPG，将 `fallback_occurred` 置为 `True`，将 `solver_engine` 更新为 `"spg"`；
+     - 记录并保全触发回退的根本原因（原 SLSQP 报错信息与返回码），追加 SPG 最终状态；总迭代次数累计两阶段迭代（`slsqp_iters + spg_iters`）；
+     - 若 SPG 同样未确认收敛，严格返回 `APPROXIMATE`，绝不虚报 `SOLVED`；若关闭回退（`enable_fallback=False`），如实标定未收敛并返回 `APPROXIMATE`。
+  3. **非数值（NaN/Inf）与异常防御性截断**：
+     - 在装配解向量、计算残差与评估约束违规量各阶段均加入 `math.isfinite` 严格检验；
+     - 任何出现非数值（NaN/Inf）或优化引擎异常中断的情形，一票否决直接标定为 `NUMERICAL_FAILURE`，`is_physically_valid=False`，坚决杜绝非数值被残差比较静默吸纳。
+  4. **完备可控回归测试**：
+     - 在 `tests/verify_task6gd_contact_force_solver.py` 新增 Test 32 至 Test 37（共 37 项测试），通过受控 mock 精确验证正常收敛、非成功但残差达标、非成功且残差超标、SLSQP `success=False` 回退 SPG、双引擎均失败严禁 `SOLVED`、以及 NaN/Inf/双异常中断严格标定 `NUMERICAL_FAILURE` 与解析零解路径。
+* **影响与产物**：
+  - 更新代码：`src/motion/contact_force_solver.py`；
+  - 扩充测试：`tests/verify_task6gd_contact_force_solver.py`（37 项测试全绿通过）；
+  - 实测回归全绿：`quick` (7/7), `physics` (12/12) 保持 100% 零退化（退出码 0）；
+  - 彻底消除了求解器状态伪报漏洞，确保了动力学控制上层获取的接触力状态 100% 具备数学与物理真实性。
