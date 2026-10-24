@@ -760,7 +760,13 @@ def solve_contact_forces(
             if math.isnan(val) or math.isinf(val):
                 raise ValueError(f"Target contains non-finite values: {val}")
 
+        seen_contact_ids = set()
         for c in contacts:
+            if not isinstance(c.contact_id, str) or not c.contact_id.strip():
+                raise ValueError("Contact ID must be a non-empty string")
+            if c.contact_id in seen_contact_ids:
+                raise ValueError(f"Duplicate contact_id detected: '{c.contact_id}'. Contact IDs must be unique.")
+            seen_contact_ids.add(c.contact_id)
             for val in c.contact_point_world + c.surface_normal_world:
                 if math.isnan(val) or math.isinf(val):
                     raise ValueError(f"Contact '{c.contact_id}' contains non-finite values")
@@ -1187,6 +1193,12 @@ def solution_to_multi_contact_dynamics(
     Preserves true measured surface_distance from upstream contact specs without fabricating
     arbitrary placeholder clearances.
     """
+    seen_ids = set()
+    for c in contacts:
+        if c.contact_id in seen_ids:
+            raise ValueError(f"Duplicate contact_id detected in contacts: '{c.contact_id}'")
+        seen_ids.add(c.contact_id)
+
     single_contacts: List[SingleContactDynamics] = []
     for c in contacts:
         f = solution.contact_forces.get(c.contact_id, (0.0, 0.0, 0.0))

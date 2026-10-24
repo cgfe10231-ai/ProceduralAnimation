@@ -1303,6 +1303,44 @@ class TestContactForceSolver(unittest.TestCase):
         self.assertEqual(sol_zero.force_residual_n, 0.0)
         self.assertEqual(sol_zero.torque_residual_nm, 0.0)
 
+    # -------------------------------------------------------------------------
+    # Test 38: Duplicate Contact ID Rejection
+    # -------------------------------------------------------------------------
+    def test_38_duplicate_contact_id_rejection(self):
+        """Test 38: Duplicate contact IDs in a single solve request are rejected with INVALID_INPUT."""
+        com = (0.0, 0.0, 1.0)
+        target = ContactWrenchTarget((0.0, 0.0, 500.0), (0.0, 0.0, 0.0), com)
+
+        # Two distinct contact points with identical contact_id "foot"
+        c1 = ContactConstraintSpec("foot", (-0.1, 0.0, 0.0), (0.0, 0.0, 1.0), 0.7)
+        c2 = ContactConstraintSpec("foot", (0.1, 0.0, 0.0), (0.0, 0.0, 1.0), 0.7)
+
+        sol = solve_contact_forces(target, [c1, c2], self.default_config)
+        self.assertEqual(sol.status, ContactSolverStatus.INVALID_INPUT)
+        self.assertFalse(sol.is_physically_valid)
+        self.assertFalse(sol.optimizer_converged)
+        self.assertIn("Duplicate contact_id detected", sol.message)
+
+        # Duplicate contact IDs in solution_to_multi_contact_dynamics raises ValueError
+        dummy_sol = ContactForceSolution(
+            status=ContactSolverStatus.SOLVED,
+            contact_forces={"foot": (0.0, 0.0, 250.0)},
+            total_contact_force=(0.0, 0.0, 500.0),
+            total_contact_torque_about_com=(0.0, 0.0, 0.0),
+            force_error_vector=(0.0, 0.0, 0.0),
+            force_residual_n=0.0,
+            torque_error_vector=(0.0, 0.0, 0.0),
+            torque_residual_nm=0.0,
+            max_normal_violation_n=0.0,
+            max_friction_violation_n=0.0,
+            iterations=1,
+            computation_time_sec=0.001,
+            is_physically_valid=True,
+            message="OK",
+        )
+        with self.assertRaises(ValueError):
+            solution_to_multi_contact_dynamics(dummy_sol, [c1, c2], com_world=com)
+
 
 if __name__ == "__main__":
     argv = [sys.argv[0]]
