@@ -36,6 +36,19 @@ from src.motion.forward_dynamics import (
     quat_rotate_vector,
     quat_to_rot_matrix,
 )
+from src.motion.closed_loop_dynamics import (
+    ClosedLoopAdmissibilityPolicy,
+    ClosedLoopControllerConfig,
+    ClosedLoopDynamicsCoordinator,
+    ClosedLoopFrameTelemetry,
+    ClosedLoopSimulationTrajectory,
+    ClosedLoopStepStatus,
+    DesiredMotionReference,
+    FeedbackGainsConfig,
+    compute_commanded_accelerations,
+    quat_error_rot_vector,
+    step_closed_loop_dynamics,
+)
 
 # Optional Blender-dependent modules (require bpy)
 try:

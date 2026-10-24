@@ -775,3 +775,31 @@
   - 更新代码：`src/motion/forward_dynamics.py`；
   - 扩充测试：`tests/verify_task6gd_forward_dynamics.py`（22/22 全绿通过）；
   - 实测回归：`quick` (8/8) 与 `physics` (13/13) 全部通过，保持 100% 零退化。
+
+---
+
+### [DEC-040] 多帧动力学闭环协调架构与求解准入门禁机制 (Task 6G-D-C1-B)
+* **状态**：已采纳并经实测验证 (Accepted & Verified)
+* **日期**：2026-10-24
+* **背景**：在完成接触动力学正向计算（6G-D-A）、接触力逆向优化分配（6G-D-B）与单步前向动力学积分内核（6G-D-C1-A）后，系统需要构建首个真正的多帧连续动力学闭环协调层。动画物理系统若直接将目标速度或加速度赋值为实际状态，或为了迎合测试通过而虚构超出摩擦锥的接触力，会导致动力学闭环失真；当优化器遇到摩擦不足、不可行目标或数值失败时，若缺乏明确的准入门禁策略，容易引发状态突变或伪造运动。
+* **决策与方案**：
+  1. **真实物理因果闭环链路**：
+     - 严格遵循：当前实际状态 $\to$ 期望参考与 PD 反馈律 $\to$ 目标接触扳手 $\to$ 接触力优化求解 $\to$ 准入门禁判决 $\to$ 实际接触力前向积分 $\to$ 新实际状态 $\to$ 遥测与跟踪误差记录；
+     - 绝对禁止将目标速度、目标加速度或目标角动量直接覆盖为实际物理状态，实际运动 100% 由牛顿-欧拉方程与真实分配的接触力积分驱动。
+  2. **基于自然倒立摆阻尼特性的反馈控制与数值饱和边界**：
+     - 引入 `DesiredMotionReference` 独立承载位置、速度、朝向与前馈控制；
+     - 基于人体质心自然倒立摆频率 $\omega_0 = \sqrt{g/h} \approx 3.1\text{ rad/s}$ 确立临界阻尼反馈增益（$k_p = 16.0, k_d = 6.0$），姿态跟踪引入 $SO(3)$ 李代数四元数对数映射 $\mathbf{e}_{\text{rot}} = \log(q_{\text{tgt}} \otimes q_{\text{curr}}^{-1})$；
+     - 对指令加速度与指令角动量变化率施加明确的物理饱和截断（$\|a_{\text{cmd}}\| \le a_{\max}$），杜绝初始突变引发巨大非物理力矩。
+  3. **严格的接触力求解结果准入门禁与残差防伪造策略 (`ClosedLoopAdmissibilityPolicy`)**：
+     - 明确区分五类求解状态：`SUCCESS_EXACT`、`SUCCESS_APPROXIMATE`、`REJECTED_INFEASIBLE`、`REJECTED_APPROXIMATE`、`SOLVER_INVALID_INPUT` / `SOLVER_NUMERICAL_FAILURE`；
+     - 对 `APPROXIMATE` 状态：仅当接触力严格满足物理硬约束（单侧接触 $F_n \ge 0$、3D 库仑摩擦锥 $\|\mathbf{F}_t\| \le \mu F_n$）且残差未超过门禁阈值时方可准入，并如实报告跟踪误差与状态，严禁伪装为精确求解成功；
+     - 无法安全推进时（不可行或数值失败），严格保持上一帧实际状态不修改（保障失败原子性），并输出可诊断遥测。
+  4. **完备且可序列化的逐帧遥测 (`ClosedLoopFrameTelemetry`)**：
+     - 逐帧记录时间、当前/下一状态、指令加速度、目标扳手、接触求解状态与残差、各点实际力、动力学积分状态、位置/速度/加速度跟踪误差；
+     - 提供 `to_dict()` 与 `export_telemetry()`，为后续在 `DynamicsPlayground` 中直接驱动物理遥测提供权威数据源。
+* **影响与产物**：
+  - 新增核心模块：`src/motion/closed_loop_dynamics.py`；
+  - 导出接口：更新 `src/motion/__init__.py`；
+  - 新增测试套件：`tests/verify_task6gd_closed_loop_dynamics.py`（12 项核心场景测试全绿）；
+  - 注册统一测试入口：在 `tests/test_registry.py` 注册 `closed_loop_dynamics`（纳入 QUICK, PHYSICS, FULL 分级）；
+  - 分层回归全绿：`quick` (9/9 项全部通过，14.52s) 与 `physics` (14/14 项全部通过，68.29s) 保持 100% 零退化。

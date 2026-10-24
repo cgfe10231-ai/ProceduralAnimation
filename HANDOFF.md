@@ -5,11 +5,12 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-C1-A-R1（前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正）：
-1. 空间向量与四元数严格维度与有限性门禁：强制检验 length=3 与 length=4，拦截非有限实数（NaN/Inf）；
-2. 序列集合防御性深浅拷贝与防污染隔离：State、StepInput、ContactForcePoint、StepResult 全面不可变元组转换，杜绝外部 list 修改污染状态，严格保障失败原子性；
-3. 真正的 2-Stage 中点姿态积分流程：中点世界惯性张量根据半步姿态协变更新，解决非各向同性刚体中点角速度偏差；
-4. 交付 `tests/verify_task6gd_forward_dynamics.py` 22 项测试全绿，分层回归 `quick` (8/8), `physics` (13/13) 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
+完成 Task 6G-D-C1-B（多帧动力学闭环控制与状态反馈）：
+1. 建立纯 Python 多帧动力学真实因果闭环链路：实际状态 $\to$ 期望参考与 PD 反馈律 $\to$ 目标接触扳手 $\to$ 接触力求解 $\to$ 准入门禁判决 $\to$ 真实分配外力前向动力学积分 $\to$ 新实际状态 $\to$ 逐帧遥测与跟踪误差；
+2. 严禁直接用目标速度或加速度覆盖实际状态，轨迹 100% 由牛顿-欧拉方程经接触反力单步积分演化推进；
+3. 临界阻尼反馈控制律与饱和截断：引入 `DesiredMotionReference`，基于倒立摆物理特性配置临界阻尼增益（$k_p=16.0, k_d=6.0$），姿态跟踪引入 $SO(3)$ 李代数四元数对数误差映射 $\mathbf{e}_{\text{rot}} = \log(q_{\text{tgt}} \otimes q_k^{-1})$；
+4. 严格准入门禁 `ClosedLoopAdmissibilityPolicy`：区分 6 类执行状态，不可行或数值失败时严格保全原状态（失败原子性）；
+5. 交付 `tests/verify_task6gd_closed_loop_dynamics.py` 12 项场景测试全绿，分层回归 `quick` (9/9), `physics` (14/14) 100% 零退化。**零生产运动代码开发，严格停止等待用户下一步指示**。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -43,67 +44,45 @@
 * 完成 Task 6G-D-B-R1 接触力求解器数值可靠性与状态契约修复。
 * 完成 Task 6G-D-B-R2 接触力求解器终止状态契约与优化收敛真值解耦。
 * 完成 Task 6G-D-C1-A 前向动力学单步积分内核与刚体物理状态解耦。
-* **完成 Task 6G-D-C1-A-R1 前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正**：
-  * 空间向量强制恰好 3 分量、四元数强制恰好 4 分量与有限数校验；
-  * 全面推行防御性元组复制，彻底解决外部 list 就地修改破坏不可变状态问题；
-  * 实现 2-Stage 中点姿态与角动力学积分流程，中点世界惯性张量根据半步姿态协变更新；
-  * 解决非各向同性刚体角速度与角动量求解偏差，二分步长二阶收敛比精确达到 4.01/4.00；
-  * 单元测试扩充至 22 项全绿通过；分层回归套件 `quick` 8/8, `physics` 13/13 实测全绿。
+* 完成 Task 6G-D-C1-A-R1 前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正。
+* **完成 Task 6G-D-C1-B 多帧动力学闭环控制与状态反馈**：
+  * 实现独立多帧动力学闭环协调器 `ClosedLoopDynamicsCoordinator`；
+  * 构建真实物理因果闭环链路，以 Newton-Euler 6-DOF 积分演化推进实际状态；
+  * 引入倒立摆临界阻尼增益与 $SO(3)$ 李代数四元数对数旋转姿态误差向量；
+  * 引入 `ClosedLoopAdmissibilityPolicy`，严格区分 6 类状态，保障失败原子性；
+  * 交付 12 项场景测试全绿通过，分层回归 `quick` (9/9) 与 `physics` (14/14) 100% 零退化。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
+  * `closed_loop_dynamics`：12/12 项闭环场景与数学测试全绿通过（纯 Python 6.07s，Blender 0.61s）；
   * `forward_dynamics`：22/22 项解析与状态测试全绿通过（纯 Python 0.009s，Blender 0.009s）；
   * `contact_force_solver`：38/38 项测试全绿通过（纯 Python 0.430s，Blender 0.087s）；
   * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.80s，退出码 0）；
   * `dynamics_environment_query`：13/13 项数学定理全绿（0.13s，退出码 0）；
   * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.30s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：8/8 项通过（8.07s，退出码 0）；
-  * `physics` Tier：13/13 项通过（60.99s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-C1-A 已完成并验证，严格停止。
+  * `quick` Tier：9/9 项通过（14.52s，退出码 0）；
+  * `physics` Tier：14/14 项通过（68.29s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-C1-B 已完成并验证，严格停止。
 
 ## 4. 当前文件
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-036]`)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-040]`)
 * 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
-* 核心源码：`src/motion/contact_force_solver.py`、`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
+* 核心源码：`src/motion/closed_loop_dynamics.py`、`src/motion/forward_dynamics.py`、`src/motion/contact_force_solver.py`、`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
 * 核心生成与产物：`output/dynamics_playground.blend`、`output/unified_motion_integration.blend`
 
 ## 5. 已知问题与未实现功能清单 (Unimplemented Features)
-* 接触冲量与动力学平衡闭环（根据分配力在时间步长内更新角动量与质心运动）：尚未实现（Task 6G-D-C 规划）；
-* 动态视觉验收（Blender 视口播放接触反力动画）：尚未进行（本轮为纯数学与接口契约基础）。
+* 连续步态动力学平衡（Task 6G-D-C2：步频、摆动腿着地点调整与双足动态行走的动力学耦合）；
+* 动态视觉验收（Blender 视口播放接触反力动画与遥测箭头）：尚未进行（本轮为纯数学与多帧闭环基础）。
 
 ## 6. 下一步
-* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-C 接触平衡动力学闭环）**。
-* **严禁自动进入 Task 6G-D-C 或 6H**。
+* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-C2 连续步态动力学平衡）**。
+* **严禁自动进入 Task 6G-D-C2 或 6H**。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。
 * **严禁虚报测试结果**，严格执行 6 态划分。
 * **以磁盘代码和实际测试结果为事实第一依据**。
 * **严禁编写独立脚本拼凑动画冒充连续动作**。
-* **严禁擅自进入 Task 6G-D-C**。
-* 状态标定为：Task 6G-D-B 已完成并验证，严格停止。
-
-## 4. 当前文件
-* 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
-* 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-035]`)
-* 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
-* 核心源码：`src/motion/contact_force_solver.py`、`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
-* 核心生成与产物：`output/dynamics_playground.blend`、`output/unified_motion_integration.blend`
-
-## 5. 已知问题与未实现功能清单 (Unimplemented Features)
-* 接触冲量与动力学平衡闭环（根据分配力在时间步长内更新角动量与质心运动）：尚未实现（Task 6G-D-C 规划）；
-* 动态视觉验收（Blender 视口播放接触反力动画）：尚未进行（本轮为纯数学与接口契约基础）。
-
-## 6. 下一步
-* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-C 接触平衡动力学闭环）**。
-* **严禁自动进入 Task 6G-D-C 或 6H**。
-
-## 7. 禁止事项
-* **严禁修改、删除或移动项目目录外的任何文件**。
-* **严禁虚报测试结果**，严格执行 6 态划分。
-* **以磁盘代码和实际测试结果为事实第一依据**。
-* **严禁编写独立脚本拼凑动画冒充连续动作**。
-* **严禁擅自进入 Task 6G-D-C**。
+* **严禁擅自进入 Task 6G-D-C2 或 6H**。

@@ -1,13 +1,46 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-24  
-> **当前阶段**：任务 6G-D-C1-A-R1（前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正；三维向量与四元数严格长度=3/=4有限数校验；State、StepInput、ContactForcePoint、StepResult 全面不可变元组转换；解决外部 list 就地修改污染状态漏洞；引入 2-Stage 中点姿态与角动力学积分流程，中点世界惯性张量根据半步姿态协变更新；解决非各向同性刚体中点角速度偏差；tests/verify_task6gd_forward_dynamics.py 扩充至 22 项全绿；二分步长二阶收敛比达到理论 4.01/4.00；quick 8/8、physics 13/13 保持 100% 零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C1-B）  
+> **当前阶段**：任务 6G-D-C1-B（多帧动力学闭环控制与状态反馈；建立真实物理因果闭环链路 Actual State $\to$ Target Motion & PD Control $\to$ Target Wrench $\to$ Contact Force Solver $\to$ Admissibility Gate $\to$ Forward Dynamics Integration $\to$ Next State $\to$ Telemetry & Tracking Error；严格禁止目标速度/加速度直接写状态；倒立摆阻尼反馈控制与 $SO(3)$ 李代数四元数对数姿态跟踪误差；严格求解准入门禁 `ClosedLoopAdmissibilityPolicy` 与失败原子性；全量逐帧遥测与序列化；`tests/verify_task6gd_closed_loop_dynamics.py` 12 项测试全绿，纯 Python 6.07s，Blender 0.61s；`quick` 9/9、`physics` 14/14 保持 100% 零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；严格停止，坚决不擅自进入 6G-D-C2 或 6H）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-C1-B 多帧动力学闭环控制与状态反馈 (Task 6G-D-C1-B)**：
+  * **真实物理因果闭环协调链路 (`src/motion/closed_loop_dynamics.py`)**：
+    * 建立纯 Python 多帧动力学闭环计算链：当前实际状态 $\to$ 目标运动参考与反馈控制 $\to$ 目标接触扳手 $\to$ 接触力求解器优化分配 $\to$ 准入门禁判决 $\to$ 真实分配外力前向动力学单步积分 $\to$ 新实际状态 $\to$ 逐帧遥测与跟踪误差度量；
+    * 绝对禁止将目标速度、目标加速度或目标角动量直接覆盖为实际物理状态，质心轨迹与身体姿态 100% 由 6-DOF 刚体牛顿-欧拉方程经接触反力积分演化推进；
+    * 严格遵循帧间递推关系：第 $k+1$ 帧状态必须以第 $k$ 帧前向动力学积分实际产生的状态作为唯一初始状态推进。
+  * **基于自然倒立摆阻尼特性的反馈控制与数值饱和边界**：
+    * 独立定义 `DesiredMotionReference`，包含目标质心位置/速度/前馈加速度、目标姿态四元数/角速度/前馈力矩与外部扰动；
+    * 根据人体自然倒立摆频率 $\omega_0 = \sqrt{g/h} \approx 3.13\text{ rad/s}$ 设定临界阻尼增益（$k_p = 16.0, k_d = 6.0, k_{\text{rot},p} = 25.0, k_{\text{rot},d} = 8.0$）；
+    * 姿态跟踪基于 Hamilton 四元数乘积求取相对旋转差 $\Delta q = q_{\text{tgt}} \otimes q_{\text{curr}}^{-1}$，并通过 $SO(3)$ 李代数对数映射解析提取三维角误差向量 $\mathbf{e}_{\text{rot}} = \log(\Delta q) = \frac{\theta}{\sin(\theta/2)} \mathbf{v}$；
+    * 指令加速度与指令角动量变化率施加物理饱和边界截断（$\|a_{\text{cmd}}\| \le a_{\max}$），杜绝初始突变引发巨大非物理力矩。
+  * **严格的接触力求解结果准入门禁与残差防伪造策略 (`ClosedLoopAdmissibilityPolicy`)**：
+    * 明确区分 6 类执行结果：`SUCCESS_EXACT`、`SUCCESS_APPROXIMATE`、`REJECTED_INFEASIBLE`、`REJECTED_APPROXIMATE`、`SOLVER_INVALID_INPUT` 与 `SOLVER_NUMERICAL_FAILURE`；
+    * 对 `APPROXIMATE` 状态：仅在满足物理硬约束（法向推力 $F_n \ge 0$、3D 摩擦锥 $\|\mathbf{F}_t\| \le \mu F_n$）且残差未超阈值时准入并如实报告残差与跟踪误差，绝不伪装为精确成功；
+    * 无法安全推进时（不可行或数值失败），严格保持上一帧实际状态不修改（保障失败原子性），并输出可诊断遥测。
+  * **可观测全量逐帧遥测与序列化 (`ClosedLoopFrameTelemetry`, `ClosedLoopSimulationTrajectory`)**：
+    * 逐帧记录时间、当前/下一状态、指令控制量、目标扳手、接触求解状态与残差、各点实际力、实际合力/力矩/加速度、位置/速度/加速度跟踪误差；
+    * 提供 `to_dict()` 与 `export_telemetry()`，为后续在 Blender 视口中驱动力学箭头与动态遥测提供权威数据源。
+  * **测试验证与回归全绿**：
+    * `tests/verify_task6gd_closed_loop_dynamics.py` 12 项场景测试全绿通过（纯 Python 6.07s，Blender 0.61s）：
+      1. 静止支撑平衡：双足支撑抵消重力，CoM 高度稳定在 1.0m（沉降 $< 0.5\text{ mm}$）；
+      2. 水平加速：在摩擦力允许下产生精确水平加速度（$a_x = 2.0\text{ m/s}^2$），纵向错步支撑基底精确平衡俯仰力矩；
+      3. 摩擦不足钳位：在冰面（$\mu=0.05$）上受力被摩擦锥刚性限制，真实报告跟踪误差，绝不伪造受力；
+      4. 无接触自由落体：空中零触点下按纯重力积分抛体运动，水平速度严格守恒；
+      5. 偏心接触力矩：偏心作用点产生滚转力矩并驱动姿态与角动量更新；
+      6. 多帧反馈跟踪：闭环自适应调整加速度驱动质心平滑跟踪目标轨迹；
+      7. 不可行目标拒绝：拒绝向下拉扯地表的拉力需求，保全原状态；
+      8. 求解失败原子性：非法输入安全熔断，输入状态零污染；
+      9. 确定性复现：两次独立仿真 30 帧全部物理状态 100% 位级一致；
+      10. 长程连续模拟稳定性：120 帧（5.0s）持续模拟全部数值有限、四元数保模、高度稳定；
+      11. 遥测序列化与诊断完整性检验；
+      12. 李代数四元数对数旋转误差向量精度检验。
+    * 分层回归套件实测全绿：`quick` (9/9 项全部通过，14.52s), `physics` (14/14 项全部通过，68.29s)；
+    * 0 生产运动代码修改，0 步态变动，0 训练场场景重构，严格停止。
 * **任务 6G-D-C1-A-R1 前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正 (Task 6G-D-C1-A-R1)**：
   * **三维空间向量与四元数严格维度与有限性门禁 (`src/motion/forward_dynamics.py`)**：
     * 新增 `_validate_vec3(v, name)` 与 `_validate_quat(q, name)`，强制检查向量分量个数必须恰好为 3、四元数分量个数必须恰好为 4（严禁截断或不足容忍）；
@@ -401,6 +434,12 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证。
 
 ### [已实现]
+* 多帧动力学闭环控制与状态反馈系统：`src/motion/closed_loop_dynamics.py`、`tests/verify_task6gd_closed_loop_dynamics.py`
+* 6-DOF 刚体前向动力学单步积分内核与不可变状态机：`src/motion/forward_dynamics.py`、`tests/verify_task6gd_forward_dynamics.py`
+* 多接触力优化求解与分配器（SLSQP/SPG 双引擎）：`src/motion/contact_force_solver.py`、`tests/verify_task6gd_contact_force_solver.py`
+* 接触力学、冲量与动量时间步长系统：`src/motion/contact_dynamics.py`、`tests/verify_task6gd_contact_dynamics.py`
+* 统一环境查询接口与动力学训练场单一 SSOT：`src/scene/environment_query.py`、`output/dynamics_playground.blend`、`tests/verify_task6gd_environment_query.py`
+* 统一测试管理与运行接口：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 最小兼容桥接层与单帧 6 阶段流水线执行器：`src/motion/kinematic_bridge.py`、`tests/verify_task6gc_r3b1_bridge.py`
 * 多部位接触几何、约束与支撑状态系统：`src/motion/contact_model.py`、`run_contact_model_prototype.py`、`tests/verify_task6gc_contact_model.py`、`output/contact_model_debug.blend`
 * 刚体连杆惯性张量与全身角动量模型：`src/motion/body_inertia.py`、`tests/verify_task6gb_body_inertia.py`
@@ -421,16 +460,15 @@
 * `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* 历史动作（Walk/Run/Sprint/Brake）向统一 `KinematicBridgeExecutor` 的全面重构迁移（定于 Task 6G-C-R3B-2 执行）。
+* 连续步态动力学平衡（Task 6G-D-C2：步频、摆动腿着地点调整与双足动态行走的动力学耦合）。
 * 障碍物连续跑酷动作类（如 `VaultTouchAction`）与射线几何避障。
 * 高难度特技动作：急转弯（Sharp Turn）、跑跳（Running Jump）、翻滚（Roll）、滑铲（Slide）。
 
 ### [已知缺陷与遗留说明]
-1. **历史动作尚未切换至桥接执行器**：虽然 `KinematicBridgeExecutor` 已建立并实现 0.0000 mm 等价姿态求解，但 `StartStopWalkAction`、`RunAction` 等历史动作内部目前仍调用私有姿态函数，将在 R3B-2 中逐一无损迁移。
-2. **架构断裂点 2（接触模型脱离接地锁定）**：`ContactModel` 接触状态机在桥接层中已可作为 Phase 5 遥测提取，但与 `src/rig/foot_contact.py` 物理层接地锁定的双向动态映射仍待 R3B 后续深化。
+1. **多关节身体动力学闭环与骨骼姿态映射**：Task 6G-D-C1-B 实现了全身等效刚体质心-姿态的多帧动力学闭环协调，但全身体连杆多关节动力学平衡闭环与历史步态动作迁移仍属于后续阶段（Task 6G-D-C2 / Task 7）。
+2. **架构断裂点 2（接触模型脱离接地锁定）**：`ContactModel` 接触状态机在桥接层中已可作为 Phase 5 遥测提取，但与 `src/rig/foot_contact.py` 物理层接地锁定的双向动态映射仍待后续深化。
 3. **架构断裂点 3（障碍物跑酷动作缺失）**：系统中缺乏针对障碍物交互的连续 `MotionAction` 实现，需要专门的跑酷动作生成器。
-4. **架构断裂点 4（物理无闭环）**：质心、角动量、速度学和接触模型均为事后单向只读遥测，无闭环平衡控制反馈。
-5. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
+4. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
@@ -438,8 +476,8 @@
 ---
 
 ## 2. 下一步建议
-进入 **Task 6G-C-R3B-2（历史动作向统一桥接层无损迁移）**：
-1. 保持历史步态曲线、速度曲线和步态排期 100% 不变；
-2. 将 `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 的姿态落地调用统一替换为 `KinematicBridgeExecutor.execute_frame`；
-3. 执行全量历史验证，确保历史位移、防滑漂移、抬腿高度零退化；
-4. 严禁直接进入 Task 6G-D。
+进入 **Task 6G-D-C2（连续步态动力学平衡）或按规划进行 Task 6G-D 后续阶段**：
+1. 保持历史步态曲线、速度曲线和步态排期 100% 零退化；
+2. 基于已验证的 `ClosedLoopDynamicsCoordinator` 进行连续步态下接触点与质心轨迹的闭环调节；
+3. 执行全量分层回归，确保 `quick` 与 `physics` 持续全绿；
+4. 严格遵守架构门禁，严禁擅自提前进入 Task 6H。

@@ -115,6 +115,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=15.0,
         description="Validates 6-DOF forward dynamics single-step kernel, Newton-Euler equations, momentum/angular momentum integration, quaternion attitude updates, and failure atomicity.",
     ),
+    "closed_loop_dynamics": TestDefinition(
+        test_id="closed_loop_dynamics",
+        name="Multi-Frame Dynamics Closed-Loop Control & State Feedback",
+        script_path="tests/verify_task6gd_closed_loop_dynamics.py",
+        runner_type=RunnerType.PYTHON,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=30.0,
+        description="Validates multi-frame closed-loop coordination, target wrench feedback, solver admissibility gating, Newton-Euler forward integration, and deterministic trajectory reproducibility.",
+    ),
     "runner_unit_tests": TestDefinition(
         test_id="runner_unit_tests",
         name="Test Suite Runner Unit Tests",
