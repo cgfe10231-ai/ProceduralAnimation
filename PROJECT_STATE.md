@@ -1,13 +1,27 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-24  
-> **当前阶段**：任务 6G-D-C2-A（DynamicsPlayground 真实动力学状态集成与多场景视口验证；在 `output/dynamics_playground.blend` 中成功集成并关键帧化 5 大物理场景：静态支撑、重力自由落体、水平加速、摩擦不足滑移、偏心接触滚转；封装于 `Playground_Dynamics_Visualization` 独立集合；100% 真实物理计算驱动，包含动态力箭头、角动量箭头、质心与姿态代理、目标虚影与 3D 轨迹；修正 `docs/C1_FINAL_AUDIT.md` 平动积分收敛性边界说明；分层回归 `quick` 9/9, `physics` 15/15, 历史动作 100% 零退化）  
+> **记录时间**：2026-10-25  
+> **当前阶段**：任务 6G-D-C2-A 补充完成（DynamicsPlayground 自动视觉证据采集、遥测一致性审计与跨 AI 验收管线；在单一基准 `output/dynamics_playground.blend` 基础上，自动化生成 112 张多视角高密度关键帧，提取 72 帧 `telemetry.json`，合成 $2048 \times 1080$ 综合联系表 `contact_sheet.png`，生成交互式 HTML 检查器与连续运动 GIF；Blender 对象求值位置误差实测 `0.00e+00 m`，姿态误差 `3.50e-07 rad`；严密反冒充审计通过；`quick` 9/9, `physics` 16/16, 历史动作 100% 零退化）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-C2-A 自动视觉证据采集、遥测一致性审计与跨 AI 验收管线 (Task 6G-D-C2-A 补充)**：
+  * **自动化多视角渲染矩阵 (`src/scene/dynamics_visual_evidence.py`, `run_generate_visual_evidence.py`)**：
+    * 5 大工位配置专职正面 (Front)、侧面 (Side)、俯视 (Top) 检查相机及全局鸟瞰相机；
+    * 7 级高采样关键帧（F01, F12, F24, F36, F48, F60, F72），全自动化无头生成 112 张视口静帧；
+    * 自动拼接生成高对比度综合联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/contact_sheet.png)（含工位、视角、时间戳与状态角标）。
+  * **逐帧遥测与机器防篡改审计 (`docs/evidence/task6gd_c2a/telemetry.json`, `docs/evidence/task6gd_c2a/validation_report.md`)**：
+    * 逐帧对比 Blender 求值对象世界变换与积分状态：位置误差实测 `0.00e+00 m`，姿态角测地距离误差实测 `3.50e-07 rad`；
+    * 反冒充实测通过：Station 4 打滑发散 $\Delta p = 5.30\text{ m}$，Station 5 滚转倾斜发散 $\Delta q = 1.55\text{ rad}$，绝无目标冒充。
+  * **跨 AI 交付件与分级归档保护**：
+    * Git 跟踪库入库清单：[`docs/evidence/task6gd_c2a/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/)（联系表、48 张代表性静帧、逐帧遥测 JSON、全景动画 GIF、验收报告）；
+    * 本地全量证据包：`output/evidence/task6gd_c2a/task6gd_c2a_evidence_pack.zip`（24.5 MB，包含全量 112 张高清原图与交互式 Web 检查器 [`visual_player.html`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/evidence/task6gd_c2a/visual_player.html)）。
+  * **回归测试全绿**：
+    * 新增 `tests/verify_task6gd_visual_telemetry.py`（5/5 PASS）；
+    * `quick` (9/9 PASS, 16.09s)，`physics` (16/16 PASS, 72.42s)，历史步态 100% 零退化。
 * **任务 6G-D-C2-A DynamicsPlayground 真实动力学状态集成与多场景视口验证 (Task 6G-D-C2-A)**：
   * **五大物理场景全程序化状态驱动与视口布局 (`src/scene/dynamics_visualizer.py`, `output/dynamics_playground.blend`)**：
     * **Station 1 (静态支撑平衡)**：双足接触反力平衡 $m g = 686.7\text{ N}$，CoM 高度稳定在 $Z=1.0\text{ m}$（下陷 $< 10^{-5}\text{ m}$），动态绿色反力箭头严格竖直向上；

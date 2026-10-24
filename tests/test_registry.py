@@ -231,6 +231,22 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Verifies 5-scenario real dynamics states, CoM trajectories, dynamic force arrows, and attitude keyframes in dynamics_playground.blend.",
     ),
+    "visual_evidence_telemetry": TestDefinition(
+        test_id="visual_evidence_telemetry",
+        name="Dynamics Visual Evidence & Telemetry Coherence Verification",
+        script_path="tests/verify_task6gd_visual_telemetry.py",
+        runner_type=RunnerType.PYTHON,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        expected_artifacts=[
+            "output/evidence/task6gd_c2a/telemetry.json",
+            "docs/evidence/task6gd_c2a/telemetry.json",
+            "docs/evidence/task6gd_c2a/contact_sheet.png",
+            "docs/evidence/task6gd_c2a/validation_report.md",
+        ],
+        is_visual_acceptance=True,
+        description="Verifies frame-by-frame physics and object telemetry coherence, contact force fidelity, anti-spoofing divergence, contact sheet, and validation report existence.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 3: Locomotion Actions & Unified Motion Integration

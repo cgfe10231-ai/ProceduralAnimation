@@ -904,3 +904,31 @@
   - 注册测试套件：`tests/test_registry.py` 注册 `playground_dynamics_states`；
   - 审计修正：更新 [`docs/C1_FINAL_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/C1_FINAL_AUDIT.md) 并扩充 [`tests/verify_task6gd_closed_loop_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_closed_loop_dynamics.py) 至 31 项测试全绿；
   - 回归全绿：`quick` (9/9 项通过，15.08s)，`physics` (15/15 项通过，70.36s)，历史动作 100% 零退化。
+
+---
+
+### [DEC-044] 动力学自动视觉证据、遥测一致性审计与跨 AI 联系表验收管线 (Task 6G-D-C2-A 补充要求)
+* **状态**：已采纳并经实测全绿验证 (Accepted & Fully Verified)
+* **日期**：2026-10-25
+* **背景**：用户不应承担逐帧手动截图、肉眼寻找问题或口述动画异常的高耗能工作；跨 AI（如 ChatGPT）复核需要自包含、高保真、可独立检验的图像、数值遥测与时序联系表证据。必须基于单一权威基准场景 `output/dynamics_playground.blend`，自动输出多视角关键帧、逐帧数值对比遥测、综合联系表 (Contact Sheet)、连续运动动画，并执行机器防篡改/防冒充一致性审计。
+* **决策与方案**：
+  1. **多视角高时间采样自动化渲染矩阵**：
+     - 为全部 5 个测试台配置专职的正面 (Front)、侧面 (Side)、俯视 (Top) 检查相机，外加高空全局鸟瞰相机 (`DynamicsInspectionCam`)；
+     - 对时间轴设定 7 级高密度关键帧采样：$t=0.00\text{s}$ (F01), $t=0.46\text{s}$ (F12), $t=0.96\text{s}$ (F24), $t=1.46\text{s}$ (F36), $t=1.96\text{s}$ (F48), $t=2.46\text{s}$ (F60), $t=2.96\text{s}$ (F72)；
+     - 自动批量无头渲染 112 张高分辨率 PNG 图片（105 张工位多视角图 + 7 张全景图）。
+  2. **逐帧机器遥测与跨空间严格一致性审计 (`telemetry.json`)**：
+     - 逐帧记录 72 帧全部数值动力学状态（质心、线速度、角动量、姿态四元数、接触反力、力矩、求解器状态）与 Blender 求值对象世界变换；
+     - 审计计算真实误差：Blender 求值质心与积分质心最大位置误差实测为 `0.00e+00 m`（$< 10^{-5}\text{ m}$）；姿态四元数归一化测地距离误差实测为 `3.50e-07 rad`（$< 10^{-5}\text{ rad}$）；
+     - 严密反冒充审计：在打滑工位（Station 4）实测最终质心与目标虚影发散距离达 $5.30\text{ m}$；在滚转工位（Station 5）姿态发散量达 $1.55\text{ rad}$（$> 88^\circ$），无可辩驳证明仿真器严守物理定律，绝无目标冒充。
+  3. **高分辨率时序与空间联系表 (Contact Sheet)**：
+     - 利用 Blender 内置 numpy 与原生图像引擎，将 5 个工位 $\times$ 6 列时空演化网格拼接为 $2048 \times 1080$ 的高对比度单张联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/contact_sheet.png)；
+     - 每一子图自带工位名称、视角标注、时间戳、物理状态与误差角标，无需运行 Blender 即可一览时空演化全貌。
+  4. **全套跨 AI 交付件与分级归档保护**：
+     - Git 跟踪库入库清单：[`docs/evidence/task6gd_c2a/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/)（包含联系表、48 张代表性关键帧、逐帧 `telemetry.json`、全景动画 GIF 以及自动化验收报告 [`validation_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/validation_report.md)）；
+     - 本地全量证据包：`output/evidence/task6gd_c2a/task6gd_c2a_evidence_pack.zip`（24.5 MB，包含全量 112 张高清原图与交互式 Web 检查器 [`visual_player.html`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/evidence/task6gd_c2a/visual_player.html)）。
+* **影响与产物**：
+  - 新增生产模块：[`src/scene/dynamics_visual_evidence.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/dynamics_visual_evidence.py)；
+  - 新增端到端管线脚本：[`run_generate_visual_evidence.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_generate_visual_evidence.py)；
+  - 新增自动化回归测试套件：[`tests/verify_task6gd_visual_telemetry.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_visual_telemetry.py)（5 项测试 100% 通过）；
+  - 更新中央测试注册表：`tests/test_registry.py` 注册 `visual_evidence_telemetry`；
+  - 自动化回归：`quick` (9/9 PASS, 16.09s)，`physics` (16/16 PASS, 72.42s)，历史步态 100% 零退化。

@@ -3,6 +3,33 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-25] 任务 6G-D-C2-A 补充：自动视觉证据采集、遥测一致性审计与跨 AI 验收管线
+
+### 视觉证据渲染与时空联系表 (`src/scene/dynamics_visual_evidence.py`, `run_generate_visual_evidence.py`, `docs/evidence/task6gd_c2a/`)
+* **多视角高采样自动化渲染矩阵**：
+  * 为 5 个测试工位自动配置正面 (Front)、侧面 (Side)、俯视 (Top) 专职检查相机；
+  * 执行 7 级高密度关键帧渲染（F01, F12, F24, F36, F48, F60, F72），全自动化无头生成 112 张高清视口静帧；
+  * 基于 Blender 内置 numpy 与原生图像引擎生成 $2048 \times 1080$ 的高对比度综合联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/contact_sheet.png)。
+* **逐帧遥测与机器防篡改一致性审计 (`telemetry.json`, `validation_report.md`)**：
+  * 逐帧提取 72 帧全部数值动力学状态向量与 Blender 求值对象世界变换；
+  * 机器审计结果：求值位置误差实测 `0.00e+00 m`（$< 10^{-5}\text{ m}$），归一化姿态角误差 `3.50e-07 rad`（$< 10^{-5}\text{ rad}$）；
+  * 反冒充防篡改实测通过：Station 4 打滑发散 $\Delta p = 5.30\text{ m}$，Station 5 滚转倾斜发散 $\Delta q = 1.55\text{ rad}$，绝无目标状态冒充实际状态。
+* **跨 AI 交付件与交互式查看器**：
+  * 生成动画 GIF 预览 [`dynamics_overview_anim.gif`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/dynamics_overview_anim.gif) 与交互式 HTML 播放器 [`visual_player.html`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/output/evidence/task6gd_c2a/visual_player.html)；
+  * 打包全量 24.5 MB 证据压缩包 `output/evidence/task6gd_c2a/task6gd_c2a_evidence_pack.zip`；
+  * 48 张代表性图片及核心证据同步入库 [`docs/evidence/task6gd_c2a/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/)。
+
+### 测试验证与分级回归
+* **自动化测试套件 (`tests/verify_task6gd_visual_telemetry.py`)**：
+  * 5 项一致性与完整性测试全绿通过；
+  * 在 `tests/test_registry.py` 注册 `visual_evidence_telemetry`（PHYSICS 与 FULL 分级）。
+* **分层回归测试结果**：
+  * `quick`：9/9 PASS (16.09s)；
+  * `physics`：16/16 PASS (72.42s)；
+  * 历史动作（WalkAction, RunAction）：100% 零退化通过。
+
+---
+
 ## [2026-10-24] 任务 6G-D-C2-A：DynamicsPlayground 真实动力学状态集成与多场景视口验证 (Task 6G-D-C2-A)
 
 ### 真实动力学状态集成与可视化驱动 (`src/scene/dynamics_visualizer.py`, `output/dynamics_playground.blend`, `run_dynamics_playground.py`)

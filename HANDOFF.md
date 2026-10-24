@@ -5,17 +5,19 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-C2-A（DynamicsPlayground 真实动力学状态集成与多场景视口验证）：
-1. 在原有单一基准场景 `output/dynamics_playground.blend` (230,508 字节) 中复用已有平坦调试区，全程序化注入 5 大动力学场景：
+完成 Task 6G-D-C2-A（DynamicsPlayground 真实动力学状态集成与自动视觉证据跨 AI 验收）：
+1. 在原有单一基准场景 `output/dynamics_playground.blend` (235,423 字节) 中复用已有平坦调试区，全程序化注入 5 大动力学场景：
    - Station 1: 静态支撑平衡 (双足反力平衡重力，下陷 < 1e-5m)；
    - Station 2: 重力自由落体 (空中悬停需求自然受重力加速下落，零接触力)；
    - Station 3: 水平加速推进 (摩擦锥内剪切推力，加速平移)；
    - Station 4: 摩擦不足滑移滞后 (冰面低摩擦 mu=0.08 剪切力被截断，质心显著滞后于目标虚影)；
    - Station 5: 偏心接触导致旋转 (偏心接触力矩 tau_x ~ -206 N*m 驱动身体滚转翻滚与角动量增长)；
 2. 动力学调试物体全量隔离于 `Playground_Dynamics_Visualization` Collection，100% 保护原有 45 个环境与灯光物体；
-3. 真实物理遥测：动态反力箭头按 1m = 500N 严格绑定计算力，姿态代理框 100% 绑定状态四元数；
-4. 审计报告 `docs/C1_FINAL_AUDIT.md` 边界修正，补充非恒定正弦加速度测试 `test_31`；
-5. 新增 `tests/verify_task6gd_playground_dynamics.py`，全绿通过分层回归 `quick` (9/9), `physics` (15/15), 历史动作 (Walk, Run) 100% 零退化。
+3. 真实物理遥测：动态反力箭头按 1m = 667N 严格绑定计算力，姿态代理框 100% 绑定状态四元数；
+4. 自动视觉证据矩阵：正面、侧面、俯视多角度渲染 112 张视口静帧，合成高对比度联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/contact_sheet.png)；
+5. 逐帧机器遥测与审计：`docs/evidence/task6gd_c2a/telemetry.json` 实测位置误差 `0.00e+00 m`，姿态误差 `3.50e-07 rad`；
+6. 跨 AI 交付件：动画 GIF、交互式 HTML 播放器与 24.5MB 证据包 (`output/evidence/task6gd_c2a/task6gd_c2a_evidence_pack.zip`)；
+7. 分层回归 `quick` (9/9), `physics` (16/16), 历史动作 (Walk, Run) 100% 零退化。等待 ChatGPT 复核。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
