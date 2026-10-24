@@ -1,59 +1,62 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-D-C1-FINAL（数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御）
-* **任务状态**：已验证（完成 DEF-001 ~ DEF-005 全部修复；交付 `docs/C1_FINAL_AUDIT.md` 完整审计报告；`tests/verify_task6gd_closed_loop_dynamics.py` 扩充至 30 项测试全绿，纯 Python 6.88s，Blender 0.59s；`quick` 9/9, 15.81s、`physics` 14/14, 67.56s 保持 100% 零退化；0 历史步态修改，0 Rig/IK/WBC 修改，0 训练场重建；6G-D-C1 阶段正式验收，下一里程碑锁定为 Task 6G-D-C2：在现有 DynamicsPlayground 中集成和验证真实动力学状态）
+* **当前任务编号**：任务 6G-D-C2-A（DynamicsPlayground 真实动力学状态集成与多场景视口验证）
+* **任务状态**：已验证（在单一基准场景 `output/dynamics_playground.blend` 中成功全程序化注入 5 大动力学场景：静态支撑、重力自由落体、水平加速、摩擦不足滑移、偏心接触滚转；封装于 `Playground_Dynamics_Visualization` 独立集合；100% 真实物理计算驱动，包含动态力箭头、角动量箭头、质心与姿态代理、目标虚影与 3D 轨迹；修正 `docs/C1_FINAL_AUDIT.md` 平动积分收敛性边界说明；分层回归 `quick` 9/9, 15.08s、`physics` 15/15, 70.36s、历史动作 100% 零退化；严格停止等待用户目视验收，不自动进入 6H）
 * **Git 状态**：
   * **当前分支**：`master`
-  * **基准 Commit SHA**：`ff7514989fe28c42d4c24e622b43eeec0fde3541`
-  * **本任务提交 Commit SHA**：`38c71f545133f907785422fe7fd4e4331fa213d1`
+  * **基准 Commit SHA**：`254565ce4a4e704b45ca93937449021734d7ad94`
+  * **本任务提交 Commit SHA**：`00b59bf3f3555092aa494e3933529652118c00de`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
+  * **生成二进制场景产物说明**：
+    * 场景文件路径：`output/dynamics_playground.blend` (230,508 字节)；
+    * 依据仓库 `.gitignore`（第 14 行 `output/`），二进制 `.blend` 产物未提交至 Git 版本库以避免大型二进制文件膨胀；
+    * 场景文件已在本地持久化就绪，可直接在 Blender 5.1.1 中打开播放；亦可随时由无头命令 `blender -b -P run_dynamics_playground.py` 100% 确定性复现生成；
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
 ---
 
-### 1. 6G-D-C1-FINAL 实施核心成果
+### 1. 6G-D-C2-A 实施核心成果
 * **交付物清单**：
-  1. [`docs/C1_FINAL_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/C1_FINAL_AUDIT.md)：
-     - 完整审计报告：包含缺陷矩阵（DEF-001 ~ DEF-005）、物理守恒性核验结果、二阶步长收敛阶实测数据表格、分层回归清单及 6G-D-C2 准入建议。
-  2. [`src/motion/closed_loop_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/closed_loop_dynamics.py)：
-     - **DEF-001**：在 `step_closed_loop_dynamics()` 的 `APPROXIMATE` 分支中严格连接 `allow_approximate_solutions` 准入决策链；
-     - **DEF-002**：在 `ClosedLoopSimulationTrajectory` 中区分记录 `requested_steps`、`attempted_steps`、`successful_steps`、`failed_steps`、`requested_duration` 与 `actual_physical_time`，约束 `total_time == actual_physical_time`；
-     - **DEF-003**：新增 4 个清晰正交的布尔状态 `is_contact_solution_physically_valid`、`is_policy_admitted`、`is_target_satisfied`、`state_advanced`；
-     - **DEF-004**：`actual_contact_forces` 封装为 `MappingProxyType`，`frames` 转为只读元组，`to_dict()`/`export_telemetry()` 返回深解耦 JSON-serializable 结构；
-     - **DEF-005**：配置类增加 `math.isfinite()` 与正数/非负数门禁。
-  3. [`src/motion/contact_force_solver.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_force_solver.py)：
-     - `ContactSolverConfig` 加入严格非负与有限数值 `__post_init__` 门禁。
-  4. [`tests/verify_task6gd_closed_loop_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_closed_loop_dynamics.py)：
-     - 扩充测试至 30 项全绿（涵盖近似解策略矩阵、时间与步数统计、正交语义、遥测防污染、配置门禁、系统边界、动量守恒、二阶收敛阶、牛顿-欧拉平衡）。
+  1. [`src/scene/dynamics_visualizer.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/dynamics_visualizer.py)：
+     - `run_dynamics_scenarios()`：纯 Python 运行 5 大场景闭环数值积分，与 `bpy` 彻底解耦；
+     - `inject_dynamics_visualization()`：在 Blender 中构建独立 Collection `Playground_Dynamics_Visualization`，注入 CoM 球、身体代理框、目标虚影、接触圆盘、动态力箭头、动态角动量箭头、3D 轨迹曲线与 3D 文本标签；
+     - `build_and_save_playground_with_dynamics()`：加载、注入并持久化 `output/dynamics_playground.blend`。
+  2. [`run_dynamics_playground.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_dynamics_playground.py)：
+     - 整合环境表面与 5 大物理动力学场景一键端到端生成流水线。
+  3. [`tests/verify_task6gd_playground_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_playground_dynamics.py)：
+     - 5 项独立测试全面验证 5 个测试台的物体存在性、关键帧覆盖率（1..72 帧）、数值力学物理保真度与环境隔离性（5/5 PASS）。
+  4. 审计修正：
+     - 更新 [`docs/C1_FINAL_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/C1_FINAL_AUDIT.md)，澄清平动积分公式为 $v_{k+1} = v_k + a_k \Delta t$ 与 $p_{k+1} = p_k + v_k \Delta t + \frac{1}{2} a_k \Delta t^2$，对恒定加速度场无截断误差，对非恒定加速度场呈现速度一阶精度；
+     - 在 [`tests/verify_task6gd_closed_loop_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_closed_loop_dynamics.py) 新增 `test_31` 正弦非恒定加速度对照测试（31/31 PASS）。
   5. 架构与决策文档：
-     - [`DECISIONS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/DECISIONS.md) 录入 `[DEC-042]`；
+     - [`DECISIONS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/DECISIONS.md) 录入 `[DEC-043]`；
      - 更新 [`CHANGELOG.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/CHANGELOG.md)、[`PROJECT_STATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/PROJECT_STATE.md)、[`HANDOFF.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/HANDOFF.md)。
 * **分层实测回归成果**：
-  * **`closed_loop_dynamics`**：30 项测试全绿通过（纯 Python 6.88s；Blender 0.59s，退出码 0）；
-  * **`forward_dynamics`**：22 项测试全绿通过（纯 Python 0.009s；Blender 0.009s，退出码 0）；
-  * **`contact_force_solver`**：38 项测试全绿通过（纯 Python 0.406s；Blender 0.087s，退出码 0）；
-  * **`contact_dynamics_math`**：18 项数学与契约定理全绿通过，耗时 0.79s，退出码 0；
-  * **`dynamics_environment_query`**：13 项数学定理全绿通过，耗时 0.13s，退出码 0；
-  * **`quick` Tier**：9 项测试全绿通过，耗时 15.81s，退出码 0；
-  * **`physics` Tier**：14 项测试全绿通过，耗时 67.56s，退出码 0，物理系统 100% 零退化。
+  * **`playground_dynamics_states`**：5 项测试全绿通过（纯 Python 与 Blender 1.48s，退出码 0）；
+  * **`dynamics_playground_blend`**：45 个原始环境对象与材质完好无损（1.32s，退出码 0）；
+  * **`closed_loop_dynamics`**：31 项测试全绿通过（纯 Python 6.80s；Blender 0.59s，退出码 0）；
+  * **`quick` Tier**：9 项测试全绿通过，耗时 15.08s，退出码 0；
+  * **`physics` Tier**：15 项测试全绿通过，耗时 70.36s，退出码 0，物理系统 100% 零退化；
+  * **历史动作**：StartStopWalkAction (204 帧与 408 帧级联)、RunAction (96 帧与 252 帧级联) 100% 零退化通过。
 
 ---
 
 ### 2. 纪律遵守声明与交接事实划分
 1. **已核查的架构事实**：
-   * 本模块为纯 Python 多帧刚体闭环动力学集中审计与契约加固，0 侵入生产姿态控制，未修改任何历史步态或控制器；
-   * 100% 遵守纯物理因果链路，零 `bpy` 依赖，杜绝目标状态直接赋值；
-   * 严格保障失败原子性与时间真实性，输入状态不可变，单步失败 100% 保持原状态且不累加虚假物理时间；
-   * 遥测深层只读防御，防止在数据流转与外部可视化过程中发生状态污染。
+   - 严格复用单一权威基准场景 `output/dynamics_playground.blend`，绝无第二套分立场景；
+   - 严格遵守 Collection 隔离原则（写入 `Playground_Dynamics_Visualization`），绝无篡改原有环境表面；
+   - 100% 真实物理计算驱动，力箭头与角动量箭头严格绑定真实数值输出，绝无虚假静态箭头；
+   - 严格保护生产角色骨骼与控制器，零修改 Rig、IK 与 WBC。
 2. **未执行的后续任务**：
-   * 未在 Blender 视口中驱动骨骼或渲染动态遥测箭头（等待 6G-D-C2 视口集成）。
+   - 未进入 Task 6H（多关节全身动态平衡）；
+   - 场景视口动画等待用户目视检查。
 
 ---
 
 ### 3. 下一步指令与严格禁止事项
-* **下一步**：**本轮任务正式结束。等待用户审阅并下达下一阶段指令（建议后续进入 Task 6G-D-C2：在现有 DynamicsPlayground 中集成和验证真实动力学状态）**。
+* **下一步**：**本轮任务正式结束。等待用户审阅并下达下一阶段指令（在 Blender 5.1.1 中打开 `output/dynamics_playground.blend` 进行视口目视验收）**。
 * **禁止事项**：
-  * **严禁自动进入 Task 6G-D-C2 或 6H**；
+  * **严禁自动进入 6H**；
   * **严禁修改任何生产运动算法或步态曲线**；
   * **严禁绕开 WholeBodyController 直接操作骨骼**。
