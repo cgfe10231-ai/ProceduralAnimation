@@ -39,8 +39,14 @@ def main():
     print(f"\n2. Building Blender scene geometry, normal arrows, and lighting...")
     scene, _ = build_dynamics_playground(query=query, output_path=output_blend)
 
+    print(f"\n3. Simulating and injecting 5-scenario real dynamics state visualization (Task 6G-D-C2-A)...")
+    from src.scene.dynamics_visualizer import run_dynamics_scenarios, inject_dynamics_visualization
+    scenarios = run_dynamics_scenarios(num_steps=72, env_query=query)
+    inject_dynamics_visualization(scene, scenarios)
+    bpy.ops.wm.save_mainfile(filepath=output_blend)
+
     file_size = os.path.getsize(output_blend) if os.path.exists(output_blend) else 0
-    print(f"\n3. Validation & Output Summary:")
+    print(f"\n4. Validation & Output Summary:")
     print(f"   - Target file: {output_blend}")
     print(f"   - File size:   {file_size:,} bytes")
     print(f"   - Objects:     {len(scene.objects)} objects created in scene")

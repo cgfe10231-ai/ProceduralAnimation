@@ -5,12 +5,17 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-C1-FINAL（数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御）：
-1. 近似解准入策略链修复 (DEF-001)：在 `step_closed_loop_dynamics` 中严格按策略链优先级接入 `ClosedLoopAdmissibilityPolicy.allow_approximate_solutions`；
-2. 步数统计与物理推进时间彻底解耦 (DEF-002)：在 `ClosedLoopSimulationTrajectory` 中区分记录 `requested_steps`、`attempted_steps`、`successful_steps`、`failed_steps`、`requested_duration` 与 `actual_physical_time`，约束 `total_time == actual_physical_time`；
-3. 遥测状态四维正交解耦语义 (DEF-003)：新增 `is_contact_solution_physically_valid`、`is_policy_admitted`、`is_target_satisfied`、`state_advanced`；
-4. 遥测深层不可变性与配置数值有限门禁 (DEF-004 / DEF-005)：`actual_contact_forces` 封装为 `MappingProxyType`，`frames` 转为只读元组，配置类增加 `math.isfinite` 检验；
-5. 交付 `docs/C1_FINAL_AUDIT.md` 完整审计报告与 `tests/verify_task6gd_closed_loop_dynamics.py` 30 项测试全绿，分层回归 `quick` (9/9), `physics` (14/14) 100% 零退化。**6G-D-C1 阶段正式验收，下一里程碑锁定为 Task 6G-D-C2: 在现有 DynamicsPlayground 中集成和验证真实动力学状态**。
+完成 Task 6G-D-C2-A（DynamicsPlayground 真实动力学状态集成与多场景视口验证）：
+1. 在原有单一基准场景 `output/dynamics_playground.blend` (230,508 字节) 中复用已有平坦调试区，全程序化注入 5 大动力学场景：
+   - Station 1: 静态支撑平衡 (双足反力平衡重力，下陷 < 1e-5m)；
+   - Station 2: 重力自由落体 (空中悬停需求自然受重力加速下落，零接触力)；
+   - Station 3: 水平加速推进 (摩擦锥内剪切推力，加速平移)；
+   - Station 4: 摩擦不足滑移滞后 (冰面低摩擦 mu=0.08 剪切力被截断，质心显著滞后于目标虚影)；
+   - Station 5: 偏心接触导致旋转 (偏心接触力矩 tau_x ~ -206 N*m 驱动身体滚转翻滚与角动量增长)；
+2. 动力学调试物体全量隔离于 `Playground_Dynamics_Visualization` Collection，100% 保护原有 45 个环境与灯光物体；
+3. 真实物理遥测：动态反力箭头按 1m = 500N 严格绑定计算力，姿态代理框 100% 绑定状态四元数；
+4. 审计报告 `docs/C1_FINAL_AUDIT.md` 边界修正，补充非恒定正弦加速度测试 `test_31`；
+5. 新增 `tests/verify_task6gd_playground_dynamics.py`，全绿通过分层回归 `quick` (9/9), `physics` (15/15), 历史动作 (Walk, Run) 100% 零退化。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -52,40 +57,47 @@
   * 解耦数值失败与物理不可行性，空中无接触悬停需求自然受重力下落；
   * 交付 20 项场景测试全绿通过，分层回归 `quick` (9/9, 15.09s) 与 `physics` (14/14, 66.27s) 100% 零退化。
 * **完成 Task 6G-D-C1-FINAL 数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御**：
-  * 修复 DEF-001：`allow_approximate_solutions` 严格接入准入决策树优先级；
-  * 修复 DEF-002：`simulate()` 中彻底解耦请求时长与实际物理推进时间，约束 `total_time == actual_physical_time`；
-  * 修复 DEF-003：遥测新增 4 个正交布尔字段，彻底消除语义混淆；
-  * 修复 DEF-004 / DEF-005：`actual_contact_forces` 以 `MappingProxyType` 封装防御就地修改，配置类增加 `math.isfinite` 门禁；
-  * 交付 `docs/C1_FINAL_AUDIT.md` 完整审计报告与 `tests/verify_task6gd_closed_loop_dynamics.py` 30 项测试全绿，分层回归 `quick` (9/9, 15.81s) 与 `physics` (14/14, 67.56s) 100% 零退化。
+  * 修复 DEF-001 ~ DEF-005 全部缺陷，交付 `docs/C1_FINAL_AUDIT.md` 完整审计报告；
+  * `tests/verify_task6gd_closed_loop_dynamics.py` 扩充至 30 项测试全绿。
+* **完成 Task 6G-D-C2-A DynamicsPlayground 真实动力学状态集成与多场景视口验证**：
+  * 在单一基准场景 `output/dynamics_playground.blend` (230,508 字节) 中复用已有平坦调试区，全程序化注入 5 大动力学场景：静态支撑、重力自由落体、水平加速、摩擦不足滑移、偏心接触滚转；
+  * 动力学调试物体全量隔离于 `Playground_Dynamics_Visualization` Collection，100% 保护原有 45 个环境与灯光物体；
+  * 真实物理遥测：动态反力箭头按 1m = 500N 严格绑定计算力，姿态代理框 100% 绑定状态四元数；
+  * 审计报告 `docs/C1_FINAL_AUDIT.md` 边界修正，补充非恒定正弦加速度测试 `test_31`（31/31 项测试全绿）；
+  * 新增 `tests/verify_task6gd_playground_dynamics.py`（5/5 PASS），全绿通过分层回归 `quick` (9/9, 15.08s), `physics` (15/15, 70.36s), 历史动作 (Walk, Run) 100% 零退化。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `closed_loop_dynamics`：30/30 项闭环场景与数学测试全绿通过（纯 Python 6.88s，Blender 0.59s）；
+  * `playground_dynamics_states`：5/5 项场景与对象测试全绿（纯 Python 与 Blender 1.48s）；
+  * `closed_loop_dynamics`：31/31 项闭环场景与数学测试全绿通过（纯 Python 6.80s，Blender 0.59s）；
   * `forward_dynamics`：22/22 项解析与状态测试全绿通过（纯 Python 0.009s，Blender 0.009s）；
   * `contact_force_solver`：38/38 项测试全绿通过（纯 Python 0.406s，Blender 0.087s）；
   * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.79s，退出码 0）；
   * `dynamics_environment_query`：13/13 项数学定理全绿（0.13s，退出码 0）；
   * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.31s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：9/9 项通过（15.81s，退出码 0）；
-  * `physics` Tier：14/14 项通过（67.56s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-C1-FINAL 已完成并验证，6G-D-C1 正式收官验收，严格停止。
+  * `quick` Tier：9/9 项通过（15.08s，退出码 0）；
+  * `physics` Tier：15/15 项通过（70.36s，退出码 0），历史物理模块 100% 零退化；
+* 状态标定为：Task 6G-D-C2-A 已完成并验证，严格停止。
 
 ## 4. 当前文件
+* 核心场景产物：`output/dynamics_playground.blend`（230,508 字节，单一 SSOT，可在 Blender 5.1.1 直接打开播放）
+* 核心可视化模块：`src/scene/dynamics_visualizer.py`
+* 场景生成入口：`run_dynamics_playground.py`
+* 核心测试脚本：`tests/verify_task6gd_playground_dynamics.py`、`tests/verify_task6gd_closed_loop_dynamics.py`
 * 核心审计文档：`docs/C1_FINAL_AUDIT.md` (SSOT)
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-042]`)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-043]`)
 * 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
-* 核心源码：`src/motion/closed_loop_dynamics.py`、`src/motion/forward_dynamics.py`、`src/motion/contact_force_solver.py`、`src/motion/contact_dynamics.py`、`src/motion/framework.py`、`src/motion/kinematic_bridge.py`、`src/motion/whole_body_controller.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
-* 核心生成与产物：`output/dynamics_playground.blend`、`output/unified_motion_integration.blend`
+* 核心源码：`src/motion/closed_loop_dynamics.py`、`src/motion/forward_dynamics.py`、`src/motion/contact_force_solver.py`、`src/motion/contact_dynamics.py`、`src/scene/dynamics_visualizer.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
 
 ## 5. 已知问题与未实现功能清单 (Unimplemented Features)
-* 真实动力学状态在 DynamicsPlayground 中的集成与验证（Task 6G-D-C2：在已有 21 表面动力学训练场中结合环境查询驱动质心闭环动力学步进与 Blender 视口遥测）；
-* 动态视觉验收（Blender 视口播放接触反力动画与遥测箭头）：尚未进行（等待 6G-D-C2 视口集成）。
+* 连续多关节动态平衡（Task 6H：步频调整、摆动腿着地点选择与双足动态行走的全身动力学耦合）；
+* 动态视觉验收（用户在 Blender 5.1.1 中目视播放 5 个测试台动画并核对力学箭头）。
 
 ## 6. 下一步
-* **严格停止，等待用户审阅并下达下一阶段指令（建议进入 Task 6G-D-C2: 在现有 DynamicsPlayground 中集成和验证真实动力学状态）**。
-* **严禁自动进入 Task 6G-D-C2 或 6H**。
+* **严格停止，等待用户审阅并下达下一阶段指令（建议进入用户目视验收与后续多关节动态平衡准备）**。
+* **严禁自动进入 6H**。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。

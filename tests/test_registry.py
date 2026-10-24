@@ -220,6 +220,17 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Reopens dynamics_playground.blend in headless Blender to verify 6-zone meshes, materials, normal arrows, and cameras.",
     ),
+    "playground_dynamics_states": TestDefinition(
+        test_id="playground_dynamics_states",
+        name="Dynamics Playground Real Dynamics State Integration Verification",
+        script_path="tests/verify_task6gd_playground_dynamics.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        expected_artifacts=["output/dynamics_playground.blend"],
+        is_visual_acceptance=True,
+        description="Verifies 5-scenario real dynamics states, CoM trajectories, dynamic force arrows, and attitude keyframes in dynamics_playground.blend.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 3: Locomotion Actions & Unified Motion Integration

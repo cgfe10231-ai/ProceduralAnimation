@@ -3,6 +3,37 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-24] 任务 6G-D-C2-A：DynamicsPlayground 真实动力学状态集成与多场景视口验证 (Task 6G-D-C2-A)
+
+### 真实动力学状态集成与可视化驱动 (`src/scene/dynamics_visualizer.py`, `output/dynamics_playground.blend`, `run_dynamics_playground.py`)
+* **五大物理场景全程序化状态驱动与视口布局**：
+  * **Station 1 (静态支撑平衡)**：双足接触反力平衡 $m g = 686.7\text{ N}$，CoM 高度稳定在 $Z=1.0\text{ m}$（下陷 $< 10^{-5}\text{ m}$），动态绿色反力箭头严格竖直向上；
+  * **Station 2 (重力自由落体)**：空中无接触悬停需求，状态按自然重力 $-9.81\text{ m/s}^2$ 自然加速下落，零接触力虚构，目标虚影悬空直观呈现跟踪偏差；
+  * **Station 3 (水平加速推进)**：在库仑摩擦锥限制内产生前进剪切力（$F_x = 105\text{ N}$），质心沿 $+X$ 加速平移，反力箭头倾角严格对应合外力方向；
+  * **Station 4 (摩擦不足滑移滞后)**：冰面低摩擦（$\mu=0.08$）强制截断剪切力，实际质心滞后于目标虚影 $> 2.0\text{ m}$，直观呈现打滑与失控；
+  * **Station 5 (偏心接触导致旋转)**：偏心单足接触点产生滚转力矩 $\tau_x \approx -206\text{ N}\cdot\text{m}$，驱动身体姿态连续倾斜翻滚，动态角动量箭头实时延伸。
+* **视觉调试集合隔离与环境不可变原则 (ACG Section 6 遵守)**：
+  * 动力学几何体（CoM 球、身体代理框、目标虚影、接触圆盘、动态力箭头、动态角动量箭头、3D 轨迹曲线、站台 3D 文本标签、检查相机）全部封装入独立集合 `Playground_Dynamics_Visualization`；
+  * 原始训练场集合 `Playground_Surfaces`、`Playground_Visuals`、`Playground_Lighting_Cameras` 的 45 个对象保持 100% 不变；
+  * 保留 `PlaygroundOverviewCam` 为主场景相机，新增 `DynamicsInspectionCam` 供用户快速切换鸟瞰 5 个测试台。
+* **平动数值积分边界审计修正 (Section VIII)**：
+  * 在 `docs/C1_FINAL_AUDIT.md` 明确平动积分公式为 $v_{k+1} = v_k + a_k \Delta t$ 与 $p_{k+1} = p_k + v_k \Delta t + \frac{1}{2} a_k \Delta t^2$；
+  * 澄清其对恒定加速度场（如重力）具有解析无截断特性（$< 10^{-12}\text{ m}$），但在非恒定加速度场中呈现速度一阶精度，不可无条件称为两阶段二阶 Velocity Verlet；
+  * 新增测试 `test_31_non_constant_acceleration_convergence_benchmark`，在非恒定正弦加速度场中实测记录一阶收敛表现（误差减半比 $\approx 2.0$）。
+
+### 测试验证与架构状态
+* **测试套件扩充与注册 (`tests/verify_task6gd_playground_dynamics.py`, `tests/test_registry.py`)**：
+  * 新增 `verify_task6gd_playground_dynamics.py`，纯 Python 与 Blender Headless 全绿通过（5/5 PASS）；
+  * 在 `tests/test_registry.py` 注册 `playground_dynamics_states`（纳入 PHYSICS 与 FULL 分级）；
+  * `tests/verify_task6gd_closed_loop_dynamics.py` 扩充至 31 项测试全绿通过。
+* **分层回归全绿**：
+  * `quick` (9/9 项全绿通过，15.08s)；
+  * `physics` (15/15 项全绿通过，70.36s)；
+  * 历史动作（Walk, Run）100% 零退化通过；
+  * 严格遵守边界：0 骨骼/Rig 修改，0 历史动作篡改，单一 SSOT 训练场复用。
+
+
+
 ## [2026-10-24] 任务 6G-D-C1-FINAL：数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御 (Task 6G-D-C1-FINAL)
 
 ### 数值闭环集中数学审计与缺陷修复 (`src/motion/closed_loop_dynamics.py`, `src/motion/contact_force_solver.py`, `docs/C1_FINAL_AUDIT.md`)

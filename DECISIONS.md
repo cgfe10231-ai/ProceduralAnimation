@@ -874,3 +874,33 @@
   - 测试套件扩充：`tests/verify_task6gd_closed_loop_dynamics.py`（20 项扩充至 30 项测试，30/30 PASS）；
   - 统一测试回归：`quick` (9/9 全绿, 15.81s)，`physics` (14/14 全绿, 67.56s)；
   - 阶段收尾：6G-D-C1 数值闭环开发与数学审计全部就绪，下一里程碑锁定为 **Task 6G-D-C2: 在现有 DynamicsPlayground 中集成和验证真实动力学状态**。
+
+---
+
+### [DEC-043] DynamicsPlayground 真实动力学状态集成与多场景视口验证 (Task 6G-D-C2-A)
+* **状态**：已采纳并经实测全绿验证 (Accepted & Fully Verified)
+* **日期**：2026-10-24
+* **背景**：在 6G-D-C1 数值闭环阶段验收后，需要将纯 Python 数值积分结果接入 Blender 3D 场景进行直观视口验证。依据永久架构门禁（ACG Section 6），必须复用单一基准场景 `output/dynamics_playground.blend`，严禁建立分立场景；必须将动力学遥测几何体隔离在专用集合中，严禁修改已有环境网格；必须 100% 由真实物理数据驱动，严禁摆设虚假静态箭头；同时需要修正审计文档关于平动积分二阶收敛性的边界说明。
+* **决策与方案**：
+  1. **五大物理场景全程序化状态驱动与视口布局**：
+     - **Station 1 (静态支撑平衡)**：双足接触反力平衡 $m g = 686.7\text{ N}$，CoM 高度稳定在 $Z=1.0\text{ m}$（下陷 $< 10^{-5}\text{ m}$），动态绿色反力箭头严格竖直向上；
+     - **Station 2 (重力自由落体)**：空中无接触悬停需求，状态按自然重力 $-9.81\text{ m/s}^2$ 自然加速下落，零接触力虚构，目标虚影悬空直观呈现跟踪偏差；
+     - **Station 3 (水平加速推进)**：在库仑摩擦锥限制内产生前进剪切力（$F_x = 105\text{ N}$），质心沿 $+X$ 加速平移，反力箭头倾角严格对应合外力方向；
+     - **Station 4 (摩擦不足滑移滞后)**：冰面低摩擦（$\mu=0.08$）强制截断剪切力，实际质心滞后于目标虚影 $> 2.0\text{ m}$，直观呈现打滑与失控；
+     - **Station 5 (偏心接触导致旋转)**：偏心单足接触点产生滚转力矩 $\tau_x \approx -206\text{ N}\cdot\text{m}$，驱动身体姿态连续倾斜翻滚，动态角动量箭头实时延伸。
+  2. **视觉调试集合隔离与环境不可变原则 (ACG Section 6 遵守)**：
+     - 动力学几何体（CoM 球、身体代理框、目标虚影、接触圆盘、动态力箭头、动态角动量箭头、3D 轨迹曲线、站台 3D 文本标签、检查相机）全部封装入独立集合 `Playground_Dynamics_Visualization`；
+     - 原始训练场集合 `Playground_Surfaces`、`Playground_Visuals`、`Playground_Lighting_Cameras` 的 45 个对象保持 100% 不变；
+     - 保留 `PlaygroundOverviewCam` 为主场景相机，新增 `DynamicsInspectionCam` 供用户快速切换鸟瞰 5 个测试台。
+  3. **平动数值积分边界审计修正 (Section VIII)**：
+     - 在 `docs/C1_FINAL_AUDIT.md` 明确平动积分公式为 $v_{k+1} = v_k + a_k \Delta t$ 与 $p_{k+1} = p_k + v_k \Delta t + \frac{1}{2} a_k \Delta t^2$；
+     - 澄清其对恒定加速度场（如重力）具有解析无截断特性（$< 10^{-12}\text{ m}$），但在非恒定加速度场中呈现速度一阶精度，不可无条件称为两阶段二阶 Velocity Verlet；
+     - 新增测试 `test_31_non_constant_acceleration_convergence_benchmark`，在非恒定正弦加速度场中实测记录一阶收敛表现（误差减半比 $\approx 2.0$）。
+* **影响与产物**：
+  - 新增核心模块：[`src/scene/dynamics_visualizer.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/dynamics_visualizer.py)（纯 Python 场景模拟与 Blender 关键帧注入解耦）；
+  - 更新生成脚本：[`run_dynamics_playground.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_dynamics_playground.py)；
+  - 更新场景产物：`output/dynamics_playground.blend`（230,508 字节，包含 86 个物体，可在 Blender 5.1.1 直接打开播放）；
+  - 新增测试套件：[`tests/verify_task6gd_playground_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_playground_dynamics.py)（5 项测试全部通过）；
+  - 注册测试套件：`tests/test_registry.py` 注册 `playground_dynamics_states`；
+  - 审计修正：更新 [`docs/C1_FINAL_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/C1_FINAL_AUDIT.md) 并扩充 [`tests/verify_task6gd_closed_loop_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_closed_loop_dynamics.py) 至 31 项测试全绿；
+  - 回归全绿：`quick` (9/9 项通过，15.08s)，`physics` (15/15 项通过，70.36s)，历史动作 100% 零退化。

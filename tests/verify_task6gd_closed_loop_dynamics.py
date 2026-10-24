@@ -1259,6 +1259,70 @@ class TestClosedLoopDynamics(unittest.TestCase):
                 delta=1e-7,
             )
 
+    # -------------------------------------------------------------------------
+    # Scenario 31: Non-Constant Acceleration Translational Benchmark (Section VIII)
+    # -------------------------------------------------------------------------
+    def test_31_non_constant_acceleration_convergence_benchmark(self):
+        """Scenario 31: Measure translational error scaling under non-constant sinusoidal driving force."""
+        a0 = 5.0
+        omega = 2.0 * math.pi
+        m = 70.0
+        T = 0.4
+
+        dts = [0.04, 0.02, 0.01]
+        v_errors = []
+        x_errors = []
+
+        for dt in dts:
+            n_steps = int(round(T / dt))
+            state = ForwardDynamicsState(
+                timestamp=0.0,
+                mass=m,
+                com_position_world=(0.0, 0.0, 0.0),
+                com_velocity_world=(0.0, 0.0, 0.0),
+                angular_momentum_about_com_world=(0.0, 0.0, 0.0),
+                orientation_quat_world=(1.0, 0.0, 0.0, 0.0),
+                inertia_tensor_body=self.default_inertia,
+            )
+            for k in range(n_steps):
+                t_curr = k * dt
+                F_x = m * a0 * math.sin(omega * t_curr)
+                step_in = ForwardDynamicsStepInput(
+                    dt=dt,
+                    gravity_acceleration_world=(0.0, 0.0, 0.0),
+                    external_forces_world=((F_x, 0.0, 0.0),),
+                    external_torques_about_com_world=(),
+                    contact_forces=(),
+                )
+                res = integrate_forward_dynamics_single_step(state, step_in)
+                state = res.state_next
+
+            v_exact = (a0 / omega) * (1.0 - math.cos(omega * T))
+            x_exact = (a0 / omega) * T - (a0 / (omega * omega)) * math.sin(omega * T)
+
+            v_err = abs(state.com_velocity_world[0] - v_exact)
+            x_err = abs(state.com_position_world[0] - x_exact)
+            v_errors.append(v_err)
+            x_errors.append(x_err)
+
+        # Velocity convergence ratios ~ 2.0 (1st order forward velocity update)
+        r_v1 = v_errors[0] / v_errors[1]
+        r_v2 = v_errors[1] / v_errors[2]
+        self.assertAlmostEqual(r_v1, 2.0, delta=0.20)
+        self.assertAlmostEqual(r_v2, 2.0, delta=0.20)
+
+        # Position convergence ratios ~ 2.0 (driven by 1st order velocity error)
+        r_x1 = x_errors[0] / x_errors[1]
+        r_x2 = x_errors[1] / x_errors[2]
+        self.assertAlmostEqual(r_x1, 2.0, delta=0.15)
+        self.assertAlmostEqual(r_x2, 2.0, delta=0.15)
+
+        # Monotonic convergence
+        self.assertLess(v_errors[2], v_errors[1])
+        self.assertLess(v_errors[1], v_errors[0])
+        self.assertLess(x_errors[2], x_errors[1])
+        self.assertLess(x_errors[1], x_errors[0])
+
 
 if __name__ == "__main__":
     argv = [sys.argv[0]]
