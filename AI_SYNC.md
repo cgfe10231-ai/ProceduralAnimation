@@ -5,6 +5,7 @@
 * **任务状态**：已完全验证 (Fully Verified & Automated Pass)；完成 `docs/PHASE7A_REUSE_AUDIT.md` 历史 19 骨骼角色与运动资产复用审计（纳入 `audit_c2_final_inspector.py --verify-docs` 永久 AST 门禁）；在不覆盖或篡改 `output/dynamics_playground.blend` 单一训练场 SSOT 的前提下，通过既有 `build_character`、`build_rig`、`bind_character_to_rig`、`setup_leg_ik`、`setup_arm_ik` 将真实 19 骨骼角色无损装入 `"Character"` 集合，并经由唯一生产控制链 `MotionPlanner / MotionAction -> KinematicBridgeExecutor.execute_frame -> WholeBodyController.execute_frame -> Rig/IK/FK` 完成 Stages A–E 五阶段控制闭环与四大数学一致性验证；导出派生可播放场景 `output/dynamics_playground_task7a1.blend` 与 `docs/evidence/task7a1/` 自动遥测/多视角 PNG/GIF 证据包；`quick` (10/10 PASS)、`physics` (16/16 PASS)、`motion` (6/6 PASS)、`full` (25/25 PASS) 与 `--verify-docs` 全绿通过；严格停止于 Task 7A-1，不自动进入 Task 7A-2。
 * **Git 状态**：
   * **当前分支**：`master`
+  * **Task 7A-1 功能与证据主提交 Commit SHA**：`727c0fe5180274c3758259bbc9aabe6d3036ef54`（`feat(task-7a-1): integrate 19-bone character into dynamics playground and verify control loop`）
   * **基准 Commit SHA**：`994bfc4e5ecc705c6c48ef54ac526be4601fc12c`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`，远程 HEAD 与本地最新 commit SHA 一致)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
