@@ -5,8 +5,8 @@
 * **任务状态**：已完全验证 (Fully Verified & Automated Pass)；通用 AST 符号校验器消除写文件副作用、实现纯只读模式分离与子句级精准否定豁免；增加 6 组动态随机自检用例；扩展 `TestDefinition.script_args` 并提供独立测试用例 `tests/test_architecture_integrity_gate.py` 接入统一测试注册表；`quick` (10/10 PASS) 与 `full` (24/24 PASS) 全绿通过；底座架构与资产正式冻结，进入只读维护状态；严格停止，不自动触发 Phase 7A 或 Phase 6H，等待人类指令。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **文档真实性门禁与架构冻结 Commit SHA**：`3efd5e412fa79ffaabd32d77eb5aa138475b4a50`（`docs(task-6gd-c2-final): establish universal AST documentation integrity gate and freeze architecture constraints`）
-  * **纠偏基准 Commit SHA**：`ce13bbdccf13ce7e66b3308247ca8f0dff6a1821` / `39f5aa062cfea313855f7cb3c99470d1c7ddd627`
+  * **门禁收口与只读测试接入 Commit SHA**：`96c49733fa43df4958f0e0d54a26e850eb262078`（`docs(task-6gd-c2-final): close architecture integrity gate with read-only AST verification in test runner`）
+  * **前期门禁基准 Commit SHA**：`3efd5e412fa79ffaabd32d77eb5aa138475b4a50` / `660d9365519987067209aaba8901535717503481`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`，远程 HEAD 与本地 commit SHA 完全一致)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
