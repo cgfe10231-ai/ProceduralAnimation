@@ -5,19 +5,24 @@
 ---
 
 ## 1. 当前目标
-完成 Task 6G-D-C2-A（DynamicsPlayground 真实动力学状态集成与自动视觉证据跨 AI 验收）：
-1. 在原有单一基准场景 `output/dynamics_playground.blend` (235,423 字节) 中复用已有平坦调试区，全程序化注入 5 大动力学场景：
-   - Station 1: 静态支撑平衡 (双足反力平衡重力，下陷 < 1e-5m)；
-   - Station 2: 重力自由落体 (空中悬停需求自然受重力加速下落，零接触力)；
-   - Station 3: 水平加速推进 (摩擦锥内剪切推力，加速平移)；
-   - Station 4: 摩擦不足滑移滞后 (冰面低摩擦 mu=0.08 剪切力被截断，质心显著滞后于目标虚影)；
-   - Station 5: 偏心接触导致旋转 (偏心接触力矩 tau_x ~ -206 N*m 驱动身体滚转翻滚与角动量增长)；
-2. 动力学调试物体全量隔离于 `Playground_Dynamics_Visualization` Collection，100% 保护原有 45 个环境与灯光物体；
-3. 真实物理遥测：动态反力箭头按 1m = 667N 严格绑定计算力，姿态代理框 100% 绑定状态四元数；
-4. 自动视觉证据矩阵：正面、侧面、俯视多角度渲染 112 张视口静帧，合成高对比度联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/contact_sheet.png)；
-5. 逐帧机器遥测与审计：`docs/evidence/task6gd_c2a/telemetry.json` 实测位置误差 `0.00e+00 m`，姿态误差 `3.50e-07 rad`；
-6. 跨 AI 交付件：动画 GIF、交互式 HTML 播放器与 24.5MB 证据包 (`output/evidence/task6gd_c2a/task6gd_c2a_evidence_pack.zip`)；
-7. 分层回归 `quick` (9/9), `physics` (16/16), 历史动作 (Walk, Run) 100% 零退化。等待 ChatGPT 复核。
+Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结）**已完全验证通过并正式冻结**：
+1. **时空严格对齐**：72 步离散积分扩展对齐为 73 个物理状态（$S_0$ 到 $S_{72}$），对应 Blender 时间轴 Frame 1 至 Frame 73（$F = k + 1$）；标准关键帧采样 F01, F13, F25, F37, F49, F61, F73（对齐 $t=0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0\text{s}$）；
+2. **物理与数学精度边界正式界定**：正式确立单刚体集总 CoM 动力学模型（$m=70\text{kg}, I=\text{diag}(15,15,5)$）为底座阶段核心；明确 Station 2 物理实质为空中弹道自由落体（不含触地撞击回弹）；明确 Station 3/4 为理想连续接触点位移（不代表迈步交替冲击）；
+3. **全量工程资产审计**：完成全库 19 个 `.blend` 场景资产与 52 个 Python 模块审计，确认 19 骨骼标准人形拓扑为单一 SSOT；确立 `output/dynamics_playground.blend` 为动力学实测单一权威场景；
+4. **发布五大权威架构冻结规范与综合验证报告**：
+   - `docs/FOUNDATION_ASSET_AUDIT.md` (全量工程资产与规范审计)
+   - `docs/FOUNDATION_ARCHITECTURE_AUDIT.md` (5 层架构分类、单帧 6 阶段协议与收敛设计)
+   - `docs/FOUNDATION_DEPENDENCY_MAP.md` (模块单向依赖拓扑与零 bpy 污染矩阵)
+   - `docs/FOUNDATION_STATE_OWNERSHIP.md` (状态唯一权威归属矩阵)
+   - `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md` (Phase 7A 至 Phase 6H 演进路线与 Task <Phase>-<Seq> 命名规范)
+   - `docs/C2_FINAL_VALIDATION.md` (Task 6G-D-C2-FINAL 综合验收报告)
+5. **机器遥测硬断言与分级回归全绿**：
+   - Blender 求值位置误差实测 `0.00e+00 m`（$< 10^{-5}\text{ m}$）；姿态误差实测 `3.50e-07 rad`（$< 10^{-5}\text{ rad}$）；
+   - S4 滑移发散 $\Delta p = 5.30\text{ m}$；S5 滚转发散 $\Delta q = 1.55\text{ rad}$ ($88.8^\circ$)，绝无目标冒充；
+   - 自动化回归：`quick` (9/9 PASS, 9.66s)，`physics` (16/16 PASS, 72.07s)，历史成熟步态 100% 零退化。
+6. **底座正式冻结承诺**：
+   - 6G-D 正式冻结并进入维护模式，严禁自动创建 C2-B/C3/6G-E 分支；未来统一采用 `Task <Phase>-<Seq>` 命名；
+   - 严格停止，不自动触发 Phase 7A 或 Phase 6H。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -53,20 +58,11 @@
 * 完成 Task 6G-D-C1-A 前向动力学单步积分内核与刚体物理状态解耦。
 * 完成 Task 6G-D-C1-A-R1 前向动力学状态不可变性防御性复制与非各向同性刚体二阶中点姿态积分修正。
 * 完成 Task 6G-D-C1-B 多帧动力学闭环控制与状态反馈。
-* **完成 Task 6G-D-C1-B-R1 完整三维重力统一、旋转反馈陀螺耦合修正与物理不可行性解耦准入门禁**：
-  * 扩展 `ContactWrenchTarget.from_target_motion` 支持传入完整 3D 重力向量，保持旧 `gravity_z` 调用兼容；
-  * 修正旋转反馈律计入世界系陀螺耦合力矩 $\boldsymbol{\tau}_{\text{gyro}} = \boldsymbol{\omega} \times \mathbf{L}$，无旋转反馈时保全纯前馈角动量语义；
-  * 解耦数值失败与物理不可行性，空中无接触悬停需求自然受重力下落；
-  * 交付 20 项场景测试全绿通过，分层回归 `quick` (9/9, 15.09s) 与 `physics` (14/14, 66.27s) 100% 零退化。
-* **完成 Task 6G-D-C1-FINAL 数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御**：
-  * 修复 DEF-001 ~ DEF-005 全部缺陷，交付 `docs/C1_FINAL_AUDIT.md` 完整审计报告；
-  * `tests/verify_task6gd_closed_loop_dynamics.py` 扩充至 30 项测试全绿。
-* **完成 Task 6G-D-C2-A DynamicsPlayground 真实动力学状态集成与多场景视口验证**：
-  * 在单一基准场景 `output/dynamics_playground.blend` (230,508 字节) 中复用已有平坦调试区，全程序化注入 5 大动力学场景：静态支撑、重力自由落体、水平加速、摩擦不足滑移、偏心接触滚转；
-  * 动力学调试物体全量隔离于 `Playground_Dynamics_Visualization` Collection，100% 保护原有 45 个环境与灯光物体；
-  * 真实物理遥测：动态反力箭头按 1m = 500N 严格绑定计算力，姿态代理框 100% 绑定状态四元数；
-  * 审计报告 `docs/C1_FINAL_AUDIT.md` 边界修正，补充非恒定正弦加速度测试 `test_31`（31/31 项测试全绿）；
-  * 新增 `tests/verify_task6gd_playground_dynamics.py`（5/5 PASS），全绿通过分层回归 `quick` (9/9, 15.08s), `physics` (15/15, 70.36s), 历史动作 (Walk, Run) 100% 零退化。
+* 完成 Task 6G-D-C1-B-R1 完整三维重力统一、旋转反馈陀螺耦合修正与物理不可行性解耦准入门禁。
+* 完成 Task 6G-D-C1-FINAL 数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御。
+* 完成 Task 6G-D-C2-A DynamicsPlayground 真实动力学状态集成与多场景视口验证。
+* 完成 Task 6G-D-C2-A 补充要求：自动视觉证据采集、遥测一致性审计与跨 AI 验收管线。
+* **完成 Task 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结**。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：

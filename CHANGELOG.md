@@ -3,6 +3,39 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-25] 任务 6G-D-C2-FINAL：6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结
+
+### 时空标准化与闭环收口 (`src/scene/dynamics_visualizer.py`, `src/scene/dynamics_visual_evidence.py`, `run_generate_visual_evidence.py`)
+* **73 状态（Frame 1..73）时间线标准映射**：
+  * 将 72 步离散积分（$N=72, \Delta t=1/24\text{s}$）严格对齐为 73 个物理状态（$S_0$ 到 $S_{72}$），对应 Blender 时间轴 Frame 1 至 Frame 73（$F = k + 1$）；
+  * 采样关键帧对齐整数与半秒网格：$t = 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0\text{s}$（F01, F13, F25, F37, F49, F61, F73）；
+  * 编码输出 73 帧连续平滑动画 GIF (`dynamics_overview_anim.gif`，24 FPS，delay 4cs)；
+  * 更新综合联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](docs/evidence/task6gd_c2a/contact_sheet.png)（含标准秒标记 F01, F25, F49, F73）。
+* **场景相机状态一致性保证**：
+  * 在无头渲染完成后统一将 `PlaygroundOverviewCam` 恢复为场景主相机，保证 `output/dynamics_playground.blend` 随手打开即为全局全景。
+
+### 架构审计与规范冻结文档交付 (`docs/`)
+* **发布 5 份权威架构冻结规范与 1 份综合验证报告**：
+  1. [`docs/FOUNDATION_ASSET_AUDIT.md`](docs/FOUNDATION_ASSET_AUDIT.md)：全库 19 个 `.blend` 资产、52 个 Python 模块与规范体系审计；
+  2. [`docs/FOUNDATION_ARCHITECTURE_AUDIT.md`](docs/FOUNDATION_ARCHITECTURE_AUDIT.md)：5 层架构分类、单帧 6 阶段协议与单刚体 CoM 动力学收敛设计；
+  3. [`docs/FOUNDATION_DEPENDENCY_MAP.md`](docs/FOUNDATION_DEPENDENCY_MAP.md)：模块单向依赖拓扑与纯 Python 核心零 `bpy` 污染矩阵；
+  4. [`docs/FOUNDATION_STATE_OWNERSHIP.md`](docs/FOUNDATION_STATE_OWNERSHIP.md)：时间、质心、骨骼、IK 与接触力唯一权威归属矩阵；
+  5. [`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`](docs/ROADMAP_FOUNDATION_TO_FULLBODY.md)：Phase 7A 至 Phase 6H 严格演进路线与 `Task <Phase>-<Seq>` 命名规范；
+  6. [`docs/C2_FINAL_VALIDATION.md`](docs/C2_FINAL_VALIDATION.md)：Task 6G-D-C2-FINAL 综合验收报告。
+
+### 测试用例更新与分级回归
+* **更新测试套件**：
+  * [`tests/verify_task6gd_playground_dynamics.py`](tests/verify_task6gd_playground_dynamics.py)：断言 `frame_end = 73` 及 73 帧物理精度（5/5 PASS）；
+  * [`tests/verify_task6gd_visual_telemetry.py`](tests/verify_task6gd_visual_telemetry.py)：断言 73 帧时序完整性与跨空间一致性（5/5 PASS）；
+  * [`tests/verify_task6gd_playground_blend.py`](tests/verify_task6gd_playground_blend.py)：验证 14 个区域网格、21 个法线指示箭头及主相机（100% PASS）；
+  * [`tests/run_test_suite.py`](tests/run_test_suite.py) & [`run_tests.ps1`](run_tests.ps1)：修复 Windows 沙箱环境终端进程强杀逻辑（使用原生 `os.kill(pid, 9)` 取代沙箱阻塞的 `taskkill`），支持无缓冲实时回显。
+* **分级实测全绿回归**：
+  * `quick`：9/9 PASS (9.66s)；
+  * `physics`：16/16 PASS (72.07s)；
+  * 历史成熟动作（StartStopWalkAction, RunAction）：100% 零退化通过。
+
+---
+
 ## [2026-10-25] 任务 6G-D-C2-A 补充：自动视觉证据采集、遥测一致性审计与跨 AI 验收管线
 
 ### 视觉证据渲染与时空联系表 (`src/scene/dynamics_visual_evidence.py`, `run_generate_visual_evidence.py`, `docs/evidence/task6gd_c2a/`)

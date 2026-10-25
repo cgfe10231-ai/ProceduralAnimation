@@ -1,13 +1,41 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-25  
-> **当前阶段**：任务 6G-D-C2-A 补充完成（DynamicsPlayground 自动视觉证据采集、遥测一致性审计与跨 AI 验收管线；在单一基准 `output/dynamics_playground.blend` 基础上，自动化生成 112 张多视角高密度关键帧，提取 72 帧 `telemetry.json`，合成 $2048 \times 1080$ 综合联系表 `contact_sheet.png`，生成交互式 HTML 检查器与连续运动 GIF；Blender 对象求值位置误差实测 `0.00e+00 m`，姿态误差 `3.50e-07 rad`；严密反冒充审计通过；`quick` 9/9, `physics` 16/16, 历史动作 100% 零退化）  
+> **当前阶段**：任务 6G-D-C2-FINAL 已完全验证通过并正式冻结（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结；完成 73 状态 Frame 1..73 时空标准化，发布 5 份权威架构冻结规范与 C2 综合验证报告；审计确认 19 个 .blend 场景与 19 骨骼标准拓扑完好；Blender 求值位置误差 0.00e+00m，姿态误差 3.50e-07 rad；反冒充发散硬核通过；quick 9/9, physics 16/16, 历史动作 100% 零退化；6G-D 正式冻结并进入只读维护，严禁自动衍生 C2-B/C3/6G-E，严格停止等待人类指令）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 (Task 6G-D-C2-FINAL)**：
+  * **时空标准化与 73 状态闭环收口 (`src/scene/dynamics_visualizer.py`, `src/scene/dynamics_visual_evidence.py`)**：
+    * 72 步辛动力学积分严格映射为 73 个物理状态（$S_0$ 至 $S_{72}$），对准 Blender 时间轴 Frame 1 至 Frame 73（$F = k + 1$）；
+    * 采样时刻标准化为 $t = 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0\text{s}$（F01, F13, F25, F37, F49, F61, F73），与标准秒级网格完美对齐；
+    * 编码输出 73 帧连续全局运动动画 GIF (`dynamics_overview_anim.gif`，24 FPS，delay 4cs)；
+    * 重新渲染拼接更新综合联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](docs/evidence/task6gd_c2a/contact_sheet.png)（含标准秒标记 F01, F25, F49, F73）。
+  * **物理模型与精度边界正式划定**：
+    * 正式确立单刚体集总 CoM 动力学模型（$m=70\text{kg}, I=\text{diag}(15,15,5)$）为底座阶段核心，避免过早陷入铰接多体力矩爆炸；
+    * 严格界定 Station 2 物理实质为空中弹道自由落体（验证无支撑不可行性与零接触力输出），不包含触地碰撞回弹；
+    * 严格界定 Station 3/4 为理想连续足端位移，不代表实际迈步交替冲击。
+  * **全量工程资产、骨骼拓扑与规范体系地毯式审计**：
+    * 审计全库 19 个 `.blend` 场景资产、52 个 Python 模块及全部规则体系；
+    * 确认全系统骨骼层阶以 19 骨骼标准人形拓扑为单一 SSOT；
+    * 确立 `output/dynamics_playground.blend` 为动力学实测单一权威场景。
+  * **发布五大权威架构冻结规范与综合验证报告**：
+    * `docs/FOUNDATION_ASSET_AUDIT.md` (全量工程资产与规范审计)
+    * `docs/FOUNDATION_ARCHITECTURE_AUDIT.md` (5 层架构分类、单帧 6 阶段协议与收敛设计)
+    * `docs/FOUNDATION_DEPENDENCY_MAP.md` (模块单向依赖拓扑与零 bpy 污染矩阵)
+    * `docs/FOUNDATION_STATE_OWNERSHIP.md` (状态唯一权威归属矩阵)
+    * `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md` (Phase 7A 至 Phase 6H 演进路线与 Task <Phase>-<Seq> 命名规范)
+    * `docs/C2_FINAL_VALIDATION.md` (Task 6G-D-C2-FINAL 综合验收报告)
+  * **机器遥测硬断言与分级回归全绿**：
+    * Blender 求值位置误差实测 `0.00e+00 m`（门禁 $< 10^{-5}\text{ m}$）；姿态误差实测 `3.50e-07 rad`（门禁 $< 10^{-5}\text{ rad}$）；
+    * S4 滑移发散 $\Delta p = 5.30\text{ m}$；S5 滚转发散 $\Delta q = 1.55\text{ rad}$ ($88.8^\circ$)，绝无目标冒充；
+    * 自动化回归：`quick` (9/9 PASS, 9.66s)，`physics` (16/16 PASS, 72.07s)，历史成熟步态 100% 零退化。
+  * **架构正式冻结承诺**：
+    * 6G-D 正式冻结并进入维护模式，严禁自动创建 C2-B/C3/6G-E 分支；
+    * 严格停止，不自动触发 Phase 7A 或 Phase 6H。
 * **任务 6G-D-C2-A 自动视觉证据采集、遥测一致性审计与跨 AI 验收管线 (Task 6G-D-C2-A 补充)**：
   * **自动化多视角渲染矩阵 (`src/scene/dynamics_visual_evidence.py`, `run_generate_visual_evidence.py`)**：
     * 5 大工位配置专职正面 (Front)、侧面 (Side)、俯视 (Top) 检查相机及全局鸟瞰相机；

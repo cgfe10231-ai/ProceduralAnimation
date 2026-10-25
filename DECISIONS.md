@@ -932,3 +932,41 @@
   - 新增自动化回归测试套件：[`tests/verify_task6gd_visual_telemetry.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_visual_telemetry.py)（5 项测试 100% 通过）；
   - 更新中央测试注册表：`tests/test_registry.py` 注册 `visual_evidence_telemetry`；
   - 自动化回归：`quick` (9/9 PASS, 16.09s)，`physics` (16/16 PASS, 72.42s)，历史步态 100% 零退化。
+
+---
+
+### [DEC-045] 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 (Task 6G-D-C2-FINAL)
+* **状态**：已采纳并经实测全绿验证 (Accepted & Fully Verified)
+* **日期**：2026-10-25
+* **背景**：Task 6G-D 经过 6G-D-A、6G-D-B、6G-D-C1、6G-D-C2-A 多轮深耕，已圆满打通接触力学、有界摩擦锥二次规划求解、前向动力学辛积分、多帧闭环控制与 Blender 视口遥测验证。为实现底座架构的真正收口与长期稳定，必须防止工程陷入无休止的局部扩展，防止跨 AI 协同认知漂移，杜绝私自衍生 C2-B/C3/6G-E 等分支，并对全工程 19 个 `.blend` 资产、52 个 Python 模块与规范体系建立地毯式审计与架构冻结。
+* **决策与方案**：
+  1. **73 状态（Frame 1..73）时空严格标准化与闭环收口**：
+     - 将 72 步离散积分（$N=72, \Delta t=1/24\text{s}$）严格对齐为 73 个物理状态（$S_0$ 到 $S_{72}$），对应 Blender 时间轴 Frame 1 至 Frame 73（$F = k + 1$）；
+     - 标准化关键帧采样时刻为 $t = 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0\text{s}$（对应 Frame 1, 13, 25, 37, 49, 61, 73），实现与秒级网格完美对齐；
+     - 编码 73 帧连续平滑动画 GIF（delay 4cs，24 FPS 回放），并生成覆盖标准秒节点的 5 工位 $\times$ 6 视角时空联系表。
+  2. **物理与数学精度边界严格界定 (Accuracy Demarcation)**：
+     - 正式确认底座阶段采用单刚体集总 CoM 动力学模型（$m=70\text{kg}, I=\text{diag}(15,15,5)$），明确其解决全局动量与接触防打滑的核心定位，避免过早陷入铰接多体（Featherstone）力矩爆炸；
+     - 明确 Station 2 物理实质为空中弹道自由落体（验证无接触悬停的物理不可行性与零接触力输出），不包含地面撞击回弹动力学；
+     - 明确 Station 3 与 4 使用理想连续接触点位移，不代表实际双足迈步交替冲击动力学。
+  3. **全量工程资产、骨骼拓扑与规范体系地毯式审计**：
+     - 完成全库 19 个 `.blend` 场景资产、52 个 Python 模块及全部规则体系的机器与语义审计；
+     - 确认全系统骨骼层阶以 19 骨骼标准人形拓扑为单一 SSOT，所有历史场景均保持几何与层阶兼容；
+     - 确立 `output/dynamics_playground.blend` 为动力学实测单一权威场景，严禁新建分立场景。
+  4. **五大权威架构冻结规范与验证报告发布**：
+     - 编写并交付：
+       1. [`docs/FOUNDATION_ASSET_AUDIT.md`](docs/FOUNDATION_ASSET_AUDIT.md)：全量工程资产与规范审计；
+       2. [`docs/FOUNDATION_ARCHITECTURE_AUDIT.md`](docs/FOUNDATION_ARCHITECTURE_AUDIT.md)：5 层架构分类、单帧 6 阶段协议与动力学收敛设计；
+       3. [`docs/FOUNDATION_DEPENDENCY_MAP.md`](docs/FOUNDATION_DEPENDENCY_MAP.md)：模块单向依赖拓扑与零 `bpy` 污染矩阵；
+       4. [`docs/FOUNDATION_STATE_OWNERSHIP.md`](docs/FOUNDATION_STATE_OWNERSHIP.md)：各物理量、时间与骨骼唯一写入所有权矩阵；
+       5. [`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`](docs/ROADMAP_FOUNDATION_TO_FULLBODY.md)：Phase 7A 至 Phase 6H 严格演进路线与规范；
+       6. [`docs/C2_FINAL_VALIDATION.md`](docs/C2_FINAL_VALIDATION.md)：Task 6G-D-C2-FINAL 综合验收报告。
+  5. **未来阶段统一命名规范与冻结原则**：
+     - Task 6G-D 正式冻结并进入只读维护状态，严禁创建 C2-B/C3/6G-E 等分支；
+     - 未来阶段统一命名为 `Task <Phase>-<Seq>`（例如 `Task 7A-1`、`Task 7A-2`、`Task 7B-1` 等）；
+     - 本任务完成后严格停止，不自动触发 Phase 7A 或 Phase 6H。
+* **影响与产物**：
+  - 更新核心文件：[`src/scene/dynamics_visualizer.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/dynamics_visualizer.py)、[`src/scene/dynamics_visual_evidence.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/dynamics_visual_evidence.py)、[`run_generate_visual_evidence.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_generate_visual_evidence.py)、[`run_tests.ps1`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_tests.ps1)、[`tests/run_test_suite.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/run_test_suite.py)；
+  - 更新测试套件：[`tests/verify_task6gd_playground_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_playground_dynamics.py)、[`tests/verify_task6gd_visual_telemetry.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_visual_telemetry.py)；
+  - 发布 6 份架构冻结文档：`docs/FOUNDATION_*.md`、`docs/ROADMAP_*.md` 与 `docs/C2_FINAL_VALIDATION.md`；
+  - 刷新产物：`output/dynamics_playground.blend` (73 帧，PlaygroundOverviewCam 激活)、`telemetry.json` (892 KB)、`contact_sheet.png` (1.06 MB)、`dynamics_overview_anim.gif` (73 帧，249 KB)；
+  - 回归全绿：`quick` (9/9 PASS, 9.66s)，`physics` (16/16 PASS, 72.07s)，历史步态 100% 零退化。

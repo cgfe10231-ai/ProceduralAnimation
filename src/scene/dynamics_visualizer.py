@@ -221,6 +221,7 @@ def run_dynamics_scenarios(
         "description": "Propulsion forces within friction cone; tracks target with zero lag",
         "station_origin": (s3_x0, s3_y, 0.0),
         "trajectory": s3_traj,
+        "ref_sched": s3_ref_sched,
         "contacts_sched": s3_contacts_sched,
         "has_angular_momentum": False,
     }
@@ -273,6 +274,7 @@ def run_dynamics_scenarios(
         "description": "Tangential forces clamped at mu*Fn; visual slip and lag vs target ghost",
         "station_origin": (s4_x0, s4_y, 0.0),
         "trajectory": s4_traj,
+        "ref_sched": s4_ref_sched,
         "contacts_sched": s4_contacts_sched,
         "has_angular_momentum": False,
     }
@@ -415,7 +417,7 @@ def inject_dynamics_visualization(
 
     # 3. Setup timeline
     scene.frame_start = 1
-    scene.frame_end = 72
+    scene.frame_end = 73
     scene.frame_current = 1
 
     scenario_keys = list(scenarios_data.keys())
@@ -495,22 +497,69 @@ def inject_dynamics_visualization(
 
             contact_objs[cid] = (disc_obj, arrow_obj)
 
-        # G. Trajectory Spline Curve
+        # Build 73 chronological states: S0 (t=0) at frame 1 ... S72 (t=3.0s) at frame 73
+        timeline_samples = []
+        dt = 1.0 / 24.0
+
+        for k, frame_telem in enumerate(frames):
+            curr_state = frame_telem.state_current
+            if "contacts_sched" in s_data:
+                c_list = s_data["contacts_sched"](k, frame_telem.timestamp, curr_state)
+            else:
+                c_list = s_data.get("contacts", [])
+            c_map = {c.contact_id: c.contact_point_world for c in c_list}
+
+            timeline_samples.append({
+                "frame": k + 1,
+                "timestamp": frame_telem.timestamp,
+                "state": curr_state,
+                "target_pos": frame_telem.motion_reference.target_com_position_world or curr_state.com_position_world,
+                "contact_pos_map": c_map,
+                "contact_forces": frame_telem.actual_contact_forces,
+            })
+
+        # Terminal state S72 at t = 72 * dt = 3.0s (frame 73)
+        final_state = traj.final_state
+        final_t = 72 * dt
+        last_step = frames[-1]
+        if "ref_sched" in s_data:
+            term_ref = s_data["ref_sched"](72, final_t, final_state)
+            term_tgt = term_ref.target_com_position_world or final_state.com_position_world
+        else:
+            term_tgt = last_step.motion_reference.target_com_position_world or final_state.com_position_world
+
+        if "contacts_sched" in s_data:
+            final_c_list = s_data["contacts_sched"](72, final_t, final_state)
+        else:
+            final_c_list = s_data.get("contacts", [])
+        final_c_map = {c.contact_id: c.contact_point_world for c in final_c_list}
+
+        timeline_samples.append({
+            "frame": 73,
+            "timestamp": final_t,
+            "state": final_state,
+            "target_pos": term_tgt,
+            "contact_pos_map": final_c_map,
+            "contact_forces": last_step.actual_contact_forces,
+        })
+
+        # G. Trajectory Spline Curve (73 points)
         curve_data = bpy.data.curves.new(f"Dynamics_TrajectoryData_S{s_idx}", type="CURVE")
         curve_data.dimensions = "3D"
         curve_data.bevel_depth = 0.015
         polyline = curve_data.splines.new("POLY")
-        polyline.points.add(len(frames) - 1)
+        polyline.points.add(len(timeline_samples) - 1)
 
         traj_obj = bpy.data.objects.new(f"Dynamics_Trajectory_S{s_idx}", curve_data)
         traj_obj.data.materials.append(mat_com)
         viz_col.objects.link(traj_obj)
 
         # ---------------------------------------------------------------------
-        # Keyframing Loop Across Simulated Frames (100% Numerical Dynamics)
+        # Keyframing Loop Across 73 Standardized States (S0 at F1 ... S72 at F73)
         # ---------------------------------------------------------------------
-        for f_idx, frame_telem in enumerate(frames, start=1):
-            curr_state = frame_telem.state_current
+        for sample in timeline_samples:
+            f_idx = sample["frame"]
+            curr_state = sample["state"]
             p_actual = curr_state.com_position_world
             q_actual = curr_state.orientation_quat_world
 
@@ -528,7 +577,7 @@ def inject_dynamics_visualization(
             body_obj.keyframe_insert("rotation_quaternion", frame=f_idx)
 
             # 4. Target Ghost Position
-            p_target = frame_telem.motion_reference.target_com_position_world or p_actual
+            p_target = sample["target_pos"]
             ghost_obj.location = p_target
             ghost_obj.keyframe_insert("location", frame=f_idx)
 
@@ -548,13 +597,8 @@ def inject_dynamics_visualization(
                 ang_mom_obj.keyframe_insert("scale", frame=f_idx)
 
             # 6. Contact Discs and Force Arrows
-            # We obtain contact point positions for this frame:
-            if "contacts_sched" in s_data:
-                contacts_this_frame = s_data["contacts_sched"](f_idx - 1, frame_telem.timestamp, curr_state)
-            else:
-                contacts_this_frame = s_data.get("contacts", [])
-
-            c_pos_map = {c.contact_id: c.contact_point_world for c in contacts_this_frame}
+            c_pos_map = sample["contact_pos_map"]
+            forces_map = sample["contact_forces"]
 
             for cid, (disc, arrow) in contact_objs.items():
                 if cid in c_pos_map:
@@ -567,7 +611,7 @@ def inject_dynamics_visualization(
                 disc.keyframe_insert("scale", frame=f_idx)
 
                 # Force Arrow
-                force_vec = frame_telem.actual_contact_forces.get(cid, (0.0, 0.0, 0.0))
+                force_vec = forces_map.get(cid, (0.0, 0.0, 0.0))
                 q_f, mag_f = quat_from_z_to_vector(force_vec)
                 arrow.location = c_pos_map.get(cid, (0.0, 0.0, 0.0))
                 arrow.rotation_quaternion = q_f

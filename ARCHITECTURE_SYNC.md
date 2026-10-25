@@ -1,9 +1,10 @@
 # ARCHITECTURE_SYNC: 架构同步与模块调用规范卡片
 
-> **最新架构审计基准版本**：v2.3 (Task 6G-C-R3B-2 历史动作向统一桥接层与全身控制架构无损迁移完成)  
-> **审计基准 Git SHA**：`d76f035` / `339c38a`  
-> **当前状态**：历史 4 大动作（Walk/Run/Sprint/Brake）已 100% 无损迁移至 KinematicBridgeExecutor 与 WholeBodyController，通过全部验证，严禁进入 6G-D，等待用户 Blender 视口验收  
-> **核心原则**：磁盘代码与真实运行调用链是唯一事实依据。杜绝只读指标伪装闭环控制，严格区分当前架构、R3B 集成架构与未来规划。
+> **最新架构审计基准版本**：v3.0 (Task 6G-D-C2-FINAL 6G 动力学最终收口、全量工程审计与运动底座架构冻结)  
+> **审计基准 Git SHA**：`d0d73d476e2f2d3f3b629d767744ab12ba867bf8`  
+> **权威架构文档集合**：详见 [`docs/FOUNDATION_ASSET_AUDIT.md`](docs/FOUNDATION_ASSET_AUDIT.md)、[`docs/FOUNDATION_ARCHITECTURE_AUDIT.md`](docs/FOUNDATION_ARCHITECTURE_AUDIT.md)、[`docs/FOUNDATION_DEPENDENCY_MAP.md`](docs/FOUNDATION_DEPENDENCY_MAP.md)、[`docs/FOUNDATION_STATE_OWNERSHIP.md`](docs/FOUNDATION_STATE_OWNERSHIP.md)、[`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`](docs/ROADMAP_FOUNDATION_TO_FULLBODY.md) 与 [`docs/C2_FINAL_VALIDATION.md`](docs/C2_FINAL_VALIDATION.md)  
+> **当前状态**：动力学 73 状态（Frame 1..73）全闭环对齐，接触力二次规划求解与辛前向积分经 100% 机器遥测硬断言通过；底座正式冻结进入只读维护，严禁自动衍生 C2-B/C3/6G-E 分支，严格停止等待人类指令  
+> **核心原则**：磁盘代码与真实运行调用链是唯一事实依据。单刚体集总 CoM 动力学内核与历史成熟步态保持 100% 兼容与零退化。
 
 ---
 

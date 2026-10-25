@@ -40,7 +40,7 @@ class TestDynamicsVisualTelemetry(unittest.TestCase):
         self.assertIn("summary", data)
 
         meta = data["metadata"]
-        self.assertEqual(meta["num_frames"], 72)
+        self.assertEqual(meta["num_frames"], 73)
         self.assertEqual(meta["fps"], 24)
         self.assertAlmostEqual(meta["dt_sec"], 1.0 / 24.0, places=6)
 
@@ -56,7 +56,7 @@ class TestDynamicsVisualTelemetry(unittest.TestCase):
             self.assertIn(s_key, stations, f"Missing station: {s_key}")
             s_data = stations[s_key]
             frames = s_data["frames"]
-            self.assertEqual(len(frames), 72, f"Station {s_key} must contain exactly 72 frames")
+            self.assertEqual(len(frames), 73, f"Station {s_key} must contain exactly 73 frames")
 
             # Check timestamp progression
             prev_t = -1.0
@@ -203,4 +203,7 @@ class TestDynamicsVisualTelemetry(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    argv = [sys.argv[0]]
+    if "--" in sys.argv:
+        argv.extend(sys.argv[sys.argv.index("--") + 1:])
+    unittest.main(argv=argv)

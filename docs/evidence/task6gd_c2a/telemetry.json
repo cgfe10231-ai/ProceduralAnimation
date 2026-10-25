@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "task_id": "Task 6G-D-C2-A",
+    "task_id": "Task 6G-D-C2-FINAL",
     "benchmark_scene": "output/dynamics_playground.blend",
     "num_stations": 5,
-    "num_frames": 72,
+    "num_frames": 73,
     "fps": 24,
     "dt_sec": 0.041666666666666664,
     "isolation_collection": "Playground_Dynamics_Visualization"
@@ -7004,6 +7004,103 @@
             "side": "keyframe_samples/s1_side_f072.png",
             "top": "keyframe_samples/s1_top_f072.png"
           }
+        },
+        {
+          "frame": 73,
+          "timestamp_sec": 3.0,
+          "solver_status": "solved",
+          "integrated_state": {
+            "com_position": [
+              -3.0,
+              -3.999985,
+              1.0
+            ],
+            "com_velocity": [
+              0.0,
+              0.000134,
+              -5e-06
+            ],
+            "orientation_quaternion_wxyz": [
+              1.0,
+              0.000152,
+              0.0,
+              0.0
+            ],
+            "angular_momentum": [
+              0.002023,
+              0.0,
+              0.0
+            ]
+          },
+          "target_reference": {
+            "target_com_position": [
+              -3.0,
+              -4.0,
+              1.0
+            ],
+            "target_com_velocity": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "target_orientation_quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "blender_evaluated": {
+            "com_sphere_position": [
+              -3.0,
+              -3.999985,
+              1.0
+            ],
+            "body_proxy_position": [
+              -3.0,
+              -3.999985,
+              1.0
+            ],
+            "body_proxy_quaternion_wxyz": [
+              1.0,
+              0.000152,
+              0.0,
+              0.0
+            ],
+            "target_ghost_position": [
+              -3.0,
+              -4.0,
+              1.0
+            ]
+          },
+          "contact_forces": {
+            "foot_L": [
+              0.0,
+              -193.44004467351232,
+              10.153873446439853
+            ],
+            "foot_R": [
+              0.0,
+              193.3897396776728,
+              676.546532155014
+            ]
+          },
+          "total_contact_force": [
+            0.0,
+            -0.05,
+            686.7
+          ],
+          "coherence_deltas": {
+            "position_error_m": 0.0,
+            "orientation_error_rad": 0.0,
+            "target_actual_divergence_m": 1.5e-05,
+            "target_actual_rot_divergence_rad": 0.000304
+          },
+          "associated_images": {
+            "front": "keyframe_samples/s1_front_f073.png",
+            "side": "keyframe_samples/s1_side_f073.png",
+            "top": "keyframe_samples/s1_top_f073.png"
+          }
         }
       ],
       "metrics": {
@@ -7011,8 +7108,8 @@
         "max_body_orientation_error_rad": 0.0,
         "max_force_arrow_alignment_error_rad": 0.0,
         "max_target_actual_divergence_m": 9e-05,
-        "final_target_actual_divergence_m": 8e-06,
-        "final_target_actual_rot_divergence_rad": 0.000295
+        "final_target_actual_divergence_m": 1.5e-05,
+        "final_target_actual_rot_divergence_rad": 0.000304
       }
     },
     "scenario_2_free_fall": {
@@ -13218,14 +13315,100 @@
             "side": "keyframe_samples/s2_side_f072.png",
             "top": "keyframe_samples/s2_top_f072.png"
           }
+        },
+        {
+          "frame": 73,
+          "timestamp_sec": 3.0,
+          "solver_status": "infeasible",
+          "integrated_state": {
+            "com_position": [
+              -3.0,
+              -2.0,
+              -40.645
+            ],
+            "com_velocity": [
+              0.0,
+              0.0,
+              -29.43
+            ],
+            "orientation_quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "angular_momentum": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "target_reference": {
+            "target_com_position": [
+              -3.0,
+              -2.0,
+              3.5
+            ],
+            "target_com_velocity": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "target_orientation_quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "blender_evaluated": {
+            "com_sphere_position": [
+              -3.0,
+              -2.0,
+              -40.645
+            ],
+            "body_proxy_position": [
+              -3.0,
+              -2.0,
+              -40.645
+            ],
+            "body_proxy_quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "target_ghost_position": [
+              -3.0,
+              -2.0,
+              3.5
+            ]
+          },
+          "contact_forces": {},
+          "total_contact_force": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "coherence_deltas": {
+            "position_error_m": 0.0,
+            "orientation_error_rad": 0.0,
+            "target_actual_divergence_m": 44.145,
+            "target_actual_rot_divergence_rad": 0.0
+          },
+          "associated_images": {
+            "front": "keyframe_samples/s2_front_f073.png",
+            "side": "keyframe_samples/s2_side_f073.png",
+            "top": "keyframe_samples/s2_top_f073.png"
+          }
         }
       ],
       "metrics": {
         "max_com_position_error_m": 0.0,
         "max_body_orientation_error_rad": 0.0,
         "max_force_arrow_alignment_error_rad": 0.0,
-        "max_target_actual_divergence_m": 42.927266,
-        "final_target_actual_divergence_m": 42.927266,
+        "max_target_actual_divergence_m": 44.145,
+        "final_target_actual_divergence_m": 44.145,
         "final_target_actual_rot_divergence_rad": 0.0
       }
     },
@@ -20224,6 +20407,103 @@
             "side": "keyframe_samples/s3_side_f072.png",
             "top": "keyframe_samples/s3_top_f072.png"
           }
+        },
+        {
+          "frame": 73,
+          "timestamp_sec": 3.0,
+          "solver_status": "approximate",
+          "integrated_state": {
+            "com_position": [
+              0.010057,
+              0.0,
+              1.0
+            ],
+            "com_velocity": [
+              3.039141,
+              0.0,
+              -0.0
+            ],
+            "orientation_quaternion_wxyz": [
+              0.247954,
+              0.0,
+              0.968772,
+              0.0
+            ],
+            "angular_momentum": [
+              0.0,
+              -212.739817,
+              0.0
+            ]
+          },
+          "target_reference": {
+            "target_com_position": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "target_com_velocity": [
+              3.0,
+              0.0,
+              0.0
+            ],
+            "target_orientation_quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "blender_evaluated": {
+            "com_sphere_position": [
+              0.010057,
+              0.0,
+              1.0
+            ],
+            "body_proxy_position": [
+              0.010057,
+              0.0,
+              1.0
+            ],
+            "body_proxy_quaternion_wxyz": [
+              0.247954,
+              0.0,
+              0.968772,
+              0.0
+            ],
+            "target_ghost_position": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "contact_forces": {
+            "foot_L": [
+              -7.334982578400379,
+              0.0,
+              343.3500000193027
+            ],
+            "foot_R": [
+              -7.334982578400379,
+              0.0,
+              343.3500000193027
+            ]
+          },
+          "total_contact_force": [
+            -14.67,
+            0.0,
+            686.7
+          ],
+          "coherence_deltas": {
+            "position_error_m": 0.0,
+            "orientation_error_rad": 0.0,
+            "target_actual_divergence_m": 0.010057,
+            "target_actual_rot_divergence_rad": 2.640456
+          },
+          "associated_images": {
+            "front": "keyframe_samples/s3_front_f073.png",
+            "side": "keyframe_samples/s3_side_f073.png",
+            "top": "keyframe_samples/s3_top_f073.png"
+          }
         }
       ],
       "metrics": {
@@ -20231,8 +20511,8 @@
         "max_body_orientation_error_rad": 2.1e-07,
         "max_force_arrow_alignment_error_rad": 0.0,
         "max_target_actual_divergence_m": 0.10785,
-        "final_target_actual_divergence_m": 0.008244,
-        "final_target_actual_rot_divergence_rad": 2.902988
+        "final_target_actual_divergence_m": 0.010057,
+        "final_target_actual_rot_divergence_rad": 2.640456
       }
     },
     "scenario_4_insufficient_friction": {
@@ -27230,15 +27510,112 @@
             "side": "keyframe_samples/s4_side_f072.png",
             "top": "keyframe_samples/s4_top_f072.png"
           }
+        },
+        {
+          "frame": 73,
+          "timestamp_sec": 3.0,
+          "solver_status": "approximate",
+          "integrated_state": {
+            "com_position": [
+              -2.438252,
+              2.0,
+              1.376846
+            ],
+            "com_velocity": [
+              2.373393,
+              0.0,
+              0.237413
+            ],
+            "orientation_quaternion_wxyz": [
+              0.053452,
+              0.0,
+              0.99857,
+              0.0
+            ],
+            "angular_momentum": [
+              0.0,
+              -187.193567,
+              0.0
+            ]
+          },
+          "target_reference": {
+            "target_com_position": [
+              3.0,
+              2.0,
+              1.0
+            ],
+            "target_com_velocity": [
+              6.0,
+              0.0,
+              0.0
+            ],
+            "target_orientation_quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "blender_evaluated": {
+            "com_sphere_position": [
+              -2.438252,
+              2.0,
+              1.376846
+            ],
+            "body_proxy_position": [
+              -2.438252,
+              2.0,
+              1.376846
+            ],
+            "body_proxy_quaternion_wxyz": [
+              0.053452,
+              0.0,
+              0.99857,
+              0.0
+            ],
+            "target_ghost_position": [
+              3.0,
+              2.0,
+              1.0
+            ]
+          },
+          "contact_forces": {
+            "foot_L": [
+              27.666526684643067,
+              0.0,
+              345.83158355803835
+            ],
+            "foot_R": [
+              27.666526684643067,
+              0.0,
+              345.83158355803835
+            ]
+          },
+          "total_contact_force": [
+            55.333,
+            0.0,
+            691.663
+          ],
+          "coherence_deltas": {
+            "position_error_m": 0.0,
+            "orientation_error_rad": 4e-08,
+            "target_actual_divergence_m": 5.451294,
+            "target_actual_rot_divergence_rad": 3.034637
+          },
+          "associated_images": {
+            "front": "keyframe_samples/s4_front_f073.png",
+            "side": "keyframe_samples/s4_side_f073.png",
+            "top": "keyframe_samples/s4_top_f073.png"
+          }
         }
       ],
       "metrics": {
         "max_com_position_error_m": 0.0,
         "max_body_orientation_error_rad": 2.9e-07,
         "max_force_arrow_alignment_error_rad": 0.0,
-        "max_target_actual_divergence_m": 5.300914,
-        "final_target_actual_divergence_m": 5.300914,
-        "final_target_actual_rot_divergence_rad": 2.604043
+        "max_target_actual_divergence_m": 5.451294,
+        "final_target_actual_divergence_m": 5.451294,
+        "final_target_actual_rot_divergence_rad": 3.034637
       }
     },
     "scenario_5_eccentric_rotation": {
@@ -33876,6 +34253,98 @@
             "side": "keyframe_samples/s5_side_f072.png",
             "top": "keyframe_samples/s5_top_f072.png"
           }
+        },
+        {
+          "frame": 73,
+          "timestamp_sec": 3.0,
+          "solver_status": "approximate",
+          "integrated_state": {
+            "com_position": [
+              -3.0,
+              3.623979,
+              0.661061
+            ],
+            "com_velocity": [
+              0.0,
+              0.632859,
+              -3.272549
+            ],
+            "orientation_quaternion_wxyz": [
+              0.838171,
+              -0.545408,
+              0.0,
+              0.0
+            ],
+            "angular_momentum": [
+              -643.003065,
+              0.0,
+              0.0
+            ]
+          },
+          "target_reference": {
+            "target_com_position": [
+              -3.0,
+              4.0,
+              1.0
+            ],
+            "target_com_velocity": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "target_orientation_quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "blender_evaluated": {
+            "com_sphere_position": [
+              -3.0,
+              3.623979,
+              0.661061
+            ],
+            "body_proxy_position": [
+              -3.0,
+              3.623979,
+              0.661061
+            ],
+            "body_proxy_quaternion_wxyz": [
+              0.838171,
+              -0.545408,
+              0.0,
+              0.0
+            ],
+            "target_ghost_position": [
+              -3.0,
+              4.0,
+              1.0
+            ]
+          },
+          "contact_forces": {
+            "eccentric_foot": [
+              0.0,
+              229.9812974421598,
+              883.7876053530521
+            ]
+          },
+          "total_contact_force": [
+            0.0,
+            229.981,
+            883.788
+          ],
+          "coherence_deltas": {
+            "position_error_m": 0.0,
+            "orientation_error_rad": 4e-08,
+            "target_actual_divergence_m": 0.506233,
+            "target_actual_rot_divergence_rad": 1.153751
+          },
+          "associated_images": {
+            "front": "keyframe_samples/s5_front_f073.png",
+            "side": "keyframe_samples/s5_side_f073.png",
+            "top": "keyframe_samples/s5_top_f073.png"
+          }
         }
       ],
       "metrics": {
@@ -33883,8 +34352,8 @@
         "max_body_orientation_error_rad": 3.5e-07,
         "max_force_arrow_alignment_error_rad": 0.0,
         "max_target_actual_divergence_m": 0.948759,
-        "final_target_actual_divergence_m": 0.446863,
-        "final_target_actual_rot_divergence_rad": 1.549033
+        "final_target_actual_divergence_m": 0.506233,
+        "final_target_actual_rot_divergence_rad": 1.153751
       }
     }
   },

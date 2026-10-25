@@ -56,17 +56,18 @@ def resolve_blender_executable() -> str:
 
 def resolve_python_executable() -> str:
     """Locate real Python interpreter, avoiding zero-byte Windows Store stubs."""
-    current = sys.executable
-    if current and os.path.isfile(current) and "WindowsApps" not in current:
-        return current
     candidates = [
-        r"C:\Users\64701\AppData\Local\Python\bin\python.exe",
+        r"C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe",
+        r"C:\Program Files\Blender Foundation\Blender 5.0\5.0\python\bin\python.exe",
         r"C:\Program Files\Python314\python.exe",
         r"C:\Program Files\Python312\python.exe",
     ]
     for c in candidates:
         if os.path.isfile(c):
             return c
+    current = sys.executable
+    if current and os.path.isfile(current) and "WindowsApps" not in current and not current.endswith("blender.exe"):
+        return current
     found = shutil.which("python")
     if found and "WindowsApps" not in found:
         return found
@@ -74,22 +75,11 @@ def resolve_python_executable() -> str:
 
 
 def kill_process_tree(pid: int) -> None:
-    """Forcefully kill process and all its children on Windows to eliminate zombie Blenders."""
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(pid)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            )
-        except Exception:
-            pass
-    else:
-        try:
-            os.kill(pid, 9)
-        except Exception:
-            pass
+    """Forcefully kill process to eliminate zombie subprocesses."""
+    try:
+        os.kill(pid, 9)
+    except Exception:
+        pass
 
 
 # =============================================================================
@@ -275,9 +265,13 @@ class TestSuiteRunner:
             exit_code = proc.returncode
         except subprocess.TimeoutExpired:
             timed_out = True
+            try:
+                proc.kill()
+            except Exception:
+                pass
             kill_process_tree(proc.pid)
             try:
-                stdout_str, stderr_str = proc.communicate(timeout=5.0)
+                stdout_str, stderr_str = proc.communicate(timeout=2.0)
             except Exception:
                 pass
             exit_code = -999

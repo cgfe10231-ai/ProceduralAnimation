@@ -168,14 +168,14 @@ class TestDynamicsPlaygroundIntegration(unittest.TestCase):
         self.assertIsNotNone(bpy.data.objects.get("PlaygroundOverviewCam"))
 
     def test_04_keyframed_animation_timeline_and_motion(self):
-        """Scenario 4: Scene has 72 frames; dynamic objects contain valid keyframe animation curves."""
+        """Scenario 4: Scene has 73 frames (S0..S72); dynamic objects contain valid keyframe animation curves."""
         if not self.bpy_available:
             self.skipTest("bpy not available in pure Python environment")
         import bpy
 
         scene = bpy.context.scene
         self.assertEqual(scene.frame_start, 1)
-        self.assertEqual(scene.frame_end, 72)
+        self.assertEqual(scene.frame_end, 73)
         self.assertEqual(scene.render.fps, 24)
 
         # Dynamic objects must have animation data
@@ -193,14 +193,14 @@ class TestDynamicsPlaygroundIntegration(unittest.TestCase):
 
         scene = bpy.context.scene
 
-        # Station 1: Frame 1 and Frame 72 CoM height
+        # Station 1: Frame 1 and Frame 73 CoM height
         scene.frame_set(1)
         com1 = bpy.data.objects["Dynamics_CoM_S1"]
         z1_f1 = com1.location[2]
-        scene.frame_set(72)
-        z1_f72 = com1.location[2]
+        scene.frame_set(73)
+        z1_f73 = com1.location[2]
         self.assertAlmostEqual(z1_f1, 1.0, delta=1e-5)
-        self.assertAlmostEqual(z1_f72, 1.0, delta=1e-5)
+        self.assertAlmostEqual(z1_f73, 1.0, delta=1e-5)
 
         # Station 2: Free fall drop
         scene.frame_set(1)
@@ -215,13 +215,13 @@ class TestDynamicsPlaygroundIntegration(unittest.TestCase):
         scene.frame_set(1)
         com3 = bpy.data.objects["Dynamics_CoM_S3"]
         x3_f1 = com3.location[0]
-        scene.frame_set(72)
-        x3_f72 = com3.location[0]
+        scene.frame_set(73)
+        x3_f73 = com3.location[0]
         self.assertAlmostEqual(x3_f1, -6.0, delta=1e-5)
-        self.assertGreater(x3_f72, -0.5)  # Advanced forward by >5.5m
+        self.assertGreater(x3_f73, -0.5)  # Advanced forward by >5.5m
 
         # Station 4: Friction slip lag
-        scene.frame_set(72)
+        scene.frame_set(73)
         com4 = bpy.data.objects["Dynamics_CoM_S4"]
         ghost4 = bpy.data.objects["Dynamics_TargetGhost_S4"]
         x4_actual = com4.location[0]
@@ -230,7 +230,7 @@ class TestDynamicsPlaygroundIntegration(unittest.TestCase):
         self.assertGreater(lag4, 2.0)  # Shows visible lag in viewport
 
         # Station 5: Roll tilt
-        scene.frame_set(48)
+        scene.frame_set(49)
         body5 = bpy.data.objects["Dynamics_BodyProxy_S5"]
         q5 = body5.rotation_quaternion
         self.assertNotEqual(q5[1], 0.0)  # Non-zero roll quaternion component qx

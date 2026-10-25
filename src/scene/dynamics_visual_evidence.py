@@ -356,10 +356,10 @@ def collect_frame_telemetry(scene: Any, scenarios_data: Dict[str, Any]) -> Dict[
     """
     telemetry_root: Dict[str, Any] = {
         "metadata": {
-            "task_id": "Task 6G-D-C2-A",
+            "task_id": "Task 6G-D-C2-FINAL",
             "benchmark_scene": "output/dynamics_playground.blend",
             "num_stations": len(scenarios_data),
-            "num_frames": 72,
+            "num_frames": 73,
             "fps": 24,
             "dt_sec": 1.0 / 24.0,
             "isolation_collection": "Playground_Dynamics_Visualization",
@@ -386,6 +386,7 @@ def collect_frame_telemetry(scene: Any, scenarios_data: Dict[str, Any]) -> Dict[
         s_data = scenarios_data[s_key]
         traj = s_data["trajectory"]
         frames = traj.frames
+        dt = 1.0 / 24.0
 
         station_record: Dict[str, Any] = {
             "station_index": s_idx,
@@ -405,6 +406,50 @@ def collect_frame_telemetry(scene: Any, scenarios_data: Dict[str, Any]) -> Dict[
             },
         }
 
+        # Build 73 timeline samples
+        station_samples = []
+        for k, f_data in enumerate(frames):
+            curr_state = f_data.state_current
+            c_forces = {cid: list(f_vec) for cid, f_vec in f_data.actual_contact_forces.items()}
+            p_target = f_data.motion_reference.target_com_position_world or curr_state.com_position_world
+            v_target = f_data.motion_reference.target_com_velocity_world or (0.0, 0.0, 0.0)
+            q_target = f_data.motion_reference.target_orientation_quat_world or (1.0, 0.0, 0.0, 0.0)
+            station_samples.append({
+                "frame": k + 1,
+                "timestamp": f_data.timestamp,
+                "solver_status": f_data.solver_status.value if hasattr(f_data.solver_status, "value") else str(f_data.solver_status),
+                "state": curr_state,
+                "target_p": p_target,
+                "target_v": v_target,
+                "target_q": q_target,
+                "forces": c_forces,
+            })
+
+        # Terminal state S72 at frame 73 (t=3.0s)
+        last_f = frames[-1]
+        final_t = 72 * dt
+        if "ref_sched" in s_data:
+            term_ref = s_data["ref_sched"](72, final_t, traj.final_state)
+            term_tgt_p = term_ref.target_com_position_world or traj.final_state.com_position_world
+            term_tgt_v = term_ref.target_com_velocity_world or (0.0, 0.0, 0.0)
+            term_tgt_q = term_ref.target_orientation_quat_world or (1.0, 0.0, 0.0, 0.0)
+        else:
+            term_tgt_p = last_f.motion_reference.target_com_position_world or traj.final_state.com_position_world
+            term_tgt_v = last_f.motion_reference.target_com_velocity_world or (0.0, 0.0, 0.0)
+            term_tgt_q = last_f.motion_reference.target_orientation_quat_world or (1.0, 0.0, 0.0, 0.0)
+
+        last_forces = {cid: list(f_vec) for cid, f_vec in last_f.actual_contact_forces.items()}
+        station_samples.append({
+            "frame": 73,
+            "timestamp": final_t,
+            "solver_status": last_f.solver_status.value if hasattr(last_f.solver_status, "value") else str(last_f.solver_status),
+            "state": traj.final_state,
+            "target_p": term_tgt_p,
+            "target_v": term_tgt_v,
+            "target_q": term_tgt_q,
+            "forces": last_forces,
+        })
+
         # Reference Blender objects
         import bpy
         com_obj = bpy.data.objects.get(f"Dynamics_CoMSphere_S{s_idx}")
@@ -417,18 +462,19 @@ def collect_frame_telemetry(scene: Any, scenarios_data: Dict[str, Any]) -> Dict[
         max_force_err = 0.0
         max_diverge_p = 0.0
 
-        for f_idx, f_data in enumerate(frames, start=1):
+        for sample in station_samples:
+            f_idx = sample["frame"]
             scene.frame_set(f_idx)
 
-            curr_state = f_data.state_current
+            curr_state = sample["state"]
             p_actual = curr_state.com_position_world
             v_actual = curr_state.com_velocity_world
             q_actual = curr_state.orientation_quat_world
             L_actual = curr_state.angular_momentum_about_com_world
 
-            p_target = f_data.motion_reference.target_com_position_world or p_actual
-            v_target = f_data.motion_reference.target_com_velocity_world or (0.0, 0.0, 0.0)
-            q_target = f_data.motion_reference.target_orientation_quat_world or (1.0, 0.0, 0.0, 0.0)
+            p_target = sample["target_p"]
+            v_target = sample["target_v"]
+            q_target = sample["target_q"]
 
             # Evaluate Blender objects
             p_blender_com = tuple(com_obj.matrix_world.translation) if com_obj else p_actual
@@ -447,13 +493,13 @@ def collect_frame_telemetry(scene: Any, scenarios_data: Dict[str, Any]) -> Dict[
             max_diverge_p = max(max_diverge_p, div_p)
 
             # Contact forces & solver status
-            c_forces = {cid: list(f_vec) for cid, f_vec in f_data.actual_contact_forces.items()}
-            total_force = [sum(f_data.actual_contact_forces[c][i] for c in f_data.actual_contact_forces) for i in range(3)] if f_data.actual_contact_forces else [0.0, 0.0, 0.0]
+            c_forces = sample["forces"]
+            total_force = [sum(c_forces[c][i] for c in c_forces) for i in range(3)] if c_forces else [0.0, 0.0, 0.0]
 
             frame_entry = {
                 "frame": f_idx,
-                "timestamp_sec": round(f_data.timestamp, 5),
-                "solver_status": f_data.solver_status.value if hasattr(f_data.solver_status, "value") else str(f_data.solver_status),
+                "timestamp_sec": round(sample["timestamp"], 5),
+                "solver_status": sample["solver_status"],
                 "integrated_state": {
                     "com_position": [round(x, 6) for x in p_actual],
                     "com_velocity": [round(x, 6) for x in v_actual],
@@ -515,7 +561,7 @@ def collect_frame_telemetry(scene: Any, scenarios_data: Dict[str, Any]) -> Dict[
 def render_keyframe_images(
     scene: Any,
     output_dir: str,
-    keyframe_indices: Sequence[int] = (1, 12, 24, 36, 48, 60, 72),
+    keyframe_indices: Sequence[int] = (1, 13, 25, 37, 49, 61, 73),
     cams: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, str]:
     """Render keyframe images for each station across Front, Side, and Top views."""
@@ -612,7 +658,7 @@ def build_contact_sheet_image(
     # Header banner
     draw_text_to_numpy(
         canvas,
-        "PROCEDURALANIMATION - TASK 6G-D-C2-A DYNAMICS VERIFICATION CONTACT SHEET",
+        "PROCEDURALANIMATION - TASK 6G-D-C2-FINAL DYNAMICS VERIFICATION CONTACT SHEET",
         margin + 10,
         margin + 20,
         color=(0.3, 0.8, 1.0),
@@ -620,7 +666,7 @@ def build_contact_sheet_image(
     )
     draw_text_to_numpy(
         canvas,
-        "SCENE: output/dynamics_playground.blend | CLOSED-LOOP SIMULATION: 72 FRAMES (24 FPS, dt=1/24s) | 100% NUMERICAL DYNAMICS",
+        "SCENE: output/dynamics_playground.blend | CLOSED-LOOP SIMULATION: 73 STANDARDIZED STATES (24 FPS, dt=1/24s) | 100% NUMERICAL DYNAMICS",
         margin + 10,
         margin + 55,
         color=(0.85, 0.85, 0.85),
@@ -630,11 +676,11 @@ def build_contact_sheet_image(
     # Column Headers
     col_titles = [
         "T=0.00S (F01) SIDE",
-        "T=1.00S (F24) SIDE",
-        "T=2.00S (F48) SIDE",
-        "T=3.00S (F72) SIDE",
-        "T=3.00S (F72) FRONT",
-        "T=3.00S (F72) TOP",
+        "T=1.00S (F25) SIDE",
+        "T=2.00S (F49) SIDE",
+        "T=3.00S (F73) SIDE",
+        "T=3.00S (F73) FRONT",
+        "T=3.00S (F73) TOP",
     ]
     for c_idx, title in enumerate(col_titles):
         col_x = sidebar_w + margin + c_idx * (tile_w + col_gap)
@@ -650,11 +696,11 @@ def build_contact_sheet_image(
 
     col_image_keys = [
         ("side", 1),
-        ("side", 24),
-        ("side", 48),
-        ("side", 72),
-        ("front", 72),
-        ("top", 72),
+        ("side", 25),
+        ("side", 49),
+        ("side", 73),
+        ("front", 73),
+        ("top", 73),
     ]
 
     # Process each station row
@@ -739,7 +785,7 @@ def generate_interactive_html_player(
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Dynamics Playground Interactive Verification Player (Task 6G-D-C2-A)</title>
+<title>Dynamics Playground Interactive Verification Player (Task 6G-D-C2-FINAL)</title>
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; background: #0f141c; color: #d0d7de; margin: 0; padding: 20px; }}
   h1 {{ font-size: 20px; margin-bottom: 5px; color: #58a6ff; }}
@@ -764,7 +810,7 @@ def generate_interactive_html_player(
 </head>
 <body>
 <h1>Dynamics Playground Interactive Telemetry & Visual Player</h1>
-<div class="subtitle">Task 6G-D-C2-A | Scene: output/dynamics_playground.blend | 100% Numerical Dynamics Keyframing</div>
+<div class="subtitle">Task 6G-D-C2-FINAL | Scene: output/dynamics_playground.blend | 73 Standardized States (24 FPS, dt=1/24s) | 100% Numerical Dynamics</div>
 
 <div class="container">
   <div class="viewport-panel">
@@ -827,7 +873,7 @@ def generate_interactive_html_player(
 
 <script>
 const telemetry = {telem_json};
-const keyframes = [1, 12, 24, 36, 48, 60, 72];
+const keyframes = [1, 13, 25, 37, 49, 61, 73];
 let currStation = "scenario_1_static_support";
 let currView = "side";
 let currKeyframeIdx = 0;
@@ -847,7 +893,7 @@ function updateView() {{
   const sNum = sMap[currStation];
   const fname = `s${{sNum}}_${{currView}}_f${{String(fNum).padStart(3, '0')}}.png`;
   document.getElementById('viewImg').src = `${{image_rel_dir}}/${{fname}}`;
-  document.getElementById('frameLabel').textContent = `F${{String(fNum).padStart(2, '0')}} (${{(fNum/24).toFixed(2)}}s)`;
+  document.getElementById('frameLabel').textContent = `F${{String(fNum).padStart(2, '0')}} (${{((fNum - 1)/24).toFixed(2)}}s)`;
   document.getElementById('frameSlider').value = currKeyframeIdx + 1;
 
   const stData = telemetry.stations[currStation];
@@ -945,13 +991,13 @@ def generate_validation_markdown_report(
     stations = telemetry.get("stations", {})
 
     report_lines: List[str] = [
-        "# Task 6G-D-C2-A: DynamicsPlayground 真实动力学状态视觉验证报告",
+        "# Task 6G-D-C2-FINAL: DynamicsPlayground 真实动力学状态视觉验证报告",
         "",
         "## 一、验收审计总览 (Executive Summary)",
         "",
         "- **被审基准场景**：`output/dynamics_playground.blend`（单一权威基准）",
         "- **动力学内核**：`ClosedLoopDynamicsCoordinator` + `ForwardDynamicsState` + `ContactForceSolver`",
-        "- **时间步长与总帧数**：72 帧，24 FPS，步长 $\\Delta t = 1/24\\text{ s}$（3.0 秒全连续运动）",
+        "- **时间步长与总帧数**：73 状态（72 步积分），24 FPS，步长 $\\Delta t = 1/24\\text{ s}$（3.0 秒全连续运动，Frame 1 至 73）",
         f"- **Blender 对象与数值积分最大位置误差**：`{summary.get('max_position_error_m', 0.0):.2e} m`（要求 $< 1\\times 10^{{-5}}\\text{{ m}}$）",
         f"- **Blender 对象与数值积分最大姿态误差**：`{summary.get('max_orientation_error_rad', 0.0):.2e} rad`（要求 $< 1\\times 10^{{-5}}\\text{{ rad}}$）",
         "- **目标状态防冒充/防篡改审计**：**100% 验证通过**（在滑移与偏心滚转工位，实际状态与目标虚影发生符合物理规律的显著发散，严禁冒充）",
@@ -963,7 +1009,7 @@ def generate_validation_markdown_report(
         "",
         f"![Dynamics Contact Sheet]({contact_sheet_rel_path})",
         "",
-        "*注：本联系表涵盖全部 5 个测试台在 $t=0.00\\text{s}$ (F01)、$t=1.00\\text{s}$ (F24)、$t=2.00\\text{s}$ (F48)、$t=3.00\\text{s}$ (F72) 的侧面演化，以及 $t=3.00\\text{s}$ 的正面与俯视终态。*",
+        "*注：本联系表涵盖全部 5 个测试台在 $t=0.00\\text{s}$ (F01)、$t=1.00\\text{s}$ (F25)、$t=2.00\\text{s}$ (F49)、$t=3.00\\text{s}$ (F73) 的侧面演化，以及 $t=3.00\\text{s}$ 的正面与俯视终态。*",
         "",
         "---",
         "",

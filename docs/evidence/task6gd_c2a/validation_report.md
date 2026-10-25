@@ -1,10 +1,10 @@
-# Task 6G-D-C2-A: DynamicsPlayground 真实动力学状态视觉验证报告
+# Task 6G-D-C2-FINAL: DynamicsPlayground 真实动力学状态视觉验证报告
 
 ## 一、验收审计总览 (Executive Summary)
 
 - **被审基准场景**：`output/dynamics_playground.blend`（单一权威基准）
 - **动力学内核**：`ClosedLoopDynamicsCoordinator` + `ForwardDynamicsState` + `ContactForceSolver`
-- **时间步长与总帧数**：72 帧，24 FPS，步长 $\Delta t = 1/24\text{ s}$（3.0 秒全连续运动）
+- **时间步长与总帧数**：73 状态（72 步积分），24 FPS，步长 $\Delta t = 1/24\text{ s}$（3.0 秒全连续运动，Frame 1 至 73）
 - **Blender 对象与数值积分最大位置误差**：`0.00e+00 m`（要求 $< 1\times 10^{-5}\text{ m}$）
 - **Blender 对象与数值积分最大姿态误差**：`3.50e-07 rad`（要求 $< 1\times 10^{-5}\text{ rad}$）
 - **目标状态防冒充/防篡改审计**：**100% 验证通过**（在滑移与偏心滚转工位，实际状态与目标虚影发生符合物理规律的显著发散，严禁冒充）
@@ -16,7 +16,7 @@
 
 ![Dynamics Contact Sheet](contact_sheet.png)
 
-*注：本联系表涵盖全部 5 个测试台在 $t=0.00\text{s}$ (F01)、$t=1.00\text{s}$ (F24)、$t=2.00\text{s}$ (F48)、$t=3.00\text{s}$ (F72) 的侧面演化，以及 $t=3.00\text{s}$ 的正面与俯视终态。*
+*注：本联系表涵盖全部 5 个测试台在 $t=0.00\text{s}$ (F01)、$t=1.00\text{s}$ (F25)、$t=2.00\text{s}$ (F49)、$t=3.00\text{s}$ (F73) 的侧面演化，以及 $t=3.00\text{s}$ 的正面与俯视终态。*
 
 ---
 
@@ -25,10 +25,10 @@
 | 工位编号 | 工位名称与物理机制 | 接触条件与外力 | 最大位置误差 | 最大姿态误差 | 目标发散量 (Anti-Spoofing) | 验收结论 |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: |
 | **Station 1** | Station 1: Static Support Equilibrium<br>*Gravity balanced by normal ground reaction; zero sinkage (< 1e-5m)* | 地面约束 | `0.00e+00 m` | `0.00e+00 rad` | $\Delta p = 0.00\text{ m}$, $\Delta q = 0.00\text{ rad}$ | **PASS** |
-| **Station 2** | Station 2: Gravity Free-Fall<br>*Unassisted gravitational drop under -9.81 m/s^2; zero contact forces* | 地面约束 | `0.00e+00 m` | `0.00e+00 rad` | $\Delta p = 42.93\text{ m}$, $\Delta q = 0.00\text{ rad}$ | **PASS** |
-| **Station 3** | Station 3: Horizontal Acceleration<br>*Propulsion forces within friction cone; tracks target with zero lag* | 地面约束 | `0.00e+00 m` | `2.10e-07 rad` | $\Delta p = 0.01\text{ m}$, $\Delta q = 2.90\text{ rad}$ | **PASS** |
-| **Station 4** | Station 4: Insufficient Friction Clamping<br>*Tangential forces clamped at mu*Fn; visual slip and lag vs target ghost* | 地面约束 | `0.00e+00 m` | `2.90e-07 rad` | $\Delta p = 5.30\text{ m}$, $\Delta q = 2.60\text{ rad}$ | **PASS** |
-| **Station 5** | Station 5: Eccentric Contact Rotation<br>*Eccentric lever arm creates net roll torque; rotates body attitude and builds L_x* | 地面约束 | `0.00e+00 m` | `3.50e-07 rad` | $\Delta p = 0.45\text{ m}$, $\Delta q = 1.55\text{ rad}$ | **PASS** |
+| **Station 2** | Station 2: Gravity Free-Fall<br>*Unassisted gravitational drop under -9.81 m/s^2; zero contact forces* | 地面约束 | `0.00e+00 m` | `0.00e+00 rad` | $\Delta p = 44.15\text{ m}$, $\Delta q = 0.00\text{ rad}$ | **PASS** |
+| **Station 3** | Station 3: Horizontal Acceleration<br>*Propulsion forces within friction cone; tracks target with zero lag* | 地面约束 | `0.00e+00 m` | `2.10e-07 rad` | $\Delta p = 0.01\text{ m}$, $\Delta q = 2.64\text{ rad}$ | **PASS** |
+| **Station 4** | Station 4: Insufficient Friction Clamping<br>*Tangential forces clamped at mu*Fn; visual slip and lag vs target ghost* | 地面约束 | `0.00e+00 m` | `2.90e-07 rad` | $\Delta p = 5.45\text{ m}$, $\Delta q = 3.03\text{ rad}$ | **PASS** |
+| **Station 5** | Station 5: Eccentric Contact Rotation<br>*Eccentric lever arm creates net roll torque; rotates body attitude and builds L_x* | 地面约束 | `0.00e+00 m` | `3.50e-07 rad` | $\Delta p = 0.51\text{ m}$, $\Delta q = 1.15\text{ rad}$ | **PASS** |
 
 ---
 

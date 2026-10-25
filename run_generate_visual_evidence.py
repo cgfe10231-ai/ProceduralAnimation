@@ -51,7 +51,7 @@ from src.scene.dynamics_visual_evidence import (
 def main() -> int:
     t0 = time.time()
     print("=" * 78)
-    print("TASK 6G-D-C2-A: AUTOMATED VISUAL EVIDENCE & TELEMETRY GENERATION")
+    print("TASK 6G-D-C2-FINAL: AUTOMATED VISUAL EVIDENCE & TELEMETRY GENERATION")
     print("=" * 78)
 
     blend_path = os.path.abspath("output/dynamics_playground.blend")
@@ -74,7 +74,7 @@ def main() -> int:
     # 1. Run numerical simulation scenarios (72 frames, dt=1/24s)
     print("\n[STEP 1/8] Running numerical closed-loop scenarios...")
     scenarios_data = run_dynamics_scenarios(num_steps=72, dt=1.0 / 24.0)
-    print(f"  Simulated {len(scenarios_data)} physical stations across 72 frames.")
+    print(f"  Simulated {len(scenarios_data)} physical stations across 72 frames (73 standardized states).")
 
     # 2. Inject visual keyframes & cameras
     print("\n[STEP 2/8] Injecting/refreshing visual keyframes & station cameras...")
@@ -95,7 +95,7 @@ def main() -> int:
 
     # 4. Render keyframe stills
     print("\n[STEP 4/8] Rendering multi-view keyframe stills across 7 keyframe intervals...")
-    keyframe_indices = (1, 12, 24, 36, 48, 60, 72)
+    keyframe_indices = (1, 13, 25, 37, 49, 61, 73)
     rendered_stills = render_keyframe_images(scene, img_dir, keyframe_indices=keyframe_indices, cams=cams)
     print(f"  Rendered {len(rendered_stills)} keyframe image files to: {img_dir}")
 
@@ -105,12 +105,22 @@ def main() -> int:
     build_contact_sheet_image(img_dir, contact_sheet_path, telemetry)
     print(f"  Contact Sheet generated: {contact_sheet_path} ({os.path.getsize(contact_sheet_path)} bytes).")
 
-    # 6. Encode Animated GIF
+    # 6. Encode Animated GIF (Continuous 73-frame animation)
     print("\n[STEP 6/8] Encoding continuous motion animated GIF preview...")
     gif_path = os.path.join(output_base, "dynamics_overview_anim.gif")
-    # Read rendered overview frames
+    insp_cam = bpy.data.objects.get("DynamicsInspectionCam")
+    if insp_cam:
+        scene.camera = insp_cam
+        for f_idx in range(1, 74):
+            scene.frame_set(f_idx)
+            fname = f"overview_f{f_idx:03d}.png"
+            out_file = os.path.abspath(os.path.join(img_dir, fname))
+            if not os.path.isfile(out_file):
+                scene.render.filepath = out_file
+                bpy.ops.render.render(write_still=True)
+
     gif_frames = []
-    for f_idx in keyframe_indices:
+    for f_idx in range(1, 74):
         ov_path = os.path.join(img_dir, f"overview_f{f_idx:03d}.png")
         if os.path.isfile(ov_path):
             b_img = bpy.data.images.load(ov_path)
@@ -126,8 +136,13 @@ def main() -> int:
             gif_frames.append(buf[np.ix_(y_idx, x_idx)])
 
     if gif_frames:
-        encode_animated_gif(gif_path, 320, 180, gif_frames, delay_cs=25)
-        print(f"  Animated GIF encoded: {gif_path} ({os.path.getsize(gif_path)} bytes).")
+        encode_animated_gif(gif_path, 320, 180, gif_frames, delay_cs=4)
+        print(f"  Continuous animated GIF encoded: {gif_path} ({os.path.getsize(gif_path)} bytes, {len(gif_frames)} frames).")
+
+    # Restore default scene camera
+    cam_over = bpy.data.objects.get("PlaygroundOverviewCam")
+    if cam_over:
+        scene.camera = cam_over
 
     # 7. Generate Interactive HTML Player & Markdown Report
     print("\n[STEP 7/8] Generating Interactive HTML Player and Validation Report...")
@@ -152,8 +167,8 @@ def main() -> int:
     if os.path.isfile(gif_path):
         shutil.copy2(gif_path, os.path.join(docs_evidence_dir, "dynamics_overview_anim.gif"))
 
-    # Copy representative keyframe stills (e.g., F01, F36, F72 for each station)
-    sample_frames = (1, 36, 72)
+    # Copy representative keyframe stills (e.g., F01, F37, F73 for each station)
+    sample_frames = (1, 37, 73)
     sample_count = 0
     for s_idx in range(1, 6):
         for v_type in ("side", "front", "top"):
