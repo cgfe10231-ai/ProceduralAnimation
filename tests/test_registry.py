@@ -45,6 +45,7 @@ class TestDefinition:
     is_visual_acceptance: bool = False
     is_optional: bool = False
     description: str = ""
+    script_args: List[str] = field(default_factory=list)
 
     def validate(self, project_root: str) -> List[str]:
         """Validate definition integrity against local file system."""
@@ -70,6 +71,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
     # -------------------------------------------------------------------------
     # Tier 1: Quick Smoke Checks (Pure Python + Fast In-Memory)
     # -------------------------------------------------------------------------
+    "architecture_integrity_gate": TestDefinition(
+        test_id="architecture_integrity_gate",
+        name="Architecture Documentation Integrity & Symbol Existence Gate",
+        script_path="tests/test_architecture_integrity_gate.py",
+        runner_type=RunnerType.PYTHON,
+        tiers=[TestTier.QUICK, TestTier.FULL],
+        timeout_sec=15.0,
+        description="Strictly read-only AST existence check across all architecture freeze docs.",
+    ),
     "spatial_layout_clearance": TestDefinition(
         test_id="spatial_layout_clearance",
         name="Spatial Corridor Clearance & Math Layout",

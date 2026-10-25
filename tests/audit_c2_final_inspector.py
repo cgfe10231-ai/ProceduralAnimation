@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -363,13 +364,65 @@ class DocReferenceValidator:
         self.path_pattern = re.compile(r"\b((?:src|tests)/[A-Za-z0-9_./-]+\.py)\b")
         self.qualified_pattern = re.compile(r"`?([A-Z][A-Za-z0-9_]+)\.([A-Za-z_][A-Za-z0-9_]*)(?:\(\))?`?")
         self.class_pattern = re.compile(
-            r"`([A-Z][A-Za-z0-9]+(?:Controller|Executor|Planner|State|Target|Solver|Model|Query|Action|Bridge|Data|Rig|Spec|Config|Result|Tracker|Builder|Inspector|Sequence|Timeline|Context|Lifecycle|Status|Type))`"
+            r"`([A-Z][A-Za-z0-9_]+(?:Controller|Executor|Planner|State|Target|Solver|Model|Query|Action|Bridge|Data|Rig|Spec|Config|Result|Tracker|Builder|Inspector|Sequence|Timeline|Context|Lifecycle|Status|Type))`"
         )
         self.external_namespaces = {
             "math", "np", "numpy", "bpy", "sys", "os", "re", "ast", "json", "typing",
             "Path", "Vector", "Quaternion", "Euler", "Matrix", "MappingProxyType", "Enum",
             "ABC", "Dict", "List", "Set", "Tuple", "Optional", "Any", "Union"
         }
+        self.negation_keywords = [
+            "不存在", "non-existent", "not exist", "does not exist", "non-existing",
+            "phantom", "幻觉", "曾用或错误名称", "非真实", "虚构", "未定义",
+            "已废除", "已废弃", "已移除", "已消除", "消除", "禁止", "严禁", "不得",
+            "避免", "休眠引用", "非法", "无效", "错误引用", "历史偏差"
+        ]
+
+    def is_symbol_exempted_by_context(self, line: str, match_start: int, match_end: int) -> bool:
+        """Check if the specific matched symbol token is explicitly in a negation/exemption context.
+        
+        Strict clause-level checking: avoids whole-line skipping, ensuring that a negation in one clause
+        does not suppress errors in another clause on the same line.
+        """
+        after_text = line[match_end:match_end + 60]
+        paren_match = re.match(r"^\s*[(（]([^)）]+)[)）]", after_text)
+        if paren_match:
+            inner = paren_match.group(1).lower()
+            if any(kw in inner for kw in self.negation_keywords):
+                return True
+
+        clause_delims = ";；。|,\n"
+        c_start = 0
+        for i in range(match_start - 1, -1, -1):
+            if line[i] in clause_delims:
+                c_start = i + 1
+                break
+        c_end = len(line)
+        for i in range(match_end, len(line)):
+            if line[i] in clause_delims:
+                c_end = i
+                break
+
+        before_clause = line[c_start:match_start]
+        after_clause = line[match_end:c_end]
+
+        if any(kw in before_clause for kw in self.negation_keywords):
+            return True
+        if any(kw in after_clause for kw in self.negation_keywords):
+            return True
+
+        intro = before_clause.strip().lower()
+        if any(intro.startswith(lead) for lead in ["如", "例如", "比如", "such as", "e.g."]):
+            prev_start = 0
+            for i in range(c_start - 2, -1, -1):
+                if line[i] in clause_delims:
+                    prev_start = i + 1
+                    break
+            prev_clause = line[prev_start:c_start - 1]
+            if any(kw in prev_clause for kw in self.negation_keywords):
+                return True
+
+        return False
 
     def validate_document(self, doc_name: str, content: str) -> List[str]:
         errors: List[str] = []
@@ -392,20 +445,13 @@ class DocReferenceValidator:
                 k in line for k in ["(Proposed)", "(Planned)", "PROPOSED", "拟议", "规划中", "Future Architecture"]
             )
 
-            # Skip checking lines that discuss rejected or non-existent symbols explicitly
-            if any(k in line for k in [
-                "不存在", "non-existent", "Non-Existent", "Removed", "Eliminated",
-                "forbidden", "未定义", "零不存在", "phantom", "幻觉", "曾用或错误名称", "严禁再用"
-            ]):
-                continue
-
             # 1. Module path validation
             for match in self.path_pattern.finditer(line):
                 mod_path = match.group(1)
                 if mod_path not in self.index.modules and not (REPO_ROOT / mod_path).exists():
-                    if not line_is_proposed:
+                    if not line_is_proposed and not self.is_symbol_exempted_by_context(line, match.start(), match.end()):
                         errors.append(
-                            f"[{doc_name}:{idx}] ERROR: File '{mod_path}' | Symbol '{mod_path}' | Type: NON_EXISTENT_MODULE | Conclusion: Module path does not exist on disk."
+                            f"[{doc_name}:{idx}] ERROR: File '{mod_path}' | Symbol '{mod_path}' | Type: NON_EXISTENT_MODULE | State: INVALID | Conclusion: Module path does not exist on disk."
                         )
 
             # 2. Qualified symbol validation: Class.member
@@ -419,15 +465,15 @@ class DocReferenceValidator:
                 if cls_name in self.index.classes:
                     members = self.index.all_members.get(cls_name, set())
                     if member not in members:
-                        is_enum = any(any("Enum" in b for b in c_def["bases"]) for c_def in self.index.classes[cls_name])
-                        err_type = "NON_EXISTENT_ENUM_MEMBER" if is_enum else "NON_EXISTENT_METHOD"
-                        if not line_is_proposed:
+                        if not line_is_proposed and not self.is_symbol_exempted_by_context(line, match.start(), match.end()):
+                            is_enum = any(any("Enum" in b for b in c_def["bases"]) for c_def in self.index.classes[cls_name])
+                            err_type = "NON_EXISTENT_ENUM_MEMBER" if is_enum else "NON_EXISTENT_METHOD"
                             src_mod = self.index.classes[cls_name][0]["module"]
                             errors.append(
-                                f"[{doc_name}:{idx}] ERROR: File '{src_mod}' | Symbol '{cls_name}.{member}' | Type: {err_type} | Conclusion: Class '{cls_name}' exists in '{src_mod}' but defines no member '{member}'."
+                                f"[{doc_name}:{idx}] ERROR: File '{src_mod}' | Symbol '{cls_name}.{member}' | Type: {err_type} | State: INVALID | Conclusion: Class '{cls_name}' exists in '{src_mod}' but defines no member '{member}'."
                             )
                 else:
-                    if not line_is_proposed:
+                    if not line_is_proposed and not self.is_symbol_exempted_by_context(line, match.start(), match.end()):
                         if cls_name.endswith((
                             "Controller", "Executor", "Planner", "State", "Target", "Solver", "Model",
                             "Query", "Action", "Bridge", "Data", "Rig", "Spec", "Config", "Result",
@@ -435,7 +481,7 @@ class DocReferenceValidator:
                             "Lifecycle", "Status", "Type"
                         )) and cls_name not in self.index.module_stems_pascal:
                             errors.append(
-                                f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}.{member}' | Type: NON_EXISTENT_CLASS | Conclusion: Class '{cls_name}' is not defined in any Python module."
+                                f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}.{member}' | Type: NON_EXISTENT_CLASS | State: INVALID | Conclusion: Class '{cls_name}' is not defined in any Python module."
                             )
 
             # 3. Stand-alone Class Name validation
@@ -452,9 +498,9 @@ class DocReferenceValidator:
                         continue
 
                     if cls_name not in self.index.classes:
-                        if not line_is_proposed:
+                        if not line_is_proposed and not self.is_symbol_exempted_by_context(line, match.start(), match.end()):
                             errors.append(
-                                f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}' | Type: NON_EXISTENT_CLASS | Conclusion: Class '{cls_name}' is not defined in the codebase."
+                                f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}' | Type: NON_EXISTENT_CLASS | State: INVALID | Conclusion: Class '{cls_name}' is not defined in the codebase."
                             )
 
             # 4. Table row checking: Claimed IMPLEMENTED vs PROPOSED/Unimplemented
@@ -470,15 +516,16 @@ class DocReferenceValidator:
                     ):
                         continue
                     if cls_name not in self.index.classes:
-                        errors.append(
-                            f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}' | Type: MISLABELED_IMPLEMENTATION | Conclusion: Symbol claimed as IMPLEMENTED but does not exist in code."
-                        )
+                        if not self.is_symbol_exempted_by_context(line, match.start(), match.end()):
+                            errors.append(
+                                f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}' | Type: MISLABELED_IMPLEMENTATION | State: INVALID | Conclusion: Symbol claimed as IMPLEMENTED but does not exist in code."
+                            )
 
         return errors
 
 
 def run_validator_test_suite(index: CodebaseSymbolIndex) -> Tuple[bool, List[str]]:
-    """Self-test suite for the documentation validator verifying positive, negative, proposed, and prose safety."""
+    """Self-test suite for the documentation validator verifying positive, negative, proposed, prose, dynamic, and clause safety."""
     validator = DocReferenceValidator(index)
     test_errors: List[str] = []
 
@@ -529,14 +576,51 @@ def run_validator_test_suite(index: CodebaseSymbolIndex) -> Tuple[bool, List[str
     if len(prose_res) > 0:
         test_errors.append(f"Test 4 (Prose) FAILED: False alarms on natural language words: {prose_res}")
 
+    # Test 5: Dynamic Synthetic Negative Case (Anti-memorization / Anti-overfitting)
+    rand_tag = uuid.uuid4().hex[:8]
+    dyn_mod = f"src/motion/dynamic_phantom_{rand_tag}.py"
+    dyn_enum = f"ContactLifecycle.DYNAMIC_PHANTOM_{rand_tag.upper()}"
+    dyn_method = f"WholeBodyController.dynamic_phantom_{rand_tag}()"
+    dyn_class = f"DynamicPhantom_{rand_tag.capitalize()}Controller"
+    dyn_table = f"| `{dyn_class}` | IMPLEMENTED |"
+    dyn_content = (
+        f"# Dynamic Synthetic Test\n"
+        f"Module `{dyn_mod}` is invoked.\n"
+        f"References `{dyn_enum}` state.\n"
+        f"Calls `{dyn_method}` directly.\n"
+        f"Uses `{dyn_class}`.\n"
+        f"{dyn_table}\n"
+    )
+    dyn_res = validator.validate_document("test_dynamic_negative.md", dyn_content)
+    expected_dyn_types = ["NON_EXISTENT_MODULE", "NON_EXISTENT_ENUM_MEMBER", "NON_EXISTENT_METHOD", "NON_EXISTENT_CLASS", "MISLABELED_IMPLEMENTATION"]
+    for exp in expected_dyn_types:
+        if not any(exp in err for err in dyn_res):
+            test_errors.append(f"Test 5 (Dynamic Negative) FAILED: Expected error type '{exp}' was not caught in {dyn_res}")
+
+    # Test 6: Multi-Clause / Clause-level Negation Exemption (No Whole-Line Skipping)
+    rand_tag2 = uuid.uuid4().hex[:8]
+    uncaught_stem = f"WholeBodyController.uncaught_{rand_tag2}"
+    uncaught_method = f"{uncaught_stem}()"
+    exempt_mod = f"src/motion/exempt_{rand_tag2}.py"
+    clause_content = (
+        f"# Multi-Clause Test\n"
+        f"We eliminated all phantom calls; now Phase 6 runs `{uncaught_method}`; note that `{exempt_mod}` does not exist.\n"
+    )
+    clause_res = validator.validate_document("test_clause.md", clause_content)
+    if not any(uncaught_stem in err for err in clause_res):
+        test_errors.append(f"Test 6 (Clause Exemption) FAILED: Uncaught method '{uncaught_stem}' was wrongly suppressed by another clause.")
+    if any(exempt_mod in err for err in clause_res):
+        test_errors.append(f"Test 6 (Clause Exemption) FAILED: Negated module '{exempt_mod}' was wrongly reported as an error.")
+
     success = (len(test_errors) == 0)
     if success:
-        print("[SELF-TEST] PASS: All 4 validator test cases (Positive, Negative, Proposed, Prose) verified successfully.")
+        print("[SELF-TEST] PASS: All 6 validator test cases (Positive, Negative, Proposed, Prose, Dynamic, Clause Exemption) verified successfully.")
     return success, test_errors
 
 
-def verify_freeze_docs(audit_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def verify_freeze_docs(audit_data: Dict[str, Any], repo_root: Optional[Path] = None) -> Tuple[bool, List[str]]:
     """Scan all freeze markdown docs in docs/ for non-existent paths or forbidden phantom APIs."""
+    root = repo_root or REPO_ROOT
     doc_files = [
         "docs/FOUNDATION_ASSET_AUDIT.md",
         "docs/FOUNDATION_ARCHITECTURE_AUDIT.md",
@@ -568,7 +652,7 @@ def verify_freeze_docs(audit_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
     all_errors: List[str] = []
 
     for df in doc_files:
-        p = REPO_ROOT / df
+        p = root / df
         if not p.exists():
             all_errors.append(f"Missing document: {df}")
             continue
@@ -579,12 +663,14 @@ def verify_freeze_docs(audit_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
     return (len(all_errors) == 0), all_errors
 
 
-def main() -> int:
+def build_codebase_ast(repo_root: Optional[Path] = None, inspect_blender: bool = False) -> Tuple[Dict[str, Any], List[str]]:
+    """Build in-memory AST index of codebase and optional blend inspection without modifying any files."""
+    root = repo_root or REPO_ROOT
     tracked_set = get_git_tracked_files()
 
-    src_files = sorted((REPO_ROOT / "src").rglob("*.py"))
-    test_files = sorted((REPO_ROOT / "tests").rglob("*.py"))
-    root_scripts = sorted(REPO_ROOT.glob("run_*.py"))
+    src_files = sorted((root / "src").rglob("*.py"))
+    test_files = sorted((root / "tests").rglob("*.py"))
+    root_scripts = sorted(root.glob("run_*.py"))
 
     src_modules = [inspect_python_file(p, tracked_set) for p in src_files]
     test_scripts = [inspect_python_file(p, tracked_set) for p in test_files]
@@ -592,14 +678,24 @@ def main() -> int:
 
     blend_records: List[Dict[str, Any]] = []
     log_lines: List[str] = []
-    try:
-        import bpy  # noqa: F401
-        blend_records, log_lines = inspect_blend_files(tracked_set)
-    except ImportError:
-        print("[WARN] Running outside Blender: skipping bpy .blend inspection.")
+    if inspect_blender:
+        try:
+            import bpy  # noqa: F401
+            blend_records, log_lines = inspect_blend_files(tracked_set)
+        except ImportError:
+            pass
+
+    # In purely read-only mode, if blend_records is empty, load cached metadata if available
+    json_path = root / "docs" / "evidence" / "task6gd_c2a" / "codebase_and_blend_audit.json"
+    if not blend_records and json_path.exists():
+        try:
+            cached = json.loads(json_path.read_text(encoding="utf-8"))
+            blend_records = cached.get("blend_files", [])
+        except Exception:
+            pass
 
     audit_payload = {
-        "repository_root": str(REPO_ROOT),
+        "repository_root": str(root),
         "counts": {
             "src_python_files": len(src_modules),
             "test_python_files": len(test_scripts),
@@ -611,30 +707,52 @@ def main() -> int:
         "root_scripts": root_py,
         "blend_files": blend_records,
     }
+    return audit_payload, log_lines
 
-    out_dir = REPO_ROOT / "docs" / "evidence" / "task6gd_c2a"
-    out_dir.mkdir(parents=True, exist_ok=True)
 
-    json_path = out_dir / "codebase_and_blend_audit.json"
-    log_path = out_dir / "blend_inspection_log.txt"
+def run_audit_verify_docs(audit_payload: Optional[Dict[str, Any]] = None, repo_root: Optional[Path] = None) -> Tuple[bool, List[str]]:
+    """Run full documentation integrity check across freeze docs in strictly read-only mode."""
+    root = repo_root or REPO_ROOT
+    if audit_payload is None:
+        audit_payload, _ = build_codebase_ast(repo_root=root, inspect_blender=False)
+    return verify_freeze_docs(audit_payload, repo_root=root)
 
-    if blend_records:
+
+def run_validator_self_test(audit_payload: Optional[Dict[str, Any]] = None, repo_root: Optional[Path] = None) -> Tuple[bool, List[str]]:
+    """Run validator self-test suite in strictly read-only mode."""
+    root = repo_root or REPO_ROOT
+    if audit_payload is None:
+        audit_payload, _ = build_codebase_ast(repo_root=root, inspect_blender=False)
+    index = CodebaseSymbolIndex(audit_payload)
+    return run_validator_test_suite(index)
+
+
+def main() -> int:
+    is_generate_mode = ("--generate" in sys.argv or "--refresh" in sys.argv)
+    is_verify_mode = ("--verify-docs" in sys.argv)
+    is_test_validator_mode = ("--test-validator" in sys.argv)
+    is_summary_mode = ("--summary" in sys.argv)
+
+    # 1. Build AST in memory (strictly read-only)
+    inspect_blender = is_generate_mode
+    audit_payload, log_lines = build_codebase_ast(REPO_ROOT, inspect_blender=inspect_blender)
+
+    # 2. Mode A: Generate / Refresh (explicitly requested only)
+    if is_generate_mode:
+        out_dir = REPO_ROOT / "docs" / "evidence" / "task6gd_c2a"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        json_path = out_dir / "codebase_and_blend_audit.json"
+        log_path = out_dir / "blend_inspection_log.txt"
+
         json_path.write_text(json.dumps(audit_payload, indent=2, ensure_ascii=False), encoding="utf-8")
-        log_path.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
         print(f"[AUDIT] Wrote {json_path}")
-        print(f"[AUDIT] Wrote {log_path}")
-        for line in log_lines:
-            print(line)
-    elif json_path.exists():
-        # Preserve blend_files metadata when refreshing AST outside Blender
-        cached = json.loads(json_path.read_text(encoding="utf-8"))
-        audit_payload["blend_files"] = cached.get("blend_files", [])
-        audit_payload["counts"]["output_blend_files"] = len(audit_payload["blend_files"])
-        json_path.write_text(json.dumps(audit_payload, indent=2, ensure_ascii=False), encoding="utf-8")
-        print(f"[AUDIT] Refreshed codebase AST in {json_path}")
+        if log_lines:
+            log_path.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+            print(f"[AUDIT] Wrote {log_path}")
 
-    if "--summary" in sys.argv:
-        print("\n=== SRC MODULES (51) ===")
+    # 3. Summary Mode
+    if is_summary_mode:
+        print("\n=== SRC MODULES ===")
         for m in audit_payload["src_modules"]:
             cls_list = [f"{c['name']}(L{c['lineno']})" for c in m["classes"]]
             fn_list = [f"{f['name']}(L{f['lineno']})" for f in m["functions"] if not f["name"].startswith("_")]
@@ -647,24 +765,34 @@ def main() -> int:
         for m in audit_payload["root_scripts"]:
             print(f"{m['path']} | {m['line_count']}L | {m['size_bytes']}B")
 
-    if "--test-validator" in sys.argv:
-        index = CodebaseSymbolIndex(audit_payload)
-        suite_ok, suite_errs = run_validator_test_suite(index)
-        if not suite_ok:
+    # 4. Mode C: Validator Test Suite (read-only)
+    if is_test_validator_mode:
+        ok, errs = run_validator_self_test(audit_payload, repo_root=REPO_ROOT)
+        if not ok:
             print("[TEST-VALIDATOR] FAILED with errors:")
-            for e in suite_errs:
+            for e in errs:
                 print(f"  - {e}")
             return 1
         return 0
 
-    if "--verify-docs" in sys.argv:
-        ok, errs = verify_freeze_docs(audit_payload)
+    # 5. Mode B: Verify Freeze Documentation (read-only)
+    if is_verify_mode:
+        ok, errs = run_audit_verify_docs(audit_payload, repo_root=REPO_ROOT)
         if not ok:
             print("[VERIFY-DOCS] FAILED with errors:")
             for e in errs:
                 print(f"  - {e}")
             return 1
         print("[VERIFY-DOCS] PASS: All referenced src/tests paths exist on disk and zero phantom symbols found.")
+        return 0
+
+    if not is_generate_mode and not is_summary_mode:
+        print("[AUDIT] In-memory AST audit completed (strictly read-only, zero files modified).")
+        print("[AUDIT] Available flags:")
+        print("  --verify-docs    : Validate all architecture documentation for referenced symbol existence")
+        print("  --test-validator : Run validator self-test suite (positive, negative, proposed, prose, dynamic, clause)")
+        print("  --summary        : Display module, class, and method counts")
+        print("  --generate       : Refresh and write JSON/log inspection artifacts")
 
     return 0
 

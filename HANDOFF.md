@@ -5,23 +5,22 @@
 ---
 
 ## 1. 当前目标
-Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 含 C2-FINAL 验收纠偏与 Documentation Integrity Gate）**已完全验证通过并正式冻结**：
-1. **升级全库通用 AST 符号校验器 (`tests/audit_c2_final_inspector.py`)**：
-   - 自动解析源码 AST 提取全库 51 个模块的类、方法、函数、属性及 Enum 成员，构建 `CodebaseSymbolIndex` 与 18 个 `.blend` 场景资产索引；
-   - 建立四态判别契约：`IMPLEMENTED`（真实存在）、`EXISTS_NOT_INTEGRATED`（存在未合流）、`PROPOSED`（未来规划，严禁假冒已实现）、`INVALID`（不存在直接报错）；
-   - 内置自测试套件 `run_validator_test_suite`，覆盖 Positive、Negative、Proposed、Prose Safety 四大场景，实测零假通过、零自然语言误报；
-   - 运行 `python tests/audit_c2_final_inspector.py --verify-docs` 100% 全绿通过 (Exit Code 0)。
-2. **枚举与接口引用真实性纠偏**：
-   - 修正 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`，明确区分离散触地事件（Touchdown Event）与持续接触生命周期状态（`ContactLifecycle`: `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`），未向源码增加假枚举；
-   - 纠偏并对齐真实源码接口（`ClosedLoopDynamicsCoordinator.simulate`、`DynamicsEnvironmentQuery.query_surface_at_point`、移除 `_apply_micro_projection` 幻觉引用并还原为真实几何合规检查 `multi_contact.check_all_contacts`）。
-3. **固化生产调用主链与状态所有权边界**：
-   - 在权威架构文档中彻底固化唯一生产主链：
-     $$\text{MotionPlanner} / \text{MotionAction} \longrightarrow \text{KinematicBridgeExecutor.execute_frame()} \longrightarrow \text{WholeBodyController.execute_frame()} \longrightarrow \text{Blender Rig/IK/FK} \longrightarrow \text{物理遥测} \longrightarrow \text{MotionState}$$
-   - 严禁任何后续 Agent 绕开、复制或自行替换此主链；严格区分当前 19 骨骼 WBC 管线与 6G-D 质心动力学管线，尚未实现的合流严禁谎报已实现。
-4. **固化后续路线 (7A $\to$ 7B $\to$ 7C $\to$ 7D $\to$ 7E $\to$ 7F $\to$ 6H) 与任务命名纪律**：
-   - 统一后续任务命名为 `Task <阶段>-<序号>`（如 `Task 7A-1`），严禁私自衍生同级或下游分支。
-5. **前后置十步闭环架构防漂移门禁确立**：
-   - 在 `docs/ARCHITECTURE_CHANGE_GATE.md` 确立十步防漂移协议并在 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 强制引用。
+Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计、通用程序化运动底座架构冻结、文档真实性门禁与 Architecture Integrity Gate Closure）**已完全验证通过并正式闭环**：
+1. **消除校验器写文件副作用并实现严格模式分离 (`tests/audit_c2_final_inspector.py`)**：
+   - 严格分离 Mode A（`--generate` / `--refresh` 仅在显式请求时写入磁盘产物）、Mode B（`--verify-docs` 纯内存校验，零写文件）与 Mode C（`--test-validator` 纯只读自测）；
+   - 执行 `--verify-docs` 或自测后 `git status --short` 实测 100% 干净，零修改、零 hash 变化。
+2. **消除整行跳过漏洞并建立子句级精准否定豁免**：
+   - 废除 `any(k in line for k in [...]) continue` 整行跳过机制，采用分号/逗号/句号/括号的独立子句级上下文精准判定；
+   - 仅对自身所在子句包含显式否定关键词（如“不存在”、“严禁调用”）的符号予以豁免，同一行其他子句出现的符号严格核验 AST 物理存在性。
+3. **扩充防过拟合动态随机测试套件**：
+   - 自测试用例增至 6 项：新增动态 UUID 随机命名负例（Test 5）与同行复合子句检验（Test 6），杜绝硬编码黑名单作弊。
+4. **统一测试执行器参数传递扩展与独立门禁测试**：
+   - `TestDefinition` 扩展可选 `script_args`，`tests/run_test_suite.py` 100% 向后兼容支持参数传递，`tests/test_runner_unit.py` 11/11 单元测试全通；
+   - 编写薄测试脚本 [`tests/test_architecture_integrity_gate.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_architecture_integrity_gate.py)，注册为 `architecture_integrity_gate`，纳入 `TestTier.QUICK` 与 `TestTier.FULL`。
+5. **全级别回归套件全绿**：
+   - `.\run_tests.ps1 -tier quick`：**10 / 10 PASS** (10.46s)，门禁用例 0.68s 首位通过；
+   - `.\run_tests.ps1 -tier full`：**24 / 24 PASS** (95.07s)，动力学、运动学、约束、步态及门禁套件全量通过；
+   - 源码物理零变动：未修改 `src/` 下任何 Python 文件，未修改任何 `.blend` 文件。
 6. **底座正式冻结承诺**：
    - 6G-D 正式冻结并进入维护模式，严禁自动创建 C2-B/C3/6G-E 分支；
    - 严格停止，不自动触发 Phase 7A 或 Phase 6H。

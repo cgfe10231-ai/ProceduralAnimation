@@ -1002,3 +1002,31 @@
   - 未修改 `src/` 下任何 Python 文件，未修改任何 `.blend` 文件；
   - 架构冻结文档 100% 具备机器可证明的真实性（Exit Code 0）；
   - 彻底封死后续 Agent 认知漂移与私自造轮子路径。
+
+---
+
+### [DEC-047] 2026-10-25: Task 6G-D-C2-FINAL 架构门禁收口、只读 AST 校验与统一测试套件无缝集成
+
+* **状态**：已批准 (Approved)
+* **日期**：2026-10-25
+* **背景**：在 6G-D-C2-FINAL 最终验收收口中，发现先前的 `tests/audit_c2_final_inspector.py` 在执行 `--verify-docs` 时存在回写 AST JSON 文件的写磁盘副作用；且在包含否定关键词时采用整行跳过（whole-line skipping）策略，存在掩盖同一行其他未否定符号的漏检风险；此外文档门禁未接入 `run_test_suite.py` 自动化测试注册表。必须建立可重复执行、真正只读、防过拟合并接入统一测试系统的永久门禁。
+* **决策与方案**：
+  1. **彻底分离校验器运行模式与消除写文件副作用**：
+     - **Mode A (生成/刷新)**：仅在显式传入 `--generate` 或 `--refresh` 时回写 `codebase_and_blend_audit.json` 与 `blend_inspection_log.txt`；
+     - **Mode B (校验文档)**：`--verify-docs` 采用纯内存 AST 索引执行文档扫描，禁止对磁盘文件进行任何写入或覆盖，遇错返回非零退出码；
+     - **Mode C (校验器自测)**：`--test-validator` 执行 6 组正负例测试，纯只读无副作用；
+     - 默认无参数模式：纯内存解析，打印指引，零写文件。
+  2. **消除整行跳过漏洞，建立子句级精准否定豁免判定机制**：
+     - 废除原有的 `any(k in line for k in [...]) continue` 整行跳过逻辑；
+     - 改为针对每一个匹配符号，基于标点边界（`;；。|,\n`）提取其所属独立子句与紧邻括号，仅当该符号自身所在子句显式包含否定修饰词（如“不存在”、“严禁调用”、“曾用错误名称”等）时才予以豁免；同一行其他子句中引用的符号继续执行严格 AST 存在性检验。
+  3. **增强防过拟合与防硬编码自检**：
+     - 自检套件扩充至 6 大用例：新增基于 `uuid.uuid4().hex` 动态随机生成的模块路径、枚举成员、方法、类名及表格虚假实现用例（Test 5），以及复合子句同行动态符号检验用例（Test 6），杜绝仅靠硬编码黑名单通过测试的可能性。
+  4. **测试注册表支持脚本参数并提供独立测试用例**：
+     - 扩展 `TestDefinition` 增加可选的 `script_args: List[str] = field(default_factory=list)`，并在 `run_test_suite.py` 中保持 100% 向后兼容；在 `test_runner_unit.py` 中增加用例 11 进行参数传递回归校验；
+     - 提供薄测试脚本 [`tests/test_architecture_integrity_gate.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_architecture_integrity_gate.py)，作为正式测试用例注册进 `TEST_REGISTRY`，纳入 `TestTier.QUICK` 和 `TestTier.FULL`。
+  5. **严格只读静态事实校验声明**：
+     - 门禁工具定位于静态 AST 符号物理存在性事实校验，不主观宣称未测试逻辑的物理正确性。
+* **影响**：
+  - 未修改 `src/` 下任何 Python 文件，未修改任何 `.blend` 文件；
+  - `.\run_tests.ps1 -tier quick`（10/10 PASS）与 `.\run_tests.ps1 -tier full`（24/24 PASS）全量通过；
+  - 架构门禁已正式接入系统持续回归，任何失效接口或虚构引用将直接导致测试失败与退出码 1，彻底完成 C2-FINAL 验收收口。

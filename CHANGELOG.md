@@ -3,6 +3,39 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-25] 任务 6G-D-C2-FINAL：架构门禁收口、只读 AST 校验与统一测试套件无缝集成 (Architecture Integrity Gate Closure)
+
+### 彻底消除写文件副作用与运行模式隔离 (`tests/audit_c2_final_inspector.py`)
+* **严格模式分离与只读保证**：
+  * 重构 `tests/audit_c2_final_inspector.py` 为显式三模式结构：
+    - **Mode A (生成/刷新)**：仅在显式传入 `--generate` 或 `--refresh` 时触发向 `codebase_and_blend_audit.json` 和 `blend_inspection_log.txt` 写入磁盘产物；
+    - **Mode B (校验文档)**：`--verify-docs` 采用纯内存 AST 索引执行文档扫描，禁止对磁盘文件进行任何写入或覆盖；
+    - **Mode C (校验器自测)**：`--test-validator` 执行 6 组正负例测试，纯只读无副作用；
+    - 默认无参数模式：纯内存解析，打印可用参数说明，零写文件。
+  * 实测验证：执行 `--verify-docs` 或 `--test-validator` 后 `git status --short` 保持工作区 100% 干净，零修改、零 hash 变化。
+
+### 消除整行跳过漏洞与子句级精准否定豁免 (`tests/audit_c2_final_inspector.py`)
+* **消除 Whole-Line Skipping 缺陷**：
+  * 废除 `any(k in line for k in [...]) continue` 的整行跳过机制；
+  * 新增 `is_symbol_exempted_by_context` 方法，针对每个匹配到的符号，基于分号、逗号、句号、管道符等子句边界（`;；。|,\n`）以及紧随其后的括号提取局部上下文，仅当符号所属子句或紧邻修饰明确包含否定关键词（“不存在”、“严禁调用”、“虚构”等）时才给予豁免；
+  * 同一行中其他子句出现的符号正常接受 AST 物理存在性检验，彻底根除同行多符号漏检风险。
+
+### 防过拟合动态随机测试套件 (`tests/audit_c2_final_inspector.py`)
+* **自检套件扩充至 6 大用例**：
+  * 新增 Test 5（动态随机负例）：使用 `uuid.uuid4().hex` 动态生成非固定名称的虚构模块、枚举成员、方法、类名及表格虚假实现，杜绝仅靠硬编码黑名单通过自测；
+  * 新增 Test 6（复合子句同行豁免用例）：验证同一行中“已声明不存在的模块被豁免”同时“未声明不存在的虚构方法被准确检出报错”，确保整行跳过漏洞已被根治。
+
+### 统一测试执行器参数传递扩展与独立门禁测试 (`tests/test_registry.py`, `tests/run_test_suite.py`, `tests/test_runner_unit.py`, `tests/test_architecture_integrity_gate.py`)
+* **扩展 TestDefinition 支持可选 script_args**：
+  * 在 `TestDefinition` 中增加 `script_args: List[str] = field(default_factory=list)`；
+  * 在 `tests/run_test_suite.py` 中向后兼容支持在执行 Python 及 Blender 进程时追加 `script_args`；
+  * 在 `tests/test_runner_unit.py` 增加用例 11，实测参数传递逻辑正确（11/11 PASS）；
+* **创建独立测试用例 tests/test_architecture_integrity_gate.py**：
+  * 编写薄测试入口脚本，注册为 `architecture_integrity_gate` 并纳入 `TestTier.QUICK` 与 `TestTier.FULL`；
+  * 实测 `.\run_tests.ps1 -tier quick`（10/10 PASS, 10.46s）与 `.\run_tests.ps1 -tier full`（24/24 PASS, 95.07s）全绿通过。
+
+---
+
 ## [2026-10-25] 任务 6G-D-C2-FINAL：文档真实性门禁、通用 AST 符号校验器与架构约束彻底冻结 (Documentation Integrity Gate)
 
 ### 枚举与接口引用真实性纠偏 (`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`, `docs/FOUNDATION_*.md`)

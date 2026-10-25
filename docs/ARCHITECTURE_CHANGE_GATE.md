@@ -28,7 +28,7 @@
 1. **读取规范与门禁**：完整读取 `AGENTS.md`、`GEMINI.md` 与本架构门禁规范 (`docs/ARCHITECTURE_CHANGE_GATE.md`)。
 2. **读取交接卡片**：完整读取最新版 `AI_SYNC.md`，确认当前 Git HEAD commit SHA 与未提交文件现场。
 3. **查阅真实源码**：深入查阅相关的真实 Python 模块源码，严禁仅凭架构图、文字概述或聊天记忆推断接口。
-4. **核对符号物理存在**：核对所调用的方法、类、枚举成员、数据结构与文件在磁盘上 100% 物理存在（必须通过 `python tests/audit_c2_final_inspector.py --verify-docs` 自动化校验，严禁引用虚构符号）。
+4. **核对符号物理存在**：核对所调用的方法、类、枚举成员、数据结构与文件在磁盘上 100% 物理存在（已集成至统一测试系统：`python tests/run_test_suite.py --test-id architecture_integrity_gate` 或 `python tests/audit_c2_final_inspector.py --verify-docs` 严格只读执行，零副作用，严禁引用虚构符号）。
 5. **杜绝功能职责重叠**：确认新开发内容不会创建与现有系统职责重叠的模块（严禁制造第二套控制器、第二套求解器或第二套场景）。
 6. **严禁绕开生产管线**：确认所有运动与骨骼解算接入既有统一管线（$\text{MotionPlanner} \to \text{KinematicBridgeExecutor} \to \text{WholeBodyController} \to \text{Rig/IK/FK}$），严禁私自绕道。
 7. **确认任务当前准入**：确认任务属于当前明确准入的阶段（当前为 Task 6G-D-C2-FINAL 冻结维护，后续阶段必须按 7A $\to$ 7B $\to$ 7C $\to$ 7D $\to$ 7E $\to$ 7F $\to$ 6H 顺序逐级准入，严禁提前越级或自设衍生阶段）。

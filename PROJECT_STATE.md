@@ -8,6 +8,20 @@
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-C2-FINAL 架构门禁收口、只读 AST 校验与统一测试套件无缝集成 (Architecture Integrity Gate Closure)**：
+  * **彻底消除写文件副作用与运行模式分离**：
+    - `tests/audit_c2_final_inspector.py` 实现严格模式隔离：仅在显式传入 `--generate` 或 `--refresh` 时触发 Mode A 写入磁盘产物；`--verify-docs`（Mode B）与 `--test-validator`（Mode C）采用纯内存 AST 与只读缓存索引，严禁对磁盘文件进行任何写入或覆盖（`git status --short` 实测零变更）；
+  * **消除整行跳过漏洞与建立子句级精准否定豁免**：
+    - 彻底废除整行跳过策略，改为基于分号/逗号/句号/括号的独立子句级精准匹配；仅当目标符号自身所属子句包含明确否定修饰词时才豁免，彻底杜绝同行其他未否定虚构符号被隐蔽漏检的缺陷；
+  * **增强防过拟合与防硬编码动态随机自检**：
+    - 自测试用例由 4 项扩充至 6 项，新增基于 `uuid.uuid4().hex` 动态生成的虚构模块、方法、枚举成员、类名及表格欺骗用例（Test 5），以及同行动态复合子句用例（Test 6），全量自动化通过；
+  * **统一测试执行器参数传递扩展与独立门禁测试用例**：
+    - 扩展 `TestDefinition` 增加可选的 `script_args: List[str] = field(default_factory=list)`，并在 `run_test_suite.py` 中向后兼容传递至子进程；在 `test_runner_unit.py` 增加用例 11 实测通过（11/11 PASS, 0.94s）；
+    - 编写专用薄测试脚本 [`tests/test_architecture_integrity_gate.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_architecture_integrity_gate.py)，作为正式测试 `architecture_integrity_gate` 注册进 `TEST_REGISTRY`，纳入 `TestTier.QUICK` 与 `TestTier.FULL`；
+  * **全级别回归套件 100% 通过**：
+    - `.\run_tests.ps1 -tier quick`：**10 / 10 PASS** (10.46s)，门禁用例 0.68s 首位通过；
+    - `.\run_tests.ps1 -tier full`：**24 / 24 PASS** (95.07s)，涵盖动力学、运动学、约束、步态及架构门禁全量套件，无一失败；
+    - 物理代码零变动：未修改 `src/` 下任何 Python 文件，未修改任何 `.blend` 文件。
 * **任务 6G-D-C2-FINAL 文档真实性门禁、通用 AST 符号校验器与架构约束彻底冻结 (Documentation Integrity Gate)**：
   * **枚举与接口引用纠偏**：修正 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`，明确区分离散触地事件（Touchdown Event）与持续接触生命周期状态（`ContactLifecycle`: `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`），未向源码增加假枚举；纠偏 `ClosedLoopDynamicsCoordinator.simulate`、`DynamicsEnvironmentQuery.query_surface_at_point` 与 `KinematicBridgeExecutor` 真实几何检查；
   * **通用 AST 存在性校验器 (`tests/audit_c2_final_inspector.py`)**：通过 Python AST 解析提取全库 51 个模块的类、方法、函数、属性及 Enum 成员，构建 `CodebaseSymbolIndex` 与 Blender 资产索引，实现跨文档通用符号存在性核验；

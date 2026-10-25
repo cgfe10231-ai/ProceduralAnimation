@@ -73,6 +73,21 @@ class TestRunnerUnitTests(unittest.TestCase):
         with open(os.path.join(PROJECT_ROOT, cls.sleep_script_rel), "w", encoding="utf-8") as fp:
             fp.write("import time\ntime.sleep(10)\n")
 
+        # 5. args_script.py (for script_args propagation testing)
+        cls.args_script_rel = os.path.relpath(
+            os.path.join(cls.unit_tmp_dir, "args_script.py"), PROJECT_ROOT
+        )
+        with open(os.path.join(PROJECT_ROOT, cls.args_script_rel), "w", encoding="utf-8") as fp:
+            fp.write(
+                "import sys\n"
+                "if sys.argv[1:] == ['--foo', 'bar']:\n"
+                "    print('[OK] Args received')\n"
+                "    sys.exit(0)\n"
+                "else:\n"
+                "    print('[FAIL] Args mismatch: ' + repr(sys.argv[1:]))\n"
+                "    sys.exit(1)\n"
+            )
+
         # Create runner instance pointing to unit_tmp_dir
         cls.runner = TestSuiteRunner(
             blender_bin="mock_blender.exe",
@@ -452,6 +467,22 @@ class TestRunnerUnitTests(unittest.TestCase):
         self.assertEqual(calc_exit_code([p, s_opt], 2), 0)
         self.assertEqual(calc_exit_code([p, nr], 2), 1)
         self.assertEqual(calc_exit_code([], 0), 1)
+
+    def test_11_script_args_propagation(self):
+        """Case 11: script_args are correctly propagated to child command."""
+        test_def = TestDefinition(
+            test_id="unit_case_args",
+            name="Unit Case Args",
+            script_path=self.args_script_rel,
+            runner_type=RunnerType.PYTHON,
+            tiers=[TestTier.QUICK],
+            timeout_sec=5.0,
+            script_args=["--foo", "bar"],
+        )
+        res = self.run_silent(self.runner.execute_test, test_def)
+        self.assertEqual(res.status, "PASSED")
+        self.assertEqual(res.exit_code, 0)
+        self.assertIn("[OK] Args received", res.stdout)
 
 
 if __name__ == "__main__":

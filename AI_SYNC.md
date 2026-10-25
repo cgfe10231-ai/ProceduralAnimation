@@ -1,8 +1,8 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 含 Documentation Integrity Gate）
-* **任务状态**：已完全验证 (Fully Verified & Automated Pass)；通用 AST 符号校验器自测试与全库文档核验全绿通过；底座架构与资产正式冻结，进入只读维护状态；严格停止，不自动触发 Phase 7A 或 Phase 6H，等待人类指令。
+* **当前任务编号**：任务 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计、通用程序化运动底座架构冻结、文档真实性门禁与 Architecture Integrity Gate Closure）
+* **任务状态**：已完全验证 (Fully Verified & Automated Pass)；通用 AST 符号校验器消除写文件副作用、实现纯只读模式分离与子句级精准否定豁免；增加 6 组动态随机自检用例；扩展 `TestDefinition.script_args` 并提供独立测试用例 `tests/test_architecture_integrity_gate.py` 接入统一测试注册表；`quick` (10/10 PASS) 与 `full` (24/24 PASS) 全绿通过；底座架构与资产正式冻结，进入只读维护状态；严格停止，不自动触发 Phase 7A 或 Phase 6H，等待人类指令。
 * **Git 状态**：
   * **当前分支**：`master`
   * **文档真实性门禁与架构冻结 Commit SHA**：`3efd5e412fa79ffaabd32d77eb5aa138475b4a50`（`docs(task-6gd-c2-final): establish universal AST documentation integrity gate and freeze architecture constraints`）
@@ -18,7 +18,8 @@
 
 | 证据 / 文档类型 | 仓库相对路径 / 本地绝对路径 | 文件说明与审计关键点 | GitHub 同步状态 |
 | :--- | :--- | :--- | :---: |
-| **只读 AST 与 `.blend` 审计器** | [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py) | 自动扫描 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本与 18 个 `output/*.blend` 场景，并提供 `--verify-docs` 零幻觉路径/符号校验 | **已入库同步** |
+| **只读 AST 与 `.blend` 审计器** | [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py) | 自动扫描 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本与 18 个 `output/*.blend` 场景，严格只读模式分离（Mode A 生成/刷新、Mode B 校验、Mode C 自测），零写文件副作用 | **已入库同步** |
+| **架构门禁独立测试脚本** | [`tests/test_architecture_integrity_gate.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_architecture_integrity_gate.py) | 架构文档引用与符号物理存在性独立门禁测试用例，注册进 `TEST_REGISTRY`（`architecture_integrity_gate`），纳入 `quick` 与 `full` 级别持续回归 | **已入库同步** |
 | **机器可读 AST & Blend JSON** | [`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/codebase_and_blend_audit.json) | 完整记录全库 Python AST（类、方法、函数、import 行号）与 18 个 `.blend` 场景的真实元数据 | **已入库同步** |
 | **Blender 5.1.1 开档核查日志** | [`docs/evidence/task6gd_c2a/blend_inspection_log.txt`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/blend_inspection_log.txt) | 18 个 `output/*.blend` 文件大小、帧范围、物体数、骨骼数、Action 与 F-Curve 实测日志 | **已入库同步** |
 | **C2 最终验收与纠偏报告** | [`docs/C2_FINAL_VALIDATION.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/C2_FINAL_VALIDATION.md) | 逐项交代 6 大审查问题的纠偏事实、AST/Blend 机器核验与分层回归结果 | **已入库同步** |
@@ -39,13 +40,15 @@
 
 * **通用 AST 符号存在性与四态契约审计 (`tests/audit_c2_final_inspector.py --verify-docs`)**：**PASS (Exit Code 0)**
   * 扫描全量 16 份架构冻结与状态同步文档，确认引用的所有模块、类、方法、函数、属性及 Enum 成员 100% 物理存在于磁盘；
-  * 内置自测试套件 (`--test-validator`)：覆盖 Positive、Negative、Proposed、Prose Safety 四大用例，实测零假通过、零自然语言误报 (Exit Code 0)。
+  * 内置自测试套件 (`--test-validator`)：覆盖 6 组用例（Positive、Negative、Proposed、Prose Safety、Dynamic Synthetic Random、Multi-Clause Exemption），实测零假通过、零自然语言误报、零写文件副作用 (Exit Code 0)。
 * **专职一致性套件 (`tests/verify_task6gd_visual_telemetry.py`)**：**5/5 PASS**
   * 最大位置误差：`0.00e+00 m`（门禁 $< 10^{-5}\text{ m}$）；最大姿态误差：`3.50e-07 rad`（门禁 $< 10^{-5}\text{ rad}$）；
   * 反冒充发散实测：Station 4 打滑发散 $\Delta p = 5.30\text{ m}$；Station 5 滚转发散 $\Delta q = 1.55\text{ rad}$ ($> 88^\circ$)。
 * **分级实测回归总结**：
-  * **`quick` Tier**：9/9 全绿通过 (Exit Code 0)；
-  * **`physics` Tier**：16/16 全绿通过 (Exit Code 0)；
+  * **`quick` Tier**：**10 / 10 PASS** (10.46s, Exit Code 0，首位运行 `architecture_integrity_gate` 0.68s 通过)；
+  * **`physics` Tier**：**16 / 16 PASS** (Exit Code 0)；
+  * **`full` Tier**：**24 / 24 PASS** (95.07s, Exit Code 0，全量套件去重执行无一失败)；
+  * **测试执行器单元测试 (`tests/test_runner_unit.py`)**：**11 / 11 PASS** (0.94s，含 `script_args` 命令行参数传递断言)；
   * **历史动作回归**：`verify_r3b2_walk_action.py` (25/25 PASS) 与 `verify_r3b2_run_action.py` (25/25 PASS) 100% 零退化通过。
 
 ---

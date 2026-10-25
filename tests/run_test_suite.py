@@ -198,8 +198,12 @@ class TestSuiteRunner:
         # 2. Build command based on runner type
         if test.runner_type == RunnerType.PYTHON:
             cmd = [self.python_bin, full_script]
+            if getattr(test, "script_args", None):
+                cmd.extend(test.script_args)
         elif test.runner_type == RunnerType.BLENDER_HEADLESS:
             cmd = [self.blender_bin, "-b", "-P", full_script]
+            if getattr(test, "script_args", None):
+                cmd.extend(["--"] + test.script_args)
         elif test.runner_type == RunnerType.BLENDER_WITH_BLEND:
             if not test.target_blend:
                 fail_status = "FAILED" if not test.is_optional else "SKIPPED"
@@ -243,6 +247,8 @@ class TestSuiteRunner:
                     is_optional=test.is_optional,
                 )
             cmd = [self.blender_bin, "-b", full_blend, "-P", full_script]
+            if getattr(test, "script_args", None):
+                cmd.extend(["--"] + test.script_args)
         else:
             raise ValueError(f"Unknown runner_type: {test.runner_type}")
 
