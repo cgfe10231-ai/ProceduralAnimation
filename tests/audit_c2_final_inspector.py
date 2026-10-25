@@ -89,6 +89,17 @@ def inspect_python_file(py_path: Path, tracked_set: Set[str]) -> Dict[str, Any]:
                 })
         elif isinstance(node, ast.ClassDef):
             methods: List[Dict[str, Any]] = []
+            attributes: List[str] = []
+            enum_members: List[str] = []
+            bases = []
+            for b in node.bases:
+                if isinstance(b, ast.Name):
+                    bases.append(b.id)
+                elif isinstance(b, ast.Attribute):
+                    bases.append(f"{ getattr(b.value, 'id', '') }.{b.attr}")
+
+            is_enum_class = any("Enum" in b for b in bases)
+
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     methods.append({
@@ -96,18 +107,26 @@ def inspect_python_file(py_path: Path, tracked_set: Set[str]) -> Dict[str, Any]:
                         "lineno": item.lineno,
                         "end_lineno": getattr(item, "end_lineno", item.lineno),
                     })
-            bases = []
-            for b in node.bases:
-                if isinstance(b, ast.Name):
-                    bases.append(b.id)
-                elif isinstance(b, ast.Attribute):
-                    bases.append(f"{ getattr(b.value, 'id', '') }.{b.attr}")
+                elif isinstance(item, ast.Assign):
+                    for target in item.targets:
+                        if isinstance(target, ast.Name):
+                            attributes.append(target.id)
+                            if is_enum_class or target.id.isupper():
+                                enum_members.append(target.id)
+                elif isinstance(item, ast.AnnAssign):
+                    if isinstance(item.target, ast.Name):
+                        attributes.append(item.target.id)
+                        if is_enum_class or item.target.id.isupper():
+                            enum_members.append(item.target.id)
+
             classes.append({
                 "name": node.name,
                 "bases": bases,
                 "lineno": node.lineno,
                 "end_lineno": getattr(node, "end_lineno", node.lineno),
                 "methods": methods,
+                "attributes": sorted(set(attributes)),
+                "enum_members": sorted(set(enum_members)),
             })
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             functions.append({
@@ -270,6 +289,252 @@ def inspect_blend_files(tracked_set: Set[str]) -> Tuple[List[Dict[str, Any]], Li
     return records, log_lines
 
 
+class CodebaseSymbolIndex:
+    """Aggregated index of modules, classes, methods, functions, attributes, enum members, and Blender assets."""
+
+    def __init__(self, audit_payload: Dict[str, Any]):
+        self.modules: Set[str] = set()
+        self.module_stems_pascal: Set[str] = set()
+        self.classes: Dict[str, List[Dict[str, Any]]] = {}
+        self.functions: Dict[str, List[str]] = {}
+        self.all_members: Dict[str, Set[str]] = {}
+        self.domain_acronyms: Set[str] = {
+            "WBC", "CoM", "ROM", "IK", "FK", "ZMP", "SI", "FPS", "SSOT", "AST", "JSON",
+            "API", "UI", "CLI", "HEAD", "PR", "RMS", "DOF", "6DOF", "FIFO", "LIFO", "PD", "SE3", "SO3"
+        }
+        self.blend_actions: Set[str] = set()
+        self.blend_objects: Set[str] = set()
+        self.blend_collections: Set[str] = set()
+        self.blend_bones: Set[str] = set()
+
+        for m in (
+            audit_payload.get("src_modules", [])
+            + audit_payload.get("test_scripts", [])
+            + audit_payload.get("root_scripts", [])
+        ):
+            mod_path = m["path"]
+            self.modules.add(mod_path)
+            stem = Path(mod_path).stem
+            pascal_stem = "".join(part.capitalize() for part in stem.split("_"))
+            self.module_stems_pascal.add(pascal_stem)
+
+            for c in m.get("classes", []):
+                c_name = c["name"]
+                if c_name not in self.classes:
+                    self.classes[c_name] = []
+                m_names = {item["name"] for item in c.get("methods", [])}
+                a_names = set(c.get("attributes", []))
+                e_names = set(c.get("enum_members", []))
+                self.classes[c_name].append({
+                    "module": mod_path,
+                    "methods": m_names,
+                    "attributes": a_names,
+                    "enum_members": e_names,
+                    "bases": c.get("bases", []),
+                })
+                if c_name not in self.all_members:
+                    self.all_members[c_name] = set()
+                self.all_members[c_name].update(m_names)
+                self.all_members[c_name].update(a_names)
+                self.all_members[c_name].update(e_names)
+
+            for f in m.get("functions", []):
+                f_name = f["name"]
+                if f_name not in self.functions:
+                    self.functions[f_name] = []
+                self.functions[f_name].append(mod_path)
+
+        for b in audit_payload.get("blend_files", []):
+            for act in b.get("actions", []):
+                self.blend_actions.add(act.get("action_name", ""))
+            for col in b.get("collections", []):
+                self.blend_collections.add(col)
+            for arm in b.get("armatures", []):
+                self.blend_objects.add(arm.get("object_name", ""))
+                for bone in arm.get("bone_names", []):
+                    self.blend_bones.add(bone)
+
+
+class DocReferenceValidator:
+    """Universal documentation reference auditor with AST-backed existence checking."""
+
+    def __init__(self, index: CodebaseSymbolIndex):
+        self.index = index
+        self.path_pattern = re.compile(r"\b((?:src|tests)/[A-Za-z0-9_./-]+\.py)\b")
+        self.qualified_pattern = re.compile(r"`?([A-Z][A-Za-z0-9_]+)\.([A-Za-z_][A-Za-z0-9_]*)(?:\(\))?`?")
+        self.class_pattern = re.compile(
+            r"`([A-Z][A-Za-z0-9]+(?:Controller|Executor|Planner|State|Target|Solver|Model|Query|Action|Bridge|Data|Rig|Spec|Config|Result|Tracker|Builder|Inspector|Sequence|Timeline|Context|Lifecycle|Status|Type))`"
+        )
+        self.external_namespaces = {
+            "math", "np", "numpy", "bpy", "sys", "os", "re", "ast", "json", "typing",
+            "Path", "Vector", "Quaternion", "Euler", "Matrix", "MappingProxyType", "Enum",
+            "ABC", "Dict", "List", "Set", "Tuple", "Optional", "Any", "Union"
+        }
+
+    def validate_document(self, doc_name: str, content: str) -> List[str]:
+        errors: List[str] = []
+        lines = content.splitlines()
+        is_proposed_section = False
+
+        for idx, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                header_lower = stripped.lower()
+                if any(k in header_lower for k in ["future", "phase 7", "phase 6h", "proposed", "planned", "未实现", "规划"]):
+                    is_proposed_section = True
+                elif any(k in header_lower for k in [
+                    "phase 1", "phase 2", "phase 3", "phase 4", "phase 5", "phase 6",
+                    "task 6", "pipeline a", "pipeline b", "current", "已实现", "资产审计", "架构审计"
+                ]):
+                    is_proposed_section = False
+
+            line_is_proposed = is_proposed_section or any(
+                k in line for k in ["(Proposed)", "(Planned)", "PROPOSED", "拟议", "规划中", "Future Architecture"]
+            )
+
+            # Skip checking lines that discuss rejected or non-existent symbols explicitly
+            if any(k in line for k in [
+                "不存在", "non-existent", "Non-Existent", "Removed", "Eliminated",
+                "forbidden", "未定义", "零不存在", "phantom", "幻觉", "曾用或错误名称", "严禁再用"
+            ]):
+                continue
+
+            # 1. Module path validation
+            for match in self.path_pattern.finditer(line):
+                mod_path = match.group(1)
+                if mod_path not in self.index.modules and not (REPO_ROOT / mod_path).exists():
+                    if not line_is_proposed:
+                        errors.append(
+                            f"[{doc_name}:{idx}] ERROR: File '{mod_path}' | Symbol '{mod_path}' | Type: NON_EXISTENT_MODULE | Conclusion: Module path does not exist on disk."
+                        )
+
+            # 2. Qualified symbol validation: Class.member
+            for match in self.qualified_pattern.finditer(line):
+                cls_name, member = match.group(1), match.group(2)
+                if cls_name in self.external_namespaces or cls_name in self.index.domain_acronyms:
+                    continue
+                if cls_name in self.index.blend_objects or cls_name in self.index.blend_actions:
+                    continue
+
+                if cls_name in self.index.classes:
+                    members = self.index.all_members.get(cls_name, set())
+                    if member not in members:
+                        is_enum = any(any("Enum" in b for b in c_def["bases"]) for c_def in self.index.classes[cls_name])
+                        err_type = "NON_EXISTENT_ENUM_MEMBER" if is_enum else "NON_EXISTENT_METHOD"
+                        if not line_is_proposed:
+                            src_mod = self.index.classes[cls_name][0]["module"]
+                            errors.append(
+                                f"[{doc_name}:{idx}] ERROR: File '{src_mod}' | Symbol '{cls_name}.{member}' | Type: {err_type} | Conclusion: Class '{cls_name}' exists in '{src_mod}' but defines no member '{member}'."
+                            )
+                else:
+                    if not line_is_proposed:
+                        if cls_name.endswith((
+                            "Controller", "Executor", "Planner", "State", "Target", "Solver", "Model",
+                            "Query", "Action", "Bridge", "Data", "Rig", "Spec", "Config", "Result",
+                            "Tracker", "Builder", "Inspector", "Sequence", "Timeline", "Context",
+                            "Lifecycle", "Status", "Type"
+                        )) and cls_name not in self.index.module_stems_pascal:
+                            errors.append(
+                                f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}.{member}' | Type: NON_EXISTENT_CLASS | Conclusion: Class '{cls_name}' is not defined in any Python module."
+                            )
+
+            # 3. Stand-alone Class Name validation
+            if doc_name != "CHANGELOG.md":
+                for match in self.class_pattern.finditer(line):
+                    cls_name = match.group(1)
+                    if (
+                        cls_name in self.external_namespaces
+                        or cls_name in self.index.domain_acronyms
+                        or cls_name in self.index.module_stems_pascal
+                        or cls_name in self.index.blend_objects
+                        or cls_name in self.index.blend_actions
+                    ):
+                        continue
+
+                    if cls_name not in self.index.classes:
+                        if not line_is_proposed:
+                            errors.append(
+                                f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}' | Type: NON_EXISTENT_CLASS | Conclusion: Class '{cls_name}' is not defined in the codebase."
+                            )
+
+            # 4. Table row checking: Claimed IMPLEMENTED vs PROPOSED/Unimplemented
+            if "|" in line and any(k in line for k in ["IMPLEMENTED", "已实现"]) and not any(k in line for k in ["GitHub 同步状态", "已入库同步", "证据 / 文档类型"]):
+                for match in re.finditer(r"`([A-Z][A-Za-z0-9_]+)`", line):
+                    cls_name = match.group(1)
+                    if (
+                        cls_name in self.external_namespaces
+                        or cls_name in self.index.domain_acronyms
+                        or cls_name in self.index.module_stems_pascal
+                        or cls_name in self.index.blend_objects
+                        or cls_name in self.index.blend_actions
+                    ):
+                        continue
+                    if cls_name not in self.index.classes:
+                        errors.append(
+                            f"[{doc_name}:{idx}] ERROR: File '{doc_name}' | Symbol '{cls_name}' | Type: MISLABELED_IMPLEMENTATION | Conclusion: Symbol claimed as IMPLEMENTED but does not exist in code."
+                        )
+
+        return errors
+
+
+def run_validator_test_suite(index: CodebaseSymbolIndex) -> Tuple[bool, List[str]]:
+    """Self-test suite for the documentation validator verifying positive, negative, proposed, and prose safety."""
+    validator = DocReferenceValidator(index)
+    test_errors: List[str] = []
+
+    # Test 1: Positive Case
+    pos_content = (
+        "# Implemented Section\n"
+        "We use `src/motion/contact_dynamics.py` and enum member `ContactLifecycle.ESTABLISHED`.\n"
+        "Calls `WholeBodyController.execute_frame()` and `solve_contact_forces()`.\n"
+        "Component `WholeBodyController` is active.\n"
+    )
+    pos_res = validator.validate_document("test_positive.md", pos_content)
+    if len(pos_res) > 0:
+        test_errors.append(f"Test 1 (Positive) FAILED: Unexpected errors: {pos_res}")
+
+    # Test 2: Negative Case
+    neg_content = (
+        "# Implemented Section\n"
+        "Module `src/motion/fake_dynamics.py` is invoked.\n"
+        "References `ContactLifecycle.TOUCHDOWN` on ground.\n"
+        "Calls `WholeBodyController.apply_pose()` directly.\n"
+        "Instantiates `KinematicPoseTarget`.\n"
+    )
+    neg_res = validator.validate_document("test_negative.md", neg_content)
+    expected_err_types = ["NON_EXISTENT_MODULE", "NON_EXISTENT_ENUM_MEMBER", "NON_EXISTENT_METHOD", "NON_EXISTENT_CLASS"]
+    for exp in expected_err_types:
+        if not any(exp in err for err in neg_res):
+            test_errors.append(f"Test 2 (Negative) FAILED: Expected error type '{exp}' was not caught in {neg_res}")
+
+    # Test 3: Proposed / Future Planning Case
+    prop_content = (
+        "## Future Architecture (Proposed)\n"
+        "Under future planning, `PlannedTerrainAdapter.adapt_step()` is proposed for Phase 7A.\n"
+        "## Current Implementation\n"
+        "| Component | Status |\n"
+        "| `PlannedTerrainAdapter` | IMPLEMENTED |\n"
+    )
+    prop_res = validator.validate_document("test_proposed.md", prop_content)
+    if not any("MISLABELED_IMPLEMENTATION" in err for err in prop_res):
+        test_errors.append("Test 3 (Proposed) FAILED: Did not catch MISLABELED_IMPLEMENTATION when un-implemented symbol claimed IMPLEMENTED.")
+
+    # Test 4: Prose / Natural Language Protection Case
+    prose_content = (
+        "# General Discussion\n"
+        "The `master` branch is tested with `quick` and `physics` tiers.\n"
+        "We observe `Walk` and `Run` behavior in `Blender` at 24 `FPS` with `Z-up` orientation.\n"
+    )
+    prose_res = validator.validate_document("test_prose.md", prose_content)
+    if len(prose_res) > 0:
+        test_errors.append(f"Test 4 (Prose) FAILED: False alarms on natural language words: {prose_res}")
+
+    success = (len(test_errors) == 0)
+    if success:
+        print("[SELF-TEST] PASS: All 4 validator test cases (Positive, Negative, Proposed, Prose) verified successfully.")
+    return success, test_errors
+
+
 def verify_freeze_docs(audit_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """Scan all freeze markdown docs in docs/ for non-existent paths or forbidden phantom APIs."""
     doc_files = [
@@ -279,6 +544,10 @@ def verify_freeze_docs(audit_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         "docs/FOUNDATION_STATE_OWNERSHIP.md",
         "docs/ROADMAP_FOUNDATION_TO_FULLBODY.md",
         "docs/C2_FINAL_VALIDATION.md",
+        "docs/ARCHITECTURE_CHANGE_GATE.md",
+        "AGENTS.md",
+        "GEMINI.md",
+        ".agents/rules/project_rules.md",
         "DECISIONS.md",
         "PROJECT_STATE.md",
         "CHANGELOG.md",
@@ -287,40 +556,27 @@ def verify_freeze_docs(audit_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         "AI_SYNC.md",
     ]
 
-    forbidden_hallucinations = [
-        "src/motion/kinematics_service.py",
-        "src/motion/locomotion_synthesizer.py",
-        "src/character/character_rig.py",
-        "src/actions/walk.py",
-        "WholeBodyController.apply_pose",
-        "ForwardDynamicsKernel.integrate_step",
-        "KinematicPoseTarget",
-    ]
+    index = CodebaseSymbolIndex(audit_data)
 
-    known_py_paths = {m["path"] for m in audit_data["src_modules"] + audit_data["test_scripts"] + audit_data["root_scripts"]}
-    errors: List[str] = []
+    # 1. Run self-test suite
+    suite_ok, suite_errs = run_validator_test_suite(index)
+    if not suite_ok:
+        return False, [f"[VALIDATOR SELF-TEST ERROR] {e}" for e in suite_errs]
 
-    path_pattern = re.compile(r"\b((?:src|tests)/[A-Za-z0-9_./-]+\.py)\b")
+    # 2. Run document reference validator across all freeze documents
+    validator = DocReferenceValidator(index)
+    all_errors: List[str] = []
 
     for df in doc_files:
         p = REPO_ROOT / df
         if not p.exists():
-            errors.append(f"Missing document: {df}")
+            all_errors.append(f"Missing document: {df}")
             continue
         content = p.read_text(encoding="utf-8")
+        doc_errs = validator.validate_document(df, content)
+        all_errors.extend(doc_errs)
 
-        # Check forbidden phantom identifiers (unless explicitly noted as rejected/non-existent in audit log, so we avoid even writing them in docs!)
-        for fh in forbidden_hallucinations:
-            if fh in content:
-                errors.append(f"[{df}] Contains forbidden non-existent symbol/path: '{fh}'")
-
-        # Check all src/...py and tests/...py paths referenced in the doc
-        for match in path_pattern.finditer(content):
-            ref_path = match.group(1)
-            if ref_path not in known_py_paths and not (REPO_ROOT / ref_path).exists():
-                errors.append(f"[{df}] References non-existent Python path on disk: '{ref_path}'")
-
-    return (len(errors) == 0), errors
+    return (len(all_errors) == 0), all_errors
 
 
 def main() -> int:
@@ -369,10 +625,15 @@ def main() -> int:
         print(f"[AUDIT] Wrote {log_path}")
         for line in log_lines:
             print(line)
+    elif json_path.exists():
+        # Preserve blend_files metadata when refreshing AST outside Blender
+        cached = json.loads(json_path.read_text(encoding="utf-8"))
+        audit_payload["blend_files"] = cached.get("blend_files", [])
+        audit_payload["counts"]["output_blend_files"] = len(audit_payload["blend_files"])
+        json_path.write_text(json.dumps(audit_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"[AUDIT] Refreshed codebase AST in {json_path}")
 
     if "--summary" in sys.argv:
-        if not blend_records and json_path.exists():
-            audit_payload = json.loads(json_path.read_text(encoding="utf-8"))
         print("\n=== SRC MODULES (51) ===")
         for m in audit_payload["src_modules"]:
             cls_list = [f"{c['name']}(L{c['lineno']})" for c in m["classes"]]
@@ -386,10 +647,17 @@ def main() -> int:
         for m in audit_payload["root_scripts"]:
             print(f"{m['path']} | {m['line_count']}L | {m['size_bytes']}B")
 
+    if "--test-validator" in sys.argv:
+        index = CodebaseSymbolIndex(audit_payload)
+        suite_ok, suite_errs = run_validator_test_suite(index)
+        if not suite_ok:
+            print("[TEST-VALIDATOR] FAILED with errors:")
+            for e in suite_errs:
+                print(f"  - {e}")
+            return 1
+        return 0
+
     if "--verify-docs" in sys.argv:
-        # Load JSON if running outside Blender
-        if not blend_records and json_path.exists():
-            audit_payload = json.loads(json_path.read_text(encoding="utf-8"))
         ok, errs = verify_freeze_docs(audit_payload)
         if not ok:
             print("[VERIFY-DOCS] FAILED with errors:")

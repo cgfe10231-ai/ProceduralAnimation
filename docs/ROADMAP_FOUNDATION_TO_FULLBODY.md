@@ -50,7 +50,8 @@ flowchart LR
 
 ### Phase 7E: Dynamic Cooperation & Contact Switching of Existing IK/FK Solvers
 - **Core Objective**:
-  - Orchestrate seamless, artifact-free transitions between FK swing (`set_arm_ik_influence(0.0)` / unlocked foot IK) and world-locked IK contact (`lock_foot_contact` / `set_arm_ik_influence(1.0)` with `ContactLifecycle.TOUCHDOWN` $\to$ `ESTABLISHED` $\to$ `RELEASED` in `src/motion/contact_model.py`) across all 4 limbs (`foot_L`, `foot_R`, `hand_L`, `hand_R`) without creating a second IK/FK solver.
+  - Orchestrate seamless, artifact-free transitions between FK swing (`set_arm_ik_influence(0.0)` / unlocked foot IK) and world-locked IK contact (`lock_foot_contact` / `set_arm_ik_influence(1.0)`) across all 4 limbs (`foot_L`, `foot_R`, `hand_L`, `hand_R`) without creating a second IK/FK solver.
+  - Correctly track contact lifecycle progression via `ContactLifecycle` (`CANDIDATE` $\to$ `ESTABLISHED` $\to$ `RELEASED` / `BROKEN` in `src/motion/contact_model.py#L53`), where touchdown is treated strictly as the discrete kinetic engagement event triggering `CANDIDATE` $\to$ `ESTABLISHED` (distinguishing instantaneous engagement events from continuous lifecycle states).
 
 ### Phase 7F: Whole-Body Locomotion, Grasping, Support, Release & Continuous Training Ground Traversal
 - **Core Objective**:
@@ -59,6 +60,7 @@ flowchart LR
 ### Phase 6H: Dynamic Balance & Active Compensation
 - **Core Objective**:
   - Build active balance recovery and perturbation compensation (ankle/hip/stepping/arm-windmilling strategies) atop the integrated full-body dynamics loop from Phases 7A–7F, reacting to external pushes (`external_forces_world`), low-friction slips (`low_friction_patch`), and narrow supports (`balance_beam`).
+  - **Strict Admission Gate**: Phase 6H dynamic balance is strictly contingent upon the completion and verification of Phases 7A through 7F; developing active balance compensation prior to full character scene integration is prohibited.
 
 ---
 
@@ -68,3 +70,12 @@ flowchart LR
 2. **Single Pose & IK Writer**: All 19-bone pose and IK mutations must pass through `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()`.
 3. **Single Dynamics Integrator & Force Solver**: All centroidal force allocation and 6-DOF state integration must use `solve_contact_forces()` (`src/motion/contact_force_solver.py`) and `integrate_forward_dynamics_single_step()` (`src/motion/forward_dynamics.py`).
 4. **Zero Historical Gait Degradation**: Historical actions (`StartStopWalkAction`, `RunAction`, `SprintStartAction`, `SprintBrakeAction`) and `output/unified_motion_integration.blend` must remain 100% green across all regression tiers.
+5. **Task Naming Convention**: Subsequent tasks must strictly adhere to the `Task <Phase>-<Index>` format (e.g., `Task 7A-1`, `Task 7A-2`, `Task 7B-1`). Defect fixes remain under the scope of their original task acceptance; creating arbitrary sub-phases or derivative task letters (such as C2-B, C3, 6G-E) is forbidden.
+6. **Strict Prohibitions**:
+   - Do NOT redefine Phase 7A as pure foot-placement research; foot placement is an internal sub-capability of 7A lower-limb continuous traversal on the 19-bone character.
+   - Do NOT redefine Phase 7B as centroidal dynamics development.
+   - Do NOT redefine Phase 7C as upper-body momentum compensation.
+   - Do NOT develop dynamic balance compensation before the real character completes continuous scene traversal.
+   - Do NOT create a second character system or second armature.
+   - Do NOT create a second dynamics training ground.
+   - Do NOT mislabel future planned interfaces as currently implemented production modules.

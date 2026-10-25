@@ -91,6 +91,17 @@
 
 ## 8. 永久架构门禁与防伪造纪律 (Architecture Change Gate & Anti-Fabrication Rules)
 * **单一权威规范来源 (SSOT)**：所有架构变更准入、行为清规与偏差报批，以 [`docs/ARCHITECTURE_CHANGE_GATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ARCHITECTURE_CHANGE_GATE.md) 为唯一权威标准。
+* **架构防漂移前后置十步闭环检查协议 (Ten-Step Anti-Drift Protocol)**：后续所有开发任务，在编写/修改代码前必须逐项核查，任务结束时必须再次运行闭环核验：
+  1. 读取规范与门禁（`AGENTS.md` / `GEMINI.md` / `docs/ARCHITECTURE_CHANGE_GATE.md`）；
+  2. 读取最新版 `AI_SYNC.md`（确认当前 HEAD SHA 与未提交文件现场）；
+  3. 查阅真实源码（深入查阅真实 Python 模块源码，严禁仅凭图表推断）；
+  4. 核对符号物理存在（通过 `python tests/audit_c2_final_inspector.py --verify-docs` 自动校验，严禁引用虚构符号）；
+  5. 杜绝职责重叠模块（严禁制造第二套控制器、第二套求解器或第二套场景）；
+  6. 严禁绕开生产管线（所有运动接入 $\text{MotionPlanner} \to \text{Bridge} \to \text{WBC} \to \text{Rig/IK/FK}$）；
+  7. 确认任务当前准入（按 7A $\to$ 7B $\to$ 7C $\to$ 7D $\to$ 7E $\to$ 7F $\to$ 6H 顺序逐级准入，严禁提前越级或自设衍生阶段）；
+  8. 确保历史零退化（严禁篡改成熟动作参数、时间轴或静默放宽 ROM 阈值）；
+  9. 保护跨宿主复用边界（纯 Python 动力学内核与 Blender `bpy` 解耦，保持未来跨引擎复用能力）；
+  10. 架构变更事前报批（所有新架构调整必须获得用户书面授权并录入 `DECISIONS.md`）。
 * **架构变更前置 11 问清单 (Pre-flight Checklist)**：任何新功能或重构开发前，必须明确：
   1. 已有实现与可复用模块排查；
   2. 唯一层级职责；

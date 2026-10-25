@@ -441,7 +441,7 @@
      - `SprintStartAction`（114 帧）：构建起跑深蹲、蹬地与加速冲刺的规划位姿，接入统一桥接层；引入平滑摆动脚解剖踝俯仰调制（$\theta_{\text{pitch}} = -18.0^\circ \sin(\pi s)$），消除深屈膝时由于强制水平足底导致的 ROM 超限。
      - `SprintBrakeAction`（48 帧）：构建高速切入、受控前滑与双足稳态合拢停步的规划位姿，接入统一桥接层；引入制动踝俯仰调制（$-12.0^\circ \sin(\pi s)$），实现微米级无冲突停步锁定。
   2. **速度指标与接触意图严格解耦与非混淆保障**：
-     - 严格区分 `MotionState.planned_linear_velocity`（规划期望速度）、`MotionState.root_derived_linear_velocity`（根节点差分测量速度）与 `MotionState.com_linear_velocity`（全身体物理质心线速度），绝不互相覆盖或混淆。
+     - 严格区分 `MotionState.params['planned_linear_velocity']`（规划期望速度）、`MotionState.params['root_derived_linear_velocity']`（根节点差分测量速度）与 `MotionState.params['com_linear_velocity']`（全身体物理质心线速度），绝不互相覆盖或混淆。
      - 严格区分接触意图（`contact_intent`）、世界锁定（`is_locked`）与几何合规性校验。
      - 任何 IK、ROM 或接触几何违规均由 `bridge_res.success` 真实拦截，严禁静默放行。
   3. **直接生成可播放统一连续动画 Blender 验收文件**：
@@ -971,3 +971,34 @@
   - 更新测试套件：[`tests/verify_task6gd_playground_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_playground_dynamics.py)、[`tests/verify_task6gd_visual_telemetry.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gd_visual_telemetry.py)；
   - 发布并纠偏 6 份架构冻结文档：`docs/FOUNDATION_*.md`、`docs/ROADMAP_*.md` 与 `docs/C2_FINAL_VALIDATION.md`；
   - 回归全绿：`quick` (9/9 PASS)，`physics` (16/16 PASS)，`--verify-docs` (PASS)，历史步态 100% 零退化。
+
+---
+
+### [DEC-046] 2026-10-25: Task 6G-D-C2-FINAL 文档真实性门禁、通用 AST 符号校验器与架构约束彻底冻结
+
+* **状态**：已批准 (Approved)
+* **日期**：2026-10-25
+* **背景**：针对跨 AI 审阅中发现的文档潜在幻觉（如 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md` 引用非枚举成员 `ContactLifecycle.TOUCHDOWN`，以及历史文档中的符号/方法微瑕），必须升级自动化校验工具为通用 AST 存在性核验，杜绝硬编码黑名单的局限性；同时固化唯一生产调用链、状态读写边界与后续开发路线，防止任何认知漂移。
+* **决策与方案**：
+  1. **枚举与接口真实性纠偏**：
+     - 修正 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`，明确区分离散触地动力学事件（Touchdown Event）与持续接触生命周期状态（`ContactLifecycle`: `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`）；
+     - 严禁为了让文档成立而向源码枚举添加 `TOUCHDOWN`；
+     - 修复 `docs/FOUNDATION_ARCHITECTURE_AUDIT.md`、`docs/FOUNDATION_DEPENDENCY_MAP.md`、`docs/FOUNDATION_STATE_OWNERSHIP.md` 中微小的真实接口偏差（`ClosedLoopDynamicsCoordinator.simulate`、`DynamicsEnvironmentQuery.query_surface_at_point`、移除未定义的 `_apply_micro_projection` 幻觉引用并还原为真实几何合规检查 `multi_contact.check_all_contacts`）。
+  2. **升级文档引用校验器 (`tests/audit_c2_final_inspector.py`) 为通用 AST 校验器**：
+     - 自动解析源码 AST 提取全库模块路径、类定义、方法定义、顶层函数、类属性与 Enum 成员，并建立 `CodebaseSymbolIndex`；
+     - 引入四元状态判别体系：`IMPLEMENTED`（真实存在且接入）、`EXISTS_NOT_INTEGRATED`（源码存在但暂未合流）、`PROPOSED`（未来拟议，严禁伪报已实现）、`INVALID`（不存在或错误 API，直接报错中断）；
+     - 引入内置自测试套件 `run_validator_test_suite`，覆盖 Positive、Negative、Proposed、Prose Safety 四大场景，严禁假通过与自然语言误报；
+     - 提供 `--test-validator` 与 `--verify-docs` 命令行入口，遇错返回非零退出码。
+  3. **冻结生产调用主链与状态所有权**：
+     - 在权威架构文档中彻底固化唯一生产主链：
+       $$\text{MotionPlanner} / \text{MotionAction} \longrightarrow \text{KinematicBridgeExecutor.execute_frame()} \longrightarrow \text{WholeBodyController.execute_frame()} \longrightarrow \text{Blender Rig/IK/FK} \longrightarrow \text{物理遥测} \longrightarrow \text{MotionState}$$
+     - 严禁任何后续 Agent 绕开、复制或自行替换此主链；明确 CoM/惯性/遥测当前为只读评估，C1/C2 质心动力学当前为独立管线，未完成的合流严禁谎报已实现。
+  4. **固化后续路线 (7A $\to$ 7B $\to$ 7C $\to$ 7D $\to$ 7E $\to$ 7F $\to$ 6H) 与命名纪律**：
+     - 后续任务严格按顺序准入：7A（19骨骼角色进入训练场）$\to$ 7B（上肢独立控制）$\to$ 7C（动力学合流）$\to$ 7D（多关节动力协调）$\to$ 7E（IK/FK动态协同）$\to$ 7F（全身连续环境交互）$\to$ 6H（动态平衡与主动补偿）；
+     - 后续新任务统一使用 `Task <阶段>-<序号>`（如 `Task 7A-1`），严禁私自衍生同级或下游分支。
+  5. **建立前后置十步闭环架构防漂移门禁**：
+     - 在 `docs/ARCHITECTURE_CHANGE_GATE.md` 确立十步闭环防漂移协议，并在 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 强制引用。
+* **影响**：
+  - 未修改 `src/` 下任何 Python 文件，未修改任何 `.blend` 文件；
+  - 架构冻结文档 100% 具备机器可证明的真实性（Exit Code 0）；
+  - 彻底封死后续 Agent 认知漂移与私自造轮子路径。

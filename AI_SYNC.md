@@ -1,8 +1,8 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 含 C2-FINAL 验收纠偏）
-* **任务状态**：已完全验证 (Fully Verified & Automated Pass)；底座架构与资产正式冻结，进入只读维护状态；严格停止，不自动触发 Phase 7A 或 Phase 6H，等待人类指令。
+* **当前任务编号**：任务 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 含 Documentation Integrity Gate）
+* **任务状态**：已完全验证 (Fully Verified & Automated Pass)；通用 AST 符号校验器自测试与全库文档核验全绿通过；底座架构与资产正式冻结，进入只读维护状态；严格停止，不自动触发 Phase 7A 或 Phase 6H，等待人类指令。
 * **Git 状态**：
   * **当前分支**：`master`
   * **纠偏核心 Commit SHA**：`39f5aa062cfea313855f7cb3c99470d1c7ddd627`（`docs(task-6gd-c2-final): correct architecture freeze audit docs with machine-verified AST and blend inventory`）
@@ -37,8 +37,9 @@
 
 ## 2. 自动化一致性测试与分层回归结果
 
-* **文档路径与符号零幻觉审计 (`tests/audit_c2_final_inspector.py --verify-docs`)**：**PASS (Exit Code 0)**
-  * 扫描全部 12 份架构冻结与状态同步文档，确认引用的所有 `src/*.py` 与 `tests/*.py` 100% 物理存在于磁盘，且零不存在模块或虚构 API。
+* **通用 AST 符号存在性与四态契约审计 (`tests/audit_c2_final_inspector.py --verify-docs`)**：**PASS (Exit Code 0)**
+  * 扫描全量 16 份架构冻结与状态同步文档，确认引用的所有模块、类、方法、函数、属性及 Enum 成员 100% 物理存在于磁盘；
+  * 内置自测试套件 (`--test-validator`)：覆盖 Positive、Negative、Proposed、Prose Safety 四大用例，实测零假通过、零自然语言误报 (Exit Code 0)。
 * **专职一致性套件 (`tests/verify_task6gd_visual_telemetry.py`)**：**5/5 PASS**
   * 最大位置误差：`0.00e+00 m`（门禁 $< 10^{-5}\text{ m}$）；最大姿态误差：`3.50e-07 rad`（门禁 $< 10^{-5}\text{ rad}$）；
   * 反冒充发散实测：Station 4 打滑发散 $\Delta p = 5.30\text{ m}$；Station 5 滚转发散 $\Delta q = 1.55\text{ rad}$ ($> 88^\circ$)。

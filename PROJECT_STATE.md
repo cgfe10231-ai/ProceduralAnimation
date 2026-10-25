@@ -8,6 +8,12 @@
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 6G-D-C2-FINAL 文档真实性门禁、通用 AST 符号校验器与架构约束彻底冻结 (Documentation Integrity Gate)**：
+  * **枚举与接口引用纠偏**：修正 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`，明确区分离散触地事件（Touchdown Event）与持续接触生命周期状态（`ContactLifecycle`: `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`），未向源码增加假枚举；纠偏 `ClosedLoopDynamicsCoordinator.simulate`、`DynamicsEnvironmentQuery.query_surface_at_point` 与 `KinematicBridgeExecutor` 真实几何检查；
+  * **通用 AST 存在性校验器 (`tests/audit_c2_final_inspector.py`)**：通过 Python AST 解析提取全库 51 个模块的类、方法、函数、属性及 Enum 成员，构建 `CodebaseSymbolIndex` 与 Blender 资产索引，实现跨文档通用符号存在性核验；
+  * **四态契约与自测试套件**：引入 `IMPLEMENTED`、`EXISTS_NOT_INTEGRATED`、`PROPOSED`、`INVALID` 四态模型；内置自测试套件覆盖 Positive、Negative、Proposed、Prose Safety 四大用例，实测零假通过、零自然语言误报；
+  * **前后置十步闭环架构防漂移门禁**：在 `docs/ARCHITECTURE_CHANGE_GATE.md` 确立十步防漂移协议并在 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 强制引用；
+  * **全量文档机器核验**：`tests/audit_c2_final_inspector.py --verify-docs` 100% 全绿通过 (Exit Code 0)。
 * **任务 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结（含 C2-FINAL 验收纠偏）**：
   * **机器可验证全库 AST 与 `.blend` 资产审计 (`tests/audit_c2_final_inspector.py`)**：
     * 编写并在 Blender 5.1.1 无头模式下执行只读审计脚本 [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py)，导出 [`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/codebase_and_blend_audit.json) 与 [`docs/evidence/task6gd_c2a/blend_inspection_log.txt`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/blend_inspection_log.txt)；
@@ -591,6 +597,7 @@
 ### [已知缺陷与遗留说明]
 1. **双管线尚未汇流（计划于 Phase 7A / 7C 解决）**：当前 `output/dynamics_playground.blend` 仅包含 14 区环境网格与 6G-D 刚体代理可视化（`Playground_Dynamics_Visualization`，0 骨骼），尚未放入 19 骨骼 `CharacterArmature`（定位于 **Phase 7A**），且 6G-D 质心动力学尚未与 `KinematicBridgeExecutor` + `WholeBodyController` 闭环汇流（定位于 **Phase 7C**）。
 2. **Station 2 / 3 / 4 模型边界**：Station 2 为空中自由落体弹道（不含触地回弹碰撞）；Station 3 与 4 在训练场代理阶段采用连续移动接触点（待 7A/7C 替换为真实 19 骨骼双足交替落脚）。
+3. **`src/motion/kinematic_bridge.py:447` 存在休眠引用 `ContactLifecycle.TOUCHDOWN`**：在手臂主动触碰障碍物表面的未激活分支中，存在一行休眠代码引用了不存在的枚举成员 `ContactLifecycle.TOUCHDOWN`；由于本任务严格禁止修改任何 `src/` 文件，该缺陷已明确登记为已知缺陷，待后续允许修改生产代码的任务统一修复。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。

@@ -166,14 +166,14 @@ flowchart TD
 
 | 概念分类 | 源码标准名称 | 源码定义位置 | 曾用或错误名称（严禁再用） | 合法枚举值列表 |
 | :--- | :--- | :--- | :--- | :--- |
-| **支撑类型** | `SupportType` | `src/motion/contact_model.py` | `STABLE_FEET`, `StableStance` | `DOUBLE_STANCE`, `SINGLE_STANCE_L`, `SINGLE_STANCE_R`, `HAND_SUPPORT`, `WALL_FOOT_STANCE`, `LEDGE_HANG`, `MULTI_SURFACE`, `FLIGHT` |
-| **接触类型** | `ContactType` | `src/motion/contact_model.py` | `UnilateralContact`, `HardContact` | `UNILATERAL`, `GRASP`, `FREE` |
-| **接触生命周期** | `ContactLifecycle` | `src/motion/contact_model.py` | `ContactState` | `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN` |
-| **ROM 约束模式** | `ConstraintMode` | `src/motion/joint_limits.py` | `ROMMode`, `LimitType` | `BOX_EULER`, `ELLIPTICAL_CONE`, `HINGE_1D` |
-| **运动模式** | `MotionMode` | `src/motion/framework.py` | `GaitMode` | `STAND`, `WALK`, `RUN`, `SPRINT`, `BRAKE`, `JUMP`, `FALL`, `CUSTOM` |
-| **足部世界锁定** | `lock_foot_contact` | `src/rig/foot_contact.py` | `FootLockAdapter`, `ContactLock` | 函数：`lock_foot_contact(arm, side, ...)` |
-| **双腿 IK 求解** | `set_foot_ik_target` | `src/rig/ik.py` | `LegIKSolver` | 函数：`set_foot_ik_target(arm, side, ...)` |
-| **双臂 IK 求解** | `set_hand_ik_target` | `src/rig/arm_ik.py` | `ArmIKSolver` | 函数：`set_hand_ik_target(arm, side, ...)` |
+| **支撑类型** | `SupportType` | `src/motion/contact_model.py` | STABLE_FEET, StableStance (废弃) | `DOUBLE_STANCE`, `SINGLE_STANCE_L`, `SINGLE_STANCE_R`, `HAND_SUPPORT`, `WALL_FOOT_STANCE`, `LEDGE_HANG`, `MULTI_SURFACE`, `FLIGHT` |
+| **接触类型** | `ContactType` | `src/motion/contact_model.py` | UnilateralContact, HardContact (废弃) | `UNILATERAL`, `GRASP`, `FREE` |
+| **接触生命周期** | `ContactLifecycle` | `src/motion/contact_model.py` | ContactState (废弃) | `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN` |
+| **ROM 约束模式** | `ConstraintMode` | `src/motion/joint_limits.py` | ROMMode, LimitType (废弃) | `BOX_EULER`, `ELLIPTICAL_CONE`, `HINGE_1D` |
+| **运动模式** | `MotionMode` | `src/motion/framework.py` | GaitMode (废弃) | `STAND`, `WALK`, `RUN`, `SPRINT`, `BRAKE`, `JUMP`, `FALL`, `CUSTOM` |
+| **足部世界锁定** | `lock_foot_contact` | `src/rig/foot_contact.py` | FootLockAdapter, ContactLock (废弃) | 函数：`lock_foot_contact(arm, side, ...)` |
+| **双腿 IK 求解** | `set_foot_ik_target` | `src/rig/ik.py` | LegIKSolver (废弃) | 函数：`set_foot_ik_target(arm, side, ...)` |
+| **双臂 IK 求解** | `set_hand_ik_target` | `src/rig/arm_ik.py` | ArmIKSolver (废弃) | 函数：`set_hand_ik_target(arm, side, ...)` |
 
 ---
 

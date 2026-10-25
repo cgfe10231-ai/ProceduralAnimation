@@ -20,6 +20,19 @@ At the Task 6G-D-C2-FINAL freeze point, the repository contains **two verified, 
    - Computes desired feedback accelerations (`compute_commanded_accelerations`), solves constrained 3D contact forces (`solve_contact_forces`), and integrates the 6-DOF Newton-Euler equations of motion (`integrate_forward_dynamics_single_step`) to advance `ForwardDynamicsState` (`src/motion/forward_dynamics.py#L432`).
    - Visualized in Blender by `src/scene/dynamics_visualizer.py` (`run_dynamics_scenarios`, `inject_dynamics_visualization`) and `src/scene/dynamics_visual_evidence.py`, which drive rigid-body proxy objects (`Dynamics_BodyProxy_S1..S5`, `Dynamics_CoM_S1..S5`, `Dynamics_ContactDisc_*`, `Dynamics_ForceArrow_*`) across frames `1..73` ($S_0..S_{72}$) in `output/dynamics_playground.blend`.
 
+### 1.1 Frozen Production Call Chain & Component Responsibilities
+The authoritative production execution chain is frozen and strictly non-substitutable:
+$$\text{MotionPlanner} / \text{MotionAction} \longrightarrow \text{KinematicBridgeExecutor.execute_frame()} \longrightarrow \text{WholeBodyController.execute_frame()} \longrightarrow \text{Blender Rig / IK / FK} \longrightarrow \text{CoM / 惯性 / 遥测} \longrightarrow \text{MotionState}$$
+Subsequent agents are strictly forbidden from bypassing, duplicating, or replacing this chain.
+
+* **`MotionAction`**: Responsible for continuous multi-frame action trajectory planning (generates sequence of per-frame kinematic targets);
+* **`KinematicBridgeExecutor`**: Responsible for deterministic single-frame 6-phase protocol organization (converts targets, coordinates WBC, applies truthful micro-projection, triggers keyframing);
+* **`WholeBodyController`**: Sole writer of character armature pose and IK targets (computes root motion, bone rotations, and dispatches to leg/arm IK/FK);
+* **`src/rig/` Existing IK/FK (`ik.py`, `arm_ik.py`, `foot_contact.py`)**: Real mechanical execution engine operating on Blender armature constraints;
+* **`JointModel` (`src/motion/joint_limits.py`)**: Responsible for anatomical Range of Motion (ROM) limit verification and clamping;
+* **`CoM / Inertia / Kinematics / Contact Telemetry` (`rigid_link.py`, `body_inertia.py`, `body_kinematics.py`, `contact_model.py`)**: 100% read-only post-evaluation sensors (zero write-back to bones or IK controllers);
+* **Task 6G-D Numerical Dynamics (`contact_dynamics.py`, `contact_force_solver.py`, `forward_dynamics.py`, `closed_loop_dynamics.py`)**: Currently an independent numerical simulation and visualization pipeline; confluence between 19-bone WBC and centroidal dynamics is NOT yet implemented (scheduled for Phase 7C).
+
 ```mermaid
 flowchart TD
     subgraph PipelineA["Pipeline A: Production 19-Bone Kinematic & WBC Pipeline (Active in unified_motion_integration.blend)"]
@@ -34,7 +47,7 @@ flowchart TD
     end
 
     subgraph PipelineB["Pipeline B: Task 6G-D Centroidal Numerical Dynamics Pipeline (Active in dynamics_playground.blend)"]
-        CLDC["ClosedLoopDynamicsCoordinator.run_trajectory()<br/>step_closed_loop_dynamics()<br/>(src/motion/closed_loop_dynamics.py#L563)"] --> CMD["compute_commanded_accelerations()<br/>& ContactWrenchTarget.from_target_motion()<br/>(src/motion/contact_force_solver.py#L173)"]
+        CLDC["ClosedLoopDynamicsCoordinator.simulate()<br/>step_closed_loop_dynamics()<br/>(src/motion/closed_loop_dynamics.py#L563)"] --> CMD["compute_commanded_accelerations()<br/>& ContactWrenchTarget.from_target_motion()<br/>(src/motion/contact_force_solver.py#L173)"]
         CMD --> CFS["solve_contact_forces()<br/>(src/motion/contact_force_solver.py#L757)"]
         CFS --> FDI["integrate_forward_dynamics_single_step()<br/>(src/motion/forward_dynamics.py#L659)"]
         FDI --> FDS["ForwardDynamicsState (S_0..S_72)<br/>(src/motion/forward_dynamics.py#L432)"]
@@ -78,8 +91,8 @@ flowchart TD
     8. Evaluates 15-segment Center of Mass via `compute_whole_body_com()` (`src/motion/rigid_link.py#L261`) and returns `WholeBodyControlResult` (`src/motion/whole_body_controller.py#L230`).
 - **Phase 3 — Multi-Limb Geometric Contact Evaluation**:
   - Calls `evaluate_limb_contacts_from_armature()` ([`src/motion/contact_model.py#L511-L552`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py#L511-L552)) against `EnvironmentQuery` surfaces.
-- **Phase 4 — Truthful Micro-Projection & Constraint Feedback**:
-  - Calls `self._apply_micro_projection()` ([`src/motion/kinematic_bridge.py#L466-L567`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py#L466-L567)). Only corrects small penetrations or stance slips within `max_micro_projection_m = 0.03 m`; never silently masks large reachability failures.
+- **Phase 4 — Truthful Geometric Compliance & Constraint Feedback**:
+  - Evaluates actual limb positions against surface geometry via `multi_contact.check_all_contacts(actual_positions)` ([`src/motion/kinematic_bridge.py#L486-L504`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py#L486-L504)), recording any gap, slip, or penetration violations into `UnmetConstraint(category="CONTACT_GEOMETRY")` without masking or falsifying reachability failures.
 - **Phase 5 — Read-Only Physics Telemetry Enrichment**:
   - Re-evaluates `compute_whole_body_com()` (`src/motion/rigid_link.py#L261`), `BodyKinematicsTracker.sample_and_update()` (`src/motion/body_kinematics.py#L626`), and `compute_whole_body_inertia()` (`src/motion/body_inertia.py#L628`).
   - Enriches the frame's `MotionState` via `enrich_motion_state_with_contacts()`, `enrich_motion_state_with_kinematics()`, and `enrich_motion_state_with_inertia()`.
@@ -126,4 +139,4 @@ flowchart TD
    - Frames `1..18` ($k = 0..17$): Ground launch phase with active bilateral foot contacts pushing against `flat_start` ($F_z > 0$).
    - Frames `19..73` ($k = 18..72$): True airborne free-fall (`contacts = []`, $\mathbf{F}_{\text{contact}} = \mathbf{0}$, $\mathbf{a} = (0, 0, -9.81)\text{ m/s}^2$). Any non-zero hover acceleration reference in mid-air is classified as `CONTROL_INFEASIBLE_PHYSICS_ADVANCED` while physical state evolves strictly under gravity.
 4. **Station 3 & Station 4 Moving Contact Points (`S3_Slope_Up_Climb`, `S4_Friction_Slip_Limit`)**:
-   - Because `output/dynamics_playground.blend` does not yet contain the 19-bone character rig (scheduled for Phase 7A), Stations 3 and 4 advance their contact anchor positions $\mathbf{p}_{c,i}(t)$ kinematically along the $18^\circ$ slope (`slope_up_18deg`) and flat ground (`flat_start`) via `DynamicsEnvironmentQuery.query_surface_at()` so the support base tracks the moving CoM reference without artificial tipping torque $\mathbf{r} \times \mathbf{F}$. Replacing these proxy contact schedules with real 19-bone foot placements is part of **Phase 7A / 7C**.
+   - Because `output/dynamics_playground.blend` does not yet contain the 19-bone character rig (scheduled for Phase 7A), Stations 3 and 4 advance their contact anchor positions $\mathbf{p}_{c,i}(t)$ kinematically along the $18^\circ$ slope (`slope_up_18deg`) and flat ground (`flat_start`) via `DynamicsEnvironmentQuery.query_surface_at_point()` so the support base tracks the moving CoM reference without artificial tipping torque $\mathbf{r} \times \mathbf{F}$. Replacing these proxy contact schedules with real 19-bone foot placements is part of **Phase 7A / 7C**.

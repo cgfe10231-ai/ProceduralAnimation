@@ -514,7 +514,125 @@
               "lineno": 326,
               "end_lineno": 327
             }
-          ]
+          ],
+          "attributes": [
+            "arm_ik_blend_filename",
+            "arm_ik_total_frames",
+            "blend_filename",
+            "building_color",
+            "building_count",
+            "camera_focal_length",
+            "character_blend_filename",
+            "character_foot_contact_blend_filename",
+            "character_foot_contact_preview_filename",
+            "character_ik_blend_filename",
+            "character_ik_preview_filename",
+            "character_path_points",
+            "character_preview_filename",
+            "character_rig_blend_filename",
+            "character_rig_preview_filename",
+            "color_mode",
+            "corridor_clearance",
+            "file_format",
+            "fill_light_energy",
+            "fill_light_location",
+            "forward_walk_blend_filename",
+            "forward_walk_cycles",
+            "forward_walk_pelvis_crouch",
+            "forward_walk_preview_frames",
+            "forward_walk_step_height",
+            "forward_walk_step_length",
+            "fps",
+            "frame_end",
+            "frame_start",
+            "ground_color",
+            "ground_size",
+            "ground_thickness",
+            "key_light_energy",
+            "key_light_location",
+            "motion_framework_blend_filename",
+            "motion_framework_preview_filename",
+            "output_dir_name",
+            "pillar_color",
+            "pillar_count",
+            "preview_frames",
+            "preview_samples",
+            "project_root",
+            "random_seed",
+            "render_engine",
+            "resolution_percentage",
+            "resolution_x",
+            "resolution_y",
+            "run_arm_swing_deg",
+            "run_blend_filename",
+            "run_cycle_frames",
+            "run_cycles",
+            "run_elbow_base_deg",
+            "run_elbow_swing_deg",
+            "run_pelvis_base_z",
+            "run_pelvis_bounce_amp",
+            "run_pelvis_roll_deg",
+            "run_pelvis_sway_amp",
+            "run_pelvis_yaw_deg",
+            "run_preview_frames",
+            "run_stance_frames",
+            "run_step_height",
+            "run_step_length",
+            "run_torso_lean_deg",
+            "run_torso_yaw_deg",
+            "sprint_accel_frames",
+            "sprint_arm_swing_deg",
+            "sprint_blend_filename",
+            "sprint_brake_blend_filename",
+            "sprint_brake_frames",
+            "sprint_brake_preview_frames",
+            "sprint_crouch_start",
+            "sprint_lean_sprint_deg",
+            "sprint_lean_start_deg",
+            "sprint_pelvis_base_z",
+            "sprint_pelvis_bounce_amp",
+            "sprint_prep_frames",
+            "sprint_preview_frames",
+            "sprint_settle_frames",
+            "sprint_stance_frames_sprint",
+            "sprint_stance_frames_start",
+            "sprint_start_frames",
+            "sprint_steady_frames",
+            "sprint_step_frames_sprint",
+            "sprint_step_frames_start",
+            "sprint_step_height_sprint",
+            "sprint_step_height_start",
+            "sprint_target_speed",
+            "start_stop_accel_frames",
+            "start_stop_accel_pelvis_drop",
+            "start_stop_accel_torso_lean_deg",
+            "start_stop_blend_filename",
+            "start_stop_decel_frames",
+            "start_stop_decel_torso_lean_deg",
+            "start_stop_init_step_length",
+            "start_stop_preview_frames",
+            "start_stop_stand_end_frames",
+            "start_stop_stand_start_frames",
+            "start_stop_steady_frames",
+            "start_stop_steady_step_length",
+            "start_stop_target_speed",
+            "walk_arm_swing_deg",
+            "walk_cycle_blend_filename",
+            "walk_cycle_frames",
+            "walk_cycle_preview_filename",
+            "walk_elbow_base_deg",
+            "walk_elbow_swing_deg",
+            "walk_pelvis_bob_amp",
+            "walk_pelvis_crouch",
+            "walk_pelvis_roll_deg",
+            "walk_pelvis_sway_amp",
+            "walk_pelvis_yaw_deg",
+            "walk_step_height",
+            "walk_step_length",
+            "walk_torso_lean_deg",
+            "walk_torso_yaw_deg"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -1649,7 +1767,16 @@
               "lineno": 233,
               "end_lineno": 242
             }
-          ]
+          ],
+          "attributes": [
+            "ixx",
+            "ixy",
+            "ixz",
+            "iyy",
+            "iyz",
+            "izz"
+          ],
+          "enum_members": []
         },
         {
           "name": "SegmentGeometrySpec",
@@ -1662,7 +1789,21 @@
               "lineno": 288,
               "end_lineno": 362
             }
-          ]
+          ],
+          "attributes": [
+            "custom_moments",
+            "description",
+            "dim_x",
+            "dim_y",
+            "dim_z",
+            "nominal_length",
+            "radius_x",
+            "radius_y",
+            "radius_z",
+            "segment_id",
+            "shape_type"
+          ],
+          "enum_members": []
         },
         {
           "name": "BodyInertiaModel",
@@ -1680,14 +1821,35 @@
               "lineno": 386,
               "end_lineno": 399
             }
-          ]
+          ],
+          "attributes": [
+            "geometries",
+            "mass_distribution",
+            "model_name",
+            "source"
+          ],
+          "enum_members": []
         },
         {
           "name": "SegmentInertiaState",
           "bases": [],
           "lineno": 573,
           "end_lineno": 585,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "bone_name",
+            "displacement_from_body_com",
+            "local_inertia",
+            "mass_kg",
+            "orbital_angular_momentum",
+            "segment_id",
+            "spin_angular_momentum",
+            "total_angular_momentum",
+            "world_com",
+            "world_inertia_body_com",
+            "world_inertia_com"
+          ],
+          "enum_members": []
         },
         {
           "name": "WholeBodyInertiaState",
@@ -1705,7 +1867,23 @@
               "lineno": 618,
               "end_lineno": 621
             }
-          ]
+          ],
+          "attributes": [
+            "angular_momentum_body_com",
+            "com_linear_velocity",
+            "com_world",
+            "frame",
+            "inertia_tensor_body_com",
+            "orbital_angular_momentum_total",
+            "reference_frame",
+            "reference_point",
+            "segments",
+            "spin_angular_momentum_total",
+            "time_sec",
+            "total_mass_kg",
+            "units"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -1912,7 +2090,26 @@
               "lineno": 190,
               "end_lineno": 191
             }
-          ]
+          ],
+          "attributes": [
+            "com_world",
+            "commanded_velocity",
+            "contacts",
+            "end_effectors",
+            "frame",
+            "joint_quats",
+            "joint_rotations_rad",
+            "pelvis_orientation_quat",
+            "pelvis_position",
+            "root_orientation_euler_deg",
+            "root_orientation_quat",
+            "root_position",
+            "segment_orientations",
+            "segment_positions",
+            "source",
+            "time_sec"
+          ],
+          "enum_members": []
         },
         {
           "name": "BodyVelocityState",
@@ -1945,7 +2142,27 @@
               "lineno": 235,
               "end_lineno": 236
             }
-          ]
+          ],
+          "attributes": [
+            "com_linear_acceleration",
+            "com_linear_velocity",
+            "commanded_velocity",
+            "dt",
+            "end_effector_velocities",
+            "joint_angular_velocities",
+            "joint_angular_velocities_deg",
+            "pelvis_linear_velocity",
+            "root_angular_acceleration",
+            "root_angular_velocity",
+            "root_angular_velocity_deg",
+            "root_linear_acceleration",
+            "root_linear_velocity",
+            "segment_angular_velocities",
+            "segment_linear_velocities",
+            "time_sec",
+            "velocity_tracking_error_mps"
+          ],
+          "enum_members": []
         },
         {
           "name": "BodyMotionState",
@@ -1998,7 +2215,12 @@
               "lineno": 278,
               "end_lineno": 279
             }
-          ]
+          ],
+          "attributes": [
+            "pose",
+            "velocity"
+          ],
+          "enum_members": []
         },
         {
           "name": "BodyKinematicsTracker",
@@ -2031,7 +2253,9 @@
               "lineno": 681,
               "end_lineno": 752
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -2338,7 +2562,18 @@
               "lineno": 189,
               "end_lineno": 228
             }
-          ]
+          ],
+          "attributes": [
+            "external_forces_world",
+            "external_torques_about_com_world",
+            "target_angular_momentum_rate_world",
+            "target_angular_velocity_world",
+            "target_com_position_world",
+            "target_com_velocity_world",
+            "target_linear_acceleration_world",
+            "target_orientation_quat_world"
+          ],
+          "enum_members": []
         },
         {
           "name": "FeedbackGainsConfig",
@@ -2351,7 +2586,16 @@
               "lineno": 250,
               "end_lineno": 264
             }
-          ]
+          ],
+          "attributes": [
+            "kd_pos",
+            "kd_rot",
+            "kp_pos",
+            "kp_rot",
+            "max_angular_momentum_rate_cmd",
+            "max_linear_acceleration_cmd"
+          ],
+          "enum_members": []
         },
         {
           "name": "ClosedLoopAdmissibilityPolicy",
@@ -2364,7 +2608,16 @@
               "lineno": 286,
               "end_lineno": 294
             }
-          ]
+          ],
+          "attributes": [
+            "allow_approximate_solutions",
+            "allow_infeasible_zero_force_fallback",
+            "max_allowable_force_residual",
+            "max_allowable_torque_residual",
+            "strict_freeze_on_infeasible",
+            "strict_solved_only"
+          ],
+          "enum_members": []
         },
         {
           "name": "ClosedLoopControllerConfig",
@@ -2377,7 +2630,16 @@
               "lineno": 307,
               "end_lineno": 311
             }
-          ]
+          ],
+          "attributes": [
+            "admissibility_policy",
+            "dt",
+            "feedback_gains",
+            "forward_dynamics_config",
+            "gravity_acceleration_world",
+            "solver_config"
+          ],
+          "enum_members": []
         },
         {
           "name": "ClosedLoopStepStatus",
@@ -2387,7 +2649,27 @@
           ],
           "lineno": 318,
           "end_lineno": 327,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "CONTROL_INFEASIBLE_PHYSICS_ADVANCED",
+            "INTEGRATION_FAILURE",
+            "REJECTED_APPROXIMATE",
+            "REJECTED_INFEASIBLE",
+            "SOLVER_INVALID_INPUT",
+            "SOLVER_NUMERICAL_FAILURE",
+            "SUCCESS_APPROXIMATE",
+            "SUCCESS_EXACT"
+          ],
+          "enum_members": [
+            "CONTROL_INFEASIBLE_PHYSICS_ADVANCED",
+            "INTEGRATION_FAILURE",
+            "REJECTED_APPROXIMATE",
+            "REJECTED_INFEASIBLE",
+            "SOLVER_INVALID_INPUT",
+            "SOLVER_NUMERICAL_FAILURE",
+            "SUCCESS_APPROXIMATE",
+            "SUCCESS_EXACT"
+          ]
         },
         {
           "name": "ClosedLoopFrameTelemetry",
@@ -2420,7 +2702,40 @@
               "lineno": 382,
               "end_lineno": 428
             }
-          ]
+          ],
+          "attributes": [
+            "actual_angular_momentum_rate_world",
+            "actual_contact_forces",
+            "actual_linear_acceleration_world",
+            "actual_net_force_world",
+            "actual_net_torque_about_com_world",
+            "commanded_angular_momentum_rate_world",
+            "commanded_linear_acceleration_world",
+            "frame_index",
+            "is_contact_solution_physically_valid",
+            "is_control_feasible",
+            "is_physically_valid",
+            "is_policy_admitted",
+            "is_target_satisfied",
+            "message",
+            "motion_reference",
+            "solver_force_residual_n",
+            "solver_is_physically_valid",
+            "solver_status",
+            "solver_torque_residual_nm",
+            "state_advanced",
+            "state_current",
+            "state_next",
+            "step_status",
+            "target_contact_wrench_force_world",
+            "target_contact_wrench_torque_world",
+            "timestamp",
+            "tracking_error_angular_momentum_rate",
+            "tracking_error_linear_acc",
+            "tracking_error_position",
+            "tracking_error_velocity"
+          ],
+          "enum_members": []
         },
         {
           "name": "ClosedLoopSimulationTrajectory",
@@ -2443,7 +2758,22 @@
               "lineno": 483,
               "end_lineno": 485
             }
-          ]
+          ],
+          "attributes": [
+            "actual_physical_time",
+            "all_advanced",
+            "attempted_steps",
+            "dt",
+            "failed_steps",
+            "final_state",
+            "frames",
+            "initial_state",
+            "requested_duration",
+            "requested_steps",
+            "successful_steps",
+            "total_time"
+          ],
+          "enum_members": []
         },
         {
           "name": "ClosedLoopDynamicsCoordinator",
@@ -2466,7 +2796,9 @@
               "lineno": 891,
               "end_lineno": 983
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -2823,14 +3155,42 @@
           ],
           "lineno": 115,
           "end_lineno": 122,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "NON_CONTACT_FORCE_VIOLATION",
+            "SEPARATED",
+            "SLIP_LIMIT",
+            "SLIP_VIOLATION",
+            "STICK",
+            "TENSION_VIOLATION"
+          ],
+          "enum_members": [
+            "NON_CONTACT_FORCE_VIOLATION",
+            "SEPARATED",
+            "SLIP_LIMIT",
+            "SLIP_VIOLATION",
+            "STICK",
+            "TENSION_VIOLATION"
+          ]
         },
         {
           "name": "FrictionConstraintEvaluation",
           "bases": [],
           "lineno": 126,
           "end_lineno": 148,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "friction_limit_n",
+            "friction_margin_n",
+            "is_valid",
+            "normal_force_n",
+            "normal_force_vector",
+            "status",
+            "tangential_force_n",
+            "tangential_force_vector",
+            "violation_reason"
+          ],
+          "enum_members": []
         },
         {
           "name": "SingleContactDynamics",
@@ -2903,7 +3263,21 @@
               "lineno": 295,
               "end_lineno": 425
             }
-          ]
+          ],
+          "attributes": [
+            "com_world",
+            "contact_force_world",
+            "contact_id",
+            "contact_point_world",
+            "contact_tolerance",
+            "dt",
+            "friction_coeff",
+            "is_in_contact_override",
+            "surface_distance",
+            "surface_id",
+            "surface_normal_world"
+          ],
+          "enum_members": []
         },
         {
           "name": "MultiContactDynamics",
@@ -2991,7 +3365,13 @@
               "lineno": 616,
               "end_lineno": 621
             }
-          ]
+          ],
+          "attributes": [
+            "com_world",
+            "contacts",
+            "dt"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -3171,7 +3551,21 @@
           ],
           "lineno": 85,
           "end_lineno": 91,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "APPROXIMATE",
+            "INFEASIBLE",
+            "INVALID_INPUT",
+            "NUMERICAL_FAILURE",
+            "SOLVED"
+          ],
+          "enum_members": [
+            "APPROXIMATE",
+            "INFEASIBLE",
+            "INVALID_INPUT",
+            "NUMERICAL_FAILURE",
+            "SOLVED"
+          ]
         },
         {
           "name": "ContactConstraintSpec",
@@ -3184,7 +3578,21 @@
               "lineno": 123,
               "end_lineno": 151
             }
-          ]
+          ],
+          "attributes": [
+            "allows_regular_support",
+            "contact_id",
+            "contact_point_world",
+            "contact_tolerance",
+            "friction_coeff",
+            "is_in_contact",
+            "max_normal_force",
+            "min_normal_force",
+            "surface_distance",
+            "surface_id",
+            "surface_normal_world"
+          ],
+          "enum_members": []
         },
         {
           "name": "ContactWrenchTarget",
@@ -3202,7 +3610,13 @@
               "lineno": 173,
               "end_lineno": 238
             }
-          ]
+          ],
+          "attributes": [
+            "com_world",
+            "target_force_world",
+            "target_torque_world"
+          ],
+          "enum_members": []
         },
         {
           "name": "ContactSolverConfig",
@@ -3215,14 +3629,47 @@
               "lineno": 254,
               "end_lineno": 268
             }
-          ]
+          ],
+          "attributes": [
+            "constraint_tolerance",
+            "enable_fallback",
+            "force_tolerance_n",
+            "max_iterations",
+            "method",
+            "regularization_weight",
+            "torque_tolerance_nm",
+            "weight_force",
+            "weight_torque"
+          ],
+          "enum_members": []
         },
         {
           "name": "ContactForceSolution",
           "bases": [],
           "lineno": 272,
           "end_lineno": 291,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "computation_time_sec",
+            "contact_forces",
+            "fallback_occurred",
+            "force_error_vector",
+            "force_residual_n",
+            "is_physically_valid",
+            "iterations",
+            "max_friction_violation_n",
+            "max_normal_violation_n",
+            "message",
+            "optimizer_converged",
+            "optimizer_message",
+            "solver_engine",
+            "status",
+            "torque_error_vector",
+            "torque_residual_nm",
+            "total_contact_force",
+            "total_contact_torque_about_com"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -3475,7 +3922,17 @@
           ],
           "lineno": 46,
           "end_lineno": 50,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "FREE",
+            "GRASP",
+            "UNILATERAL"
+          ],
+          "enum_members": [
+            "FREE",
+            "GRASP",
+            "UNILATERAL"
+          ]
         },
         {
           "name": "ContactLifecycle",
@@ -3485,7 +3942,19 @@
           ],
           "lineno": 53,
           "end_lineno": 58,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "BROKEN",
+            "CANDIDATE",
+            "ESTABLISHED",
+            "RELEASED"
+          ],
+          "enum_members": [
+            "BROKEN",
+            "CANDIDATE",
+            "ESTABLISHED",
+            "RELEASED"
+          ]
         },
         {
           "name": "SupportType",
@@ -3495,14 +3964,44 @@
           ],
           "lineno": 61,
           "end_lineno": 70,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "DOUBLE_STANCE",
+            "FLIGHT",
+            "HAND_SUPPORT",
+            "LEDGE_HANG",
+            "MULTI_SURFACE",
+            "SINGLE_STANCE_L",
+            "SINGLE_STANCE_R",
+            "WALL_FOOT_STANCE"
+          ],
+          "enum_members": [
+            "DOUBLE_STANCE",
+            "FLIGHT",
+            "HAND_SUPPORT",
+            "LEDGE_HANG",
+            "MULTI_SURFACE",
+            "SINGLE_STANCE_L",
+            "SINGLE_STANCE_R",
+            "WALL_FOOT_STANCE"
+          ]
         },
         {
           "name": "GeometricConstraintResult",
           "bases": [],
           "lineno": 107,
           "end_lineno": 121,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "details",
+            "distance_normal_m",
+            "is_valid",
+            "penetration_depth_m",
+            "tangential_slip_m",
+            "total_position_error_m",
+            "violation_reason"
+          ],
+          "enum_members": []
         },
         {
           "name": "ContactRecord",
@@ -3535,7 +4034,26 @@
               "lineno": 213,
               "end_lineno": 272
             }
-          ]
+          ],
+          "attributes": [
+            "body_local_anchor",
+            "contact_id",
+            "contact_type",
+            "env_local_anchor",
+            "env_object_name",
+            "friction_coeff_dynamic",
+            "friction_coeff_static",
+            "lifecycle",
+            "limb",
+            "max_allowable_gap_m",
+            "max_allowable_penetration_m",
+            "max_allowable_slip_m",
+            "metadata",
+            "surface_id",
+            "world_normal",
+            "world_position"
+          ],
+          "enum_members": []
         },
         {
           "name": "MultiContactState",
@@ -3573,14 +4091,31 @@
               "lineno": 355,
               "end_lineno": 391
             }
-          ]
+          ],
+          "attributes": [
+            "contacts",
+            "frame",
+            "metadata",
+            "time_sec"
+          ],
+          "enum_members": []
         },
         {
           "name": "EnvironmentalSurface",
           "bases": [],
           "lineno": 500,
           "end_lineno": 508,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "center_world",
+            "dimensions",
+            "friction_dynamic",
+            "friction_static",
+            "normal_world",
+            "surface_id",
+            "surface_type"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -3840,7 +4375,16 @@
               "lineno": 392,
               "end_lineno": 397
             }
-          ]
+          ],
+          "attributes": [
+            "ixx",
+            "ixy",
+            "ixz",
+            "iyy",
+            "iyz",
+            "izz"
+          ],
+          "enum_members": []
         },
         {
           "name": "ForwardDynamicsStatus",
@@ -3850,7 +4394,19 @@
           ],
           "lineno": 404,
           "end_lineno": 409,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "INVALID_INPUT",
+            "NUMERICAL_FAILURE",
+            "SINGULAR_INERTIA",
+            "SUCCESS"
+          ],
+          "enum_members": [
+            "INVALID_INPUT",
+            "NUMERICAL_FAILURE",
+            "SINGULAR_INERTIA",
+            "SUCCESS"
+          ]
         },
         {
           "name": "ContactForcePoint",
@@ -3863,7 +4419,13 @@
               "lineno": 419,
               "end_lineno": 424
             }
-          ]
+          ],
+          "attributes": [
+            "contact_force_world",
+            "contact_id",
+            "contact_point_world"
+          ],
+          "enum_members": []
         },
         {
           "name": "ForwardDynamicsState",
@@ -3911,7 +4473,17 @@
               "lineno": 506,
               "end_lineno": 508
             }
-          ]
+          ],
+          "attributes": [
+            "angular_momentum_about_com_world",
+            "com_position_world",
+            "com_velocity_world",
+            "inertia_tensor_body",
+            "mass",
+            "orientation_quat_world",
+            "timestamp"
+          ],
+          "enum_members": []
         },
         {
           "name": "ForwardDynamicsStepInput",
@@ -3929,14 +4501,30 @@
               "lineno": 572,
               "end_lineno": 602
             }
-          ]
+          ],
+          "attributes": [
+            "contact_forces",
+            "dt",
+            "external_forces_world",
+            "external_torques_about_com_world",
+            "gravity_acceleration_world",
+            "target_angular_momentum_rate_world",
+            "target_linear_acceleration_world"
+          ],
+          "enum_members": []
         },
         {
           "name": "ForwardDynamicsConfig",
           "bases": [],
           "lineno": 606,
           "end_lineno": 610,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "integration_method",
+            "tolerance_positive_definite",
+            "tolerance_quaternion_norm"
+          ],
+          "enum_members": []
         },
         {
           "name": "ForwardDynamicsStepResult",
@@ -3949,7 +4537,24 @@
               "lineno": 631,
               "end_lineno": 652
             }
-          ]
+          ],
+          "attributes": [
+            "actual_angular_momentum_rate_world",
+            "actual_angular_velocity_world",
+            "actual_linear_acceleration_world",
+            "angular_momentum_rate_tracking_error",
+            "computation_time_sec",
+            "is_physically_valid",
+            "linear_acceleration_tracking_error",
+            "message",
+            "net_force_world",
+            "net_torque_about_com_world",
+            "state_next",
+            "status",
+            "target_angular_momentum_rate_world",
+            "target_linear_acceleration_world"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -4496,7 +5101,45 @@
           ],
           "lineno": 117,
           "end_lineno": 144,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "ACCELERATE",
+            "AIRBORNE",
+            "CLIMB",
+            "DECELERATE",
+            "IDLE",
+            "JUMP",
+            "ROLL",
+            "RUN",
+            "SLIDE",
+            "SLOPE_BOOST",
+            "SPRINT",
+            "START",
+            "STOP",
+            "TURN",
+            "VAULT",
+            "WALK",
+            "WALL_RUN"
+          ],
+          "enum_members": [
+            "ACCELERATE",
+            "AIRBORNE",
+            "CLIMB",
+            "DECELERATE",
+            "IDLE",
+            "JUMP",
+            "ROLL",
+            "RUN",
+            "SLIDE",
+            "SLOPE_BOOST",
+            "SPRINT",
+            "START",
+            "STOP",
+            "TURN",
+            "VAULT",
+            "WALK",
+            "WALL_RUN"
+          ]
         },
         {
           "name": "ContactPointState",
@@ -4509,7 +5152,21 @@
               "lineno": 178,
               "end_lineno": 191
             }
-          ]
+          ],
+          "attributes": [
+            "contact_world_xyz",
+            "current_world_xyz",
+            "drift_m",
+            "hip_to_target_dist",
+            "is_locked",
+            "is_reachable",
+            "limb",
+            "phase",
+            "strictly_in_reach",
+            "surface_normal",
+            "target_rotation_deg"
+          ],
+          "enum_members": []
         },
         {
           "name": "MotionState",
@@ -4557,7 +5214,21 @@
               "lineno": 253,
               "end_lineno": 267
             }
-          ]
+          ],
+          "attributes": [
+            "acceleration",
+            "contacts",
+            "frame",
+            "gait_phase",
+            "is_airborne",
+            "mode",
+            "orientation_deg",
+            "params",
+            "position",
+            "time_sec",
+            "velocity"
+          ],
+          "enum_members": []
         },
         {
           "name": "ContactConstraintAdapter",
@@ -4595,7 +5266,9 @@
               "lineno": 329,
               "end_lineno": 351
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         },
         {
           "name": "BlenderPoseApplicator",
@@ -4618,21 +5291,45 @@
               "lineno": 382,
               "end_lineno": 383
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         },
         {
           "name": "MotionRuntimeContext",
           "bases": [],
           "lineno": 387,
           "end_lineno": 397,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "armature_obj",
+            "bridge_executor",
+            "config",
+            "contact_adapter",
+            "environment",
+            "pose_applicator",
+            "root_obj",
+            "scene"
+          ],
+          "enum_members": []
         },
         {
           "name": "ActionExecutionResult",
           "bases": [],
           "lineno": 405,
           "end_lineno": 415,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "action_name",
+            "final_state",
+            "frame_records",
+            "initial_state",
+            "metrics",
+            "states",
+            "step_schedule",
+            "unreachable_count"
+          ],
+          "enum_members": []
         },
         {
           "name": "MotionAction",
@@ -4662,7 +5359,9 @@
               "lineno": 444,
               "end_lineno": 449
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         },
         {
           "name": "StartStopWalkAction",
@@ -4692,7 +5391,9 @@
               "lineno": 497,
               "end_lineno": 833
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         },
         {
           "name": "MotionPlanner",
@@ -4720,7 +5421,9 @@
               "lineno": 915,
               "end_lineno": 1010
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -5086,14 +5789,32 @@
           ],
           "lineno": 56,
           "end_lineno": 60,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "BOX_EULER",
+            "ELLIPTICAL_CONE",
+            "HINGE_1D"
+          ],
+          "enum_members": [
+            "BOX_EULER",
+            "ELLIPTICAL_CONE",
+            "HINGE_1D"
+          ]
         },
         {
           "name": "AxisViolation",
           "bases": [],
           "lineno": 64,
           "end_lineno": 70,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "axis",
+            "excess_deg",
+            "limit_max_deg",
+            "limit_min_deg",
+            "requested_deg"
+          ],
+          "enum_members": []
         },
         {
           "name": "JointViolation",
@@ -5111,7 +5832,17 @@
               "lineno": 89,
               "end_lineno": 93
             }
-          ]
+          ],
+          "attributes": [
+            "axis_violations",
+            "bone_name",
+            "compound_limit_deg",
+            "compound_requested_deg",
+            "compound_violation_deg",
+            "disallowed_dof_violations",
+            "joint_id"
+          ],
+          "enum_members": []
         },
         {
           "name": "JointValidationResult",
@@ -5124,14 +5855,27 @@
               "lineno": 103,
               "end_lineno": 116
             }
-          ]
+          ],
+          "attributes": [
+            "is_valid",
+            "max_excess_deg",
+            "violations"
+          ],
+          "enum_members": []
         },
         {
           "name": "AxisModification",
           "bases": [],
           "lineno": 120,
           "end_lineno": 125,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "axis",
+            "clamped_deg",
+            "delta_deg",
+            "original_deg"
+          ],
+          "enum_members": []
         },
         {
           "name": "JointModification",
@@ -5144,7 +5888,14 @@
               "lineno": 137,
               "end_lineno": 138
             }
-          ]
+          ],
+          "attributes": [
+            "bone_name",
+            "compound_adjusted",
+            "joint_id",
+            "modifications"
+          ],
+          "enum_members": []
         },
         {
           "name": "JointClampResult",
@@ -5157,7 +5908,15 @@
               "lineno": 150,
               "end_lineno": 157
             }
-          ]
+          ],
+          "attributes": [
+            "clamped_rotations_deg",
+            "clamped_rotations_rad",
+            "is_modified",
+            "max_adjustment_deg",
+            "modifications"
+          ],
+          "enum_members": []
         },
         {
           "name": "JointLimitSpec",
@@ -5180,7 +5939,25 @@
               "lineno": 288,
               "end_lineno": 357
             }
-          ]
+          ],
+          "attributes": [
+            "allowed_dofs",
+            "bone_name",
+            "compound_cone_max_deg",
+            "compound_cone_max_rad",
+            "constraint_mode",
+            "engineering_notes",
+            "joint_id",
+            "local_axis_description",
+            "max_deg",
+            "max_rad",
+            "min_deg",
+            "min_rad",
+            "preferred_deg",
+            "preferred_rad",
+            "source"
+          ],
+          "enum_members": []
         },
         {
           "name": "JointModel",
@@ -5218,7 +5995,13 @@
               "lineno": 547,
               "end_lineno": 559
             }
-          ]
+          ],
+          "attributes": [
+            "joints",
+            "model_name",
+            "notes"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -5380,28 +6163,89 @@
           "bases": [],
           "lineno": 83,
           "end_lineno": 94,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "clamp_reach",
+            "contact_intent",
+            "contact_type",
+            "is_locked",
+            "normal_world",
+            "rotation_deg",
+            "surface_id",
+            "world_xyz"
+          ],
+          "enum_members": []
         },
         {
           "name": "PlannedHandTarget",
           "bases": [],
           "lineno": 98,
           "end_lineno": 110,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "contact_intent",
+            "contact_type",
+            "enabled",
+            "is_locked",
+            "normal_world",
+            "rotation_deg",
+            "surface_id",
+            "weight",
+            "world_xyz"
+          ],
+          "enum_members": []
         },
         {
           "name": "KinematicPlannedPose",
           "bases": [],
           "lineno": 114,
           "end_lineno": 146,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "accel_mps2",
+            "active_step_index",
+            "dt",
+            "fk_joint_rotations_deg",
+            "foot_L",
+            "foot_R",
+            "frame",
+            "gait_phase",
+            "hand_L",
+            "hand_R",
+            "head_rotation_deg",
+            "is_flight",
+            "motion_mode",
+            "neck_rotation_deg",
+            "pelvis_location",
+            "pelvis_rotation_deg",
+            "root_position",
+            "root_yaw_deg",
+            "speed_mps",
+            "spine_rotation_deg",
+            "time_seconds"
+          ],
+          "enum_members": []
         },
         {
           "name": "BridgeExecutionResult",
           "bases": [],
           "lineno": 243,
           "end_lineno": 255,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "com_world",
+            "contact_geometry_errors",
+            "frame",
+            "inertia_state",
+            "motion_state",
+            "rom_violations",
+            "success",
+            "support_type",
+            "tracking_errors",
+            "unmet_constraints",
+            "wbc_result"
+          ],
+          "enum_members": []
         },
         {
           "name": "KinematicBridgeExecutor",
@@ -5424,7 +6268,9 @@
               "lineno": 294,
               "end_lineno": 592
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -5845,7 +6691,17 @@
               "lineno": 45,
               "end_lineno": 56
             }
-          ]
+          ],
+          "attributes": [
+            "bone_name",
+            "description",
+            "local_com_fraction",
+            "local_com_offset",
+            "mass_ratio",
+            "nominal_length",
+            "segment_id"
+          ],
+          "enum_members": []
         },
         {
           "name": "BodyMassDistribution",
@@ -5883,21 +6739,46 @@
               "lineno": 121,
               "end_lineno": 165
             }
-          ]
+          ],
+          "attributes": [
+            "model_name",
+            "segments",
+            "source",
+            "total_mass_kg"
+          ],
+          "enum_members": []
         },
         {
           "name": "SegmentCoMResult",
           "bases": [],
           "lineno": 169,
           "end_lineno": 177,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "armature_com",
+            "bone_name",
+            "local_com",
+            "mass_kg",
+            "mass_ratio",
+            "segment_id",
+            "world_com"
+          ],
+          "enum_members": []
         },
         {
           "name": "WholeBodyCoMResult",
           "bases": [],
           "lineno": 181,
           "end_lineno": 187,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "com_armature",
+            "com_world",
+            "model_name",
+            "segments",
+            "total_mass_kg"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -6030,7 +6911,9 @@
               "lineno": 155,
               "end_lineno": 524
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -6254,7 +7137,9 @@
               "lineno": 168,
               "end_lineno": 479
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -6516,7 +7401,9 @@
               "lineno": 200,
               "end_lineno": 519
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -7370,7 +8257,18 @@
           "bases": [],
           "lineno": 71,
           "end_lineno": 80,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "clamp_reach",
+            "effector_id",
+            "enabled",
+            "is_locked",
+            "pole_hint_world_xyz",
+            "target_rotation_deg",
+            "target_world_xyz",
+            "weight"
+          ],
+          "enum_members": []
         },
         {
           "name": "WholeBodyControlTargets",
@@ -7403,21 +8301,60 @@
               "lineno": 185,
               "end_lineno": 194
             }
-          ]
+          ],
+          "attributes": [
+            "fk_joint_rotations_deg",
+            "foot_L",
+            "foot_R",
+            "hand_L",
+            "hand_R",
+            "head_rotation_deg",
+            "neck_rotation_deg",
+            "pelvis_location",
+            "pelvis_rotation_deg",
+            "root_position",
+            "root_yaw_deg",
+            "spine_rotation_deg"
+          ],
+          "enum_members": []
         },
         {
           "name": "UnmetConstraint",
           "bases": [],
           "lineno": 202,
           "end_lineno": 208,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "category",
+            "description",
+            "details",
+            "error_amount",
+            "target_name"
+          ],
+          "enum_members": []
         },
         {
           "name": "EndEffectorFeedback",
           "bases": [],
           "lineno": 212,
           "end_lineno": 226,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "actual_rotation_deg",
+            "actual_world_xyz",
+            "effector_id",
+            "enabled",
+            "is_reachable",
+            "max_reach_m",
+            "orientation_error_deg",
+            "position_error_m",
+            "reach_distance_m",
+            "requested_rotation_deg",
+            "requested_world_xyz",
+            "strictly_in_reach",
+            "weight"
+          ],
+          "enum_members": []
         },
         {
           "name": "WholeBodyControlResult",
@@ -7430,7 +8367,20 @@
               "lineno": 243,
               "end_lineno": 261
             }
-          ]
+          ],
+          "attributes": [
+            "com_result",
+            "end_effectors",
+            "has_rom_violation",
+            "is_all_reachable",
+            "max_end_effector_error_m",
+            "pelvis_world_position",
+            "rom_validation",
+            "root_world_position",
+            "success",
+            "unmet_constraints"
+          ],
+          "enum_members": []
         },
         {
           "name": "WholeBodyController",
@@ -7453,7 +8403,9 @@
               "lineno": 646,
               "end_lineno": 651
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -9781,7 +10733,17 @@
           "bases": [],
           "lineno": 263,
           "end_lineno": 270,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "camera_name",
+            "focal_length_mm",
+            "location",
+            "look_at",
+            "station_id",
+            "station_index",
+            "view_type"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -10172,14 +11134,47 @@
           ],
           "lineno": 26,
           "end_lineno": 35,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "BOX_SIDE",
+            "BOX_TOP",
+            "HORIZONTAL_GROUND",
+            "LEDGE_BAR",
+            "SLOPED_RAMP",
+            "STAIR_RISER",
+            "STAIR_TREAD",
+            "VERTICAL_WALL"
+          ],
+          "enum_members": [
+            "BOX_SIDE",
+            "BOX_TOP",
+            "HORIZONTAL_GROUND",
+            "LEDGE_BAR",
+            "SLOPED_RAMP",
+            "STAIR_RISER",
+            "STAIR_TREAD",
+            "VERTICAL_WALL"
+          ]
         },
         {
           "name": "SurfaceQueryResult",
           "bases": [],
           "lineno": 39,
           "end_lineno": 67,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "allows_regular_support",
+            "contact_point_world",
+            "error_reason",
+            "friction_coeff",
+            "ray_hit_distance",
+            "signed_distance",
+            "success",
+            "surface_id",
+            "surface_normal_world",
+            "surface_type"
+          ],
+          "enum_members": []
         },
         {
           "name": "OrientedSurface",
@@ -10207,7 +11202,20 @@
               "lineno": 199,
               "end_lineno": 215
             }
-          ]
+          ],
+          "attributes": [
+            "allows_regular_support",
+            "center",
+            "description",
+            "friction_coeff",
+            "half_extents",
+            "normal",
+            "surface_id",
+            "surface_type",
+            "u_axis",
+            "v_axis"
+          ],
+          "enum_members": []
         },
         {
           "name": "EnvironmentQuery",
@@ -10250,7 +11258,9 @@
               "lineno": 378,
               "end_lineno": 380
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         },
         {
           "name": "DynamicsEnvironmentQuery",
@@ -10300,7 +11310,9 @@
               "lineno": 559,
               "end_lineno": 693
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -10414,21 +11426,47 @@
               "lineno": 22,
               "end_lineno": 23
             }
-          ]
+          ],
+          "attributes": [
+            "center_x",
+            "center_y",
+            "height",
+            "name",
+            "size_x",
+            "size_y"
+          ],
+          "enum_members": []
         },
         {
           "name": "PillarLayout",
           "bases": [],
           "lineno": 26,
           "end_lineno": 31,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "center_x",
+            "center_y",
+            "height",
+            "name",
+            "radius"
+          ],
+          "enum_members": []
         },
         {
           "name": "SceneLayoutData",
           "bases": [],
           "lineno": 34,
           "end_lineno": 40,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "buildings",
+            "ground_size",
+            "ground_thickness",
+            "path_points",
+            "pillars",
+            "random_seed"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -10611,10 +11649,46 @@
   "test_scripts": [
     {
       "path": "tests/audit_c2_final_inspector.py",
-      "size_bytes": 16343,
-      "line_count": 405,
-      "git_tracked": false,
-      "classes": [],
+      "size_bytes": 30103,
+      "line_count": 673,
+      "git_tracked": true,
+      "classes": [
+        {
+          "name": "CodebaseSymbolIndex",
+          "bases": [],
+          "lineno": 292,
+          "end_lineno": 355,
+          "methods": [
+            {
+              "name": "__init__",
+              "lineno": 295,
+              "end_lineno": 355
+            }
+          ],
+          "attributes": [],
+          "enum_members": []
+        },
+        {
+          "name": "DocReferenceValidator",
+          "bases": [],
+          "lineno": 358,
+          "end_lineno": 477,
+          "methods": [
+            {
+              "name": "__init__",
+              "lineno": 361,
+              "end_lineno": 372
+            },
+            {
+              "name": "validate_document",
+              "lineno": 374,
+              "end_lineno": 477
+            }
+          ],
+          "attributes": [],
+          "enum_members": []
+        }
+      ],
       "functions": [
         {
           "name": "get_git_tracked_files",
@@ -10629,22 +11703,27 @@
         {
           "name": "inspect_python_file",
           "lineno": 60,
-          "end_lineno": 141
+          "end_lineno": 160
         },
         {
           "name": "inspect_blend_files",
-          "lineno": 144,
-          "end_lineno": 270
+          "lineno": 163,
+          "end_lineno": 289
+        },
+        {
+          "name": "run_validator_test_suite",
+          "lineno": 480,
+          "end_lineno": 535
         },
         {
           "name": "verify_freeze_docs",
-          "lineno": 273,
-          "end_lineno": 323
+          "lineno": 538,
+          "end_lineno": 579
         },
         {
           "name": "main",
-          "lineno": 326,
-          "end_lineno": 401
+          "lineno": 582,
+          "end_lineno": 669
         }
       ],
       "imports": [
@@ -10760,7 +11839,22 @@
           "bases": [],
           "lineno": 124,
           "end_lineno": 136,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "duration_sec",
+            "exit_code",
+            "failure_reason",
+            "is_optional",
+            "is_visual_acceptance",
+            "name",
+            "runner_type",
+            "status",
+            "stderr",
+            "stdout",
+            "test_id",
+            "tier_names"
+          ],
+          "enum_members": []
         },
         {
           "name": "TestSuiteRunner",
@@ -10788,7 +11882,9 @@
               "lineno": 369,
               "end_lineno": 479
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -11066,7 +12162,17 @@
           ],
           "lineno": 18,
           "end_lineno": 21,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "BLENDER_HEADLESS",
+            "BLENDER_WITH_BLEND",
+            "PYTHON"
+          ],
+          "enum_members": [
+            "BLENDER_HEADLESS",
+            "BLENDER_WITH_BLEND",
+            "PYTHON"
+          ]
         },
         {
           "name": "TestTier",
@@ -11076,7 +12182,21 @@
           ],
           "lineno": 24,
           "end_lineno": 29,
-          "methods": []
+          "methods": [],
+          "attributes": [
+            "FULL",
+            "LEGACY",
+            "MOTION",
+            "PHYSICS",
+            "QUICK"
+          ],
+          "enum_members": [
+            "FULL",
+            "LEGACY",
+            "MOTION",
+            "PHYSICS",
+            "QUICK"
+          ]
         },
         {
           "name": "TestDefinition",
@@ -11089,7 +12209,23 @@
               "lineno": 49,
               "end_lineno": 62
             }
-          ]
+          ],
+          "attributes": [
+            "creates_artifacts",
+            "description",
+            "expected_artifacts",
+            "is_optional",
+            "is_visual_acceptance",
+            "name",
+            "overwrites_history",
+            "runner_type",
+            "script_path",
+            "target_blend",
+            "test_id",
+            "tiers",
+            "timeout_sec"
+          ],
+          "enum_members": []
         }
       ],
       "functions": [
@@ -11247,7 +12383,9 @@
               "lineno": 414,
               "end_lineno": 454
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -15979,7 +17117,9 @@
               "lineno": 1265,
               "end_lineno": 1324
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -16344,7 +17484,9 @@
               "lineno": 736,
               "end_lineno": 887
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -16704,7 +17846,9 @@
               "lineno": 1309,
               "end_lineno": 1342
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -16995,7 +18139,9 @@
               "lineno": 348,
               "end_lineno": 438
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -17198,7 +18344,9 @@
               "lineno": 895,
               "end_lineno": 941
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -17512,7 +18660,9 @@
               "lineno": 188,
               "end_lineno": 238
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],
@@ -17602,7 +18752,9 @@
               "lineno": 173,
               "end_lineno": 202
             }
-          ]
+          ],
+          "attributes": [],
+          "enum_members": []
         }
       ],
       "functions": [],

@@ -7,13 +7,20 @@
 
 ## 1. Current Actual Implementation — Pipeline A: 19-Bone Kinematic & WBC Pipeline
 
+### 1.1 Character Locomotion Pipeline Contracts
+* **Action Target Generation**: Kinematic trajectory targets are produced exclusively by `MotionAction` (`StartStopWalkAction`, `RunAction`, etc.);
+* **Pose & IK Target Writing**: Character root transform, bone rotations, and IK Empty targets are written exclusively by `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()`;
+* **Foot Contact Locking**: Stance foot pin and unpin operations are executed exclusively by `src/rig/foot_contact.py` (`lock_foot_contact`, `unlock_foot_contact`);
+* **ROM Limit Verification**: Anatomical joint limits are evaluated and clamped exclusively by `JointModel` (`src/motion/joint_limits.py`);
+* **Post-Pose Telemetry Generation**: Armature evaluation generates strictly read-only physical telemetry (`compute_whole_body_com`, `compute_whole_body_inertia`, `evaluate_limb_contacts_from_armature`) enriched into `MotionState`.
+
 In the current production 19-bone character pipeline (`output/unified_motion_integration.blend` and all `MotionPlanner` / `MotionAction` workflows), state ownership is governed by the 6-phase single-frame execution protocol in [`src/motion/kinematic_bridge.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py):
 
 | State / Blender Object | Real Type & Module Location | Exclusive Writer (Single Owner) | Authorized Readers | Mutation Contract & Prohibitions |
 | :--- | :--- | :--- | :--- | :--- |
 | **Per-Frame Planned Kinematic Target** | `KinematicPlannedPose` (`src/motion/kinematic_bridge.py#L114`), `PlannedFootTarget(#L83)`, `PlannedHandTarget(#L98)` | Active `MotionAction.execute()` (`StartStopWalkAction` in `src/motion/framework.py#L497`, `RunAction` in `src/motion/run_cycle.py#L153`, `SprintStartAction` in `src/motion/sprint_start.py#L213`, `SprintBrakeAction` in `src/motion/sprint_brake.py#L178`) | `convert_planned_pose_to_wbc_targets(#L153)`, `KinematicBridgeExecutor.execute_frame(#L294)` | Frozen/read-only once passed to `KinematicBridgeExecutor.execute_frame()`. Actions must never directly mutate `CharacterArmature.pose.bones` or `FootIK` Empties. |
 | **Whole-Body Controller Input Contract** | `WholeBodyControlTargets` (`src/motion/whole_body_controller.py#L84`), `EndEffectorTarget(#L71)` | `convert_planned_pose_to_wbc_targets()` (`src/motion/kinematic_bridge.py#L153`) | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L296`) | Constructed in Phase 1 of `KinematicBridgeExecutor.execute_frame()`. |
-| **`CharacterRoot` World Transform** | `bpy.types.Object` (`"CharacterRoot"`) | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L315-L343`) (and `KinematicBridgeExecutor._apply_micro_projection()` at `src/motion/kinematic_bridge.py#L466` within $\le 0.03\text{ m}$) | `src/rig/ik.py`, `src/rig/foot_contact.py`, `src/rig/arm_ik.py`, `src/motion/body_kinematics.py` | Root motion preserves world-locked stance feet (`FootIK.L/R` with `parent=None`). |
+| **`CharacterRoot` World Transform** | `bpy.types.Object` (`"CharacterRoot"`) | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L315-L343`) | `src/rig/ik.py`, `src/rig/foot_contact.py`, `src/rig/arm_ik.py`, `src/motion/body_kinematics.py` | Root motion preserves world-locked stance feet (`FootIK.L/R` with `parent=None`). |
 | **Torso & FK Pose Bones** (`pelvis`, `spine`, `neck`, `head`, FK limb bones) | `bpy.types.PoseBone` on `"CharacterArmature"` | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L345-L374`) and `JointModel.clamp_armature_pose()` (`src/motion/joint_limits.py#L747` when `enforce_rom_clamping=True`) | `JointModel.validate_armature_pose()`, `compute_whole_body_com()`, `sample_body_pose_snapshot()`, `compute_whole_body_inertia()` | High-level actions and physics telemetry modules (`rigid_link.py`, `body_kinematics.py`, `body_inertia.py`, `contact_model.py`) are **strictly forbidden** from writing to `pose.bones`. |
 | **Leg IK & Support Lock Controllers** (`FootIK.L/R`, `KneePole.L/R`) | `bpy.types.Object` (Empties) & custom properties `["is_locked"]`, `["locked_ankle_world_xyz"]` | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L378-L407`) delegating to `lock_foot_contact(#L70)`, `unlock_foot_contact(#L149)`, `evaluate_foot_support(#L194)` (`src/rig/foot_contact.py`) and `set_foot_ik_target(#L295)` (`src/rig/ik.py`) | `get_leg_ik_state()` (`src/rig/ik.py#L236`), `evaluate_limb_contacts_from_armature()` (`src/motion/contact_model.py#L511`) | When `is_locked=True`, `FootIK.<side>` is unparented (`parent=None`) and pinned in World Space; `evaluate_foot_support()` never secretly drags or clamps a locked stance target. |
 | **Arm IK & Hand Rotation Controllers** (`HandIK.L/R`, `ElbowPole.L/R`, `ArmIK.L/R`, `HandRotation.L/R`) | `bpy.types.Object` (Empties) & `bpy.types.PoseBoneConstraints` | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L412-L426`) delegating to `set_hand_ik_target(#L392)` and `set_arm_ik_influence(#L243)` (`src/rig/arm_ik.py`) | `get_arm_ik_state()` (`src/rig/arm_ik.py#L315`), `evaluate_limb_contacts_from_armature()` (`src/motion/contact_model.py#L511`) | When `hand_L/R.enabled == False` or `weight == 0.0`, constraint influence is set to `0.0` so FK arm swing evaluates with zero interference. |
@@ -24,6 +31,12 @@ In the current production 19-bone character pipeline (`output/unified_motion_int
 ---
 
 ## 2. Current Actual Implementation — Pipeline B: Task 6G-D Centroidal Numerical Dynamics Pipeline
+
+### 2.1 Numerical Centroidal Dynamics Contracts
+* **Actual State Representation**: The physical integrated state is represented exclusively by `ForwardDynamicsState` (`src/motion/forward_dynamics.py#L432`, strictly immutable 6-DOF centroidal state);
+* **Contact Force Allocation**: 3D contact forces are allocated exclusively by `ContactForceSolver` (`solve_contact_forces` at `src/motion/contact_force_solver.py#L757`) subject to Coulomb friction cone and unilateral push constraints;
+* **Closed-Loop Feedback Evaluation**: Motion tracking error and acceleration commands are computed exclusively by `ClosedLoopDynamicsCoordinator` (`step_closed_loop_dynamics` at `src/motion/closed_loop_dynamics.py#L563`);
+* **Blender State Visualization**: Visual telemetry is rendered exclusively by Blender `DynamicsVisualizer` (`inject_dynamics_visualization` at `src/scene/dynamics_visualizer.py#L381`), displaying numerical states via rigid-body proxies in `output/dynamics_playground.blend`.
 
 In the Task 6G-D numerical dynamics and `output/dynamics_playground.blend` visualization pipeline, state ownership is governed by [`src/motion/forward_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/forward_dynamics.py), [`src/motion/contact_force_solver.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_force_solver.py), [`src/motion/closed_loop_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/closed_loop_dynamics.py), and [`src/scene/dynamics_visualizer.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/dynamics_visualizer.py):
 
@@ -39,6 +52,11 @@ In the Task 6G-D numerical dynamics and `output/dynamics_playground.blend` visua
 ---
 
 ## 3. Unfinished Confluence & Planned Future Ownership (Phase 7A to Phase 6H)
+
+### 3.1 Strict Confluence Boundaries & Anti-Fabrication Rules
+* **No Unified Feedback Loop Yet**: The character armature pose (Pipeline A) and numerical dynamics state (Pipeline B) have NOT yet formed a unified closed-loop feedback system.
+* **Prohibition of False Shared Physical State**: Claiming that the character armature and the centroidal dynamics engine currently share a single authoritative physical state is strictly prohibited.
+* **Prohibition of Preemptive Duplicate Modules**: Creating a second `WholeBodyController`, a second `MotionState`, or a second numerical integrator ahead of scheduled Phase 7C confluence is strictly prohibited.
 
 To prevent architectural confusion or premature claims, the following ownership bridges are **explicitly marked as NOT YET IMPLEMENTED** at the Task 6G-D-C2-FINAL freeze point:
 

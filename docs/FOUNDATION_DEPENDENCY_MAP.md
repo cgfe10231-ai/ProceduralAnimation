@@ -167,7 +167,7 @@ Every dependency edge below is backed by an exact `import` line and call-site li
 | 41 | `src/motion/closed_loop_dynamics.py` | `step_closed_loop_dynamics(L563)` | `src/motion/forward_dynamics.py` | `ForwardDynamicsStepInput.from_solution_and_specs(L556)`, `integrate_forward_dynamics_single_step(L659)` | Imported at `L62`; called at `L768`, `L779` |
 | 42 | `src/motion/contact_force_solver.py` | `solve_contact_forces(L757)` | `src/motion/contact_force_solver.py` | `build_contact_mapping_matrix(L298)`, `project_to_friction_cone(L381)` | Defined at `L298`, `L381`; called at `L886`, `L533` |
 | 43 | `src/motion/contact_force_solver.py` | `solution_to_multi_contact_dynamics(L1207)` | `src/motion/contact_dynamics.py` | `SingleContactDynamics(L156)`, `MultiContactDynamics(L433)` | Imported at `L57`; called at `L1223`, `L1239` |
-| 44 | `src/motion/contact_dynamics.py` | `create_contact_dynamics_from_environment(L628)` | `src/scene/environment_query.py` | `DynamicsEnvironmentQuery.query_surface_at(L432)` | Imported at `L26`; called at `L659` |
+| 44 | `src/motion/contact_dynamics.py` | `create_contact_dynamics_from_environment(L628)` | `src/scene/environment_query.py` | `DynamicsEnvironmentQuery.query_surface_at_point(L432)` | Imported at `L26`; called at `L665` |
 
 ---
 

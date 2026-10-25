@@ -5,28 +5,23 @@
 ---
 
 ## 1. 当前目标
-Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 含 C2-FINAL 验收纠偏）**已完全验证通过并正式冻结**：
-1. **机器可验证 AST 与 `.blend` 全库审计 (`tests/audit_c2_final_inspector.py`)**：
-   - 导出 [`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`](docs/evidence/task6gd_c2a/codebase_and_blend_audit.json) 与 [`docs/evidence/task6gd_c2a/blend_inspection_log.txt`](docs/evidence/task6gd_c2a/blend_inspection_log.txt)；
-   - 实测核实全库 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本及 18 个 `output/*.blend` 场景；
-   - 核实 `output/unified_motion_integration.blend` 为 462 帧连续运动整合资产（298,537 字节，`1..462` 帧，27 个物体，`CharacterArmature` 19 骨骼，12 个 Action，180 条 F-Curve，80,628 个关键帧）；
-   - 核实 `output/dynamics_playground.blend` 为 73 帧训练场与代理遥测资产（234,436 字节，`1..73` 帧，101 个物体，0 骨骼，30 个 Action，182 条 F-Curve）。
-2. **时空严格对齐**：72 步离散积分扩展对齐为 73 个物理状态（$S_0$ 到 $S_{72}$），对应 Blender 时间轴 Frame 1 至 Frame 73（$F = k + 1$）；标准关键帧采样 F01, F13, F25, F37, F49, F61, F73（对齐 $t=0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0\text{s}$）；
-3. **双管线现状与数学精度边界正式界定**：
-   - 完整恢复真实生产运动学管线（Pipeline A：`MotionPlanner` / `MotionAction` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` $\to$ Blender Rig / IK / FK $\to$ 只读物理遥测 $\to$ `MotionState`）；
-   - 明确 6G-D 质心动力学管线（Pipeline B：`ClosedLoopDynamicsCoordinator` $\to$ `solve_contact_forces()` $\to$ `integrate_forward_dynamics_single_step()` $\to$ `inject_dynamics_visualization()`）当前驱动 `output/dynamics_playground.blend` 中的刚体代理网格，尚未与 19 骨骼 `WholeBodyController` 汇流（汇流定位于未来 **Phase 7C**）；
-4. **发布并纠偏五大权威架构冻结规范与综合验证报告（通过 `--verify-docs` 零幻觉路径/符号校验）**：
-   - `docs/FOUNDATION_ASSET_AUDIT.md` (全量 51 模块、42 测试、19 入口脚本与 18 个 `.blend` 资产机器核查清单)
-   - `docs/FOUNDATION_ARCHITECTURE_AUDIT.md` (真实生产运动学管线 Pipeline A 与 6G-D 质心动力学管线 Pipeline B 架构及闭环边界)
-   - `docs/FOUNDATION_DEPENDENCY_MAP.md` (含真实调用文件、被调文件、函数/类名与源码行号的 44 条依赖边及独立 `Future Architecture` 章节)
-   - `docs/FOUNDATION_STATE_OWNERSHIP.md` (严格区分当前实际实现与未完成汇流边界的状态所有权矩阵)
-   - `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md` (权威演进路线：**7A** 19 骨骼角色进入 `DynamicsPlayground` 完成下肢连续通行 $\to$ **7B** 上肢独立运动与末端目标验证 $\to$ **7C** `KinematicBridge`、`WholeBodyController`、`CoM` 与动力学状态汇流 $\to$ **7D** 多关节动态协同 $\to$ **7E** 既有 IK/FK 求解器动态协同与接触切换 $\to$ **7F** 全身移动、抓握、支撑、释放与连续训练场通行 $\to$ **6H** 动态平衡与主动补偿)
-   - `docs/C2_FINAL_VALIDATION.md` (Task 6G-D-C2-FINAL 综合验收与纠偏报告)
-5. **机器遥测硬断言与分级回归全绿**：
-   - `tests/audit_c2_final_inspector.py --verify-docs`：0 缺失路径、0 幻觉符号（Exit Code 0）；
-   - Blender 求值位置误差实测 `0.00e+00 m`（$< 10^{-5}\text{ m}$）；姿态误差实测 `3.50e-07 rad`（$< 10^{-5}\text{ rad}$）；
-   - S4 滑移发散 $\Delta p = 5.30\text{ m}$；S5 滚转发散 $\Delta q = 1.55\text{ rad}$ ($88.8^\circ$)，绝无目标冒充；
-   - 自动化回归：`quick` (9/9 PASS)，`physics` (16/16 PASS)，历史成熟步态 100% 零退化。
+Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 含 C2-FINAL 验收纠偏与 Documentation Integrity Gate）**已完全验证通过并正式冻结**：
+1. **升级全库通用 AST 符号校验器 (`tests/audit_c2_final_inspector.py`)**：
+   - 自动解析源码 AST 提取全库 51 个模块的类、方法、函数、属性及 Enum 成员，构建 `CodebaseSymbolIndex` 与 18 个 `.blend` 场景资产索引；
+   - 建立四态判别契约：`IMPLEMENTED`（真实存在）、`EXISTS_NOT_INTEGRATED`（存在未合流）、`PROPOSED`（未来规划，严禁假冒已实现）、`INVALID`（不存在直接报错）；
+   - 内置自测试套件 `run_validator_test_suite`，覆盖 Positive、Negative、Proposed、Prose Safety 四大场景，实测零假通过、零自然语言误报；
+   - 运行 `python tests/audit_c2_final_inspector.py --verify-docs` 100% 全绿通过 (Exit Code 0)。
+2. **枚举与接口引用真实性纠偏**：
+   - 修正 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`，明确区分离散触地事件（Touchdown Event）与持续接触生命周期状态（`ContactLifecycle`: `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`），未向源码增加假枚举；
+   - 纠偏并对齐真实源码接口（`ClosedLoopDynamicsCoordinator.simulate`、`DynamicsEnvironmentQuery.query_surface_at_point`、移除 `_apply_micro_projection` 幻觉引用并还原为真实几何合规检查 `multi_contact.check_all_contacts`）。
+3. **固化生产调用主链与状态所有权边界**：
+   - 在权威架构文档中彻底固化唯一生产主链：
+     $$\text{MotionPlanner} / \text{MotionAction} \longrightarrow \text{KinematicBridgeExecutor.execute_frame()} \longrightarrow \text{WholeBodyController.execute_frame()} \longrightarrow \text{Blender Rig/IK/FK} \longrightarrow \text{物理遥测} \longrightarrow \text{MotionState}$$
+   - 严禁任何后续 Agent 绕开、复制或自行替换此主链；严格区分当前 19 骨骼 WBC 管线与 6G-D 质心动力学管线，尚未实现的合流严禁谎报已实现。
+4. **固化后续路线 (7A $\to$ 7B $\to$ 7C $\to$ 7D $\to$ 7E $\to$ 7F $\to$ 6H) 与任务命名纪律**：
+   - 统一后续任务命名为 `Task <阶段>-<序号>`（如 `Task 7A-1`），严禁私自衍生同级或下游分支。
+5. **前后置十步闭环架构防漂移门禁确立**：
+   - 在 `docs/ARCHITECTURE_CHANGE_GATE.md` 确立十步防漂移协议并在 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 强制引用。
 6. **底座正式冻结承诺**：
    - 6G-D 正式冻结并进入维护模式，严禁自动创建 C2-B/C3/6G-E 分支；
    - 严格停止，不自动触发 Phase 7A 或 Phase 6H。

@@ -3,6 +3,30 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-25] 任务 6G-D-C2-FINAL：文档真实性门禁、通用 AST 符号校验器与架构约束彻底冻结 (Documentation Integrity Gate)
+
+### 枚举与接口引用真实性纠偏 (`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`, `docs/FOUNDATION_*.md`)
+* **区分触地事件与接触生命周期枚举**：
+  * 修正 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`，将接触生命周期明确核准为 `ContactLifecycle`（`CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`），明确触地（Touchdown）属于离散动力学状态切换事件，严禁向源码添加未定义枚举；
+  * 纠偏并对齐真实源码接口：将此前文档中错误的 run_trajectory 纠正为真实方法 `ClosedLoopDynamicsCoordinator.simulate`，将错误的 query_surface_at 纠正为真实方法 `DynamicsEnvironmentQuery.query_surface_at_point`；
+  * 纠偏 Phase 4 执行描述：移除未定义的幻觉引用 _apply_micro_projection，还原为真实的几何合规检查 `multi_contact.check_all_contacts`；
+  * 纠正 `DECISIONS.md` 中属性引用，明确速度指标位于 `MotionState.params` 字典中（如 `MotionState.params['planned_linear_velocity']`）。
+
+### 升级全库通用 AST 符号校验器 (`tests/audit_c2_final_inspector.py`)
+* **通用 AST 解析与索引构建**：
+  * `inspect_python_file` 升级为全面提取类属性（`attributes`）与枚举成员（`enum_members`）；
+  * 构建 `CodebaseSymbolIndex`，自动索引全库 51 个模块的类、方法、函数、属性、Enum 成员以及 18 个 `.blend` 场景的 Action、Object、Bone 资产名称；
+  * 建立四态判别契约：`IMPLEMENTED`（真实存在）、`EXISTS_NOT_INTEGRATED`（存在未合流）、`PROPOSED`（未来规划，严禁假冒已实现）、`INVALID`（不存在直接报错）；
+  * 新增内置自测试套件 `run_validator_test_suite`，覆盖 Positive、Negative、Proposed、Prose Safety 四大场景，实测零假通过、零自然语言误报；
+  * 提供 `--test-validator` 与 `--verify-docs` 命令行参数。
+
+### 固化架构防漂移前后置十步闭环检查协议 (`docs/ARCHITECTURE_CHANGE_GATE.md`)
+* **前后置十步闭环门禁确立**：
+  * 在 `docs/ARCHITECTURE_CHANGE_GATE.md` 写入架构防漂移前后置十步闭环检查协议；
+  * 在 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 建立单向强制引用，禁止建立第二套规则。
+
+---
+
 ## [2026-10-25] 任务 6G-D-C2-FINAL：6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结（含 C2-FINAL 验收纠偏）
 
 ### 机器可验证全库 AST 与 Blender `.blend` 资产审计 (`tests/audit_c2_final_inspector.py`, `docs/evidence/task6gd_c2a/`)
