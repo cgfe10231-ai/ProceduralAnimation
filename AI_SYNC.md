@@ -5,8 +5,8 @@
 * **任务状态**：已完全验证 (Fully Verified & Automated Pass)；通用 AST 符号校验器自测试与全库文档核验全绿通过；底座架构与资产正式冻结，进入只读维护状态；严格停止，不自动触发 Phase 7A 或 Phase 6H，等待人类指令。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **纠偏核心 Commit SHA**：`39f5aa062cfea313855f7cb3c99470d1c7ddd627`（`docs(task-6gd-c2-final): correct architecture freeze audit docs with machine-verified AST and blend inventory`）
-  * **纠偏前基准 Commit SHA**：`56f38627563a425e1e765d961653a0fc89fa19c7`（核心代码收口 `edd72c21a9498e217c4ef1b1c7f0f925f2349fa2`）
+  * **文档真实性门禁与架构冻结 Commit SHA**：`3efd5e412fa79ffaabd32d77eb5aa138475b4a50`（`docs(task-6gd-c2-final): establish universal AST documentation integrity gate and freeze architecture constraints`）
+  * **纠偏基准 Commit SHA**：`ce13bbdccf13ce7e66b3308247ca8f0dff6a1821` / `39f5aa062cfea313855f7cb3c99470d1c7ddd627`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`，远程 HEAD 与本地 commit SHA 完全一致)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
