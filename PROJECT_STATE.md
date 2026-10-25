@@ -1,34 +1,35 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-25  
-> **当前阶段**：任务 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证）已完成并全部验证通过（交付 `docs/PHASE7A_REUSE_AUDIT.md`、`src/scene/playground_character_integration.py`、`run_task7a1_character_playground.py`、`tests/verify_task7a1_character_playground.py`、派生可播放场景 `output/dynamics_playground_task7a1.blend` 及 `docs/evidence/task7a1/` 自动遥测与多视角截图/GIF 证据包；权威 `output/dynamics_playground.blend` 100% 零改动保留；`quick` 10/10, `physics` 16/16, `motion` 6/6, `full` 25/25, `--verify-docs` 全绿通过；严格停止于 Task 7A-1，不自动进入 Task 7A-2，等待用户与 ChatGPT 审阅）  
+> **当前阶段**：任务 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及 Final Acceptance Closure 最终验收收尾）已完成并全部验证通过（交付 `docs/PHASE7A_REUSE_AUDIT.md`、`src/scene/playground_character_integration.py`、`run_task7a1_character_playground.py`、严格只读解耦测试 `tests/verify_task7a1_character_playground.py`、派生可播放场景 `output/dynamics_playground_task7a1.blend`、204 帧重开数学验证报告 `docs/evidence/task7a1/full_frame_validation.json`、综合报告 `docs/evidence/task7a1/task7a1_verification_report.json` 及 204 帧连续预览 `docs/evidence/task7a1/task7a1_walk_preview.gif`；权威 `output/dynamics_playground.blend` 101 个受保护对象、16 个地形表面与 `S1..S5` 73 帧轨迹 100% 零改动保留；`quick` 10/10, `physics` 16/16, `motion` 6/6, `full` 25/25, `--verify-docs` 全绿通过；严格停止于 Task 7A-1，不自动进入 Task 7A-2，等待用户与 ChatGPT 审阅）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 7A-1 历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证 (Task 7A-1)**：
+* **任务 7A-1 历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及 Final Acceptance Closure 最终验收收尾 (Task 7A-1)**：
   * **历史资产与模块复用审计 (`docs/PHASE7A_REUSE_AUDIT.md`)**：
     - 完整审计 `output/unified_motion_integration.blend`、`output/dynamics_playground.blend` 及 19 个既有核心 Python 模块，精确记录 7 大章节（已存在直接可用能力、训练场现有内容、必须保留的历史资产、必须复用的接口、真正缺失的能力、严禁重复创建的模块、最小适配点），纳入 `tests/audit_c2_final_inspector.py --verify-docs` 永久 AST 门禁；
-  * **真实 19 骨骼角色无损装入 `DynamicsPlayground` (`src/scene/playground_character_integration.py`, `run_task7a1_character_playground.py`)**：
+  * **真实 19 骨骼角色无损装入 `DynamicsPlayground` 与深度场景资产对比 (`src/scene/playground_character_integration.py`, `run_task7a1_character_playground.py`)**：
     - 以 `output/dynamics_playground.blend` 为唯一训练场 SSOT（只读加载，原始文件字节数与时间戳 100% 零改动）；
-    - 100% 保留原有 4 大集合（`Playground_Surfaces`, `Playground_Visuals`, `Playground_Lighting_Cameras`, `Playground_Dynamics_Visualization`）、16 个地形表面网格与 5 个动力学工位（`S1..S5` 在 Frame 1 与 Frame 73 的世界坐标和四元数完全不变）；
-    - 通过既有 `build_character`、`build_rig`、`bind_character_to_rig`、`setup_leg_ik`、`setup_arm_ik` 将 `CharacterRoot`、19 骨骼 `CharacterArmature`、13 个网格部件（`REQUIRED_PARTS`, `parent_type="BONE"`）与 8 个 IK/Pole 控制器（`FootIK.L/R`, `KneePole.L/R`, `HandIK.L/R`, `ElbowPole.L/R`）装配入 `"Character"` 集合，并导出派生可播放场景 `output/dynamics_playground_task7a1.blend`；
+    - 深度快照对比 (`capture_deep_playground_snapshot` / `verify_derived_blend_against_deep_snapshot`) 验证：100% 保留原有 4 大集合（`Playground_Surfaces`: 16, `Playground_Visuals`: 32, `Playground_Lighting_Cameras`: 8, `Playground_Dynamics_Visualization`: 45，合计 101 个受保护对象）、全部 16 个地形表面网格顶点数/多边形数/包围盒/材质，以及 5 个动力学工位（`S1..S5` 在 Frames 1..73 的动作 F-Curve 与世界变换完全不变）；
+    - 仅在 `"Character"` 集合新增 26 个角色与观察相机对象（`CharacterRoot`、19 骨骼 `CharacterArmature`、13 个 `parent_type="BONE"` 网格部件、8 个 IK/Pole 控制器、3 个 `Task7A1_Char*Cam` 观察相机），导出派生可播放场景 `output/dynamics_playground_task7a1.blend`；
   * **五阶段最小控制闭环验证（全部经由 `MotionPlanner` / `MotionAction` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` $\to$ Rig/IK/FK）**：
     - **Stage A (静态站立姿态)**：位于 `Surface_FlatGround` $(0.0, -8.0, 0.0)\text{ m}$，双足最低点 $Z_{\min} = 0.0\text{ m}$ 无穿地/悬空，末端最大误差 $3.0\times 10^{-6}\text{ m}$，CoM $(0.0, -7.99627, 1.04793)\text{ m}$，零 ROM 违例，`support_type = "double_stance"`；
     - **Stage B (根节点有限位移与非零偏航)**：`CharacterRoot` 移动至 $(0.25, -7.65, 0.0)\text{ m}$、偏航 $+6.0^\circ$、骨盆下沉 $-0.030\text{ m}$，根位置误差 `0.0 m`，末端误差 $7.0\times 10^{-6}\text{ m}$，零 ROM 违例；
     - **Stage C (单脚独立 IK 控制)**：左脚 $(-0.11, -8.05, 0.07)\text{ m}$、右脚抬起 $(0.14, -7.82, 0.21)\text{ m}$ 非对称目标，跟踪误差分别为 $2.2\times 10^{-5}\text{ m}$ 与 $4.5\times 10^{-5}\text{ m}$，大腿 $0.42\text{ m}$ / 小腿 $0.40\text{ m}$ 零拉伸，膝盖前向偏移 $+0.1191\text{ m}$ / $+0.2271\text{ m}$ 零翻转；
     - **Stage D (支撑脚世界空间锁定)**：左脚锁定于 $(-0.11, -8.00, 0.07)\text{ m}$（`FootIK.L.parent == None`），`CharacterRoot` 连续 5 步前移侧移同时右脚摆动，实测控制器漂移 `0.0 m`、踝骨漂移 `0.0 m`、足部网格中心漂移 `0.0 m`；
-    - **Stage E (最小历史连续步态复用)**：通过 `MotionPlanner` 在训练场 `Surface_FlatGround` 上执行 `StartStopWalkAction` 204 帧连续行走（$Y: -8.0000\text{ m} \to -6.7400\text{ m}$，总位移 $1.2600\text{ m}$，峰值速度 $0.2400\text{ m/s}$，不可达帧数 `0`，抽样关键帧全量 `rom_is_valid = True`）；
-  * **四大数学一致性验证**：
-    - **1. 五重坐标空间一致性**：在非零平移 $(1.35, -7.25, 0.0)\text{ m}$、非零偏航 $+6.5^\circ$、左右脚不同目标下，向量往返误差 `0.0 m`，五重空间点链往返误差 $2.19\times 10^{-7}\text{ m}$；
-    - **2. 质量与质心计算 (`src/motion/rigid_link.py`)**：15 分段模型质量比总和 `1.0`，默认总质量 `70.0 kg` / 缩放参考质量 `75.0 kg`，标准站立左右对称分段误差 `0.0 m`，下蹲前倾姿态变化引起质心真实偏移 $(+0.04376, +0.11271, -0.07506)\text{ m}$；
-    - **3. 几何接触验证 (`contact_model.py`, `foot_contact.py`, `environment_query.py`)**：验证双足锁定 (`double_stance`)、左锁右放 (`single_stance_l`)、右锁左放 (`single_stance_r`)、地面法向 $(0,0,1)$ 与高度 $0.0\text{ m}$，明确区分几何接触锚点约束与动力学反力；
-    - **4. 约束真实性验证 (`joint_limits.py`, `whole_body_controller.py`)**：不可达目标 ($1.70\text{ m} > 0.82\text{ m}$) 真实记录 `REACHABILITY` 且 `success=False`；超限姿态（脊柱 $-85^\circ$、左肩 $+175^\circ$）真实记录 `ROM_VIOLATION` 且 `success=False`；开启 `enforce_rom_clamping=True` 时绝不静默伪报成功；
-  * **自动视觉证据与全级别回归全绿**：
-    - 自动生成 `docs/evidence/task7a1/task7a1_verification_report.json`、28 张多视角关键帧 PNG 渲染图与连续步态预览 `docs/evidence/task7a1/task7a1_walk_preview.gif`；
-    - 新增集成测试 `tests/verify_task7a1_character_playground.py`（6/6 PASS）并注册入 `TEST_REGISTRY`（`task7a1_character_playground`）；
+    - **Stage E (最小历史连续步态复用)**：通过 `MotionPlanner` 在训练场 `Surface_FlatGround` 上执行 `StartStopWalkAction` 204 帧连续行走（$Y: -8.0000\text{ m} \to -6.7400\text{ m}$，总位移 $1.2600\text{ m}$，峰值速度 $0.2400\text{ m/s}$，不可达帧数 `0`）；
+  * **204 帧全帧独立只读重开验证 (`validate_reopened_task7a1_blend`, `docs/evidence/task7a1/full_frame_validation.json`)**：
+    - 不重新运行 `MotionPlanner` 或 `WholeBodyController`，直接只读重开 `output/dynamics_playground_task7a1.blend` 逐帧评估 Frames `1..204`，并严格标注 `reopen_evaluated`（重开场景真实求值）与 `analytical_reference`（解析生成参考）；
+    - **根节点平移连续性**：`stand_start` (`Frames 1..13`) 与 `stand_stop` (`Frames 193..204`) 最大单帧位移 `0.0 m`；全时域最大单帧步长 `0.010000 m` (Frame 68)，有限差分速度与解析中点速度最大偏差 $6.2\times 10^{-5}\text{ m/s}$ (Frame 186)，最大有限差分加速度 $0.168365\text{ m/s}^2$ (Frame 167，与解析峰值 $0.167552\text{ m/s}^2$ 高度吻合)；
+    - **19 骨骼旋转四元数测地线连续性**：处理 $q \sim -q$ 双覆盖等价后计算 $\Delta\theta_f = 2\arccos(|\langle q_f, q_{f-1}\rangle|)$，全 19 骨骼全时域最大单帧测地角步长为 `5.24453 deg` (`forearm.R`, Frame 44)，关键骨骼最大步长：`pelvis` `0.7038 deg`、`spine` `0.29957 deg`、`thigh.L/R` `3.23694 deg`、`shin.L/R` `3.53393 deg`、`foot.L/R` `1.56632 deg`（均远小于 $8.0^\circ$ 连续阈值，零姿态翻转跳变）；
+    - **全 9 个支撑区间与 8 次接触生命周期切换验证**：分别量化 `FootIK.L/R` 控制器世界漂移（全支撑帧 `0.0 m`）与实际踝骨 (`shin.tail` / `foot.head`) 世界漂移（最大值 $2.94\times 10^{-5}\text{ m}$，Frame 41，帧间最大滑移 $2.0\times 10^{-5}\text{ m}$）；支撑期内 `Foot_L/R` 最低点 $Z_{\min} \in [-2.9\times 10^{-5}, +3.0\times 10^{-6}]\text{ m}$ 零穿地零悬空；8 次支撑切换边界最大单帧踝骨步长 $0.003148\text{ m}$ 平滑无瞬移；
+    - **全 204 帧 CoM 与刚体几何一致性**：总质量恒为 `70.0 kg`，0 `NaN/Inf`，CoM 前向位移 `1.2600 m`，横向摆动范围 $[-0.015111, +0.015111]\text{ m}$（跨度 `0.030222 m`），竖直范围 $[1.008095, 1.047930]\text{ m}$，全 204 帧大腿/小腿长度误差 `< 1e-6 m`，全 204 帧 `rom_violation_frame_count == 0`；
+  * **测试与生成严格解耦及 204 帧真实连续 GIF 证据 (`tests/verify_task7a1_character_playground.py`, `docs/evidence/task7a1/task7a1_walk_preview.gif`)**：
+    - `run_task7a1_character_playground.py` 专职生成，重开 `.blend` 连续渲染全 204 帧（24 FPS, `delay_cs=4`）生成 `docs/evidence/task7a1/task7a1_walk_preview.gif`（二进制校验 `frame_count == 204`）；
+    - `tests/verify_task7a1_character_playground.py`（8/8 PASS，耗时 0.36s）严格只读，缺失产物直接报 `ARTIFACT_MISSING`，且通过前后 `st_size` / `st_mtime_ns` 断言证明测试过程对 `.blend`、`.json`、`.gif` 零修改；
     - `quick` (10/10 PASS), `physics` (16/16 PASS), `motion` (6/6 PASS), `full` (25/25 PASS), `--verify-docs` (PASS)。
 * **任务 6G-D-C2-FINAL 架构门禁收口、只读 AST 校验与统一测试套件无缝集成 (Architecture Integrity Gate Closure)**：
   * **彻底消除写文件副作用与运行模式分离**：

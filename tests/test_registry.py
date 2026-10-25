@@ -316,12 +316,14 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         tiers=[TestTier.MOTION, TestTier.FULL],
         timeout_sec=90.0,
         expected_artifacts=[
+            "output/dynamics_playground.blend",
             "output/dynamics_playground_task7a1.blend",
+            "docs/evidence/task7a1/full_frame_validation.json",
             "docs/evidence/task7a1/task7a1_verification_report.json",
             "docs/evidence/task7a1/task7a1_walk_preview.gif",
         ],
         is_visual_acceptance=True,
-        description="Verifies 19-bone character integration into DynamicsPlayground, Stages A-E control loop, 5 coordinate spaces, 15-segment CoM, geometric contacts, and ROM/reachability truthfulness.",
+        description="Read-only reopen verification of 19-bone character integration into DynamicsPlayground, 204-frame mathematical/continuity/contact validation, deep scene preservation, and 204-frame continuous GIF.",
     ),
 
     # -------------------------------------------------------------------------
