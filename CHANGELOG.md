@@ -3,6 +3,50 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-26] 任务 7A-1：最终架构整理、单一职责解耦、接触状态持久化合同与负向测试闭环 (Task 7A-1 Final Architecture & Compatibility Closure)
+
+### 架构解耦与单一职责模块重构 (`src/scene/playground_*`)
+* **消除 2872 行集中文件，拆分为四个内聚子模块与轻量级门面**：
+  * 原 `src/scene/playground_character_integration.py` 拆分为：
+    - [`src/scene/playground_asset_preservation.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_asset_preservation.py)（386 行）：负责训练场 101 个受保护对象、16 个表面网格几何（顶点坐标容差 $<10^{-5}$、面拓扑与顶点索引）、层级结构、世界矩阵、材质槽、环境属性、Layered F-Curves（时间与取值 $<10^{-4}$、手柄与插值模式）以及 S1..S5 5 工位 73 帧基准轨迹全 73 帧（非抽样）深度快照对比与差异报告；
+    - [`src/scene/playground_evidence_exporter.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_evidence_exporter.py)（223 行）：负责多视角相机 PNG 渲染、NumPy RGBA 加载、GIF 帧数与帧率真实校验、204 帧平滑 GIF 预览合成及验证报告 JSON 导出；
+    - [`src/scene/playground_character_assembly.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_character_assembly.py)（1495 行）：负责角色装配（复用既有 `build_character` + `build_rig` + `bind_character_to_rig` + `setup_leg_ik` + `setup_arm_ik`）、五阶段最小控制闭环（Stage A..D）、四大数学一致性验证、Stage E 204 帧连续行走步态执行，并将执行接触状态与支撑锚点持久化写入场景属性与伴生 JSON 文件；
+    - [`src/scene/playground_kinematic_validation.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_kinematic_validation.py)（765 行）：负责从派生 `.blend` 独立只读重开全 204 帧评估，恢复持久化接触契约、验证根位移平滑度、19 骨骼四元数测地线连续性、9 个支撑区间实际踝骨漂移（对比持久化锚点）、70.0 kg 质心轨迹与关节 ROM；
+    - [`src/scene/playground_character_integration.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_character_integration.py)（183 行）：重构为轻量级总控门面（Facade），重新导出所有公开符号以保持 100% 向后兼容性。
+
+### 接触状态持久化合同 (Contact State Persistence Contract)
+* **执行期持久化与独立重开验证脱敏**：
+  * Stage E 执行期间将逐帧实际接触状态（帧号、时间、双足锁定标志、支撑侧、支撑脚世界锚点 $(X,Y,Z)$、步态阶段、步序、触地/离地离散事件）序列化写入 Blender 场景 ID 属性 `scene["task7a1_contact_state_records"]`，并在 `FootIK.L/R` 控制器上对 `is_locked` 逐帧打关键帧；同时导出伴生文件 [`docs/evidence/task7a1/task7a1_contact_state_records.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task7a1/task7a1_contact_state_records.json)；
+  * 重开验收通过 `recover_and_verify_contact_states_from_blend(scene)` 恢复持久化接触数据，彻底废除对 `MotionPlanner` 或步态公式重新推导的依赖；
+  * 严格区分三类数据流：**Category A (运行时记录)**、**Category B (重开评估值)**、**Category C (解析参考值)**，并在 `full_frame_validation.json` 中清晰分离。
+
+### 六大隔离负向测试闭环与套件扩充 (`tests/verify_task7a1_character_playground.py`)
+* **验证测试集扩充至 15 项（含 6 项负向故障注入与 1 项只读零篡改测试）**：
+  * Test 09：网格内部顶点微调（包围盒不变）$\implies$ 深度资产校验立即捕获（`VERTEX_DIFF`）；
+  * Test 10：F-Curve 关键帧数值微调（帧数不变）$\implies$ 深度资产校验立即捕获（`KEYFRAME_VALUE_DIFF`）；
+  * Test 11：S1..S5 工位中间帧 37 状态篡改 $\implies$ 深度轨迹对比立即捕获（`TRAJECTORY_DIFF`）；
+  * Test 12：接触记录缺失帧（删除 Frame 50）$\implies$ 持久化合同立即报错（`MISSING_FRAME_RECORD`）；
+  * Test 13：支撑足锚点被篡改或置空 $\implies$ 锚点完整性检查立即报错（`TAMPERED_ANCHOR`）；
+  * Test 14：资产版本号不匹配（篡改版本号）$\implies$ 契约校验立即报错（`VERSION_MISMATCH`）；
+  * Test 15：测试前后文件大小与修改时间戳比对，证明只读回归测试对所有产物零写磁盘；
+  * 测试套件 15/15 PASS (1.10s)。
+
+### 真实兼容性调用矩阵补充 (`docs/PHASE7A_REUSE_AUDIT.md`)
+* 新增第三节“生产与动力学核心模块调用矩阵”，详细记录 9 大模块（`framework.py`, `kinematic_bridge.py`, `whole_body_controller.py`, `src/rig/`, `src/character/`, `rigid_link.py`, `contact_model.py`, `environment_query.py`, `src/scene/playground_*`）及未接入的 6G-D 动力学核心的真实调用者、被调用者、输入与输出合同。
+
+### 统一测试套件编码兼容性加固 (`tests/run_test_suite.py`)
+* 在 `subprocess.Popen` 中增加 `encoding="utf-8", errors="replace"`，彻底消除 Windows 默认 GBK 终端环境下由 UTF-8 控制台输出导致的 reader 线程 `UnicodeDecodeError` 异常。
+
+### 全级别回归套件全绿
+* `.\run_tests.ps1 -tier quick`：**10 / 10 PASS** (11.14s)；
+* `.\run_tests.ps1 -tier physics`：**16 / 16 PASS** (78.07s)；
+* `.\run_tests.ps1 -tier motion`：**6 / 6 PASS** (20.79s)；
+* `.\run_tests.ps1 -tier full`：**25 / 25 PASS** (100.84s)；
+* `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)。
+
+---
+
+
 ## [2026-10-25] 任务 7A-1：历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及 Final Acceptance Closure 最终验收收尾 (Task 7A-1)
 
 ### 历史 19 骨骼角色与运动资产复用审计 (`docs/PHASE7A_REUSE_AUDIT.md`, `tests/audit_c2_final_inspector.py`)

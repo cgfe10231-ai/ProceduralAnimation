@@ -1,0 +1,3685 @@
+{
+  "schema_name": "Task7A1_ContactStatePersistence",
+  "schema_version": "1.0",
+  "blend_asset_version": "Task7A1_204f_v1",
+  "action_id": "start_stop_walk",
+  "total_frames": 204,
+  "fps": 24,
+  "character_armature": "CharacterArmature",
+  "records": [
+    {
+      "frame": 1,
+      "time_sec": 0.0,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 2,
+      "time_sec": 0.041667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 3,
+      "time_sec": 0.083333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 4,
+      "time_sec": 0.125,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 5,
+      "time_sec": 0.166667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 6,
+      "time_sec": 0.208333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 7,
+      "time_sec": 0.25,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 8,
+      "time_sec": 0.291667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 9,
+      "time_sec": 0.333333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 10,
+      "time_sec": 0.375,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 11,
+      "time_sec": 0.416667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 12,
+      "time_sec": 0.458333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -8.0,
+        0.0
+      ],
+      "stage": "stand_start",
+      "step_k": -1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 13,
+      "time_sec": 0.5,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stand_start",
+      "step_k": 0,
+      "contact_event": "DOUBLE_TO_LEFT",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 14,
+      "time_sec": 0.541667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 15,
+      "time_sec": 0.583333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 16,
+      "time_sec": 0.625,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 17,
+      "time_sec": 0.666667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 18,
+      "time_sec": 0.708333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 19,
+      "time_sec": 0.75,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 20,
+      "time_sec": 0.791667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 21,
+      "time_sec": 0.833333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 22,
+      "time_sec": 0.875,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 23,
+      "time_sec": 0.916667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 24,
+      "time_sec": 0.958333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 25,
+      "time_sec": 1.0,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 26,
+      "time_sec": 1.041667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 27,
+      "time_sec": 1.083333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 28,
+      "time_sec": 1.125,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 29,
+      "time_sec": 1.166667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 30,
+      "time_sec": 1.208333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 31,
+      "time_sec": 1.25,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 32,
+      "time_sec": 1.291667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 33,
+      "time_sec": 1.333333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 34,
+      "time_sec": 1.375,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 35,
+      "time_sec": 1.416667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 36,
+      "time_sec": 1.458333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 37,
+      "time_sec": 1.5,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 38,
+      "time_sec": 1.541667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 39,
+      "time_sec": 1.583333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 40,
+      "time_sec": 1.625,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 41,
+      "time_sec": 1.666667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 42,
+      "time_sec": 1.708333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "start",
+      "step_k": 0,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 43,
+      "time_sec": 1.75,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "LEFT_TO_RIGHT",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 44,
+      "time_sec": 1.791667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 45,
+      "time_sec": 1.833333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 46,
+      "time_sec": 1.875,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 47,
+      "time_sec": 1.916667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 48,
+      "time_sec": 1.958333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 49,
+      "time_sec": 2.0,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 50,
+      "time_sec": 2.041667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 51,
+      "time_sec": 2.083333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 52,
+      "time_sec": 2.125,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 53,
+      "time_sec": 2.166667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 54,
+      "time_sec": 2.208333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 55,
+      "time_sec": 2.25,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 56,
+      "time_sec": 2.291667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 57,
+      "time_sec": 2.333333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 58,
+      "time_sec": 2.375,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 59,
+      "time_sec": 2.416667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 60,
+      "time_sec": 2.458333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 61,
+      "time_sec": 2.5,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 62,
+      "time_sec": 2.541667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 63,
+      "time_sec": 2.583333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 64,
+      "time_sec": 2.625,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 65,
+      "time_sec": 2.666667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 66,
+      "time_sec": 2.708333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ],
+      "stage": "accelerate",
+      "step_k": 1,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 67,
+      "time_sec": 2.75,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "accelerate",
+      "step_k": 2,
+      "contact_event": "RIGHT_TO_LEFT",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 68,
+      "time_sec": 2.791667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 69,
+      "time_sec": 2.833333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 70,
+      "time_sec": 2.875,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 71,
+      "time_sec": 2.916667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 72,
+      "time_sec": 2.958333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 73,
+      "time_sec": 3.0,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 74,
+      "time_sec": 3.041667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 75,
+      "time_sec": 3.083333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 76,
+      "time_sec": 3.125,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 77,
+      "time_sec": 3.166667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 78,
+      "time_sec": 3.208333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 79,
+      "time_sec": 3.25,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 80,
+      "time_sec": 3.291667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 81,
+      "time_sec": 3.333333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 82,
+      "time_sec": 3.375,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 83,
+      "time_sec": 3.416667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 84,
+      "time_sec": 3.458333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 85,
+      "time_sec": 3.5,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 86,
+      "time_sec": 3.541667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 87,
+      "time_sec": 3.583333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 88,
+      "time_sec": 3.625,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 89,
+      "time_sec": 3.666667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 90,
+      "time_sec": 3.708333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 2,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 91,
+      "time_sec": 3.75,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "LEFT_TO_RIGHT",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 92,
+      "time_sec": 3.791667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 93,
+      "time_sec": 3.833333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 94,
+      "time_sec": 3.875,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 95,
+      "time_sec": 3.916667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 96,
+      "time_sec": 3.958333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 97,
+      "time_sec": 4.0,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 98,
+      "time_sec": 4.041667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 99,
+      "time_sec": 4.083333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 100,
+      "time_sec": 4.125,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 101,
+      "time_sec": 4.166667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 102,
+      "time_sec": 4.208333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 103,
+      "time_sec": 4.25,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 104,
+      "time_sec": 4.291667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 105,
+      "time_sec": 4.333333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 106,
+      "time_sec": 4.375,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 107,
+      "time_sec": 4.416667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 108,
+      "time_sec": 4.458333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 109,
+      "time_sec": 4.5,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 110,
+      "time_sec": 4.541667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 111,
+      "time_sec": 4.583333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 112,
+      "time_sec": 4.625,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 113,
+      "time_sec": 4.666667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 114,
+      "time_sec": 4.708333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 3,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 115,
+      "time_sec": 4.75,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "RIGHT_TO_LEFT",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 116,
+      "time_sec": 4.791667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 117,
+      "time_sec": 4.833333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 118,
+      "time_sec": 4.875,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 119,
+      "time_sec": 4.916667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 120,
+      "time_sec": 4.958333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 121,
+      "time_sec": 5.0,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 122,
+      "time_sec": 5.041667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 123,
+      "time_sec": 5.083333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 124,
+      "time_sec": 5.125,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 125,
+      "time_sec": 5.166667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 126,
+      "time_sec": 5.208333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 127,
+      "time_sec": 5.25,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 128,
+      "time_sec": 5.291667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 129,
+      "time_sec": 5.333333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 130,
+      "time_sec": 5.375,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 131,
+      "time_sec": 5.416667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 132,
+      "time_sec": 5.458333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 133,
+      "time_sec": 5.5,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 134,
+      "time_sec": 5.541667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 135,
+      "time_sec": 5.583333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 136,
+      "time_sec": 5.625,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 137,
+      "time_sec": 5.666667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 138,
+      "time_sec": 5.708333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "steady_walk",
+      "step_k": 4,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 139,
+      "time_sec": 5.75,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "steady_walk",
+      "step_k": 5,
+      "contact_event": "LEFT_TO_RIGHT",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 140,
+      "time_sec": 5.791667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 141,
+      "time_sec": 5.833333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 142,
+      "time_sec": 5.875,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 143,
+      "time_sec": 5.916667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 144,
+      "time_sec": 5.958333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 145,
+      "time_sec": 6.0,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 146,
+      "time_sec": 6.041667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 147,
+      "time_sec": 6.083333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 148,
+      "time_sec": 6.125,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 149,
+      "time_sec": 6.166667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 150,
+      "time_sec": 6.208333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 151,
+      "time_sec": 6.25,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 152,
+      "time_sec": 6.291667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 153,
+      "time_sec": 6.333333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 154,
+      "time_sec": 6.375,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 155,
+      "time_sec": 6.416667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 156,
+      "time_sec": 6.458333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 157,
+      "time_sec": 6.5,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 158,
+      "time_sec": 6.541667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 159,
+      "time_sec": 6.583333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 160,
+      "time_sec": 6.625,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 161,
+      "time_sec": 6.666667,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 162,
+      "time_sec": 6.708333,
+      "left_foot_locked": false,
+      "right_foot_locked": true,
+      "support_side": "RIGHT",
+      "support_anchor_L": null,
+      "support_anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ],
+      "stage": "decelerate",
+      "step_k": 5,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 163,
+      "time_sec": 6.75,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "RIGHT_TO_LEFT",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 164,
+      "time_sec": 6.791667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 165,
+      "time_sec": 6.833333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 166,
+      "time_sec": 6.875,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 167,
+      "time_sec": 6.916667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 168,
+      "time_sec": 6.958333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 169,
+      "time_sec": 7.0,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 170,
+      "time_sec": 7.041667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 171,
+      "time_sec": 7.083333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 172,
+      "time_sec": 7.125,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 173,
+      "time_sec": 7.166667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 174,
+      "time_sec": 7.208333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 175,
+      "time_sec": 7.25,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 176,
+      "time_sec": 7.291667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 177,
+      "time_sec": 7.333333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 178,
+      "time_sec": 7.375,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 179,
+      "time_sec": 7.416667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 180,
+      "time_sec": 7.458333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 181,
+      "time_sec": 7.5,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 182,
+      "time_sec": 7.541667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 183,
+      "time_sec": 7.583333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 184,
+      "time_sec": 7.625,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 185,
+      "time_sec": 7.666667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 186,
+      "time_sec": 7.708333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 187,
+      "time_sec": 7.75,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 188,
+      "time_sec": 7.791667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 189,
+      "time_sec": 7.833333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 190,
+      "time_sec": 7.875,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 191,
+      "time_sec": 7.916667,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 192,
+      "time_sec": 7.958333,
+      "left_foot_locked": true,
+      "right_foot_locked": false,
+      "support_side": "LEFT",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": null,
+      "stage": "stop_step",
+      "step_k": 6,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 193,
+      "time_sec": 8.0,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stop_step",
+      "step_k": 7,
+      "contact_event": "LEFT_TO_DOUBLE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 194,
+      "time_sec": 8.041667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 195,
+      "time_sec": 8.083333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 196,
+      "time_sec": 8.125,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 197,
+      "time_sec": 8.166667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 198,
+      "time_sec": 8.208333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 199,
+      "time_sec": 8.25,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 200,
+      "time_sec": 8.291667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 201,
+      "time_sec": 8.333333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 202,
+      "time_sec": 8.375,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 203,
+      "time_sec": 8.416667,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    },
+    {
+      "frame": 204,
+      "time_sec": 8.458333,
+      "left_foot_locked": true,
+      "right_foot_locked": true,
+      "support_side": "DOUBLE",
+      "support_anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "support_anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ],
+      "stage": "stand_stop",
+      "step_k": 7,
+      "contact_event": "NONE",
+      "source": "runtime_recorded"
+    }
+  ],
+  "transition_events": [
+    {
+      "frame": 13,
+      "time_sec": 0.5,
+      "from_side": "DOUBLE",
+      "to_side": "LEFT",
+      "event_type": "DOUBLE_TO_LEFT",
+      "anchor_L": [
+        -0.11,
+        -8.0,
+        0.0
+      ],
+      "anchor_R": null
+    },
+    {
+      "frame": 43,
+      "time_sec": 1.75,
+      "from_side": "LEFT",
+      "to_side": "RIGHT",
+      "event_type": "LEFT_TO_RIGHT",
+      "anchor_L": null,
+      "anchor_R": [
+        0.11,
+        -7.85,
+        0.0
+      ]
+    },
+    {
+      "frame": 67,
+      "time_sec": 2.75,
+      "from_side": "RIGHT",
+      "to_side": "LEFT",
+      "event_type": "RIGHT_TO_LEFT",
+      "anchor_L": [
+        -0.11,
+        -7.61,
+        0.0
+      ],
+      "anchor_R": null
+    },
+    {
+      "frame": 91,
+      "time_sec": 3.75,
+      "from_side": "LEFT",
+      "to_side": "RIGHT",
+      "event_type": "LEFT_TO_RIGHT",
+      "anchor_L": null,
+      "anchor_R": [
+        0.11,
+        -7.37,
+        0.0
+      ]
+    },
+    {
+      "frame": 115,
+      "time_sec": 4.75,
+      "from_side": "RIGHT",
+      "to_side": "LEFT",
+      "event_type": "RIGHT_TO_LEFT",
+      "anchor_L": [
+        -0.11,
+        -7.13,
+        0.0
+      ],
+      "anchor_R": null
+    },
+    {
+      "frame": 139,
+      "time_sec": 5.75,
+      "from_side": "LEFT",
+      "to_side": "RIGHT",
+      "event_type": "LEFT_TO_RIGHT",
+      "anchor_L": null,
+      "anchor_R": [
+        0.11,
+        -6.89,
+        0.0
+      ]
+    },
+    {
+      "frame": 163,
+      "time_sec": 6.75,
+      "from_side": "RIGHT",
+      "to_side": "LEFT",
+      "event_type": "RIGHT_TO_LEFT",
+      "anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "anchor_R": null
+    },
+    {
+      "frame": 193,
+      "time_sec": 8.0,
+      "from_side": "LEFT",
+      "to_side": "DOUBLE",
+      "event_type": "LEFT_TO_DOUBLE",
+      "anchor_L": [
+        -0.11,
+        -6.74,
+        0.0
+      ],
+      "anchor_R": [
+        0.11,
+        -6.74,
+        0.0
+      ]
+    }
+  ]
+}

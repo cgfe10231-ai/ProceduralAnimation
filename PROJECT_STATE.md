@@ -1,36 +1,37 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-25  
-> **当前阶段**：任务 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及 Final Acceptance Closure 最终验收收尾）已完成并全部验证通过（交付 `docs/PHASE7A_REUSE_AUDIT.md`、`src/scene/playground_character_integration.py`、`run_task7a1_character_playground.py`、严格只读解耦测试 `tests/verify_task7a1_character_playground.py`、派生可播放场景 `output/dynamics_playground_task7a1.blend`、204 帧重开数学验证报告 `docs/evidence/task7a1/full_frame_validation.json`、综合报告 `docs/evidence/task7a1/task7a1_verification_report.json` 及 204 帧连续预览 `docs/evidence/task7a1/task7a1_walk_preview.gif`；权威 `output/dynamics_playground.blend` 101 个受保护对象、16 个地形表面与 `S1..S5` 73 帧轨迹 100% 零改动保留；`quick` 10/10, `physics` 16/16, `motion` 6/6, `full` 25/25, `--verify-docs` 全绿通过；严格停止于 Task 7A-1，不自动进入 Task 7A-2，等待用户与 ChatGPT 审阅）  
+> **记录时间**：2026-10-26  
+> **当前阶段**：任务 7A-1（最终架构整理、单一职责解耦、接触状态持久化合同与负向测试闭环，Task 7A-1 Final Architecture & Compatibility Closure）已圆满完成并通过全量验证（原 2872 行集中文件解耦为 4 个专业子模块与轻量级门面；建立 Blender 场景属性与伴生 JSON 接触状态持久化合同；实现 6 大隔离负向故障注入测试，`verify_task7a1_character_playground.py` 扩充至 15 项测试全部通过；补充 `docs/PHASE7A_REUSE_AUDIT.md` 第三节生产与动力学模块调用矩阵；修复测试套件 UTF-8 编码兼容性；`quick` 10/10, `physics` 16/16, `motion` 6/6, `full` 25/25, `--verify-docs` 全绿通过；严格停止于 Task 7A-1，严禁自动进入 Task 7A-2，等待最终验收确认）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 7A-1 历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及 Final Acceptance Closure 最终验收收尾 (Task 7A-1)**：
-  * **历史资产与模块复用审计 (`docs/PHASE7A_REUSE_AUDIT.md`)**：
-    - 完整审计 `output/unified_motion_integration.blend`、`output/dynamics_playground.blend` 及 19 个既有核心 Python 模块，精确记录 7 大章节（已存在直接可用能力、训练场现有内容、必须保留的历史资产、必须复用的接口、真正缺失的能力、严禁重复创建的模块、最小适配点），纳入 `tests/audit_c2_final_inspector.py --verify-docs` 永久 AST 门禁；
-  * **真实 19 骨骼角色无损装入 `DynamicsPlayground` 与深度场景资产对比 (`src/scene/playground_character_integration.py`, `run_task7a1_character_playground.py`)**：
-    - 以 `output/dynamics_playground.blend` 为唯一训练场 SSOT（只读加载，原始文件字节数与时间戳 100% 零改动）；
-    - 深度快照对比 (`capture_deep_playground_snapshot` / `verify_derived_blend_against_deep_snapshot`) 验证：100% 保留原有 4 大集合（`Playground_Surfaces`: 16, `Playground_Visuals`: 32, `Playground_Lighting_Cameras`: 8, `Playground_Dynamics_Visualization`: 45，合计 101 个受保护对象）、全部 16 个地形表面网格顶点数/多边形数/包围盒/材质，以及 5 个动力学工位（`S1..S5` 在 Frames 1..73 的动作 F-Curve 与世界变换完全不变）；
-    - 仅在 `"Character"` 集合新增 26 个角色与观察相机对象（`CharacterRoot`、19 骨骼 `CharacterArmature`、13 个 `parent_type="BONE"` 网格部件、8 个 IK/Pole 控制器、3 个 `Task7A1_Char*Cam` 观察相机），导出派生可播放场景 `output/dynamics_playground_task7a1.blend`；
-  * **五阶段最小控制闭环验证（全部经由 `MotionPlanner` / `MotionAction` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` $\to$ Rig/IK/FK）**：
-    - **Stage A (静态站立姿态)**：位于 `Surface_FlatGround` $(0.0, -8.0, 0.0)\text{ m}$，双足最低点 $Z_{\min} = 0.0\text{ m}$ 无穿地/悬空，末端最大误差 $3.0\times 10^{-6}\text{ m}$，CoM $(0.0, -7.99627, 1.04793)\text{ m}$，零 ROM 违例，`support_type = "double_stance"`；
-    - **Stage B (根节点有限位移与非零偏航)**：`CharacterRoot` 移动至 $(0.25, -7.65, 0.0)\text{ m}$、偏航 $+6.0^\circ$、骨盆下沉 $-0.030\text{ m}$，根位置误差 `0.0 m`，末端误差 $7.0\times 10^{-6}\text{ m}$，零 ROM 违例；
-    - **Stage C (单脚独立 IK 控制)**：左脚 $(-0.11, -8.05, 0.07)\text{ m}$、右脚抬起 $(0.14, -7.82, 0.21)\text{ m}$ 非对称目标，跟踪误差分别为 $2.2\times 10^{-5}\text{ m}$ 与 $4.5\times 10^{-5}\text{ m}$，大腿 $0.42\text{ m}$ / 小腿 $0.40\text{ m}$ 零拉伸，膝盖前向偏移 $+0.1191\text{ m}$ / $+0.2271\text{ m}$ 零翻转；
-    - **Stage D (支撑脚世界空间锁定)**：左脚锁定于 $(-0.11, -8.00, 0.07)\text{ m}$（`FootIK.L.parent == None`），`CharacterRoot` 连续 5 步前移侧移同时右脚摆动，实测控制器漂移 `0.0 m`、踝骨漂移 `0.0 m`、足部网格中心漂移 `0.0 m`；
-    - **Stage E (最小历史连续步态复用)**：通过 `MotionPlanner` 在训练场 `Surface_FlatGround` 上执行 `StartStopWalkAction` 204 帧连续行走（$Y: -8.0000\text{ m} \to -6.7400\text{ m}$，总位移 $1.2600\text{ m}$，峰值速度 $0.2400\text{ m/s}$，不可达帧数 `0`）；
-  * **204 帧全帧独立只读重开验证 (`validate_reopened_task7a1_blend`, `docs/evidence/task7a1/full_frame_validation.json`)**：
-    - 不重新运行 `MotionPlanner` 或 `WholeBodyController`，直接只读重开 `output/dynamics_playground_task7a1.blend` 逐帧评估 Frames `1..204`，并严格标注 `reopen_evaluated`（重开场景真实求值）与 `analytical_reference`（解析生成参考）；
-    - **根节点平移连续性**：`stand_start` (`Frames 1..13`) 与 `stand_stop` (`Frames 193..204`) 最大单帧位移 `0.0 m`；全时域最大单帧步长 `0.010000 m` (Frame 68)，有限差分速度与解析中点速度最大偏差 $6.2\times 10^{-5}\text{ m/s}$ (Frame 186)，最大有限差分加速度 $0.168365\text{ m/s}^2$ (Frame 167，与解析峰值 $0.167552\text{ m/s}^2$ 高度吻合)；
-    - **19 骨骼旋转四元数测地线连续性**：处理 $q \sim -q$ 双覆盖等价后计算 $\Delta\theta_f = 2\arccos(|\langle q_f, q_{f-1}\rangle|)$，全 19 骨骼全时域最大单帧测地角步长为 `5.24453 deg` (`forearm.R`, Frame 44)，关键骨骼最大步长：`pelvis` `0.7038 deg`、`spine` `0.29957 deg`、`thigh.L/R` `3.23694 deg`、`shin.L/R` `3.53393 deg`、`foot.L/R` `1.56632 deg`（均远小于 $8.0^\circ$ 连续阈值，零姿态翻转跳变）；
-    - **全 9 个支撑区间与 8 次接触生命周期切换验证**：分别量化 `FootIK.L/R` 控制器世界漂移（全支撑帧 `0.0 m`）与实际踝骨 (`shin.tail` / `foot.head`) 世界漂移（最大值 $2.94\times 10^{-5}\text{ m}$，Frame 41，帧间最大滑移 $2.0\times 10^{-5}\text{ m}$）；支撑期内 `Foot_L/R` 最低点 $Z_{\min} \in [-2.9\times 10^{-5}, +3.0\times 10^{-6}]\text{ m}$ 零穿地零悬空；8 次支撑切换边界最大单帧踝骨步长 $0.003148\text{ m}$ 平滑无瞬移；
-    - **全 204 帧 CoM 与刚体几何一致性**：总质量恒为 `70.0 kg`，0 `NaN/Inf`，CoM 前向位移 `1.2600 m`，横向摆动范围 $[-0.015111, +0.015111]\text{ m}$（跨度 `0.030222 m`），竖直范围 $[1.008095, 1.047930]\text{ m}$，全 204 帧大腿/小腿长度误差 `< 1e-6 m`，全 204 帧 `rom_violation_frame_count == 0`；
-  * **测试与生成严格解耦及 204 帧真实连续 GIF 证据 (`tests/verify_task7a1_character_playground.py`, `docs/evidence/task7a1/task7a1_walk_preview.gif`)**：
-    - `run_task7a1_character_playground.py` 专职生成，重开 `.blend` 连续渲染全 204 帧（24 FPS, `delay_cs=4`）生成 `docs/evidence/task7a1/task7a1_walk_preview.gif`（二进制校验 `frame_count == 204`）；
-    - `tests/verify_task7a1_character_playground.py`（8/8 PASS，耗时 0.36s）严格只读，缺失产物直接报 `ARTIFACT_MISSING`，且通过前后 `st_size` / `st_mtime_ns` 断言证明测试过程对 `.blend`、`.json`、`.gif` 零修改；
-    - `quick` (10/10 PASS), `physics` (16/16 PASS), `motion` (6/6 PASS), `full` (25/25 PASS), `--verify-docs` (PASS)。
+* **任务 7A-1 最终架构整理、单一职责解耦、接触状态持久化合同与负向测试闭环 (Task 7A-1 Final Architecture & Compatibility Closure)**：
+  * **单一职责解耦重构 (`src/scene/playground_*`)**：
+    - 原 2872 行单一集中文件成功解耦为 4 个专业子模块与 1 个总控门面：
+      * `src/scene/playground_asset_preservation.py` (386 行)：101 个受保护对象、16 个表面网格几何（顶点坐标 $<10^{-5}$、面拓扑与顶点索引）、层级结构、世界矩阵、材质槽、环境属性、Layered F-Curves（时间与取值 $<10^{-4}$、手柄与插值模式）以及 S1..S5 5 工位 73 帧基准轨迹全 73 帧（非抽样）深度快照对比；
+      * `src/scene/playground_evidence_exporter.py` (223 行)：多视角相机 PNG 渲染、NumPy RGBA 加载、GIF 帧数与帧率真实校验、204 帧平滑 GIF 预览合成及验证报告 JSON 导出；
+      * `src/scene/playground_character_assembly.py` (1495 行)：角色装配、五阶段最小控制闭环（Stage A..D）、四大数学一致性验证、Stage E 204 帧行走步态执行与接触状态持久化；
+      * `src/scene/playground_kinematic_validation.py` (765 行)：从派生 `.blend` 独立只读重开全 204 帧评估，恢复持久化接触契约、验证根位移平滑度、19 骨骼四元数测地线连续性、9 个支撑区间实际踝骨漂移、70.0 kg 质心轨迹与关节 ROM；
+      * `src/scene/playground_character_integration.py` (183 行)：重构为轻量级总控门面，重新导出全部公开符号保持 100% 向后兼容；
+  * **接触状态持久化合同 (Contact State Persistence Contract)**：
+    - Stage E 执行期间将逐帧实际接触状态（帧号、时间、双足锁定标志、支撑侧、支撑脚世界锚点 $(X,Y,Z)$、步态阶段、步序、触地/离地离散事件）序列化写入 Blender 场景 ID 属性 `scene["task7a1_contact_state_records"]`，并在 `FootIK.L/R` 控制器上对 `is_locked` 逐帧打关键帧；同时导出伴生文件 [`docs/evidence/task7a1/task7a1_contact_state_records.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task7a1/task7a1_contact_state_records.json)；
+    - 重开验收通过 `recover_and_verify_contact_states_from_blend(scene)` 恢复持久化接触数据，彻底废除对 `MotionPlanner` 或步态公式重新推导的依赖；
+    - 严格区分三类数据流：**Category A (运行时记录)**、**Category B (重开评估值)**、**Category C (解析参考值)**，并在 `full_frame_validation.json` 中清晰分离；
+  * **六大隔离负向测试闭环与套件扩充 (`tests/verify_task7a1_character_playground.py`)**：
+    - 测试套件扩充至 15 项测试（15/15 PASS, 1.10s），包含 6 项隔离故障注入测试（网格内部顶点微调、F-Curve 关键帧数值微调、S1..S5 37 帧状态微调、接触记录缺失帧、支撑足锚点被篡改、资产版本号不匹配）与 1 项只读零篡改保护测试，证明校验体系具备严密的真实检测能力；
+  * **历史 19 骨骼角色无损装入与深度资产快照保护**：
+    - `output/dynamics_playground.blend` 101 个受保护对象、16 个表面网格几何与材质槽、S1..S5 5 工位 73 帧基准轨迹 100% 零改动保留；
+    - 仅在 `"Character"` 集合新增 26 个角色与观察相机对象，导出派生可播放场景 `output/dynamics_playground_task7a1.blend`；
+  * **五阶段最小控制闭环与全 204 帧独立重开数学验证**：
+    - Stage A（双足贴地 $Z_{\min} = 0.0\text{ m}$，误差 $3\times 10^{-6}\text{ m}$）；Stage B（根平移偏航误差 `0.0 m`）；Stage C（单脚独立 IK 零拉伸零翻转）；Stage D（支撑脚锁定控制器/踝骨漂移 `0.0 m`）；Stage E（204 帧行走总位移 $1.2600\text{ m}$，0 不可达帧，0 ROM 违例）；
+    - 全 204 帧独立只读重开评估：根平移连续平滑，19 骨骼测地角单帧最大步长 `5.24453 deg`（$< 8.0^\circ$ 阈值），9 个支撑区间实际踝骨漂移最大 $2.94\times 10^{-5}\text{ m}$，支撑足零穿地 ($Z_{\min} \ge -2.9\times 10^{-5}\text{ m}$)，70.0 kg 质心轨迹与刚体几何 100% 一致；
+    - 204 帧连续平滑预览 GIF [`docs/evidence/task7a1/task7a1_walk_preview.gif`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task7a1/task7a1_walk_preview.gif)（24 FPS，204 帧无缝连续）；
+  * **全级别回归套件全绿**：
+    - `quick` (10/10 PASS), `physics` (16/16 PASS), `motion` (6/6 PASS), `full` (25/25 PASS), `--verify-docs` (PASS)；
+    - 历史步态与动力学算法 100% 零退化。
 * **任务 6G-D-C2-FINAL 架构门禁收口、只读 AST 校验与统一测试套件无缝集成 (Architecture Integrity Gate Closure)**：
   * **彻底消除写文件副作用与运行模式分离**：
     - `tests/audit_c2_final_inspector.py` 实现严格模式隔离：仅在显式传入 `--generate` 或 `--refresh` 时触发 Mode A 写入磁盘产物；`--verify-docs`（Mode B）与 `--test-validator`（Mode C）采用纯内存 AST 与只读缓存索引，严禁对磁盘文件进行任何写入或覆盖（`git status --short` 实测零变更）；

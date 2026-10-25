@@ -116,3 +116,33 @@
    * `PipelineConfig`（[`src/config.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/config.py)）支持配置参数传入，或者直接通过 `MotionPlanner(config, armature_obj=arm, environment=playground_env)` 执行原生 `StartStopWalkAction()`（或在连续时间轴上分段记录 A/B/C/D 四项受控测试帧与 E 项 `StartStopWalkAction` 连续步态），并导出派生场景 `output/dynamics_playground_task7a1.blend`、遥测 JSON 与多视角关键帧 PNG + GIF 动画预览。
 3. **非零偏航角 (`root_yaw_deg != 0`) 下的历史 IK 约束空间约定记录（供后续转向阶段输入）**：
    * 在 [`src/rig/ik.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py) 中，`FootRotation.L/R`（`COPY_ROTATION`）配置为 `target_space = "WORLD"`、`owner_space = "LOCAL"` 且 `foot.L/R` 骨骼 `use_inherit_rotation = False`，同时 `set_foot_ik_target` 中的 `pole_world` 沿世界 `+Y` 方向偏移。当 `CharacterRoot` 发生较大偏航（如 `> 10 deg`）且 `FootIK.L/R` 作为子级（未锁定）继承 `CharacterRoot` 旋转时，`FootRotation.L/R` 会将 `FootIK` 的世界旋转叠加到已随 `CharacterArmature` 旋转的局部空间中，从而在评估踝关节局部 Z 轴偏角时产生约 $2\times\text{yaw}$ 的相对偏转。在 Task 7A-1 中严禁篡改历史 `src/rig/ik.py` 基准逻辑，在非零偏航验证中保持偏航角在生理踝关节外展阈值内（如 `6.0 deg` / `6.5 deg`），并将该坐标空间耦合特征正式记录为后续三维转向扩展阶段的已知输入。
+
+---
+
+## 三、生产与动力学核心模块调用矩阵 (Real Compatibility Audit Matrix)
+
+按照 Task 7A-1 最终架构整理规范，对当前 9 大核心模块及历史动力学组件进行真实调用关系、层级分类与接口合同审计：
+
+### 3.1 核心调用矩阵清单
+
+| 序号 | 模块 / 子系统 | 依赖关系分类 | 真实调用者 (Callers) | 被调用者 (Callees) | 输入数据结构 (Inputs) | 输出数据结构 (Outputs) |
+|---|---|---|---|---|---|---|
+| 1 | [`src/motion/framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py) | **直接调用** (Direct Call) | `playground_character_assembly.py`, `playground_kinematic_validation.py`, tests | `KinematicBridgeExecutor`, `ActionConfig`, `StartStopWalkAction` | `PipelineConfig`, `armature_obj`, `environment`, 步态参数 | `PlannedPoseTarget`, `MotionState`, 连续步态帧序列, 空间转换向量 |
+| 2 | [`src/motion/kinematic_bridge.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py) | **直接调用** (Direct Call) | `playground_character_assembly.py`, `MotionPlanner` | `WholeBodyController.execute_frame`, `environment_query.py`, `src/rig/foot_contact.py` | `PlannedPoseTarget`, `keyframe: bool`, `dt: float` | 桥接执行状态, 驱动 Blender 骨架, 关键帧写入 |
+| 3 | [`src/motion/whole_body_controller.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/whole_body_controller.py) | **直接调用** (Direct Call) | `playground_character_assembly.py` (Phase 1..6 闭环), `KinematicBridgeExecutor` | `src/rig/foot_contact.py`, `src/rig/ik.py`, `src/rig/arm_ik.py`, `src/rig/pose.py` | `WholeBodyPoseTarget` (根位置/朝向, 双足/双手 IK 目标, Pole 目标, FK 关节角) | `WBCExecutionResult` (求解成功标志, 阶段跟踪数据, 关节超限报警) |
+| 4 | `src/rig/` (`builder`, `ik`, `arm_ik`, `foot_contact`, `pose`) | **直接调用** (Direct Call) | `playground_character_assembly.py`, `WholeBodyController`, `playground_kinematic_validation.py` | Blender `bpy.types.Armature`, 约束器 (`IK`, `COPY_ROTATION`), `PoseBone` | 骨架对象, 目标坐标, 极向向量, 锁定状态 (`is_locked`) | 19 骨骼 Rig 结构, IK/FK 姿态解算, 世界变换矩阵, 局部旋转四元数 |
+| 5 | `src/character/` (`builder`, `mesh_generator`) | **直接调用** (Direct Call) | `playground_character_assembly.py` | Blender `bpy.data.meshes`, `bpy.data.materials`, `bmesh` | `PipelineConfig`, `Character` 集合引用, 尺寸参数 | 13 刚体部件网格对象, `CharacterRoot` 空间根节点, 材质槽绑定 |
+| 6 | [`src/motion/rigid_link.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/rigid_link.py) | **直接调用 & 验证** (Direct / Verify-only) | `playground_character_assembly.py` (阶段 A..D), `playground_kinematic_validation.py` (204 帧验收) | 纯 Python 数学内核 (`math`, `numpy`) | 15 分段骨骼端点世界坐标, 总质量 ($70.0\text{ kg}$ / $75.0\text{ kg}$) | `WholeBodyCoMResult` (全身质心 3D 向量, 分段质量分布, 各段局部质心) |
+| 7 | [`src/motion/contact_model.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py) | **验证与解析交叉核对** (Verify-only / Cross-Check) | `playground_character_assembly.py` (几何接触验证), `playground_kinematic_validation.py` | 纯 Python 几何与物理接触判定逻辑 | 骨架姿态, 环境表面几何定义, 接触容差 ($0.03\text{ m}$) | `ContactRecord` 清单, 几何相容性布尔值, 接触表面法线与有效支撑状态 |
+| 8 | [`src/scene/environment_query.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/environment_query.py) | **直接调用** (Direct Call) | `playground_character_assembly.py`, `KinematicBridgeExecutor` | Blender `Playground_Surfaces` 集合内 16 个网格对象 | 查询点世界坐标 $(X, Y, Z)$ 或射线起点/方向 | 地形高度 $Z$、表面法线向量、摩擦系数、表面材质类型 |
+| 9 | `src/scene/playground_*` (解耦模块群) | **直接协调与管线总控** (Orchestration Pipeline) | `run_task7a1_character_playground.py`, `tests/verify_task7a1_character_playground.py` | 上述 1..8 所有子系统, `playground_asset_preservation`, `evidence_exporter` | `output/dynamics_playground.blend`, 执行参数 | `dynamics_playground_task7a1.blend`, 接触记录 JSON, 验证报告 JSON, 204f GIF, PNG |
+| 10 | 6G-D 动力学核心 (`forward_dynamics`, `contact_dynamics`, `closed_loop_dynamics`) | **未接入主运动链但严格保留** (Unintegrated but Preserved) | 动力学测试集 (`test_6gd_*`), `verify_task6gd_playground_*` | 单刚体数值积分器, LCP/QP 接触力求解器 | 状态向量 $\mathbf{x} = [\mathbf{p}, \mathbf{q}, \mathbf{v}, \boldsymbol{\omega}]^T$, 外力/力矩 | 积分下一时刻状态, 工位 S1..S5 73 帧基准轨迹 (保持 100% 零修改) |
+
+### 3.2 模块职责边界与跨宿主保护
+
+1. **纯数学与动力学内核解耦保护**：
+   * `rigid_link.py`、`contact_model.py`、`joint_limits.py`、`forward_dynamics.py` 均为纯 Python 实现，零 `bpy` 依赖，确保未来跨游戏引擎（Unity / Unreal / 自研引擎）直接复用。
+2. **Blender 适配与桥接层独占**：
+   * `src/rig/` 与 `src/scene/` 负责承接 Blender 场景对象、约束器与数据块读写，不渗透入运动规划与动力学计算内核。
+3. **单帧 6 阶段协议独占控制权**：
+   * 所有角色运动与关键帧生成必须严格通过 `MotionPlanner` $\to$ `KinematicBridgeExecutor` $\to$ `WholeBodyController.execute_frame` $\to$ `Rig/IK/FK`，严禁外部模块绕开控制器直接修改骨骼姿态。

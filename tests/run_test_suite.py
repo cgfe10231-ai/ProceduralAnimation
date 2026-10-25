@@ -265,6 +265,8 @@ class TestSuiteRunner:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 cwd=PROJECT_ROOT,
             )
             stdout_str, stderr_str = proc.communicate(timeout=effective_timeout)

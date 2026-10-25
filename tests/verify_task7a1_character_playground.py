@@ -1,22 +1,27 @@
 """Strictly Read-Only Automated Verification & Regression Suite for Task 7A-1:
 Real 19-Bone Character Integration into DynamicsPlayground, 204-Frame Reopen Validation,
-Deep Scene Asset Preservation, and Continuous Visual Evidence Inspection.
+Deep Scene Asset Preservation, Contact State Persistence Contract, and Negative Verification.
 
-CRITICAL ARCHITECTURAL CONTRACT (Section 七):
+CRITICAL ARCHITECTURAL CONTRACT (Sections 六, 七, 八):
 - This test script is 100% READ-ONLY. It NEVER invokes `execute_task7a1_pipeline()`,
   never regenerates `.blend` files, never renders images, and never overwrites JSON reports.
-- If any required artifact (`output/dynamics_playground.blend`, `output/dynamics_playground_task7a1.blend`,
-  `docs/evidence/task7a1/full_frame_validation.json`, `docs/evidence/task7a1/task7a1_verification_report.json`,
-  `docs/evidence/task7a1/task7a1_walk_preview.gif`) is missing, the test fails immediately with `ARTIFACT_MISSING`.
+- If any required artifact is missing, the test fails immediately with `ARTIFACT_MISSING`.
 - All 204 frames of `output/dynamics_playground_task7a1.blend` are independently reopened and evaluated
   via Blender's dependency graph (`scene.frame_set(f)` + `bpy.context.view_layer.update()`) without
   calling `MotionPlanner` or `WholeBodyController`.
+- Persisted contact state is recovered directly from `scene["task7a1_contact_state_records"]`
+  without re-running MotionPlanner or gait synthesis formulas.
+- Includes 6 negative mutation tests proving detection gates cannot be bypassed by spoofed data.
 """
 
+from __future__ import annotations
+
+import copy
 import json
 import os
 import sys
 import unittest
+from typing import Any, Dict
 
 import bpy
 
@@ -29,6 +34,7 @@ from src.rig.builder import BONE_SPECIFICATIONS
 from src.scene.playground_character_integration import (
     capture_deep_playground_snapshot,
     count_gif_frames,
+    recover_and_verify_contact_states_from_blend,
     validate_reopened_task7a1_blend,
     verify_derived_blend_against_deep_snapshot,
 )
@@ -44,6 +50,7 @@ class TestTask7A1CharacterPlaygroundIntegration(unittest.TestCase):
         cls.evidence_dir = os.path.join(PROJECT_ROOT, "docs", "evidence", "task7a1")
         cls.report_json_path = os.path.join(cls.evidence_dir, "task7a1_verification_report.json")
         cls.full_frame_json_path = os.path.join(cls.evidence_dir, "full_frame_validation.json")
+        cls.contact_records_path = os.path.join(cls.evidence_dir, "task7a1_contact_state_records.json")
         cls.gif_path = os.path.join(cls.evidence_dir, "task7a1_walk_preview.gif")
 
         cls.watched_artifacts = [
@@ -51,6 +58,7 @@ class TestTask7A1CharacterPlaygroundIntegration(unittest.TestCase):
             cls.derived_blend,
             cls.report_json_path,
             cls.full_frame_json_path,
+            cls.contact_records_path,
             cls.gif_path,
         ]
         for path in cls.watched_artifacts:
@@ -69,6 +77,8 @@ class TestTask7A1CharacterPlaygroundIntegration(unittest.TestCase):
             cls.report = json.load(f)
         with open(cls.full_frame_json_path, "r", encoding="utf-8") as f:
             cls.saved_full_frame = json.load(f)
+        with open(cls.contact_records_path, "r", encoding="utf-8") as f:
+            cls.saved_contact_records = json.load(f)
 
         # 1. Read-only open of authoritative baseline `output/dynamics_playground.blend`
         bpy.ops.wm.open_mainfile(filepath=cls.source_blend)
@@ -211,7 +221,6 @@ class TestTask7A1CharacterPlaygroundIntegration(unittest.TestCase):
         self.assertEqual(len(val["frames"]), 204)
         self.assertEqual(val["fps"], 24)
 
-        # Match live reopen validation with saved full_frame_validation.json
         self.assertEqual(self.saved_full_frame["verdict"], "PASS")
         self.assertEqual(len(self.saved_full_frame["frames"]), 204)
 
@@ -296,7 +305,166 @@ class TestTask7A1CharacterPlaygroundIntegration(unittest.TestCase):
             self.assertTrue(os.path.isfile(fpath), f"Expected visual evidence PNG missing: {fname}")
             self.assertGreater(os.path.getsize(fpath), 5_000)
 
-    def test_08_readonly_verification_never_modified_artifacts(self) -> None:
+    def test_08_contact_state_persistence_contract_reopen_verification(self) -> None:
+        """Verify Contact State Persistence Contract (Section 六):
+        - Contact state records successfully recovered from reopened .blend scene custom property.
+        - Zero need for MotionPlanner or gait synthesis formula.
+        - Exactly 204 contiguous frame records recovered.
+        - All 9 stance intervals and 8 transitions recovered with world anchors.
+        """
+        bpy.ops.wm.open_mainfile(filepath=self.derived_blend)
+        scene = bpy.context.scene
+        recovered_meta = recover_and_verify_contact_states_from_blend(scene)
+
+        self.assertEqual(recovered_meta["schema_version"], "1.0")
+        self.assertEqual(recovered_meta["blend_asset_version"], "Task7A1_204f_v1")
+        self.assertEqual(recovered_meta["total_frames"], 204)
+        records = recovered_meta["records"]
+        self.assertEqual(len(records), 204)
+
+        # Verify all 9 exact stance intervals across all 204 frames
+        expected_intervals = [
+            (1, 12, True, True, "DOUBLE"),
+            (13, 42, True, False, "LEFT"),
+            (43, 66, False, True, "RIGHT"),
+            (67, 90, True, False, "LEFT"),
+            (91, 114, False, True, "RIGHT"),
+            (115, 138, True, False, "LEFT"),
+            (139, 162, False, True, "RIGHT"),
+            (163, 192, True, False, "LEFT"),
+            (193, 204, True, True, "DOUBLE"),
+        ]
+        for f_start, f_end, l_lock, r_lock, side in expected_intervals:
+            for f in range(f_start, f_end + 1):
+                rec = records[f - 1]
+                self.assertEqual(rec["left_foot_locked"], l_lock, f"Frame {f} left lock mismatch")
+                self.assertEqual(rec["right_foot_locked"], r_lock, f"Frame {f} right lock mismatch")
+                self.assertEqual(rec["support_side"], side, f"Frame {f} support side mismatch")
+
+        # Verify companion JSON matches reopened metadata
+        self.assertEqual(self.saved_contact_records["blend_asset_version"], recovered_meta["blend_asset_version"])
+        self.assertEqual(len(self.saved_contact_records["records"]), len(records))
+
+    # =========================================================================
+    # Negative Verification Suite (Section 八: 6 Isolated Failure Injections)
+    # =========================================================================
+
+    def test_09_negative_mesh_internal_vertex_mutation(self) -> None:
+        """Negative Verification 1: Mutating an internal mesh vertex without altering bounding box
+        or vertex count MUST trigger asset comparison failure in verify_derived_blend_against_deep_snapshot.
+        """
+        mutated_baseline = copy.deepcopy(self.deep_baseline)
+        target_obj = "Surface_FlatGround"
+        self.assertIn(target_obj, mutated_baseline["protected_objects"])
+        me_sig = mutated_baseline["protected_objects"][target_obj]["mesh_signature"]
+        self.assertIsNotNone(me_sig)
+
+        # Mutate an internal vertex coordinate by +0.05m
+        v_idx = 1
+        orig_v = list(me_sig["vertices"][v_idx])
+        me_sig["vertices"][v_idx] = (orig_v[0] + 0.05, orig_v[1], orig_v[2])
+
+        diff = verify_derived_blend_against_deep_snapshot(mutated_baseline, self.derived_blend)
+        self.assertFalse(diff["passed"], "Negative test failed: internal vertex mutation was not detected!")
+        self.assertEqual(diff["verdict"], "FAIL")
+        self.assertIn(target_obj, diff["mesh_geometry_diffs"])
+        self.assertGreater(diff["mesh_geometry_diffs"][target_obj]["vertex_coordinate_mismatch_count"], 0)
+
+    def test_10_negative_fcurve_keyframe_value_mutation(self) -> None:
+        """Negative Verification 2: Mutating an F-Curve keyframe value without altering keyframe count
+        MUST trigger animation curve comparison failure in verify_derived_blend_against_deep_snapshot.
+        """
+        mutated_baseline = copy.deepcopy(self.deep_baseline)
+        target_obj = "Dynamics_AngMomArrow_S5"
+        self.assertIn(target_obj, mutated_baseline["protected_objects"])
+        anim_sig = mutated_baseline["protected_objects"][target_obj]["animation_signature"]
+        self.assertIsNotNone(anim_sig)
+        fc = anim_sig["fcurves"][0]
+
+        # Mutate value of keyframe point 5 by +0.50
+        orig_val = fc["keyframe_points"][5]["co"][1]
+        fc["keyframe_points"][5]["co"] = (fc["keyframe_points"][5]["co"][0], orig_val + 0.50)
+
+        diff = verify_derived_blend_against_deep_snapshot(mutated_baseline, self.derived_blend)
+        self.assertFalse(diff["passed"], "Negative test failed: keyframe value mutation was not detected!")
+        self.assertEqual(diff["verdict"], "FAIL")
+        self.assertIn(target_obj, diff["animation_fcurve_diffs"])
+
+    def test_11_negative_station_trajectory_interframe_mutation(self) -> None:
+        """Negative Verification 3: Mutating dynamics station pose at inter-frame 37 (between previous
+        coarse samples) MUST trigger 73-frame trajectory comparison failure.
+        """
+        mutated_baseline = copy.deepcopy(self.deep_baseline)
+        trajs = mutated_baseline["station_trajectories_73f"]
+        self.assertIn("S2", trajs)
+        self.assertIn("frame_37", trajs["S2"])
+
+        # Mutate BodyProxy location at frame 37 by +0.10m
+        orig_loc = trajs["S2"]["frame_37"]["body_loc"]
+        trajs["S2"]["frame_37"]["body_loc"] = (orig_loc[0], orig_loc[1] + 0.10, orig_loc[2])
+
+        diff = verify_derived_blend_against_deep_snapshot(mutated_baseline, self.derived_blend)
+        self.assertFalse(diff["passed"], "Negative test failed: inter-frame 37 trajectory mutation was not detected!")
+        self.assertEqual(diff["verdict"], "FAIL")
+        self.assertIn("S2_frame_37", diff["station_trajectory_diffs_73f"])
+
+    def test_12_negative_contact_missing_frame_record(self) -> None:
+        """Negative Verification 4: Deleting a frame record (e.g. frame 50) MUST trigger
+        FRAME_COUNT_MISMATCH in recover_and_verify_contact_states_from_blend.
+        """
+        corrupted_payload = copy.deepcopy(self.saved_contact_records)
+        # Delete frame 50 (index 49)
+        del corrupted_payload["records"][49]
+        self.assertEqual(len(corrupted_payload["records"]), 203)
+
+        class MockScene:
+            def get(self, key: str, default=None):
+                if key == "task7a1_contact_state_records":
+                    return json.dumps(corrupted_payload)
+                return default
+
+        with self.assertRaises(ValueError) as ctx:
+            recover_and_verify_contact_states_from_blend(MockScene(), expected_frames=204)
+        self.assertIn("FRAME_COUNT_MISMATCH", str(ctx.exception))
+
+    def test_13_negative_contact_tampered_anchor(self) -> None:
+        """Negative Verification 5: Tampering with a stance anchor (e.g. None or corrupted coords)
+        MUST trigger TAMPERED_ANCHOR in recover_and_verify_contact_states_from_blend.
+        """
+        corrupted_payload = copy.deepcopy(self.saved_contact_records)
+        # Tamper frame 5 (stance frame) by corrupting support_anchor_L to None
+        corrupted_payload["records"][4]["support_anchor_L"] = None
+
+        class MockScene:
+            def get(self, key: str, default=None):
+                if key == "task7a1_contact_state_records":
+                    return json.dumps(corrupted_payload)
+                return default
+
+        with self.assertRaises(ValueError) as ctx:
+            recover_and_verify_contact_states_from_blend(MockScene())
+        self.assertIn("TAMPERED_ANCHOR", str(ctx.exception))
+
+    def test_14_negative_contact_mismatched_version(self) -> None:
+        """Negative Verification 6: Tampering with blend_asset_version MUST trigger
+        VERSION_MISMATCH in recover_and_verify_contact_states_from_blend.
+        """
+        corrupted_payload = copy.deepcopy(self.saved_contact_records)
+        corrupted_payload["blend_asset_version"] = "Task7A1_INVALID_v999"
+
+        class MockScene:
+            def get(self, key: str, default=None):
+                if key == "task7a1_contact_state_records":
+                    return json.dumps(corrupted_payload)
+                return default
+
+        with self.assertRaises(ValueError) as ctx:
+            recover_and_verify_contact_states_from_blend(
+                MockScene(), expected_version="Task7A1_204f_v1"
+            )
+        self.assertIn("VERSION_MISMATCH", str(ctx.exception))
+
+    def test_15_readonly_verification_never_modified_artifacts(self) -> None:
         """Prove that running the test suite did not overwrite or touch any `.blend`, `.json`, or `.gif` artifact."""
         for p, (size_before, mtime_before) in self.stats_before.items():
             stat_now = os.stat(p)
