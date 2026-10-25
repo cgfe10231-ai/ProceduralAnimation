@@ -1,12 +1,11 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结）
+* **当前任务编号**：任务 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 含 C2-FINAL 验收纠偏）
 * **任务状态**：已完全验证 (Fully Verified & Automated Pass)；底座架构与资产正式冻结，进入只读维护状态；严格停止，不自动触发 Phase 7A 或 Phase 6H，等待人类指令。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **基准 Commit SHA**：`d0d73d476e2f2d3f3b629d767744ab12ba867bf8`
-  * **本任务核心 Commit SHA**：`edd72c21a9498e217c4ef1b1c7f0f925f2349fa2`
+  * **纠偏前基准 Commit SHA**：`56f38627563a425e1e765d961653a0fc89fa19c7`（核心代码收口 `edd72c21a9498e217c4ef1b1c7f0f925f2349fa2`）
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
@@ -14,71 +13,46 @@
 
 ## 1. 跨 AI 审阅证据入口与产物路径清单 (ChatGPT Review Portal)
 
-针对跨 AI 独立验收（无需用户人工截图、逐帧查找或文字描述），系统已全自动化生成自包含的机器数据、架构规范与视觉证据：
+针对跨 AI 独立验收（无需用户人工截图、逐帧查找或文字描述），系统已全自动化生成自包含的机器 AST/Blend 清单、架构冻结规范与视觉遥测证据：
 
 | 证据 / 文档类型 | 仓库相对路径 / 本地绝对路径 | 文件说明与审计关键点 | GitHub 同步状态 |
 | :--- | :--- | :--- | :---: |
-| **C2 最终验收报告** | [`docs/C2_FINAL_VALIDATION.md`](docs/C2_FINAL_VALIDATION.md) | 包含各工位通过结论、最大位置/姿态误差、目标发散指标与物理规律对照 | **已入库待推送** |
-| **全量工程资产审计** | [`docs/FOUNDATION_ASSET_AUDIT.md`](docs/FOUNDATION_ASSET_AUDIT.md) | 19 个 `.blend` 场景资产、52 个 Python 模块及全部规则体系完整审计 | **已入库待推送** |
-| **底座架构审计与协议** | [`docs/FOUNDATION_ARCHITECTURE_AUDIT.md`](docs/FOUNDATION_ARCHITECTURE_AUDIT.md) | 5 层架构分类、单帧 6 阶段协议与单刚体 CoM 动力学收敛设计 | **已入库待推送** |
-| **模块依赖拓扑矩阵** | [`docs/FOUNDATION_DEPENDENCY_MAP.md`](docs/FOUNDATION_DEPENDENCY_MAP.md) | 模块单向依赖拓扑与纯 Python 核心零 `bpy` 污染矩阵 | **已入库待推送** |
-| **状态读写所有权矩阵** | [`docs/FOUNDATION_STATE_OWNERSHIP.md`](docs/FOUNDATION_STATE_OWNERSHIP.md) | 时间、质心、骨骼、IK 与接触力唯一权威归属矩阵 | **已入库待推送** |
-| **演进路线图与命名规范**| [`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`](docs/ROADMAP_FOUNDATION_TO_FULLBODY.md) | Phase 7A 至 Phase 6H 严格演进路线与 `Task <Phase>-<Seq>` 命名规范 | **已入库待推送** |
-| **时空综合联系表** | [`docs/evidence/task6gd_c2a/contact_sheet.png`](docs/evidence/task6gd_c2a/contact_sheet.png) | 5 工位 $\times$ 6 视角时空矩阵图 ($2048 \times 1080$，含标准秒 F01, F25, F49, F73) | **已入库待推送** |
-| **全景连续运动 GIF** | [`docs/evidence/task6gd_c2a/dynamics_overview_anim.gif`](docs/evidence/task6gd_c2a/dynamics_overview_anim.gif) | 73 帧连续平滑时序运动动画 (24 FPS，delay 4cs)，直观观察 5 工位同时演化 | **已入库待推送** |
-| **逐帧机器遥测 JSON** | [`docs/evidence/task6gd_c2a/telemetry.json`](docs/evidence/task6gd_c2a/telemetry.json) | 892 KB，完整记录 5 工位 $\times$ 73 帧全部实际状态、目标参考与求值误差 | **已入库待推送** |
-| **代表性关键帧静帧** | [`docs/evidence/task6gd_c2a/keyframe_samples/`](docs/evidence/task6gd_c2a/keyframe_samples/) | 48 张高清关键帧截图（覆盖 F01, F37, F73 多视角采样） | **已入库待推送** |
-| **单一权威基准 Blend** | `output/dynamics_playground.blend` | 234 KB，包含 86 个物体，`PlaygroundOverviewCam` 激活，可在 Blender 5.1.1 中按空格键播放 | 本地持久化 |
+| **只读 AST 与 `.blend` 审计器** | [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py) | 自动扫描 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本与 18 个 `output/*.blend` 场景，并提供 `--verify-docs` 零幻觉路径/符号校验 | **已入库同步** |
+| **机器可读 AST & Blend JSON** | [`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/codebase_and_blend_audit.json) | 完整记录全库 Python AST（类、方法、函数、import 行号）与 18 个 `.blend` 场景的真实元数据 | **已入库同步** |
+| **Blender 5.1.1 开档核查日志** | [`docs/evidence/task6gd_c2a/blend_inspection_log.txt`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/blend_inspection_log.txt) | 18 个 `output/*.blend` 文件大小、帧范围、物体数、骨骼数、Action 与 F-Curve 实测日志 | **已入库同步** |
+| **C2 最终验收与纠偏报告** | [`docs/C2_FINAL_VALIDATION.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/C2_FINAL_VALIDATION.md) | 逐项交代 6 大审查问题的纠偏事实、AST/Blend 机器核验与分层回归结果 | **已入库同步** |
+| **全量工程资产审计** | [`docs/FOUNDATION_ASSET_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/FOUNDATION_ASSET_AUDIT.md) | 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本及 18 个 `.blend` 场景真实清单（准确记录 `unified_motion_integration.blend` 为 462 帧、298,537 字节、19 骨骼、12 Action、180 F-Curves） | **已入库同步** |
+| **底座架构审计与双管线边界** | [`docs/FOUNDATION_ARCHITECTURE_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/FOUNDATION_ARCHITECTURE_AUDIT.md) | 完整恢复 `MotionPlanner -> KinematicBridgeExecutor.execute_frame -> WholeBodyController.execute_frame -> Rig/IK/FK -> Telemetry -> MotionState` 生产管线（Pipeline A）与 6G-D 质心动力学管线（Pipeline B）并存现状 | **已入库同步** |
+| **模块依赖拓扑与行号依据** | [`docs/FOUNDATION_DEPENDENCY_MAP.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/FOUNDATION_DEPENDENCY_MAP.md) | 44 条真实依赖边（精确到调用文件、被调文件、函数/类名、import 行号与调用行号），未来架构严格隔离在 `Future Architecture` 章节 | **已入库同步** |
+| **状态读写所有权矩阵** | [`docs/FOUNDATION_STATE_OWNERSHIP.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/FOUNDATION_STATE_OWNERSHIP.md) | 严格区分 (1) 当前已实现 19 骨骼 WBC 管线、(2) 当前已实现 6G-D 质心动力学管线、(3) 尚未完成的 7A/7C 汇流边界 | **已入库同步** |
+| **权威演进路线图 (7A–6H)** | [`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ROADMAP_FOUNDATION_TO_FULLBODY.md) | 完整恢复 **7A**（19 骨骼角色进入 `DynamicsPlayground` 下肢连续通行）$\to$ **7B**（上肢独立运动与末端验证）$\to$ **7C**（`KinematicBridge`、`WBC`、`CoM` 与动力学状态汇流）$\to$ **7D** $\to$ **7E** $\to$ **7F** $\to$ **6H** | **已入库同步** |
+| **时空综合联系表** | [`docs/evidence/task6gd_c2a/contact_sheet.png`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/contact_sheet.png) | 5 工位 $\times$ 6 视角时空矩阵图 ($2048 \times 1080$，含标准秒 F01, F25, F49, F73) | **已入库同步** |
+| **全景连续运动 GIF** | [`docs/evidence/task6gd_c2a/dynamics_overview_anim.gif`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/dynamics_overview_anim.gif) | 73 帧连续平滑时序运动动画 (24 FPS，delay 4cs) | **已入库同步** |
+| **逐帧机器遥测 JSON** | [`docs/evidence/task6gd_c2a/telemetry.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/telemetry.json) | 892 KB，完整记录 5 工位 $\times$ 73 帧全部实际状态、目标参考与求值误差 | **已入库同步** |
+| **单一权威基准 Blend** | `output/dynamics_playground.blend` | 234,436 字节，73 帧，101 个物体，0 骨骼，`PlaygroundOverviewCam` 激活 | 本地持久化 (`.gitignore`) |
+| **统一运动整合 Blend** | `output/unified_motion_integration.blend` | 298,537 字节，462 帧，27 个物体，`CharacterArmature` (19 骨骼)，12 个 Action，180 条 F-Curve | 本地持久化 (`.gitignore`) |
 
 ---
 
-## 2. 73 状态时空标准化采样与物理验证事实
+## 2. 自动化一致性测试与分层回归结果
 
-时间轴共 73 帧（24 FPS，步长 $\Delta t = 1/24\text{ s}$，运动总时长 3.0 秒）。关键运动阶段采样帧：
-- **F01** ($t = 0.00\text{s}$，状态 $S_0$)：初始静态/起点边界；
-- **F13** ($t = 0.50\text{s}$，状态 $S_{12}$)：0.5 秒半秒节点，下落加速瞬态，水平推力启动；
-- **F25** ($t = 1.00\text{s}$，状态 $S_{24}$)：**1.0 秒整数秒节点**，自由落体位移 $\Delta z = 4.905\text{ m}$，打滑工位冰面滑移开始脱幅；
-- **F37** ($t = 1.50\text{s}$，状态 $S_{36}$)：半程 1.5 秒节点，落体触地临界，偏心滚转力矩稳定积累；
-- **F49** ($t = 2.00\text{s}$，状态 $S_{48}$)：**2.0 秒整数秒节点**，Station 3 达到巡航状态，Station 4 滑移加剧；
-- **F61** ($t = 2.50\text{s}$，状态 $S_{60}$)：2.5 秒节点，躯干倾角超过 $60^\circ$；
-- **F73** ($t = 3.00\text{s}$，状态 $S_{72}$)：**3.0 秒终态节点**，全工位演化终点。
-
-| 工位编号 | 物理工位名称 | 关键采样帧与视角 | 物理保真度与防冒充判定事实 |
-| :--- | :--- | :--- | :--- |
-| **Station 1** | 静态支撑平衡 | F01, F25, F49, F73<br>(Side, Front, Top) | 双足接触反力严格等于重力（$F_z = 686.7\text{ N}$），力矩 $\tau = 0$；质心下陷量实测为 `0.00e+00 m`；目标虚影完全重叠。 |
-| **Station 2** | 重力自由落体 | F01, F25, F37, F73<br>(Side, Front, Top) | 空中悬停需求判定不可行，接触力严格为零；质心在 $-9.81\text{ m/s}^2$ 弹道自然加速下落；物理实质为高空弹道，不含触地碰撞。 |
-| **Station 3** | 摩擦水平加速 | F01, F25, F49, F73<br>(Side, Front, Top) | 库仑摩擦锥内牵引力加速推进，质心平移推进；反力箭头前倾角与动力学合力矢量完全一致；位置跟踪误差 $< 0.01\text{ m}$。 |
-| **Station 4** | 摩擦不足滑移 | F01, F25, F49, F73<br>(Side, Front, Top) | $\mu = 0.08$ 冰面静摩擦截断水平力至 $\le 55\text{ N}$；半透明目标虚影前冲，实际实体严重打滑滞后，**发散距离达 $5.30\text{ m}$**，绝无目标冒充。 |
-| **Station 5** | 偏心接触滚转 | F01, F25, F49, F73<br>(Side, Front, Top) | 偏心单足（$r_y = -0.3\text{ m}$）产生滚转力矩 $\tau_x \approx -206\text{ N}\cdot\text{m}$，驱动身体持续翻滚；品红色角动量箭头严格绑定 $L_x$ 动态伸长；姿态发散量达 $1.55\text{ rad}$ ($> 88^\circ$)。 |
-
----
-
-## 3. 自动化一致性测试与分层回归结果
-
+* **文档路径与符号零幻觉审计 (`tests/audit_c2_final_inspector.py --verify-docs`)**：**PASS (Exit Code 0)**
+  * 扫描全部 12 份架构冻结与状态同步文档，确认引用的所有 `src/*.py` 与 `tests/*.py` 100% 物理存在于磁盘，且零不存在模块或虚构 API。
 * **专职一致性套件 (`tests/verify_task6gd_visual_telemetry.py`)**：**5/5 PASS**
-  1. `test_01_telemetry_json_structure_and_integrity`：73 帧时序单调性与数据完整性通过；
-  2. `test_02_blender_object_physics_coherence`：
-     - **最大位置误差**：`0.00e+00 m`（门禁要求 $< 10^{-5}\text{ m}$）；
-     - **最大姿态误差**：`3.50e-07 rad`（门禁要求 $< 10^{-5}\text{ rad}$）；
-  3. `test_03_force_and_angular_momentum_arrows_fidelity`：法向支撑反力、零落体力、摩擦截断力与角动量增长通过；
-  4. `test_04_target_spoofing_detection_and_anti_tampering`：打滑与滚转物理发散硬验证通过；
-  5. `test_05_visual_evidence_artifacts_and_contact_sheet_exist`：联系表、GIF、报告与样本静帧存在且非空通过。
+  * 最大位置误差：`0.00e+00 m`（门禁 $< 10^{-5}\text{ m}$）；最大姿态误差：`3.50e-07 rad`（门禁 $< 10^{-5}\text{ rad}$）；
+  * 反冒充发散实测：Station 4 打滑发散 $\Delta p = 5.30\text{ m}$；Station 5 滚转发散 $\Delta q = 1.55\text{ rad}$ ($> 88^\circ$)。
 * **分级实测回归总结**：
-  * **`visual_evidence_telemetry`**：100% PASS (0.34s)；
-  * **`playground_dynamics_states`**：100% PASS (3.19s)；
-  * **`dynamics_playground_blend`**：14 个区域网格与 21 个法向指示箭头 100% PASS (1.53s)；
-  * **`quick` Tier**：9/9 全绿通过 (9.66s)；
-  * **`physics` Tier**：16/16 全绿通过 (72.07s)；
-  * **历史动作**：StartStopWalkAction 与 RunAction 100% 零退化通过。
+  * **`quick` Tier**：9/9 全绿通过 (Exit Code 0)；
+  * **`physics` Tier**：16/16 全绿通过 (Exit Code 0)；
+  * **历史动作回归**：`verify_r3b2_walk_action.py` (25/25 PASS) 与 `verify_r3b2_run_action.py` (25/25 PASS) 100% 零退化通过。
 
 ---
 
-## 4. 架构冻结指令与严格禁止事项
+## 3. 架构冻结指令与严格禁止事项
 
 * **架构冻结状态**：**Task 6G-D 全面收口冻结，进入只读维护状态**。
-* **下一步**：**严格停止，等待人类指令；后续开发任务必须遵循 `Task <Phase>-<Seq>` 统一命名规范**。
+* **下一步**：**严格停止，等待人类与 ChatGPT 复核；暂停且绝不提前进入 Phase 7A 或 Phase 6H**。
 * **严格禁止事项**：
   * **严禁自动创建 C2-B、C3、6G-E 等私自衍生分支**；
   * **严禁自动进入 Task 7A 或 Task 6H**；
-  * **严禁篡改任何历史动作控制器或生产步态算法**；
-  * **严禁在 `src/motion/` 核心动力学中引入 `bpy` 或 `mathutils`**。
+  * **严禁篡改任何历史动作控制器、动力学积分器、接触力求解器或生产步态算法**。

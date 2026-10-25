@@ -1,38 +1,38 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-25  
-> **当前阶段**：任务 6G-D-C2-FINAL 已完全验证通过并正式冻结（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结；完成 73 状态 Frame 1..73 时空标准化，发布 5 份权威架构冻结规范与 C2 综合验证报告；审计确认 19 个 .blend 场景与 19 骨骼标准拓扑完好；Blender 求值位置误差 0.00e+00m，姿态误差 3.50e-07 rad；反冒充发散硬核通过；quick 9/9, physics 16/16, 历史动作 100% 零退化；6G-D 正式冻结并进入只读维护，严禁自动衍生 C2-B/C3/6G-E，严格停止等待人类指令）  
+> **当前阶段**：任务 6G-D-C2-FINAL 已完成验收纠偏、全部验证通过并正式冻结（完成 73 状态 Frame 1..73 时空标准化；通过只读机器审计脚本 `tests/audit_c2_final_inspector.py` 导出 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本及 18 个 `output/*.blend` 场景的真实 AST 与 Blender 5.1.1 资产清单；完整修正并交付 6 份架构冻结与验收文档，恢复 `MotionPlanner -> KinematicBridgeExecutor -> WholeBodyController` 真实生产运动学管线、精确到源码行号的依赖拓扑、严格区分当前实现与未来汇流的状态所有权矩阵、462 帧 `unified_motion_integration.blend` 真实场景参数，以及 7A–7F 与 6H 权威演进路线图；`quick` 9/9, `physics` 16/16, `--verify-docs` 全绿通过；6G-D 正式冻结并进入只读维护，严格停止等待人类指令）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 (Task 6G-D-C2-FINAL)**：
+* **任务 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结（含 C2-FINAL 验收纠偏）**：
+  * **机器可验证全库 AST 与 `.blend` 资产审计 (`tests/audit_c2_final_inspector.py`)**：
+    * 编写并在 Blender 5.1.1 无头模式下执行只读审计脚本 [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py)，导出 [`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/codebase_and_blend_audit.json) 与 [`docs/evidence/task6gd_c2a/blend_inspection_log.txt`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/blend_inspection_log.txt)；
+    * 实测清点：51 个 `src/` Python 模块、42 个 `tests/` 测试脚本、19 个根目录 `run_*.py` 脚本（均 100% 纳入 Git 跟踪），以及 `output/` 下 18 个 `.blend` 场景文件（受 `.gitignore` 规则保护在本地持久化）；
+    * 核实 `output/unified_motion_integration.blend` 为 462 帧连续运动整合资产（298,537 字节，`frame_start=1..frame_end=462`，27 个物体，`CharacterArmature` 19 骨骼，12 个 Action，180 条 F-Curve，80,628 个关键帧）；
+    * 核实 `output/dynamics_playground.blend` 为 73 帧动力学训练场与代理遥测资产（234,436 字节，`frame_start=1..frame_end=73`，101 个物体，0 骨骼，30 个 Action，182 条 F-Curve）。
   * **时空标准化与 73 状态闭环收口 (`src/scene/dynamics_visualizer.py`, `src/scene/dynamics_visual_evidence.py`)**：
-    * 72 步辛动力学积分严格映射为 73 个物理状态（$S_0$ 至 $S_{72}$），对准 Blender 时间轴 Frame 1 至 Frame 73（$F = k + 1$）；
-    * 采样时刻标准化为 $t = 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0\text{s}$（F01, F13, F25, F37, F49, F61, F73），与标准秒级网格完美对齐；
-    * 编码输出 73 帧连续全局运动动画 GIF (`dynamics_overview_anim.gif`，24 FPS，delay 4cs)；
-    * 重新渲染拼接更新综合联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](docs/evidence/task6gd_c2a/contact_sheet.png)（含标准秒标记 F01, F25, F49, F73）。
-  * **物理模型与精度边界正式划定**：
-    * 正式确立单刚体集总 CoM 动力学模型（$m=70\text{kg}, I=\text{diag}(15,15,5)$）为底座阶段核心，避免过早陷入铰接多体力矩爆炸；
-    * 严格界定 Station 2 物理实质为空中弹道自由落体（验证无支撑不可行性与零接触力输出），不包含触地碰撞回弹；
-    * 严格界定 Station 3/4 为理想连续足端位移，不代表实际迈步交替冲击。
-  * **全量工程资产、骨骼拓扑与规范体系地毯式审计**：
-    * 审计全库 19 个 `.blend` 场景资产、52 个 Python 模块及全部规则体系；
-    * 确认全系统骨骼层阶以 19 骨骼标准人形拓扑为单一 SSOT；
-    * 确立 `output/dynamics_playground.blend` 为动力学实测单一权威场景。
-  * **发布五大权威架构冻结规范与综合验证报告**：
-    * `docs/FOUNDATION_ASSET_AUDIT.md` (全量工程资产与规范审计)
-    * `docs/FOUNDATION_ARCHITECTURE_AUDIT.md` (5 层架构分类、单帧 6 阶段协议与收敛设计)
-    * `docs/FOUNDATION_DEPENDENCY_MAP.md` (模块单向依赖拓扑与零 bpy 污染矩阵)
-    * `docs/FOUNDATION_STATE_OWNERSHIP.md` (状态唯一权威归属矩阵)
-    * `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md` (Phase 7A 至 Phase 6H 演进路线与 Task <Phase>-<Seq> 命名规范)
-    * `docs/C2_FINAL_VALIDATION.md` (Task 6G-D-C2-FINAL 综合验收报告)
+    * 72 步离散积分严格映射为 73 个物理状态（$S_0$ 至 $S_{72}$），对准 Blender 时间轴 Frame 1 至 Frame 73（$F = k + 1$）；
+    * 采样时刻标准化为 $t = 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0\text{s}$（F01, F13, F25, F37, F49, F61, F73）；
+    * 编码输出 73 帧连续全局运动动画 GIF (`dynamics_overview_anim.gif`，24 FPS，delay 4cs) 及综合联系表 [`docs/evidence/task6gd_c2a/contact_sheet.png`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/contact_sheet.png)。
+  * **物理模型与双管线边界正式划定**：
+    * 完整恢复真实生产运动学管线（Pipeline A）：`MotionPlanner` / `MotionAction` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` $\to$ 既有 Blender Rig / IK / FK $\to$ 只读物理遥测（`rigid_link.py`, `body_kinematics.py`, `body_inertia.py`, `contact_model.py`）$\to$ `MotionState`；
+    * 明确 6G-D 质心动力学管线（Pipeline B：`contact_dynamics.py`, `contact_force_solver.py`, `forward_dynamics.py`, `closed_loop_dynamics.py`, `dynamics_visualizer.py`）当前驱动 `output/dynamics_playground.blend` 中的刚体代理对象，尚未与 19 骨骼 `WholeBodyController` 管线汇流（汇流定位于未来 **Phase 7C**）。
+  * **发布并机器校验五大权威架构冻结规范与综合验证报告**：
+    * `docs/FOUNDATION_ASSET_AUDIT.md` (全量 51 模块、42 测试、19 入口脚本与 18 个 `.blend` 场景机器核查清单)
+    * `docs/FOUNDATION_ARCHITECTURE_AUDIT.md` (Pipeline A 19 骨骼生产管线与 Pipeline B 6G-D 质心动力学管线架构及数学闭环边界)
+    * `docs/FOUNDATION_DEPENDENCY_MAP.md` (含真实调用文件、被调文件、精确函数/类名与源码行号的 44 条依赖边及独立 `Future Architecture` 章节)
+    * `docs/FOUNDATION_STATE_OWNERSHIP.md` (严格区分当前实际实现与未完成汇流边界的状态所有权矩阵)
+    * `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md` (权威 7A $\to$ 7B $\to$ 7C $\to$ 7D $\to$ 7E $\to$ 7F $\to$ 6H 演进路线图)
+    * `docs/C2_FINAL_VALIDATION.md` (Task 6G-D-C2-FINAL 综合验收与纠偏报告)
   * **机器遥测硬断言与分级回归全绿**：
+    * `tests/audit_c2_final_inspector.py --verify-docs`：0 缺失路径、0 幻觉符号（Exit Code 0）；
     * Blender 求值位置误差实测 `0.00e+00 m`（门禁 $< 10^{-5}\text{ m}$）；姿态误差实测 `3.50e-07 rad`（门禁 $< 10^{-5}\text{ rad}$）；
     * S4 滑移发散 $\Delta p = 5.30\text{ m}$；S5 滚转发散 $\Delta q = 1.55\text{ rad}$ ($88.8^\circ$)，绝无目标冒充；
-    * 自动化回归：`quick` (9/9 PASS, 9.66s)，`physics` (16/16 PASS, 72.07s)，历史成熟步态 100% 零退化。
+    * 自动化回归：`quick` (9/9 PASS)，`physics` (16/16 PASS)，历史成熟步态 100% 零退化。
   * **架构正式冻结承诺**：
     * 6G-D 正式冻结并进入维护模式，严禁自动创建 C2-B/C3/6G-E 分支；
     * 严格停止，不自动触发 Phase 7A 或 Phase 6H。
@@ -552,11 +552,13 @@
 * **任务 5C / 5B / 5A / 4D / 4C / 4B / 4A / 3**：已验证。
 
 ### [已实现]
+* 只读 AST 与 Blender 资产机器审计器：`tests/audit_c2_final_inspector.py`、`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`、`docs/evidence/task6gd_c2a/blend_inspection_log.txt`
+* 动力学训练场自动视觉证据与逐帧遥测系统：`src/scene/dynamics_visualizer.py`、`src/scene/dynamics_visual_evidence.py`、`run_generate_visual_evidence.py`、`tests/verify_task6gd_playground_dynamics.py`、`tests/verify_task6gd_visual_telemetry.py`
 * 多帧动力学闭环控制与状态反馈系统：`src/motion/closed_loop_dynamics.py`、`tests/verify_task6gd_closed_loop_dynamics.py`
 * 6-DOF 刚体前向动力学单步积分内核与不可变状态机：`src/motion/forward_dynamics.py`、`tests/verify_task6gd_forward_dynamics.py`
 * 多接触力优化求解与分配器（SLSQP/SPG 双引擎）：`src/motion/contact_force_solver.py`、`tests/verify_task6gd_contact_force_solver.py`
 * 接触力学、冲量与动量时间步长系统：`src/motion/contact_dynamics.py`、`tests/verify_task6gd_contact_dynamics.py`
-* 统一环境查询接口与动力学训练场单一 SSOT：`src/scene/environment_query.py`、`output/dynamics_playground.blend`、`tests/verify_task6gd_environment_query.py`
+* 统一环境查询接口与动力学训练场单一 SSOT：`src/scene/environment_query.py`、`output/dynamics_playground.blend`、`tests/verify_task6gd_dynamics_playground.py`、`tests/verify_task6gd_playground_blend.py`
 * 统一测试管理与运行接口：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
 * 最小兼容桥接层与单帧 6 阶段流水线执行器：`src/motion/kinematic_bridge.py`、`tests/verify_task6gc_r3b1_bridge.py`
 * 多部位接触几何、约束与支撑状态系统：`src/motion/contact_model.py`、`run_contact_model_prototype.py`、`tests/verify_task6gc_contact_model.py`、`output/contact_model_debug.blend`
@@ -578,15 +580,17 @@
 * `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* 连续步态动力学平衡（Task 6G-D-C2：步频、摆动腿着地点调整与双足动态行走的动力学耦合）。
-* 障碍物连续跑酷动作类（如 `VaultTouchAction`）与射线几何避障。
-* 高难度特技动作：急转弯（Sharp Turn）、跑跳（Running Jump）、翻滚（Roll）、滑铲（Slide）。
+* **Phase 7A**：真实 19 骨骼角色（`src/character/builder.py` + `src/rig/builder.py`）进入 `DynamicsPlayground`（`output/dynamics_playground.blend`），完成基础下肢连续通行（落脚点规划作为 7A 下肢移动的内部能力）。
+* **Phase 7B**：上肢独立运动与末端目标验证。
+* **Phase 7C**：既有 `KinematicBridge`（`src/motion/kinematic_bridge.py`）、`WholeBodyController`（`src/motion/whole_body_controller.py`）、`CoM`（`src/motion/rigid_link.py`）与整体动力学状态（`src/motion/closed_loop_dynamics.py` / `src/motion/forward_dynamics.py`）汇流。
+* **Phase 7D**：多关节动态协同。
+* **Phase 7E**：既有 IK/FK 求解器的动态协同与接触切换。
+* **Phase 7F**：全身移动、抓握、支撑、释放与连续训练场通行。
+* **Phase 6H**：动态平衡与主动补偿。
 
 ### [已知缺陷与遗留说明]
-1. **多关节身体动力学闭环与骨骼姿态映射**：Task 6G-D-C1-B 实现了全身等效刚体质心-姿态的多帧动力学闭环协调，但全身体连杆多关节动力学平衡闭环与历史步态动作迁移仍属于后续阶段（Task 6G-D-C2 / Task 7）。
-2. **架构断裂点 2（接触模型脱离接地锁定）**：`ContactModel` 接触状态机在桥接层中已可作为 Phase 5 遥测提取，但与 `src/rig/foot_contact.py` 物理层接地锁定的双向动态映射仍待后续深化。
-3. **架构断裂点 3（障碍物跑酷动作缺失）**：系统中缺乏针对障碍物交互的连续 `MotionAction` 实现，需要专门的跑酷动作生成器。
-4. 终点附近场景存在圆柱体块，当前原型聚焦于纯平地运动学，未接入射线几何避障。
+1. **双管线尚未汇流（计划于 Phase 7A / 7C 解决）**：当前 `output/dynamics_playground.blend` 仅包含 14 区环境网格与 6G-D 刚体代理可视化（`Playground_Dynamics_Visualization`，0 骨骼），尚未放入 19 骨骼 `CharacterArmature`（定位于 **Phase 7A**），且 6G-D 质心动力学尚未与 `KinematicBridgeExecutor` + `WholeBodyController` 闭环汇流（定位于 **Phase 7C**）。
+2. **Station 2 / 3 / 4 模型边界**：Station 2 为空中自由落体弹道（不含触地回弹碰撞）；Station 3 与 4 在训练场代理阶段采用连续移动接触点（待 7A/7C 替换为真实 19 骨骼双足交替落脚）。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
@@ -594,8 +598,5 @@
 ---
 
 ## 2. 下一步建议
-进入 **Task 6G-D-C2（连续步态动力学平衡）或按规划进行 Task 6G-D 后续阶段**：
-1. 保持历史步态曲线、速度曲线和步态排期 100% 零退化；
-2. 基于已验证的 `ClosedLoopDynamicsCoordinator` 进行连续步态下接触点与质心轨迹的闭环调节；
-3. 执行全量分层回归，确保 `quick` 与 `physics` 持续全绿；
-4. 严格遵守架构门禁，严禁擅自提前进入 Task 6H。
+* **严格停止，等待人类与 ChatGPT 复核 Task 6G-D-C2-FINAL 验收纠偏结果**；
+* **暂停且严禁提前进入 Phase 7A 或 Phase 6H**。

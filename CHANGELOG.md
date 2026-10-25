@@ -3,7 +3,13 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
-## [2026-10-25] 任务 6G-D-C2-FINAL：6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结
+## [2026-10-25] 任务 6G-D-C2-FINAL：6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结（含 C2-FINAL 验收纠偏）
+
+### 机器可验证全库 AST 与 Blender `.blend` 资产审计 (`tests/audit_c2_final_inspector.py`, `docs/evidence/task6gd_c2a/`)
+* **只读 AST 与 `.blend` 清单提取**：
+  * 新增 [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py)，在 Blender 5.1.1 无头模式下只读扫描全库 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本及 18 个 `output/*.blend` 场景，生成 [`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/codebase_and_blend_audit.json) 与 [`docs/evidence/task6gd_c2a/blend_inspection_log.txt`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/blend_inspection_log.txt)；
+  * 核实 `output/unified_motion_integration.blend` 为 462 帧连续运动整合资产（298,537 字节，`1..462` 帧，27 个物体，`CharacterArmature` 19 骨骼，12 个 Action，180 条 F-Curve，80,628 个关键帧）；
+  * 核实 `output/dynamics_playground.blend` 为 73 帧训练场与代理遥测资产（234,436 字节，`1..73` 帧，101 个物体，0 骨骼，30 个 Action，182 条 F-Curve）。
 
 ### 时空标准化与闭环收口 (`src/scene/dynamics_visualizer.py`, `src/scene/dynamics_visual_evidence.py`, `run_generate_visual_evidence.py`)
 * **73 状态（Frame 1..73）时间线标准映射**：
@@ -14,14 +20,14 @@
 * **场景相机状态一致性保证**：
   * 在无头渲染完成后统一将 `PlaygroundOverviewCam` 恢复为场景主相机，保证 `output/dynamics_playground.blend` 随手打开即为全局全景。
 
-### 架构审计与规范冻结文档交付 (`docs/`)
-* **发布 5 份权威架构冻结规范与 1 份综合验证报告**：
-  1. [`docs/FOUNDATION_ASSET_AUDIT.md`](docs/FOUNDATION_ASSET_AUDIT.md)：全库 19 个 `.blend` 资产、52 个 Python 模块与规范体系审计；
-  2. [`docs/FOUNDATION_ARCHITECTURE_AUDIT.md`](docs/FOUNDATION_ARCHITECTURE_AUDIT.md)：5 层架构分类、单帧 6 阶段协议与单刚体 CoM 动力学收敛设计；
-  3. [`docs/FOUNDATION_DEPENDENCY_MAP.md`](docs/FOUNDATION_DEPENDENCY_MAP.md)：模块单向依赖拓扑与纯 Python 核心零 `bpy` 污染矩阵；
-  4. [`docs/FOUNDATION_STATE_OWNERSHIP.md`](docs/FOUNDATION_STATE_OWNERSHIP.md)：时间、质心、骨骼、IK 与接触力唯一权威归属矩阵；
-  5. [`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`](docs/ROADMAP_FOUNDATION_TO_FULLBODY.md)：Phase 7A 至 Phase 6H 严格演进路线与 `Task <Phase>-<Seq>` 命名规范；
-  6. [`docs/C2_FINAL_VALIDATION.md`](docs/C2_FINAL_VALIDATION.md)：Task 6G-D-C2-FINAL 综合验收报告。
+### 架构审计与规范冻结文档交付与纠偏 (`docs/`)
+* **发布并纠偏 5 份权威架构冻结规范与 1 份综合验证报告（通过 `--verify-docs` 零幻觉路径/符号校验）**：
+  1. [`docs/FOUNDATION_ASSET_AUDIT.md`](docs/FOUNDATION_ASSET_AUDIT.md)：全库 51 个 `src/` 模块、42 个测试、19 个入口脚本与 18 个 `.blend` 资产机器核查清单；
+  2. [`docs/FOUNDATION_ARCHITECTURE_AUDIT.md`](docs/FOUNDATION_ARCHITECTURE_AUDIT.md)：完整恢复 `MotionPlanner -> KinematicBridgeExecutor.execute_frame -> WholeBodyController.execute_frame -> Rig/IK/FK -> Telemetry -> MotionState` 真实生产运动学管线（Pipeline A）与 6G-D 质心动力学管线（Pipeline B）并存现状及数学闭环边界；
+  3. [`docs/FOUNDATION_DEPENDENCY_MAP.md`](docs/FOUNDATION_DEPENDENCY_MAP.md)：含真实调用文件、被调文件、函数/类名与源码行号的 44 条 AST 依赖边，以及独立隔离的 `Future Architecture` 章节；
+  4. [`docs/FOUNDATION_STATE_OWNERSHIP.md`](docs/FOUNDATION_STATE_OWNERSHIP.md)：严格区分当前已实现状态所有权与未完成汇流边界（Phase 7A / 7C）；
+  5. [`docs/ROADMAP_FOUNDATION_TO_FULLBODY.md`](docs/ROADMAP_FOUNDATION_TO_FULLBODY.md)：恢复权威演进路线图（**7A** 真实 19 骨骼角色进入 `DynamicsPlayground` 完成基础下肢连续通行 $\to$ **7B** 上肢独立运动与末端目标验证 $\to$ **7C** `KinematicBridge`、`WholeBodyController`、`CoM` 与整体动力学状态汇流 $\to$ **7D** 多关节动态协同 $\to$ **7E** 既有 IK/FK 求解器动态协同与接触切换 $\to$ **7F** 全身移动、抓握、支撑、释放与连续训练场通行 $\to$ **6H** 动态平衡与主动补偿）；
+  6. [`docs/C2_FINAL_VALIDATION.md`](docs/C2_FINAL_VALIDATION.md)：Task 6G-D-C2-FINAL 综合验收与纠偏报告。
 
 ### 测试用例更新与分级回归
 * **更新测试套件**：

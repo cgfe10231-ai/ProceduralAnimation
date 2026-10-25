@@ -198,7 +198,15 @@ flowchart TD
   - `src/motion/body_inertia.py`：事后惯性张量与全身体角动量分析器
   - `src/motion/contact_model.py`：事后多部位接触几何与支撑分类器
 * **7.3 统一桥接层已迁移历史动作 (Migrated Historical Actions via KinematicBridgeExecutor)**：
-  - `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 已 100% 接入 `KinematicBridgeExecutor` 与 `WholeBodyController`，经独立回归套件及统一 462 帧连续动画管线验证通过。
+  - `StartStopWalkAction`、`RunAction`、`SprintStartAction`、`SprintBrakeAction` 已 100% 接入 `KinematicBridgeExecutor` 与 `WholeBodyController`，经独立回归套件及统一 462 帧连续动画管线（`output/unified_motion_integration.blend`）验证通过。
+* **7.4 Task 6G-D 纯 Python 质心数值动力学与训练场代理遥测模块 (Task 6G-D Centroidal Dynamics & Playground Proxy Modules)**：
+  - `src/scene/environment_query.py`：`EnvironmentQuery`, `DynamicsEnvironmentQuery`, `create_standard_dynamics_playground_query`
+  - `src/motion/contact_dynamics.py`：`SingleContactDynamics`, `MultiContactDynamics`, `FrictionConstraintEvaluation`, `create_contact_dynamics_from_environment`
+  - `src/motion/contact_force_solver.py`：`ContactConstraintSpec`, `ContactWrenchTarget`, `solve_contact_forces`, `project_to_friction_cone`
+  - `src/motion/forward_dynamics.py`：`ForwardDynamicsState`, `ForwardDynamicsStepInput`, `integrate_forward_dynamics_single_step`
+  - `src/motion/closed_loop_dynamics.py`：`ClosedLoopDynamicsCoordinator`, `step_closed_loop_dynamics`, `compute_commanded_accelerations`
+  - `src/scene/dynamics_visualizer.py`：`run_dynamics_scenarios`, `inject_dynamics_visualization`（驱动 `output/dynamics_playground.blend` 中 Frame 1..73 的刚体代理可视化，尚未与 19 骨骼 `WholeBodyController` 管线汇流；二者汇流定位于未来 **Phase 7C**）
+  - `src/scene/dynamics_visual_evidence.py`：`collect_frame_telemetry`, `render_keyframe_images`, `build_contact_sheet_image`, `encode_animated_gif`
 
 ---
 
@@ -210,7 +218,7 @@ flowchart TD
 2. **清晰调用链与被调用者**：必须指明真实调用者（Caller）与被调用者（Callee），严禁创建无上游调用的孤立执行分支。
 3. **输入输出与状态所有权**：必须明确声明输入参数、输出结构体及对 Blender 骨骼/控制器物体的独占或共享读写权限。
 4. **强制复用已有模块**：严禁重复实现已存在的运动学、物理计算或控制能力。
-5. **历史回归基线锁定**：每次迭代必须无条件运行历史核心测试套件（Task 5C、6B、6C、6D、6F-D、6G-A、6G-B、6G-C），确保零退化。
+5. **历史回归基线锁定**：每次迭代必须无条件运行历史核心测试套件（Task 5C、6B、6C、6D、6F-D、6G-A、6G-B、6G-C、6G-D），确保零退化。
 6. **严禁独立演示管线冒充生产能力**：禁止编写独立的 Blender 脚本在固定时间轴上手工摆拍姿态，必须通过标准动作生成器与统一执行协议生成连续时间轴动画。
 7. **严禁为人为迎合数值阈值破坏姿态自然度**：禁止通过人为强制修改骨骼位置或隐藏误差来通过测试断言。
 8. **架构偏差事前审批制度**：若在开发中发现确有必要偏离本架构蓝图，必须先暂停并向用户详细记录架构变更原因及影响，严禁悄悄绕开。
@@ -219,6 +227,6 @@ flowchart TD
 
 ## 9. 本次同步依据的 Git Commit SHA
 
-* **底层基准 Commit**：`d76f035`
-* **当前任务**：Task 6G-C-R3B-2（历史动作无损迁移至统一桥接层与全身控制架构）
+* **底层基准 Commit**：`56f38627563a425e1e765d961653a0fc89fa19c7`
+* **当前任务**：Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结 — 验收纠偏）
 * **工作树状态**：干净、严格受版本控制。

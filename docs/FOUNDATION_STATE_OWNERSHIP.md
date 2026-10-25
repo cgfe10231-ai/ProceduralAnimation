@@ -1,42 +1,53 @@
-# FOUNDATION_STATE_OWNERSHIP: 状态权威归属与读写所有权矩阵
+# Foundation State Ownership & Single-Writer Contracts (Task 6G-D-C2-FINAL)
 
-* **文档版本**：1.0.0 (Architecture Freeze Edition)
-* **对应任务**：Task 6G-D-C2-FINAL
-* **基准 Commit**：`d0d73d476e2f2d3f3b629d767744ab12ba867bf8`
-* **适用标准**：ACG SSOT ([`docs/ARCHITECTURE_CHANGE_GATE.md`](ARCHITECTURE_CHANGE_GATE.md))
-* **最后审计日期**：2026-10-25
+> **Document Purpose**: Establishes the strict Single-Writer / Multi-Reader ownership boundaries across all state structures and Blender scene objects in the repository.  
+> **Anti-Drift Rule**: This document strictly separates **(1) Current Actual Implementation on Disk** from **(2) Unfinished Confluence & Planned Future Responsibilities**. No unimplemented classes, methods, or conversion interfaces are described as existing.
 
 ---
 
-## 一、状态归属与读写所有权矩阵 (State Ownership Matrix)
+## 1. Current Actual Implementation — Pipeline A: 19-Bone Kinematic & WBC Pipeline
 
-在多层级程序化运动生成系统中，各物理量、时间线和骨骼变换必须具备明确的**唯一写入权威 (Single Writer SSOT)**。严禁多模块写竞争或模糊所有权：
+In the current production 19-bone character pipeline (`output/unified_motion_integration.blend` and all `MotionPlanner` / `MotionAction` workflows), state ownership is governed by the 6-phase single-frame execution protocol in [`src/motion/kinematic_bridge.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py):
 
-| 物理量 / 状态范畴 | 权威数据持有者 (State Owner / SSOT) | 唯一写入权威 (Writer) | 允许只读方 (Readers) | 空间 / 坐标系与物理单位 |
+| State / Blender Object | Real Type & Module Location | Exclusive Writer (Single Owner) | Authorized Readers | Mutation Contract & Prohibitions |
 | :--- | :--- | :--- | :--- | :--- |
-| **仿真时间与步长**<br>($t_k, \Delta t, F$) | `ClosedLoopDynamicsCoordinator`<br>/ `Scene.frame_current` | 时间调度循环 (Time Stepper) | 全系统所有模块 | 时间：秒 ($\text{s}$)，帧率：$24\text{ FPS}$，步长 $\Delta t = 1/24\text{ s}$，Frame $F = k + 1$ |
-| **目标运动参考**<br>($p_{\text{target}}, v_{\text{target}}, q_{\text{target}}$) | `MotionReferenceTrajectory`<br>/ `TargetReferenceSchedule` | 高层动作规划器 (Motion Planner) | 接触力求解器、遥测审计、目标虚影渲染器 | 世界坐标系 (+Z Up, Ground Z=0.0m)，单位：$\text{m}, \text{m/s}, \text{quat}$ |
-| **接触约束规范**<br>($p_{\text{contact}}, n, \mu, F_{\text{min/max}}$) | `ContactConstraintSpec` | 环境几何查询 / 步态落足规划器 | 接触力求解器、接触标记圆盘渲染器 | 世界坐标系，力单位：$\text{N}$，摩擦系数无量纲 |
-| **实际接触反力**<br>($F_{\text{contact}}, \tau_{\text{contact}}$) | `ContactSolverResult`<br>/ `ClosedLoopFrameData` | `ContactForceSolver.solve()` | 前向动力学积分器、力矢量箭头渲染器、遥测记录器 | 世界坐标系，单位：$\text{N}, \text{N}\cdot\text{m}$ |
-| **物理实际质心状态**<br>($p_{\text{actual}}, v_{\text{actual}}, q, L$) | `ForwardDynamicsState`<br>(Frozen Immutability) | `ForwardDynamicsKernel.integrate_step()` | 全身控制器、遥测审计、轨迹曲线渲染器 | 世界坐标系，单位：$\text{m}, \text{m/s}, \text{quat}, \text{kg}\cdot\text{m}^2/\text{s}$ |
-| **骨盆与 Root 根骨骼**<br>(`root`, `pelvis`) | Blender Armature PoseBones | `WholeBodyController.apply_pose()` | 摄像机追踪器、环境避障碰撞体 | 骨骼局部/世界变换矩阵 |
-| **四肢与脊椎关节角**<br>(19 根骨骼 Pose) | Blender Armature PoseBones | `WholeBodyController.apply_pose()` | 渲染引擎、视口显示、导出器 | 欧拉角 / 四元数，弧度或四元数无量纲 |
-| **足端 / 手腕 IK 目标**<br>(End-Effectors IK Targets) | `KinematicPoseTarget`<br>/ IK Control Bones | `KinematicsService.solve_leg_ik()` | Blender IK 约束解算器 | 骨架对象空间 / 世界空间，单位：$\text{m}$ |
-| **跨系统遥测与误差指标**<br>($\Delta p, \Delta q, \text{err}$) | `telemetry.json`<br>/ `VisualTelemetryRecord` | `dynamics_visual_evidence.py` | 自动化审计套件、跨 AI 审阅报告 | 误差单位：$\text{m}, \text{rad}$，防冒充指标 |
+| **Per-Frame Planned Kinematic Target** | `KinematicPlannedPose` (`src/motion/kinematic_bridge.py#L114`), `PlannedFootTarget(#L83)`, `PlannedHandTarget(#L98)` | Active `MotionAction.execute()` (`StartStopWalkAction` in `src/motion/framework.py#L497`, `RunAction` in `src/motion/run_cycle.py#L153`, `SprintStartAction` in `src/motion/sprint_start.py#L213`, `SprintBrakeAction` in `src/motion/sprint_brake.py#L178`) | `convert_planned_pose_to_wbc_targets(#L153)`, `KinematicBridgeExecutor.execute_frame(#L294)` | Frozen/read-only once passed to `KinematicBridgeExecutor.execute_frame()`. Actions must never directly mutate `CharacterArmature.pose.bones` or `FootIK` Empties. |
+| **Whole-Body Controller Input Contract** | `WholeBodyControlTargets` (`src/motion/whole_body_controller.py#L84`), `EndEffectorTarget(#L71)` | `convert_planned_pose_to_wbc_targets()` (`src/motion/kinematic_bridge.py#L153`) | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L296`) | Constructed in Phase 1 of `KinematicBridgeExecutor.execute_frame()`. |
+| **`CharacterRoot` World Transform** | `bpy.types.Object` (`"CharacterRoot"`) | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L315-L343`) (and `KinematicBridgeExecutor._apply_micro_projection()` at `src/motion/kinematic_bridge.py#L466` within $\le 0.03\text{ m}$) | `src/rig/ik.py`, `src/rig/foot_contact.py`, `src/rig/arm_ik.py`, `src/motion/body_kinematics.py` | Root motion preserves world-locked stance feet (`FootIK.L/R` with `parent=None`). |
+| **Torso & FK Pose Bones** (`pelvis`, `spine`, `neck`, `head`, FK limb bones) | `bpy.types.PoseBone` on `"CharacterArmature"` | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L345-L374`) and `JointModel.clamp_armature_pose()` (`src/motion/joint_limits.py#L747` when `enforce_rom_clamping=True`) | `JointModel.validate_armature_pose()`, `compute_whole_body_com()`, `sample_body_pose_snapshot()`, `compute_whole_body_inertia()` | High-level actions and physics telemetry modules (`rigid_link.py`, `body_kinematics.py`, `body_inertia.py`, `contact_model.py`) are **strictly forbidden** from writing to `pose.bones`. |
+| **Leg IK & Support Lock Controllers** (`FootIK.L/R`, `KneePole.L/R`) | `bpy.types.Object` (Empties) & custom properties `["is_locked"]`, `["locked_ankle_world_xyz"]` | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L378-L407`) delegating to `lock_foot_contact(#L70)`, `unlock_foot_contact(#L149)`, `evaluate_foot_support(#L194)` (`src/rig/foot_contact.py`) and `set_foot_ik_target(#L295)` (`src/rig/ik.py`) | `get_leg_ik_state()` (`src/rig/ik.py#L236`), `evaluate_limb_contacts_from_armature()` (`src/motion/contact_model.py#L511`) | When `is_locked=True`, `FootIK.<side>` is unparented (`parent=None`) and pinned in World Space; `evaluate_foot_support()` never secretly drags or clamps a locked stance target. |
+| **Arm IK & Hand Rotation Controllers** (`HandIK.L/R`, `ElbowPole.L/R`, `ArmIK.L/R`, `HandRotation.L/R`) | `bpy.types.Object` (Empties) & `bpy.types.PoseBoneConstraints` | `WholeBodyController.execute_frame()` (`src/motion/whole_body_controller.py#L412-L426`) delegating to `set_hand_ik_target(#L392)` and `set_arm_ik_influence(#L243)` (`src/rig/arm_ik.py`) | `get_arm_ik_state()` (`src/rig/arm_ik.py#L315`), `evaluate_limb_contacts_from_armature()` (`src/motion/contact_model.py#L511`) | When `hand_L/R.enabled == False` or `weight == 0.0`, constraint influence is set to `0.0` so FK arm swing evaluates with zero interference. |
+| **Read-Only Physics Telemetry Outputs** | `WholeBodyCoMResult` (`src/motion/rigid_link.py#L181`), `BodyMotionState` (`src/motion/body_kinematics.py#L240`), `WholeBodyInertiaState` (`src/motion/body_inertia.py#L589`), `MultiContactState` (`src/motion/contact_model.py#L280`) | Computed in Phase 5 of `KinematicBridgeExecutor.execute_frame()` (`src/motion/kinematic_bridge.py#L362-L534`) | `BridgeExecutionResult(#L243)`, `MotionState.params`, test suite verifiers | 100% read-only sensors over the evaluated armature pose; zero write-back to bones or IK targets. |
+| **Unified Frame Kinematic State** | `MotionState` (`@dataclass(frozen=True)`, `src/motion/framework.py#L195`) | Constructed & enriched in `KinematicBridgeExecutor.execute_frame()` (`src/motion/kinematic_bridge.py#L494-L535`) and returned to `MotionAction` / `MotionPlanner` | Next `MotionAction.execute()` in `MotionPlanner`, verification scripts | Immutable (`frozen=True`); threaded across action boundaries via `MotionState.clone_with()`. |
+| **Armature & Controller Animation F-Curves** | `bpy.types.Action` / F-Curves on `CharacterRoot`, `CharacterArmature`, `FootIK.L/R`, `HandIK.L/R`, `KneePole.L/R`, `ElbowPole.L/R` | Phase 6 of `KinematicBridgeExecutor.execute_frame()` (`src/motion/kinematic_bridge.py#L540-L545`) calling `_keyframe_walk_frame()` (`src/motion/walk_cycle.py#L104`) and `_keyframe_additional_controllers(#L569)` | Blender timeline evaluation & `.blend` verification scripts | Keyframed once per frame after Phase 1–5 complete. |
 
 ---
 
-## 二、状态所有权四大约束法则 (Strict Ownership Invariants)
+## 2. Current Actual Implementation — Pipeline B: Task 6G-D Centroidal Numerical Dynamics Pipeline
 
-1. **法则一：实际物理状态不可篡改法则 (Physical State Immutability)**：
-   - 实际质心状态由且仅由 `forward_dynamics.py` 依据牛顿-欧拉方程经辛积分生成；
-   - 严禁任何高层规划器或 IK 求解器直接将目标参考 ($p_{\text{target}}$) 硬赋值为实际物理状态 ($p_{\text{actual}}$)。
-2. **法则二：接触力由物理优化器独占产出 (Forces Solely by Solver)**：
-   - 所有接触反力 $F_{\text{contact}}$ 必须经由 `ContactForceSolver` 严格求解（满足法向单侧性 $F_n \ge 0$ 与有界库仑摩擦锥 $\|F_t\| \le \mu F_n$）；
-   - 严禁在控制器中直接硬编码伪造外力，严禁在空中悬空时生成非零接触反力。
-3. **法则三：Blender 骨骼独占写锁 (Exclusive Armature Write Lock)**：
-   - 遵循 ACG 清规第 6 条：严禁绕开 `WholeBodyController` 直接向角色骨骼写入姿态；
-   - 所有动作层（Walk/Run/Turn）只能向 WBC 提交 `KinematicPoseTarget`，由 WBC 统一进行软限位裁决、生理角度保护和帧级骨骼写入。
-4. **法则四：状态审计独立性 (Independent Audit Ownership)**：
-   - 遥测收集模块 `dynamics_visual_evidence.py` 作为只读审计方，独立于仿真计算循环；
-   - 必须基于 Blender 求值后的实际物体变换矩阵（`obj.matrix_world`）与纯 Python 数值状态进行跨空间比对，误差超过容差（$< 10^{-5}\text{ m}$）直接判负。
+In the Task 6G-D numerical dynamics and `output/dynamics_playground.blend` visualization pipeline, state ownership is governed by [`src/motion/forward_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/forward_dynamics.py), [`src/motion/contact_force_solver.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_force_solver.py), [`src/motion/closed_loop_dynamics.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/closed_loop_dynamics.py), and [`src/scene/dynamics_visualizer.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/dynamics_visualizer.py):
+
+| State / Blender Object | Real Type & Module Location | Exclusive Writer (Single Owner) | Authorized Readers | Mutation Contract & Prohibitions |
+| :--- | :--- | :--- | :--- | :--- |
+| **6-DOF Centroidal Physical State** | `ForwardDynamicsState` (`@dataclass(frozen=True)`, `src/motion/forward_dynamics.py#L432`) | `integrate_forward_dynamics_single_step()` (`src/motion/forward_dynamics.py#L659`) | `compute_commanded_accelerations()`, `step_closed_loop_dynamics()`, `ClosedLoopFrameTelemetry`, `inject_dynamics_visualization()` | Strictly immutable (`frozen=True`, all 3-vectors and 4-quaternions validated and copied to new float tuples in `__post_init__`). **Never** overwritten directly by `DesiredMotionReference` target position/velocity/acceleration.On numerical failure (`INVALID_INPUT`, `NUMERICAL_FAILURE`), `step_closed_loop_dynamics()` preserves `state_next = state_curr` (failure atomicity). |
+| **Desired Control Reference** | `DesiredMotionReference` (`@dataclass(frozen=True)`, `src/motion/closed_loop_dynamics.py#L167`) | Scenario schedule / caller (`run_dynamics_scenarios` in `src/scene/dynamics_visualizer.py#L76`) | `compute_commanded_accelerations(#L492)`, `step_closed_loop_dynamics(#L563)` | Read-only reference input; external force/torque sequences are defensively copied to immutable tuples. |
+| **Instantaneous Contact Constraint Specs** | `ContactConstraintSpec` (`@dataclass(frozen=True)`, `src/motion/contact_force_solver.py#L95`) | `create_contact_constraint_from_environment(#L1162)` or scenario contact schedule (`src/scene/dynamics_visualizer.py`) | `solve_contact_forces(#L757)`, `ForwardDynamicsStepInput.from_solution_and_specs()` | Immutable per step; duplicate `contact_id` values in a single solve call are rejected with `ContactSolverStatus.INVALID_INPUT`. |
+| **Allocated 3D Contact Forces** | `ContactForceSolution` (`src/motion/contact_force_solver.py#L272`) | `solve_contact_forces()` (`src/motion/contact_force_solver.py#L757`) | `step_closed_loop_dynamics()`, `ForwardDynamicsStepInput.from_solution_and_specs()` | Must satisfy unilateral normal push ($F_n \ge 0$), Coulomb friction cone ($\|\mathbf{F}_t\| \le \mu F_n$), and zero force on separated contacts. |
+| **Closed-Loop Frame & Trajectory Telemetry** | `ClosedLoopFrameTelemetry(#L331)`, `ClosedLoopSimulationTrajectory(#L432)` (`src/motion/closed_loop_dynamics.py`) | `step_closed_loop_dynamics(#L563)` and `ClosedLoopDynamicsCoordinator.simulate(#L891)` | `inject_dynamics_visualization()` (`src/scene/dynamics_visualizer.py#L381`), `collect_frame_telemetry()` (`src/scene/dynamics_visual_evidence.py#L351`) | Immutable (`frozen=True`), storing `MappingProxyType` over `actual_contact_forces` and tuple of frames. |
+| **`Playground_Dynamics_Visualization` Proxy Objects** (`Dynamics_BodyProxy_S1..S5`, `Dynamics_CoM_S1..S5`, `Dynamics_TargetGhost_S1..S5`, `Dynamics_ContactDisc_*`, `Dynamics_ForceArrow_*`, `Dynamics_AngMomArrow_S5`) | `bpy.types.Object` in collection `Playground_Dynamics_Visualization` inside `output/dynamics_playground.blend` | `inject_dynamics_visualization()` (`src/scene/dynamics_visualizer.py#L381`) | `collect_frame_telemetry()` & `render_keyframe_images()` (`src/scene/dynamics_visual_evidence.py#L351`, `#L561`), `tests/verify_task6gd_playground_dynamics.py` | Driven 100% by `ClosedLoopSimulationTrajectory` states $S_0..S_{72}$ across Blender frames `1..73`. Force arrow lengths/orientations are computed directly from `actual_contact_forces` (`100 N = 0.25 m`). |
+
+---
+
+## 3. Unfinished Confluence & Planned Future Ownership (Phase 7A to Phase 6H)
+
+To prevent architectural confusion or premature claims, the following ownership bridges are **explicitly marked as NOT YET IMPLEMENTED** at the Task 6G-D-C2-FINAL freeze point:
+
+1. **19-Bone Character Presence in `output/dynamics_playground.blend` (Planned for Phase 7A)**:
+   - *Current State*: `output/dynamics_playground.blend` contains the 14-zone obstacle environment (`Playground_Surfaces`, `Playground_Visuals`) and the 6G-D rigid-body proxy visualization (`Playground_Dynamics_Visualization`), with **0 armatures (0 bones)**.
+   - *Future Phase 7A Ownership*: `CharacterRoot` and the 19-bone `CharacterArmature` (`src/character/builder.py` + `src/rig/builder.py`) will be instantiated inside `DynamicsPlayground` and driven by `MotionPlanner` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` for lower-limb continuous traversal.
+2. **Confluence Between 19-Bone WBC Pipeline (Pipeline A) and 6-DOF Centroidal Dynamics (Pipeline B) (Planned for Phase 7C)**:
+   - *Current State*: Pipeline A computes read-only `WholeBodyCoMResult` (`src/motion/rigid_link.py`), `WholeBodyInertiaState` (`src/motion/body_inertia.py`), and `MultiContactState` (`src/motion/contact_model.py`) from the 19-bone armature in `KinematicBridgeExecutor.execute_frame()`, while Pipeline B evolves `ForwardDynamicsState` (`src/motion/forward_dynamics.py`) using a standalone 6-DOF centroidal rigid-body model in `ClosedLoopDynamicsCoordinator` (`src/motion/closed_loop_dynamics.py`). There is currently **no automated runtime call** between `KinematicBridgeExecutor` and `ClosedLoopDynamicsCoordinator`.
+   - *Future Phase 7C Ownership*: Phase 7C will establish the bidirectional bridge where:
+     - Multi-limb contact geometry (`MultiContactState` from `src/motion/contact_model.py`) and 15-segment mass/inertia (`WholeBodyCoMResult` from `src/motion/rigid_link.py`, `WholeBodyInertiaState` from `src/motion/body_inertia.py`) parameterize the closed-loop dynamics step (`ClosedLoopDynamicsCoordinator.step()`), and
+     - The resulting physical CoM trajectory and attitude from `ForwardDynamicsState` feed back into `KinematicPlannedPose` / `WholeBodyControlTargets` for `WholeBodyController.execute_frame()`.
+   - Even after Phase 7C confluence, `WholeBodyController.execute_frame()` will remain the **sole writer** of Blender pose bones and IK Empty controllers, and `integrate_forward_dynamics_single_step()` will remain the **sole writer** of `ForwardDynamicsState`.

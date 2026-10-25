@@ -1,0 +1,189 @@
+========================================================================================
+BLENDER 5.1.1 READ-ONLY ASSET INVENTORY LOG (Task 6G-D-C2-FINAL)
+Blender Version: 5.1.1
+Total .blend files discovered in output/: 18
+========================================================================================
+
+[BLEND] output/character_arm_ik_prototype.blend
+  - Size Bytes   : 128,390 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..216 (216 frames)
+  - Collections  : 5 ['Camera', 'Character', 'Environment', 'Lighting', 'Markers']
+  - Objects      : 49 total {'CAMERA': 1, 'EMPTY': 10, 'MESH': 35, 'ARMATURE': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : ElbowPole.LAction (3 F-Curves, 60 keyframes, span=[1.0, 216.0]), ElbowPole.RAction (3 F-Curves, 60 keyframes, span=[1.0, 216.0]), HandIK.LAction (6 F-Curves, 120 keyframes, span=[1.0, 216.0]), HandIK.RAction (6 F-Curves, 120 keyframes, span=[1.0, 216.0])
+
+[BLEND] output/character_foot_contact_prototype.blend
+  - Size Bytes   : 120,404 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..360 (360 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CameraLookAtTargetAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0]), PipelineCameraAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0])
+
+[BLEND] output/character_forward_walk.blend
+  - Size Bytes   : 174,608 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..144 (144 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction.001 (114 F-Curves, 16416 keyframes, span=[1.0, 144.0]), CharacterRootAction.001 (6 F-Curves, 864 keyframes, span=[1.0, 144.0]), FootIK.LAction.001 (7 F-Curves, 1008 keyframes, span=[1.0, 144.0]), FootIK.RAction.001 (7 F-Curves, 1008 keyframes, span=[1.0, 144.0]), KneePole.LAction.001 (3 F-Curves, 432 keyframes, span=[1.0, 144.0]), KneePole.RAction.001 (3 F-Curves, 432 keyframes, span=[1.0, 144.0])
+
+[BLEND] output/character_ik_prototype.blend
+  - Size Bytes   : 119,716 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..360 (360 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CameraLookAtTargetAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0]), PipelineCameraAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0])
+
+[BLEND] output/character_motion_framework_5c.blend
+  - Size Bytes   : 197,126 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..204 (204 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction.001 (114 F-Curves, 23256 keyframes, span=[1.0, 204.0]), CharacterRootAction.001 (6 F-Curves, 1224 keyframes, span=[1.0, 204.0]), FootIK.LAction.001 (7 F-Curves, 1428 keyframes, span=[1.0, 204.0]), FootIK.RAction.001 (7 F-Curves, 1428 keyframes, span=[1.0, 204.0]), KneePole.LAction.001 (3 F-Curves, 612 keyframes, span=[1.0, 204.0]), KneePole.RAction.001 (3 F-Curves, 612 keyframes, span=[1.0, 204.0])
+
+[BLEND] output/character_prototype.blend
+  - Size Bytes   : 115,985 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..360 (360 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 36 total {'MESH': 31, 'EMPTY': 2, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : None (0 bones)
+  - Actions/FCs  : CameraLookAtTargetAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0]), PipelineCameraAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0])
+
+[BLEND] output/character_rig_prototype.blend
+  - Size Bytes   : 119,167 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..360 (360 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 37 total {'MESH': 31, 'EMPTY': 2, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CameraLookAtTargetAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0]), PipelineCameraAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0])
+
+[BLEND] output/character_run_prototype.blend
+  - Size Bytes   : 158,136 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..96 (96 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction.001 (114 F-Curves, 10944 keyframes, span=[1.0, 96.0]), CharacterRootAction.001 (6 F-Curves, 576 keyframes, span=[1.0, 96.0]), FootIK.LAction.001 (7 F-Curves, 672 keyframes, span=[1.0, 96.0]), FootIK.RAction.001 (7 F-Curves, 672 keyframes, span=[1.0, 96.0]), KneePole.LAction.001 (3 F-Curves, 288 keyframes, span=[1.0, 96.0]), KneePole.RAction.001 (3 F-Curves, 288 keyframes, span=[1.0, 96.0])
+
+[BLEND] output/character_sprint_brake_prototype.blend
+  - Size Bytes   : 178,099 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..162 (162 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction.001 (114 F-Curves, 18468 keyframes, span=[1.0, 162.0]), CharacterRootAction.001 (6 F-Curves, 972 keyframes, span=[1.0, 162.0]), FootIK.LAction.001 (7 F-Curves, 1134 keyframes, span=[1.0, 162.0]), FootIK.RAction.001 (7 F-Curves, 1134 keyframes, span=[1.0, 162.0]), KneePole.LAction.001 (3 F-Curves, 486 keyframes, span=[1.0, 162.0]), KneePole.RAction.001 (3 F-Curves, 486 keyframes, span=[1.0, 162.0])
+
+[BLEND] output/character_sprint_start_prototype.blend
+  - Size Bytes   : 164,489 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..114 (114 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction.001 (114 F-Curves, 12996 keyframes, span=[1.0, 114.0]), CharacterRootAction.001 (6 F-Curves, 684 keyframes, span=[1.0, 114.0]), FootIK.LAction.001 (7 F-Curves, 798 keyframes, span=[1.0, 114.0]), FootIK.RAction.001 (7 F-Curves, 798 keyframes, span=[1.0, 114.0]), KneePole.LAction.001 (3 F-Curves, 342 keyframes, span=[1.0, 114.0]), KneePole.RAction.001 (3 F-Curves, 342 keyframes, span=[1.0, 114.0])
+
+[BLEND] output/character_start_stop_walk.blend
+  - Size Bytes   : 197,086 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..204 (204 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction.001 (114 F-Curves, 23256 keyframes, span=[1.0, 204.0]), CharacterRootAction.001 (6 F-Curves, 1224 keyframes, span=[1.0, 204.0]), FootIK.LAction.001 (7 F-Curves, 1428 keyframes, span=[1.0, 204.0]), FootIK.RAction.001 (7 F-Curves, 1428 keyframes, span=[1.0, 204.0]), KneePole.LAction.001 (3 F-Curves, 612 keyframes, span=[1.0, 204.0]), KneePole.RAction.001 (3 F-Curves, 612 keyframes, span=[1.0, 204.0])
+
+[BLEND] output/character_walk_cycle.blend
+  - Size Bytes   : 142,841 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..48 (48 frames)
+  - Collections  : 4 ['Camera', 'Character', 'Environment', 'Lighting']
+  - Objects      : 41 total {'MESH': 31, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction (114 F-Curves, 5586 keyframes, span=[1.0, 49.0]), CharacterRootAction (6 F-Curves, 294 keyframes, span=[1.0, 49.0]), FootIK.LAction (7 F-Curves, 343 keyframes, span=[1.0, 49.0]), FootIK.RAction (7 F-Curves, 343 keyframes, span=[1.0, 49.0]), KneePole.LAction (3 F-Curves, 147 keyframes, span=[1.0, 49.0]), KneePole.RAction (3 F-Curves, 147 keyframes, span=[1.0, 49.0])
+
+[BLEND] output/contact_model_debug.blend
+  - Size Bytes   : 192,169 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..180 (180 frames)
+  - Collections  : 4 ['Character', 'ContactMarkers', 'Environment', 'Lighting']
+  - Objects      : 55 total {'MESH': 43, 'ARMATURE': 1, 'EMPTY': 9, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction (21 F-Curves, 3780 keyframes, span=[1.0, 180.0]), CharacterRootAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), ElbowPole.LAction (3 F-Curves, 540 keyframes, span=[1.0, 180.0]), ElbowPole.RAction (3 F-Curves, 540 keyframes, span=[1.0, 180.0]), FootIK.LAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), FootIK.RAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), HandIK.LAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), HandIK.RAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), KneePole.LAction (3 F-Curves, 540 keyframes, span=[1.0, 180.0]), KneePole.RAction (3 F-Curves, 540 keyframes, span=[1.0, 180.0]), Marker_Anchor_foot_LAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), Marker_Anchor_foot_RAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), Marker_Anchor_hand_LAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), Marker_Anchor_hand_RAction (6 F-Curves, 1080 keyframes, span=[1.0, 180.0]), Marker_Normal_foot_LAction (10 F-Curves, 1800 keyframes, span=[1.0, 180.0]), Marker_Normal_foot_RAction (10 F-Curves, 1800 keyframes, span=[1.0, 180.0]), Marker_Normal_hand_LAction (10 F-Curves, 1800 keyframes, span=[1.0, 180.0]), Marker_Normal_hand_RAction (10 F-Curves, 1800 keyframes, span=[1.0, 180.0])
+
+[BLEND] output/contact_obstacle_integration.blend
+  - Size Bytes   : 169,233 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..150 (150 frames)
+  - Collections  : 4 ['Character', 'ContactMarkers', 'Environment', 'Lighting']
+  - Objects      : 55 total {'MESH': 43, 'ARMATURE': 1, 'EMPTY': 9, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction (114 F-Curves, 17100 keyframes, span=[1.0, 150.0]), CharacterRootAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), FootIK.LAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), FootIK.RAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), HandIK.LAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), HandIK.RAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), Marker_Anchor_foot_LAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), Marker_Anchor_foot_RAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), Marker_Anchor_hand_LAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), Marker_Anchor_hand_RAction (6 F-Curves, 900 keyframes, span=[1.0, 150.0]), Marker_Normal_foot_LAction (9 F-Curves, 1350 keyframes, span=[1.0, 150.0]), Marker_Normal_foot_RAction (9 F-Curves, 1350 keyframes, span=[1.0, 150.0]), Marker_Normal_hand_LAction (9 F-Curves, 1350 keyframes, span=[1.0, 150.0]), Marker_Normal_hand_RAction (9 F-Curves, 1350 keyframes, span=[1.0, 150.0])
+
+[BLEND] output/contact_walk_integration.blend
+  - Size Bytes   : 211,759 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..204 (204 frames)
+  - Collections  : 5 ['Camera', 'Character', 'ContactMarkers', 'Environment', 'Lighting']
+  - Objects      : 46 total {'MESH': 36, 'EMPTY': 6, 'ARMATURE': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CharacterArmatureAction.001 (114 F-Curves, 23256 keyframes, span=[1.0, 204.0]), CharacterRootAction.001 (6 F-Curves, 1224 keyframes, span=[1.0, 204.0]), FootIK.LAction.001 (7 F-Curves, 1428 keyframes, span=[1.0, 204.0]), FootIK.RAction.001 (7 F-Curves, 1428 keyframes, span=[1.0, 204.0]), KneePole.LAction.001 (3 F-Curves, 612 keyframes, span=[1.0, 204.0]), KneePole.RAction.001 (3 F-Curves, 612 keyframes, span=[1.0, 204.0]), Marker_Anchor_foot_LAction (6 F-Curves, 1224 keyframes, span=[1.0, 204.0]), Marker_Anchor_foot_RAction (6 F-Curves, 1224 keyframes, span=[1.0, 204.0]), Marker_Normal_foot_LAction (9 F-Curves, 1836 keyframes, span=[1.0, 204.0]), Marker_Normal_foot_RAction (9 F-Curves, 1836 keyframes, span=[1.0, 204.0])
+
+[BLEND] output/dynamics_playground.blend
+  - Size Bytes   : 234,436 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'DynamicsPlaygroundScene' @ 24 FPS
+  - Frame Range  : 1..73 (73 frames)
+  - Collections  : 4 ['Playground_Dynamics_Visualization', 'Playground_Lighting_Cameras', 'Playground_Surfaces', 'Playground_Visuals']
+  - Objects      : 101 total {'CAMERA': 18, 'MESH': 71, 'CURVE': 5, 'LIGHT': 2, 'FONT': 5}
+  - Armatures    : None (0 bones)
+  - Actions/FCs  : Dynamics_AngMomArrow_S5Action.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_BodyProxy_S1Action.001 (7 F-Curves, 511 keyframes, span=[1.0, 73.0]), Dynamics_BodyProxy_S2Action.001 (7 F-Curves, 511 keyframes, span=[1.0, 73.0]), Dynamics_BodyProxy_S3Action.001 (7 F-Curves, 511 keyframes, span=[1.0, 73.0]), Dynamics_BodyProxy_S4Action.001 (7 F-Curves, 511 keyframes, span=[1.0, 73.0]), Dynamics_BodyProxy_S5Action.001 (7 F-Curves, 511 keyframes, span=[1.0, 73.0]), Dynamics_CoM_S1Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_CoM_S2Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_CoM_S3Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_CoM_S4Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_CoM_S5Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_ContactDisc_S1_foot_LAction.001 (6 F-Curves, 438 keyframes, span=[1.0, 73.0]), Dynamics_ContactDisc_S1_foot_RAction.001 (6 F-Curves, 438 keyframes, span=[1.0, 73.0]), Dynamics_ContactDisc_S3_foot_LAction.001 (6 F-Curves, 438 keyframes, span=[1.0, 73.0]), Dynamics_ContactDisc_S3_foot_RAction.001 (6 F-Curves, 438 keyframes, span=[1.0, 73.0]), Dynamics_ContactDisc_S4_foot_LAction.001 (6 F-Curves, 438 keyframes, span=[1.0, 73.0]), Dynamics_ContactDisc_S4_foot_RAction.001 (6 F-Curves, 438 keyframes, span=[1.0, 73.0]), Dynamics_ContactDisc_S5_eccentric_footAction.001 (6 F-Curves, 438 keyframes, span=[1.0, 73.0]), Dynamics_ForceArrow_S1_foot_LAction.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_ForceArrow_S1_foot_RAction.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_ForceArrow_S3_foot_LAction.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_ForceArrow_S3_foot_RAction.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_ForceArrow_S4_foot_LAction.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_ForceArrow_S4_foot_RAction.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_ForceArrow_S5_eccentric_footAction.001 (10 F-Curves, 730 keyframes, span=[1.0, 73.0]), Dynamics_TargetGhost_S1Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_TargetGhost_S2Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_TargetGhost_S3Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_TargetGhost_S4Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0]), Dynamics_TargetGhost_S5Action.001 (3 F-Curves, 219 keyframes, span=[1.0, 73.0])
+
+[BLEND] output/procedural_scene.blend
+  - Size Bytes   : 105,272 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'ProceduralAnimScene' @ 24 FPS
+  - Frame Range  : 1..360 (360 frames)
+  - Collections  : 3 ['Camera', 'Environment', 'Lighting']
+  - Objects      : 22 total {'MESH': 18, 'EMPTY': 1, 'CAMERA': 1, 'LIGHT': 2}
+  - Armatures    : None (0 bones)
+  - Actions/FCs  : CameraLookAtTargetAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0]), PipelineCameraAction (3 F-Curves, 9 keyframes, span=[1.0, 360.0])
+
+[BLEND] output/unified_motion_integration.blend
+  - Size Bytes   : 298,537 bytes
+  - Git Status   : tracked=False, gitignored=True
+  - Scene & FPS  : 'Scene' @ 24 FPS
+  - Frame Range  : 1..462 (462 frames)
+  - Collections  : 2 ['Character', 'Collection']
+  - Objects      : 27 total {'EMPTY': 10, 'ARMATURE': 1, 'MESH': 14, 'CAMERA': 1, 'LIGHT': 1}
+  - Armatures    : CharacterArmature (19 bones)
+  - Actions/FCs  : CameraLookAtTargetAction (3 F-Curves, 120 keyframes, span=[1.0, 462.0]), CharacterArmatureAction (114 F-Curves, 52668 keyframes, span=[1.0, 462.0]), CharacterRootAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), ElbowPole.LAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), ElbowPole.RAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), FootIK.LAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), FootIK.RAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), HandIK.LAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), HandIK.RAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), KneePole.LAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), KneePole.RAction (6 F-Curves, 2772 keyframes, span=[1.0, 462.0]), PipelineCameraAction (3 F-Curves, 120 keyframes, span=[1.0, 462.0])
+
+========================================================================================
+AUDIT COMPLETE: ZERO FILES MODIFIED.
+========================================================================================
