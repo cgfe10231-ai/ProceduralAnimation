@@ -1,13 +1,35 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-25  
-> **当前阶段**：任务 6G-D-C2-FINAL 已完成验收纠偏、全部验证通过并正式冻结（完成 73 状态 Frame 1..73 时空标准化；通过只读机器审计脚本 `tests/audit_c2_final_inspector.py` 导出 51 个 `src/` 模块、42 个 `tests/` 脚本、19 个 `run_*.py` 脚本及 18 个 `output/*.blend` 场景的真实 AST 与 Blender 5.1.1 资产清单；完整修正并交付 6 份架构冻结与验收文档，恢复 `MotionPlanner -> KinematicBridgeExecutor -> WholeBodyController` 真实生产运动学管线、精确到源码行号的依赖拓扑、严格区分当前实现与未来汇流的状态所有权矩阵、462 帧 `unified_motion_integration.blend` 真实场景参数，以及 7A–7F 与 6H 权威演进路线图；`quick` 9/9, `physics` 16/16, `--verify-docs` 全绿通过；6G-D 正式冻结并进入只读维护，严格停止等待人类指令）  
+> **当前阶段**：任务 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证）已完成并全部验证通过（交付 `docs/PHASE7A_REUSE_AUDIT.md`、`src/scene/playground_character_integration.py`、`run_task7a1_character_playground.py`、`tests/verify_task7a1_character_playground.py`、派生可播放场景 `output/dynamics_playground_task7a1.blend` 及 `docs/evidence/task7a1/` 自动遥测与多视角截图/GIF 证据包；权威 `output/dynamics_playground.blend` 100% 零改动保留；`quick` 10/10, `physics` 16/16, `motion` 6/6, `full` 25/25, `--verify-docs` 全绿通过；严格停止于 Task 7A-1，不自动进入 Task 7A-2，等待用户与 ChatGPT 审阅）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **任务 7A-1 历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证 (Task 7A-1)**：
+  * **历史资产与模块复用审计 (`docs/PHASE7A_REUSE_AUDIT.md`)**：
+    - 完整审计 `output/unified_motion_integration.blend`、`output/dynamics_playground.blend` 及 19 个既有核心 Python 模块，精确记录 7 大章节（已存在直接可用能力、训练场现有内容、必须保留的历史资产、必须复用的接口、真正缺失的能力、严禁重复创建的模块、最小适配点），纳入 `tests/audit_c2_final_inspector.py --verify-docs` 永久 AST 门禁；
+  * **真实 19 骨骼角色无损装入 `DynamicsPlayground` (`src/scene/playground_character_integration.py`, `run_task7a1_character_playground.py`)**：
+    - 以 `output/dynamics_playground.blend` 为唯一训练场 SSOT（只读加载，原始文件字节数与时间戳 100% 零改动）；
+    - 100% 保留原有 4 大集合（`Playground_Surfaces`, `Playground_Visuals`, `Playground_Lighting_Cameras`, `Playground_Dynamics_Visualization`）、16 个地形表面网格与 5 个动力学工位（`S1..S5` 在 Frame 1 与 Frame 73 的世界坐标和四元数完全不变）；
+    - 通过既有 `build_character`、`build_rig`、`bind_character_to_rig`、`setup_leg_ik`、`setup_arm_ik` 将 `CharacterRoot`、19 骨骼 `CharacterArmature`、13 个网格部件（`REQUIRED_PARTS`, `parent_type="BONE"`）与 8 个 IK/Pole 控制器（`FootIK.L/R`, `KneePole.L/R`, `HandIK.L/R`, `ElbowPole.L/R`）装配入 `"Character"` 集合，并导出派生可播放场景 `output/dynamics_playground_task7a1.blend`；
+  * **五阶段最小控制闭环验证（全部经由 `MotionPlanner` / `MotionAction` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` $\to$ Rig/IK/FK）**：
+    - **Stage A (静态站立姿态)**：位于 `Surface_FlatGround` $(0.0, -8.0, 0.0)\text{ m}$，双足最低点 $Z_{\min} = 0.0\text{ m}$ 无穿地/悬空，末端最大误差 $3.0\times 10^{-6}\text{ m}$，CoM $(0.0, -7.99627, 1.04793)\text{ m}$，零 ROM 违例，`support_type = "double_stance"`；
+    - **Stage B (根节点有限位移与非零偏航)**：`CharacterRoot` 移动至 $(0.25, -7.65, 0.0)\text{ m}$、偏航 $+6.0^\circ$、骨盆下沉 $-0.030\text{ m}$，根位置误差 `0.0 m`，末端误差 $7.0\times 10^{-6}\text{ m}$，零 ROM 违例；
+    - **Stage C (单脚独立 IK 控制)**：左脚 $(-0.11, -8.05, 0.07)\text{ m}$、右脚抬起 $(0.14, -7.82, 0.21)\text{ m}$ 非对称目标，跟踪误差分别为 $2.2\times 10^{-5}\text{ m}$ 与 $4.5\times 10^{-5}\text{ m}$，大腿 $0.42\text{ m}$ / 小腿 $0.40\text{ m}$ 零拉伸，膝盖前向偏移 $+0.1191\text{ m}$ / $+0.2271\text{ m}$ 零翻转；
+    - **Stage D (支撑脚世界空间锁定)**：左脚锁定于 $(-0.11, -8.00, 0.07)\text{ m}$（`FootIK.L.parent == None`），`CharacterRoot` 连续 5 步前移侧移同时右脚摆动，实测控制器漂移 `0.0 m`、踝骨漂移 `0.0 m`、足部网格中心漂移 `0.0 m`；
+    - **Stage E (最小历史连续步态复用)**：通过 `MotionPlanner` 在训练场 `Surface_FlatGround` 上执行 `StartStopWalkAction` 204 帧连续行走（$Y: -8.0000\text{ m} \to -6.7400\text{ m}$，总位移 $1.2600\text{ m}$，峰值速度 $0.2400\text{ m/s}$，不可达帧数 `0`，抽样关键帧全量 `rom_is_valid = True`）；
+  * **四大数学一致性验证**：
+    - **1. 五重坐标空间一致性**：在非零平移 $(1.35, -7.25, 0.0)\text{ m}$、非零偏航 $+6.5^\circ$、左右脚不同目标下，向量往返误差 `0.0 m`，五重空间点链往返误差 $2.19\times 10^{-7}\text{ m}$；
+    - **2. 质量与质心计算 (`src/motion/rigid_link.py`)**：15 分段模型质量比总和 `1.0`，默认总质量 `70.0 kg` / 缩放参考质量 `75.0 kg`，标准站立左右对称分段误差 `0.0 m`，下蹲前倾姿态变化引起质心真实偏移 $(+0.04376, +0.11271, -0.07506)\text{ m}$；
+    - **3. 几何接触验证 (`contact_model.py`, `foot_contact.py`, `environment_query.py`)**：验证双足锁定 (`double_stance`)、左锁右放 (`single_stance_l`)、右锁左放 (`single_stance_r`)、地面法向 $(0,0,1)$ 与高度 $0.0\text{ m}$，明确区分几何接触锚点约束与动力学反力；
+    - **4. 约束真实性验证 (`joint_limits.py`, `whole_body_controller.py`)**：不可达目标 ($1.70\text{ m} > 0.82\text{ m}$) 真实记录 `REACHABILITY` 且 `success=False`；超限姿态（脊柱 $-85^\circ$、左肩 $+175^\circ$）真实记录 `ROM_VIOLATION` 且 `success=False`；开启 `enforce_rom_clamping=True` 时绝不静默伪报成功；
+  * **自动视觉证据与全级别回归全绿**：
+    - 自动生成 `docs/evidence/task7a1/task7a1_verification_report.json`、28 张多视角关键帧 PNG 渲染图与连续步态预览 `docs/evidence/task7a1/task7a1_walk_preview.gif`；
+    - 新增集成测试 `tests/verify_task7a1_character_playground.py`（6/6 PASS）并注册入 `TEST_REGISTRY`（`task7a1_character_playground`）；
+    - `quick` (10/10 PASS), `physics` (16/16 PASS), `motion` (6/6 PASS), `full` (25/25 PASS), `--verify-docs` (PASS)。
 * **任务 6G-D-C2-FINAL 架构门禁收口、只读 AST 校验与统一测试套件无缝集成 (Architecture Integrity Gate Closure)**：
   * **彻底消除写文件副作用与运行模式分离**：
     - `tests/audit_c2_final_inspector.py` 实现严格模式隔离：仅在显式传入 `--generate` 或 `--refresh` 时触发 Mode A 写入磁盘产物；`--verify-docs`（Mode B）与 `--test-validator`（Mode C）采用纯内存 AST 与只读缓存索引，严禁对磁盘文件进行任何写入或覆盖（`git status --short` 实测零变更）；

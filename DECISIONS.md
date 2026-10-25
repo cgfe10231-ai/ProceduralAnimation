@@ -1030,3 +1030,27 @@
   - 未修改 `src/` 下任何 Python 文件，未修改任何 `.blend` 文件；
   - `.\run_tests.ps1 -tier quick`（10/10 PASS）与 `.\run_tests.ps1 -tier full`（24/24 PASS）全量通过；
   - 架构门禁已正式接入系统持续回归，任何失效接口或虚构引用将直接导致测试失败与退出码 1，彻底完成 C2-FINAL 验收收口。
+
+---
+
+### [DEC-048] 2026-10-25: Task 7A-1 历史 19 骨骼角色资产复用审计、真实角色接入 DynamicsPlayground 与五阶段最小控制闭环验证
+
+* **状态**：已批准并验证 (Approved & Verified)
+* **日期**：2026-10-25
+* **背景**：在完成 Task 6G-D-C2-FINAL 架构冻结与门禁收口后，正式进入 Phase 7A 第一个任务（`Task 7A-1`）。目标是在不重复造轮子、不破坏既有 `output/dynamics_playground.blend` 5 工位动力学基准的前提下，将历史验证成熟的 19 骨骼角色资产（`CharacterRoot`、`CharacterArmature`、13 个网格部件、8 个 IK/Pole 控制器）装入 `DynamicsPlayground` 训练场，并通过唯一生产控制链验证五阶段最小控制闭环与四大数学一致性。
+* **决策与方案**：
+  1. **全面审计历史 19 骨骼资产并交付 `docs/PHASE7A_REUSE_AUDIT.md`**：
+     - 完整核查 `output/unified_motion_integration.blend` 与 `output/dynamics_playground.blend` 及 19 个既有核心模块，确认 `build_character`、`build_rig`、`bind_character_to_rig`、`setup_leg_ik`、`setup_arm_ik`、`KinematicBridgeExecutor.execute_frame`、`WholeBodyController.execute_frame`、`MotionPlanner`、`StartStopWalkAction`、`compute_whole_body_com`、`DEFAULT_HUMANOID_ROM_MODEL`、`evaluate_limb_contacts_from_armature` 与 `create_standard_dynamics_playground_query` 均可 100% 原生复用，严禁新建第二套角色、骨骼或控制器。
+  2. **训练场单一 SSOT 保护与派生可播放验证场景 (`output/dynamics_playground_task7a1.blend`)**：
+     - 严格以 `output/dynamics_playground.blend` 为训练场唯一几何与动力学工位 SSOT（只读打开，保留 `Playground_Surfaces`、`Playground_Visuals`、`Playground_Lighting_Cameras`、`Playground_Dynamics_Visualization` 全部 101 个物体与 `S1..S5` 73 帧动画 100% 零改动）；
+     - 将 19 骨骼角色装配入独立的 `"Character"` 集合，并在南部平坦地面 `Surface_FlatGround` ($Y \in [-8.0, -6.74]\text{ m}$) 区域执行控制与连续步态验证，导出派生可播放场景 `output/dynamics_playground_task7a1.blend`。
+  3. **五阶段最小控制闭环与四大数学一致性验证 (`src/scene/playground_character_integration.py`)**：
+     - **Stage A (静态站立)**：双足贴地 $Z_{\min} = 0.0\text{ m}$，末端误差 $3\times 10^{-6}\text{ m}$，零 ROM 违例；
+     - **Stage B (根节点有限位移与非零偏航)**：驱动 `CharacterRoot` 至 $(0.25, -7.65, 0.0)\text{ m}$ 与 $+6.0^\circ$ 偏航，位置误差 $0.0\text{ m}$；
+     - **Stage C (单脚独立 IK 控制)**：左右脚设置非对称三维世界目标，大腿 $0.42\text{ m}$ / 小腿 $0.40\text{ m}$ 零拉伸、膝盖前向 $+Y$ 零翻转；
+     - **Stage D (支撑脚世界空间锁定)**：左脚锁定 (`FootIK.L.parent == None`) 下 `CharacterRoot` 连续 5 步前移侧移，控制器漂移 `0.0 m`，踝骨与网格中心漂移 `0.0 m`；
+     - **Stage E (最小连续历史步态复用)**：通过 `MotionPlanner` 执行 `StartStopWalkAction` 204 帧连续行走（位移 $1.2600\text{ m}$，0 不可达帧，0 ROM 违例）；
+     - **四大数学一致性验证**：五重坐标空间非零平移/偏航往返误差 $< 2.2\times 10^{-7}\text{ m}$；15 分段 CoM（70kg 默认 / 75kg 缩放，`mass_ratio_sum == 1.0`，左右对称误差 `0.0 m`，下蹲前倾姿态质心准确偏移）；几何接触 (`double_stance`, `single_stance_l`, `single_stance_r`) 与动力学反力边界清晰分离；不可达 (`REACHABILITY`) 与超限 (`ROM_VIOLATION`) 约束真实报错 (`success=False`)。
+* **影响**：
+  - 新增 [`docs/PHASE7A_REUSE_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/PHASE7A_REUSE_AUDIT.md)（纳入 `tests/audit_c2_final_inspector.py` AST 门禁扫描）、[`src/scene/playground_character_integration.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_character_integration.py)、[`run_task7a1_character_playground.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/run_task7a1_character_playground.py)、[`tests/verify_task7a1_character_playground.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task7a1_character_playground.py) 及 [`docs/evidence/task7a1/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task7a1/) 证据包；
+  - 严格停止于 Task 7A-1 收口，不自动进入 Task 7A-2。

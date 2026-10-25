@@ -629,6 +629,7 @@ def verify_freeze_docs(audit_data: Dict[str, Any], repo_root: Optional[Path] = N
         "docs/ROADMAP_FOUNDATION_TO_FULLBODY.md",
         "docs/C2_FINAL_VALIDATION.md",
         "docs/ARCHITECTURE_CHANGE_GATE.md",
+        "docs/PHASE7A_REUSE_AUDIT.md",
         "AGENTS.md",
         "GEMINI.md",
         ".agents/rules/project_rules.md",

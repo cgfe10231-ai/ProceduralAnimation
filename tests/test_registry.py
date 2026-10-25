@@ -308,6 +308,21 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Reopens unified_motion_integration.blend to verify root progression, bone bounds, and keyframes.",
     ),
+    "task7a1_character_playground": TestDefinition(
+        test_id="task7a1_character_playground",
+        name="Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop",
+        script_path="tests/verify_task7a1_character_playground.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.MOTION, TestTier.FULL],
+        timeout_sec=90.0,
+        expected_artifacts=[
+            "output/dynamics_playground_task7a1.blend",
+            "docs/evidence/task7a1/task7a1_verification_report.json",
+            "docs/evidence/task7a1/task7a1_walk_preview.gif",
+        ],
+        is_visual_acceptance=True,
+        description="Verifies 19-bone character integration into DynamicsPlayground, Stages A-E control loop, 5 coordinate spaces, 15-segment CoM, geometric contacts, and ROM/reachability truthfulness.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection

@@ -3,6 +3,29 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-25] 任务 7A-1：历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证 (Task 7A-1)
+
+### 历史 19 骨骼角色与运动资产复用审计 (`docs/PHASE7A_REUSE_AUDIT.md`, `tests/audit_c2_final_inspector.py`)
+* **全量模块与 `.blend` 资产复用审计报告**：
+  * 新增 [`docs/PHASE7A_REUSE_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/PHASE7A_REUSE_AUDIT.md)，系统核查 `output/unified_motion_integration.blend`（19 骨骼、13 个 `parent_type="BONE"` 网格部件、8 个 IK/Pole 控制器、12 个 Action）与 `output/dynamics_playground.blend`（4 大集合、16 个地形表面、5 个动力学工位 `S1..S5`），以及 19 个核心 Python 模块的精确路径、行号与复用边界；
+  * 将 `docs/PHASE7A_REUSE_AUDIT.md` 纳入 `tests/audit_c2_final_inspector.py` 的 `doc_files` 清单，接受永久只读 AST 符号存在性校验。
+
+### 真实 19 骨骼角色装入 `DynamicsPlayground` 与五阶段最小控制闭环 (`src/scene/playground_character_integration.py`, `run_task7a1_character_playground.py`)
+* **训练场单一 SSOT 保护与角色无损集成**：
+  * 只读打开权威 `output/dynamics_playground.blend`（原始文件 100% 零改动），在保留全部 4 大集合与 `S1..S5` 73 帧动画的前提下，调用既有 `build_character`、`build_rig`、`bind_character_to_rig`、`setup_leg_ik`、`setup_arm_ik` 将 19 骨骼角色装配入 `"Character"` 集合，并导出派生可播放场景 `output/dynamics_playground_task7a1.blend`；
+* **五阶段最小控制闭环验证（A–E）**：
+  * **Stage A (静态站立姿态)**：在 `Surface_FlatGround` $(0.0, -8.0, 0.0)\text{ m}$ 上双足贴地 $Z_{\min} = 0.0\text{ m}$，末端误差 $3.0\times 10^{-6}\text{ m}$，CoM $(0.0, -7.99627, 1.04793)\text{ m}$，零 ROM 违例；
+  * **Stage B (根节点有限位移与非零偏航)**：驱动 `CharacterRoot` 至 $(0.25, -7.65, 0.0)\text{ m}$ 与 $+6.0^\circ$ 偏航，根位置误差 `0.0 m`，末端误差 $7.0\times 10^{-6}\text{ m}$；
+  * **Stage C (单脚独立 IK 控制)**：左右脚非对称世界目标 $(-0.11, -8.05, 0.07)\text{ m}$ 与 $(0.14, -7.82, 0.21)\text{ m}$，大腿 $0.42\text{ m}$ / 小腿 $0.40\text{ m}$ 零拉伸，膝盖前向 $+Y$ 零翻转；
+  * **Stage D (支撑脚世界空间锁定)**：左脚锁定 (`FootIK.L.parent == None`) 下 `CharacterRoot` 连续 5 步移动，控制器、踝骨与网格中心漂移均为 `0.0 m`；
+  * **Stage E (最小连续历史步态复用)**：通过 `MotionPlanner` 执行 `StartStopWalkAction` 204 帧连续行走（位移 $1.2600\text{ m}$，0 不可达帧，0 ROM 违例）。
+* **四大数学一致性验证与自动视觉证据采集 (`docs/evidence/task7a1/`, `tests/verify_task7a1_character_playground.py`, `tests/test_registry.py`)**：
+  * 验证五重坐标空间非零平移/偏航往返误差 $< 2.2\times 10^{-7}\text{ m}$、15 分段 CoM（70kg 默认 / 75kg 缩放，质量比总和 `1.0`，姿态偏移响应）、几何接触与动力学反力边界区分、不可达 (`REACHABILITY`) 与超限 (`ROM_VIOLATION`) 真实报错；
+  * 自动输出 `docs/evidence/task7a1/task7a1_verification_report.json`、28 张多视角关键帧 PNG 截图与 `docs/evidence/task7a1/task7a1_walk_preview.gif`；
+  * 新增 `tests/verify_task7a1_character_playground.py`（6/6 PASS）并注册入 `tests/test_registry.py`（`task7a1_character_playground`）。
+
+---
+
 ## [2026-10-25] 任务 6G-D-C2-FINAL：架构门禁收口、只读 AST 校验与统一测试套件无缝集成 (Architecture Integrity Gate Closure)
 
 ### 彻底消除写文件副作用与运行模式隔离 (`tests/audit_c2_final_inspector.py`)

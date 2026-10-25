@@ -1,0 +1,2057 @@
+{
+  "task_id": "Task 7A-1",
+  "source_playground_blend": "output/dynamics_playground.blend",
+  "derived_task7a1_blend": "output/dynamics_playground_task7a1.blend",
+  "playground_stations_intact_after_walk": true,
+  "inventory": {
+    "armature_count_in_scene": 1,
+    "armature_names": [
+      "CharacterArmature"
+    ],
+    "character_collection_exists": true,
+    "character_collection_object_count": 26,
+    "character_root_world_location_m": [
+      0.0,
+      -8.0,
+      0.0
+    ],
+    "bone_count": 19,
+    "bone_names_match_specification": true,
+    "bone_hierarchy_matches_specification": true,
+    "bones": {
+      "root": {
+        "parent": null,
+        "head_local": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "tail_local": [
+          0.0,
+          0.0,
+          0.2
+        ],
+        "head_world": [
+          0.0,
+          -8.0,
+          0.0
+        ],
+        "tail_world": [
+          0.0,
+          -8.0,
+          0.2
+        ],
+        "rest_length_m": 0.2,
+        "posed_length_m": 0.2,
+        "use_connect": false,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "pelvis": {
+        "parent": "root",
+        "head_local": [
+          0.0,
+          0.0,
+          0.89
+        ],
+        "tail_local": [
+          0.0,
+          0.0,
+          1.07
+        ],
+        "head_world": [
+          0.0,
+          -8.0,
+          0.89
+        ],
+        "tail_world": [
+          0.0,
+          -8.0,
+          1.07
+        ],
+        "rest_length_m": 0.18,
+        "posed_length_m": 0.18,
+        "use_connect": false,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "spine": {
+        "parent": "pelvis",
+        "head_local": [
+          0.0,
+          0.0,
+          1.07
+        ],
+        "tail_local": [
+          0.0,
+          0.0,
+          1.55
+        ],
+        "head_world": [
+          0.0,
+          -8.0,
+          1.07
+        ],
+        "tail_world": [
+          0.0,
+          -8.0,
+          1.55
+        ],
+        "rest_length_m": 0.48,
+        "posed_length_m": 0.48,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "neck": {
+        "parent": "spine",
+        "head_local": [
+          0.0,
+          0.0,
+          1.55
+        ],
+        "tail_local": [
+          0.0,
+          0.0,
+          1.6
+        ],
+        "head_world": [
+          0.0,
+          -8.0,
+          1.55
+        ],
+        "tail_world": [
+          0.0,
+          -8.0,
+          1.6
+        ],
+        "rest_length_m": 0.05,
+        "posed_length_m": 0.05,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "head": {
+        "parent": "neck",
+        "head_local": [
+          0.0,
+          0.0,
+          1.6
+        ],
+        "tail_local": [
+          0.0,
+          0.0,
+          1.82
+        ],
+        "head_world": [
+          0.0,
+          -8.0,
+          1.6
+        ],
+        "tail_world": [
+          0.0,
+          -8.0,
+          1.82
+        ],
+        "rest_length_m": 0.22,
+        "posed_length_m": 0.22,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "shoulder.L": {
+        "parent": "spine",
+        "head_local": [
+          -0.06,
+          0.0,
+          1.54
+        ],
+        "tail_local": [
+          -0.24,
+          0.0,
+          1.54
+        ],
+        "head_world": [
+          -0.06,
+          -8.0,
+          1.54
+        ],
+        "tail_world": [
+          -0.24,
+          -8.0,
+          1.54
+        ],
+        "rest_length_m": 0.18,
+        "posed_length_m": 0.18,
+        "use_connect": false,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "upper_arm.L": {
+        "parent": "shoulder.L",
+        "head_local": [
+          -0.24,
+          0.0,
+          1.54
+        ],
+        "tail_local": [
+          -0.24,
+          0.0,
+          1.24
+        ],
+        "head_world": [
+          -0.24,
+          -8.0,
+          1.54
+        ],
+        "tail_world": [
+          -0.24,
+          -7.9895,
+          1.2402
+        ],
+        "rest_length_m": 0.3,
+        "posed_length_m": 0.3,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "forearm.L": {
+        "parent": "upper_arm.L",
+        "head_local": [
+          -0.24,
+          0.0,
+          1.24
+        ],
+        "tail_local": [
+          -0.24,
+          0.0,
+          0.98
+        ],
+        "head_world": [
+          -0.24,
+          -7.9895,
+          1.2402
+        ],
+        "tail_world": [
+          -0.24,
+          -7.9624,
+          0.9816
+        ],
+        "rest_length_m": 0.26,
+        "posed_length_m": 0.26,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": [
+          {
+            "name": "ArmIK.L",
+            "type": "IK",
+            "influence": 0.0,
+            "target": "HandIK.L",
+            "pole_target": "ElbowPole.L",
+            "chain_count": 2
+          }
+        ]
+      },
+      "hand.L": {
+        "parent": "forearm.L",
+        "head_local": [
+          -0.24,
+          0.0,
+          0.98
+        ],
+        "tail_local": [
+          -0.24,
+          0.0,
+          0.88
+        ],
+        "head_world": [
+          -0.24,
+          -7.9624,
+          0.9816
+        ],
+        "tail_world": [
+          -0.24,
+          -7.9519,
+          0.8822
+        ],
+        "rest_length_m": 0.1,
+        "posed_length_m": 0.1,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": [
+          {
+            "name": "HandRotation.L",
+            "type": "COPY_ROTATION",
+            "influence": 0.0,
+            "target": "HandIK.L",
+            "pole_target": null,
+            "chain_count": null
+          }
+        ]
+      },
+      "shoulder.R": {
+        "parent": "spine",
+        "head_local": [
+          0.06,
+          0.0,
+          1.54
+        ],
+        "tail_local": [
+          0.24,
+          0.0,
+          1.54
+        ],
+        "head_world": [
+          0.06,
+          -8.0,
+          1.54
+        ],
+        "tail_world": [
+          0.24,
+          -8.0,
+          1.54
+        ],
+        "rest_length_m": 0.18,
+        "posed_length_m": 0.18,
+        "use_connect": false,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "upper_arm.R": {
+        "parent": "shoulder.R",
+        "head_local": [
+          0.24,
+          0.0,
+          1.54
+        ],
+        "tail_local": [
+          0.24,
+          0.0,
+          1.24
+        ],
+        "head_world": [
+          0.24,
+          -8.0,
+          1.54
+        ],
+        "tail_world": [
+          0.24,
+          -7.9895,
+          1.2402
+        ],
+        "rest_length_m": 0.3,
+        "posed_length_m": 0.3,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "forearm.R": {
+        "parent": "upper_arm.R",
+        "head_local": [
+          0.24,
+          0.0,
+          1.24
+        ],
+        "tail_local": [
+          0.24,
+          0.0,
+          0.98
+        ],
+        "head_world": [
+          0.24,
+          -7.9895,
+          1.2402
+        ],
+        "tail_world": [
+          0.24,
+          -7.9624,
+          0.9816
+        ],
+        "rest_length_m": 0.26,
+        "posed_length_m": 0.26,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": [
+          {
+            "name": "ArmIK.R",
+            "type": "IK",
+            "influence": 0.0,
+            "target": "HandIK.R",
+            "pole_target": "ElbowPole.R",
+            "chain_count": 2
+          }
+        ]
+      },
+      "hand.R": {
+        "parent": "forearm.R",
+        "head_local": [
+          0.24,
+          0.0,
+          0.98
+        ],
+        "tail_local": [
+          0.24,
+          0.0,
+          0.88
+        ],
+        "head_world": [
+          0.24,
+          -7.9624,
+          0.9816
+        ],
+        "tail_world": [
+          0.24,
+          -7.9519,
+          0.8822
+        ],
+        "rest_length_m": 0.1,
+        "posed_length_m": 0.1,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": [
+          {
+            "name": "HandRotation.R",
+            "type": "COPY_ROTATION",
+            "influence": 0.0,
+            "target": "HandIK.R",
+            "pole_target": null,
+            "chain_count": null
+          }
+        ]
+      },
+      "thigh.L": {
+        "parent": "pelvis",
+        "head_local": [
+          -0.11,
+          0.0,
+          0.89
+        ],
+        "tail_local": [
+          -0.11,
+          0.0,
+          0.47
+        ],
+        "head_world": [
+          -0.11,
+          -8.0,
+          0.89
+        ],
+        "tail_world": [
+          -0.11,
+          -7.999,
+          0.47
+        ],
+        "rest_length_m": 0.42,
+        "posed_length_m": 0.42,
+        "use_connect": false,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "shin.L": {
+        "parent": "thigh.L",
+        "head_local": [
+          -0.11,
+          0.0,
+          0.47
+        ],
+        "tail_local": [
+          -0.11,
+          0.0,
+          0.07
+        ],
+        "head_world": [
+          -0.11,
+          -7.999,
+          0.47
+        ],
+        "tail_world": [
+          -0.11,
+          -8.0,
+          0.07
+        ],
+        "rest_length_m": 0.4,
+        "posed_length_m": 0.4,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": [
+          {
+            "name": "LegIK.L",
+            "type": "IK",
+            "influence": 1.0,
+            "target": "FootIK.L",
+            "pole_target": "KneePole.L",
+            "chain_count": 2
+          }
+        ]
+      },
+      "foot.L": {
+        "parent": "shin.L",
+        "head_local": [
+          -0.11,
+          0.0,
+          0.07
+        ],
+        "tail_local": [
+          -0.11,
+          0.15,
+          0.035
+        ],
+        "head_world": [
+          -0.11,
+          -8.0,
+          0.07
+        ],
+        "tail_world": [
+          -0.11,
+          -7.85,
+          0.035
+        ],
+        "rest_length_m": 0.154,
+        "posed_length_m": 0.154,
+        "use_connect": true,
+        "use_inherit_rotation": false,
+        "constraints": [
+          {
+            "name": "FootRotation.L",
+            "type": "COPY_ROTATION",
+            "influence": 1.0,
+            "target": "FootIK.L",
+            "pole_target": null,
+            "chain_count": null
+          }
+        ]
+      },
+      "thigh.R": {
+        "parent": "pelvis",
+        "head_local": [
+          0.11,
+          0.0,
+          0.89
+        ],
+        "tail_local": [
+          0.11,
+          0.0,
+          0.47
+        ],
+        "head_world": [
+          0.11,
+          -8.0,
+          0.89
+        ],
+        "tail_world": [
+          0.11,
+          -7.999,
+          0.47
+        ],
+        "rest_length_m": 0.42,
+        "posed_length_m": 0.42,
+        "use_connect": false,
+        "use_inherit_rotation": true,
+        "constraints": []
+      },
+      "shin.R": {
+        "parent": "thigh.R",
+        "head_local": [
+          0.11,
+          0.0,
+          0.47
+        ],
+        "tail_local": [
+          0.11,
+          0.0,
+          0.07
+        ],
+        "head_world": [
+          0.11,
+          -7.999,
+          0.47
+        ],
+        "tail_world": [
+          0.11,
+          -8.0,
+          0.07
+        ],
+        "rest_length_m": 0.4,
+        "posed_length_m": 0.4,
+        "use_connect": true,
+        "use_inherit_rotation": true,
+        "constraints": [
+          {
+            "name": "LegIK.R",
+            "type": "IK",
+            "influence": 1.0,
+            "target": "FootIK.R",
+            "pole_target": "KneePole.R",
+            "chain_count": 2
+          }
+        ]
+      },
+      "foot.R": {
+        "parent": "shin.R",
+        "head_local": [
+          0.11,
+          0.0,
+          0.07
+        ],
+        "tail_local": [
+          0.11,
+          0.15,
+          0.035
+        ],
+        "head_world": [
+          0.11,
+          -8.0,
+          0.07
+        ],
+        "tail_world": [
+          0.11,
+          -7.85,
+          0.035
+        ],
+        "rest_length_m": 0.154,
+        "posed_length_m": 0.154,
+        "use_connect": true,
+        "use_inherit_rotation": false,
+        "constraints": [
+          {
+            "name": "FootRotation.R",
+            "type": "COPY_ROTATION",
+            "influence": 1.0,
+            "target": "FootIK.R",
+            "pole_target": null,
+            "chain_count": null
+          }
+        ]
+      }
+    },
+    "mesh_part_count": 13,
+    "mesh_parts": {
+      "Head": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "head",
+        "expected_bone": "head",
+        "modifiers": [],
+        "dimensions_m": [
+          0.22,
+          0.22,
+          0.22
+        ],
+        "world_center_m": [
+          0.0,
+          -8.0,
+          1.71
+        ],
+        "world_min_z_m": 1.6,
+        "in_character_collection": true
+      },
+      "Torso": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "spine",
+        "expected_bone": "spine",
+        "modifiers": [],
+        "dimensions_m": [
+          0.34,
+          0.2,
+          0.48
+        ],
+        "world_center_m": [
+          0.0,
+          -8.0,
+          1.31
+        ],
+        "world_min_z_m": 1.07,
+        "in_character_collection": true
+      },
+      "Pelvis": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "pelvis",
+        "expected_bone": "pelvis",
+        "modifiers": [],
+        "dimensions_m": [
+          0.32,
+          0.18,
+          0.18
+        ],
+        "world_center_m": [
+          0.0,
+          -8.0,
+          0.98
+        ],
+        "world_min_z_m": 0.89,
+        "in_character_collection": true
+      },
+      "UpperArm_L": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "upper_arm.L",
+        "expected_bone": "upper_arm.L",
+        "modifiers": [],
+        "dimensions_m": [
+          0.08,
+          0.08,
+          0.3
+        ],
+        "world_center_m": [
+          -0.24,
+          -7.9948,
+          1.3901
+        ],
+        "world_min_z_m": 1.23879,
+        "in_character_collection": true
+      },
+      "UpperArm_R": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "upper_arm.R",
+        "expected_bone": "upper_arm.R",
+        "modifiers": [],
+        "dimensions_m": [
+          0.08,
+          0.08,
+          0.3
+        ],
+        "world_center_m": [
+          0.24,
+          -7.9948,
+          1.3901
+        ],
+        "world_min_z_m": 1.23879,
+        "in_character_collection": true
+      },
+      "LowerArm_L": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "forearm.L",
+        "expected_bone": "forearm.L",
+        "modifiers": [],
+        "dimensions_m": [
+          0.07,
+          0.07,
+          0.26
+        ],
+        "world_center_m": [
+          -0.24,
+          -7.9759,
+          1.1109
+        ],
+        "world_min_z_m": 0.97795,
+        "in_character_collection": true
+      },
+      "LowerArm_R": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "forearm.R",
+        "expected_bone": "forearm.R",
+        "modifiers": [],
+        "dimensions_m": [
+          0.07,
+          0.07,
+          0.26
+        ],
+        "world_center_m": [
+          0.24,
+          -7.9759,
+          1.1109
+        ],
+        "world_min_z_m": 0.97795,
+        "in_character_collection": true
+      },
+      "UpperLeg_L": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "thigh.L",
+        "expected_bone": "thigh.L",
+        "modifiers": [],
+        "dimensions_m": [
+          0.11,
+          0.11,
+          0.42
+        ],
+        "world_center_m": [
+          -0.11,
+          -7.9995,
+          0.68
+        ],
+        "world_min_z_m": 0.46987,
+        "in_character_collection": true
+      },
+      "UpperLeg_R": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "thigh.R",
+        "expected_bone": "thigh.R",
+        "modifiers": [],
+        "dimensions_m": [
+          0.11,
+          0.11,
+          0.42
+        ],
+        "world_center_m": [
+          0.11,
+          -7.9995,
+          0.68
+        ],
+        "world_min_z_m": 0.46987,
+        "in_character_collection": true
+      },
+      "LowerLeg_L": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "shin.L",
+        "expected_bone": "shin.L",
+        "modifiers": [],
+        "dimensions_m": [
+          0.09,
+          0.09,
+          0.4
+        ],
+        "world_center_m": [
+          -0.11,
+          -7.9995,
+          0.27
+        ],
+        "world_min_z_m": 0.06989,
+        "in_character_collection": true
+      },
+      "LowerLeg_R": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "shin.R",
+        "expected_bone": "shin.R",
+        "modifiers": [],
+        "dimensions_m": [
+          0.09,
+          0.09,
+          0.4
+        ],
+        "world_center_m": [
+          0.11,
+          -7.9995,
+          0.27
+        ],
+        "world_min_z_m": 0.06989,
+        "in_character_collection": true
+      },
+      "Foot_L": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "foot.L",
+        "expected_bone": "foot.L",
+        "modifiers": [],
+        "dimensions_m": [
+          0.1,
+          0.22,
+          0.07
+        ],
+        "world_center_m": [
+          -0.11,
+          -7.96,
+          0.035
+        ],
+        "world_min_z_m": 0.0,
+        "in_character_collection": true
+      },
+      "Foot_R": {
+        "parent": "CharacterArmature",
+        "parent_type": "BONE",
+        "parent_bone": "foot.R",
+        "expected_bone": "foot.R",
+        "modifiers": [],
+        "dimensions_m": [
+          0.1,
+          0.22,
+          0.07
+        ],
+        "world_center_m": [
+          0.11,
+          -7.96,
+          0.035
+        ],
+        "world_min_z_m": 0.0,
+        "in_character_collection": true
+      }
+    },
+    "controller_count": 8,
+    "controllers": {
+      "FootIK.L": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          -0.11,
+          -8.0,
+          0.07
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": false,
+        "in_character_collection": true
+      },
+      "FootIK.R": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          0.11,
+          -8.0,
+          0.07
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": false,
+        "in_character_collection": true
+      },
+      "KneePole.L": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          -0.11,
+          -7.35,
+          0.47
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": null,
+        "in_character_collection": true
+      },
+      "KneePole.R": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          0.11,
+          -7.35,
+          0.47
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": null,
+        "in_character_collection": true
+      },
+      "HandIK.L": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          -0.24,
+          -8.0,
+          0.98
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": null,
+        "in_character_collection": true
+      },
+      "HandIK.R": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          0.24,
+          -8.0,
+          0.98
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": null,
+        "in_character_collection": true
+      },
+      "ElbowPole.L": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          -0.32,
+          -8.4,
+          1.24
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": null,
+        "in_character_collection": true
+      },
+      "ElbowPole.R": {
+        "type": "EMPTY",
+        "parent": "CharacterRoot",
+        "world_location_m": [
+          0.32,
+          -8.4,
+          1.24
+        ],
+        "world_euler_deg": [
+          0.0,
+          -0.0,
+          0.0
+        ],
+        "is_locked": null,
+        "in_character_collection": true
+      }
+    },
+    "playground_preserved": true,
+    "playground_collections_snapshot": {
+      "Playground_Surfaces": 16,
+      "Playground_Visuals": 25,
+      "Playground_Lighting_Cameras": 4,
+      "Playground_Dynamics_Visualization": 56
+    },
+    "playground_stations_f1": {
+      "S1": {
+        "com_loc": [
+          -3.0,
+          -4.0,
+          1.0
+        ],
+        "body_loc": [
+          -3.0,
+          -4.0,
+          1.0
+        ],
+        "body_quat": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "S2": {
+        "com_loc": [
+          -3.0,
+          -2.0,
+          3.5
+        ],
+        "body_loc": [
+          -3.0,
+          -2.0,
+          3.5
+        ],
+        "body_quat": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "S3": {
+        "com_loc": [
+          -6.0,
+          0.0,
+          1.0
+        ],
+        "body_loc": [
+          -6.0,
+          0.0,
+          1.0
+        ],
+        "body_quat": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "S4": {
+        "com_loc": [
+          -6.0,
+          2.0,
+          1.0
+        ],
+        "body_loc": [
+          -6.0,
+          2.0,
+          1.0
+        ],
+        "body_quat": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "S5": {
+        "com_loc": [
+          -3.0,
+          4.0,
+          1.0
+        ],
+        "body_loc": [
+          -3.0,
+          4.0,
+          1.0
+        ],
+        "body_quat": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "playground_stations_f73": {
+      "S1": {
+        "com_loc": [
+          -3.0,
+          -3.99999,
+          1.0
+        ],
+        "body_loc": [
+          -3.0,
+          -3.99999,
+          1.0
+        ],
+        "body_quat": [
+          1.0,
+          0.00015,
+          0.0,
+          0.0
+        ]
+      },
+      "S2": {
+        "com_loc": [
+          -3.0,
+          -2.0,
+          -40.645
+        ],
+        "body_loc": [
+          -3.0,
+          -2.0,
+          -40.645
+        ],
+        "body_quat": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "S3": {
+        "com_loc": [
+          0.01006,
+          0.0,
+          1.0
+        ],
+        "body_loc": [
+          0.01006,
+          0.0,
+          1.0
+        ],
+        "body_quat": [
+          0.24795,
+          0.0,
+          0.96877,
+          0.0
+        ]
+      },
+      "S4": {
+        "com_loc": [
+          -2.43825,
+          2.0,
+          1.37685
+        ],
+        "body_loc": [
+          -2.43825,
+          2.0,
+          1.37685
+        ],
+        "body_quat": [
+          0.05345,
+          0.0,
+          0.99857,
+          0.0
+        ]
+      },
+      "S5": {
+        "com_loc": [
+          -3.0,
+          3.62398,
+          0.66106
+        ],
+        "body_loc": [
+          -3.0,
+          3.62398,
+          0.66106
+        ],
+        "body_quat": [
+          0.83817,
+          -0.54541,
+          0.0,
+          0.0
+        ]
+      }
+    }
+  },
+  "minimal_control_stages": {
+    "stage_A_static_standing": {
+      "success": true,
+      "root_world_position": [
+        0.0,
+        -8.0,
+        0.0
+      ],
+      "pelvis_world_position": [
+        0.0,
+        -8.0,
+        0.89
+      ],
+      "com_world_m": [
+        0.0,
+        -7.99627,
+        1.04793
+      ],
+      "max_end_effector_error_m": 3e-06,
+      "foot_L_min_z_m": 0.0,
+      "foot_R_min_z_m": 0.0,
+      "has_rom_violation": false,
+      "support_type": "double_stance",
+      "images": {
+        "front": "docs/evidence/task7a1/stage_A_static_front.png",
+        "side": "docs/evidence/task7a1/stage_A_static_side.png",
+        "iso": "docs/evidence/task7a1/stage_A_static_iso.png"
+      }
+    },
+    "stage_B_root_displacement": {
+      "success": true,
+      "has_rom_violation": false,
+      "requested_root_position_m": [
+        0.25,
+        -7.65,
+        0.0
+      ],
+      "actual_root_position_m": [
+        0.25,
+        -7.65,
+        0.0
+      ],
+      "root_position_error_m": 0.0,
+      "requested_yaw_deg": 6.0,
+      "actual_yaw_deg": 6.0,
+      "pelvis_bone_world_m": [
+        0.25,
+        -7.65,
+        0.86
+      ],
+      "pelvis_mesh_world_m": [
+        0.24975,
+        -7.64766,
+        0.94997
+      ],
+      "torso_mesh_world_m": [
+        0.24754,
+        -7.62659,
+        1.2792
+      ],
+      "head_mesh_world_m": [
+        0.24524,
+        -7.60474,
+        1.67841
+      ],
+      "max_end_effector_error_m": 7e-06,
+      "images": {
+        "front": "docs/evidence/task7a1/stage_B_root_disp_front.png",
+        "side": "docs/evidence/task7a1/stage_B_root_disp_side.png"
+      }
+    },
+    "stage_C_single_foot_ik": {
+      "success": true,
+      "has_rom_violation": false,
+      "foot_L": {
+        "requested_world_m": [
+          -0.11,
+          -8.05,
+          0.07
+        ],
+        "actual_world_m": [
+          -0.11,
+          -8.05,
+          0.06998
+        ],
+        "target_error_m": 2.2e-05,
+        "thigh_length_m": 0.42,
+        "shin_length_m": 0.4,
+        "knee_flexion_deg": 33.87,
+        "knee_forward_y_m": 0.1191,
+        "no_stretch": true,
+        "no_flip": true
+      },
+      "foot_R": {
+        "requested_world_m": [
+          0.14,
+          -7.82,
+          0.21
+        ],
+        "actual_world_m": [
+          0.14,
+          -7.81999,
+          0.20996
+        ],
+        "target_error_m": 4.5e-05,
+        "thigh_length_m": 0.42,
+        "shin_length_m": 0.4,
+        "knee_flexion_deg": 70.148,
+        "knee_forward_y_m": 0.2271,
+        "foot_world_euler_deg": [
+          -25.134,
+          0.0,
+          -0.0
+        ],
+        "no_stretch": true,
+        "no_flip": true
+      },
+      "images": {
+        "front": "docs/evidence/task7a1/stage_C_single_foot_ik_front.png",
+        "side": "docs/evidence/task7a1/stage_C_single_foot_ik_side.png"
+      }
+    },
+    "stage_D_support_foot_lock": {
+      "all_steps_succeeded": true,
+      "locked_anchor_world_m": [
+        -0.11,
+        -8.0,
+        0.07
+      ],
+      "max_controller_drift_m": 0.0,
+      "max_ankle_bone_drift_m": 0.0,
+      "max_mesh_center_drift_m": 0.0,
+      "steps": [
+        {
+          "step_index": 0,
+          "root_world_m": [
+            0.0,
+            -8.0,
+            0.0
+          ],
+          "swing_foot_R_target_m": [
+            0.11,
+            -8.04,
+            0.07
+          ],
+          "wbc_success": true,
+          "foot_L_is_locked": true,
+          "foot_L_controller_parent": null,
+          "foot_L_locked_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.07
+          ],
+          "foot_L_actual_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.06999
+          ],
+          "controller_drift_m": 0.0,
+          "ankle_bone_drift_m": 0.0,
+          "mesh_center_drift_m": 0.0,
+          "hip_to_target_dist_m": 0.786,
+          "is_reachable": true
+        },
+        {
+          "step_index": 1,
+          "root_world_m": [
+            -0.015,
+            -7.96,
+            0.0
+          ],
+          "swing_foot_R_target_m": [
+            0.11,
+            -7.99,
+            0.13
+          ],
+          "wbc_success": true,
+          "foot_L_is_locked": true,
+          "foot_L_controller_parent": null,
+          "foot_L_locked_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.07
+          ],
+          "foot_L_actual_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.06999
+          ],
+          "controller_drift_m": 0.0,
+          "ankle_bone_drift_m": 0.0,
+          "mesh_center_drift_m": 0.0,
+          "hip_to_target_dist_m": 0.78716,
+          "is_reachable": true
+        },
+        {
+          "step_index": 2,
+          "root_world_m": [
+            -0.025,
+            -7.92,
+            0.0
+          ],
+          "swing_foot_R_target_m": [
+            0.11,
+            -7.93,
+            0.17
+          ],
+          "wbc_success": true,
+          "foot_L_is_locked": true,
+          "foot_L_controller_parent": null,
+          "foot_L_locked_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.07
+          ],
+          "foot_L_actual_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.06999
+          ],
+          "controller_drift_m": 0.0,
+          "ankle_bone_drift_m": 0.0,
+          "mesh_center_drift_m": 0.0,
+          "hip_to_target_dist_m": 0.79046,
+          "is_reachable": true
+        },
+        {
+          "step_index": 3,
+          "root_world_m": [
+            -0.015,
+            -7.88,
+            0.0
+          ],
+          "swing_foot_R_target_m": [
+            0.11,
+            -7.87,
+            0.12
+          ],
+          "wbc_success": true,
+          "foot_L_is_locked": true,
+          "foot_L_controller_parent": null,
+          "foot_L_locked_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.07
+          ],
+          "foot_L_actual_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.06999
+          ],
+          "controller_drift_m": 0.0,
+          "ankle_bone_drift_m": 0.0,
+          "mesh_center_drift_m": 0.0,
+          "hip_to_target_dist_m": 0.79525,
+          "is_reachable": true
+        },
+        {
+          "step_index": 4,
+          "root_world_m": [
+            0.0,
+            -7.84,
+            0.0
+          ],
+          "swing_foot_R_target_m": [
+            0.11,
+            -7.82,
+            0.07
+          ],
+          "wbc_success": true,
+          "foot_L_is_locked": true,
+          "foot_L_controller_parent": null,
+          "foot_L_locked_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.07
+          ],
+          "foot_L_actual_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.06999
+          ],
+          "controller_drift_m": 0.0,
+          "ankle_bone_drift_m": 0.0,
+          "mesh_center_drift_m": 0.0,
+          "hip_to_target_dist_m": 0.80212,
+          "is_reachable": true
+        }
+      ],
+      "images": {
+        "step_0_side": "docs/evidence/task7a1/stage_D_lock_step0_side.png",
+        "step_4_side": "docs/evidence/task7a1/stage_D_lock_step4_side.png"
+      }
+    },
+    "stage_E_continuous_walk": {
+      "action_names": [
+        "start_stop_walk"
+      ],
+      "total_frames": 204,
+      "fps": 24,
+      "start_root_y_m": -8.0,
+      "end_root_y_m": -6.74,
+      "total_root_displacement_m": 1.26,
+      "peak_speed_mps": 0.24,
+      "unreachable_count": 0,
+      "step_count": 7,
+      "output_blend_path": "output/dynamics_playground_task7a1.blend",
+      "output_blend_size_bytes": 342596,
+      "sampled_frames": [
+        {
+          "frame": 1,
+          "stage": "stand_start",
+          "mode": "idle",
+          "root_world_m": [
+            0.0,
+            -8.0,
+            0.0
+          ],
+          "com_world_m": [
+            0.0,
+            -7.99775,
+            1.04795
+          ],
+          "speed_mps": 0.0,
+          "phase_L": "stance",
+          "phase_R": "stance",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.07
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -8.0,
+            0.07
+          ],
+          "foot_L_target_error_m": 3e-06,
+          "foot_R_target_error_m": 3e-06,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 24,
+          "stage": "start",
+          "mode": "start",
+          "root_world_m": [
+            0.0,
+            -7.99632,
+            0.0
+          ],
+          "com_world_m": [
+            -0.00607,
+            -7.955,
+            1.02615
+          ],
+          "speed_mps": 0.02375,
+          "phase_L": "stance",
+          "phase_R": "swing",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -8.0,
+            0.06999
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -7.95551,
+            0.15341
+          ],
+          "foot_L_target_error_m": 1e-05,
+          "foot_R_target_error_m": 4.4e-05,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 54,
+          "stage": "accelerate",
+          "mode": "accelerate",
+          "root_world_m": [
+            0.0,
+            -7.85398,
+            0.0
+          ],
+          "com_world_m": [
+            0.02248,
+            -7.80314,
+            1.03697
+          ],
+          "speed_mps": 0.20728,
+          "phase_L": "swing",
+          "phase_R": "stance",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -7.83046,
+            0.19774
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -7.85,
+            0.06999
+          ],
+          "foot_L_target_error_m": 4.6e-05,
+          "foot_R_target_error_m": 7e-06,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 78,
+          "stage": "steady_walk",
+          "mode": "walk",
+          "root_world_m": [
+            0.0,
+            -7.62,
+            0.0
+          ],
+          "com_world_m": [
+            -0.02252,
+            -7.5745,
+            1.04007
+          ],
+          "speed_mps": 0.24,
+          "phase_L": "stance",
+          "phase_R": "swing",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -7.61,
+            0.06999
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -7.64133,
+            0.2076
+          ],
+          "foot_L_target_error_m": 1.1e-05,
+          "foot_R_target_error_m": 1.2e-05,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 102,
+          "stage": "steady_walk",
+          "mode": "walk",
+          "root_world_m": [
+            0.0,
+            -7.38,
+            0.0
+          ],
+          "com_world_m": [
+            0.02252,
+            -7.3345,
+            1.04007
+          ],
+          "speed_mps": 0.24,
+          "phase_L": "swing",
+          "phase_R": "stance",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -7.40133,
+            0.2076
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -7.37,
+            0.06999
+          ],
+          "foot_L_target_error_m": 1.2e-05,
+          "foot_R_target_error_m": 1.1e-05,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 126,
+          "stage": "steady_walk",
+          "mode": "walk",
+          "root_world_m": [
+            0.0,
+            -7.14,
+            0.0
+          ],
+          "com_world_m": [
+            -0.02252,
+            -7.0945,
+            1.04007
+          ],
+          "speed_mps": 0.24,
+          "phase_L": "stance",
+          "phase_R": "swing",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -7.13,
+            0.06999
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -7.16133,
+            0.2076
+          ],
+          "foot_L_target_error_m": 1.1e-05,
+          "foot_R_target_error_m": 1.2e-05,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 150,
+          "stage": "decelerate",
+          "mode": "decelerate",
+          "root_world_m": [
+            0.0,
+            -6.90368,
+            0.0
+          ],
+          "com_world_m": [
+            0.02252,
+            -6.86227,
+            1.03568
+          ],
+          "speed_mps": 0.21625,
+          "phase_L": "swing",
+          "phase_R": "stance",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -6.96046,
+            0.18792
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -6.89,
+            0.06999
+          ],
+          "foot_L_target_error_m": 3.4e-05,
+          "foot_R_target_error_m": 6e-06,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 174,
+          "stage": "stop_step",
+          "mode": "stop",
+          "root_world_m": [
+            0.0,
+            -6.7582,
+            0.0
+          ],
+          "com_world_m": [
+            -0.01447,
+            -6.7252,
+            1.02379
+          ],
+          "speed_mps": 0.06614,
+          "phase_L": "stance",
+          "phase_R": "swing",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -6.74,
+            0.06998
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -6.84551,
+            0.14509
+          ],
+          "foot_L_target_error_m": 2.3e-05,
+          "foot_R_target_error_m": 2.5e-05,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        },
+        {
+          "frame": 204,
+          "stage": "stand_stop",
+          "mode": "idle",
+          "root_world_m": [
+            0.0,
+            -6.74,
+            0.0
+          ],
+          "com_world_m": [
+            0.0,
+            -6.73775,
+            1.04795
+          ],
+          "speed_mps": 0.0,
+          "phase_L": "stance",
+          "phase_R": "stance",
+          "foot_L_ankle_world_m": [
+            -0.11,
+            -6.74,
+            0.07
+          ],
+          "foot_R_ankle_world_m": [
+            0.11,
+            -6.74,
+            0.07
+          ],
+          "foot_L_target_error_m": 3e-06,
+          "foot_R_target_error_m": 3e-06,
+          "rom_is_valid": true,
+          "rom_max_excess_deg": 0.0
+        }
+      ],
+      "keyframe_images": {
+        "side": [
+          "docs/evidence/task7a1/stage_E_walk_f001_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f024_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f054_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f078_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f102_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f126_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f150_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f174_side.png",
+          "docs/evidence/task7a1/stage_E_walk_f204_side.png"
+        ],
+        "front": [
+          "docs/evidence/task7a1/stage_E_walk_f001_front.png",
+          "docs/evidence/task7a1/stage_E_walk_f054_front.png",
+          "docs/evidence/task7a1/stage_E_walk_f102_front.png",
+          "docs/evidence/task7a1/stage_E_walk_f150_front.png",
+          "docs/evidence/task7a1/stage_E_walk_f204_front.png"
+        ],
+        "iso": [
+          "docs/evidence/task7a1/stage_E_walk_f001_iso.png",
+          "docs/evidence/task7a1/stage_E_walk_f054_iso.png",
+          "docs/evidence/task7a1/stage_E_walk_f102_iso.png",
+          "docs/evidence/task7a1/stage_E_walk_f150_iso.png",
+          "docs/evidence/task7a1/stage_E_walk_f204_iso.png"
+        ]
+      },
+      "animated_gif_preview": "docs/evidence/task7a1/task7a1_walk_preview.gif"
+    }
+  },
+  "mathematical_consistency": {
+    "coordinate_spaces": {
+      "non_zero_translation_m": [
+        1.35,
+        -7.25,
+        0.0
+      ],
+      "non_zero_yaw_deg": 6.5,
+      "distinct_foot_targets_world_m": {
+        "foot_L": [
+          1.23756,
+          -7.3232,
+          0.07
+        ],
+        "foot_R": [
+          1.47099,
+          -7.07518,
+          0.19
+        ]
+      },
+      "wbc_success": true,
+      "world_to_root_local_vector_roundtrip_error_m": 0.0,
+      "five_space_point_chain_roundtrip_error_m": 6.38e-07,
+      "armature_vs_root_origin_alignment_error_m": 0.0,
+      "ik_end_effector_vs_bone_head_error_m": {
+        "foot_L": 9e-06,
+        "foot_R": 3e-05
+      },
+      "sample_point_in_all_5_spaces": {
+        "1_pose_bone_local_m": [
+          0.0,
+          0.077,
+          -0.07
+        ],
+        "2_armature_object_m": [
+          0.13279,
+          0.20291,
+          0.09544
+        ],
+        "3_character_root_local_m": [
+          0.13279,
+          0.20291,
+          0.09544
+        ],
+        "4_world_space_m": [
+          1.45897,
+          -7.03336,
+          0.09544
+        ],
+        "5_ik_effector_world_m": [
+          1.47099,
+          -7.07518,
+          0.19
+        ]
+      }
+    },
+    "mass_and_com": {
+      "model_15_name": "DempsterWinter15",
+      "segment_count_15": 15,
+      "default_total_mass_kg": 70.0,
+      "scaled_reference_mass_kg": 75.0,
+      "mass_ratio_sum": 1.0,
+      "segment_mass_ratios": {
+        "head": 0.081,
+        "torso": 0.355,
+        "pelvis": 0.142,
+        "upper_arm_L": 0.028,
+        "upper_arm_R": 0.028,
+        "forearm_L": 0.016,
+        "forearm_R": 0.016,
+        "hand_L": 0.006,
+        "hand_R": 0.006,
+        "thigh_L": 0.1,
+        "thigh_R": 0.1,
+        "shin_L": 0.0465,
+        "shin_R": 0.0465,
+        "foot_L": 0.0145,
+        "foot_R": 0.0145
+      },
+      "neutral_standing_com_world_m": [
+        0.0,
+        -7.99627,
+        1.04793
+      ],
+      "neutral_standing_com_armature_m": [
+        0.0,
+        0.00373,
+        1.04793
+      ],
+      "neutral_standing_13seg_com_world_m": [
+        0.0,
+        -7.99649,
+        1.05008
+      ],
+      "bilateral_com_x_offset_m": 0.0,
+      "bilateral_segment_symmetry_errors_m": {
+        "upper_arm_L_vs_upper_arm_R": 0.0,
+        "forearm_L_vs_forearm_R": 0.0,
+        "hand_L_vs_hand_R": 0.0,
+        "thigh_L_vs_thigh_R": 0.0,
+        "shin_L_vs_shin_R": 0.0,
+        "foot_L_vs_foot_R": 0.0
+      },
+      "posture_change_com_world_m": [
+        0.04376,
+        -7.88356,
+        0.97288
+      ],
+      "posture_change_com_delta_m": [
+        0.04376,
+        0.11271,
+        -0.07506
+      ]
+    },
+    "geometric_contact": {
+      "surface_query_foot_L": {
+        "surface_id": "default_ground",
+        "surface_type": "horizontal_ground",
+        "contact_point_world_m": [
+          -0.11,
+          -8.0,
+          0.0
+        ],
+        "surface_normal_world": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "signed_distance_m": 0.0,
+        "friction_coeff": 0.7
+      },
+      "surface_query_foot_R": {
+        "surface_id": "default_ground",
+        "surface_type": "horizontal_ground",
+        "contact_point_world_m": [
+          0.11,
+          -8.0,
+          0.0
+        ],
+        "surface_normal_world": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "signed_distance_m": 0.0
+      },
+      "dual_foot_lock": {
+        "support_type": "double_stance",
+        "supporting_limbs": [
+          "foot_L",
+          "foot_R"
+        ],
+        "foot_L_valid": true,
+        "foot_R_valid": true,
+        "foot_L_normal_dist_m": 0.0,
+        "foot_L_slip_m": 0.0
+      },
+      "left_foot_lock_right_release": {
+        "support_type": "single_stance_l",
+        "supporting_limbs": [
+          "foot_L"
+        ],
+        "foot_L_is_locked": true,
+        "foot_R_is_locked": false,
+        "foot_L_phase": "stance",
+        "foot_R_phase": "swing"
+      },
+      "right_foot_lock_left_release": {
+        "support_type": "single_stance_r",
+        "supporting_limbs": [
+          "foot_R"
+        ],
+        "foot_L_is_locked": false,
+        "foot_R_is_locked": true,
+        "foot_L_phase": "swing",
+        "foot_R_phase": "stance"
+      },
+      "physical_semantics_boundary": "Geometric contact (contact_model.py + foot_contact.py) enforces kinematic anchor pinning, normal gap/penetration, and tangential slip checks in meters; dynamic reaction forces (N) belong exclusively to contact_force_solver.py / forward_dynamics.py."
+    },
+    "constraint_truthfulness": {
+      "valid_pose_case": {
+        "success": true,
+        "is_all_reachable": true,
+        "has_rom_violation": false,
+        "max_end_effector_error_m": 1.5e-05,
+        "unmet_constraint_count": 0
+      },
+      "unreachable_target_case": {
+        "requested_foot_R_world_m": [
+          0.11,
+          -6.3,
+          0.5
+        ],
+        "actual_foot_R_world_m": [
+          0.11,
+          -7.19876,
+          0.69561
+        ],
+        "position_error_m": 0.9198,
+        "is_reachable": false,
+        "is_all_reachable": false,
+        "overall_success": false,
+        "unmet_categories": [
+          "REACHABILITY",
+          "ROM_VIOLATION"
+        ]
+      },
+      "rom_violation_case": {
+        "has_rom_violation": true,
+        "overall_success": false,
+        "violated_joints": [
+          "spine",
+          "upper_arm.L"
+        ],
+        "max_excess_deg": 55.0,
+        "unmet_categories": [
+          "ROM_VIOLATION",
+          "ROM_VIOLATION"
+        ]
+      },
+      "rom_clamp_reporting_case": {
+        "initial_rom_valid": false,
+        "overall_success_reported_truthfully_false": true,
+        "unmet_categories": [
+          "ROM_VIOLATION"
+        ]
+      }
+    }
+  }
+}

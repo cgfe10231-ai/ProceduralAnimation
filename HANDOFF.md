@@ -5,25 +5,19 @@
 ---
 
 ## 1. 当前目标
-Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计、通用程序化运动底座架构冻结、文档真实性门禁与 Architecture Integrity Gate Closure）**已完全验证通过并正式闭环**：
-1. **消除校验器写文件副作用并实现严格模式分离 (`tests/audit_c2_final_inspector.py`)**：
-   - 严格分离 Mode A（`--generate` / `--refresh` 仅在显式请求时写入磁盘产物）、Mode B（`--verify-docs` 纯内存校验，零写文件）与 Mode C（`--test-validator` 纯只读自测）；
-   - 执行 `--verify-docs` 或自测后 `git status --short` 实测 100% 干净，零修改、零 hash 变化。
-2. **消除整行跳过漏洞并建立子句级精准否定豁免**：
-   - 废除 `any(k in line for k in [...]) continue` 整行跳过机制，采用分号/逗号/句号/括号的独立子句级上下文精准判定；
-   - 仅对自身所在子句包含显式否定关键词（如“不存在”、“严禁调用”）的符号予以豁免，同一行其他子句出现的符号严格核验 AST 物理存在性。
-3. **扩充防过拟合动态随机测试套件**：
-   - 自测试用例增至 6 项：新增动态 UUID 随机命名负例（Test 5）与同行复合子句检验（Test 6），杜绝硬编码黑名单作弊。
-4. **统一测试执行器参数传递扩展与独立门禁测试**：
-   - `TestDefinition` 扩展可选 `script_args`，`tests/run_test_suite.py` 100% 向后兼容支持参数传递，`tests/test_runner_unit.py` 11/11 单元测试全通；
-   - 编写薄测试脚本 [`tests/test_architecture_integrity_gate.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_architecture_integrity_gate.py)，注册为 `architecture_integrity_gate`，纳入 `TestTier.QUICK` 与 `TestTier.FULL`。
-5. **全级别回归套件全绿**：
-   - `.\run_tests.ps1 -tier quick`：**10 / 10 PASS** (10.46s)，门禁用例 0.68s 首位通过；
-   - `.\run_tests.ps1 -tier full`：**24 / 24 PASS** (95.07s)，动力学、运动学、约束、步态及门禁套件全量通过；
-   - 源码物理零变动：未修改 `src/` 下任何 Python 文件，未修改任何 `.blend` 文件。
-6. **底座正式冻结承诺**：
-   - 6G-D 正式冻结并进入维护模式，严禁自动创建 C2-B/C3/6G-E 分支；
-   - 严格停止，不自动触发 Phase 7A 或 Phase 6H。
+Task 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证）**已完全验证通过并正式闭环**：
+1. **历史 19 骨骼资产与运动模块复用审计 (`docs/PHASE7A_REUSE_AUDIT.md`)**：
+   - 完整审计 `output/unified_motion_integration.blend`、`output/dynamics_playground.blend` 与 19 个既有核心模块，按 7 大章节列明精确文件路径与行号，并接入 `tests/audit_c2_final_inspector.py --verify-docs` 永久 AST 门禁。
+2. **真实 19 骨骼角色无损装入 `DynamicsPlayground` (`src/scene/playground_character_integration.py`, `run_task7a1_character_playground.py`)**：
+   - 严格以 `output/dynamics_playground.blend` 为训练场唯一 SSOT（只读加载，原始文件 100% 零改动，4 大集合与 5 个动力学工位 `S1..S5` 100% 原样保留）；
+   - 通过既有 `build_character`、`build_rig`、`bind_character_to_rig`、`setup_leg_ik`、`setup_arm_ik` 将 `CharacterRoot`、19 骨骼 `CharacterArmature`、13 个网格部件（`parent_type="BONE"`）与 8 个 IK/Pole 控制器装入 `"Character"` 集合，并导出派生可播放场景 `output/dynamics_playground_task7a1.blend`。
+3. **五阶段最小控制闭环（Stages A–E）与四大数学一致性验证**：
+   - 经由唯一生产控制链 `MotionPlanner` / `MotionAction` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` 验证：Stage A 静态站立 ($Z_{\min}=0.0\text{ m}$)、Stage B 根节点位移与 $+6.0^\circ$ 偏航、Stage C 左右脚非对称独立 IK（零拉伸、零翻转）、Stage D 支撑脚世界空间锁定（控制器与踝骨漂移 `0.0 m`）、Stage E `StartStopWalkAction` 204 帧连续行走（位移 $1.2600\text{ m}$，0 不可达帧）；
+   - 验证五重坐标空间非零平移/偏航往返误差 $< 2.2\times 10^{-7}\text{ m}$、15 分段 CoM（70kg/75kg、对称性、姿态偏移）、几何接触与动力学反力边界区分、不可达 (`REACHABILITY`) 与超限 (`ROM_VIOLATION`) 真实报错。
+4. **自动视觉证据与全级别回归全绿**：
+   - 自动输出 `docs/evidence/task7a1/task7a1_verification_report.json`、28 张多视角关键帧 PNG 与 `docs/evidence/task7a1/task7a1_walk_preview.gif`；
+   - `.\run_tests.ps1 -tier quick` (10/10 PASS)、`-tier physics` (16/16 PASS)、`-tier motion` (6/6 PASS)、`-tier full` (25/25 PASS) 与 `--verify-docs` (PASS) 全绿通过；
+   - 严格停止于 Task 7A-1，绝不自动进入 Task 7A-2。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -63,44 +57,39 @@ Task 6G-D-C2-FINAL（6G 动力学最终收口、完整工程审计、通用程�
 * 完成 Task 6G-D-C1-FINAL 数值闭环集中数学审计、步数时间解耦、正交状态语义与遥测不可变性防御。
 * 完成 Task 6G-D-C2-A DynamicsPlayground 真实动力学状态集成与多场景视口验证。
 * 完成 Task 6G-D-C2-A 补充要求：自动视觉证据采集、遥测一致性审计与跨 AI 验收管线。
-* **完成 Task 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结**。
+* 完成 Task 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结。
+* **完成 Task 7A-1 历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证**。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `playground_dynamics_states`：5/5 项场景与对象测试全绿（纯 Python 与 Blender 1.48s）；
-  * `closed_loop_dynamics`：31/31 项闭环场景与数学测试全绿通过（纯 Python 6.80s，Blender 0.59s）；
-  * `forward_dynamics`：22/22 项解析与状态测试全绿通过（纯 Python 0.009s，Blender 0.009s）；
-  * `contact_force_solver`：38/38 项测试全绿通过（纯 Python 0.406s，Blender 0.087s）；
-  * `contact_dynamics_math`：18/18 项数学与契约定理全绿（0.79s，退出码 0）；
-  * `dynamics_environment_query`：13/13 项数学定理全绿（0.13s，退出码 0）；
-  * `dynamics_playground_blend`：45 个场景对象与材质完整性通过（1.31s，退出码 0，标定为 `AUTOMATED_PASS (Visual Inspection Required)`）；
-  * `quick` Tier：9/9 项通过（15.08s，退出码 0）；
-  * `physics` Tier：15/15 项通过（70.36s，退出码 0），历史物理模块 100% 零退化；
-* 状态标定为：Task 6G-D-C2-A 已完成并验证，严格停止。
+  * `task7a1_character_playground`：6/6 项角色装配、五阶段控制、四大数学一致性与视觉证据测试全绿（Blender 2.74s / 4.72s）；
+  * `architecture_integrity_gate`：AST 符号存在性与 6 项校验器自测全绿（0.71s，退出码 0）；
+  * `quick` Tier：10/10 项通过（11.0s，退出码 0）；
+  * `physics` Tier：16/16 项通过（75.69s，退出码 0）；
+  * `motion` Tier：6/6 项通过（22.36s，退出码 0）；
+  * `full` Tier：25/25 项通过（102.93s，退出码 0），历史物理与步态模块 100% 零退化；
+* 状态标定为：Task 7A-1 已完成并验证（`AUTOMATED_PASS` + 自动视觉证据已入库），严格停止。
 
 ## 4. 当前文件
-* 核心场景产物：`output/dynamics_playground.blend`（230,508 字节，单一 SSOT，可在 Blender 5.1.1 直接打开播放）
-* 核心可视化模块：`src/scene/dynamics_visualizer.py`
-* 场景生成入口：`run_dynamics_playground.py`
-* 核心测试脚本：`tests/verify_task6gd_playground_dynamics.py`、`tests/verify_task6gd_closed_loop_dynamics.py`
-* 核心审计文档：`docs/C1_FINAL_AUDIT.md` (SSOT)
+* 核心场景产物：`output/dynamics_playground.blend`（单一训练场 SSOT，零改动保留）、`output/dynamics_playground_task7a1.blend`（Task 7A-1 19 骨骼角色接入可播放派生场景）
+* 核心角色接入模块：`src/scene/playground_character_integration.py`、`run_task7a1_character_playground.py`
+* 核心测试脚本：`tests/verify_task7a1_character_playground.py`
+* 核心审计与证据：`docs/PHASE7A_REUSE_AUDIT.md`、`docs/evidence/task7a1/task7a1_verification_report.json`、`docs/evidence/task7a1/task7a1_walk_preview.gif`
 * 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
-* 测试输出报告：`tests/output/test_report.json`、`tests/output/test_report.md`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`docs/ENGINEERING_AUDIT.md`、`PROJECT_SPEC.md`、`ARCHITECTURE.md`、`DECISIONS.md` (`[DEC-043]`)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`DECISIONS.md` (`[DEC-048]`)
 * 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
-* 核心源码：`src/motion/closed_loop_dynamics.py`、`src/motion/forward_dynamics.py`、`src/motion/contact_force_solver.py`、`src/motion/contact_dynamics.py`、`src/scene/dynamics_visualizer.py`、`src/scene/environment_query.py`、`src/scene/builder.py`
 
 ## 5. 已知问题与未实现功能清单 (Unimplemented Features)
-* 连续多关节动态平衡（Task 6H：步频调整、摆动腿着地点选择与双足动态行走的全身动力学耦合）；
-* 动态视觉验收（用户在 Blender 5.1.1 中目视播放 5 个测试台动画并核对力学箭头）。
+* 后续 Phase 7A 任务（如斜坡/台阶多表面连续通行 Task 7A-2、7B 上肢独立控制、7C 动力学合流等）；
+* 用户在 Blender 5.1.1 中目视检查 `output/dynamics_playground_task7a1.blend` 及 `docs/evidence/task7a1/` 视觉证据。
 
 ## 6. 下一步
-* **严格停止，等待用户审阅并下达下一阶段指令（建议进入用户目视验收与后续多关节动态平衡准备）**。
-* **严禁自动进入 6H**。
+* **严格停止，等待用户与 ChatGPT 审阅并下达下一阶段指令**。
+* **严禁自动进入 Task 7A-2 或后续阶段**。
 
 ## 7. 禁止事项
 * **严禁修改、删除或移动项目目录外的任何文件**。
 * **严禁虚报测试结果**，严格执行 6 态划分。
 * **以磁盘代码和实际测试结果为事实第一依据**。
 * **严禁编写独立脚本拼凑动画冒充连续动作**。
-* **严禁擅自进入 Task 6G-D-C2 或 6H**。
+* **严禁擅自进入 Task 7A-2 或 6H**。
