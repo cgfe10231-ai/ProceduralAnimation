@@ -1,13 +1,27 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-26  
-> **当前阶段**：任务 7A-2 架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收（Task 7A-2 Architecture Recovery, Continuous Terrain Traversal & Internal Blender Diagnostics）已圆满完成并通过全量验证（彻底消除第 226→227 帧 2.3717m 空间瞬移，废除全部帧号豁免；恢复 MotionPlanner 唯一调度权；100% 剥离字符串命名驱动逻辑，改为纯几何连续法向量与高程查询；解耦高层路线目标与动态落脚点离散规划；修正工期估算；生成并验证权威连续动画场景 `output/dynamics_playground_task7a2_corrected.blend` 700 帧 100% 达成 0 ROM 违规、0 地形穿模、0 IK 违例、脚踝锁定 0.000011m 漂移、骨骼 1.69e-6m 长度形变守恒、70.000kg 质量守恒；构建内嵌控制链诊断视窗 `Task7A2_ControlChain_Debug` 呈现 6 阶段实时遥测 HUD 与 3D 关键帧指示物；导出 7 张高清关键帧 PNG 与 2 份连续动态 GIF；`quick` 12/12, `motion` 8/8, `full` 28/28, `--verify-docs` 全绿通过；严格停止于 Task 7A-2，严禁自动进入 Task 7A-3，等待用户验收）  
+> **记录时间**：2026-10-27  
+> **当前阶段**：架构基线审计与 7A→7B 准入门禁（Architecture Baseline Audit — 7A→7B Admission Gate）已全部完成。全仓库 59 个 Python 模块、21 个入口脚本、47 个测试脚本及所有 .blend 场景完成深度静态与动态调用链审计，输出 8 份详尽架构审计文档至 `docs/audit/`。明确揭示双管线完全解耦现实（Pipeline A 19 骨骼角色与 Pipeline B 6-DOF 动力学代理互不相通）、环境交互为单向开环查询、质心遥测与接触模型未形成闭环反馈，并编目 8 项关键架构问题（AUDIT-01 至 AUDIT-08）。全套自动化测试 12/12 PASS，`--verify-docs` 零幻觉通过。当前状态：`ARCHITECTURE AUDIT — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **架构基线审计与 7A→7B 准入门禁 (Architecture Baseline Audit — 7A→7B Admission Gate)**：
+  * **8 份全景架构基线审计文档编纂完成 (`docs/audit/`)**：
+    - [`docs/audit/MODULE_INVENTORY.md`](docs/audit/MODULE_INVENTORY.md)：59 个生产模块逐一按 20 个关键工程问题严格回答（行号、职责、接口类型、坐标单位、读写权限、变动目标、调用关系、八态分类、硬编码与旁路检查、跨引擎复用性与测试覆盖），统计 22 Active、6 Read-Only Telemetry、5 Standalone Solvers、17 Legacy/Prototypes、9 Inits；
+    - [`docs/audit/ACTUAL_RUNTIME_ARCHITECTURE.md`](docs/audit/ACTUAL_RUNTIME_ARCHITECTURE.md)：真实控制架构图谱与 6 大执行链（Chains A..F）完整重构，清晰区分真实生产调用、只读遥测、独立求解器与待接反馈回路；深入阐明单帧 6 阶段协议落地现实；
+    - [`docs/audit/STATE_OWNERSHIP_MATRIX.md`](docs/audit/STATE_OWNERSHIP_MATRIX.md)：确立全对象数据结构读写矩阵，定位全部 4 类实际变动代码物理行号，证明 `WholeBodyController` 为骨骼姿态与 IK 目标唯一合法写入者，零直接骨骼写竞争；
+    - [`docs/audit/CALL_GRAPH_AUDIT.md`](docs/audit/CALL_GRAPH_AUDIT.md)：绘制完整生产调用图谱，明确标定 Pipeline B 4 大完全孤立模块（`forward_dynamics.py`、`contact_force_solver.py`、`closed_loop_dynamics.py`、`dynamics_visualizer.py`）及 21 个入口脚本关系；
+    - [`docs/audit/HARDCODE_AND_BYPASS_AUDIT.md`](docs/audit/HARDCODE_AND_BYPASS_AUDIT.md)：将代码全部常量与逻辑按 6 类（A..F）严格分类，记录历史 Frame 226 瞬移根因及 Task 7A-2 修正，确认生产链零直接骨骼绕行旁路；
+    - [`docs/audit/ENVIRONMENT_INTERACTION_GAP.md`](docs/audit/ENVIRONMENT_INTERACTION_GAP.md)：系统回答环境交互 10 问，揭示 `EnvironmentQuery` 为纯解析数学面而非 Blender 网格 BVH 投射线、场景构建与查询存在双重真实源、CoM 与接触状态未回传下一帧规划、IK 求解失败未触发重规划、足底接触为运动学刚性锁定而无摩擦锥物理约束等核心技术事实；
+    - [`docs/audit/DOCUMENTATION_DRIFT.md`](docs/audit/DOCUMENTATION_DRIFT.md)：核查既有文档与磁盘代码差异，指出 `ARCHITECTURE.md` 滞后于 v2.3（仍停留在动作绕过 WBC 的早期快照）、遗漏 Phase 7A 核心模块 `TerrainWalkAction`、存在 `JointModel` 等符号名称偏差；
+    - [`docs/audit/ARCHITECTURE_AUDIT_SUMMARY.md`](docs/audit/ARCHITECTURE_AUDIT_SUMMARY.md)：系统总结全审计成果，登记 AUDIT-01 至 AUDIT-08 共 8 项问题，标定 4 项为 Phase 7B 准入阻断项，制定 7B 阶段化准入路线图；
+  * **自动化验证与零幻觉门禁**：
+    - `tests/audit_c2_final_inspector.py --verify-docs` 100% PASS，全量引用符号真实存在，零虚构符号；
+    - `tests/run_test_suite.py --tier quick` 12/12 PASS (14.47s)，全套回归测试保持全绿；
+    - 状态确定：`ARCHITECTURE AUDIT — AWAITING HUMAN REVIEW`，严禁越级或衍生分支。
 * **任务 7A-2 架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收 (Task 7A-2 Architecture Recovery & Continuous Traversal Acceptance)**：
   * **P0 瞬移缺陷彻底消除与拓扑断裂证明**：
     - 消除早期实现中第 226 $\to$ 227 帧发生的 $\Delta = 2.3717\text{ m}$ 空间瞬移，彻底废除测试与验证逻辑中的任何帧号豁免代码（严禁 `frame_num != 227`）；

@@ -3,6 +3,27 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-27] 架构基线审计与 7A→7B 准入门禁 (Architecture Baseline Audit — 7A→7B Admission Gate)
+
+### 全景架构基线审计文档体系编纂 (`docs/audit/`)
+* **产出 8 份专业架构基线审计报告**：
+  - `MODULE_INVENTORY.md`：全量 59 个 Python 生产模块逐一按 20 个统一工程问题完成技术深度剖析（行号、职责、接口、读写、分类等），统计 22 Active、6 Read-Only Telemetry、5 Standalone Solvers、17 Legacy/Prototypes、9 Inits；
+  - `ACTUAL_RUNTIME_ARCHITECTURE.md`：重构 6 大运行链（Chains A..F），确立真实双管线解耦事实（Pipeline A 19 骨骼角色运动学 vs Pipeline B 6-DOF 动力学代理）；
+  - `STATE_OWNERSHIP_MATRIX.md`：建立全对象读写所有权矩阵，全盘检索骨骼与控制器物理突变行号，确认 WBC 独占骨骼写入权；
+  - `CALL_GRAPH_AUDIT.md`：绘制生产与测试调用图谱，明确标定 Pipeline B 4 大独立动力学模块与 21 个入口脚本关系；
+  - `HARDCODE_AND_BYPASS_AUDIT.md`：6 分类严格审计常量、工程配置、测试基准、字符串耦合与旁路，确认生产链零直接骨骼绕行旁路；
+  - `ENVIRONMENT_INTERACTION_GAP.md`：透视回答环境交互 10 问，揭示环境查询为纯解析面、场景构建与查询存在双重真实源、CoM 与接触状态未回传下一帧规划、IK 求解失败未触发重规划等技术事实；
+  - `DOCUMENTATION_DRIFT.md`：详细比对既有架构文档与磁盘源码差异，指出 `ARCHITECTURE.md` 滞后于 v2.3、遗漏 Phase 7A 核心模块 `TerrainWalkAction`、存在 `JointModel` 等符号名称偏差；
+  - `ARCHITECTURE_AUDIT_SUMMARY.md`：编目 AUDIT-01 至 AUDIT-08 共 8 项问题，标定 4 项为 Phase 7B 准入阻断项，制定 7B 阶段化准入路线图。
+
+### 自动化验证与零幻觉门禁
+* `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0，全量引用符号真实存在，零虚构符号)；
+* `tests/run_test_suite.py --tier quick`：**12 / 12 PASS** (14.47s)；
+* 最终状态裁定：`ARCHITECTURE AUDIT — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。
+
+---
+
+
 ## [2026-10-26] 任务 7A-2：架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收 (Task 7A-2 Architecture Recovery & Continuous Traversal Acceptance)
 
 ### P0 空间瞬移缺陷彻底根除与冻结几何拓扑断裂证明

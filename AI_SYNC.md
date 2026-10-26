@@ -1,48 +1,46 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：任务 7A-2（Architecture Recovery, Continuous Terrain Traversal & Internal Blender Diagnostics）
-* **任务状态**：已完全验证 (Fully Verified & Automated Acceptance PASS)；
-  - **彻底消除历史 P0 空间瞬移缺陷与拓扑断裂证明**：
-    * 消除早期实现中第 226 $\to$ 227 帧发生的 $\Delta = 2.3717\text{ m}$ 空间瞬移；
-    * 彻底废除验证与测试中的任何跳步豁免逻辑（零 `frame_num != 227` 豁免）；
-    * 数学证明受保护基准 `output/dynamics_playground.blend` 楼梯平台与坡道入口间存在 $1.0\text{ m}$ 几何空隙与 $0.75\text{ m}$ 垂直悬崖（单腿 $0.820\text{ m}$ 极限角色强行跨越跌落需 $1.51\text{ m}$，物理不可达）；
-    * 确定权威连续路线：Course B 坡道走廊本身即是一条完全连续且地貌多样的完整地形路线（平地入口 $\to$ 15° 上坡 $\to$ $Z=1.34\text{ m}$ 高架桥 $\to$ 20° 陡坡 $\to$ 平地缓冲着陆停止，全长 $12.2\text{ m}$，700 帧连续无缝）；
-    * 保留 `output/dynamics_playground_task7a2.blend` 作为失败对比基准，生成权威修正产物 `output/dynamics_playground_task7a2_corrected.blend`（677,981 字节，700 帧）。
-  - **MotionPlanner 调度权恢复与字符串匹配完全剥离 (`src/motion/terrain_walk.py`)**：
-    * 场景编排器严格调用 `MotionPlanner.execute(initial_state)`，动作生命周期、状态传递、帧记录由框架统一管理；
-    * 修复 `TerrainWalkAction.estimate_duration_frames`，接入真实环境查询器动态预估工期；
-    * 引入 `TerrainRouteInput` 解耦高层走廊与步态规划；
-    * 编写 `plan_terrain_footsteps`，纯基于 `DynamicsEnvironmentQuery` 表面法向量、高程差与边缘安全避障算法动态离散生成落脚点；彻底移除所有对象名/地表名字符串匹配；
-    * 校正 `pelvis` 局部 Euler 轴（局部 X=Pitch, Y=Yaw, Z=Roll），消除了上坡下坡时不必要的侧倾应力；
-    * 引入高程过渡差 $\Delta z_{\text{trans}} > 0.03\text{ m}$ 识别，在坡道与平地交界处保持足够的骨盆下沉缓冲量（$0.088\dots0.098\text{ m}$），实现 700 帧全过程 0 处 IK 超限。
-  - **内置 Blender 控制链数据诊断视窗 (`Task7A2_ControlChain_Debug`)**：
-    * 在同一 `.blend` 文件中内嵌诊断场景，构建 6 阶段结构化 HUD 文字展板与 3D 关键帧指示物（足端目标球、质心环、锁定箭头、法向箭头）；
-    * 内嵌 `task7a2_debug_hud_driver.py` 脚本挂载时间线变化事件，支持在视口中拖动时间线毫秒级实时查看全身体控制链指标。
-  - **全 700 帧严苛物理与生物力学数学验证（无豁免）**：
-    * **C0 根位移连续性**：700 帧根骨平移单帧位移严格 $\le 0.0333\text{ m}$（阈值 0.12m，零任何帧号豁免）；
-    * **骨骼刚性保全**：全 700 帧骨骼长度伸缩最大误差 $0.00000169\text{ m}$（$< 0.0017\text{ mm}$）；
-    * **支撑足零滑移漂移**：全 700 帧支撑足锁定期间实际踝骨漂移 $0.00001144\text{ m}$（$< 0.012\text{ mm}$）；
-    * **生理 ROM 零越界**：全 17 处人体关节欧拉角 100% 处于生理活动范围内（0 ROM violations）；
-    * **地形穿透零违规**：三维碰撞网格全 700 帧零足底顶点穿透（0 penetrations）；
-    * **全身质量守恒**：全 14 连杆刚体质量严格守恒为 70.000 kg，CoM 自适应动态起伏。
-  - **受保护资产零篡改与历史零退化**：
-    * `output/dynamics_playground.blend`（234,436 字节）与 `output/unified_motion_integration.blend`（298,537 字节）100% 保持只读基准，0 字节差异；
-    * 全级别测试套件全绿（`quick` 12/12, `motion` 8/8, `full` 28/28, `--verify-docs` 0 phantom symbols）；
-    * 严格停止于 Task 7A-2，绝不自动进入 Task 7A-3 或 Phase 7B。
+* **当前任务编号**：架构基线审计与 7A→7B 准入门禁（Architecture Baseline Audit — 7A→7B Admission Gate）
+* **任务状态**：已完成全面架构审计并通过机器硬验证；最终状态判定为 `ARCHITECTURE AUDIT — AWAITING HUMAN REVIEW`（严格停止等待人类审批，严禁自动进入 Phase 7B）；
+  - **8 份全景架构基线审计文档体系编纂完成 (`docs/audit/`)**：
+    * `docs/audit/MODULE_INVENTORY.md`：全量 59 个 Python 生产模块逐一按 20 个统一工程问题完成技术深度剖析（行号、职责、接口、读写、分类等），统计 22 Active、6 Read-Only Telemetry、5 Standalone Solvers、17 Legacy/Prototypes、9 Inits；
+    * `docs/audit/ACTUAL_RUNTIME_ARCHITECTURE.md`：重构 6 大运行链（Chains A..F），确立真实双管线解耦事实（Pipeline A 19 骨骼角色运动学 vs Pipeline B 6-DOF 动力学代理）；
+    * `docs/audit/STATE_OWNERSHIP_MATRIX.md`：建立全对象读写所有权矩阵，全盘检索骨骼与控制器物理突变行号，确认 WBC 独占骨骼写入权；
+    * `docs/audit/CALL_GRAPH_AUDIT.md`：绘制生产与测试调用图谱，明确标定 Pipeline B 4 大独立动力学模块与 21 个入口脚本关系；
+    * `docs/audit/HARDCODE_AND_BYPASS_AUDIT.md`：6 分类严格审计常量、工程配置、测试基准、字符串耦合与旁路，确认生产链零直接骨骼绕行旁路；
+    * `docs/audit/ENVIRONMENT_INTERACTION_GAP.md`：透视回答环境交互 10 问，揭示环境查询为纯解析面、场景构建与查询存在双重真实源、CoM 与接触状态未回传下一帧规划、IK 求解失败未触发重规划等技术事实；
+    * `docs/audit/DOCUMENTATION_DRIFT.md`：详细比对既有架构文档与磁盘源码差异，指出 `ARCHITECTURE.md` 滞后于 v2.3、遗漏 Phase 7A 核心模块 `TerrainWalkAction`、存在 `JointModel` 等符号名称偏差；
+    * `docs/audit/ARCHITECTURE_AUDIT_SUMMARY.md`：编目 AUDIT-01 至 AUDIT-08 共 8 项问题，标定 4 项为 Phase 7B 准入阻断项，制定 7B 阶段化准入路线图。
+  - **核心审计结论与事实发现**：
+    * **双管线并行独立现实**：Pipeline A（19 骨骼角色姿态生成）与 Pipeline B（6-DOF 单刚体集总质心动力学）在磁盘上完全解耦，Pipeline B 仅驱动动力学训练场中的代理方块与力学箭头，未参与角色驱动；
+    * **开环环境感知现实**：`DynamicsEnvironmentQuery` 采用解析数学面计算高程与法向量，未执行 Blender 网格 BVH 投射线；
+    * **只读遥测未闭环现实**：质心（CoM）、身体惯量、速度与接触模型均为事后只读采样，未前馈或反馈调节下一帧落脚点或骨盆平衡。
+  - **严苛验证与零幻觉门禁**：
+    * `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0，全量引用符号真实存在，零虚构符号)；
+    * `tests/run_test_suite.py --tier quick`：**12 / 12 PASS** (14.47s)；
+    * 历史受保护资产保持 0 字节修改；
+    * 严格停止，禁止擅自进入 Phase 7B。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **Task 7A-2 修正基准 Commit SHA**：`009a9cb8ceeb2576a1bad65d454b7117567a3391`
-  * **Task 7A-2 修正落地 Commit SHA**：`e398d52995a1992ce7cf1d7cf1939215b39fc8bd`
+  * **审计前基准 Commit SHA**：`670766a26fa7b2ba1f8feee609625d01de98cd39`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
 ---
 
-## 1. Task 7A-2 跨 AI 审阅证据入口与产物路径清单 (ChatGPT Review Portal)
+## 1. 架构基线审计跨 AI 审阅证据入口与产物路径清单 (ChatGPT Review Portal)
 
 | 证据 / 文档类型 | 仓库相对路径 / 本地绝对路径 | 文件说明与审计关键点 | GitHub 同步状态 |
 | :--- | :--- | :--- | :---: |
+| **全量模块盘点** | [`docs/audit/MODULE_INVENTORY.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/MODULE_INVENTORY.md) | 全量 59 个 Python 生产模块逐一按 20 个统一工程问题剖析，确立八态分类与复用评估 | **本次提交同步** |
+| **真实运行时架构** | [`docs/audit/ACTUAL_RUNTIME_ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/ACTUAL_RUNTIME_ARCHITECTURE.md) | 重构 Chains A..F，明确双管线完全解耦现实与单帧 6 阶段协议落地现实 | **本次提交同步** |
+| **状态读写所有权矩阵** | [`docs/audit/STATE_OWNERSHIP_MATRIX.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/STATE_OWNERSHIP_MATRIX.md) | 盘点全部对象/数据结构独占读写者与代码物理突变行号，确认 WBC 独占骨骼写入 | **本次提交同步** |
+| **调用图谱审计** | [`docs/audit/CALL_GRAPH_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/CALL_GRAPH_AUDIT.md) | 绘制生产调用链与测试调用链，标定 Pipeline B 4 大独立模块与 21 个入口脚本关系 | **本次提交同步** |
+| **硬编码与旁路审计** | [`docs/audit/HARDCODE_AND_BYPASS_AUDIT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/HARDCODE_AND_BYPASS_AUDIT.md) | 常量 6 分类，记录历史瞬移缺陷消除，确认生产管线零直接骨骼操作旁路 | **本次提交同步** |
+| **环境交互断层分析** | [`docs/audit/ENVIRONMENT_INTERACTION_GAP.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/ENVIRONMENT_INTERACTION_GAP.md) | 透视回答环境交互 10 问，确立单向开环查询、CoM 未反馈等核心断层 | **本次提交同步** |
+| **文档漂移分析** | [`docs/audit/DOCUMENTATION_DRIFT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/DOCUMENTATION_DRIFT.md) | 比对既有架构文档与磁盘源码差异，揭示 `ARCHITECTURE.md` v2.3 滞后等问题 | **本次提交同步** |
+| **综合审计总结与门禁** | [`docs/audit/ARCHITECTURE_AUDIT_SUMMARY.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/ARCHITECTURE_AUDIT_SUMMARY.md) | 编目 AUDIT-01 至 AUDIT-08 关键问题，标定 4 项 7B 阻断项，裁定严格停止于评审态 | **本次提交同步** |
 | **Phase 7A-2 综合技术报告** | [`docs/PHASE7A2_TERRAIN_TRAVERSAL_REPORT.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/PHASE7A2_TERRAIN_TRAVERSAL_REPORT.md) | 包含 P0 瞬移根因、拓扑断裂证明、Course B 700 帧连续穿行方案、诊断视窗与全物理指标 | **已入库同步** |
 | **核心运动模块：地形行走** | [`src/motion/terrain_walk.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py) | `TerrainRouteInput`、`plan_terrain_footsteps`、100% 剥离字符串判断、连续法向倾角、Euler 轴校正与过渡沉降缓冲 | **已入库同步** |
 | **核心编排模块：训练场地形通行** | [`src/scene/playground_terrain_traversal.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_terrain_traversal.py) | 接入 `MotionPlanner.execute()`、装配 `Task7A2_ControlChain_Debug` 场景、布置 6 阶段 HUD 与 3D 指示物、挂载时间线驱动 | **已入库同步** |

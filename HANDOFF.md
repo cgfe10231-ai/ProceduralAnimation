@@ -4,41 +4,34 @@
 
 ---
 
-## 1. 当前目标
-Task 7A-2（Existing 19-Bone Character: Architecture Recovery, Continuous Terrain Traversal & Internal Blender Diagnostics，真实 19 骨骼角色在动力学训练场中连续通过起伏复杂地形、P0 瞬移消除与内置数据诊断视窗）**已完全验证通过并正式闭环**：
-1. **彻底消除 Frame 226 $\to$ 227 空间瞬移缺陷与冻结几何拓扑断裂证明**：
-   - 根除历史实现中在楼梯结束坐标 $(0.0, 7.95, 0.75)$ 与坡道入口坐标 $(0.0, 10.20, 0.0)$ 间发生的 $\Delta = 2.3717\text{ m}$ 空间瞬移；
-   - 彻底废除验证与测试中的任何跳步豁免逻辑（零 `frame_num != 227` 豁免）；
-   - 数学证明受保护基准 `output/dynamics_playground.blend` 楼梯平台与坡道入口间存在 $1.0\text{ m}$ 几何空隙与 $0.75\text{ m}$ 垂直悬崖（单腿 $0.820\text{ m}$ 极限角色强行跨越跌落需 $1.51\text{ m}$，物理不可达）；
-   - 确定权威连续路线：Course B 坡道走廊本身即是一条完全连续且地貌多样的完整地形路线（平地入口 $\to$ 15° 上坡 $\to$ $Z=1.34\text{ m}$ 高架桥 $\to$ 20° 陡坡 $\to$ 平地缓冲着陆停止，全长 $12.2\text{ m}$，700 帧连续无缝）；
-   - 保留 `output/dynamics_playground_task7a2.blend` 作为失败对比基准，生成权威修正产物 `output/dynamics_playground_task7a2_corrected.blend`（677,981 字节，700 帧）。
-2. **MotionPlanner 调度权恢复与字符串匹配完全剥离 (`src/motion/terrain_walk.py`)**：
-   - 场景编排器严格调用 `MotionPlanner.execute(initial_state)`，动作生命周期、状态传递、帧记录由框架统一管理；
-   - 修复 `TerrainWalkAction.estimate_duration_frames`，接入真实环境查询器动态预估工期；
-   - 引入 `TerrainRouteInput` 解耦高层走廊与步态规划；
-   - 编写 `plan_terrain_footsteps`，纯基于 `DynamicsEnvironmentQuery` 表面法向量、高程差与边缘安全避障算法动态离散生成落脚点；彻底移除所有对象名/地表名字符串匹配；
-   - 校正 `pelvis` 局部 Euler 轴（局部 X=Pitch, Y=Yaw, Z=Roll），消除了上坡下坡时不必要的侧倾应力；
-   - 引入高程过渡差 $\Delta z_{\text{trans}} > 0.03\text{ m}$ 识别，在坡道与平地交界处保持足够的骨盆下沉缓冲量（$0.088\dots0.098\text{ m}$），实现 700 帧全过程 0 处 IK 超限。
-3. **内置 Blender 控制链数据诊断视窗 (`Task7A2_ControlChain_Debug`)**：
-   - 在同一 `.blend` 文件中内嵌诊断场景，构建 6 阶段结构化 HUD 文字展板与 3D 关键帧指示物（足端目标球、质心环、锁定箭头、法向箭头）；
-   - 内嵌 `task7a2_debug_hud_driver.py` 脚本挂载时间线变化事件，支持在视口中拖动时间线毫秒级实时查看全身体控制链指标。
-4. **700 帧全帧严苛物理与生物力学数学验证（无豁免）**：
-   - **C0 根位移连续性**：700 帧根骨平移单帧位移严格 $\le 0.0333\text{ m}$（阈值 0.12m，零任何帧号豁免）；
-   - **骨骼刚性保全**：全 700 帧骨骼长度伸缩最大误差 $0.00000169\text{ m}$（$< 0.0017\text{ mm}$）；
-   - **支撑足零滑移漂移**：全 700 帧支撑足锁定期间实际踝骨漂移 $0.00001144\text{ m}$（$< 0.012\text{ mm}$）；
-   - **生理 ROM 零越界**：全 17 处人体关节欧拉角 100% 处于生理活动范围内（0 ROM violations）；
-   - **地形穿透零违规**：三维碰撞网格全 700 帧零足底顶点穿透（0 penetrations）；
-   - **全身质量守恒**：全 14 连杆刚体质量严格守恒为 70.000 kg，CoM 自适应动态起伏。
-5. **多视角检查相机与完整视觉证据库 (`docs/evidence/task7a2/`)**：
-   - 场景内置专用验收视口相机（`Task7A2_RampCam`, `Task7A2_OverviewCam`, `Task7A2_DebugCam`）及 6 个关键事件时间轴标记；
-   - 产出 7 张多角度全高清关键帧 PNG 与 2 份连续动态 GIF（`task7a2_ramp_traversal.gif` 140 帧 399KB, `task7a2_control_chain_debug.gif` 100 帧 303KB）；
-   - 导出结构化伴生数据：`task7a2_contact_state_records.json`、`task7a2_control_chain_diagnostics.json`、`task7a2_execution_summary.json`、`task7a2_validation_report.json`、`task7a2_evidence_manifest.json`。
-6. **受保护资产零篡改与历史零退化**：
-   - `output/dynamics_playground.blend`（234,436 字节）与 `output/unified_motion_integration.blend`（298,537 字节）100% 保持只读基准，0 字节差异；
-   - 全级别测试套件全绿（`quick` 12/12, `motion` 8/8, `full` 28/28, `--verify-docs` 0 phantom symbols）；
-   - 严格停止于 Task 7A-2，绝不自动进入 Task 7A-3 或 Phase 7B。
+## 1. 当前目标与当前状态
+**当前任务**：架构基线审计与 7A→7B 准入门禁（Architecture Baseline Audit — 7A→7B Admission Gate）。  
+**当前状态**：`ARCHITECTURE AUDIT — AWAITING HUMAN REVIEW`（严格停止等待人类审批，严禁自动进入 Phase 7B）。
 
-## 2. 已完成
+### 本任务核心产出与成果
+1. **全景架构基线审计文档体系编纂完成 (`docs/audit/`)**：
+   - [`docs/audit/MODULE_INVENTORY.md`](docs/audit/MODULE_INVENTORY.md)：盘点全部 59 个 Python 生产模块，以 20 项统一标准透视行号、职责、接口类型、读写权限及跨引擎复用性；
+   - [`docs/audit/ACTUAL_RUNTIME_ARCHITECTURE.md`](docs/audit/ACTUAL_RUNTIME_ARCHITECTURE.md)：重构 Chains A..F 真实运行链路，揭示 Pipeline A（19 骨骼运动学）与 Pipeline B（6-DOF 动力学代理）在磁盘上的完全解耦事实；
+   - [`docs/audit/STATE_OWNERSHIP_MATRIX.md`](docs/audit/STATE_OWNERSHIP_MATRIX.md)：确立全对象读写矩阵，定位所有直接突变行号，确认 WBC 独占骨骼写入权，零直接骨骼旁路；
+   - [`docs/audit/CALL_GRAPH_AUDIT.md`](docs/audit/CALL_GRAPH_AUDIT.md)：绘制生产与测试调用图谱，标定 4 大独立动力学模块与 21 个入口脚本关系；
+   - [`docs/audit/HARDCODE_AND_BYPASS_AUDIT.md`](docs/audit/HARDCODE_AND_BYPASS_AUDIT.md)：6 分类严格审计常量、配置、测试基准与旁路，确认生产链零直接骨骼绕行；
+   - [`docs/audit/ENVIRONMENT_INTERACTION_GAP.md`](docs/audit/ENVIRONMENT_INTERACTION_GAP.md)：透视回答环境交互 10 问，确认环境感知为单向开环查询、CoM 与接触状态未回传下一帧闭环、IK 失败未触发重规划；
+   - [`docs/audit/DOCUMENTATION_DRIFT.md`](docs/audit/DOCUMENTATION_DRIFT.md)：详述 `ARCHITECTURE.md` 滞后于 v2.3 等文档漂移；
+   - [`docs/audit/ARCHITECTURE_AUDIT_SUMMARY.md`](docs/audit/ARCHITECTURE_AUDIT_SUMMARY.md)：编目 AUDIT-01 至 AUDIT-08 共 8 项问题，标定 4 项为 Phase 7B 准入阻断项，制定阶段化路线图。
+2. **严苛验证与门禁**：
+   - `python tests/audit_c2_final_inspector.py --verify-docs` 100% PASS（零幻觉符号，所有引用物理存在）；
+   - `python tests/run_test_suite.py --tier quick` 12/12 PASS (14.47s)；
+   - 严格停止，禁止擅自进入 Phase 7B。
+
+## 2. 已完成历史里程碑
+* 任务 7A-2：架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收（700 帧连续地形行走）。
+* 任务 7A-1：历史角色资产复用、接入 DynamicsPlayground 训练场与最小控制闭环验证（204 帧连续平地行走）。
+* 任务 6G-D：单刚体集总质心动力学前向积分与多接触力二次规划求解器（C2-FINAL 冻结）。
+* 任务 6G-C：接触模型几何计算与最小兼容桥接层落地。
+* 任务 6G-A / 6G-B：人体刚体运动学微分器与转动惯量张量计算。
+* 任务 6F-A 至 6F-D：双臂 IK、全身质心 (CoM)、解剖学关节 ROM 模型与全身姿态协调器 (WBC)。
+* 任务 6A 至 6D：统一运动框架 `MotionPlanner`、跑步模式、冲刺加速与急停制动。
+* 任务 4A 至 5C：19 骨骼标准人形角色构建、双腿 IK 约束、足部世界接触锁定与行走步态。
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
 * 建立统一物理世界坐标约定（$Z$ 轴向上，地表精准对齐 $Z=0.0\text{ m}$，单位米）。
 * 实现统一运动框架 `MotionState`、`MotionAction`、`MotionPlanner` 与 Blender 姿态适配层（Task 6A）。
