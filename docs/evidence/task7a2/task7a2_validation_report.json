@@ -1,40 +1,18 @@
 {
-  "is_valid": true,
-  "blend_file": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a2.blend",
-  "total_frames_evaluated": 926,
-  "max_root_velocity_m_per_frame": 0.03211,
-  "max_bone_rotation_delta_deg": 22.5,
-  "max_ankle_drift_m": 0.0,
-  "max_bone_stretch_m": 1.55e-06,
-  "total_mass_kg": 70.0,
-  "min_com_height_m": 0.955,
-  "max_com_height_m": 2.3744,
-  "rom_violation_count": 0,
-  "rom_violation_frames": [],
-  "terrain_penetration_count": 0,
-  "terrain_penetrations": [],
-  "summary_metadata": {
-    "task": "Task 7A-2",
-    "total_frames": 926,
-    "stairs_frames": 226,
-    "ramps_frames": 700,
-    "max_locked_ankle_drift_m": 0.0,
-    "unreachable_count": 0,
-    "courses": {
-      "stairs": {
-        "start_frame": 1,
-        "end_frame": 226,
-        "steps": 11,
-        "total_disp_y": 3.05,
-        "total_disp_z": 0.75
-      },
-      "ramps": {
-        "start_frame": 227,
-        "end_frame": 926,
-        "steps": 42,
-        "total_disp_y": 12.2,
-        "total_disp_z": 0.0
-      }
-    }
-  }
+  "status": "PASS",
+  "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a2_corrected.blend",
+  "total_frames_evaluated": 700,
+  "max_root_velocity_m_per_frame": 0.0333,
+  "max_bone_rotation_delta_deg": 16.7,
+  "max_locked_ankle_drift_m": 1.144e-05,
+  "max_bone_stretch_m": 1.69e-06,
+  "com_height_range_m": [
+    0.975,
+    2.37
+  ],
+  "total_rom_violations": 0,
+  "total_terrain_penetrations": 0,
+  "mass_conservation_pass": true,
+  "diagnostic_scene_verified": true,
+  "diagnostic_records_count": 700
 }

@@ -1,34 +1,36 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-26  
-> **当前阶段**：任务 7A-2（真实 19 骨骼角色连续复杂地形自适应下肢穿越、单一控制链闭环与 926 帧全量验收，Task 7A-2 Continuous Terrain Traversal in DynamicsPlayground）已圆满完成并通过全量验证（构建 `TerrainWalkAction` 纯动态地表查询与连续步态调度；解决足端高程接触锁定与脚踝偏置解耦；实现全足端刚体 3D 悬空防穿透与解剖学生理踝关节矢状面自适应松弛；生成并验证派生独立可播放场景 `output/dynamics_playground_task7a2.blend` 926 帧 100% 达成 0 ROM 违规、0 地形穿模、0 IK 违例、脚踝锁定 0.0m 漂移、骨骼 1.55e-6m 长度形变守恒、70.000kg 质量守恒；导出 9 张高清关键帧 PNG 与 2 份连续动态 GIF；`quick` 10/10, `physics` 16/16, `motion` 7/7, `full` 26/26, `--verify-docs` 全绿通过；严格停止于 Task 7A-2，严禁自动进入 Task 7A-3 或 Phase 7B，等待用户验收）  
+> **当前阶段**：任务 7A-2 架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收（Task 7A-2 Architecture Recovery, Continuous Terrain Traversal & Internal Blender Diagnostics）已圆满完成并通过全量验证（彻底消除第 226→227 帧 2.3717m 空间瞬移，废除全部帧号豁免；恢复 MotionPlanner 唯一调度权；100% 剥离字符串命名驱动逻辑，改为纯几何连续法向量与高程查询；解耦高层路线目标与动态落脚点离散规划；修正工期估算；生成并验证权威连续动画场景 `output/dynamics_playground_task7a2_corrected.blend` 700 帧 100% 达成 0 ROM 违规、0 地形穿模、0 IK 违例、脚踝锁定 0.000011m 漂移、骨骼 1.69e-6m 长度形变守恒、70.000kg 质量守恒；构建内嵌控制链诊断视窗 `Task7A2_ControlChain_Debug` 呈现 6 阶段实时遥测 HUD 与 3D 关键帧指示物；导出 7 张高清关键帧 PNG 与 2 份连续动态 GIF；`quick` 12/12, `motion` 8/8, `full` 28/28, `--verify-docs` 全绿通过；严格停止于 Task 7A-2，严禁自动进入 Task 7A-3，等待用户验收）  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **任务 7A-2 真实 19 骨骼角色连续复杂地形（楼梯与斜坡高架桥）自适应下肢穿越、单一控制链闭环与 926 帧全量验收 (Task 7A-2 Continuous Terrain Traversal in DynamicsPlayground)**：
-  * **单一连续地形运动规划器 (`src/motion/terrain_walk.py`)**：
-    - 构建通用地形行进动作类 `TerrainWalkAction(MotionAction)` 与离散步态生成函数 `build_terrain_step_schedule`；
-    - 零环境高度硬编码：严格通过 `DynamicsEnvironmentQuery` 接口（`ground_height_at` 与 `surface_normal_at`）逐帧动态查询足底各位置地表高程与法向量；
-    - 矢状面法向量自适应俯仰：通过 $\text{atan2}(-n_y, n_z)$ 计算坡度法向量法向偏角，自动匹配上坡（+15°）、下坡（-20°）与平地（0°）足端世界姿态。
-  * **核心控制链向后兼容增强 (`src/rig/foot_contact.py`, `src/motion/whole_body_controller.py`, `src/motion/kinematic_bridge.py`)**：
-    - **足端高程接触锁定解除平地硬编码**：升级 `lock_foot_contact` 支持传入世界空间真实接触高程 `float(contact_world_xyz[2])`，保留对默认 `FLAT_GROUND_Z = 0.0` 的 100% 兼容；
-    - **脚踝世界坐标与接触坐标分离**：在 `WholeBodyController.execute_frame` 中将脚踝目标转换为地面接触点 `contact_ground_xyz = (target_x, target_y, target_z - ANKLE_REST_Z)`，彻底消除 70mm 偏置累加 bug，实现脚踝锁定物理零漂移（`0.00000000 m`）；
-    - **显式可配置地面夹持标志 (`clamp_ground`)**：在 `EndEffectorTarget` 与 `PlannedFootTarget` 中引入 `clamp_ground: bool = True`，地形跨越时设为 `False`，避免 WBC 误将高程目标投影至根节点高度。
-  * **全足端 3D 刚体包围盒悬空防穿透与台阶边缘防碰**：
-    - 脚掌刚体具备 22cm 纵向长度（后跟 $-0.07\text{ m}$ 至脚尖 $+0.15\text{ m}$）；在摆动相中实时查询整足底部最大地形高度：
-      $$z_{\text{foot\_terr}} = \max\Big(z_{\text{terr}}(x, y-0.07),\, z_{\text{terr}}(x, y),\, z_{\text{terr}}(x, y+0.15)\Big)$$
-      结合 $0.045\text{ m}$ 动态悬空最小净距，彻底消除踢面切削与边缘穿模（926 帧全量 0 穿模）。
-  * **生理学踝关节矢状面自适应与分级骨盆沉降**：
-    - 在摆动相引入生理性踝关节松弛机制（摆动中段脚尖沿摆动弧线自然微倾 18°~22°），离地瞬间引入自然的蹬地限位（$\le 10^\circ$）；
-    - 引入自适应分级骨盆沉降参数：上坡登高沉降 $0.063\text{ m}$，下坡缓冲沉降 $0.095\text{ m}$，平地行进沉降 $0.030\text{ m}$，台阶攀爬沉降 $0.120\text{ m}$，完美平衡大腿小腿最大延伸极限（$< 0.820\text{ m}$）与踝关节背屈/跖屈生理极限（$[-25.0^\circ, +45.0^\circ]$），在 926 帧中达成 0 ROM 违规。
-  * **派生场景生成、只读重开验收与完备视觉证据 (`run_task7a2_terrain_traversal.py`, `tests/verify_task7a2_terrain_traversal.py`)**：
-    - 派生生成 `output/dynamics_playground_task7a2.blend`（581,882 字节，926 帧，内嵌 3 专用相机与 10 个关键阶段时间线标记）；
-    - 独立只读重开评估全 926 帧：0 穿模、0 ROM 违规、0 IK 违例、踝骨漂移 $0.0\text{ m}$、骨骼形变 $1.55\times 10^{-6}\text{ m}$、质量严格守恒 70.000 kg；
-    - 渲染 9 张高清关键帧 PNG 与 2 份连续动态 GIF（`task7a2_stairs_traversal.gif` 76 帧 301KB、`task7a2_ramp_traversal.gif` 100 帧 286KB）；
-    - 注册 `task7a2_terrain_traversal` 入测试套件 `motion` 与 `full` 级别，全层级测试 100% 通过（`quick` 10/10, `physics` 16/16, `motion` 7/7, `full` 26/26, `--verify-docs` PASS）。
+* **任务 7A-2 架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收 (Task 7A-2 Architecture Recovery & Continuous Traversal Acceptance)**：
+  * **P0 瞬移缺陷彻底消除与拓扑断裂证明**：
+    - 消除早期实现中第 226 $\to$ 227 帧发生的 $\Delta = 2.3717\text{ m}$ 空间瞬移，彻底废除测试与验证逻辑中的任何帧号豁免代码（严禁 `frame_num != 227`）；
+    - 数学证明冻结基准 `output/dynamics_playground.blend` 楼梯顶部平台（$Y \in [7.5, 10.0], Z=0.75\text{ m}$）与坡道（$Y \in [11.0, 16.0], Z \in [0.0, 1.34]\text{ m}$）之间存在 $1.0\text{ m}$ 几何空隙与 $0.75\text{ m}$ 垂直悬崖，单腿极限伸展 $0.820\text{ m}$ 的角色强行跨越需 $1.51\text{ m}$ 伸展，物理不可达；
+    - 确定权威连续路线：Course B 坡道走廊本身即是一条完全连续且地貌多样的完整地形路线（平地入口 $\to$ 15° 上坡 $\to$ $Z=1.34\text{ m}$ 高架桥 $\to$ 20° 陡坡 $\to$ 平地缓冲着陆停止，全长 $12.2\text{ m}$，700 帧连续无缝）；
+    - 生成权威修正产物 `output/dynamics_playground_task7a2_corrected.blend`，保留 `output/dynamics_playground_task7a2.blend` 作为失败对比基准，严格受保护。
+  * **恢复 MotionPlanner 唯一调度权与环境工期估算修正**：
+    - 场景编排器严格通过 `MotionPlanner.execute(initial_state)` 执行，动作生命周期、状态传递、帧记录由框架统一管理，严禁场景层私调底层动作；
+    - 修复 `TerrainWalkAction.estimate_duration_frames`，接入真实环境查询器动态预估工期。
+  * **100% 剥离字符串命名驱动逻辑与路线目标解耦**：
+    - 引入 `TerrainRouteInput` 解耦高层走廊与步态规划；
+    - 编写 `plan_terrain_footsteps`，纯基于 `DynamicsEnvironmentQuery` 表面法向量、高程差与边缘安全避障算法动态离散生成落脚点；彻底移除所有对象名/地表名字符串匹配。
+  * **骨盆 Euler 轴向校正与坡道过渡伸展缓冲**：
+    - 校正 `pelvis` 局部 Euler 轴（局部 X=Pitch, Y=Yaw, Z=Roll），消除了上坡下坡时不必要的侧倾应力；
+    - 引入高程过渡差 $\Delta z_{\text{trans}} > 0.03\text{ m}$ 识别，在坡道与平地交界处保持足够的骨盆下沉缓冲量（$0.088\dots0.098\text{ m}$），实现 700 帧全过程 0 处 IK 超限。
+  * **内置 Blender 控制链数据诊断视窗 (`Task7A2_ControlChain_Debug`)**：
+    - 在同一 `.blend` 文件中内嵌诊断场景，构建 6 阶段结构化 HUD 文字展板与 3D 关键帧指示物（足端目标球、质心环、锁定箭头、法向箭头）；
+    - 内嵌 `task7a2_debug_hud_driver.py` 脚本挂载时间线变化事件，支持在视口中拖动时间线毫秒级实时查看全身体控制链指标。
+  * **负向测试与全量回归套件**：
+    - 编写 `tests/test_p0_frame226_teleport_regression.py` 永久固化瞬移缺陷检测；
+    - 编写 `tests/test_terrain_walk_negative.py` 验证地表重命名不变性、高程扰动自适应与悬崖超限拒绝；
+    - 700 帧无豁免数学检验：0 瞬移（最大位移 $0.0333\text{ m}$/帧）、0 ROM 违规、0 穿模、脚踝漂移 $0.000011\text{ m}$、骨骼形变 $0.0000017\text{ m}$、质量守恒 70.0 kg；
+    - 全套件全绿：`quick` (12/12), `motion` (8/8), `full` (28/28), `--verify-docs` (PASS)。
 * **任务 7A-1 最终架构整理、单一职责解耦、接触状态持久化合同与负向测试闭环 (Task 7A-1 Final Architecture & Compatibility Closure)**：
   * **单一职责解耦重构 (`src/scene/playground_*`)**：
     - 原 2872 行单一集中文件成功解耦为 4 个专业子模块与 1 个总控门面：

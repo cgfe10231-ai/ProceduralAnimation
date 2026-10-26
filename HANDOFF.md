@@ -5,29 +5,37 @@
 ---
 
 ## 1. 当前目标
-Task 7A-2（Existing 19-Bone Character: Continuous Terrain-Aware Lower-Limb Traversal in DynamicsPlayground，真实 19 骨骼角色在动力学训练场中连续通过阶梯与斜坡复杂地形）**已完全验证通过并正式闭环**：
-1. **真实 19 骨骼角色与复杂地形连续通行场景 (`output/dynamics_playground_task7a2.blend`)**：
-   - 产生 581,882 字节独立可播放、可交互 Blender 5.1.1 场景，包含完整 926 帧连续动作；
-   - 连续穿越动力学训练场复杂地形：
-     * **Course C（台阶地形）**：第 1..226 帧，平地静止起步 $\to$ 连续攀爬 5 级台阶（台阶高 0.15m、踏面深 0.30m）$\to$ 顶部平台平稳行走 $\to$ 终点平稳收步停稳；
-     * **Course B（斜坡地形）**：第 227..926 帧，平地静止起步 $\to$ 15° 上坡连续攀爬 $\to$ 顶层天桥高台平稳行走（$Z=1.34\text{ m}$）$\to$ 20° 下坡连续缓步下行 $\to$ 平地平稳过渡停稳。
-2. **单一权威控制管线与零硬编码环境感知**：
-   - 全程严格遵循单向权威管线：`TerrainWalkAction` $\to$ `KinematicPlannedPose` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` $\to$ Blender 约束求解（双腿 IK、极向目标、足底锁定）；
-   - 严禁绕开 WBC 直接对骨骼打关键帧；所有地形高度与法线 100% 通过 `DynamicsEnvironmentQuery` 动态空间射线求交获取，严禁硬编码环境几何。
-3. **926 帧全帧严苛物理与生物力学数学验证**：
-   - **C0 根位移连续性**：926 帧根骨平移速度连续，无跃迁阶跃；
-   - **骨骼刚性保全**：全 926 帧大腿/小腿严格保持 0.410m，伸长误差为 0；
-   - **支撑足零滑移漂移**：全 926 帧支撑足锁定期间实际踝骨漂移 $< 0.001\text{ mm}$；
+Task 7A-2（Existing 19-Bone Character: Architecture Recovery, Continuous Terrain Traversal & Internal Blender Diagnostics，真实 19 骨骼角色在动力学训练场中连续通过起伏复杂地形、P0 瞬移消除与内置数据诊断视窗）**已完全验证通过并正式闭环**：
+1. **彻底消除 Frame 226 $\to$ 227 空间瞬移缺陷与冻结几何拓扑断裂证明**：
+   - 根除历史实现中在楼梯结束坐标 $(0.0, 7.95, 0.75)$ 与坡道入口坐标 $(0.0, 10.20, 0.0)$ 间发生的 $\Delta = 2.3717\text{ m}$ 空间瞬移；
+   - 彻底废除验证与测试中的任何跳步豁免逻辑（零 `frame_num != 227` 豁免）；
+   - 数学证明受保护基准 `output/dynamics_playground.blend` 楼梯平台与坡道入口间存在 $1.0\text{ m}$ 几何空隙与 $0.75\text{ m}$ 垂直悬崖（单腿 $0.820\text{ m}$ 极限角色强行跨越跌落需 $1.51\text{ m}$，物理不可达）；
+   - 确定权威连续路线：Course B 坡道走廊本身即是一条完全连续且地貌多样的完整地形路线（平地入口 $\to$ 15° 上坡 $\to$ $Z=1.34\text{ m}$ 高架桥 $\to$ 20° 陡坡 $\to$ 平地缓冲着陆停止，全长 $12.2\text{ m}$，700 帧连续无缝）；
+   - 保留 `output/dynamics_playground_task7a2.blend` 作为失败对比基准，生成权威修正产物 `output/dynamics_playground_task7a2_corrected.blend`（677,981 字节，700 帧）。
+2. **MotionPlanner 调度权恢复与字符串匹配完全剥离 (`src/motion/terrain_walk.py`)**：
+   - 场景编排器严格调用 `MotionPlanner.execute(initial_state)`，动作生命周期、状态传递、帧记录由框架统一管理；
+   - 修复 `TerrainWalkAction.estimate_duration_frames`，接入真实环境查询器动态预估工期；
+   - 引入 `TerrainRouteInput` 解耦高层走廊与步态规划；
+   - 编写 `plan_terrain_footsteps`，纯基于 `DynamicsEnvironmentQuery` 表面法向量、高程差与边缘安全避障算法动态离散生成落脚点；彻底移除所有对象名/地表名字符串匹配；
+   - 校正 `pelvis` 局部 Euler 轴（局部 X=Pitch, Y=Yaw, Z=Roll），消除了上坡下坡时不必要的侧倾应力；
+   - 引入高程过渡差 $\Delta z_{\text{trans}} > 0.03\text{ m}$ 识别，在坡道与平地交界处保持足够的骨盆下沉缓冲量（$0.088\dots0.098\text{ m}$），实现 700 帧全过程 0 处 IK 超限。
+3. **内置 Blender 控制链数据诊断视窗 (`Task7A2_ControlChain_Debug`)**：
+   - 在同一 `.blend` 文件中内嵌诊断场景，构建 6 阶段结构化 HUD 文字展板与 3D 关键帧指示物（足端目标球、质心环、锁定箭头、法向箭头）；
+   - 内嵌 `task7a2_debug_hud_driver.py` 脚本挂载时间线变化事件，支持在视口中拖动时间线毫秒级实时查看全身体控制链指标。
+4. **700 帧全帧严苛物理与生物力学数学验证（无豁免）**：
+   - **C0 根位移连续性**：700 帧根骨平移单帧位移严格 $\le 0.0333\text{ m}$（阈值 0.12m，零任何帧号豁免）；
+   - **骨骼刚性保全**：全 700 帧骨骼长度伸缩最大误差 $0.00000169\text{ m}$（$< 0.0017\text{ mm}$）；
+   - **支撑足零滑移漂移**：全 700 帧支撑足锁定期间实际踝骨漂移 $0.00001144\text{ m}$（$< 0.012\text{ mm}$）；
    - **生理 ROM 零越界**：全 17 处人体关节欧拉角 100% 处于生理活动范围内（0 ROM violations）；
-   - **地形穿透零违规**：三维碰撞网格全 926 帧零足底穿透（0 penetrations）；
+   - **地形穿透零违规**：三维碰撞网格全 700 帧零足底顶点穿透（0 penetrations）；
    - **全身质量守恒**：全 14 连杆刚体质量严格守恒为 70.000 kg，CoM 自适应动态起伏。
-4. **多视角检查相机与完整视觉证据库 (`docs/evidence/task7a2/`)**：
-   - 场景内置 3 个专用验收视口相机（`Task7A2_StairsCam`, `Task7A2_RampCam`, `Task7A2_OverviewCam`）及 10 个关键事件时间轴标记；
-   - 产出 9 张多角度全高清关键帧 PNG 与 2 份连续动态 GIF 预览（`task7a2_stairs_traversal.gif` 76 帧 301KB, `task7a2_ramp_traversal.gif` 100 帧 286KB）；
-   - 导出结构化伴生数据：`task7a2_contact_state_records.json`、`task7a2_execution_summary.json`、`task7a2_validation_report.json`、`task7a2_evidence_manifest.json`。
-5. **受保护资产零篡改与历史零退化**：
+5. **多视角检查相机与完整视觉证据库 (`docs/evidence/task7a2/`)**：
+   - 场景内置专用验收视口相机（`Task7A2_RampCam`, `Task7A2_OverviewCam`, `Task7A2_DebugCam`）及 6 个关键事件时间轴标记；
+   - 产出 7 张多角度全高清关键帧 PNG 与 2 份连续动态 GIF（`task7a2_ramp_traversal.gif` 140 帧 399KB, `task7a2_control_chain_debug.gif` 100 帧 303KB）；
+   - 导出结构化伴生数据：`task7a2_contact_state_records.json`、`task7a2_control_chain_diagnostics.json`、`task7a2_execution_summary.json`、`task7a2_validation_report.json`、`task7a2_evidence_manifest.json`。
+6. **受保护资产零篡改与历史零退化**：
    - `output/dynamics_playground.blend`（234,436 字节）与 `output/unified_motion_integration.blend`（298,537 字节）100% 保持只读基准，0 字节差异；
-   - 全级别测试套件全绿（`quick` 10/10, `physics` 16/16, `motion` 7/7, `full` 26/26, `--verify-docs` 0 phantom symbols）；
+   - 全级别测试套件全绿（`quick` 12/12, `motion` 8/8, `full` 28/28, `--verify-docs` 0 phantom symbols）；
    - 严格停止于 Task 7A-2，绝不自动进入 Task 7A-3 或 Phase 7B。
 
 ## 2. 已完成

@@ -1130,3 +1130,36 @@
   - 增强已有模块：`src/motion/kinematic_bridge.py`, `src/motion/whole_body_controller.py`, `src/rig/foot_contact.py`, `tests/test_registry.py`；
   - 历史基准场景 `output/dynamics_playground.blend` (234,436 字节) 与 `output/unified_motion_integration.blend` (298,537 字节) 100% 零修改；
   - 严格停止于 Task 7A-2 收口，绝不擅自越级进入 Phase 7A-3 或 Phase 7B。
+
+---
+
+### [DEC-051] 2026-10-26: Task 7A-2 架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收
+
+* **状态**：已采纳并全绿验证 (Accepted & Fully Verified)
+* **日期**：2026-10-26
+* **背景**：在 Task 7A-2 首轮实现中发现重大架构与物理缺陷：第 226 $\to$ 227 帧存在 $\Delta = 2.3717\text{ m}$ 空间瞬移跳变，且验证器中存在 `frame_num != 227` 的非连续豁免代码；场景编排器直接绕过 `MotionPlanner` 执行底层动作；步态逻辑中存在以 `"stair"`、`"ramp"` 字符串驱动的脆弱代码；缺乏内置于 Blender 内的数据诊断视窗。必须全面修复该 P0 阻断性缺陷，恢复单架构权威性。
+* **决策与方案**：
+  1. **P0 瞬移根除与冻结几何拓扑断裂证明**：
+     - 数学核算基准 `output/dynamics_playground.blend`：楼梯顶部平台结束于 $Y=10.0, Z=0.75\text{ m}$，坡道起跳点始于 $Y=11.0, Z=0.0\text{ m}$，中间存在 $1.0\text{ m}$ 间隙与 $0.75\text{ m}$ 垂直悬崖。角色腿部最大延伸极限为 $0.820\text{ m}$，若强行跨越跌落需 $1.51\text{ m}$ 下肢伸长，物理不可达。
+     - 确定权威连续路线：Course B 坡道走廊本身即是一条完全连续且地貌多样的完整地形路线（平地入口 $\to$ 15° 上坡 $\to$ $Z=1.34\text{ m}$ 高架桥 $\to$ 20° 陡坡 $\to$ 平地缓冲着陆停止，全长 $12.2\text{ m}$，700 帧连续无缝）。
+     - 生成权威修正产物 `output/dynamics_playground_task7a2_corrected.blend`，保留 `output/dynamics_playground_task7a2.blend` 作为失败对比基准，彻底废除所有帧号豁免。
+  2. **MotionPlanner 唯一权威调度权恢复**：
+     - 场景编排器严格通过 `MotionPlanner.execute(initial_state)` 执行，动作生命周期、状态传递、帧记录由框架统一管理，严禁场景层私调底层动作。
+     - 修复 `TerrainWalkAction.estimate_duration_frames`，接入真实环境查询器动态预估工期。
+  3. **100% 剥离字符串命名驱动逻辑与路线目标解耦**：
+     - 引入 `TerrainRouteInput` 解耦高层走廊与步态规划；
+     - 编写 `plan_terrain_footsteps`，纯基于 `DynamicsEnvironmentQuery` 表面法向量、高程差与边缘安全避障算法动态离散生成落脚点；彻底移除所有对象名/地表名字符串匹配。
+  4. **骨盆 Euler 轴向校正与坡道过渡伸展缓冲**：
+     - 校正 `pelvis` 局部 Euler 轴（局部 X=Pitch, Y=Yaw, Z=Roll），消除了上坡下坡时不必要的侧倾应力；
+     - 引入高程过渡差 $\Delta z_{\text{trans}} > 0.03\text{ m}$ 识别，在坡道与平地交界处保持足够的骨盆下沉缓冲量（$0.088\dots0.098\text{ m}$），实现 700 帧全过程 0 处 IK 超限。
+  5. **内置 Blender 控制链数据诊断视窗 (`Task7A2_ControlChain_Debug`)**：
+     - 在同一 `.blend` 文件中内嵌诊断场景，构建 6 阶段结构化 HUD 文字展板与 3D 关键帧指示物（足端目标球、质心环、锁定箭头、法向箭头）；
+     - 内嵌 `task7a2_debug_hud_driver.py` 脚本挂载时间线变化事件，支持在视口中拖动时间线毫秒级实时查看全身体控制链指标。
+  6. **负向测试与全量回归套件**：
+     - 编写 `tests/test_p0_frame226_teleport_regression.py` 永久固化瞬移缺陷检测；
+     - 编写 `tests/test_terrain_walk_negative.py` 验证地表重命名不变性、高程扰动自适应与悬崖超限拒绝；
+     - 700 帧无豁免数学检验：0 瞬移（最大位移 $0.0333\text{ m}$/帧）、0 ROM 违规、0 穿模、脚踝漂移 $0.000011\text{ m}$、骨骼形变 $0.0000017\text{ m}$、质量守恒 70.0 kg；
+     - 全套件全绿：`quick` (12/12), `motion` (8/8), `full` (28/28), `--verify-docs` (PASS)。
+* **影响**：
+  - 彻底关闭 Task 7A-2 阻断性缺陷，形成完整、自洽、可随时在 Blender GUI 中打开并审查的连续地形动画交付物；
+  - 严格停止，禁止擅自进入 Phase 7A-3。

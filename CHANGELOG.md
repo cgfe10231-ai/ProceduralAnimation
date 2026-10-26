@@ -3,6 +3,43 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-26] 任务 7A-2：架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收 (Task 7A-2 Architecture Recovery & Continuous Traversal Acceptance)
+
+### P0 空间瞬移缺陷彻底根除与冻结几何拓扑断裂证明
+* **消除 Frame 226 $\to$ 227 瞬移跳变**：
+  - 根除历史实现中在楼梯结束坐标 $(0.0, 7.95, 0.75)$ 与坡道入口坐标 $(0.0, 10.20, 0.0)$ 间发生的 $\Delta = 2.3717\text{ m}$ 空间瞬移；
+  - 彻底废除验证与测试中的任何跳步豁免逻辑（零 `frame_num != 227` 豁免）；
+  - 数学证明受保护基准 `output/dynamics_playground.blend` 楼梯平台与坡道入口间存在 $1.0\text{ m}$ 几何空隙与 $0.75\text{ m}$ 垂直悬崖（单腿 $0.820\text{ m}$ 极限角色强行跨越跌落需 $1.51\text{ m}$，物理不可达）；
+  - 确定权威连续路线：Course B 坡道走廊本身即是一条完全连续且地貌多样的完整地形路线（平地入口 $\to$ 15° 上坡 $\to$ $Z=1.34\text{ m}$ 高架桥 $\to$ 20° 陡坡 $\to$ 平地缓冲着陆停止，全长 $12.2\text{ m}$，700 帧连续无缝）；
+  - 保留 `output/dynamics_playground_task7a2.blend` 作为失败对比基准，生成权威修正产物 `output/dynamics_playground_task7a2_corrected.blend`。
+
+### MotionPlanner 调度权恢复与字符串匹配完全剥离 (`src/motion/terrain_walk.py`)
+* **统一调度接入 MotionPlanner**：
+  - 场景编排器严格调用 `MotionPlanner.execute(initial_state)`，动作生命周期、状态传递、帧记录由框架统一管理；
+  - 修复 `TerrainWalkAction.estimate_duration_frames`，接入真实环境查询器动态预估工期。
+* **100% 剥离字符串命名逻辑与走廊解耦**：
+  - 引入 `TerrainRouteInput` 解耦高层走廊与步态规划；
+  - 编写 `plan_terrain_footsteps`，纯基于 `DynamicsEnvironmentQuery` 表面法向量、高程差与边缘安全避障算法动态离散生成落脚点；彻底移除所有对象名/地表名字符串匹配。
+* **骨盆 Euler 轴向校正与坡道过渡伸展缓冲**：
+  - 校正 `pelvis` 局部 Euler 轴（局部 X=Pitch, Y=Yaw, Z=Roll），消除了上坡下坡时不必要的侧倾应力；
+  - 引入高程过渡差 $\Delta z_{\text{trans}} > 0.03\text{ m}$ 识别，在坡道与平地交界处保持足够的骨盆下沉缓冲量（$0.088\dots0.098\text{ m}$），实现 700 帧全过程 0 处 IK 超限。
+
+### 内置 Blender 控制链数据诊断视窗 (`Task7A2_ControlChain_Debug`)
+* 在同一 `.blend` 文件中内嵌诊断场景，构建 6 阶段结构化 HUD 文字展板与 3D 关键帧指示物（足端目标球、质心环、锁定箭头、法向箭头）；
+* 内嵌 `task7a2_debug_hud_driver.py` 脚本挂载时间线变化事件，支持在视口中拖动时间线毫秒级实时查看全身体控制链指标。
+
+### 负向测试与全量回归套件全绿
+* 编写 `tests/test_p0_frame226_teleport_regression.py` 永久固化瞬移缺陷检测；
+* 编写 `tests/test_terrain_walk_negative.py` 验证地表重命名不变性、高程扰动自适应与悬崖超限拒绝；
+* 700 帧无豁免数学检验：0 瞬移（最大位移 $0.0333\text{ m}$/帧）、0 ROM 违规、0 穿模、脚踝漂移 $0.000011\text{ m}$、骨骼形变 $0.0000017\text{ m}$、质量守恒 70.0 kg；
+* `quick`：**12 / 12 PASS** (15.17s)；
+* `motion`：**8 / 8 PASS** (23.44s)；
+* `full`：**28 / 28 PASS** (103.96s)；
+* `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)。
+
+---
+
+
 ## [2026-10-26] 任务 7A-2：真实 19 骨骼角色连续复杂地形（楼梯与斜坡高架桥）自适应下肢穿越、单一控制链闭环与 926 帧全量验收 (Task 7A-2 Continuous Terrain Traversal in DynamicsPlayground)
 
 ### 连续复杂地形运动规划内核 (`src/motion/terrain_walk.py`)

@@ -325,6 +325,28 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Read-only reopen verification of 19-bone character integration into DynamicsPlayground, 204-frame mathematical/continuity/contact validation, deep scene preservation, and 204-frame continuous GIF.",
     ),
+    "task7a2_p0_teleport_regression": TestDefinition(
+        test_id="task7a2_p0_teleport_regression",
+        name="Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect",
+        script_path="tests/test_p0_frame226_teleport_regression.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.MOTION, TestTier.FULL],
+        timeout_sec=30.0,
+        expected_artifacts=[
+            "output/dynamics_playground_task7a2.blend",
+            "output/dynamics_playground_task7a2_corrected.blend",
+        ],
+        description="Regression test proving detection of the 2.37m teleportation defect in baseline blend and 0-violation unexempted continuity in corrected blend.",
+    ),
+    "task7a2_negative_invariance": TestDefinition(
+        test_id="task7a2_negative_invariance",
+        name="Task 7A-2: Terrain Walk Invariance & Negative Physics Verification",
+        script_path="tests/test_terrain_walk_negative.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=20.0,
+        description="Negative tests proving 100% surface renaming invariance, dynamic elevation perturbation adaptation, and physiological drop rejection (>0.35m).",
+    ),
     "task7a2_terrain_traversal": TestDefinition(
         test_id="task7a2_terrain_traversal",
         name="Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground",
@@ -335,15 +357,17 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         expected_artifacts=[
             "output/dynamics_playground.blend",
             "output/dynamics_playground_task7a2.blend",
+            "output/dynamics_playground_task7a2_corrected.blend",
             "docs/evidence/task7a2/task7a2_contact_state_records.json",
             "docs/evidence/task7a2/task7a2_execution_summary.json",
+            "docs/evidence/task7a2/task7a2_control_chain_diagnostics.json",
             "docs/evidence/task7a2/task7a2_validation_report.json",
             "docs/evidence/task7a2/task7a2_evidence_manifest.json",
-            "docs/evidence/task7a2/task7a2_stairs_traversal.gif",
             "docs/evidence/task7a2/task7a2_ramp_traversal.gif",
+            "docs/evidence/task7a2/task7a2_control_chain_debug.gif",
         ],
         is_visual_acceptance=True,
-        description="Read-only verification of 19-bone character continuous terrain traversal in DynamicsPlayground (stairs ascent and sloped ramp ascent/descent), 926-frame mathematical evaluation, zero ROM violations, zero ankle drift, and visual evidence.",
+        description="Read-only verification of 19-bone character continuous terrain traversal in DynamicsPlayground, 700-frame mathematical evaluation, zero ROM violations, zero ankle drift, dedicated diagnostic scene, and visual evidence.",
     ),
 
     # -------------------------------------------------------------------------

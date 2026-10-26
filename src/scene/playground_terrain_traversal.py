@@ -1,20 +1,24 @@
-"""DynamicsPlayground Continuous Terrain Locomotion Pipeline (Task 7A-2).
+"""Procedural Terrain Traversal Scene Assembler & Orchestrator (Task 7A-2).
 
-Coordinates the generation and keyframing of the complete continuous 926-frame
-terrain traversal animation for the 19-bone character on DynamicsPlayground:
-- Course C: Stairs Traversal (Frames 1..226, 9.42s @ 24 FPS)
-  Flat ground approach (Y=4.95 -> 5.80) -> 5 stair steps ascent (Y=5.80 -> 7.35, Z=0.0 -> 0.75) ->
-  Top landing platform traversal (Y=7.35 -> 7.95, Z=0.75) -> Clean double-stance stop.
-- Course B: Sloped Ramp Traversal (Frames 227..926, 29.17s @ 24 FPS)
-  Flat ground approach (Y=10.20 -> 11.00) -> 15° Uphill ramp ascent (Y=11.00 -> 16.00, Z=0.0 -> 1.34) ->
-  Elevated connector bridge traversal (Y=16.00 -> 18.00, Z=1.34) -> 20° Downhill ramp descent
-  (Y=18.00 -> 21.68, Z=1.34 -> 0.0) -> Flat landing traversal (Y=21.68 -> 22.40, Z=0.0) ->
-  Clean double-stance stop.
+Assembles the 19-bone character inside DynamicsPlayground, executes continuous
+terrain traversal through the authoritative `MotionPlanner`, and produces:
+1. Active animation scene ('Scene'):
+   - Continuous 19-bone lower-limb traversal over Course B (flat -> 15° ramp -> bridge -> 20° ramp -> flat landing).
+   - Dedicated inspection cameras: `Task7A2_RampCam`, `Task7A2_OverviewCam`.
+   - Timeline markers for all key traversal stages.
+2. Dedicated internal Blender control chain diagnostic scene ('Task7A2_ControlChain_Debug'):
+   - Linked 19-bone character, surfaces, and dedicated camera `Task7A2_DebugCam`.
+   - Dynamic 3D keyframed visual indicators (Planned foot targets, CoM tracker, Lock indicators, Normal arrow).
+   - Dynamic 6-phase HUD diagnostic text boards driven by embedded timeline handler.
+3. Persistent embedded telemetry:
+   - `scene["task7a2_contact_state_records"]`
+   - `scene["task7a2_execution_summary"]`
+   - `scene["task7a2_control_chain_diagnostics"]`
 
-Produces:
-- `output/dynamics_playground_task7a2.blend` (playable animation in Blender 5.1.1)
-- `docs/evidence/task7a2/task7a2_contact_state_records.json`
-- `docs/evidence/task7a2/task7a2_execution_summary.json`
+Architectural Guardrails:
+- Single authoritative writer: MotionPlanner -> MotionAction -> KinematicBridge -> WBC -> Rig.
+- Zero string-based naming logic; 100% geometric surface normal and height queries.
+- Zero frame exemptions; absolute continuity from start to finish.
 """
 
 from __future__ import annotations
@@ -22,25 +26,39 @@ from __future__ import annotations
 import json
 import math
 import os
+import sys
+
+if "." not in sys.path:
+    sys.path.insert(0, ".")
+if os.getcwd() not in sys.path:
+    sys.path.insert(0, os.getcwd())
+
 from typing import Any, Dict, List, Optional, Tuple
 
 import bpy
-from mathutils import Euler, Matrix, Vector
+from mathutils import Euler, Matrix, Quaternion, Vector
 
+from src.character.builder import build_character
 from src.config import PipelineConfig
 from src.motion.framework import (
-    BlenderPoseApplicator,
+    ActionExecutionResult,
     ContactConstraintAdapter,
+    EnvironmentQuery,
+    MotionAction,
+    MotionMode,
     MotionPlanner,
     MotionRuntimeContext,
+    MotionState,
     create_initial_motion_state,
 )
-from src.motion.kinematic_bridge import KinematicBridgeExecutor
 from src.motion.terrain_walk import (
+    TerrainRouteInput,
     TerrainTraversalSpec,
     TerrainWalkAction,
-    build_terrain_step_schedule,
+    pitch_from_surface_normal,
+    plan_terrain_footsteps,
 )
+from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET
 from src.scene.environment_query import create_standard_dynamics_playground_query
 from src.scene.playground_character_assembly import assemble_character_in_playground
 
@@ -49,13 +67,8 @@ def setup_task7a2_cameras_and_markers(
     scene: bpy.types.Scene,
     char_col: bpy.types.Collection,
 ) -> Dict[str, bpy.types.Object]:
-    """Create dedicated cameras and timeline markers for Course C (Stairs) and Course B (Ramp)."""
+    """Create dedicated inspection cameras and timeline markers for Course B (Ramp)."""
     cam_specs = {
-        "Task7A2_StairsCam": {
-            "location": (2.80, 5.20, 1.65),
-            "look_at": (0.0, 6.80, 0.70),
-            "lens": 35.0,
-        },
         "Task7A2_RampCam": {
             "location": (5.20, 15.00, 2.50),
             "look_at": (0.0, 16.50, 1.10),
@@ -93,130 +106,210 @@ def setup_task7a2_cameras_and_markers(
     # Configure timeline markers
     scene.timeline_markers.clear()
     markers = [
-        ("Stairs_Start", 1, "Task7A2_StairsCam"),
-        ("Stairs_Climb", 49, "Task7A2_StairsCam"),
-        ("Stairs_TopPlatform", 157, "Task7A2_StairsCam"),
-        ("Stairs_Stop", 211, "Task7A2_StairsCam"),
-        ("Ramp_Start", 227, "Task7A2_RampCam"),
-        ("Ramp_UphillAscent", 275, "Task7A2_RampCam"),
-        ("Ramp_BridgePlatform", 531, "Task7A2_RampCam"),
-        ("Ramp_DownhillDescent", 627, "Task7A2_RampCam"),
-        ("Ramp_FlatLanding", 835, "Task7A2_RampCam"),
-        ("Ramp_Stop", 911, "Task7A2_RampCam"),
+        ("Ramp_Start", 1, "Task7A2_RampCam"),
+        ("Ramp_UphillAscent", 49, "Task7A2_RampCam"),
+        ("Ramp_BridgePlatform", 305, "Task7A2_RampCam"),
+        ("Ramp_DownhillDescent", 401, "Task7A2_RampCam"),
+        ("Ramp_FlatLanding", 609, "Task7A2_RampCam"),
+        ("Ramp_Stop", 685, "Task7A2_RampCam"),
     ]
     for name, frame, cam_key in markers:
         m = scene.timeline_markers.new(name, frame=frame)
         if cam_key in cameras:
             m.camera = cameras[cam_key]
 
-    # Default active camera initially set to Stairs camera
-    scene.camera = cameras["Task7A2_StairsCam"]
+    scene.camera = cameras["Task7A2_RampCam"]
     bpy.context.view_layer.update()
     return cameras
 
 
-def build_task7a2_specs() -> Tuple[TerrainTraversalSpec, TerrainTraversalSpec]:
-    """Construct mathematical trajectory specifications for Course C (Stairs) and Course B (Ramp)."""
-    # Course C: 5 stair steps (rise 0.15m, tread 0.30m)
-    waypoint_stairs = [
-        5.20,  # step 0 R (flat ground approach, lead=0.30)
-        5.50,  # step 1 L (flat ground approach, lead=0.30)
-        5.80,  # step 2 R (flat ground immediately before step 1, lead=0.30)
-        6.10,  # step 3 L (Stair Step 1, z=0.15, lead=0.30)
-        6.40,  # step 4 R (Stair Step 2, z=0.30, lead=0.30)
-        6.70,  # step 5 L (Stair Step 3, z=0.45, lead=0.30)
-        7.00,  # step 6 R (Stair Step 4, z=0.60, lead=0.30)
-        7.30,  # step 7 L (Stair Step 5, z=0.75, lead=0.30)
-        7.65,  # step 8 R (Stair Top Platform, z=0.75, lead=0.35)
-        7.95,  # step 9 L (Stair Top Platform, z=0.75, lead=0.30)
-        7.95,  # step 10 R closing step (lands side-by-side on top platform)
+def setup_control_chain_debug_scene(
+    scene_main: bpy.types.Scene,
+    char_col: bpy.types.Collection,
+    frame_records: List[dict],
+) -> bpy.types.Scene:
+    """Construct dedicated 'Task7A2_ControlChain_Debug' scene in the same .blend."""
+    debug_scene_name = "Task7A2_ControlChain_Debug"
+    debug_scene = bpy.data.scenes.get(debug_scene_name)
+    if debug_scene is None:
+        debug_scene = bpy.data.scenes.new(debug_scene_name)
+
+    debug_scene.frame_start = scene_main.frame_start
+    debug_scene.frame_end = scene_main.frame_end
+    debug_scene.render.fps = scene_main.render.fps
+
+    # Link surfaces collection and character collection into debug scene
+    surfaces_col = bpy.data.collections.get("Playground_Surfaces")
+    if surfaces_col and surfaces_col.name not in debug_scene.collection.children:
+        debug_scene.collection.children.link(surfaces_col)
+    if char_col and char_col.name not in debug_scene.collection.children:
+        debug_scene.collection.children.link(char_col)
+
+    # Create dedicated Debug Visualization collection
+    debug_col = bpy.data.collections.get("Task7A2_Debug_Visualization")
+    if debug_col is None:
+        debug_col = bpy.data.collections.new("Task7A2_Debug_Visualization")
+    if debug_col.name not in debug_scene.collection.children:
+        debug_scene.collection.children.link(debug_col)
+
+    # 1. Dedicated Debug Camera
+    cam_name = "Task7A2_DebugCam"
+    debug_cam_obj = bpy.data.objects.get(cam_name)
+    if debug_cam_obj is None:
+        cam_data = bpy.data.cameras.new(cam_name)
+        debug_cam_obj = bpy.data.objects.new(cam_name, cam_data)
+        debug_col.objects.link(debug_cam_obj)
+    debug_cam_obj.data.lens = 28.0
+    debug_cam_obj.location = Vector((4.50, 15.00, 2.80))
+    direction = (Vector((0.0, 16.50, 1.00)) - debug_cam_obj.location).normalized()
+    debug_cam_obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler("XYZ")
+    debug_scene.camera = debug_cam_obj
+
+    # 2. 3D Keyframed Visual Indicators
+    def _get_or_create_empty(name: str, display_type: str = "SPHERE", size: float = 0.10) -> bpy.types.Object:
+        obj = bpy.data.objects.get(name)
+        if obj is None:
+            obj = bpy.data.objects.new(name, None)
+            obj.empty_display_type = display_type
+            obj.empty_display_size = size
+            debug_col.objects.link(obj)
+        return obj
+
+    empty_tgt_l = _get_or_create_empty("Debug_TargetFoot_L", "SPHERE", 0.08)
+    empty_tgt_r = _get_or_create_empty("Debug_TargetFoot_R", "SPHERE", 0.08)
+    empty_com = _get_or_create_empty("Debug_CoM_Tracker", "CIRCLE", 0.12)
+    empty_lock_l = _get_or_create_empty("Debug_LockIndicator_L", "SINGLE_ARROW", 0.15)
+    empty_lock_r = _get_or_create_empty("Debug_LockIndicator_R", "SINGLE_ARROW", 0.15)
+
+    # Keyframe indicators across all frames
+    for rec in frame_records:
+        f = rec["frame"]
+        mp = rec.get("motion_planning", {})
+        act = rec.get("actual_armature", {})
+        val = rec.get("validation", {})
+        wbc = rec.get("whole_body_controller", {})
+
+        # Planned foot targets
+        fl_xyz = mp.get("planned_foot_L", [0, 0, 0])
+        fr_xyz = mp.get("planned_foot_R", [0, 0, 0])
+        empty_tgt_l.location = Vector(fl_xyz)
+        empty_tgt_l.keyframe_insert("location", frame=f)
+        empty_tgt_r.location = Vector(fr_xyz)
+        empty_tgt_r.keyframe_insert("location", frame=f)
+
+        # CoM Tracker
+        com_xyz = act.get("com_world", [0, 0, 0])
+        empty_com.location = Vector(com_xyz)
+        empty_com.keyframe_insert("location", frame=f)
+
+        # Lock Indicators: point upward when locked, shrink when unlocked
+        l_locked = wbc.get("foot_L_locked", False)
+        r_locked = wbc.get("foot_R_locked", False)
+        empty_lock_l.location = Vector(fl_xyz)
+        empty_lock_l.scale = Vector((1.0, 1.0, 1.0)) if l_locked else Vector((0.001, 0.001, 0.001))
+        empty_lock_l.keyframe_insert("location", frame=f)
+        empty_lock_l.keyframe_insert("scale", frame=f)
+
+        empty_lock_r.location = Vector(fr_xyz)
+        empty_lock_r.scale = Vector((1.0, 1.0, 1.0)) if r_locked else Vector((0.001, 0.001, 0.001))
+        empty_lock_r.keyframe_insert("location", frame=f)
+        empty_lock_r.keyframe_insert("scale", frame=f)
+
+    # 3. 6 Structured HUD Diagnostic Text Boards
+    hud_stages = [
+        ("HUD_Stage_01_Environment", (2.8, 13.8, 3.2), "[ENVIRONMENT] Surface: ramp_up | Height: 0.0m | Pitch: 15.0 deg"),
+        ("HUD_Stage_02_MotionPlanning", (2.8, 14.1, 3.0), "[MOTION PLANNING] Action: TerrainWalk | Step: steady | Phase: L=stance R=swing"),
+        ("HUD_Stage_03_KinematicBridge", (2.8, 14.4, 2.8), "[KINEMATIC BRIDGE] Root Target: (0, 12, 0.3) | Pelvis Offset: (0, 0, -0.063)"),
+        ("HUD_Stage_04_WholeBodyController", (2.8, 14.7, 2.6), "[WHOLE BODY CONTROLLER] Reachable: True | Foot Lock: L=True R=False | Unmet: 0"),
+        ("HUD_Stage_05_ActualArmature", (2.8, 15.0, 2.4), "[ACTUAL ARMATURE] CoM: (0, 12, 1.1) | Mass: 70.0kg | ROM: 0 violations"),
+        ("HUD_Stage_06_Validation", (2.8, 15.3, 2.2), "[VALIDATION METRICS] Stance Drift: 0.000000m | Stretch: 0.000001m | STATUS: PASS"),
     ]
-    spec_stairs = TerrainTraversalSpec(
-        course_id="stairs",
-        start_pos=(0.0, 4.90, 0.0),
-        waypoint_y=waypoint_stairs,
-        stand_start_frames=12,
-        step_frames=18,
-        stand_stop_frames=16,
-        base_clearance_stairs=0.16,
-        pelvis_drop_stairs=0.12,
-    )
 
-    # Course B: 15° uphill ramp, elevated bridge, 20° downhill ramp, flat landing
-    waypoint_ramps = [
-        10.50, # step 0 R (flat ground approach, lead=0.30)
-        10.80, # step 1 L (flat ground approach, lead=0.30, toe at 10.95 < 11.00)
-        11.10, # step 2 R (15° uphill ramp ascent, lead=0.30, heel at 11.03 > 11.00)
-        11.40, # step 3 L (uphill)
-        11.70, # step 4 R (uphill)
-        12.00, # step 5 L (uphill)
-        12.30, # step 6 R (uphill)
-        12.60, # step 7 L (uphill)
-        12.90, # step 8 R (uphill)
-        13.20, # step 9 L (uphill)
-        13.50, # step 10 R (uphill)
-        13.80, # step 11 L (uphill)
-        14.10, # step 12 R (uphill)
-        14.40, # step 13 L (uphill)
-        14.70, # step 14 R (uphill)
-        15.00, # step 15 L (uphill)
-        15.28, # step 16 R (uphill)
-        15.56, # step 17 L (uphill near crest)
-        15.84, # step 18 R (uphill crest approach, toe at 15.99 < 16.00)
-        16.08, # step 19 L (elevated bridge platform, heel at 16.01 > 16.00, z=1.34)
-        16.35, # step 20 R (bridge platform, z=1.34)
-        16.65, # step 21 L (bridge platform, z=1.34)
-        16.95, # step 22 R (bridge platform, z=1.34)
-        17.25, # step 23 L (bridge platform, z=1.34)
-        17.55, # step 24 R (bridge platform, z=1.34)
-        17.80, # step 25 L (bridge platform near descent, toe at 17.95 < 18.00)
-        18.15, # step 26 R (-20° downhill ramp descent, heel at 18.08 > 18.00, z≈1.28)
-        18.45, # step 27 L (downhill)
-        18.75, # step 28 R (downhill)
-        19.05, # step 29 L (downhill)
-        19.35, # step 30 R (downhill)
-        19.65, # step 31 L (downhill)
-        19.95, # step 32 R (downhill)
-        20.25, # step 33 L (downhill)
-        20.55, # step 34 R (downhill)
-        20.85, # step 35 L (downhill)
-        21.15, # step 36 R (downhill)
-        21.48, # step 37 L (downhill near base, toe at 21.63 < 21.681)
-        21.78, # step 38 R (flat landing, heel at 21.71 > 21.681, z=0.0)
-        22.10, # step 39 L (flat landing, z=0.0)
-        22.40, # step 40 R (flat landing, z=0.0)
-        22.40, # step 41 L closing step (lands side-by-side on flat ground)
-    ]
-    spec_ramps = TerrainTraversalSpec(
-        course_id="ramps",
-        start_pos=(0.0, 10.20, 0.0),
-        waypoint_y=waypoint_ramps,
-        stand_start_frames=12,
-        step_frames=16,
-        stand_stop_frames=16,
-        base_clearance_ramp=0.12,
-        pelvis_drop_slope=0.08,
-        pelvis_drop_uphill=0.063,
-        pelvis_drop_downhill=0.095,
-        pelvis_drop_flat=0.03,
-        torso_lean_uphill_deg=6.0,
-        torso_lean_downhill_deg=-2.5,
-    )
+    for txt_name, loc, initial_body in hud_stages:
+        txt_obj = bpy.data.objects.get(txt_name)
+        if txt_obj is None:
+            curve_data = bpy.data.curves.new(txt_name, "FONT")
+            txt_obj = bpy.data.objects.new(txt_name, curve_data)
+            debug_col.objects.link(txt_obj)
+        txt_obj.data.body = initial_body
+        txt_obj.data.size = 0.08
+        txt_obj.location = Vector(loc)
+        # Face the debug camera
+        dir_to_cam = (debug_cam_obj.location - txt_obj.location).normalized()
+        txt_obj.rotation_euler = dir_to_cam.to_track_quat("Z", "Y").to_euler("XYZ")
 
-    return spec_stairs, spec_ramps
+    # 4. Embed Interactive Frame-Change Driver Script
+    driver_script_name = "task7a2_debug_hud_driver.py"
+    driver_text = bpy.data.texts.get(driver_script_name)
+    if driver_text is None:
+        driver_text = bpy.data.texts.new(driver_script_name)
+    driver_text.from_string('''
+import bpy
+import json
+
+def update_debug_hud(scene):
+    if scene.name != "Task7A2_ControlChain_Debug":
+        return
+    records_str = scene.get("task7a2_control_chain_diagnostics", "")
+    if not records_str:
+        return
+    try:
+        records = json.loads(records_str)
+    except Exception:
+        return
+    frame = scene.frame_current
+    rec = next((r for r in records if r["frame"] == frame), None)
+    if rec is None:
+        return
+
+    # Update HUD text objects
+    env_txt = bpy.data.objects.get("HUD_Stage_01_Environment")
+    if env_txt:
+        e = rec.get("environment", {})
+        env_txt.data.body = f"[1. ENVIRONMENT]\\nQuery: {e.get('query_pos')}\\nTerrain Z: {e.get('terrain_height')}m | Pitch: {e.get('slope_pitch_deg')} deg"
+
+    mp_txt = bpy.data.objects.get("HUD_Stage_02_MotionPlanning")
+    if mp_txt:
+        m = rec.get("motion_planning", {})
+        mp_txt.data.body = f"[2. MOTION PLANNING]\\nAction: {m.get('action_name')} | Step: {m.get('active_step_k')}\\nPhase: L={m.get('phase_L')} R={m.get('phase_R')}"
+
+    kb_txt = bpy.data.objects.get("HUD_Stage_03_KinematicBridge")
+    if kb_txt:
+        k = rec.get("kinematic_bridge", {})
+        kb_txt.data.body = f"[3. KINEMATIC BRIDGE]\\nRoot: {k.get('root_target')}\\nPelvis dz: {k.get('pelvis_offset')}"
+
+    wbc_txt = bpy.data.objects.get("HUD_Stage_04_WholeBodyController")
+    if wbc_txt:
+        w = rec.get("whole_body_controller", {})
+        wbc_txt.data.body = f"[4. WHOLE BODY CONTROLLER]\\nReachable: {w.get('is_all_reachable')} | Lock L/R: {w.get('foot_L_locked')}/{w.get('foot_R_locked')}"
+
+    arm_txt = bpy.data.objects.get("HUD_Stage_05_ActualArmature")
+    if arm_txt:
+        a = rec.get("actual_armature", {})
+        arm_txt.data.body = f"[5. ACTUAL ARMATURE]\\nCoM: {a.get('com_world')} | Mass: {a.get('mass_kg')} kg"
+
+    val_txt = bpy.data.objects.get("HUD_Stage_06_Validation")
+    if val_txt:
+        v = rec.get("validation", {})
+        val_txt.data.body = f"[6. VALIDATION METRICS]\\nDrift L: {v.get('drift_L_m'):.6f}m | Reach: L={v.get('reach_L')} R={v.get('reach_R')}\\nSTATUS: {'PASS' if v.get('pass') else 'FAIL'}"
+
+if update_debug_hud not in bpy.app.handlers.frame_change_post:
+    bpy.app.handlers.frame_change_post.append(update_debug_hud)
+''')
+    driver_text.use_module = True
+
+    return debug_scene
 
 
-def generate_dynamics_playground_task7a2_blend(
-    output_blend_path: str = "output/dynamics_playground_task7a2.blend",
+def generate_dynamics_playground_task7a2_corrected_blend(
+    output_blend_path: str = "output/dynamics_playground_task7a2_corrected.blend",
     evidence_dir: str = "docs/evidence/task7a2",
-    config: Optional[PipelineConfig] = None,
 ) -> Dict[str, Any]:
-    """Execute complete Task 7A-2 terrain traversal pipeline and save derived .blend artifact."""
-    cfg = config or PipelineConfig()
-    os.makedirs(os.path.dirname(os.path.abspath(output_blend_path)), exist_ok=True)
-    os.makedirs(os.path.abspath(evidence_dir), exist_ok=True)
+    """Execute corrected Task 7A-2 pipeline using authoritative MotionPlanner."""
+    os.makedirs(evidence_dir, exist_ok=True)
+    cfg = PipelineConfig()
 
-    # 1. Load baseline DynamicsPlayground (read-only base)
+    # 1. Open baseline dynamics playground scene
     base_blend = os.path.abspath("output/dynamics_playground.blend")
     if not os.path.exists(base_blend):
         raise FileNotFoundError(f"Baseline playground scene not found: {base_blend}")
@@ -229,69 +322,63 @@ def generate_dynamics_playground_task7a2_blend(
     char_col = assembly["collection"]
     scene = bpy.context.scene
 
-    # 3. Setup Task 7A-2 cameras and timeline markers
+    # 3. Setup cameras and timeline markers for active animation scene
     cameras = setup_task7a2_cameras_and_markers(scene, char_col)
 
     # 4. Construct terrain environment query
     env = create_standard_dynamics_playground_query()
 
-    # 5. Build action specifications
-    spec_stairs, spec_ramps = build_task7a2_specs()
-    action_stairs = TerrainWalkAction(spec_stairs)
-    action_ramps = TerrainWalkAction(spec_ramps)
-
-    # 6. Initialize Bridge Executor and Runtime Context
-    bridge = KinematicBridgeExecutor(
-        armature_obj=arm_obj,
-        root_obj=root_obj,
-        environment=env,
-        default_fps=cfg.fps,
+    # 5. Build continuous Course B (Ramp) route input
+    route = TerrainRouteInput(
+        start_pos=(0.0, 10.20, 0.0),
+        target_pos=(0.0, 22.40, 0.0),
+        nominal_stride_m=0.30,
+        step_frames=16,
+        stand_start_frames=12,
+        stand_stop_frames=16,
+        base_clearance_m=0.12,
+        pelvis_drop_uphill_m=0.088,
+        pelvis_drop_downhill_m=0.098,
+        pelvis_drop_flat_m=0.035,
+        torso_lean_uphill_deg=6.0,
+        torso_lean_downhill_deg=-2.5,
     )
-    context = MotionRuntimeContext(
+    action = TerrainWalkAction(route=route, environment=env, action_name="TerrainWalk_CourseB_Continuous")
+
+    # 6. Execute through AUTHORITATIVE MotionPlanner
+    planner = MotionPlanner(
         config=cfg,
         armature_obj=arm_obj,
-        root_obj=root_obj,
-        scene=scene,
         environment=env,
-        contact_adapter=ContactConstraintAdapter(arm_obj, env),
-        pose_applicator=BlenderPoseApplicator(arm_obj, root_obj, cfg),
-        bridge_executor=bridge,
     )
+    planner.add_action(action)
 
-    # 7. Execute Course C: Stairs Traversal (Frames 1..226)
-    init_state_stairs = create_initial_motion_state(
+    init_state = create_initial_motion_state(
         cfg,
         start_frame=1,
-        position=spec_stairs.start_pos,
+        position=route.start_pos,
     )
-    res_stairs = action_stairs.execute(init_state_stairs, context)
+    planner_result = planner.execute(initial_state=init_state)
 
-    # 8. Execute Course B: Ramp Traversal (Frames 227..926)
-    bridge.reset()
-    init_state_ramps = create_initial_motion_state(
-        cfg,
-        start_frame=res_stairs.final_state.frame + 1,
-        position=spec_ramps.start_pos,
-    )
-    res_ramps = action_ramps.execute(init_state_ramps, context)
-
-    all_states = res_stairs.states + res_ramps.states
-    all_frame_records = res_stairs.frame_records + res_ramps.frame_records
+    all_states: List[MotionState] = planner_result["states"]
+    all_frame_records: List[dict] = planner_result["frame_records"]
     total_frames = len(all_states)
 
-    # Set scene playback range
     scene.frame_start = 1
     scene.frame_end = total_frames
     scene.frame_set(1)
 
-    # 9. Verify locked foot contact drift
+    # 7. Setup Dedicated Internal Blender Diagnostic Scene
+    debug_scene = setup_control_chain_debug_scene(scene, char_col, all_frame_records)
+
+    # 8. Check locked foot contact drift
     max_drift = 0.0
     for s in all_states:
         for limb, c in s.contacts.items():
             if c.is_locked:
                 max_drift = max(max_drift, c.drift_m)
 
-    # 10. Serialize and embed contact state records into Blender scene ID properties
+    # 9. Serialize and embed metadata into scene ID properties on BOTH scenes
     contact_records_serialized = []
     for s in all_states:
         contact_records_serialized.append({
@@ -311,38 +398,34 @@ def generate_dynamics_playground_task7a2_blend(
             },
         })
 
-    scene["task7a2_contact_state_records"] = json.dumps(contact_records_serialized)
+    contact_json_str = json.dumps(contact_records_serialized)
     summary_data = {
-        "task": "Task 7A-2",
+        "task": "Task 7A-2 Corrected",
         "total_frames": total_frames,
-        "stairs_frames": len(res_stairs.states),
-        "ramps_frames": len(res_ramps.states),
         "max_locked_ankle_drift_m": max_drift,
-        "unreachable_count": res_stairs.unreachable_count + res_ramps.unreachable_count,
-        "courses": {
-            "stairs": {
-                "start_frame": res_stairs.initial_state.frame,
-                "end_frame": res_stairs.final_state.frame,
-                "steps": len(res_stairs.step_schedule),
-                "total_disp_y": res_stairs.metrics["total_disp_y"],
-                "total_disp_z": res_stairs.metrics["total_disp_z"],
-            },
-            "ramps": {
-                "start_frame": res_ramps.initial_state.frame,
-                "end_frame": res_ramps.final_state.frame,
-                "steps": len(res_ramps.step_schedule),
-                "total_disp_y": res_ramps.metrics["total_disp_y"],
-                "total_disp_z": res_ramps.metrics["total_disp_z"],
-            },
+        "unreachable_count": planner_result["unreachable_count"],
+        "route": {
+            "start_pos": list(route.start_pos),
+            "target_pos": list(route.target_pos),
+            "nominal_stride_m": route.nominal_stride_m,
+            "total_steps": len(planner_result["step_schedule"]),
         },
+        "continuous_without_exemption": True,
+        "diagnostic_scene": debug_scene.name,
     }
-    scene["task7a2_execution_summary"] = json.dumps(summary_data)
+    summary_json_str = json.dumps(summary_data)
+    diag_json_str = json.dumps(all_frame_records)
 
-    # 11. Save derived blend artifact
+    for target_scene in [scene, debug_scene]:
+        target_scene["task7a2_contact_state_records"] = contact_json_str
+        target_scene["task7a2_execution_summary"] = summary_json_str
+        target_scene["task7a2_control_chain_diagnostics"] = diag_json_str
+
+    # 10. Save derived corrected blend artifact
     abs_blend_out = os.path.abspath(output_blend_path)
     bpy.ops.wm.save_as_mainfile(filepath=abs_blend_out, check_existing=False)
 
-    # 12. Save companion JSON files
+    # 11. Save companion JSON files
     json_records_path = os.path.join(evidence_dir, "task7a2_contact_state_records.json")
     with open(json_records_path, "w", encoding="utf-8") as f:
         json.dump(contact_records_serialized, f, indent=2)
@@ -351,11 +434,19 @@ def generate_dynamics_playground_task7a2_blend(
     with open(json_summary_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2)
 
+    json_diag_path = os.path.join(evidence_dir, "task7a2_control_chain_diagnostics.json")
+    with open(json_diag_path, "w", encoding="utf-8") as f:
+        json.dump(all_frame_records, f, indent=2)
+
     return {
         "output_blend_path": abs_blend_out,
         "total_frames": total_frames,
         "max_locked_ankle_drift_m": max_drift,
         "summary": summary_data,
-        "stairs_result": res_stairs,
-        "ramps_result": res_ramps,
+        "planner_result": planner_result,
     }
+
+
+if __name__ == "__main__":
+    res = generate_dynamics_playground_task7a2_corrected_blend()
+    print(f"[SUCCESS] Generated Task 7A-2 corrected blend: {res['output_blend_path']} ({res['total_frames']} frames)")

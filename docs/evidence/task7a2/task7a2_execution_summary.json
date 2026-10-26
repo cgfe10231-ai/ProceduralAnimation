@@ -1,24 +1,22 @@
 {
-  "task": "Task 7A-2",
-  "total_frames": 926,
-  "stairs_frames": 226,
-  "ramps_frames": 700,
-  "max_locked_ankle_drift_m": 0.0,
+  "task": "Task 7A-2 Corrected",
+  "total_frames": 700,
+  "max_locked_ankle_drift_m": 4.983508235031104e-05,
   "unreachable_count": 0,
-  "courses": {
-    "stairs": {
-      "start_frame": 1,
-      "end_frame": 226,
-      "steps": 11,
-      "total_disp_y": 3.05,
-      "total_disp_z": 0.75
-    },
-    "ramps": {
-      "start_frame": 227,
-      "end_frame": 926,
-      "steps": 42,
-      "total_disp_y": 12.2,
-      "total_disp_z": 0.0
-    }
-  }
+  "route": {
+    "start_pos": [
+      0.0,
+      10.2,
+      0.0
+    ],
+    "target_pos": [
+      0.0,
+      22.4,
+      0.0
+    ],
+    "nominal_stride_m": 0.3,
+    "total_steps": 42
+  },
+  "continuous_without_exemption": true,
+  "diagnostic_scene": "Task7A2_ControlChain_Debug"
 }
