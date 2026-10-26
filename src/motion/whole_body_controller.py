@@ -52,6 +52,7 @@ from src.rig.foot_contact import (
     unlock_foot_contact,
 )
 from src.rig.ik import (
+    ANKLE_REST_Z,
     IK_TARGET_NAMES,
     MAX_LEG_REACH,
     MIN_LEG_REACH,
@@ -78,6 +79,7 @@ class EndEffectorTarget:
     weight: float = 1.0                                               # Blend weight / influence in [0.0, 1.0]
     is_locked: bool = False                                           # Foot ground support lock flag
     clamp_reach: bool = True                                          # Project to maximum reach sphere if out of reach
+    clamp_ground: bool = True                                         # Clamp Z to prevent ground penetration when flat
 
 
 @dataclass
@@ -143,6 +145,7 @@ class WholeBodyControlTargets:
         is_locked: bool = False,
         enabled: bool = True,
         clamp_reach: bool = True,
+        clamp_ground: bool = True,
     ) -> WholeBodyControlTargets:
         side_upper = side.upper()
         eff_id = f"foot_{side_upper}"
@@ -155,6 +158,7 @@ class WholeBodyControlTargets:
             weight=weight,
             is_locked=is_locked,
             clamp_reach=clamp_reach,
+            clamp_ground=clamp_ground,
         )
         if side_upper == "L":
             self.foot_L = target
@@ -383,13 +387,18 @@ class WholeBodyController:
                 was_locked = bool(ik_obj.get("is_locked", False)) if ik_obj is not None else False
 
                 if foot_tgt.is_locked:
+                    contact_ground_xyz = (
+                        foot_tgt.target_world_xyz[0],
+                        foot_tgt.target_world_xyz[1],
+                        foot_tgt.target_world_xyz[2] - ANKLE_REST_Z,
+                    )
                     cur_locked_pt = tuple(ik_obj.get("contact_world_xyz", ())) if ik_obj is not None else ()
-                    loc_diff = math.dist(cur_locked_pt, foot_tgt.target_world_xyz) if len(cur_locked_pt) == 3 else 999.0
+                    loc_diff = math.dist(cur_locked_pt, contact_ground_xyz) if len(cur_locked_pt) == 3 else 999.0
                     if not was_locked or loc_diff > 0.001:
                         lock_foot_contact(
                             arm,
                             side,
-                            contact_world_xyz=foot_tgt.target_world_xyz,
+                            contact_world_xyz=contact_ground_xyz,
                             target_rotation_deg=foot_tgt.target_rotation_deg,
                         )
                     else:
@@ -403,7 +412,7 @@ class WholeBodyController:
                         world_xyz=foot_tgt.target_world_xyz,
                         foot_rotation_deg=foot_tgt.target_rotation_deg,
                         clamp_reach=foot_tgt.clamp_reach,
-                        clamp_ground=True,
+                        clamp_ground=foot_tgt.clamp_ground,
                     )
 
         # ---------------------------------------------------------------------

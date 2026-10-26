@@ -94,9 +94,9 @@ def lock_foot_contact(
     if contact_world_xyz is None:
         contact_world = Vector((current_ankle_world.x, current_ankle_world.y, FLAT_GROUND_Z))
     else:
-        contact_world = Vector((contact_world_xyz[0], contact_world_xyz[1], FLAT_GROUND_Z))
+        contact_world = Vector((contact_world_xyz[0], contact_world_xyz[1], float(contact_world_xyz[2])))
 
-    locked_ankle_world = Vector((contact_world.x, contact_world.y, FLAT_GROUND_Z + ANKLE_REST_Z))
+    locked_ankle_world = Vector((contact_world.x, contact_world.y, contact_world.z + ANKLE_REST_Z))
 
     if target_rotation_deg is None:
         current_euler = ik_obj.matrix_world.to_euler("XYZ")

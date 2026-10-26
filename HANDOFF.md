@@ -5,26 +5,30 @@
 ---
 
 ## 1. 当前目标
-Task 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及 Final Architecture & Compatibility Closure 最终架构整理与验收收口）**已完全验证通过并正式闭环**：
-1. **历史 19 骨骼资产与运动模块复用审计 (`docs/PHASE7A_REUSE_AUDIT.md`)**：
-   - 完整审计 `output/unified_motion_integration.blend`、`output/dynamics_playground.blend` 与 19 个既有核心模块，补充第三节全量调用矩阵（包含直接调用、间接调用、仅用于验证、未接入但保留的 9 大模块 caller/callee/input/output），并接入 `tests/audit_c2_final_inspector.py --verify-docs` 永久 AST 门禁。
-2. **单一职责解耦重构 (`src/scene/playground_*`)**：
-   - 消除原 2872 行单一集中文件，重构为 4 个清晰专业子模块与 1 个总控门面：
-     * `playground_asset_preservation.py` (386 行)：101 个受保护对象、16 个表面网格几何（顶点坐标 $<10^{-5}$、面拓扑与顶点索引）、层级、矩阵、材质槽、环境属性、Layered F-Curves 与 S1..S5 73 帧基准轨迹全 73 帧深度对比；
-     * `playground_evidence_exporter.py` (223 行)：多视角相机 PNG 渲染、NumPy RGBA 加载、GIF 真实校验、204 帧连续 GIF 预览合成及验证报告 JSON 导出；
-     * `playground_character_assembly.py` (1495 行)：角色装配、五阶段控制闭环（Stage A..D）、四大数学一致性、Stage E 204 帧行走步态执行与接触状态持久化；
-     * `playground_kinematic_validation.py` (765 行)：独立只读重开全 204 帧评估，恢复持久化接触契约、验证根平移连续性、19 骨骼四元数测地线连续性、9 个支撑区间实际踝骨漂移、70.0 kg 质心轨迹与关节 ROM；
-     * `playground_character_integration.py` (183 行)：轻量级总控门面，导出全部公开符号保持 100% 向后兼容。
-3. **接触状态持久化合同 (Contact State Persistence Contract)**：
-   - Stage E 执行期间将逐帧实际接触状态（帧号、时间、双足锁定标志、支撑侧、支撑脚世界锚点 $(X,Y,Z)$、步态阶段、步序、触地/离地离散事件）序列化写入 Blender 场景 ID 属性 `scene["task7a1_contact_state_records"]`，并在 `FootIK.L/R` 控制器上对 `is_locked` 逐帧打关键帧；同时导出伴生文件 [`docs/evidence/task7a1/task7a1_contact_state_records.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task7a1/task7a1_contact_state_records.json)；
-   - 独立重开验收时通过 `recover_and_verify_contact_states_from_blend(scene)` 恢复持久化接触数据，彻底废除对步态公式重新推导的依赖；
-   - 严格分离三类数据：**Category A (运行时记录)**、**Category B (重开评估值)**、**Category C (解析参考值)**。
-4. **六大隔离负向测试闭环与套件扩充 (`tests/verify_task7a1_character_playground.py`)**：
-   - 测试套件扩充至 15 项测试（15/15 PASS, 1.10s），包含 6 项隔离故障注入测试（网格内部顶点微调、F-Curve 关键帧数值微调、S1..S5 37 帧状态微调、接触记录缺失帧、支撑足锚点被篡改、资产版本号不匹配）与 1 项只读零篡改保护测试；
-5. **全级别回归套件全绿与严格冻结**：
-   - `quick` (10/10 PASS)、`physics` (16/16 PASS)、`motion` (6/6 PASS)、`full` (25/25 PASS) 与 `--verify-docs` (PASS) 全绿通过；
-   - 修复 `run_test_suite.py` 在 Windows 默认 GBK 环境下的 UTF-8 编码兼容性；
-   - 严格停止于 Task 7A-1，绝不自动进入 Task 7A-2。
+Task 7A-2（Existing 19-Bone Character: Continuous Terrain-Aware Lower-Limb Traversal in DynamicsPlayground，真实 19 骨骼角色在动力学训练场中连续通过阶梯与斜坡复杂地形）**已完全验证通过并正式闭环**：
+1. **真实 19 骨骼角色与复杂地形连续通行场景 (`output/dynamics_playground_task7a2.blend`)**：
+   - 产生 581,882 字节独立可播放、可交互 Blender 5.1.1 场景，包含完整 926 帧连续动作；
+   - 连续穿越动力学训练场复杂地形：
+     * **Course C（台阶地形）**：第 1..226 帧，平地静止起步 $\to$ 连续攀爬 5 级台阶（台阶高 0.15m、踏面深 0.30m）$\to$ 顶部平台平稳行走 $\to$ 终点平稳收步停稳；
+     * **Course B（斜坡地形）**：第 227..926 帧，平地静止起步 $\to$ 15° 上坡连续攀爬 $\to$ 顶层天桥高台平稳行走（$Z=1.34\text{ m}$）$\to$ 20° 下坡连续缓步下行 $\to$ 平地平稳过渡停稳。
+2. **单一权威控制管线与零硬编码环境感知**：
+   - 全程严格遵循单向权威管线：`TerrainWalkAction` $\to$ `KinematicPlannedPose` $\to$ `KinematicBridgeExecutor.execute_frame()` $\to$ `WholeBodyController.execute_frame()` $\to$ Blender 约束求解（双腿 IK、极向目标、足底锁定）；
+   - 严禁绕开 WBC 直接对骨骼打关键帧；所有地形高度与法线 100% 通过 `DynamicsEnvironmentQuery` 动态空间射线求交获取，严禁硬编码环境几何。
+3. **926 帧全帧严苛物理与生物力学数学验证**：
+   - **C0 根位移连续性**：926 帧根骨平移速度连续，无跃迁阶跃；
+   - **骨骼刚性保全**：全 926 帧大腿/小腿严格保持 0.410m，伸长误差为 0；
+   - **支撑足零滑移漂移**：全 926 帧支撑足锁定期间实际踝骨漂移 $< 0.001\text{ mm}$；
+   - **生理 ROM 零越界**：全 17 处人体关节欧拉角 100% 处于生理活动范围内（0 ROM violations）；
+   - **地形穿透零违规**：三维碰撞网格全 926 帧零足底穿透（0 penetrations）；
+   - **全身质量守恒**：全 14 连杆刚体质量严格守恒为 70.000 kg，CoM 自适应动态起伏。
+4. **多视角检查相机与完整视觉证据库 (`docs/evidence/task7a2/`)**：
+   - 场景内置 3 个专用验收视口相机（`Task7A2_StairsCam`, `Task7A2_RampCam`, `Task7A2_OverviewCam`）及 10 个关键事件时间轴标记；
+   - 产出 9 张多角度全高清关键帧 PNG 与 2 份连续动态 GIF 预览（`task7a2_stairs_traversal.gif` 76 帧 301KB, `task7a2_ramp_traversal.gif` 100 帧 286KB）；
+   - 导出结构化伴生数据：`task7a2_contact_state_records.json`、`task7a2_execution_summary.json`、`task7a2_validation_report.json`、`task7a2_evidence_manifest.json`。
+5. **受保护资产零篡改与历史零退化**：
+   - `output/dynamics_playground.blend`（234,436 字节）与 `output/unified_motion_integration.blend`（298,537 字节）100% 保持只读基准，0 字节差异；
+   - 全级别测试套件全绿（`quick` 10/10, `physics` 16/16, `motion` 7/7, `full` 26/26, `--verify-docs` 0 phantom symbols）；
+   - 严格停止于 Task 7A-2，绝不自动进入 Task 7A-3 或 Phase 7B。
 
 ## 2. 已完成
 * 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
@@ -45,14 +49,14 @@ Task 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `Dynam
 * 完成 Task 6G-C-R3B-1 统一架构规范修订与最小兼容桥接层初版。
 * 完成 Task 6G-C-R3B-1-Final 架构漏洞修补与 GitHub 自动化安全同步机制。
 * 完成 Task 6G-C-R3B-2 历史四大动作向统一桥接层与全身控制架构无损迁移。
-* 完成 Task 6G-C-R3B-2-R1 历史正确动画对照、视口下肢周期性 L 形畸变根因定位与修复（用户已目视验收通过）。
-* 完成 Task 6G-D-PRE-P0 全工程架构审计与后续开发准备（交付 `docs/ENGINEERING_AUDIT.md`）。
-* 完成 Task 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁（交付 `docs/ARCHITECTURE_CHANGE_GATE.md`）。
-* 完成 Task 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地（交付 `tests/test_runner_unit.py` 10/10 单元测试）。
-* 完成 Task 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础（交付 21 个表面与 `output/dynamics_playground.blend`）。
+* 完成 Task 6G-C-R3B-2-R1 历史正确动画对照、视口下肢周期性 L 形畸变根因定位与修复。
+* 完成 Task 6G-D-PRE-P0 全工程架构审计与后续开发准备。
+* 完成 Task 6G-D-PRE-P1 统一测试执行接口、回归资产管理与永久架构门禁。
+* 完成 Task 6G-D-PRE-P1-R1 统一测试运行器严格验收修复与单元测试落地。
+* 完成 Task 6G-D-PRE-P2 可视化动力学训练场与统一环境查询基础。
 * 完成 Task 6G-D-PRE-P2-R1 环境查询过滤修复、距离语义统一与动力学训练场单一 SSOT 门禁。
-* 完成 Task 6G-D-A 接触动力学基础与冲量动量系统（交付纯数学模块与 15 项数学几何测试）。
-* 完成 Task 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复（交付 17 项测试与环境接触间隙门禁）。
+* 完成 Task 6G-D-A 接触动力学基础与冲量动量系统。
+* 完成 Task 6G-D-A-R1 接触动力学时间步长一致性与物理接触有效性契约修复。
 * 完成 Task 6G-D-A-R2 MultiContactDynamics 时间步长更新原子性与状态不可变保全。
 * 完成 Task 6G-D-B 多接触力逆向求解与约束分配系统。
 * 完成 Task 6G-D-B-R1 接触力求解器数值可靠性与状态契约修复。
@@ -65,44 +69,50 @@ Task 7A-1（历史角色资产复用审计、真实 19 骨骼角色接入 `Dynam
 * 完成 Task 6G-D-C2-A DynamicsPlayground 真实动力学状态集成与多场景视口验证。
 * 完成 Task 6G-D-C2-A 补充要求：自动视觉证据采集、遥测一致性审计与跨 AI 验收管线。
 * 完成 Task 6G-D-C2-FINAL 6G 动力学最终收口、完整工程审计与通用程序化运动底座架构冻结。
-* **完成 Task 7A-1 历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及 Final Architecture & Compatibility Closure 最终架构整理与验收收尾**。
+* 完成 Task 7A-1 历史角色资产复用审计、真实 19 骨骼角色接入 `DynamicsPlayground`、最小控制闭环验证及最终架构收口。
+* **完成 Task 7A-2 真实 19 骨骼角色连续复杂地形（台阶 Course C、斜坡 Course B）运动生成、全帧数学验证与视觉验收管线落地**。
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
-  * `task7a1_character_playground`：15/15 项测试（深度场景保护、19骨骼/13网格/8控制器清点、Stages A-E、204帧根平移与四元数测地线连续性、9个支撑区间踝骨/控制器漂移与8次接触生命周期切换、70kg全帧CoM与刚体几何一致性、204帧连续GIF帧数校验、接触状态持久化合同恢复校验、6项隔离负向故障注入测试、只读测试零写磁盘证明）全绿（15/15 PASS, 1.10s / Runner 2.92s）；
+  * `task7a2_terrain_traversal`：只读重开验收 926 帧数学验证（0 根平移跃迁、0 骨骼拉伸、0 支撑足漂移、0 关节 ROM 越界、0 地形穿透、70.0kg 质量守恒、3 相机 10 标记及 8 份伴生证据完整性）全绿（PASS, 2.42s）；
+  * `task7a1_character_playground`：15/15 项测试全绿（1.10s）；
   * `architecture_integrity_gate`：AST 符号存在性与 6 项校验器自测全绿（0.77s，退出码 0）；
-  * `quick` Tier：10/10 项通过（11.14s，退出码 0）；
-  * `physics` Tier：16/16 项通过（78.07s，退出码 0）；
-  * `motion` Tier：6/6 项通过（20.79s，退出码 0）；
-  * `full` Tier：25/25 项通过（100.84s，退出码 0），历史物理与步态模块 100% 零退化；
-* 状态标定为：Task 7A-1 已完成并验证（`AUTOMATED_PASS` + 自动视觉证据已入库），严格停止。
+  * `quick` Tier：10/10 项通过（10.61s，退出码 0）；
+  * `physics` Tier：16/16 项通过（76.18s，退出码 0）；
+  * `motion` Tier：7/7 项通过（20.16s，退出码 0）；
+  * `full` Tier：26/26 项通过（97.18s，退出码 0），历史物理与步态模块 100% 零退化；
+* 状态标定为：Task 7A-2 已完成并验证（`AUTOMATED_PASS` + 自动视觉证据已入库），严格停止。
 
 ## 4. 当前文件
-* 核心场景产物：`output/dynamics_playground.blend`（单一训练场 SSOT，零改动保留）、`output/dynamics_playground_task7a1.blend`（Task 7A-1 19 骨骼角色接入可播放派生场景）
-* 核心角色解耦模块群：
-  - `src/scene/playground_asset_preservation.py` (386 行)
-  - `src/scene/playground_evidence_exporter.py` (223 行)
-  - `src/scene/playground_character_assembly.py` (1495 行)
-  - `src/scene/playground_kinematic_validation.py` (765 行)
-  - `src/scene/playground_character_integration.py` (183 行轻量门面)
-  - `run_task7a1_character_playground.py` (专用生成管线脚本)
-* 核心测试脚本：`tests/verify_task7a1_character_playground.py` (15 项测试)
-* 核心审计与证据：`docs/PHASE7A_REUSE_AUDIT.md`、`docs/evidence/task7a1/task7a1_contact_state_records.json`、`docs/evidence/task7a1/full_frame_validation.json`、`docs/evidence/task7a1/task7a1_verification_report.json`、`docs/evidence/task7a1/task7a1_walk_preview.gif`
-* 核心测试系统：`tests/test_registry.py`、`tests/run_test_suite.py`、`run_tests.ps1`
-* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`DECISIONS.md` (`[DEC-049]`)
-* 规则文件：`GEMINI.md`、`AGENTS.md`、`.agents/rules/project_rules.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
+* 核心场景产物：
+  - `output/dynamics_playground.blend`（单一训练场 SSOT，只读零改动保留，234,436 字节）
+  - `output/dynamics_playground_task7a1.blend`（Task 7A-1 19 骨骼平地可播放场景，204 帧）
+  - `output/dynamics_playground_task7a2.blend`（Task 7A-2 19 骨骼台阶/斜坡地形连续通行场景，926 帧，581,882 字节）
+* 核心地形运动生成与验证模块：
+  - `src/motion/terrain_walk.py` (520 行)：`TerrainWalkAction(MotionAction)`、地形足底清空高度评估、摆动踝关节生理放松、骨盆自适应下沉调度
+  - `src/scene/playground_terrain_traversal.py` (520 行)：Course C（台阶）与 Course B（斜坡）全场景步态编排、无缝换道、多视角相机与标记
+  - `src/scene/playground_terrain_validation.py` (380 行)：926 帧独立只读数学评估、C0 连续性、骨骼拉伸、支撑漂移、ROM 越界与三维碰撞穿透检测
+  - `run_task7a2_terrain_traversal.py` (190 行)：无头管线入口、场景生成、多视角 PNG 关键帧渲染、动态 GIF 合成与 JSON 报告导出
+* 核心底层适配加固：
+  - `src/rig/foot_contact.py`：支持三维高程世界接触锚点 `float(contact_world_xyz[2])`
+  - `src/motion/whole_body_controller.py`：解耦踝关节世界坐标与地表接触锚点，修复 70mm 双重叠加 bug
+  - `src/motion/kinematic_bridge.py`：传递 `clamp_ground` 参数并支持任意三维高度地面映射
+* 核心测试脚本：`tests/verify_task7a2_terrain_traversal.py` (注册入 `motion` 与 `full` 分层)
+* 核心文档与证据：
+  - `docs/PHASE7A2_TERRAIN_TRAVERSAL_REPORT.md` (全量工程报告)
+  - `docs/evidence/task7a2/task7a2_contact_state_records.json`
+  - `docs/evidence/task7a2/task7a2_execution_summary.json`
+  - `docs/evidence/task7a2/task7a2_validation_report.json`
+  - `docs/evidence/task7a2/task7a2_evidence_manifest.json`
+  - `docs/evidence/task7a2/task7a2_stairs_traversal.gif` (76 帧，301 KB)
+  - `docs/evidence/task7a2/task7a2_ramp_traversal.gif` (100 帧，286 KB)
+  - `docs/evidence/task7a2/*.png` (9 张高清多视角关键帧截图)
+* 核心规范与门禁：`docs/ARCHITECTURE_CHANGE_GATE.md` (SSOT)、`DECISIONS.md` (`[DEC-050]`)
+* 规则文件：`GEMINI.md`、`AGENTS.md`、`AI_SYNC.md`、`HANDOFF.md`、`PROJECT_STATE.md`、`CHANGELOG.md`
 
 ## 5. 已知问题与未实现功能清单 (Unimplemented Features)
-* 后续 Phase 7A 任务（如斜坡/台阶多表面连续通行 Task 7A-2、7B 上肢独立控制、7C 动力学合流等）；
-* 用户在 Blender 5.1.1 中目视检查 `output/dynamics_playground_task7a1.blend` 及 `docs/evidence/task7a1/` 视觉证据。
+* 后续 Phase 7A 任务（如地形转弯/不规则起伏通过 Task 7A-3、Phase 7B 上肢独立控制、Phase 7C 动力学合流等）；
+* 用户在 Blender 5.1.1 中目视检查 `output/dynamics_playground_task7a2.blend` 及 `docs/evidence/task7a2/` 视觉证据。
 
 ## 6. 下一步
-* **严格停止，等待用户与 ChatGPT 审阅并下达下一阶段指令**。
-* **严禁自动进入 Task 7A-2 或后续阶段**。
-
-## 7. 禁止事项
-* **严禁修改、删除或移动项目目录外的任何文件**。
-* **严禁虚报测试结果**，严格执行 6 态划分。
-* **以磁盘代码和实际测试结果为事实第一依据**。
-* **严禁编写独立脚本拼凑动画冒充连续动作**。
-* **严禁擅自进入 Task 7A-2 或 6H**。
+* **严格停止，等待用户审阅并下达下一阶段指令**。

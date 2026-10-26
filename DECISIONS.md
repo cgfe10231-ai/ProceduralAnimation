@@ -1096,3 +1096,37 @@
   - 未修改任何历史运动规划算法或动力学数值积分器；
   - 彻底满足 Task 7A-1 最终验收关闭条件；
   - 严格停止，禁止自动准入 Task 7A-2。
+
+---
+
+### [DEC-050] 2026-10-26: Task 7A-2 真实 19 骨骼角色连续复杂地形（楼梯与斜坡高架桥）自适应下肢穿越、单一控制链闭环与 926 帧全量验收
+
+* **状态**：已采纳并全绿验证 (Accepted & Fully Verified)
+* **日期**：2026-10-26
+* **背景**：正式准入 Phase 7A 第二阶段（`Task 7A-2`）。目标是在保持历史 `output/dynamics_playground.blend` 训练场只读受保护的前提下，将成熟的 19 骨骼角色接入连续复杂起伏地形（Course C 楼梯穿越与 Course B 斜坡/高架桥穿越），产出可在 Blender 5.1.1 中直接打开、时间线播放、交互审查的派生场景 `output/dynamics_playground_task7a2.blend`。必须经受 926 帧全量骨骼求值验证，确保足端零滑移锁定、零骨骼拉伸、零解剖学 ROM 违规、零地形穿模，且历史测试集 100% 零退化。
+* **决策与方案**：
+  1. **单一连续地形运动规划器 (`src/motion/terrain_walk.py`)**：
+     - 构建通用地形行进动作类 `TerrainWalkAction(MotionAction)` 与离散步态生成函数 `build_terrain_step_schedule`；
+     - 零环境高度硬编码：严格通过 `DynamicsEnvironmentQuery` 接口（`ground_height_at` 与 `surface_normal_at`）逐帧动态查询足底各位置地表高程与法向量，完全解耦场景几何；
+     - 矢状面法向量自适应偏航与俯仰：通过 $\text{atan2}(-n_y, n_z)$ 计算坡度法向量法向偏角，自动匹配上坡（+15°）、下坡（-20°）与平地（0°）足端世界姿态。
+  2. **核心控制链向后兼容增强 (`src/rig/foot_contact.py`, `src/motion/whole_body_controller.py`, `src/motion/kinematic_bridge.py`)**：
+     - **足端高程接触锁定解除平地硬编码**：升级 `lock_foot_contact` 支持传入世界空间真实接触高程 `float(contact_world_xyz[2])`，保留对默认 `FLAT_GROUND_Z = 0.0` 的 100% 兼容；
+     - **脚踝世界坐标与接触坐标分离**：在 `WholeBodyController.execute_frame` 中将脚踝目标转换为地面接触点 `contact_ground_xyz = (target_x, target_y, target_z - ANKLE_REST_Z)`，彻底消除 70mm 偏置累加 bug，实现脚踝锁定物理零漂移（`0.00000000 m`）；
+     - **显式可配置地面夹持标志 (`clamp_ground`)**：在 `EndEffectorTarget` 与 `PlannedFootTarget` 中引入 `clamp_ground: bool = True`，地形跨越时设为 `False`，避免 WBC 误将高程目标投影至根节点高度。
+  3. **全足端 3D 刚体包围盒悬空防穿透与台阶边缘防碰**：
+     - 脚掌刚体具备 22cm 纵向长度（后跟 $-0.07\text{ m}$ 至脚尖 $+0.15\text{ m}$）；在摆动相中实时查询整足底部最大地形高度：
+       $$z_{\text{foot\_terr}} = \max\Big(z_{\text{terr}}(x, y-0.07),\, z_{\text{terr}}(x, y),\, z_{\text{terr}}(x, y+0.15)\Big)$$
+       结合 $0.045\text{ m}$ 动态悬空最小净距，彻底消除踢面切削与边缘穿模（926 帧全量 0 穿模）。
+  4. **生理学踝关节矢状面自适应与分级骨盆沉降**：
+     - 在摆动相引入生理性踝关节松弛机制（摆动中段脚尖沿摆动弧线自然微倾 18°~22°），离地瞬间引入自然的蹬地限位（$\le 10^\circ$）；
+     - 引入自适应分级骨盆沉降参数：上坡登高沉降 $0.063\text{ m}$，下坡缓冲沉降 $0.095\text{ m}$，平地行进沉降 $0.030\text{ m}$，台阶攀爬沉降 $0.120\text{ m}$，完美平衡大腿小腿最大延伸极限（$< 0.820\text{ m}$）与踝关节背屈/跖屈生理极限（$[-25.0^\circ, +45.0^\circ]$），在 926 帧中达成 0 ROM 违规。
+  5. **派生场景生成、只读重开验收与完备视觉证据 (`run_task7a2_terrain_traversal.py`, `tests/verify_task7a2_terrain_traversal.py`)**：
+     - 派生生成 `output/dynamics_playground_task7a2.blend`（581,882 字节，926 帧，内嵌 3 专用相机与 10 个关键阶段时间线标记）；
+     - 独立只读重开评估全 926 帧：0 穿模、0 ROM 违规、0 IK 违例、踝骨漂移 $0.0\text{ m}$、骨骼形变 $1.55\times 10^{-6}\text{ m}$、质量严格守恒 70.000 kg；
+     - 渲染 9 张高清关键帧 PNG 与 2 份连续动态 GIF（`task7a2_stairs_traversal.gif` 76 帧 301KB、`task7a2_ramp_traversal.gif` 100 帧 286KB）；
+     - 注册 `task7a2_terrain_traversal` 入测试套件 `motion` 与 `full` 级别，全层级测试 100% 通过（`quick` 10/10, `physics` 16/16, `motion` 7/7, `full` 26/26, `--verify-docs` PASS）。
+* **影响**：
+  - 新增核心模块：`src/motion/terrain_walk.py`, `src/scene/playground_terrain_traversal.py`, `src/scene/playground_terrain_validation.py`, `run_task7a2_terrain_traversal.py`, `tests/verify_task7a2_terrain_traversal.py`, `docs/PHASE7A2_TERRAIN_TRAVERSAL_REPORT.md`；
+  - 增强已有模块：`src/motion/kinematic_bridge.py`, `src/motion/whole_body_controller.py`, `src/rig/foot_contact.py`, `tests/test_registry.py`；
+  - 历史基准场景 `output/dynamics_playground.blend` (234,436 字节) 与 `output/unified_motion_integration.blend` (298,537 字节) 100% 零修改；
+  - 严格停止于 Task 7A-2 收口，绝不擅自越级进入 Phase 7A-3 或 Phase 7B。

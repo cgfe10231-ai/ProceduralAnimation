@@ -1,0 +1,24 @@
+{
+  "task": "Task 7A-2",
+  "total_frames": 926,
+  "stairs_frames": 226,
+  "ramps_frames": 700,
+  "max_locked_ankle_drift_m": 0.0,
+  "unreachable_count": 0,
+  "courses": {
+    "stairs": {
+      "start_frame": 1,
+      "end_frame": 226,
+      "steps": 11,
+      "total_disp_y": 3.05,
+      "total_disp_z": 0.75
+    },
+    "ramps": {
+      "start_frame": 227,
+      "end_frame": 926,
+      "steps": 42,
+      "total_disp_y": 12.2,
+      "total_disp_z": 0.0
+    }
+  }
+}

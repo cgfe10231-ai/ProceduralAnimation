@@ -86,6 +86,7 @@ class PlannedFootTarget:
     is_locked: bool = False
     rotation_deg: Tuple[float, float, float] = (0.0, 0.0, 0.0)
     clamp_reach: bool = True
+    clamp_ground: bool = True
 
     # Contact semantics: distinct from IK target positioning
     contact_intent: bool = True  # In locomotion actions, foot targets a surface (ground)
@@ -187,6 +188,7 @@ def convert_planned_pose_to_wbc_targets(
         enabled=True,
         weight=1.0,
         clamp_reach=planned.foot_L.clamp_reach,
+        clamp_ground=planned.foot_L.clamp_ground,
     )
     targets.foot_R = EndEffectorTarget(
         effector_id="foot_R",
@@ -196,6 +198,7 @@ def convert_planned_pose_to_wbc_targets(
         enabled=True,
         weight=1.0,
         clamp_reach=planned.foot_R.clamp_reach,
+        clamp_ground=planned.foot_R.clamp_ground,
     )
 
     # Hands (IK or FK)

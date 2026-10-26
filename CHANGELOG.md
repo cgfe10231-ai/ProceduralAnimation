@@ -3,6 +3,39 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-26] 任务 7A-2：真实 19 骨骼角色连续复杂地形（楼梯与斜坡高架桥）自适应下肢穿越、单一控制链闭环与 926 帧全量验收 (Task 7A-2 Continuous Terrain Traversal in DynamicsPlayground)
+
+### 连续复杂地形运动规划内核 (`src/motion/terrain_walk.py`)
+* **动态环境高程与坡度自适应规划**：
+  - 实现通用地形行进动作类 `TerrainWalkAction(MotionAction)` 与离散步态生成函数 `build_terrain_step_schedule`；
+  - 零环境高度硬编码：严格通过 `DynamicsEnvironmentQuery` 接口（`ground_height_at` 与 `surface_normal_at`）动态获取 3D 地形高度与表面法向量；
+  - 矢状面法向量俯仰对齐：基于 $\text{atan2}(-n_y, n_z)$ 动态计算地表俯仰角度，自动适配上坡（+15°）、下坡（-20°）与水平（0°）足端世界姿态；
+  - 全足端 3D 刚体包围盒悬空防穿透：实时查询脚后跟（$-0.07\text{ m}$）、脚踝（$0.0\text{ m}$）与脚尖（$+0.15\text{ m}$）三点地表最大高程，配合 $0.045\text{ m}$ 动态悬空最小净距，彻底消除踢面与斜坡切削（926 帧全量 0 穿模）；
+  - 生理学踝关节自适应松弛：摆动相中段引入 $18^\circ\sim22^\circ$ 跖屈松弛，并在离地瞬间引入自然的蹬地限位（$\le 10^\circ$），消除小腿旋转导致的关节极限强加；
+  - 分级骨盆沉降参数：上坡登高沉降 $0.063\text{ m}$，下坡缓冲沉降 $0.095\text{ m}$，平地行进沉降 $0.030\text{ m}$，台阶攀爬沉降 $0.120\text{ m}$，完美平衡伸腿极限与关节 ROM。
+
+### 核心运动控制链向后兼容增强 (`src/rig/foot_contact.py`, `src/motion/whole_body_controller.py`, `src/motion/kinematic_bridge.py`)
+* **解除足部接触锁定平地硬编码**：升级 `lock_foot_contact` 接受真实三维世界高程 `float(contact_world_xyz[2])`，保留对默认 `FLAT_GROUND_Z = 0.0` 的 100% 兼容；
+* **脚踝世界坐标与接触坐标解耦**：在 `WholeBodyController.execute_frame` 中将脚踝目标转换为地面接触点 `contact_ground_xyz = (target_x, target_y, target_z - ANKLE_REST_Z)`，彻底消除 70mm 偏置累加 bug，实现脚踝锁定物理零漂移（`0.00000000 m`）；
+* **显式可配置地面夹持标志 (`clamp_ground`)**：在 `EndEffectorTarget` 与 `PlannedFootTarget` 中引入 `clamp_ground: bool = True`，复杂地形行进时显式配置为 `False`，避免 WBC 误将高程目标投影至根节点高度。
+
+### 场景生成、只读重开验收与完备视觉证据 (`run_task7a2_terrain_traversal.py`, `tests/verify_task7a2_terrain_traversal.py`)
+* **独立场景生成与只读重开验收**：
+  - 生成 `output/dynamics_playground_task7a2.blend`（581,882 字节，926 帧，内嵌 3 专用相机与 10 个关键阶段时间线标记）；
+  - 独立只读重开评估全 926 帧：0 穿模、0 ROM 违规、0 IK 违例、踝骨漂移 $0.0\text{ m}$、骨骼形变 $1.55\times 10^{-6}\text{ m}$、质量严格守恒 70.000 kg；
+  - 渲染 9 张高清关键帧 PNG 与 2 份连续动态 GIF（`task7a2_stairs_traversal.gif` 76 帧 301KB、`task7a2_ramp_traversal.gif` 100 帧 286KB）；
+  - 注册 `task7a2_terrain_traversal` 入测试套件 `motion` 与 `full` 级别。
+
+### 全级别回归套件全绿
+* `.\run_tests.ps1 -tier quick`：**10 / 10 PASS** (10.61s)；
+* `.\run_tests.ps1 -tier physics`：**16 / 16 PASS** (76.18s)；
+* `.\run_tests.ps1 -tier motion`：**7 / 7 PASS** (20.16s)；
+* `.\run_tests.ps1 -tier full`：**26 / 26 PASS** (97.18s)；
+* `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)。
+
+---
+
+
 ## [2026-10-26] 任务 7A-1：最终架构整理、单一职责解耦、接触状态持久化合同与负向测试闭环 (Task 7A-1 Final Architecture & Compatibility Closure)
 
 ### 架构解耦与单一职责模块重构 (`src/scene/playground_*`)

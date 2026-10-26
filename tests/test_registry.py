@@ -325,6 +325,26 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Read-only reopen verification of 19-bone character integration into DynamicsPlayground, 204-frame mathematical/continuity/contact validation, deep scene preservation, and 204-frame continuous GIF.",
     ),
+    "task7a2_terrain_traversal": TestDefinition(
+        test_id="task7a2_terrain_traversal",
+        name="Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground",
+        script_path="tests/verify_task7a2_terrain_traversal.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.MOTION, TestTier.FULL],
+        timeout_sec=120.0,
+        expected_artifacts=[
+            "output/dynamics_playground.blend",
+            "output/dynamics_playground_task7a2.blend",
+            "docs/evidence/task7a2/task7a2_contact_state_records.json",
+            "docs/evidence/task7a2/task7a2_execution_summary.json",
+            "docs/evidence/task7a2/task7a2_validation_report.json",
+            "docs/evidence/task7a2/task7a2_evidence_manifest.json",
+            "docs/evidence/task7a2/task7a2_stairs_traversal.gif",
+            "docs/evidence/task7a2/task7a2_ramp_traversal.gif",
+        ],
+        is_visual_acceptance=True,
+        description="Read-only verification of 19-bone character continuous terrain traversal in DynamicsPlayground (stairs ascent and sloped ramp ascent/descent), 926-frame mathematical evaluation, zero ROM violations, zero ankle drift, and visual evidence.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection
