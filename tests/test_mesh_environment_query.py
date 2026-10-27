@@ -1701,6 +1701,281 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
         )
         self.assertEqual(adapter.cache_version, 1)
 
+    # -------------------------------------------------------------------------
+    # Repair Unit 2 Final Closure: C05-1 to C05-4 & C06 Exception Safety Hardening
+    # -------------------------------------------------------------------------
+
+    def test_43_c05_1_collection_member_unlinked(self):
+        """C05-1: Unlinking an object from an allowed collection removes it from query results with 1 rebuild."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col_allowed = bpy.data.collections.new("Col_Allowed")
+        bpy.context.scene.collection.children.link(col_allowed)
+
+        col_forbidden = bpy.data.collections.new("Col_Forbidden")
+        bpy.context.scene.collection.children.link(col_forbidden)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 2.0))
+        surf_a = bpy.context.active_object
+        surf_a.name = "Surface_A"
+        col_allowed.objects.link(surf_a)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 5.0, 2.0))
+        surf_b = bpy.context.active_object
+        surf_b.name = "Surface_B"
+        col_allowed.objects.link(surf_b)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 10.0, 2.0))
+        surf_f = bpy.context.active_object
+        surf_f.name = "Surface_Forbidden"
+        col_forbidden.objects.link(surf_f)
+        bpy.context.view_layer.update()
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_Allowed",))
+        self.assertEqual(adapter.rebuild_count, 1)
+        self.assertIn("Surface_A", adapter.tracked_objects)
+        self.assertIn("Surface_B", adapter.tracked_objects)
+        self.assertNotIn("Surface_Forbidden", adapter.tracked_objects)
+
+        # Confirm initial hits on A and B, miss on Forbidden
+        res_a_init = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertTrue(res_a_init.success)
+        self.assertAlmostEqual(res_a_init.contact_point_world[2], 2.0, places=3)
+
+        res_b_init = adapter.ray_cast(origin=(0.0, 5.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertTrue(res_b_init.success)
+
+        # Unlink Surface_A from Col_Allowed (A remains in Blender bpy.data.objects)
+        col_allowed.objects.unlink(surf_a)
+        self.assertIn("Surface_A", bpy.data.objects)
+        bpy.context.view_layer.update()
+
+        # Do NOT call invalidate() or rebuild(); query should detect change automatically
+        res_a_after = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertFalse(res_a_after.success, "Unlinked Surface_A must no longer be hit by query")
+        self.assertEqual(res_a_after.surface_id, "none")
+
+        res_b_after = adapter.ray_cast(origin=(0.0, 5.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertTrue(res_b_after.success, "Surface_B must remain queryable")
+        self.assertAlmostEqual(res_b_after.contact_point_world[2], 2.0, places=3)
+
+        self.assertEqual(adapter.rebuild_count, 2, "Exactly one rebuild must occur when member is unlinked")
+        self.assertNotIn("Surface_A", adapter.tracked_objects)
+        self.assertIn("Surface_B", adapter.tracked_objects)
+        self.assertNotIn("Surface_Forbidden", adapter.tracked_objects)
+
+    def test_44_c05_2_real_object_deletion(self):
+        """C05-2: Real object deletion via bpy.data.objects.remove removes object from cache without dangling state."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_Del")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        obj_a = bpy.context.active_object
+        obj_a.name = "Mesh_Del_A"
+        col.objects.link(obj_a)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 5.0, 1.0))
+        obj_b = bpy.context.active_object
+        obj_b.name = "Mesh_Del_B"
+        col.objects.link(obj_b)
+        bpy.context.view_layer.update()
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_Del",))
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # Delete Mesh_Del_A completely from Blender database
+        bpy.data.objects.remove(obj_a, do_unlink=True)
+        bpy.context.view_layer.update()
+
+        # Do NOT call invalidate() or rebuild() manually
+        res_a = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertFalse(res_a.success, "Deleted object must not be hit")
+
+        res_b = adapter.ray_cast(origin=(0.0, 5.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertTrue(res_b.success, "Retained object must be hit")
+        self.assertAlmostEqual(res_b.contact_point_world[2], 1.0, places=3)
+
+        self.assertNotIn("Mesh_Del_A", adapter.tracked_objects)
+        self.assertIn("Mesh_Del_B", adapter.tracked_objects)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+
+    def test_45_c05_3_non_empty_to_empty_transition_and_reuse(self):
+        """C05-3: Non-empty collection transitioning to empty sets VALID_EMPTY, reuses across 100 queries, then recovers."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_EmptyTrans")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 2.0))
+        mesh_sole = bpy.context.active_object
+        mesh_sole.name = "SoleMesh"
+        col.objects.link(mesh_sole)
+        bpy.context.view_layer.update()
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_EmptyTrans",))
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # Move SoleMesh out of the collection
+        col.objects.unlink(mesh_sole)
+        bpy.context.view_layer.update()
+
+        # Regular query detects collection is now empty
+        res_empty = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertFalse(res_empty.success)
+        self.assertEqual(res_empty.source_type, "none")
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_EMPTY)
+        self.assertFalse(adapter.has_bvh)
+        self.assertTrue(adapter.is_empty)
+        self.assertEqual(adapter.polygon_count, 0)
+        self.assertEqual(adapter.vertex_count, 0)
+        self.assertEqual(adapter.tracked_objects, [])
+        self.assertEqual(adapter.rebuild_count, 2)
+
+        # Execute 100 queries against empty environment: rebuild_count must remain 2 (0 rebuilds)
+        for i in range(100):
+            res_i = adapter.ray_cast(origin=(0.0, float(i), 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+            self.assertFalse(res_i.success)
+            self.assertEqual(res_i.surface_id, "none")
+        self.assertEqual(adapter.rebuild_count, 2, "Zero rebuilds allowed across 100 empty queries")
+
+        # Now add new mesh into collection
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 4.0))
+        fresh_mesh = bpy.context.active_object
+        fresh_mesh.name = "FreshMesh"
+        col.objects.link(fresh_mesh)
+        bpy.context.view_layer.update()
+
+        # Next query automatically recovers to VALID_NON_EMPTY and hits FreshMesh
+        res_fresh = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0), distance=20.0)
+        self.assertTrue(res_fresh.success)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+        self.assertEqual(adapter.rebuild_count, 3)
+        self.assertAlmostEqual(res_fresh.contact_point_world[2], 4.0, places=3)
+
+    def test_46_c05_4_recursive_collection_membership(self):
+        """C05-4: Recursive collection membership change detection and sibling isolation."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col_parent = bpy.data.collections.new("Col_Parent")
+        bpy.context.scene.collection.children.link(col_parent)
+
+        col_child = bpy.data.collections.new("Col_Child")
+        col_parent.children.link(col_child)
+
+        col_sibling = bpy.data.collections.new("Col_Sibling")
+        bpy.context.scene.collection.children.link(col_sibling)
+
+        col_fake = bpy.data.collections.new("Col_Parent_Fake")
+        bpy.context.scene.collection.children.link(col_fake)
+
+        # Mesh in child collection
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 2.0))
+        mesh_child_a = bpy.context.active_object
+        mesh_child_a.name = "Mesh_Child_A"
+        col_child.objects.link(mesh_child_a)
+
+        # Mesh in sibling collection
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 10.0, 2.0))
+        mesh_sib = bpy.context.active_object
+        mesh_sib.name = "Mesh_Sib"
+        col_sibling.objects.link(mesh_sib)
+
+        # Mesh in similar named collection
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 20.0, 2.0))
+        mesh_fake = bpy.context.active_object
+        mesh_fake.name = "Mesh_Fake"
+        col_fake.objects.link(mesh_fake)
+        bpy.context.view_layer.update()
+
+        # Adapter targets only Col_Parent
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_Parent",))
+        self.assertEqual(adapter.rebuild_count, 1)
+        self.assertEqual(adapter.tracked_objects, ["Mesh_Child_A"])
+
+        # Query A hits; queries at Sib and Fake locations miss
+        res_a = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertTrue(res_a.success)
+
+        res_sib = adapter.ray_cast(origin=(0.0, 10.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertFalse(res_sib.success)
+
+        res_fake = adapter.ray_cast(origin=(0.0, 20.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertFalse(res_fake.success)
+
+        # Unlink Mesh_Child_A from Col_Child: query at A now misses
+        col_child.objects.unlink(mesh_child_a)
+        bpy.context.view_layer.update()
+
+        res_a_after = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertFalse(res_a_after.success)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_EMPTY)
+
+        # Add Mesh_Child_B to Col_Child: automatically detected and hit
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 5.0, 3.0))
+        mesh_child_b = bpy.context.active_object
+        mesh_child_b.name = "Mesh_Child_B"
+        col_child.objects.link(mesh_child_b)
+        bpy.context.view_layer.update()
+
+        res_b = adapter.ray_cast(origin=(0.0, 5.0, 10.0), direction=(0.0, 0.0, -1.0), distance=20.0)
+        self.assertTrue(res_b.success)
+        self.assertEqual(adapter.rebuild_count, 3)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+        self.assertEqual(adapter.tracked_objects, ["Mesh_Child_B"])
+
+    def test_47_c06_rebuild_exception_safety(self):
+        """C06: Verify rebuild exception safety across gather, snapshot, and BVH compilation with self-healing recovery."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_Exc")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        plane = bpy.context.active_object
+        plane.name = "ExcPlane"
+        col.objects.link(plane)
+        bpy.context.view_layer.update()
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_Exc",))
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # Exception Point 1: _gather_target_objects raises
+        with unittest.mock.patch.object(adapter, "_gather_target_objects", side_effect=RuntimeError("Simulated gather crash")):
+            adapter.invalidate()
+            with self.assertRaises(RuntimeError):
+                adapter.rebuild()
+            self.assertEqual(adapter.cache_state, AdapterCacheState.FAILED)
+            self.assertTrue(adapter.dirty)
+            self.assertNotEqual(adapter.cache_state, AdapterCacheState.REBUILDING)
+
+        # Exception Point 2: _compute_object_snapshot raises
+        with unittest.mock.patch.object(adapter, "_compute_object_snapshot", side_effect=RuntimeError("Simulated snapshot crash")):
+            adapter.invalidate()
+            with self.assertRaises(RuntimeError):
+                adapter.rebuild()
+            self.assertEqual(adapter.cache_state, AdapterCacheState.FAILED)
+            self.assertTrue(adapter.dirty)
+            self.assertNotEqual(adapter.cache_state, AdapterCacheState.REBUILDING)
+
+        # Exception Point 3: BVHTree.FromPolygons raises
+        mock_bvh_cls = unittest.mock.MagicMock()
+        mock_bvh_cls.FromPolygons.side_effect = RuntimeError("Simulated BVH crash")
+        with unittest.mock.patch("src.scene.blender_mesh_query_adapter.BVHTree", mock_bvh_cls):
+            adapter.invalidate()
+            with self.assertRaises(RuntimeError):
+                adapter.rebuild()
+            self.assertEqual(adapter.cache_state, AdapterCacheState.FAILED)
+            self.assertTrue(adapter.dirty)
+            self.assertNotEqual(adapter.cache_state, AdapterCacheState.REBUILDING)
+
+        # Self-healing / retry contract: issue regular query after error condition clears
+        res_rec = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self.assertTrue(res_rec.success)
+        self.assertAlmostEqual(res_rec.contact_point_world[2], 1.0, places=3)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+        self.assertFalse(adapter.dirty)
+
 
 def run_tests() -> int:
     suite = unittest.TestLoader().loadTestsFromTestCase(TestMeshEnvironmentQuery)

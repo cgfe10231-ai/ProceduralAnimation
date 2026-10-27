@@ -1,0 +1,34 @@
+=== COUNTER-FACTUAL VERIFICATION LOG: DEFECT F01 (MEMBER RETENTION LEAK) ===
+TARGET DEFECT: F01 (Old collection member mistakenly retained in cache when unlinked)
+MUTATION: Injected buggy check that only checks issubset (ignoring unlinked members)
+
+--- PHASE 1: MUTATED / LEGACY EXECUTION (EXPECTED FAILURE) ---
+EXIT STATUS: FAILURE
+FAILURES COUNT: 1
+test_43_c05_1_collection_member_unlinked (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_43_c05_1_collection_member_unlinked)
+C05-1: Unlinking an object from an allowed collection removes it from query results with 1 rebuild. ... FAIL
+
+======================================================================
+FAIL: test_43_c05_1_collection_member_unlinked (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_43_c05_1_collection_member_unlinked)
+C05-1: Unlinking an object from an allowed collection removes it from query results with 1 rebuild.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 1754, in test_43_c05_1_collection_member_unlinked
+    self.assertFalse(res_a_after.success, "Unlinked Surface_A must no longer be hit by query")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : Unlinked Surface_A must no longer be hit by query
+
+----------------------------------------------------------------------
+Ran 1 test in 0.051s
+
+FAILED (failures=1)
+
+--- PHASE 2: PRODUCTION LOGIC RESTORED (EXPECTED PASS) ---
+EXIT STATUS: PASS
+test_43_c05_1_collection_member_unlinked (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_43_c05_1_collection_member_unlinked)
+C05-1: Unlinking an object from an allowed collection removes it from query results with 1 rebuild. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.051s
+
+OK

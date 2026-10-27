@@ -202,5 +202,45 @@ Unit 2 test cases (`test_33` through `test_42` in [`tests/test_mesh_environment_
 - **C05**: Collection membership changes and in-place rename without BVH rebuild.
 - **C06**: 300 unchanged queries (100 same ray, 100 diff ray, 100 nearest) execute with `rebuild_count = 1`.
 
+### 7.5 Invalidation Boundary Delineation & Final Closure Verification
+
+#### 7.5.1 Invalidation Boundary: Automatically Detected vs Explicit Invalidation Required
+To guarantee absolute architectural clarity and avoid cache desynchronization, the boundary between automatic detection (Path A) and explicit invalidation (Path B) is formally codified:
+
+1. **Automatically Detected by Path A (`refresh()` on query)**:
+   - **Transforms**: Object translation, rotation, scale, and world transforms propagated through parent-child hierarchies ($|\Delta| > 10^{-6}$).
+   - **Mesh Geometry**: Edit-mode raw vertex movements, python vertex writes (`foreach_get('co')` buffer hash).
+   - **Mesh Topology**: Face additions, deletions, edge flips (`foreach_get('vertex_index')` loop index buffer hash).
+   - **Modifier Stack**: Modifier parameter changes, modifier additions/deletions, `show_viewport` visibility toggles (RNA property fingerprint).
+   - **Collection Scopes**: Objects linked, unlinked, or deleted across allowed collections (including recursive subcollections) via `session_uid` tracking.
+   - **Object Renames**: In-place rename without BVH rebuild.
+
+2. **Explicit Invalidation Required via Path B (`adapter.invalidate()`)**:
+   - **External Modifier Drivers**: Modifiers or geometry nodes driven by unqueried external scene objects or custom properties where depsgraph update events are not triggered on the queried object.
+   - **Armature Bone Deformations / Physics Point Caches**: Complex bone deforms or physics simulation caches evaluated outside standard depsgraph scene evaluation.
+   - **Timeline Playback without Property Dirtying**: Frame advancement where procedural scripts modify geometry without updating Blender RNA data properties.
+
+#### 7.5.2 Real Geometric Scanning Overhead
+The automatic detection path (`refresh()`) hashes vertex coordinates and inspects matrices to bypass expensive BVH rebuilding:
+- **Hashing vs Rebuilding Performance**:
+  - Scanning $100$ vertices costs $\approx 0.04\text{ ms}$, whereas full BVH compilation and normal calculation costs $\sim 1\text{ ms}$ to $10\text{ ms}$. Path A provides a $\sim 25\times$ to $250\times$ speedup when geometry is unchanged.
+- **Scanning Overhead Statement**:
+  - Scanning is **not** zero cost ($0\text{ ms}$). When scanning a scene with dozens of complex candidate objects, calling `_gather_target_objects()` and hashing millions of vertices on every query would introduce non-trivial CPU latency.
+  - Therefore, candidate collection scoping (`collection_names` parameter, hardened in Repair Unit 1) is an architectural prerequisite: it bounds the scanning budget strictly to relevant terrain collections.
+
+#### 7.5.3 Final Closure Verification (C05-1 through C05-4 & C06)
+Repair Unit 2 Final Closure verifies five advanced lifecycle cases (`test_43` through `test_47`):
+- **C05-1**: Unlinking an object from an allowed collection without deleting it from `bpy.data.objects` triggers exactly 1 rebuild, completely removes it from spatial/raycast query results, and strictly ignores objects in forbidden collections (`test_43`).
+- **C05-2**: Real object deletion via `bpy.data.objects.remove(obj, do_unlink=True)` cleans cache metadata and triggers 1 rebuild with 0 dangling pointers and no exceptions (`test_44`).
+- **C05-3**: When all objects are unlinked from a collection, state transitions from `VALID_NON_EMPTY` to `VALID_EMPTY`. Across 100 consecutive queries, `rebuild_count` remains unchanged (0 rebuilds), queries return `success=False` with `source_type="none"` without fabricating ground, and adding a new mesh cleanly recovers state to `VALID_NON_EMPTY` (`test_45`).
+- **C05-4**: Recursive collection traversal (`col.all_objects`), unlinking from child collections, adding new meshes to child collections, and strict isolation of sibling collections (`test_46`).
+- **C06**: Rebuild exception safety across candidate gather, snapshot computation, and BVH compilation (`mathutils.bvhtree.BVHTree.FromPolygons`), ensuring rollback to `AdapterCacheState.FAILED`, marking `_dirty = True`, releasing evaluated meshes, and self-healing recovery upon subsequent query (`test_47`).
+
+#### 7.5.4 Expanded Counter-Factual Proofs (F01, F02, F03)
+In addition to C01, C03, and C05, three dedicated counter-factual mutations were executed in Blender 5.1.1 Headless to physically prove falsifiability:
+- **F01 (Member Retention Leak)**: Mutating `_check_scene_changed()` to check only `issubset` causes unlinked members to be retained in the BVH; test fails with Exit Code 1 (`AssertionError: True is not false : Unlinked Surface_A must no longer be hit by query`). Production code passes with Exit Code 0.
+- **F02 (Empty BVH Repeated Rebuild Leak)**: Mutating `refresh()` to check `self._bvh is None` causes repeated rebuilds across 100 empty queries; test fails with Exit Code 1 (`AssertionError: 102 != 2 : Zero rebuilds allowed across 100 empty queries`). Production code passes with Exit Code 0.
+- **F03 (Exception Residual in Rebuilding)**: Placing `_gather_target_objects()` outside `try:` leaves the adapter permanently stuck in `REBUILDING`; test fails with Exit Code 1 (`AssertionError: <AdapterCacheState.REBUILDING: 'rebuilding'> != <AdapterCacheState.FAILED: 'failed'>`). Production code passes with Exit Code 0.
+
 Evidence logs and boundary reports are preserved in [`docs/evidence/environment_gate01_ru2/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru2/).
 

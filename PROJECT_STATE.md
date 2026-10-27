@@ -1,14 +1,14 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-27  
-> **当前阶段**：Environment Gate 01 — Repair Unit 2（BVH Cache Invalidation, Scene Geometry Consistency & Lifecycle State Machine）已全部完成并通过 42 项完整验证。实现了 `AdapterCacheState` 五状态生命周期状态机（`INVALID`, `VALID_EMPTY`, `VALID_NON_EMPTY`, `REBUILDING`, `FAILED`），彻底解决空环境重复触发 `rebuild()` 的泄漏缺陷（C01）；建立了双通道失效检测体系：Path A 自动检测（矩阵 16 元素比对覆盖位移/旋转/缩放/父子层级传播、内存缓冲区顶点哈希与拓扑循环哈希、动态 RNA 修改器属性与视口可见性指纹、基于 `session_uid` 的集合成员变动感知及原地重命名零重建优化）与 Path B 显式声明（`adapter.invalidate()` 后下次查询自动重建）；实施了原子提交与异常回滚机制，在 `finally:` 中统一释放求值网格；在白名单目录 `docs/evidence/environment_gate01_ru2/` 中真实运行生成并归档了 C01、C03、C05 三项反事实变异失败与生产恢复通过日志及结构化总结报告与边界报告。全套分级测试回归：`quick` (13/13 PASS), `physics` (19/19 PASS), `motion` (8/8 PASS), `full` (30/30 PASS), `--verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动。当前状态：`ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Repair Unit 3 或 Phase 7B。  
+> **记录时间**：2026-10-28  
+> **当前阶段**：Environment Gate 01 — Repair Unit 2 Final Closure（深度集合生命周期、异常安全加固与反事实实证闭环）已全部完成并通过 47 项完整验证。实现了 `AdapterCacheState` 五状态生命周期状态机（`INVALID`, `VALID_EMPTY`, `VALID_NON_EMPTY`, `REBUILDING`, `FAILED`），彻底解决空环境重复触发 `rebuild()` 的泄漏缺陷（C01）；建立了双通道失效检测体系：Path A 自动检测（矩阵 16 元素比对覆盖位移/旋转/缩放/父子层级传播、内存缓冲区顶点哈希与拓扑循环哈希、动态 RNA 修改器属性与视口可见性指纹、基于 `session_uid` 的集合成员变动感知及原地重命名零重建优化）与 Path B 显式声明（`adapter.invalidate()` 后下次查询自动重建）；将 `_gather_target_objects()` 与快照计算完整封装入 `rebuild()` 的 `try:` 保护块内，全面加固异常安全回滚（C06），求值网格统一在 `finally:` 中释放；扩充验证深度集合生命周期（C05-1 解除关联剔除、C05-2 真实物理删除零野指针、C05-3 非空转空 100 次查询 0 重建与后续恢复、C05-4 递归子集合与同级集合隔离）；在白名单目录 `docs/evidence/environment_gate01_ru2/` 中真实运行生成并归档了 C01, C03, C05 以及 F01, F02, F03 六项反事实变异失败与生产恢复通过日志及结构化总结报告与边界报告。全套分级测试回归：`quick` (13/13 PASS), `physics` (19/19 PASS), `motion` (8/8 PASS), `full` (30/30 PASS), `--verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动。当前状态：`ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`，严格停止等待人类审批，严禁擅自进入 Repair Unit 3 或 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
-* **Environment Gate 01 — Repair Unit 2: BVH缓存失效、场景几何变更检测与五状态生命周期状态机 (C01-C06)**：
+* **Environment Gate 01 — Repair Unit 2 Final Closure: 深度集合生命周期、异常安全加固与反事实实证闭环 (C01-C06, F01-F03)**：
   * **显式五状态生命周期状态机与空环境复用 (C01)**：
     - 定义 `AdapterCacheState` 枚举：`INVALID`, `VALID_EMPTY`, `VALID_NON_EMPTY`, `REBUILDING`, `FAILED`；
     - 空集合场景下构建后安全驻留于 `VALID_EMPTY`，在 100 次空查询中严格保持 `rebuild_count = 1`（0 次冗余重建），返回 `success=False` 与 `NO_HIT:` 理由，绝不伪造 $Z=0.0\text{m}$ 虚假地面；当新网格加入集合后自动转入 `VALID_NON_EMPTY` 并成功命中；
@@ -22,22 +22,31 @@
       * 基于 `obj.session_uid` 追踪集合成员变动，新增或删除对象即刻触发重建（C05）；
       * **原地重命名零重建优化**：当对象仅改名而几何未变时，就地更新元数据名称与 Surface ID，**BVH 重建次数为 0**（C05）。
     - **Path B (显式失效)**：调用 `adapter.invalidate()` 标记 `_dirty = True` 及 `INVALID` 状态，后续首次常规查询自动触发原子重建，调用方无需显式调用 `rebuild()`（C03）。
-  * **原子提交与异常安全回滚 (C04)**：
+  * **原子提交、求值网格释放与全流程异常安全回滚 (C04, C06)**：
     - 提取数据与生成快照暂存于局部内存，BVH 构建成功后原子提交；
+    - 将 `_gather_target_objects()` 与快照计算完整移入 `try:` 保护块内部，任何阶段异常均回滚至 `FAILED` 状态并保留 `dirty=True`，绝不暴露脏数据或卡死在 `REBUILDING`；
     - 求值网格在 `finally:` 中统一通过 `eval_obj.to_mesh_clear()` 清理，杜绝内存泄漏；
-    - 构建异常时回滚至 `FAILED` 状态并保留 `dirty=True`，绝不暴露脏数据。
-  * **不变场景高复用保证 (C06)**：
+    - 后续常规查询自动具备自愈恢复能力（重新触发原子重建）。
+  * **深度集合生命周期验证 (C05-1 至 C05-4)**：
+    - **C05-1**: 仅解除关联（未删除）的对象从 BVH 中剔除（1 次重建），且受禁集合对象绝不被查询；
+    - **C05-2**: `bpy.data.objects.remove(obj, do_unlink=True)` 触发 1 次重建，元数据清理干净，0 野指针；
+    - **C05-3**: 非空转空转入 `VALID_EMPTY`，100 次空查询 0 重建复用，返回 `success=False`（`source_type="none"`），加入新 Mesh 干净恢复；
+    - **C05-4**: 子集合成员递归追踪、子集合解关联剔除、子集合新增感知及同级集合严格隔离。
+  * **不变场景高复用保证**：
     - 300 次查询（100次同向射线、100次异向射线、100次最近点搜索）重建次数恒为 1（0 次重建）。
-  * **全量 42 项测试与反事实实证归档**：
-    - 新增 Unit 2 专用验证用例 `test_33` 至 `test_42`，42 项测试全绿通过（42/42 PASS in 2.13s）；
-    - 编写受控变异生成脚本 `tests/run_counter_factual_ru2.py`，在真实环境执行并归档 C01, C03, C05 三项反事实变异失败与生产恢复通过日志至 `docs/evidence/environment_gate01_ru2/`：
+  * **全量 47 项测试与 6 项反事实实证归档**：
+    - 新增 Unit 2 最终收口验证用例 `test_43` 至 `test_47`，47 项测试全绿通过（47/47 PASS in 2.588s）；
+    - 编写受控变异生成脚本 `tests/run_counter_factual_ru2.py`，在真实环境执行并归档 6 项反事实变异失败与生产恢复通过日志至 `docs/evidence/environment_gate01_ru2/`：
       * `counter_factual_c01_empty_rebuild.log` (变异旧逻辑在 100 次空查询中产生 201 次重建，Exit code 1; 生产逻辑恒为 1，Exit code 0)
       * `counter_factual_c03_vertex_stale.log` (变异旧逻辑忽略顶点哈希导致未感知修改，Exit code 1; 生产逻辑正确重建，Exit code 0)
       * `counter_factual_c05_collection_membership_stale.log` (变异旧逻辑未感知集合新增对象，Exit code 1; 生产逻辑正确重建，Exit code 0)
+      * `counter_factual_f01_member_retention_leak.log` (变异仅检查子集导致解关联对象残留，Exit code 1; 生产逻辑正确剔除，Exit code 0)
+      * `counter_factual_f02_empty_bvh_repeated_rebuild.log` (变异依赖 `_bvh is None` 导致空环境重复重建，Exit code 1; 生产逻辑零重建复用，Exit code 0)
+      * `counter_factual_f03_exception_state_residual.log` (变异在 `try:` 外收集对象导致异常卡死在 `REBUILDING`，Exit code 1; 生产逻辑回滚至 `FAILED` 并自愈恢复，Exit code 0)
     - 编纂反事实总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`；
     - 全量分级测试通过：`quick` (13/13), `physics` (19/19), `motion` (8/8), `full` (30/30)；
     - 符号审计 `audit_c2_final_inspector.py --verify-docs` 0 错误；`output/` 历史资产 0 字节变动；
-    - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
+    - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
 * **Environment Gate 01 — Repair Unit 1 Final Acceptance: 数值覆盖提升、独立数学验证、真实故障注入证据链与射线边界闭环 (Final Acceptance & Evidence Closure)**：
   * **全 8 字段物理契约断言升级与独立解析验证 (T01)**：
     - 升级 `_assert_surface_contract()`：严格核验完整 3D 接触点、3D 法向量（单位长度误差 $< 10^{-5}$）、独立欧几里得射线距离 $\|\mathbf{p}_{\text{hit}} - \mathbf{p}_{\text{orig}}\|$ 与射线方向夹角对齐、独立带符号距离二次验证，以及 `allowed_objects` 表面所属权校验；

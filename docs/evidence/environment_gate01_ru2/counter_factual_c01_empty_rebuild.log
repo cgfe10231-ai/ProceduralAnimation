@@ -19,7 +19,7 @@ Traceback (most recent call last):
 AssertionError: 201 != 1 : Cache rebuild count must remain exactly 1 after 100 empty queries
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.190s
+Ran 1 test in 0.191s
 
 FAILED (failures=1)
 

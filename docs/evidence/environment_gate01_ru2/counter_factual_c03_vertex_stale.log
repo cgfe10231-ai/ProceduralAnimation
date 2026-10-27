@@ -29,6 +29,6 @@ test_35_c03_1_vertex_coordinate_movement (tests.test_mesh_environment_query.Test
 C03-1: Path A automatic detection of vertex coordinate movements without calling invalidate(). ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.049s
+Ran 1 test in 0.050s
 
 OK

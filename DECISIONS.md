@@ -1327,3 +1327,49 @@
 * **影响**：
   - 彻底解决了环境查询适配器在动态场景下的几何一致性与缓存失效难题，实现了高性能（未变场景 300 次查询 0 重建）与高保真（任意几何/层级/修改器变动自动同步）的统一；
   - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
+
+---
+
+### [DEC-057] 2026-10-28: Environment Gate 01 — Repair Unit 2 Final Closure: C05-1至C05-4集合生命周期、C06异常安全加固与F01-F03反事实实证闭环
+
+* **状态**：已采纳并完成 (Accepted & Completed)
+* **日期**：2026-10-28
+* **背景**：在 Repair Unit 2 最终收口与验收阶段，依据架构清规执行深度边界加固：
+  1. **C05 深度集合生命周期验证不足**：旧测试仅核验了单集合基本增删，缺少对象从集合解除关联（Unlink）但保留在全局数据块中时的精确剔除、真实物理删除（`bpy.data.objects.remove`）后的零野指针与元数据清理、非空向空集合转换后的 100 次空查询零重建复用与后续新网格加入恢复，以及递归子集合增删与同名/同级集合隔离性检验；
+  2. **C06 重建异常安全盲区**：`rebuild()` 在进入 `try:` 前即调用了 `_gather_target_objects()`，若集合访问或场景遍历抛出异常，会导致缓存状态永久卡死在 `REBUILDING`，且无法触发向 `FAILED` 状态回滚与求值网格释放；
+  3. **失效边界与扫描开销界定未固化**：自动检测（Path A）与显式失效（Path B）的边界缺乏形式化规约，顶点哈希比对开销缺乏客观说明；
+  4. **反事实实证证据需扩充**：除 C01、C03、C05 外，需针对解除关联成员残留（F01）、有效空 BVH 重复重建（F02）、重建异常残留卡死在 `REBUILDING`（F03）注入受控变异以建立闭环物理可证伪证据。
+* **决策与方案**：
+  1. **生产适配器异常安全与状态自愈加固 (`src/scene/blender_mesh_query_adapter.py`)**：
+     - 将 `_gather_target_objects()` 与快照计算完整移入 `rebuild()` 的 `try:` 保护块内部；
+     - 确保任何阶段（候选收集、快照计算、求值网格提取、BVH 编译）抛出未捕获异常时，缓存状态必然回滚至 `AdapterCacheState.FAILED` 并设置 `dirty = True`；
+     - 任何临时求值网格必然在 `finally:` 中执行 `to_mesh_clear()` 清理，杜绝内存泄漏；
+     - 后续常规查询自动具备自愈恢复能力（重新触发原子重建）。
+  2. **深度集合生命周期与异常测试扩充 (`tests/test_mesh_environment_query.py`)**：
+     - 新增 `test_43_c05_1_collection_member_unlinked`：核验仅解除关联（未删除）的对象从 BVH 中剔除（1 次重建），且受禁集合对象绝不被查询；
+     - 新增 `test_44_c05_2_real_object_deletion`：核验 `bpy.data.objects.remove(obj, do_unlink=True)` 触发 1 次重建，元数据清理干净，0 野指针；
+     - 新增 `test_45_c05_3_non_empty_to_empty_transition_and_reuse`：核验非空转空转入 `VALID_EMPTY`，100 次空查询 0 重建复用，返回 `success=False`（`source_type="none"`），加入新 Mesh 干净恢复；
+     - 新增 `test_46_c05_4_recursive_collection_membership`：核验子集合成员递归追踪、子集合解关联剔除、子集合新增感知及同级集合严格隔离；
+     - 新增 `test_47_c06_rebuild_exception_safety`：核验 gather、snapshot 及 BVH 编译异常下统一回滚至 `FAILED`，求值网格安全释放，后续查询自愈恢复；
+     - 全套 47 项环境测试在 Blender 5.1.1 Headless 下全绿通过（47/47 PASS in 2.588s）。
+  3. **扩充反事实实证至 6 项真实变异 (`tests/run_counter_factual_ru2.py`, `docs/evidence/environment_gate01_ru2/`)**：
+     - 真实执行并归档 6 项受控故障变异日志：
+       * `counter_factual_c01_empty_rebuild.log` (变异 Exit 1: 201 != 1; 生产 Exit 0)
+       * `counter_factual_c03_vertex_stale.log` (变异 Exit 1: 1 != 2; 生产 Exit 0)
+       * `counter_factual_c05_collection_membership_stale.log` (变异 Exit 1: 2 != 1; 生产 Exit 0)
+       * `counter_factual_f01_member_retention_leak.log` (变异 Exit 1: 解关联对象残留; 生产 Exit 0)
+       * `counter_factual_f02_empty_bvh_repeated_rebuild.log` (变异 Exit 1: 102 != 2; 生产 Exit 0)
+       * `counter_factual_f03_exception_state_residual.log` (变异 Exit 1: REBUILDING != FAILED; 生产 Exit 0)
+     - 更新 `counter_factual_summary.md` 与 `cache_invalidation_boundary_report.md`。
+  4. **失效边界与开销界定固化 (`docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md`)**：
+     - 形式化矩阵界定 Path A（位移/旋转/缩放/父子层级/顶点移动/拓扑修改/修改器/集合增删解关联/重命名）与 Path B（外部驱动/复杂骨骼与点缓存/时间轴未标记刷新）；
+     - 客观声明几何扫描开销：`refresh()` 检查顶点哈希避免了 $1\sim 10\text{ms}$ 的 BVH 重建，但其自身扫描并非零成本（约 $0.04\text{ms}$/物体），候选集合隔离是保证扫描预算可控的架构前提。
+  5. **全量回归与受控保护检验**：
+     - 47 项环境网格查询测试全绿（47/47 PASS in 2.588s）；
+     - `run_test_suite.py` 全分级通过：`quick` (13/13), `physics` (19/19), `motion` (8/8), `full` (30/30)；
+     - `audit_c2_final_inspector.py --verify-docs` 校验 0 错误；
+     - `output/` 历史 `.blend` 资产 0 字节变动；
+     - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
+* **影响**：
+  - 彻底完成了 Environment Gate 01 Repair Unit 2 的收口闭环，为后续足底精确落脚点规划与高程查询提供了具备百分之百确定性、异常安全与物理可证伪性的底层网格适配器；
+  - 维持零历史退化与零架构违规。

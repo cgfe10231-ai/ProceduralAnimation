@@ -19,7 +19,7 @@ Traceback (most recent call last):
 AssertionError: 2 != 1 : Object rename without geometric change must reuse BVH with 0 rebuilds
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.053s
+Ran 1 test in 0.052s
 
 FAILED (failures=1)
 
@@ -29,6 +29,6 @@ test_41_c05_collection_membership_lifecycle (tests.test_mesh_environment_query.T
 C05: Collection membership lifecycle, isolation of forbidden collection, and rename without BVH rebuild. ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.050s
+Ran 1 test in 0.053s
 
 OK

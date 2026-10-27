@@ -273,37 +273,37 @@ class BlenderMeshEnvironmentAdapter:
     def rebuild(self) -> None:
         """Force complete re-evaluation of target scene meshes and rebuild BVH tree."""
         self._cache_state = AdapterCacheState.REBUILDING
-        target_objects = self._gather_target_objects()
-
-        mesh_objects = [obj for obj in target_objects if obj.type == "MESH" and obj.data is not None]
-        if not mesh_objects:
-            self._world_vertices = []
-            self._world_polygons = []
-            self._poly_metadata = []
-            self._bvh = None
-            self._tracked_objects = []
-            self._tracked_session_uids = set()
-            self._tracked_names_by_uid = {}
-            self._object_snapshots = {}
-            self._dirty = False
-            self._cache_state = AdapterCacheState.VALID_EMPTY
-            self._rebuild_count += 1
-            self._cache_version += 1
-            self._last_refresh_time = time.time()
-            return
-
-        new_world_verts: List[Vector] = []
-        new_polys: List[List[int]] = []
-        new_poly_meta: List[MeshPolygonMetadata] = []
-        new_snapshots: Dict[int, ObjectGeometrySnapshot] = {}
-        new_tracked_names: List[str] = []
-        new_tracked_uids: Set[int] = set()
-        new_names_by_uid: Dict[int, str] = {}
-        vert_offset = 0
-
         eval_objs_to_clear: List[Tuple[bpy.types.Object, bpy.types.Mesh]] = []
 
         try:
+            target_objects = self._gather_target_objects()
+
+            mesh_objects = [obj for obj in target_objects if obj.type == "MESH" and obj.data is not None]
+            if not mesh_objects:
+                self._world_vertices = []
+                self._world_polygons = []
+                self._poly_metadata = []
+                self._bvh = None
+                self._tracked_objects = []
+                self._tracked_session_uids = set()
+                self._tracked_names_by_uid = {}
+                self._object_snapshots = {}
+                self._dirty = False
+                self._cache_state = AdapterCacheState.VALID_EMPTY
+                self._rebuild_count += 1
+                self._cache_version += 1
+                self._last_refresh_time = time.time()
+                return
+
+            new_world_verts: List[Vector] = []
+            new_polys: List[List[int]] = []
+            new_poly_meta: List[MeshPolygonMetadata] = []
+            new_snapshots: Dict[int, ObjectGeometrySnapshot] = {}
+            new_tracked_names: List[str] = []
+            new_tracked_uids: Set[int] = set()
+            new_names_by_uid: Dict[int, str] = {}
+            vert_offset = 0
+
             depsgraph = bpy.context.evaluated_depsgraph_get()
 
             for obj in mesh_objects:

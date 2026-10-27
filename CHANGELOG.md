@@ -3,6 +3,45 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-28] Environment Gate 01 — Repair Unit 2 Final Closure: C05-1至C05-4深度集合生命周期、C06异常安全加固与F01-F03反事实实证闭环
+
+### 生产适配器异常安全与状态加固 (`src/scene/blender_mesh_query_adapter.py`)
+* **`rebuild()` 全流程异常安全与自动回滚**：
+  - 将 `_gather_target_objects()` 与快照计算完整移入 `try:` 保护块内；
+  - 确保任何阶段（候选收集、快照计算、求值网格提取、BVH 编译）抛出未捕获异常时，缓存状态必然回滚至 `AdapterCacheState.FAILED` 并设置 `dirty = True`；
+  - 杜绝状态卡死在 `REBUILDING`，临时求值网格在 `finally:` 中统一通过 `eval_obj.to_mesh_clear()` 清理；
+  - 后续查询自动触发自愈恢复重建。
+
+### 验收测试套件扩充 (`tests/test_mesh_environment_query.py`)
+* **新增 Unit 2 最终收口用例 (`test_43` 至 `test_47`)**：
+  - `test_43_c05_1_collection_member_unlinked`: 仅解除关联（未删除）的对象从 BVH 中剔除（1 次重建），且受禁集合对象绝不被查询；
+  - `test_44_c05_2_real_object_deletion`: `bpy.data.objects.remove(obj, do_unlink=True)` 触发 1 次重建，元数据清理干净，0 野指针；
+  - `test_45_c05_3_non_empty_to_empty_transition_and_reuse`: 非空转空转入 `VALID_EMPTY`，100 次空查询 0 重建复用，返回 `success=False`（`source_type="none"`），加入新 Mesh 干净恢复；
+  - `test_46_c05_4_recursive_collection_membership`: 子集合成员递归追踪、子集合解关联剔除、子集合新增感知及同级集合严格隔离；
+  - `test_47_c06_rebuild_exception_safety`: gather、snapshot 及 BVH 编译异常下统一回滚至 `FAILED`，求值网格安全释放，后续查询自愈恢复。
+* 全 47 项环境测试在 Blender 5.1.1 Headless 下全绿通过（47/47 PASS in 2.588s）。
+
+### 反事实实证生成器与归档扩充 (`tests/run_counter_factual_ru2.py`, `docs/evidence/environment_gate01_ru2/`)
+* 扩充至 6 项真实反事实变异验证：
+  - `counter_factual_c01_empty_rebuild.log`: 变异旧逻辑在 100 次空查询中产生 201 次重建（Exit code 1），生产逻辑恒为 1（Exit code 0）；
+  - `counter_factual_c03_vertex_stale.log`: 变异旧逻辑忽略顶点哈希导致未感知修改（Exit code 1），生产逻辑正确重建（Exit code 0）；
+  - `counter_factual_c05_collection_membership_stale.log`: 变异旧逻辑未感知集合新增对象（Exit code 1），生产逻辑正确重建（Exit code 0）；
+  - `counter_factual_f01_member_retention_leak.log`: 变异仅检查子集导致解关联对象残留（Exit code 1），生产逻辑正确剔除（Exit code 0）；
+  - `counter_factual_f02_empty_bvh_repeated_rebuild.log`: 变异依赖 `_bvh is None` 导致空环境重复重建（Exit code 1），生产逻辑零重建复用（Exit code 0）；
+  - `counter_factual_f03_exception_state_residual.log`: 变异在 `try:` 外收集对象导致异常卡死在 `REBUILDING`（Exit code 1），生产逻辑回滚至 `FAILED` 并自愈恢复（Exit code 0）。
+* 更新反事实总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`。
+
+### 规范文档更新与失效边界界定
+* 更新 `docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md`：新增 Section 7.5，形式化定义 Path A 与 Path B 边界矩阵，客观声明几何扫描开销与候选集合隔离的前置必要性。
+* 录入架构决策 `[DEC-057]` 至 `DECISIONS.md`。
+
+### 自动化回归与受控保护检验
+* 统一测试分级套件全量全绿：`quick` (13/13), `physics` (19/19), `motion` (8/8), `full` (30/30)；
+* `audit_c2_final_inspector.py --verify-docs` 校验 0 错误；
+* `output/` 历史 `.blend` 资产 0 字节变动；
+* 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`。
+
+
 ## [2026-10-27] Environment Gate 01 — Repair Unit 2: BVH Cache Invalidation, Scene Geometry Consistency & Lifecycle State Machine (Defects C01-C06)
 
 ### 生产适配器机制重构 (`src/scene/blender_mesh_query_adapter.py`)

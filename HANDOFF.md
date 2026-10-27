@@ -5,8 +5,8 @@
 ---
 
 ## 1. 当前目标与当前状态
-**当前任务**：Environment Gate 01 — Repair Unit 2: BVH Cache Invalidation, Scene Geometry Consistency & Lifecycle State Machine (Defects C01-C06)。  
-**当前状态**：`ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`（严格停止等待人类审批，严禁自动进入 Repair Unit 3 或 Phase 7B）。
+**当前任务**：Environment Gate 01 — Repair Unit 2 Final Closure: BVH Cache Invalidation, Scene Geometry Consistency & Exception Safety Hardening (Defects C01-C06, F01-F03)。  
+**当前状态**：`ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`（严格停止等待人类审批，严禁自动进入 Repair Unit 3 或 Phase 7B）。
 
 ### 本任务核心产出与成果
 1. **显式五状态生命周期状态机与空环境复用 (C01)**：
@@ -22,23 +22,27 @@
      * 基于 `obj.session_uid` 追踪集合成员变动，新增或删除对象即刻触发重建（C05）；
      * **原地重命名零重建优化**：当对象仅改名而几何未变时，就地更新元数据名称与 Surface ID，**BVH 重建次数为 0**（C05）。
    - **Path B (显式失效)**：调用 `adapter.invalidate()` 标记 `_dirty = True` 及 `INVALID` 状态，后续首次常规查询自动触发原子重建，调用方无需显式调用 `rebuild()`（C03）。
-3. **原子提交、求值网格释放与异常安全回滚 (C04)**：
-   - 提取数据与生成快照暂存于局部内存，BVH 构建成功后原子提交；
+3. **全流程异常安全与自动回滚加固 (C06)**：
+   - 将 `_gather_target_objects()` 与快照计算完整封装入 `rebuild()` 的 `try:` 保护块内；
+   - 任何构建或求值异常必然回滚至 `AdapterCacheState.FAILED` 并设置 `dirty = True`，杜绝卡死在 `REBUILDING`；
    - 求值网格在 `finally:` 中统一通过 `eval_obj.to_mesh_clear()` 清理，杜绝内存泄漏；
-   - 构建异常时回滚至 `FAILED` 状态并保留 `dirty=True`，绝不暴露脏数据。
-4. **不变场景高复用保证 (C06)**：
-   - 300 次查询（100次同向射线、100次异向射线、100次最近点搜索）重建次数恒为 1（0 次重建）。
+   - 后续查询自动具备自愈恢复能力（重新触发原子重建）。
+4. **深度集合生命周期验证 (C05-1 至 C05-4)**：
+   - **C05-1**: 仅解除关联（未删除）的对象从 BVH 中剔除（1 次重建），且受禁集合对象绝不被查询；
+   - **C05-2**: `bpy.data.objects.remove(obj, do_unlink=True)` 触发 1 次重建，元数据清理干净，0 野指针；
+   - **C05-3**: 非空转空转入 `VALID_EMPTY`，100 次空查询 0 重建复用，返回 `success=False`（`source_type="none"`），加入新 Mesh 干净恢复；
+   - **C05-4**: 子集合成员递归追踪、子集合解关联剔除、子集合新增感知及同级集合严格隔离。
 5. **测试套件扩充与全量回归**：
-   - 新增 Unit 2 专用用例 `test_33` 至 `test_42`，42 项测试全绿通过（42/42 PASS in 2.13s）；
-   - 编写受控变异生成脚本 `tests/run_counter_factual_ru2.py`，真实运行归档 C01, C03, C05 三项反事实变异失败与生产恢复通过日志至 `docs/evidence/environment_gate01_ru2/`；
-   - 编纂反事实总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`；
-   - `tests/run_test_suite.py --tier quick`：**13 / 13 PASS** (19.44s)；
-   - `tests/run_test_suite.py --tier physics`：**19 / 19 PASS** (83.81s)；
-   - `tests/run_test_suite.py --tier motion`：**8 / 8 PASS** (23.42s)；
-   - `tests/run_test_suite.py --tier full`：**30 / 30 PASS** (110.95s)；
+   - 新增 Unit 2 最终收口用例 `test_43` 至 `test_47`，47 项测试全绿通过（47/47 PASS in 2.588s）；
+   - 扩充反事实测试至 6 项真实变异（C01, C03, C05, F01, F02, F03），真实运行归档至 `docs/evidence/environment_gate01_ru2/`；
+   - 更新反事实总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`；
+   - `tests/run_test_suite.py --tier quick`：**13 / 13 PASS**；
+   - `tests/run_test_suite.py --tier physics`：**19 / 19 PASS**；
+   - `tests/run_test_suite.py --tier motion`：**8 / 8 PASS**；
+   - `tests/run_test_suite.py --tier full`：**30 / 30 PASS**；
    - `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)；
    - 受保护资产检查：`git diff output/` 0 差异；
-   - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
+   - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
 
 ## 2. 已完成历史里程碑
 * Environment Gate 01 — Repair Unit 1：候选范围隔离机制与表面筛选语义修复及最终验收（覆盖率 32/32 PASS，故障注入与极端边界报告归档）。

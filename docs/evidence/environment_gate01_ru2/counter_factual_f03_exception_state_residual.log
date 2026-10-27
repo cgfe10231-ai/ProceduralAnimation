@@ -1,0 +1,34 @@
+=== COUNTER-FACTUAL VERIFICATION LOG: DEFECT F03 (EXCEPTION STATE RESIDUAL IN REBUILDING) ===
+TARGET DEFECT: F03 (Rebuild mid-flight exception leaving cache stuck in REBUILDING state)
+MUTATION: Placed _gather_target_objects call outside try/except block without FAILED rollback
+
+--- PHASE 1: MUTATED / LEGACY EXECUTION (EXPECTED FAILURE) ---
+EXIT STATUS: FAILURE
+FAILURES COUNT: 1
+test_47_c06_rebuild_exception_safety (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_47_c06_rebuild_exception_safety)
+C06: Verify rebuild exception safety across gather, snapshot, and BVH compilation with self-healing recovery. ... FAIL
+
+======================================================================
+FAIL: test_47_c06_rebuild_exception_safety (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_47_c06_rebuild_exception_safety)
+C06: Verify rebuild exception safety across gather, snapshot, and BVH compilation with self-healing recovery.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 1948, in test_47_c06_rebuild_exception_safety
+    self.assertEqual(adapter.cache_state, AdapterCacheState.FAILED)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: <AdapterCacheState.REBUILDING: 'rebuilding'> != <AdapterCacheState.FAILED: 'failed'>
+
+----------------------------------------------------------------------
+Ran 1 test in 0.049s
+
+FAILED (failures=1)
+
+--- PHASE 2: PRODUCTION LOGIC RESTORED (EXPECTED PASS) ---
+EXIT STATUS: PASS
+test_47_c06_rebuild_exception_safety (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_47_c06_rebuild_exception_safety)
+C06: Verify rebuild exception safety across gather, snapshot, and BVH compilation with self-healing recovery. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.051s
+
+OK

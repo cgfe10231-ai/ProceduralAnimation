@@ -1,0 +1,34 @@
+=== COUNTER-FACTUAL VERIFICATION LOG: DEFECT F02 (EMPTY BVH REPEATED REBUILD LEAK) ===
+TARGET DEFECT: F02 (Old code treating valid empty BVH as invalid and rebuilding on every query)
+MUTATION: Restored legacy refresh condition `if force or self._dirty or self._bvh is None: self.rebuild()`
+
+--- PHASE 1: MUTATED / LEGACY EXECUTION (EXPECTED FAILURE) ---
+EXIT STATUS: FAILURE
+FAILURES COUNT: 1
+test_45_c05_3_non_empty_to_empty_transition_and_reuse (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_45_c05_3_non_empty_to_empty_transition_and_reuse)
+C05-3: Non-empty collection transitioning to empty sets VALID_EMPTY, reuses across 100 queries, then recovers. ... FAIL
+
+======================================================================
+FAIL: test_45_c05_3_non_empty_to_empty_transition_and_reuse (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_45_c05_3_non_empty_to_empty_transition_and_reuse)
+C05-3: Non-empty collection transitioning to empty sets VALID_EMPTY, reuses across 100 queries, then recovers.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 1840, in test_45_c05_3_non_empty_to_empty_transition_and_reuse
+    self.assertEqual(adapter.rebuild_count, 2, "Zero rebuilds allowed across 100 empty queries")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 102 != 2 : Zero rebuilds allowed across 100 empty queries
+
+----------------------------------------------------------------------
+Ran 1 test in 0.052s
+
+FAILED (failures=1)
+
+--- PHASE 2: PRODUCTION LOGIC RESTORED (EXPECTED PASS) ---
+EXIT STATUS: PASS
+test_45_c05_3_non_empty_to_empty_transition_and_reuse (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_45_c05_3_non_empty_to_empty_transition_and_reuse)
+C05-3: Non-empty collection transitioning to empty sets VALID_EMPTY, reuses across 100 queries, then recovers. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.050s
+
+OK
