@@ -230,13 +230,26 @@ class BlenderMeshEnvironmentAdapter:
                         return
 
     def _gather_target_objects(self) -> List[bpy.types.Object]:
-        """Collect mesh objects from configured collections, object names, or active scene."""
+        """Collect mesh objects from configured collections, object names, or active scene.
+
+        Strict Candidate Isolation Contract (Repair Unit 1 / Defect A03):
+        - Rule A: Explicit Collection Mode (`collection_names is not None`):
+          Queries meshes strictly contained within specified collections (retaining subcollection
+          traversal). Never automatically includes other collections or falls back to full scene
+          scan, even if the collection is non-existent or contains 0 meshes (returns empty list).
+        - Rule B: Explicit Object Mode (`object_names is not None`):
+          Queries specified mesh object names only. Non-existent or non-mesh names are ignored;
+          duplicates are deduplicated; never falls back to full scene scan.
+        - Rule C: Full Scene Mode:
+          Permitted ONLY when caller explicitly sets `collection_names=None` AND `object_names=None`.
+          Full scene scanning is never used as an implicit fallback.
+        """
         objects: List[bpy.types.Object] = []
 
         if self._object_names is not None:
             for name in self._object_names:
                 obj = bpy.data.objects.get(name)
-                if obj and obj.type == "MESH":
+                if obj and obj.type == "MESH" and obj not in objects:
                     objects.append(obj)
             return objects
 
@@ -247,12 +260,11 @@ class BlenderMeshEnvironmentAdapter:
                     for obj in col.all_objects:
                         if obj.type == "MESH" and obj not in objects:
                             objects.append(obj)
-            if objects:
-                return objects
+            return objects
 
-        # Fallback to all mesh objects in scene
+        # Rule C: Explicit full-scene mode (both collection_names and object_names are None)
         for obj in self._scene.objects:
-            if obj.type == "MESH":
+            if obj.type == "MESH" and obj not in objects:
                 objects.append(obj)
         return objects
 
@@ -295,7 +307,15 @@ class BlenderMeshEnvironmentAdapter:
         distance: float = 10.0,
         surface_type_filter: Optional[str] = None,
     ) -> SurfaceQueryResult:
-        """Cast a directional ray into the evaluated mesh BVH tree."""
+        """Cast a directional ray into the evaluated mesh BVH tree.
+
+        Semantics (Repair Unit 1 / Defect A01):
+        - Unfiltered (`surface_type_filter is None`):
+          Returns the nearest physical hit along the ray path. Never penetrates or searches behind.
+        - Filtered (`surface_type_filter is not None`):
+          Searches forward along ray path up to `distance` for the closest surface matching filter.
+          NOTE: This is a geometric query and does not imply human penetration feasibility.
+        """
         self.refresh()
 
         if self._bvh is None or not self._poly_metadata:
@@ -321,9 +341,89 @@ class BlenderMeshEnvironmentAdapter:
         dir_vec = Vector((rx / r_len, ry / r_len, rz / r_len))
         orig_vec = Vector(origin)
 
-        hit_loc, hit_norm, hit_idx, hit_dist = self._bvh.ray_cast(orig_vec, dir_vec, distance)
+        # Standard unfiltered query: strictly return the first physical surface hit
+        if not surface_type_filter:
+            hit_loc, hit_norm, hit_idx, hit_dist = self._bvh.ray_cast(orig_vec, dir_vec, distance)
 
-        if hit_loc is None or hit_idx is None:
+            if hit_loc is None or hit_idx is None:
+                return SurfaceQueryResult(
+                    surface_id="none",
+                    surface_type="none",
+                    contact_point_world=(0.0, 0.0, 0.0),
+                    surface_normal_world=(0.0, 0.0, 1.0),
+                    signed_distance=float("inf"),
+                    friction_coeff=0.0,
+                    allows_regular_support=False,
+                    success=False,
+                    ray_hit_distance=float("inf"),
+                    error_reason=f"No mesh surface intersected along ray within {distance:.2f}m",
+                    source_type="none",
+                )
+
+            meta = self._poly_metadata[hit_idx]
+            norm_unit = hit_norm.normalized() if hit_norm.length > 1e-8 else Vector(meta.normal_world)
+            signed_dist = float((orig_vec - hit_loc).dot(norm_unit))
+
+            return SurfaceQueryResult(
+                surface_id=meta.surface_id,
+                surface_type=meta.surface_type.value,
+                contact_point_world=(float(hit_loc.x), float(hit_loc.y), float(hit_loc.z)),
+                surface_normal_world=(float(norm_unit.x), float(norm_unit.y), float(norm_unit.z)),
+                signed_distance=signed_dist,
+                friction_coeff=meta.friction_coeff,
+                allows_regular_support=meta.allows_regular_support,
+                success=True,
+                ray_hit_distance=float(hit_dist),
+                error_reason=None,
+                source_type="mesh",
+            )
+
+        # Filtered query: search forward along ray direction for closest matching surface
+        filter_str = surface_type_filter.value if hasattr(surface_type_filter, "value") else str(surface_type_filter)
+        current_origin = orig_vec.copy()
+        max_steps = 64
+        step_epsilon = 1e-4  # 0.1mm forward push to prevent re-hitting same polygon
+
+        found_hit = False
+        target_loc = None
+        target_norm = None
+        target_idx = None
+        target_dist = 0.0
+
+        for _ in range(max_steps):
+            dist_from_orig = float((current_origin - orig_vec).dot(dir_vec))
+            remaining_dist = distance - dist_from_orig
+            if remaining_dist <= 1e-6:
+                break
+
+            hit_loc, hit_norm, hit_idx, hit_dist = self._bvh.ray_cast(
+                current_origin, dir_vec, remaining_dist
+            )
+
+            if hit_loc is None or hit_idx is None:
+                break
+
+            cum_dist = float((hit_loc - orig_vec).dot(dir_vec))
+            if cum_dist > distance + 1e-6:
+                break
+
+            meta = self._poly_metadata[hit_idx]
+            if meta.surface_type.value == filter_str:
+                found_hit = True
+                target_loc = hit_loc
+                target_norm = hit_norm
+                target_idx = hit_idx
+                target_dist = max(0.0, cum_dist)
+                break
+
+            # Strictly advance forward past current intersection
+            forward_from_hit = hit_loc + dir_vec * step_epsilon
+            if (forward_from_hit - current_origin).dot(dir_vec) < step_epsilon:
+                current_origin = current_origin + dir_vec * step_epsilon
+            else:
+                current_origin = forward_from_hit
+
+        if not found_hit or target_loc is None or target_idx is None:
             return SurfaceQueryResult(
                 surface_id="none",
                 surface_type="none",
@@ -334,44 +434,24 @@ class BlenderMeshEnvironmentAdapter:
                 allows_regular_support=False,
                 success=False,
                 ray_hit_distance=float("inf"),
-                error_reason=f"No mesh surface intersected along ray within {distance:.2f}m",
+                error_reason=f"No mesh surface matching filter '{filter_str}' intersected along ray within {distance:.2f}m",
                 source_type="none",
             )
 
-        meta = self._poly_metadata[hit_idx]
-
-        if surface_type_filter and meta.surface_type.value != surface_type_filter:
-            return SurfaceQueryResult(
-                surface_id="none",
-                surface_type="none",
-                contact_point_world=(0.0, 0.0, 0.0),
-                surface_normal_world=(0.0, 0.0, 1.0),
-                signed_distance=float("inf"),
-                friction_coeff=0.0,
-                allows_regular_support=False,
-                success=False,
-                ray_hit_distance=float("inf"),
-                error_reason=f"Intersected surface type '{meta.surface_type.value}' does not match filter '{surface_type_filter}'",
-                source_type="none",
-            )
-
-        # Signed distance: projection of (query_point - hit_point) along outward normal
-        # >0: query point is in front of surface (gap)
-        # 0.0: on surface
-        # <0: query point is behind surface (penetration)
-        norm_unit = hit_norm.normalized() if hit_norm.length > 1e-8 else Vector(meta.normal_world)
-        signed_dist = float((orig_vec - hit_loc).dot(norm_unit))
+        meta = self._poly_metadata[target_idx]
+        norm_unit = target_norm.normalized() if target_norm.length > 1e-8 else Vector(meta.normal_world)
+        signed_dist = float((orig_vec - target_loc).dot(norm_unit))
 
         return SurfaceQueryResult(
             surface_id=meta.surface_id,
             surface_type=meta.surface_type.value,
-            contact_point_world=(float(hit_loc.x), float(hit_loc.y), float(hit_loc.z)),
+            contact_point_world=(float(target_loc.x), float(target_loc.y), float(target_loc.z)),
             surface_normal_world=(float(norm_unit.x), float(norm_unit.y), float(norm_unit.z)),
             signed_distance=signed_dist,
             friction_coeff=meta.friction_coeff,
             allows_regular_support=meta.allows_regular_support,
             success=True,
-            ray_hit_distance=float(hit_dist),
+            ray_hit_distance=float(target_dist),
             error_reason=None,
             source_type="mesh",
         )
@@ -382,7 +462,14 @@ class BlenderMeshEnvironmentAdapter:
         max_distance: float = 5.0,
         surface_type_filter: Optional[str] = None,
     ) -> SurfaceQueryResult:
-        """Find the closest point on evaluated meshes to a 3D query point."""
+        """Find the closest point on evaluated meshes to a 3D query point.
+
+        Semantics (Repair Unit 1 / Defect A02):
+        - Unfiltered (`surface_type_filter is None`):
+          Returns the globally nearest mesh surface within `max_distance`.
+        - Filtered (`surface_type_filter is not None`):
+          Returns the nearest matching surface within `max_distance` via BVH range search.
+        """
         self.refresh()
 
         if self._bvh is None or not self._poly_metadata:
@@ -401,9 +488,50 @@ class BlenderMeshEnvironmentAdapter:
             )
 
         p_vec = Vector(point_world)
-        near_loc, near_norm, near_idx, near_dist = self._bvh.find_nearest(p_vec, max_distance)
 
-        if near_loc is None or near_idx is None:
+        # Unfiltered: globally nearest point
+        if not surface_type_filter:
+            near_loc, near_norm, near_idx, near_dist = self._bvh.find_nearest(p_vec, max_distance)
+
+            if near_loc is None or near_idx is None:
+                return SurfaceQueryResult(
+                    surface_id="none",
+                    surface_type="none",
+                    contact_point_world=(0.0, 0.0, 0.0),
+                    surface_normal_world=(0.0, 0.0, 1.0),
+                    signed_distance=float("inf"),
+                    friction_coeff=0.0,
+                    allows_regular_support=False,
+                    success=False,
+                    ray_hit_distance=None,
+                    error_reason=f"No mesh surface found within max_distance={max_distance:.2f}m",
+                    source_type="none",
+                )
+
+            meta = self._poly_metadata[near_idx]
+            norm_unit = near_norm.normalized() if near_norm.length > 1e-8 else Vector(meta.normal_world)
+            diff = p_vec - near_loc
+            signed_dist = float(near_dist if diff.dot(norm_unit) >= 0.0 else -near_dist)
+
+            return SurfaceQueryResult(
+                surface_id=meta.surface_id,
+                surface_type=meta.surface_type.value,
+                contact_point_world=(float(near_loc.x), float(near_loc.y), float(near_loc.z)),
+                surface_normal_world=(float(norm_unit.x), float(norm_unit.y), float(norm_unit.z)),
+                signed_distance=signed_dist,
+                friction_coeff=meta.friction_coeff,
+                allows_regular_support=meta.allows_regular_support,
+                success=True,
+                ray_hit_distance=None,
+                error_reason=None,
+                source_type="mesh",
+            )
+
+        # Filtered: find all polygons within max_distance and select closest of matching type
+        filter_str = surface_type_filter.value if hasattr(surface_type_filter, "value") else str(surface_type_filter)
+        candidates = self._bvh.find_nearest_range(p_vec, max_distance)
+
+        if not candidates:
             return SurfaceQueryResult(
                 surface_id="none",
                 surface_type="none",
@@ -418,9 +546,12 @@ class BlenderMeshEnvironmentAdapter:
                 source_type="none",
             )
 
-        meta = self._poly_metadata[near_idx]
+        matching = [
+            c for c in candidates
+            if self._poly_metadata[c[2]].surface_type.value == filter_str
+        ]
 
-        if surface_type_filter and meta.surface_type.value != surface_type_filter:
+        if not matching:
             return SurfaceQueryResult(
                 surface_id="none",
                 surface_type="none",
@@ -431,10 +562,12 @@ class BlenderMeshEnvironmentAdapter:
                 allows_regular_support=False,
                 success=False,
                 ray_hit_distance=None,
-                error_reason=f"Nearest surface type '{meta.surface_type.value}' does not match filter '{surface_type_filter}'",
+                error_reason=f"No mesh surface matching filter '{filter_str}' found within max_distance={max_distance:.2f}m",
                 source_type="none",
             )
 
+        near_loc, near_norm, near_idx, near_dist = min(matching, key=lambda c: c[3])
+        meta = self._poly_metadata[near_idx]
         norm_unit = near_norm.normalized() if near_norm.length > 1e-8 else Vector(meta.normal_world)
         diff = p_vec - near_loc
         signed_dist = float(near_dist if diff.dot(norm_unit) >= 0.0 else -near_dist)

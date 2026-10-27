@@ -116,3 +116,38 @@ In accordance with Section 2 of the project specifications:
 * **Host Layer (`src/scene/blender_mesh_query_adapter.py`)**: Couples with Blender's `bpy` and `mathutils.bvhtree` C-extensions.
 * **Core Interface (`src/scene/environment_query.py`)**: Contains zero `bpy` imports. Retains pure Python dataclasses and mathematical methods.
 * **Pluggable Architecture**: `DynamicsEnvironmentQuery` accepts `mesh_adapter` via dependency injection (`set_mesh_adapter`). In headless environments without Blender or during fast mathematical CI tests, `DynamicsEnvironmentQuery` runs purely in Python with 100% backward compatibility.
+
+---
+
+## 6. Candidate Scope Isolation & Surface Filter Semantics (Repair Unit 1)
+
+Following the audit of Environment Gate 01, three semantic defects in candidate scope and surface filtering were identified and resolved under Repair Unit 1:
+
+### 6.1 Strict Candidate Scope Isolation (Defect A03)
+When gathering target mesh objects from the scene, the adapter strictly adheres to three mutually exclusive modes:
+1. **Explicit Collection Mode (`collection_names is not None`)**:
+   Queries meshes strictly contained within the specified collections (retaining recursive subcollection traversal). Never includes other collections and **never falls back to a full scene scan**, even if a collection does not exist or contains zero meshes (in which case it evaluates to $\emptyset$).
+2. **Explicit Object Mode (`object_names is not None`)**:
+   Queries specified mesh object names only. Non-existent names or non-mesh objects are ignored; duplicate names are deduplicated; never falls back to full scene scan.
+3. **Explicit Full-Scene Mode (`collection_names is None and object_names is None`)**:
+   Permitted exclusively when both parameters are explicitly passed as `None`. Full-scene scanning is strictly prohibited as an implicit fallback.
+
+**Data Invariant**:
+$$\text{QueriedObjects} \subseteq \text{ExplicitlyAllowedObjects}, \quad \text{NonExistentCollection} \implies \text{QueriedObjects} = \emptyset$$
+
+### 6.2 Raycast Surface Filtering Semantics (Defect A01)
+1. **Unfiltered Raycast (`surface_type_filter is None`)**:
+   Returns the nearest physical surface hit along the ray path. Never penetrates or searches behind the first intersection.
+2. **Filtered Raycast (`surface_type_filter is not None`)**:
+   Searches forward along the ray path up to `distance` for the closest surface matching `surface_type_filter`.
+   * Advances forward past non-matching intersections by $\Delta s \ge 10^{-4}\text{ m}$.
+   * Guaranteed positive progression and termination within at most 64 steps.
+   * `ray_hit_distance` strictly reports the cumulative Euclidean distance from the original ray origin, not a local step distance.
+   * *Note*: This is a geometric query and does not imply human body penetration feasibility across obstacle surfaces.
+
+### 6.3 Nearest Point Surface Filtering Semantics (Defect A02)
+1. **Unfiltered Nearest Point (`surface_type_filter is None`)**:
+   Returns the globally nearest mesh surface to the query point within `max_distance`.
+2. **Filtered Nearest Point (`surface_type_filter is not None`)**:
+   Performs a native accelerated range search (`find_nearest_range(point, max_distance)`) and selects the surface matching `surface_type_filter` with the minimal Euclidean distance to the query point. If no matching surface exists within `max_distance`, strictly returns `success = False`.
+

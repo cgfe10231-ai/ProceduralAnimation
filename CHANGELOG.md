@@ -3,6 +3,37 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-27] Environment Gate 01 — Repair Unit 1: Blender Mesh 环境查询候选范围隔离与表面筛选语义修复 (Candidate Scope Isolation & Surface Filter Semantics Repair)
+
+### 缺陷修复与语义重构 (`src/scene/blender_mesh_query_adapter.py`)
+* **缺陷 A03 (Collection 范围泄漏修复)**：
+  - 重构 `_gather_target_objects`，实现规则 A、B、C 严格范围隔离；
+  - 规则 A (显式 Collection 模式)：`collection_names is not None` 时仅查询指定集合（支持递归子集合），若集合不存在或为空严格返回空集 $\emptyset$，绝不回退全场景扫描；
+  - 规则 B (显式 Object 模式)：`object_names is not None` 时仅查询指定 Mesh，自动去重，绝不回退全场景；
+  - 规则 C (显式全场景模式)：仅当两者均为 `None` 时才允许全场景网格扫描，彻底废除隐式兜底回退。
+* **缺陷 A01 (ray_cast 表面过滤向前推进检索)**：
+  - 无过滤模式：严格保持返回射线路径上首个最近真实物理命中面；
+  - 有过滤模式：沿射线方向迭代推进搜索最近合格面，每次推进距离严格为正 ($\Delta s \ge 10^{-4}\text{ m}$)，上限 64 步，累计计算从原始起点起的真实欧氏距离 `ray_hit_distance`，避免局部步长误差；
+  - 确立几何筛选语义：明确注明此为几何查询，不代表人体具备穿透可行性。
+* **缺陷 A02 (find_nearest 表面过滤范围搜索)**：
+  - 无过滤模式：返回全局最近真实网格表面；
+  - 有过滤模式：通过 `bvh.find_nearest_range(p, max_distance)` 检索候选集，筛选匹配目标类型并选取真实欧氏距离最小者，无匹配面严格返回 `success=False`。
+
+### 测试套件扩充与受控故障反例验证 (`tests/test_mesh_environment_query.py`)
+* **15 项新反例用例编写与全量 23 项测试全绿**：
+  - A03 反例 4 项：集合不存在未命中、空集合不回退、集合严格隔离、显式全场景模式；
+  - A01 反例 6 项：无过滤最近命中、过滤第二表面、过滤不存在类型、距离不足失败、方向缩放不变性、起点在表面重合；
+  - A02 反例 5 项：无过滤最近面、过滤目标面、半径不足失败、查询点移动自适应、旋转目标面法向更新；
+  - 全 8 字段严密断言：`surface_id`, `surface_type`, `contact_point_world`, `surface_normal_world`, `ray_hit_distance`, `signed_distance`, `source_type`, `allows_regular_support`；
+* **受控故障反例验证 (Fault Injection)**：
+  - 在隔离测试中重现旧 A03、A01、A02 逻辑，严格证实旧逻辑下 counter-examples 必报失败，新逻辑下全部通过，证实测试具备真实缺陷检出能力。
+* **自动化分层回归套件全绿**：
+  - `quick` (13/13 PASS), `physics` (19/19 PASS), `motion` (8/8 PASS), `full` (30/30 PASS), `--verify-docs` (PASS)；受保护资产 0 字节变动。
+* **阶段状态裁定**：`ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`。
+
+---
+
+
 ## [2026-10-27] Environment Gate 01: 真实 Blender Mesh 环境查询接入与数据真实性门禁 (Real Blender Mesh Environment Query Access & Data Authenticity Gate)
 
 ### 核心功能与适配器架构 (`src/scene/blender_mesh_query_adapter.py`, `src/scene/environment_query.py`)

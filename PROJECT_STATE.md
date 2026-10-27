@@ -1,13 +1,37 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-27  
-> **当前阶段**：Environment Gate 01（真实 Blender Mesh 环境查询接入与数据真实性门禁）已全部完成并通过 14 项严格验收标准。实现了宿主解耦的 `BlenderMeshEnvironmentAdapter`，基于 Blender 原生 `mathutils.bvhtree.BVHTree.FromPolygons` 构建世界空间 BVH；保持 `src/scene/environment_query.py` 纯 Python 无 `bpy` 依赖；确立运行时真实 Mesh 为物理事实来源并扩展 `source_type` 追踪契约；通过世界三角形三顶点叉积严格重构法向量；建立动态矩阵/顶点指纹缓存刷新机制；定义坡度倾角 $>60^\circ$（$N_z < 0.50$）不可支撑准则与摩擦系数隔离；独立实证了 `KinematicBridgeExecutor:404` 接触高程强制压平至 $Z=0.0\text{ m}$ 的缺陷并编纂隔离建议案 `docs/proposals/CONTACT_CHAIN_BRIDGE_ELEVATION_GAP.md`（本门禁零修改人体控制代码）。全套测试回归：`quick` (13/13 PASS), `physics` (19/19 PASS), `--verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动。当前状态：`ENVIRONMENT GATE 01 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。  
+> **当前阶段**：Environment Gate 01 — Repair Unit 1（Blender Mesh 环境查询候选范围隔离与表面筛选语义修复）已全部完成并通过 15 项新增反例及全量 23 项单元验证。重构了 `BlenderMeshEnvironmentAdapter` 的候选对象采集逻辑，确立规则 A（显式 Collection 模式绝不回退）、规则 B（显式 Object 模式去重防泄漏）、规则 C（显式全场景模式）；重构了 `ray_cast` 推进式表面过滤逻辑，在保持无过滤最近物理命中前提下，支持沿射线方向正向步进检索最近目标表面，累计计算真实欧氏距离；重构了 `find_nearest` 范围搜索逻辑，支持基于 `find_nearest_range` 筛选最近目标表面；实施了全 8 字段数据契约严密断言与隔离受控故障注入，严格证明测试的反例检出能力。全套测试回归：`quick` (13/13 PASS), `physics` (19/19 PASS), `motion` (8/8 PASS), `full` (30/30 PASS), `--verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动。当前状态：`ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01 — Repair Unit 1: Blender Mesh 环境查询候选范围隔离与表面筛选语义修复 (Candidate Scope Isolation & Surface Filter Semantics Repair)**：
+  * **候选范围隔离机制重构 (Defect A03 修复)**：
+    - 规则 A (显式 Collection 模式)：`collection_names is not None` 时仅检索指定集合（保留递归子集合），若集合不存在或无网格严格返回空集 $\emptyset$，绝不回退全场景；
+    - 规则 B (显式 Object 模式)：`object_names is not None` 时仅检索指定名称的有效 Mesh，去重过滤，绝不回退全场景；
+    - 规则 C (显式全场景模式)：仅当两者均为 `None` 时允许扫描当前场景全量网格，严禁隐式全场景兜底。
+  * **射线推进式表面过滤语义重构 (Defect A01 修复)**：
+    - 无过滤模式：严格保持返回射线路径上首个最近真实物理命中面；
+    - 有过滤模式：沿射线方向迭代推进搜索最近合格面，每次推进距离严格为正 ($\Delta s \ge 10^{-4}\text{ m}$)，上限 64 步，累计计算从原始起点起的真实欧氏距离 `ray_hit_distance`；
+    - 确立几何筛选语义：明确注明此为几何查询，不代表人体具备穿透可行性。
+  * **最近点范围搜索表面过滤语义重构 (Defect A02 修复)**：
+    - 无过滤模式：返回全局最近真实网格表面；
+    - 有过滤模式：通过 `bvh.find_nearest_range(p, max_distance)` 检索候选多边形集，筛选匹配目标类型并选取真实欧氏距离最小者，无匹配面严格返回 `success=False`。
+  * **全 8 字段契约检查与受控故障反例验证 (`tests/test_mesh_environment_query.py`)**：
+    - 编写并扩充 15 项专门反例测试（A03 4项、A01 6项、A02 5项），全套测试扩展至 23 项且实测全部通过 (23/23 PASS, 1.39s)；
+    - 逐项核验 `surface_id`, `surface_type`, `contact_point_world`, `surface_normal_world`, `ray_hit_distance`, `signed_distance`, `source_type`, `allows_regular_support`；
+    - 隔离受控故障注入验证：在独立测试中模拟旧 A03 回退全场景、旧 A01 单命中短路、旧 A02 单最近面短路，实证 counter-examples 均能精准捕获缺陷并报错，新代码 100% 修复并通过。
+  * **全级别分层回归套件全绿**：
+    - `tests/run_test_suite.py --tier quick`：**13 / 13 PASS** (18.73s)；
+    - `tests/run_test_suite.py --tier physics`：**19 / 19 PASS** (83.61s)；
+    - `tests/run_test_suite.py --tier motion`：**8 / 8 PASS** (23.57s)；
+    - `tests/run_test_suite.py --tier full`：**30 / 30 PASS** (107.69s)；
+    - `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)；
+    - 受控资产检查：`git diff output/` 0 差异；
+    - 最终状态裁定：`ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。
 * **Environment Gate 01: 真实 Blender Mesh 环境查询接入与数据真实性门禁 (Real Blender Mesh Environment Query Access & Data Authenticity Gate)**：
   * **真实 Blender Mesh 物理事实来源确立与纯 Python 解耦 (`src/scene/blender_mesh_query_adapter.py`, `src/scene/environment_query.py`)**：
     - 实现 `BlenderMeshEnvironmentAdapter`，采用 Blender 原生 `mathutils.bvhtree.BVHTree.FromPolygons`，在世界坐标空间（$V_w = M_w \cdot v$）构建 BVH，规避非等比缩放引起的法向量失真；
