@@ -1,13 +1,39 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-27  
-> **当前阶段**：架构基线审计与 7A→7B 准入门禁（Architecture Baseline Audit — 7A→7B Admission Gate）已全部完成。全仓库 59 个 Python 模块、21 个入口脚本、47 个测试脚本及所有 .blend 场景完成深度静态与动态调用链审计，输出 8 份详尽架构审计文档至 `docs/audit/`。明确揭示双管线完全解耦现实（Pipeline A 19 骨骼角色与 Pipeline B 6-DOF 动力学代理互不相通）、环境交互为单向开环查询、质心遥测与接触模型未形成闭环反馈，并编目 8 项关键架构问题（AUDIT-01 至 AUDIT-08）。全套自动化测试 12/12 PASS，`--verify-docs` 零幻觉通过。当前状态：`ARCHITECTURE AUDIT — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。  
+> **当前阶段**：Environment Gate 01（真实 Blender Mesh 环境查询接入与数据真实性门禁）已全部完成并通过 14 项严格验收标准。实现了宿主解耦的 `BlenderMeshEnvironmentAdapter`，基于 Blender 原生 `mathutils.bvhtree.BVHTree.FromPolygons` 构建世界空间 BVH；保持 `src/scene/environment_query.py` 纯 Python 无 `bpy` 依赖；确立运行时真实 Mesh 为物理事实来源并扩展 `source_type` 追踪契约；通过世界三角形三顶点叉积严格重构法向量；建立动态矩阵/顶点指纹缓存刷新机制；定义坡度倾角 $>60^\circ$（$N_z < 0.50$）不可支撑准则与摩擦系数隔离；独立实证了 `KinematicBridgeExecutor:404` 接触高程强制压平至 $Z=0.0\text{ m}$ 的缺陷并编纂隔离建议案 `docs/proposals/CONTACT_CHAIN_BRIDGE_ELEVATION_GAP.md`（本门禁零修改人体控制代码）。全套测试回归：`quick` (13/13 PASS), `physics` (19/19 PASS), `--verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动。当前状态：`ENVIRONMENT GATE 01 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01: 真实 Blender Mesh 环境查询接入与数据真实性门禁 (Real Blender Mesh Environment Query Access & Data Authenticity Gate)**：
+  * **真实 Blender Mesh 物理事实来源确立与纯 Python 解耦 (`src/scene/blender_mesh_query_adapter.py`, `src/scene/environment_query.py`)**：
+    - 实现 `BlenderMeshEnvironmentAdapter`，采用 Blender 原生 `mathutils.bvhtree.BVHTree.FromPolygons`，在世界坐标空间（$V_w = M_w \cdot v$）构建 BVH，规避非等比缩放引起的法向量失真；
+    - 严格保持 `src/scene/environment_query.py` 纯 Python 无 `bpy` 依赖，以鸭子类型委托与 `create_mesh_backed_dynamics_query()` 安全构建；
+    - 确立 Blender 运行时**真实 Mesh 为几何物理权威来源**；解析表面保留为无 Blender 依赖纯 Python 单元测试与历史退化兜底；
+    - 在 `SurfaceQueryResult` 中扩展 `source_type: str`（`"mesh"` / `"analytical"` / `"none"`），实现数据来源全流程可追溯；
+    - 严禁隐式伪造高程：射线未命中或点查询超出范围时，严格返回 `success=False`，绝不伪造 $Z=0.0\text{ m}$ 地面。
+  * **世界空间法向实时重构与动态缓存失效机制**：
+    - 通过世界三角形三顶点叉积计算严格单位法向量，杜绝物体旋转后法向量未更新的隐患；
+    - 动态缓存失效机制：监控物体矩阵、顶点总数与包围盒哈希指纹，任何位移、旋转、缩放或顶点编辑均触发自动刷新或手动 `refresh()` / `rebuild()`。
+  * **3D 表面几何类型与支撑面准则**：
+    - 斜率夹角 $> 60^\circ$（$N_z < 0.50$）严格判定为不可支撑面（`allows_regular_support = False`）；
+    - 几何类型细分：水平地面（$N_z \ge 0.99$）、斜坡（$0.15 \le N_z < 0.99$）、垂直立面（$|N_z| < 0.15$）；
+    - 摩擦系数元数据隔离：优先读取物体自定义属性 `custom_friction`，缺省时根据几何形态分配物理标准摩擦系数。
+  * **KinematicBridge 接触高程硬编码缺陷实证与隔离建议案**：
+    - 编写独立缺陷复现测试 `tests/test_contact_elevation_gap_repro.py`，实证高架台（$Z=1.3397\text{ m}$）上足端接触被强制压平至 $Z=0.0\text{ m}$（误差 $1.3397\text{ m}$），实证第 388-394 行硬编码单水平基准面 `EnvironmentalSurface` 的环境开环缺陷；
+    - 编纂完整工程建议案 `docs/proposals/CONTACT_CHAIN_BRIDGE_ELEVATION_GAP.md`，给出单点改动方案与向前兼容防护，供后续门禁报批实施，本门禁零修改人体控制代码。
+  * **规范文档编纂与 14 项严格测试全套件通过**：
+    - 编制规范文档 [`docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md`](docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md)；
+    - 编写 `tests/test_mesh_environment_query.py`（8/8 PASS，覆盖 14 项严格验收标准）；
+    - `tests/test_contact_elevation_gap_repro.py`（PASS）；
+    - `tests/run_test_suite.py --tier quick`：**13 / 13 PASS**（16.61s）；
+    - `tests/run_test_suite.py --tier physics`：**19 / 19 PASS**（77.57s）；
+    - `tests/audit_c2_final_inspector.py --verify-docs`：**PASS**（Exit Code 0，引用符号 100% 存在）；
+    - 受保护场景资产检查：`git diff output/` 0 差异；
+    - 最终状态裁定：`ENVIRONMENT GATE 01 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。
 * **架构基线审计与 7A→7B 准入门禁 (Architecture Baseline Audit — 7A→7B Admission Gate)**：
   * **8 份全景架构基线审计文档编纂完成 (`docs/audit/`)**：
     - [`docs/audit/MODULE_INVENTORY.md`](docs/audit/MODULE_INVENTORY.md)：59 个生产模块逐一按 20 个关键工程问题严格回答（行号、职责、接口类型、坐标单位、读写权限、变动目标、调用关系、八态分类、硬编码与旁路检查、跨引擎复用性与测试覆盖），统计 22 Active、6 Read-Only Telemetry、5 Standalone Solvers、17 Legacy/Prototypes、9 Inits；

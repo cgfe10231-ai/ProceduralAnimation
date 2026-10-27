@@ -65,6 +65,7 @@ class SurfaceQueryResult:
     success: bool                       # True if a valid surface was found within range
     ray_hit_distance: Optional[float] = None  # Non-negative Euclidean hit distance along ray; None if point query
     error_reason: Optional[str] = None
+    source_type: str = "analytical"           # "mesh" | "analytical" | "default" | "none"
 
 
 # =============================================================================
@@ -398,13 +399,40 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
         self,
         ground_z: float = 0.0,
         surfaces: Optional[Sequence[OrientedSurface]] = None,
+        mesh_adapter: Optional[Any] = None,
+        prefer_mesh: bool = False,
     ) -> None:
         super().__init__(ground_z=ground_z)
         self._surfaces: Dict[str, OrientedSurface] = {}
+        self._mesh_adapter = mesh_adapter
+        self._prefer_mesh = bool(prefer_mesh and mesh_adapter is not None)
 
         if surfaces:
             for s in surfaces:
                 self.register_surface(s)
+
+    def set_mesh_adapter(self, adapter: Any, prefer_mesh: bool = True) -> None:
+        """Attach a Blender mesh environment adapter and optionally prioritize mesh over analytical."""
+        self._mesh_adapter = adapter
+        self._prefer_mesh = bool(prefer_mesh and adapter is not None)
+
+    @property
+    def mesh_adapter(self) -> Optional[Any]:
+        """Return attached mesh environment adapter (if any)."""
+        return self._mesh_adapter
+
+    @property
+    def prefer_mesh(self) -> bool:
+        """Return True if mesh geometry is preferred over analytical surfaces."""
+        return self._prefer_mesh
+
+    @prefer_mesh.setter
+    def prefer_mesh(self, val: bool) -> None:
+        self._prefer_mesh = bool(val and self._mesh_adapter is not None)
+
+    def has_mesh_adapter(self) -> bool:
+        """Return True if an evaluated mesh adapter is attached."""
+        return self._mesh_adapter is not None
 
     def register_surface(self, surface: OrientedSurface) -> None:
         """Register an analytical environmental surface patch."""
@@ -425,9 +453,16 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
     def ground_height_at(self, x: float, y: float) -> float:
         """Return highest walkable surface Z elevation at World (x, y).
 
-        If (x, y) falls on a stair, ramp, or platform, returns its exact elevation.
-        Otherwise falls back to default base ground_z (0.0m).
+        If mesh adapter is active, queries evaluated scene mesh.
+        Otherwise evaluates analytical surface patches.
+        Falls back to default base ground_z (0.0m) if no elevated surface hit.
         """
+        if self._prefer_mesh and self._mesh_adapter is not None:
+            mesh_z = self._mesh_adapter.ground_height_at(x, y)
+            if mesh_z is not None:
+                return float(mesh_z)
+            return self.ground_z
+
         best_z = self.ground_z
 
         for s in self._surfaces.values():
@@ -444,6 +479,12 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
 
         Returns normal of highest walkable surface at (x, y), or (0, 0, 1) if base ground.
         """
+        if self._prefer_mesh and self._mesh_adapter is not None:
+            mesh_n = self._mesh_adapter.surface_normal_at(x, y)
+            if mesh_n is not None:
+                return mesh_n
+            return (0.0, 0.0, 1.0)
+
         best_z = self.ground_z
         best_normal = (0.0, 0.0, 1.0)
 
@@ -456,6 +497,30 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
                 best_normal = s.normal
 
         return best_normal
+
+    def ray_ground_elevation(
+        self,
+        x: float,
+        y: float,
+        start_z: float = 50.0,
+        max_fall: float = 100.0,
+    ) -> Optional[float]:
+        """Strict ground query returning exact Z if hit, or None on miss.
+
+        Guarantees that empty gaps, cliffs, or off-mesh locations do NOT return a fake ground_z.
+        """
+        if self._prefer_mesh and self._mesh_adapter is not None:
+            return self._mesh_adapter.ground_height_at(x, y, start_z=start_z, max_fall=max_fall)
+
+        best_z: Optional[float] = None
+        for s in self._surfaces.values():
+            if not s.allows_regular_support:
+                continue
+            z = s.elevation_at_xy(x, y)
+            if z is not None:
+                if best_z is None or z > best_z:
+                    best_z = z
+        return best_z
 
     # -------------------------------------------------------------------------
     # Full 3D Spatial & Wall Queries
@@ -479,6 +544,13 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
         Returns:
             SurfaceQueryResult with contact point, normal, signed distance, and friction.
         """
+        if self._prefer_mesh and self._mesh_adapter is not None:
+            return self._mesh_adapter.query_surface_at_point(
+                point_world=point_world,
+                max_distance=max_distance,
+                surface_type_filter=surface_type_filter,
+            )
+
         px, py, pz = point_world
 
         best_surface_id: Optional[str] = None
@@ -581,6 +653,14 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
             - `ray_hit_distance` is the non-negative Euclidean distance traveled along the ray
               to hit the surface (None if not a directional ray query).
         """
+        if self._prefer_mesh and self._mesh_adapter is not None:
+            return self._mesh_adapter.query_spatial_surface(
+                point_world=point_world,
+                ray_direction=ray_direction,
+                max_distance=max_distance,
+                surface_type_filter=surface_type_filter,
+            )
+
         if ray_direction is None:
             # Point query: nearest surface (excluding default horizontal ground if no filter given)
             px, py, pz = point_world

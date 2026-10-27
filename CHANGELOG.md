@@ -3,6 +3,44 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-27] Environment Gate 01: 真实 Blender Mesh 环境查询接入与数据真实性门禁 (Real Blender Mesh Environment Query Access & Data Authenticity Gate)
+
+### 核心功能与适配器架构 (`src/scene/blender_mesh_query_adapter.py`, `src/scene/environment_query.py`)
+* **真实 Blender Mesh 物理事实来源确立**：
+  - 实现 `BlenderMeshEnvironmentAdapter`，基于 Blender 原生 `mathutils.bvhtree.BVHTree.FromPolygons` 构建世界空间 BVH；
+  - 严格保持 `src/scene/environment_query.py` 纯 Python 无 `bpy` 依赖，解耦宿主环境与数学内核；
+  - 在 `SurfaceQueryResult` 契约中扩展 `source_type: str`（`"mesh"` / `"analytical"` / `"none"`），实现几何数据来源可追溯；
+  - 严禁隐式伪造高程：射线未命中或点查询超出范围时，严格返回 `success=False`，绝不凭空捏造 $Z=0.0\text{ m}$ 平地。
+* **世界空间几何变换与法向严密重构**：
+  - 提取物体的世界矩阵变换顶点（$V_w = M_w \cdot v$），天然规避非等比缩放引起的法向量失真；
+  - 通过世界三角形三顶点叉积计算严格单位法向量，杜绝物体旋转后法向量未更新的隐患；
+  - 动态缓存失效与增量重建机制：监控物体矩阵、顶点总数与包围盒哈希指纹，任何位移、旋转、缩放或顶点编辑均触发自动刷新。
+* **3D 表面几何类型与支撑面分类**：
+  - 建立倾角阈值分类规则：水平地面（$N_z \ge 0.99$）、斜坡（$0.15 \le N_z < 0.99$）、垂直立面（$|N_z| < 0.15$）；
+  - 斜率倾角 $> 60^\circ$（$N_z < 0.50$）强制标定为不可支撑面（`allows_regular_support = False`）；
+  - 摩擦系数分类元数据：优先读取物体自定义属性 `custom_friction`，缺省时根据几何形态分配物理标准摩擦系数。
+
+### 缺陷实证与隔离建议案
+* **KinematicBridge 接触高程硬编码缺陷实证 (`tests/test_contact_elevation_gap_repro.py`)**：
+  - 独立实证 `src/motion/kinematic_bridge.py:404` 将足端接触点强制压平至 $Z=0.0\text{ m}$，导致高架台（$Z=1.3397\text{ m}$）上产生 $1.3397\text{ m}$ 接触高程误差；
+  - 独立实证第 388-394 行硬编码单水平基准面 `EnvironmentalSurface` 的环境开环缺陷。
+* **最小改动建议案编纂 (`docs/proposals/CONTACT_CHAIN_BRIDGE_ELEVATION_GAP.md`)**：
+  - 编制严密工程建议案，提出向 `KinematicBridgeExecutor` 注入 `environment_query` 的单点改动方案与向前兼容防护，供后续门禁报批，本门禁零修改人体控制代码。
+* **规范文档编纂 (`docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md`)**：
+  - 编纂完整 BVH 空间查询语义、缓存规则、数据契约与双源决议机制。
+
+### 自动化测试与工程门禁验证
+* `tests/test_mesh_environment_query.py`：**8 / 8 PASS**（覆盖 14 项严格验收标准，耗时 2.16s）；
+* `tests/test_contact_elevation_gap_repro.py`：**PASS**（耗时 1.91s）；
+* `tests/run_test_suite.py --tier quick`：**13 / 13 PASS**（耗时 16.61s）；
+* `tests/run_test_suite.py --tier physics`：**19 / 19 PASS**（耗时 77.57s）；
+* `tests/audit_c2_final_inspector.py --verify-docs`：**PASS**（Exit Code 0，引用符号 100% 存在）；
+* 受保护场景资产检查：`git diff output/` 0 差异；
+* 最终状态裁定：`ENVIRONMENT GATE 01 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。
+
+---
+
+
 ## [2026-10-27] 架构基线审计与 7A→7B 准入门禁 (Architecture Baseline Audit — 7A→7B Admission Gate)
 
 ### 全景架构基线审计文档体系编纂 (`docs/audit/`)

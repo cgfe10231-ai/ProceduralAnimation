@@ -257,6 +257,24 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Verifies frame-by-frame physics and object telemetry coherence, contact force fidelity, anti-spoofing divergence, contact sheet, and validation report existence.",
     ),
+    "mesh_environment_query": TestDefinition(
+        test_id="mesh_environment_query",
+        name="Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity",
+        script_path="tests/test_mesh_environment_query.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        description="Comprehensive 14-point regression verifying BlenderMeshEnvironmentAdapter, BVHTree spatial queries, dynamic mesh mutations, support classification, and friction metadata.",
+    ),
+    "contact_elevation_gap_repro": TestDefinition(
+        test_id="contact_elevation_gap_repro",
+        name="Environment Gate 01 Defect Reproduction: KinematicBridge Elevation Gap",
+        script_path="tests/test_contact_elevation_gap_repro.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        description="Demonstrates and verifies the stance contact Z=0.0 flattening defect in KinematicBridge line 404.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 3: Locomotion Actions & Unified Motion Integration

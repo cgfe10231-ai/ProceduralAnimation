@@ -1191,3 +1191,35 @@
 * **影响**：
   - 为后续 Phase 7B 动态平衡与 Phase 7C 接触力学闭环提供了无可争议的单一事实基线（SSOT）；
   - 彻底消除了基于过时文档或心理推测推进开发的漂移风险。
+
+---
+
+### [DEC-053] 2026-10-27: Environment Gate 01: 真实 Blender Mesh 环境查询接入与数据真实性门禁
+
+* **状态**：已采纳并完成 (Accepted & Completed)
+* **日期**：2026-10-27
+* **背景**：在 7A $\to$ 7B 架构审计中查明：既有 `DynamicsEnvironmentQuery` 采用解析表面（`OrientedSurface`）计算高程与法向，运行时并未真正查询 Blender 场景内的真实 Mesh。这导致场景中的实际网格发生位移、旋转、形变或拓扑删除时，环境查询依然返回静态解析解，违背了“物理世界几何真实性”原则。同时，`KinematicBridgeExecutor:404` 存在足端锁定接触硬编码 $Z=0.0\text{ m}$ 的缺陷。在启动 Phase 7B 之前，必须接入真实 Blender Mesh 查询门禁，同时不得重写人体控制系统、不得开发导航、不得引入主动动力学补偿。
+* **决策与方案**：
+  1. **双层几何权威来源与来源标记机制**：
+     - 确立 Blender 运行时**真实 Mesh 为几何物理权威来源**；解析表面保留为无 Blender 依赖纯 Python 单元测试与历史退化兜底；
+     - 在 `SurfaceQueryResult` 中扩展 `source_type: str`（`"mesh"` / `"analytical"` / `"none"`），严禁混用无标记的几何解；
+     - 射线未命中或点查询超出范围时，严格返回 `success=False`，严禁隐式伪造 $Z=0.0\text{ m}$ 地面。
+  2. **宿主解耦适配器架构 (`BlenderMeshEnvironmentAdapter`)**：
+     - 在宿主层新建 `src/scene/blender_mesh_query_adapter.py`，保持 `src/scene/environment_query.py` 纯 Python 无 `bpy` 依赖；
+     - 采用 Blender 原生 `mathutils.bvhtree.BVHTree.FromPolygons`，在世界坐标系空间（$V_w = M_w \cdot v$）构建 BVH，天然规避非等比缩放引起的法向量畸变；
+     - 实时法向量重构：通过世界三角形三顶点叉积计算严格单位法向量；
+     - 动态缓存失效机制：记录物体变换矩阵、顶点数与包围盒指纹，检测到物体平移、旋转、缩放或顶点变动时自动触发增量/全量 BVH 重建。
+  3. **3D 表面分类与有效支撑面判据**：
+     - 斜率夹角 $> 60^\circ$（$N_z < 0.50$）严格判定为非支撑面（`allows_regular_support = False`），杜绝垂直立面与陡坡上的非法站立；
+     - 几何类型细分：水平地面（$N_z \ge 0.99$）、斜坡（$0.15 \le N_z < 0.99$）、垂直立面（$|N_z| < 0.15$）、台阶顶面、倒悬天花板；
+     - 摩擦系数元数据隔离：自定义物体属性优先，无配置时按几何类型赋予物理默认摩擦系数。
+  4. **KinematicBridge 接触高程硬编码缺陷隔离与最小改动建议案**：
+     - 编写独立缺陷复现测试 `tests/test_contact_elevation_gap_repro.py`，实证高架台（$Z=1.3397\text{ m}$）上足端接触被强制压平至 $Z=0.0\text{ m}$（误差 $1.3397\text{ m}$）；
+     - 编写完整工程建议案 `docs/proposals/CONTACT_CHAIN_BRIDGE_ELEVATION_GAP.md`，给出单点改动方案与向前兼容防护，供后续门禁报批实施，本门禁不修改任何人体控制代码。
+  5. **14 项严格测试验证与全套件通过**：
+     - 编写 `tests/test_mesh_environment_query.py`，全量覆盖真实训练场网格、动态平移、动态旋转、顶点编辑、物体删除、间隙悬崖脱靶、非支撑立面、摩擦力区分及与 `DynamicsEnvironmentQuery` 无缝接入；
+     - 全套件全绿：`quick` (13/13), `physics` (19/19), `verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动；
+     - 裁定状态：`ENVIRONMENT GATE 01 — AWAITING HUMAN REVIEW`，严禁未经人类指令自动跨入 Phase 7B。
+* **影响**：
+  - 彻底解决了环境感知的真实性与动态性问题，确保后续角色在接触和运动计算中所面对的环境与视口中的 Blender Mesh 100% 绝对一致；
+  - 严格保持了零架构漂移与零历史退化。
