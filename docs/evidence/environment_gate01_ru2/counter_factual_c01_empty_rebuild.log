@@ -1,0 +1,34 @@
+=== COUNTER-FACTUAL VERIFICATION LOG: DEFECT C01 (EMPTY REBUILD LEAK) ===
+TARGET DEFECT: C01 (Repeated rebuilds on empty environment due to _bvh is None)
+MUTATION: Restored legacy refresh condition `if force or self._dirty or self._bvh is None: self.rebuild()`
+
+--- PHASE 1: MUTATED / LEGACY EXECUTION (EXPECTED FAILURE) ---
+EXIT STATUS: FAILURE
+FAILURES COUNT: 1
+test_33_c01_empty_environment_cache_reuse_and_addition (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_33_c01_empty_environment_cache_reuse_and_addition)
+C01: Empty collection builds once into VALID_EMPTY, reuses cache across 100 queries, then updates upon mesh addition. ... FAIL
+
+======================================================================
+FAIL: test_33_c01_empty_environment_cache_reuse_and_addition (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_33_c01_empty_environment_cache_reuse_and_addition)
+C01: Empty collection builds once into VALID_EMPTY, reuses cache across 100 queries, then updates upon mesh addition.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 1325, in test_33_c01_empty_environment_cache_reuse_and_addition
+    self.assertEqual(adapter.rebuild_count, 1, "Cache rebuild count must remain exactly 1 after 100 empty queries")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 201 != 1 : Cache rebuild count must remain exactly 1 after 100 empty queries
+
+----------------------------------------------------------------------
+Ran 1 test in 0.190s
+
+FAILED (failures=1)
+
+--- PHASE 2: PRODUCTION LOGIC RESTORED (EXPECTED PASS) ---
+EXIT STATUS: PASS
+test_33_c01_empty_environment_cache_reuse_and_addition (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_33_c01_empty_environment_cache_reuse_and_addition)
+C01: Empty collection builds once into VALID_EMPTY, reuses cache across 100 queries, then updates upon mesh addition. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.052s
+
+OK

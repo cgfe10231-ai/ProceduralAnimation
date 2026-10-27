@@ -24,16 +24,19 @@ import math
 import os
 import sys
 import unittest
+import unittest.mock
 from typing import List, Optional, Sequence, Tuple
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
 from src.scene.blender_mesh_query_adapter import (
+    AdapterCacheState,
     BlenderMeshEnvironmentAdapter,
     create_mesh_backed_dynamics_query,
 )
@@ -1285,6 +1288,418 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=False,
             expected_error_prefix="NO_HIT:",
         )
+
+    # -------------------------------------------------------------------------
+    # Repair Unit 2 / Defects C01 - C06: BVH Cache Invalidation & Geometry Consistency
+    # -------------------------------------------------------------------------
+
+    def test_33_c01_empty_environment_cache_reuse_and_addition(self):
+        """C01: Empty collection builds once into VALID_EMPTY, reuses cache across 100 queries, then updates upon mesh addition."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C01")
+        bpy.context.scene.collection.children.link(col)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C01",))
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_EMPTY)
+        self.assertEqual(adapter.rebuild_count, 1)
+        self.assertEqual(adapter.cache_version, 1)
+        self.assertFalse(adapter.has_bvh)
+        self.assertTrue(adapter.is_empty)
+        self.assertEqual(adapter.polygon_count, 0)
+        self.assertEqual(adapter.vertex_count, 0)
+
+        # Execute 100 queries against empty environment
+        for i in range(100):
+            res_ray = adapter.ray_cast(origin=(0.0, float(i), 10.0), direction=(0.0, 0.0, -1.0), distance=20.0)
+            self.assertFalse(res_ray.success)
+            self.assertEqual(res_ray.surface_id, "none")
+            self.assertEqual(res_ray.error_reason, "NO_HIT: No evaluated meshes available in environment adapter")
+            self.assertTrue(math.isinf(res_ray.signed_distance))
+
+            res_near = adapter.find_nearest(point_world=(0.0, float(i), 0.0), max_distance=10.0)
+            self.assertFalse(res_near.success)
+            self.assertEqual(res_near.surface_id, "none")
+            self.assertEqual(res_near.error_reason, "NO_HIT: No evaluated meshes available in environment adapter")
+
+        # Crucial verification: zero repeated rebuilds occurred!
+        self.assertEqual(adapter.rebuild_count, 1, "Cache rebuild count must remain exactly 1 after 100 empty queries")
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_EMPTY)
+
+        # Now dynamically add a mesh into the collection
+        bpy.ops.mesh.primitive_plane_add(size=4.0, location=(0.0, 0.0, 3.5))
+        plane = bpy.context.active_object
+        col.objects.link(plane)
+        bpy.context.view_layer.update()
+
+        # Query should detect change, rebuild into VALID_NON_EMPTY, and hit
+        res_after = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0), distance=20.0)
+        self.assertTrue(res_after.success)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertEqual(adapter.cache_version, 2)
+        self.assertTrue(adapter.has_bvh)
+        self.assertFalse(adapter.is_empty)
+        self.assertAlmostEqual(res_after.contact_point_world[2], 3.5, places=3)
+
+    def test_34_c02_object_and_parent_transform_detection(self):
+        """C02: Detect translation, rotation, non-uniform scale, and parent hierarchy transform propagation."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C02")
+        bpy.context.scene.collection.children.link(col)
+
+        # Setup parent object and child mesh
+        parent_empty = bpy.data.objects.new("ParentRigRoot", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = (0.0, 0.0, 2.0)
+
+        bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 0.0))
+        box = bpy.context.active_object
+        box.name = "ChildBox"
+        box.parent = parent_empty
+        col.objects.link(box)
+        bpy.context.view_layer.update()
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C02",))
+        # Initial top: parent Z=2.0 + box half-size 1.0 = 3.0m
+        res_init = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_init.success)
+        self.assertAlmostEqual(res_init.contact_point_world[2], 3.0, places=3)
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # 1. Non-uniform scale: scale box in Z by 2.0 -> half-size becomes 2.0 -> top becomes 2.0 + 2.0 = 4.0m
+        box.scale.z = 2.0
+        bpy.context.view_layer.update()
+        res_scale = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_scale.success)
+        self.assertAlmostEqual(res_scale.contact_point_world[2], 4.0, places=3)
+        self.assertEqual(adapter.rebuild_count, 2)
+
+        # 2. Rotation: rotate box 45 degrees around Y-axis
+        box.rotation_euler.y = math.radians(45.0)
+        bpy.context.view_layer.update()
+        res_rot = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_rot.success)
+        self.assertEqual(adapter.rebuild_count, 3)
+        # Normal should be tilted
+        self.assertAlmostEqual(abs(res_rot.surface_normal_world[0]), math.sin(math.radians(45.0)), places=2)
+
+        # 3. Parent-child hierarchy propagation: move parent empty from Z=2.0 to Z=6.0
+        parent_empty.location.z = 6.0
+        bpy.context.view_layer.update()
+        res_parent = adapter.ray_cast(origin=(0.0, 0.0, 20.0), direction=(0.0, 0.0, -1.0), distance=25.0)
+        self.assertTrue(res_parent.success)
+        self.assertEqual(adapter.rebuild_count, 4)
+        # Top of box must have shifted upward by 4.0m
+        self.assertGreater(res_parent.contact_point_world[2], 6.0)
+
+    def test_35_c03_1_vertex_coordinate_movement(self):
+        """C03-1: Path A automatic detection of vertex coordinate movements without calling invalidate()."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C03_1")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=4.0, location=(0.0, 0.0, 1.0))
+        plane = bpy.context.active_object
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C03_1",))
+        res_init = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertAlmostEqual(res_init.contact_point_world[2], 1.0, places=3)
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # Path A: Edit vertex coordinates directly in memory WITHOUT calling adapter.invalidate()
+        for v in plane.data.vertices:
+            v.co.z += 1.25
+        plane.data.update()
+        bpy.context.view_layer.update()
+
+        # Direct query automatically detects vert_hash change and rebuilds
+        res_auto = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_auto.success)
+        self.assertEqual(adapter.rebuild_count, 2, "Automatic change detection must trigger rebuild")
+        self.assertAlmostEqual(res_auto.contact_point_world[2], 2.25, places=3)
+
+    def test_36_c03_2_topology_addition(self):
+        """C03-2: Path A automatic detection of added polygon faces."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C03_2")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        plane = bpy.context.active_object
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C03_2",))
+        # Point at (5.0, 5.0) currently has no mesh
+        res_before = adapter.ray_cast(origin=(5.0, 5.0, 10.0), direction=(0.0, 0.0, -1.0))
+        self.assertFalse(res_before.success)
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # Add a new face at (5, 5) via bmesh
+        bm = bmesh.new()
+        bm.from_mesh(plane.data)
+        v1 = bm.verts.new((4.0, 4.0, 2.0))
+        v2 = bm.verts.new((6.0, 4.0, 2.0))
+        v3 = bm.verts.new((6.0, 6.0, 2.0))
+        v4 = bm.verts.new((4.0, 6.0, 2.0))
+        bm.faces.new((v1, v2, v3, v4))
+        bm.to_mesh(plane.data)
+        bm.free()
+        plane.data.update()
+        bpy.context.view_layer.update()
+
+        # Query at (5.0, 5.0) now hits the newly added polygon
+        res_after = adapter.ray_cast(origin=(5.0, 5.0, 10.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_after.success)
+        self.assertEqual(adapter.rebuild_count, 2)
+        # Local Z=2.0 + object translation Z=1.0 = 3.0m
+        self.assertAlmostEqual(res_after.contact_point_world[2], 3.0, places=3)
+
+    def test_37_c03_3_geometry_deletion(self):
+        """C03-3: Path A automatic detection of deleted polygon faces returning miss."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C03_3")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        plane = bpy.context.active_object
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C03_3",))
+        res_before = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_before.success)
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # Delete the face from mesh
+        bm = bmesh.new()
+        bm.from_mesh(plane.data)
+        bm.faces.ensure_lookup_table()
+        bm.faces.remove(bm.faces[0])
+        bm.to_mesh(plane.data)
+        bm.free()
+        plane.data.update()
+        bpy.context.view_layer.update()
+
+        res_after = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertFalse(res_after.success)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_EMPTY)
+
+    def test_38_c03_4_same_vertex_count_modification(self):
+        """C03-4: Detect coordinate change when vertex and polygon counts remain strictly identical."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C03_4")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        plane = bpy.context.active_object
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C03_4",))
+        self.assertEqual(adapter.rebuild_count, 1)
+        v_count_init = adapter.vertex_count
+        p_count_init = adapter.polygon_count
+
+        # Shift all vertex coordinates by +2.0m in Z without changing count
+        for v in plane.data.vertices:
+            v.co.z += 2.0
+        plane.data.update()
+        bpy.context.view_layer.update()
+
+        # Query should detect vert_hash difference
+        res = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res.success)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertEqual(adapter.vertex_count, v_count_init)
+        self.assertEqual(adapter.polygon_count, p_count_init)
+        self.assertAlmostEqual(res.contact_point_world[2], 3.0, places=3)
+
+    def test_39_c03_5_explicit_invalidation_path_b(self):
+        """C03-5: Path B explicit adapter.invalidate() triggers rebuild on subsequent query."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C03_5")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        plane = bpy.context.active_object
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C03_5",))
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # Path B: Explicit invalidation
+        adapter.invalidate()
+        self.assertTrue(adapter.dirty)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.INVALID)
+
+        # Caller does NOT call adapter.rebuild() or refresh(force=True), just issues next regular query
+        res = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res.success)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertFalse(adapter.dirty)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+
+    def test_40_c04_modifier_evaluated_mesh_consistency(self):
+        """C04: Detect modifier additions, property adjustments, viewport toggles, and verify atomic rollback."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C04")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        plane = bpy.context.active_object
+        plane.name = "ModPlane"
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C04",))
+        res_base = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertAlmostEqual(res_base.contact_point_world[2], 1.0, places=3)
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # 1. Add SOLIDIFY modifier
+        mod = plane.modifiers.new(name="Solidify", type="SOLIDIFY")
+        mod.thickness = 0.5
+        mod.offset = 1.0  # extrudes upward
+        bpy.context.view_layer.update()
+
+        res_mod = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_mod.success)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertAlmostEqual(res_mod.contact_point_world[2], 1.5, places=3)
+
+        # 2. Change modifier property (thickness -> 1.0)
+        mod.thickness = 1.0
+        bpy.context.view_layer.update()
+
+        res_mod2 = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_mod2.success)
+        self.assertEqual(adapter.rebuild_count, 3)
+        self.assertAlmostEqual(res_mod2.contact_point_world[2], 2.0, places=3)
+
+        # 3. Viewport visibility toggle: disable modifier in viewport
+        mod.show_viewport = False
+        bpy.context.view_layer.update()
+
+        res_toggled = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_toggled.success)
+        self.assertEqual(adapter.rebuild_count, 4)
+        self.assertAlmostEqual(res_toggled.contact_point_world[2], 1.0, places=3)
+
+        # 4. Remove modifier
+        plane.modifiers.remove(mod)
+        bpy.context.view_layer.update()
+
+        res_removed = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_removed.success)
+        self.assertEqual(adapter.rebuild_count, 5)
+        self.assertAlmostEqual(res_removed.contact_point_world[2], 1.0, places=3)
+
+        # 5. Atomic rollback test: verify exception handling transitions to FAILED
+        with unittest.mock.patch.object(adapter, "_compute_object_snapshot", side_effect=RuntimeError("Simulated depsgraph crash")):
+            adapter.invalidate()
+            with self.assertRaises(RuntimeError):
+                adapter.rebuild()
+            self.assertEqual(adapter.cache_state, AdapterCacheState.FAILED)
+            self.assertTrue(adapter.dirty)
+
+    def test_41_c05_collection_membership_lifecycle(self):
+        """C05: Collection membership lifecycle, isolation of forbidden collection, and rename without BVH rebuild."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col_allowed = bpy.data.collections.new("Col_Allowed")
+        bpy.context.scene.collection.children.link(col_allowed)
+
+        col_forbidden = bpy.data.collections.new("Col_Forbidden")
+        bpy.context.scene.collection.children.link(col_forbidden)
+
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        plane_allowed = bpy.context.active_object
+        plane_allowed.name = "OriginalName"
+        col_allowed.objects.link(plane_allowed)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_Allowed",))
+        self.assertEqual(adapter.rebuild_count, 1)
+
+        # 1. Add object to forbidden collection: must NOT trigger rebuild or affect allowed query
+        bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 10.0))
+        cube_forbidden = bpy.context.active_object
+        cube_forbidden.name = "ForbiddenCube"
+        col_forbidden.objects.link(cube_forbidden)
+        bpy.context.view_layer.update()
+
+        res_check = adapter.ray_cast(origin=(0.0, 0.0, 15.0), direction=(0.0, 0.0, -1.0), distance=20.0)
+        # Hits plane at 1.0, completely ignoring forbidden cube at 10.0
+        self.assertTrue(res_check.success)
+        self.assertAlmostEqual(res_check.contact_point_world[2], 1.0, places=3)
+        self.assertEqual(adapter.rebuild_count, 1, "Forbidden collection modification must not cause rebuild")
+
+        # 2. Object rename without geometric changes:
+        # Renaming must update metadata in-place WITHOUT rebuilding BVH
+        old_uid = plane_allowed.session_uid
+        plane_allowed.name = "RenamedMeshSurface"
+        self.assertEqual(plane_allowed.session_uid, old_uid)
+        bpy.context.view_layer.update()
+
+        res_rename = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_rename.success)
+        self.assertEqual(adapter.rebuild_count, 1, "Object rename without geometric change must reuse BVH with 0 rebuilds")
+        self.assertIn("RenamedMeshSurface", res_rename.surface_id)
+        self.assertEqual(adapter.tracked_objects, ["RenamedMeshSurface"])
+
+        # 3. Add object to allowed collection: triggers rebuild
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(10.0, 10.0, 2.0))
+        plane2 = bpy.context.active_object
+        plane2.name = "SecondAllowed"
+        col_allowed.objects.link(plane2)
+        bpy.context.view_layer.update()
+
+        res_p2 = adapter.ray_cast(origin=(10.0, 10.0, 5.0), direction=(0.0, 0.0, -1.0))
+        self.assertTrue(res_p2.success)
+        self.assertEqual(adapter.rebuild_count, 2)
+        self.assertAlmostEqual(res_p2.contact_point_world[2], 2.0, places=3)
+
+    def test_42_c06_cache_reuse_under_unchanged_scene(self):
+        """C06: Guarantee 300 unchanged queries (100 same ray, 100 diff ray, 100 nearest) execute with rebuild_count=1."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("Col_C06")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_cube_add(size=4.0, location=(0.0, 0.0, 2.0))
+        cube = bpy.context.active_object
+        cube.name = "GroundCube"
+        col.objects.link(cube)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("Col_C06",))
+        self.assertEqual(adapter.rebuild_count, 1)
+        self.assertEqual(adapter.cache_state, AdapterCacheState.VALID_NON_EMPTY)
+
+        # Batch 1: 100 identical ray casts
+        for _ in range(100):
+            res = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0), distance=15.0)
+            self.assertTrue(res.success)
+            self.assertAlmostEqual(res.contact_point_world[2], 4.0, places=3)
+
+        # Batch 2: 100 different ray casts across different origins and directions
+        for i in range(100):
+            ox = (i % 10 - 5) * 0.2
+            oy = (i // 10 - 5) * 0.2
+            res = adapter.ray_cast(origin=(ox, oy, 8.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+            self.assertTrue(res.success)
+            self.assertAlmostEqual(res.contact_point_world[2], 4.0, places=3)
+
+        # Batch 3: 100 find_nearest queries
+        for i in range(100):
+            px = (i % 10 - 5) * 0.1
+            py = (i // 10 - 5) * 0.1
+            res_near = adapter.find_nearest(point_world=(px, py, 6.0), max_distance=5.0)
+            self.assertTrue(res_near.success)
+            self.assertAlmostEqual(res_near.contact_point_world[2], 4.0, places=3)
+
+        # Final invariant verification: rebuild_count must remain exactly 1 after 300 queries!
+        self.assertEqual(
+            adapter.rebuild_count,
+            1,
+            f"Zero rebuilds allowed across 300 queries in unchanged scene; expected 1, got {adapter.rebuild_count}",
+        )
+        self.assertEqual(adapter.cache_version, 1)
 
 
 def run_tests() -> int:

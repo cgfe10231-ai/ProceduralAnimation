@@ -1287,3 +1287,43 @@
 * **影响**：
   - 全面补齐了环境网格查询系统的数值精度验证、边界条件鲁棒性与故障注入可证伪证据链；
   - 维持零历史退化与零架构违规。
+
+---
+
+### [DEC-056] 2026-10-27: Environment Gate 01 — Repair Unit 2: BVH缓存失效、场景几何变更检测与五状态生命周期状态机 (C01-C06)
+
+* **状态**：已采纳并完成 (Accepted & Completed)
+* **日期**：2026-10-27
+* **背景**：在 Environment Gate 01 架构审查中，发现几何查询适配器 `BlenderMeshEnvironmentAdapter` 存在 6 项底层缓存与一致性缺陷（C01 至 C06）：
+  1. **C01 (空环境重复重建泄漏)**：旧逻辑以 `_bvh is None` 作为缓存无效判定条件。空集合场景无 Mesh 时 `_bvh` 恒为 `None`，导致后续每次查询均触发 `rebuild()`，100 次空查询产生 100 次冗余重建；
+  2. **C02 (几何变换检测盲区)**：旧逻辑仅核验世界位移差异，忽略了旋转、非均匀缩放以及父子层级变换传播；
+  3. **C03 (顶点坐标与拓扑修改脱靶)**：内存中直接编辑顶点坐标（`v.co`）或拓扑增删面时，旧逻辑无法自动感知，导致 BVH 空间树陈旧；
+  4. **C04 (修改器与求值网格一致性)**：未追踪修改器增删、参数变动及视口可见性切换，缺少异常安全回滚与求值网格释放机制；
+  5. **C05 (集合成员增删与重命名失效)**：仅凭名称列表遍历，集合新增对象无法被检出；对象重命名会破坏追踪或触发不必要的重建；
+  6. **C06 (未变场景无意义重复重建)**：未提供不变场景下严格复用缓存且重建次数恒为 1 的测试保障。
+* **决策与方案**：
+  1. **显式五状态生命周期状态机 (`AdapterCacheState`)**：
+     - 定义 `INVALID`、`VALID_EMPTY`、`VALID_NON_EMPTY`、`REBUILDING`、`FAILED` 五类状态，彻底废除仅依赖 `_bvh is None` 的模糊判定；
+     - 空集合构建后安全转入 `VALID_EMPTY`，在 100 次查询中严格保持 0 次重建，返回 `success=False`（附 `NO_HIT:` 理由），绝不伪造 $Z=0.0\text{m}$ 虚假地面；当新网格加入集合后自动转入 `VALID_NON_EMPTY`。
+  2. **双通道失效检测体系 (Path A 自动感知 vs Path B 显式声明)**：
+     - **Path A (自动检测)**：每次查询调用 `refresh()` 时执行 `_check_scene_changed()`：
+       * 矩阵 16 元素严格比对（容差 $10^{-6}$），全面覆盖位移、旋转、非均匀缩放与父子物体层级变换传播；
+       * 极速内存缓冲区哈希（`array.array('f', ...)` + `foreach_get('co', ...)`），$0.04\text{ ms}$ 内精准捕获毫米级顶点移动；
+       * 循环索引哈希（`foreach_get('vertex_index', ...)`），精准捕获多边形拓扑增删与翻转；
+       * 动态 RNA 属性扫描，精准捕获任意修改器（Solidify, Displace 等）参数、增删及 `show_viewport` 切换；
+       * 基于 `obj.session_uid` 追踪集合成员变动，新增或删除对象即刻触发重建；
+       * **原地重命名零重建优化**：当对象仅改名而几何未变时，就地更新元数据名称与 Surface ID，**BVH 重建次数为 0**。
+     - **Path B (显式失效)**：调用 `adapter.invalidate()` 标记 `_dirty = True` 及 `INVALID` 状态，后续首次常规查询自动触发原子重建，调用方无需显式调用 `rebuild()`。
+  3. **原子提交与异常安全回滚**：
+     - 新顶点、多边形、元数据在局部变量中全量就绪后原子提交；
+     - 求值网格在 `finally:` 中统一通过 `eval_obj.to_mesh_clear()` 清理，杜绝内存泄漏；
+     - 发生异常时回滚至 `FAILED` 状态并保留 `dirty=True`，绝不暴露半提交脏数据。
+  4. **全量 42 项测试与反事实实证归档**：
+     - 新增 Unit 2 专用测试 `test_33` 至 `test_42`，42 项测试全绿通过（42/42 PASS in 2.13s）；
+     - 编写反事实测试生成器 `tests/run_counter_factual_ru2.py`，在真实环境执行并归档 C01, C03, C05 三项反事实变异失败与生产恢复通过日志至 `docs/evidence/environment_gate01_ru2/`；
+     - 编写结构化总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`；
+     - 全量分级测试通过：`quick` (13/13), `physics` (19/19), `motion` (8/8), `full` (30/30)；
+     - 符号审计 `audit_c2_final_inspector.py --verify-docs` 0 错误；`output/` 历史资产 0 字节变动。
+* **影响**：
+  - 彻底解决了环境查询适配器在动态场景下的几何一致性与缓存失效难题，实现了高性能（未变场景 300 次查询 0 重建）与高保真（任意几何/层级/修改器变动自动同步）的统一；
+  - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。

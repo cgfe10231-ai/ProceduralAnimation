@@ -1,0 +1,34 @@
+=== COUNTER-FACTUAL VERIFICATION LOG: DEFECT C05 (STALE COLLECTION MEMBERSHIP) ===
+TARGET DEFECT: C05 (Failure to detect new objects added to target collection)
+MUTATION: Removed session_uid set comparison, iterating only historical _tracked_objects
+
+--- PHASE 1: MUTATED / LEGACY EXECUTION (EXPECTED FAILURE) ---
+EXIT STATUS: FAILURE
+FAILURES COUNT: 1
+test_41_c05_collection_membership_lifecycle (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_41_c05_collection_membership_lifecycle)
+C05: Collection membership lifecycle, isolation of forbidden collection, and rename without BVH rebuild. ... FAIL
+
+======================================================================
+FAIL: test_41_c05_collection_membership_lifecycle (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_41_c05_collection_membership_lifecycle)
+C05: Collection membership lifecycle, isolation of forbidden collection, and rename without BVH rebuild.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 1643, in test_41_c05_collection_membership_lifecycle
+    self.assertEqual(adapter.rebuild_count, 1, "Object rename without geometric change must reuse BVH with 0 rebuilds")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 1 : Object rename without geometric change must reuse BVH with 0 rebuilds
+
+----------------------------------------------------------------------
+Ran 1 test in 0.053s
+
+FAILED (failures=1)
+
+--- PHASE 2: PRODUCTION LOGIC RESTORED (EXPECTED PASS) ---
+EXIT STATUS: PASS
+test_41_c05_collection_membership_lifecycle (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_41_c05_collection_membership_lifecycle)
+C05: Collection membership lifecycle, isolation of forbidden collection, and rename without BVH rebuild. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.050s
+
+OK

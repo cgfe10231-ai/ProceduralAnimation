@@ -159,3 +159,48 @@ When a query returns `success=False`, `error_reason` explicitly distinguishes be
 
 Evidence artifacts, coverage matrices, and real fault injection execution logs are preserved in [`docs/evidence/environment_gate01_ru1/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/).
 
+---
+
+## 7. BVH Cache Invalidation, Geometry Consistency & Lifecycle State Machine (Repair Unit 2)
+
+Following the audit of Environment Gate 01, six critical cache invalidation and geometry consistency defects (C01 through C06) were resolved under Repair Unit 2:
+
+### 7.1 Five-State Cache Lifecycle (`AdapterCacheState`)
+Legacy implementations relied exclusively on `_bvh is None` as an implicit cache dirty check, which broke down in empty environments (causing repeated rebuilds on every query). Repair Unit 2 introduces an explicit state machine:
+
+| Cache State | Description | Invariants & Guarantees |
+|---|---|---|
+| `INVALID` | Uninitialized or explicitly marked dirty via `invalidate()` | Forces rebuild on next spatial or ray query (Path B) |
+| `VALID_EMPTY` | Evaluated collection confirmed to contain 0 meshes or 0 polygons | `has_bvh=False`, `is_empty=True`, `polygon_count=0`. Reused across queries with **0 rebuilds**; returns `success=False` without fabricating ground |
+| `VALID_NON_EMPTY` | Evaluated geometry compiled into world-space `BVHTree` | `has_bvh=True`, `is_empty=False`, `polygon_count>0`. Reused across unchanged queries |
+| `REBUILDING` | Active transient state during `rebuild()` execution | Guards against reentrant evaluation calls |
+| `FAILED` | Exception occurred during depsgraph evaluation or BVH build | Rollback state; prevents publishing partial/corrupted geometry; sets `dirty=True` |
+
+### 7.2 Dual Invalidation Paths (Path A vs Path B)
+1. **Path A: Automatic Scene Change Detection (`_check_scene_changed()`)**:
+   Evaluated automatically on every spatial query (`refresh()`). Inspects:
+   * **Transformation Matrices**: Compares all 16 elements of `matrix_world` with $|\Delta| > 10^{-6}$. Accurately detects translation, rotation, non-uniform scale, and parent-child hierarchy transform propagation.
+   * **Raw Geometry Coordinates**: Computes fast memory buffer hash (`array.array('f', ...)` + `foreach_get('co', ...)`) of raw vertex coordinates in $0.04\text{ ms}$, detecting sub-millimeter coordinate edits.
+   * **Loop Topology**: Computes buffer hash of polygon loop vertex indices (`foreach_get('vertex_index', ...)`), detecting face additions, face deletions, and edge flips.
+   * **Modifier State**: Inspects RNA properties of all modifiers, tracking parameter changes (e.g. solidify thickness, displace strength), modifier additions, deletions, and `show_viewport` toggles.
+   * **Collection Membership**: Tracks object identities via `obj.session_uid` sets, detecting objects linked, unlinked, or deleted in target collections.
+   * **In-Place Rename Optimization**: When an object is renamed without geometric or transform changes, `session_uid` matches the snapshot. The adapter updates `_poly_metadata` object names and surface IDs in-place with **zero BVH rebuilds** (`rebuild_count` unchanged).
+2. **Path B: Explicit Invalidation (`adapter.invalidate()`)**:
+   External callers trigger invalidation via `adapter.invalidate()`. The adapter sets `_dirty = True` and transitions to `AdapterCacheState.INVALID`. The caller is **not** required to call `rebuild()`; the very next regular query automatically detects dirty state, rebuilds BVH atomically, and returns fresh results.
+
+### 7.3 Atomic Commit & Exception Safety
+- All new vertices, polygons, metadata, and snapshots are staged in local variables before compiling the BVH.
+- Evaluated mesh copies (`obj.evaluated_get(depsgraph).to_mesh()`) are tracked in an `eval_objs_to_clear` list and released in `finally:` via `eval_obj.to_mesh_clear()`, eliminating Blender memory leaks.
+- If depsgraph evaluation or BVH construction fails, the adapter transitions to `AdapterCacheState.FAILED`, rolls back, and re-raises the exception without publishing partial state.
+
+### 7.4 Verification & Counter-Factual Evidence
+Unit 2 test cases (`test_33` through `test_42` in [`tests/test_mesh_environment_query.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_mesh_environment_query.py)) verify:
+- **C01**: 100 queries against empty environment execute with `rebuild_count = 1`.
+- **C02**: Translation, rotation, non-uniform scale, and parent hierarchy propagation trigger rebuilds.
+- **C03**: Vertex moves (Path A), topology additions, geometry deletions, and `invalidate()` (Path B).
+- **C04**: Modifier additions, parameter adjustments, viewport toggles, and atomic rollback.
+- **C05**: Collection membership changes and in-place rename without BVH rebuild.
+- **C06**: 300 unchanged queries (100 same ray, 100 diff ray, 100 nearest) execute with `rebuild_count = 1`.
+
+Evidence logs and boundary reports are preserved in [`docs/evidence/environment_gate01_ru2/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru2/).
+

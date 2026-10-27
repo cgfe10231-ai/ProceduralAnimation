@@ -5,38 +5,43 @@
 ---
 
 ## 1. 当前目标与当前状态
-**当前任务**：Environment Gate 01 — Repair Unit 1 Final Acceptance: 数值覆盖提升、独立数学验证、真实故障注入证据链与射线边界闭环 (Final Acceptance & Evidence Closure)。  
-**当前状态**：`ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`（严格停止等待人类审批，严禁自动进入 Repair Unit 2 或 Phase 7B）。
+**当前任务**：Environment Gate 01 — Repair Unit 2: BVH Cache Invalidation, Scene Geometry Consistency & Lifecycle State Machine (Defects C01-C06)。  
+**当前状态**：`ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`（严格停止等待人类审批，严禁自动进入 Repair Unit 3 或 Phase 7B）。
 
 ### 本任务核心产出与成果
-1. **全 8 字段物理契约断言升级与独立解析验证 (T01)**：
-   - 升级 `_assert_surface_contract()`：核验完整 3D 接触点、3D 法向量（单位长度误差 $< 10^{-5}$）、独立欧几里得射线距离与方向夹角对齐、独立带符号距离二次验证，以及 `allowed_objects` 表面所属权校验；
-   - 升级历史测试 09 至 23 全量接入完整三维向量核验；
-   - 新增 `test_24_non_axis_aligned_rotated_scene`：采用中心 $(3.0, 4.0, 2.0)$、欧拉角 $(30^\circ, 45^\circ, 0^\circ)$ 的非轴对齐斜面，查询点位于 $(3.5, 4.2, 5.0)$，对齐独立解析公式与 Blender C-BVHTree 计算结果（误差 $< 10^{-5}$）；
-   - 生成覆盖 32 个测试的完整测试覆盖矩阵 [`docs/evidence/environment_gate01_ru1/test_coverage_matrix.md`](docs/evidence/environment_gate01_ru1/test_coverage_matrix.md)。
-2. **真实故障注入实证产物与独立日志归档 (T02)**：
-   - 在白名单目录 [`docs/evidence/environment_gate01_ru1/`](docs/evidence/environment_gate01_ru1/) 真实运行 Blender 5.1.1 Headless 生成三个独立故障注入日志：
-     * `fault_injection_a03.log` (Exit code 1, `Surface_Forbidden` 越界捕获)
-     * `fault_injection_a01.log` (Exit code 1, `Box_Front` 提前阻断捕获)
-     * `fault_injection_a02.log` (Exit code 1, `Box_Near` 筛选短路捕获)
-   - 编写结构化总结报告 [`fault_injection_summary.md`](docs/evidence/environment_gate01_ru1/fault_injection_summary.md)，详述代码变异、命令、退出码及生产恢复通过记录。
-3. **射线迭代机制优化与 8 项极端边界检验 (T03)**：
-   - 优化 `BlenderMeshEnvironmentAdapter.ray_cast()`：默认步进推进设为 `step_epsilon = 1e-6`（$1\mu m$），支持动态自适应缩放（防止数值同面重复判定），并暴露 `max_steps` 与 `step_epsilon`；
-   - 失败原因严格标准化：`SEARCH_LIMIT_REACHED:` vs `NO_HIT:`；
-   - 新增 8 项极端边界测试（`test_25` 至 `test_32`）：单表面、三层多表面过滤、跨过滤缓存复用、`max_steps=5` 恰好命中、`max_steps=4` 预算耗尽、超薄 $50\mu m$ 障碍穿透、表面边界起点穿透、以及距离阈值 $6.0001\text{m}$ vs $5.9990\text{m}$ 临界区分；
-   - 编写射线迭代与边界报告 [`ray_iteration_boundary_report.md`](docs/evidence/environment_gate01_ru1/ray_iteration_boundary_report.md)。
-4. **分层回归测试与规范文档更新**：
-   - 更新规范文档 [`docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md`](docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md)；
-   - `mesh_environment_query`：**32 / 32 PASS** (1.74s)；
-   - `tests/run_test_suite.py --tier quick`：**13 / 13 PASS** (18.74s)；
-   - `tests/run_test_suite.py --tier physics`：**19 / 19 PASS** (82.39s)；
-   - `tests/run_test_suite.py --tier motion`：**8 / 8 PASS** (23.18s)；
-   - `tests/run_test_suite.py --tier full`：**30 / 30 PASS** (107.94s)；
+1. **显式五状态生命周期状态机与空环境复用 (C01)**：
+   - 实现 `AdapterCacheState`：`INVALID`, `VALID_EMPTY`, `VALID_NON_EMPTY`, `REBUILDING`, `FAILED`；
+   - 彻底解决空集合重复触发 `rebuild()` 的泄漏问题：100 次空环境查询中 `rebuild_count` 恒为 1（0 次冗余重建），返回 `success=False` 与 `NO_HIT:` 理由，绝不制造 $Z=0.0\text{m}$ 虚假地面；
+   - 暴露只读遥测属性：`cache_state`, `rebuild_count`, `cache_version`, `is_empty`, `has_bvh`, `dirty`, `is_dirty`。
+2. **双通道几何与环境失效检测体系 (Path A vs Path B)**：
+   - **Path A (自动检测)**：每次查询调用 `refresh()` 时执行 `_check_scene_changed()`：
+     * 矩阵 16 元素比对（容差 $10^{-6}$），精准感知位移、旋转、非均匀缩放与父子物体层级变换传播（C02）；
+     * 极速内存缓冲区哈希（`array.array('f', ...)` + `foreach_get('co', ...)`, $<0.05\text{ms}$），精准捕获毫米级顶点移动（C03）；
+     * 循环索引哈希（`foreach_get('vertex_index', ...)`, $<0.02\text{ms}$），精准捕获多边形拓扑增删与翻转（C03）；
+     * 动态 RNA 属性扫描，精准捕获任意修改器（Solidify, Displace 等）参数调整、增删及 `show_viewport` 切换（C04）；
+     * 基于 `obj.session_uid` 追踪集合成员变动，新增或删除对象即刻触发重建（C05）；
+     * **原地重命名零重建优化**：当对象仅改名而几何未变时，就地更新元数据名称与 Surface ID，**BVH 重建次数为 0**（C05）。
+   - **Path B (显式失效)**：调用 `adapter.invalidate()` 标记 `_dirty = True` 及 `INVALID` 状态，后续首次常规查询自动触发原子重建，调用方无需显式调用 `rebuild()`（C03）。
+3. **原子提交、求值网格释放与异常安全回滚 (C04)**：
+   - 提取数据与生成快照暂存于局部内存，BVH 构建成功后原子提交；
+   - 求值网格在 `finally:` 中统一通过 `eval_obj.to_mesh_clear()` 清理，杜绝内存泄漏；
+   - 构建异常时回滚至 `FAILED` 状态并保留 `dirty=True`，绝不暴露脏数据。
+4. **不变场景高复用保证 (C06)**：
+   - 300 次查询（100次同向射线、100次异向射线、100次最近点搜索）重建次数恒为 1（0 次重建）。
+5. **测试套件扩充与全量回归**：
+   - 新增 Unit 2 专用用例 `test_33` 至 `test_42`，42 项测试全绿通过（42/42 PASS in 2.13s）；
+   - 编写受控变异生成脚本 `tests/run_counter_factual_ru2.py`，真实运行归档 C01, C03, C05 三项反事实变异失败与生产恢复通过日志至 `docs/evidence/environment_gate01_ru2/`；
+   - 编纂反事实总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`；
+   - `tests/run_test_suite.py --tier quick`：**13 / 13 PASS** (19.44s)；
+   - `tests/run_test_suite.py --tier physics`：**19 / 19 PASS** (83.81s)；
+   - `tests/run_test_suite.py --tier motion`：**8 / 8 PASS** (23.42s)；
+   - `tests/run_test_suite.py --tier full`：**30 / 30 PASS** (110.95s)；
    - `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)；
-   - 受保护场景资产检查：`git diff output/` 0 差异；
-   - 严格停止，禁止擅自进入 Repair Unit 2 或 Phase 7B。
+   - 受保护资产检查：`git diff output/` 0 差异；
+   - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
 
 ## 2. 已完成历史里程碑
+* Environment Gate 01 — Repair Unit 1：候选范围隔离机制与表面筛选语义修复及最终验收（覆盖率 32/32 PASS，故障注入与极端边界报告归档）。
 * Environment Gate 01：真实 Blender Mesh 环境查询接入与数据真实性门禁。
 * 任务 7A→7B 准入门禁：全仓库静态与动态调用链架构基线审计（输出 8 份审计报告至 `docs/audit/`）。
 * 任务 7A-2：架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收（700 帧连续地形行走）。

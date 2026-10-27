@@ -3,6 +3,62 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-27] Environment Gate 01 — Repair Unit 2: BVH Cache Invalidation, Scene Geometry Consistency & Lifecycle State Machine (Defects C01-C06)
+
+### 生产适配器机制重构 (`src/scene/blender_mesh_query_adapter.py`)
+* **显式五状态生命周期状态机 (`AdapterCacheState`)**：
+  - 新增 `AdapterCacheState` 枚举：`INVALID`, `VALID_EMPTY`, `VALID_NON_EMPTY`, `REBUILDING`, `FAILED`；
+  - 彻底淘汰仅依赖 `_bvh is None` 的模糊判定，解决空集合重复触发 `rebuild()` 的泄漏问题（C01）；
+  - 空集合场景下安全构建并驻留于 `VALID_EMPTY`，在 100 次空查询中严格保持 `rebuild_count = 1`（0 次冗余重建），返回 `success=False` 与 `NO_HIT:` 理由，绝不伪造 $Z=0.0\text{m}$ 虚假地面；
+  - 暴露只读遥测属性：`cache_state`, `rebuild_count`, `cache_version`, `is_empty`, `has_bvh`, `dirty`, `is_dirty`。
+* **双通道几何与环境失效检测体系 (Path A 自动检测 vs Path B 显式声明)**：
+  - **Path A (自动检测)**：每次查询调用 `refresh()` 时执行 `_check_scene_changed()`：
+    * 矩阵 16 元素严格比对（容差 $10^{-6}$），全面覆盖位移、旋转、非均匀缩放与父子物体层级变换传播（C02）；
+    * 极速内存缓冲区哈希（`array.array('f', ...)` + `foreach_get('co', ...)`, $<0.05\text{ms}$），精准捕获毫米级顶点移动（C03）；
+    * 循环索引哈希（`foreach_get('vertex_index', ...)`, $<0.02\text{ms}$），精准捕获多边形拓扑增删与翻转（C03）；
+    * 动态 RNA 属性扫描，精准捕获任意修改器（Solidify, Displace 等）参数调整、修改器增删及 `show_viewport` 切换（C04）；
+    * 基于 `obj.session_uid` 追踪集合成员变动，新增或删除对象即刻触发重建（C05）；
+    * **原地重命名零重建优化**：当对象仅改名而几何未变时，就地更新元数据名称与 Surface ID，**BVH 重建次数为 0**（C05）。
+  - **Path B (显式失效)**：调用 `adapter.invalidate()` 标记 `_dirty = True` 及 `INVALID` 状态，后续首次常规查询自动触发原子重建，调用方无需显式调用 `rebuild()`。
+* **原子提交与异常安全回滚**：
+  - 提取数据与生成快照暂存于局部内存，BVH 构建成功后原子提交；
+  - 求值网格在 `finally:` 中统一通过 `eval_obj.to_mesh_clear()` 清理，杜绝内存泄漏；
+  - 构建异常时回滚至 `FAILED` 状态并保留 `dirty=True`，绝不暴露脏数据。
+
+### 测试套件扩充 (`tests/test_mesh_environment_query.py`)
+* **新增 Unit 2 专用验证用例 (`test_33` 至 `test_42`)**：
+  - `test_33_c01_empty_environment_cache_reuse_and_addition`: 100 次空查询重建次数恒为 1，动态添加 Mesh 后自动恢复 `VALID_NON_EMPTY`；
+  - `test_34_c02_object_and_parent_transform_detection`: 位移、旋转、非均匀缩放及父级物体变换传播检测；
+  - `test_35_c03_1_vertex_coordinate_movement`: Path A 无需调用 invalidate 自动感知顶点坐标变动；
+  - `test_36_c03_2_topology_addition`: 动态添加面后精准命中新增多边形；
+  - `test_37_c03_3_geometry_deletion`: 删除面后对应区域精准返回脱靶；
+  - `test_38_c03_4_same_vertex_count_modification`: 顶点与面数不变时通过坐标哈希检测几何变更；
+  - `test_39_c03_5_explicit_invalidation_path_b`: 调用 invalidate 后下次常规查询自动触发重建；
+  - `test_40_c04_modifier_evaluated_mesh_consistency`: Solidify 修改器添加、厚度调整、视口切换、移除及异常回滚到 FAILED；
+  - `test_41_c05_collection_membership_lifecycle`: 隔离非受控集合、删除对象以及对象改名零重建复用 BVH；
+  - `test_42_c06_cache_reuse_under_unchanged_scene`: 未变场景下 300 次查询（100次同向射线、100次异向射线、100次最近点搜索）重建次数恒为 1（0 次重建）。
+* 全 42 项测试 Blender Headless 运行全部一次性全绿通过（42/42 PASS in 2.13s）。
+
+### 反事实实证生成器与归档 (`tests/run_counter_factual_ru2.py`, `docs/evidence/environment_gate01_ru2/`)
+* 编写受控变异生成脚本，在真实 Blender 5.1.1 环境中执行并记录：
+  - `counter_factual_c01_empty_rebuild.log`: 变异旧逻辑在 100 次空查询中产生 201 次重建（Exit code 1），生产逻辑恒为 1（Exit code 0）；
+  - `counter_factual_c03_vertex_stale.log`: 变异旧逻辑忽略顶点哈希导致未感知修改（Exit code 1），生产逻辑正确重建（Exit code 0）；
+  - `counter_factual_c05_collection_membership_stale.log`: 变异旧逻辑未感知集合新增对象（Exit code 1），生产逻辑正确重建（Exit code 0）。
+* 编纂反事实总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`。
+
+### 自动化回归与受控保护检验
+* **统一测试分级套件全量全绿**：
+  - `quick`: 13/13 PASS (19.44s)
+  - `physics`: 19/19 PASS (83.81s)
+  - `motion`: 8/8 PASS (23.42s)
+  - `full`: 30/30 PASS (110.95s)
+  - `audit_c2_final_inspector.py --verify-docs`: 0 errors (PASS)
+* **受保护资产检验**：`git diff output/` 严格为 0 字节。
+* **阶段状态裁定**：`ENVIRONMENT GATE 01 / REPAIR UNIT 2 — AWAITING HUMAN REVIEW`。
+
+---
+
+
 ## [2026-10-27] Environment Gate 01 — Repair Unit 1 Final Acceptance: 数值覆盖提升、独立数学验证、真实故障注入证据链与射线边界闭环 (Final Acceptance & Evidence Closure)
 
 ### 生产适配器机制优化 (`src/scene/blender_mesh_query_adapter.py`)

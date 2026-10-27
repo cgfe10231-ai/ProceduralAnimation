@@ -1,0 +1,34 @@
+=== COUNTER-FACTUAL VERIFICATION LOG: DEFECT C03 (STALE VERTEX COORDS IN PATH A) ===
+TARGET DEFECT: C03 (Failure to detect vertex coordinate modification without invalidate())
+MUTATION: Removed vert_hash check from _check_scene_changed, checking only matrix_world
+
+--- PHASE 1: MUTATED / LEGACY EXECUTION (EXPECTED FAILURE) ---
+EXIT STATUS: FAILURE
+FAILURES COUNT: 1
+test_35_c03_1_vertex_coordinate_movement (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_35_c03_1_vertex_coordinate_movement)
+C03-1: Path A automatic detection of vertex coordinate movements without calling invalidate(). ... FAIL
+
+======================================================================
+FAIL: test_35_c03_1_vertex_coordinate_movement (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_35_c03_1_vertex_coordinate_movement)
+C03-1: Path A automatic detection of vertex coordinate movements without calling invalidate().
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 1419, in test_35_c03_1_vertex_coordinate_movement
+    self.assertEqual(adapter.rebuild_count, 2, "Automatic change detection must trigger rebuild")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 2 : Automatic change detection must trigger rebuild
+
+----------------------------------------------------------------------
+Ran 1 test in 0.051s
+
+FAILED (failures=1)
+
+--- PHASE 2: PRODUCTION LOGIC RESTORED (EXPECTED PASS) ---
+EXIT STATUS: PASS
+test_35_c03_1_vertex_coordinate_movement (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_35_c03_1_vertex_coordinate_movement)
+C03-1: Path A automatic detection of vertex coordinate movements without calling invalidate(). ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.049s
+
+OK
