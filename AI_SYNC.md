@@ -1,49 +1,56 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：Environment Gate 01 — Repair Unit 1: Blender Mesh 环境查询候选范围隔离与表面筛选语义修复 (Candidate Scope Isolation & Surface Filter Semantics Repair)
-* **任务状态**：已完成候选范围隔离重构（规则 A、B、C）、射线推进式表面过滤与累计真实欧氏距离计算、范围搜索最近目标表面检索、全 8 字段严密断言、15 项新反例扩充及隔离受控故障注入验证；最终状态判定为 `ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`（严格停止等待人类审批，严禁自动进入 Phase 7B）；
-  - **候选范围隔离机制重构 (Defect A03 修复)**：
-    * 规则 A (显式 Collection 模式)：`collection_names is not None` 时仅检索指定集合（保留递归子集合），若集合不存在或无网格严格返回空集 $\emptyset$，绝不回退全场景；
-    * 规则 B (显式 Object 模式)：`object_names is not None` 时仅检索指定名称的有效 Mesh，去重过滤，绝不回退全场景；
-    * 规则 C (显式全场景模式)：仅当两者均为 `None` 时允许扫描当前场景全量网格，严禁隐式全场景兜底。
-  - **射线推进式表面过滤语义重构 (Defect A01 修复)**：
-    * 无过滤模式：严格保持返回射线路径上首个最近真实物理命中面；
-    * 有过滤模式：沿射线方向迭代推进搜索最近合格面，每次推进距离严格为正 ($\Delta s \ge 10^{-4}\text{ m}$)，上限 64 步，累计计算从原始起点起的真实欧氏距离 `ray_hit_distance`；
-    * 确立几何筛选语义：明确注明此为几何查询，不代表人体具备穿透可行性。
-  - **最近点范围搜索表面过滤语义重构 (Defect A02 修复)**：
-    * 无过滤模式：返回全局最近真实网格表面；
-    * 有过滤模式：通过 `bvh.find_nearest_range(p, max_distance)` 检索候选多边形集，筛选匹配目标类型并选取真实欧氏距离最小者，无匹配面严格返回 `success=False`。
-  - **全 8 字段契约检查与受控故障反例验证 (`tests/test_mesh_environment_query.py`)**：
-    * 编写并扩充 15 项专门反例测试（A03 4项、A01 6项、A02 5项），全套测试扩展至 23 项且实测全部通过 (23/23 PASS, 1.39s)；
-    * 逐项断言 `surface_id`, `surface_type`, `contact_point_world`, `surface_normal_world`, `ray_hit_distance`, `signed_distance`, `source_type`, `allows_regular_support`；
-    * 隔离受控故障注入验证：在独立测试中模拟旧 A03 回退全场景、旧 A01 单命中短路、旧 A02 单最近面短路，实证 counter-examples 均能精准捕获缺陷并报错，新代码 100% 修复并通过。
+* **当前任务编号**：Environment Gate 01 — Repair Unit 1 Final Acceptance: 数值覆盖提升、独立数学验证、真实故障注入证据链与射线边界闭环 (Final Acceptance & Evidence Closure)
+* **任务状态**：已完成全 8 字段物理契约断言升级、非轴对齐旋转 3D 场景独立解析几何核算、Blender 5.1.1 Headless 真实故障注入实证产物归档、射线步长精度升级至 $1\mu m$ 及 8 项极端边界覆盖，全 32 项环境查询测试与统一测试分级套件全量全绿；最终状态判定为 `ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`（严格停止等待人类审批，严禁自动进入 Repair Unit 2 或 Phase 7B）；
+  - **T01 (数值覆盖与独立解析校验)**：
+    * 升级 `_assert_surface_contract()`：严格核验完整 3D 接触点、3D 法向量（单位长度误差 $< 10^{-5}$）、独立欧几里得射线距离与方向夹角对齐、独立带符号距离二次验证，以及 `allowed_objects` 表面所属权校验；
+    * 新增 `test_24_non_axis_aligned_rotated_scene`：采用位置 $(3.0, 4.0, 2.0)$、欧拉角 $(30^\circ, 45^\circ, 0^\circ)$ 的非轴对齐斜面，查询点位于 $(3.5, 4.2, 5.0)$，对齐独立解析公式与 Blender C-BVHTree 计算结果（误差 $< 10^{-5}$）；
+    * 归档完整测试覆盖矩阵 [`docs/evidence/environment_gate01_ru1/test_coverage_matrix.md`](docs/evidence/environment_gate01_ru1/test_coverage_matrix.md)。
+  - **T02 (真实故障注入实证产物归档)**：
+    * 在白名单目录 [`docs/evidence/environment_gate01_ru1/`](docs/evidence/environment_gate01_ru1/) 真实运行 Blender 5.1.1 Headless 生成三个独立故障注入日志：
+      * `fault_injection_a03.log` (Exit code 1, `Surface_Forbidden` 越界捕获)
+      * `fault_injection_a01.log` (Exit code 1, `Box_Front` 提前阻断捕获)
+      * `fault_injection_a02.log` (Exit code 1, `Box_Near` 筛选短路捕获)
+    * 归档总结报告 [`docs/evidence/environment_gate01_ru1/fault_injection_summary.md`](docs/evidence/environment_gate01_ru1/fault_injection_summary.md)。
+  - **T03 (射线迭代机制优化与 8 项极端边界检验)**：
+    * 优化 `BlenderMeshEnvironmentAdapter.ray_cast()`：默认步进推进设为 `step_epsilon = 1e-6`（$1\mu m$），支持动态自适应缩放（防止数值同面重复判定），并暴露 `max_steps` 与 `step_epsilon`；
+    * 失败原因严格标准化：`SEARCH_LIMIT_REACHED:` vs `NO_HIT:`；
+    * 新增 8 项极端边界测试（`test_25` 至 `test_32`）：单表面、三层多表面过滤、跨过滤缓存复用、`max_steps=5` 恰好命中、`max_steps=4` 预算耗尽、超薄 $50\mu m$ 障碍穿透、表面边界起点穿透、以及距离阈值 $6.0001\text{m}$ vs $5.9990\text{m}$ 临界区分；
+    * 归档射线迭代与边界报告 [`docs/evidence/environment_gate01_ru1/ray_iteration_boundary_report.md`](docs/evidence/environment_gate01_ru1/ray_iteration_boundary_report.md)。
   - **全级别分层回归套件全绿**：
-    * `tests/run_test_suite.py --tier quick`：**13 / 13 PASS** (18.73s)；
-    * `tests/run_test_suite.py --tier physics`：**19 / 19 PASS** (83.61s)；
-    * `tests/run_test_suite.py --tier motion`：**8 / 8 PASS** (23.57s)；
-    * `tests/run_test_suite.py --tier full`：**30 / 30 PASS** (107.69s)；
+    * `mesh_environment_query`：**32 / 32 PASS** (1.74s)；
+    * `tests/run_test_suite.py --tier quick`：**13 / 13 PASS** (18.74s)；
+    * `tests/run_test_suite.py --tier physics`：**19 / 19 PASS** (82.39s)；
+    * `tests/run_test_suite.py --tier motion`：**8 / 8 PASS** (23.18s)；
+    * `tests/run_test_suite.py --tier full`：**30 / 30 PASS** (107.94s)；
     * `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)；
     * 受控资产检查：`git diff output/` 0 差异；
-    * 严格停止，禁止擅自进入 Phase 7B。
+    * 严格停止，禁止擅自进入 Repair Unit 2 或 Phase 7B。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **审查基准 Commit SHA**：`1abd484babe750501a0356dcf2030beef26471d9`
-  * **修复落地 Commit SHA**：`b4af6004c68710df39b3c7467a7b764ee88b9362`
-  * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master` - 远程已对齐同步)
+  * **审查基准 Commit SHA**：`497bb0d6bd9ab411f2ed80c34dc609f2191bc566`
+  * **修复落地 Commit SHA**：PENDING_COMMIT
+  * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
 ---
 
-## 1. Environment Gate 01 / Repair Unit 1 审阅证据入口与产物路径清单 (ChatGPT Review Portal)
+## 1. Environment Gate 01 / Repair Unit 1 Final Acceptance 审阅证据入口与产物路径清单 (Review Portal)
 
 | 证据 / 源码类型 | 仓库相对路径 / 本地绝对路径 | 文件说明与关键点 | GitHub 同步状态 |
 | :--- | :--- | :--- | :---: |
-| **Mesh 环境适配器** | [`src/scene/blender_mesh_query_adapter.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/blender_mesh_query_adapter.py) | 修复 A03 范围隔离（规则 A/B/C）、A01 推进式射线过滤与 A02 范围搜索最近目标面 | **本次提交同步** |
-| **23 项验收与反例测试套件** | [`tests/test_mesh_environment_query.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_mesh_environment_query.py) | 扩充 15 项专门反例测试（A03 4项、A01 6项、A02 5项），全 8 字段严密断言 (23/23 PASS) | **本次提交同步** |
-| **环境查询语义规范更新** | [`docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md) | 新增第 6 节：候选范围隔离机制、射线与最近点表面过滤精确语义 | **本次提交同步** |
-| **架构与技术决策记录** | [`DECISIONS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/DECISIONS.md) | 录入 `[DEC-054]`，记录 Repair Unit 1 规则 A/B/C、推进式射线与范围最近点决策 | **本次提交同步** |
-| **项目变更历史更新** | [`CHANGELOG.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/CHANGELOG.md) | 记录 Environment Gate 01 — Repair Unit 1 详细变更 | **本次提交同步** |
+| **Mesh 环境适配器** | [`src/scene/blender_mesh_query_adapter.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/blender_mesh_query_adapter.py) | 优化 `ray_cast` 步长基准为 $1\mu m$，暴露 `max_steps`，标准化 `NO_HIT:` 与 `SEARCH_LIMIT_REACHED:` | **本次提交同步** |
+| **32 项全量验收测试套件** | [`tests/test_mesh_environment_query.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_mesh_environment_query.py) | 全 8 字段契约断言、非轴对齐斜面独立解析验证、8 项极端边界覆盖 (32/32 PASS) | **本次提交同步** |
+| **环境查询语义规范更新** | [`docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/ENVIRONMENT_MESH_QUERY_SEMANTICS.md) | 补充射线高精度迭代机制、薄层穿透与失败原因机器判定规则 | **本次提交同步** |
+| **测试覆盖矩阵报告** | [`docs/evidence/environment_gate01_ru1/test_coverage_matrix.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/test_coverage_matrix.md) | 全 32 项测试完整多维契约与预期值明细表 | **本次提交同步** |
+| **故障注入执行日志 A03** | [`docs/evidence/environment_gate01_ru1/fault_injection_a03.log`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/fault_injection_a03.log) | 真实 Blender 5.1.1 Headless 执行日志，Exit Code 1，捕获 Collection 越界 | **本次提交同步** |
+| **故障注入执行日志 A01** | [`docs/evidence/environment_gate01_ru1/fault_injection_a01.log`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/fault_injection_a01.log) | 真实 Blender 5.1.1 Headless 执行日志，Exit Code 1，捕获射线过滤短路 | **本次提交同步** |
+| **故障注入执行日志 A02** | [`docs/evidence/environment_gate01_ru1/fault_injection_a02.log`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/fault_injection_a02.log) | 真实 Blender 5.1.1 Headless 执行日志，Exit Code 1，捕获最近面过滤短路 | **本次提交同步** |
+| **故障注入总结报告** | [`docs/evidence/environment_gate01_ru1/fault_injection_summary.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/fault_injection_summary.md) | 代码变异、执行命令、退出码及生产恢复对比报告 | **本次提交同步** |
+| **射线迭代边界分析报告** | [`docs/evidence/environment_gate01_ru1/ray_iteration_boundary_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/ray_iteration_boundary_report.md) | 8 项极端边界机理分析与标准化诊断前缀规范 | **本次提交同步** |
+| **架构决策记录** | [`DECISIONS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/DECISIONS.md) | 录入 `[DEC-055]`，记录 Final Acceptance T01/T02/T03 实施依据 | **本次提交同步** |
+| **项目变更历史更新** | [`CHANGELOG.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/CHANGELOG.md) | 详细记录 Final Acceptance 各项改进与验证结论 | **本次提交同步** |
 | **项目状态文档更新** | [`PROJECT_STATE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/PROJECT_STATE.md) | 状态更新为 `ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW` | **本次提交同步** |
 | **会话交接说明书更新** | [`HANDOFF.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/HANDOFF.md) | 同步当前最新目标、状态与测试结论 | **本次提交同步** |
 
@@ -53,22 +60,16 @@
 
 * **架构文档与 AST 符号门禁 (`tests/audit_c2_final_inspector.py --verify-docs`)**：**PASS (Exit Code 0)**
   - 扫描全量架构与状态同步文档，0 缺失路径、0 幻觉符号。
-* **Unit 1 单元测试套件 (`tests/test_mesh_environment_query.py`)**：**23 / 23 PASS (Exit Code 0, 1.39s)**
-* **受控故障注入反例验证**：
-  - A03 集合回退故障：反例测试捕获泄漏，`assert len(tracked_objects) == 0` 精准报错；
-  - A01 射线单命中故障：反例测试捕获短路，`assert res.success is True` 精准报错；
-  - A02 最近面单命中故障：反例测试捕获短路，`assert res.success is True` 精准报错；
-  - 生产代码：上述 3 项反例全量通过。
-* **统一分层回归总结**：
-  * **`quick` Tier**：**13 / 13 PASS** (18.73s, Exit Code 0)；
-  * **`physics` Tier**：**19 / 19 PASS** (83.61s, Exit Code 0)；
-  * **`motion` Tier**：**8 / 8 PASS** (23.57s, Exit Code 0)；
-  * **`full` Tier**：**30 / 30 PASS** (107.69s, Exit Code 0)。
-* **受保护资产无损验证**：
-  * `git diff output/`：0 字节改动。
-
----
-
-## 3. 阶段边界与严格禁止事项
-
-* **下一步**：**严格停止于 `ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`，等待人类审查；绝不自动进入 Phase 7B 或其他 Repair Unit**。
+* **Unit 1 单元测试套件 (`tests/test_mesh_environment_query.py`)**：**32 / 32 PASS (Exit Code 0, 1.74s)**
+* **受控真实故障注入反例验证**：
+  - A03 集合回退故障：`fault_injection_a03.log` 真实捕获泄漏，Exit Code 1，断言精准报错；
+  - A01 射线单命中故障：`fault_injection_a01.log` 真实捕获短路，Exit Code 1，断言精准报错；
+  - A02 最近面单命中故障：`fault_injection_a02.log` 真实捕获短路，Exit Code 1，断言精准报错；
+  - 生产代码恢复后全量全绿，实证测试套件具备百分之百物理可证伪性。
+* **统一测试分级套件**：
+  - `quick`: **13 / 13 PASS** (18.74s)
+  - `physics`: **19 / 19 PASS** (82.39s)
+  - `motion`: **8 / 8 PASS** (23.18s)
+  - `full`: **30 / 30 PASS** (107.94s)
+* **受保护资产检验**：`git diff output/` 严格为 0 字节。
+* **下一阶段边界与准入**：严格停留在 `ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`。严禁未经人类指令进入 Repair Unit 2 或 Phase 7B。

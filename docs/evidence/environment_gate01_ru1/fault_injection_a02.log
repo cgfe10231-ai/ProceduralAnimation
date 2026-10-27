@@ -1,0 +1,34 @@
+COMMAND: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --python-expr <A02_MUTATION>
+EXIT_CODE: 1
+=== STDOUT ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+=== STDERR ===
+test_20_a02_2_nearest_filtered_finds_target_surface (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_20_a02_2_nearest_filtered_finds_target_surface)
+A02-2: Filtered find_nearest finds closest matching surface B (dist 0.8m). ... FAIL
+
+======================================================================
+FAIL: test_20_a02_2_nearest_filtered_finds_target_surface (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_20_a02_2_nearest_filtered_finds_target_surface)
+A02-2: Filtered find_nearest finds closest matching surface B (dist 0.8m).
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 793, in test_20_a02_2_nearest_filtered_finds_target_surface
+    self._assert_surface_contract(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        res,
+        ^^^^
+    ...<9 lines>...
+        query_origin=(0.0, 0.0, 1.0),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 361, in _assert_surface_contract
+    self.assertIn(expected_id_substr, res.surface_id)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Plane_Far' not found in 'mesh:Box_Near:5'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.233s
+
+FAILED (failures=1)
+

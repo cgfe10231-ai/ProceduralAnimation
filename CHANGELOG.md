@@ -3,6 +3,52 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-27] Environment Gate 01 — Repair Unit 1 Final Acceptance: 数值覆盖提升、独立数学验证、真实故障注入证据链与射线边界闭环 (Final Acceptance & Evidence Closure)
+
+### 生产适配器机制优化 (`src/scene/blender_mesh_query_adapter.py`)
+* **高精度推进步长与薄层穿透能力**：
+  - 将 `ray_cast` 推进步进基准调整为 `step_epsilon = 1e-6`（$1\mu m$），支持解析薄至 $50\mu m$ 的超薄层几何；
+  - 构造函数引入 `step_epsilon` 默认配置参数，同时在 `ray_cast` 中支持单次调用重载；
+  - 引入数值重叠自适应步长机制：在同一多边形索引上出现浮点微距重复命中时，动态扩大步长规避自相交死循环。
+* **失败原因标准化区分 (T03 Disambiguation)**：
+  - 明确区分几何脱靶（`NO_HIT:`）与搜索预算耗尽（`SEARCH_LIMIT_REACHED:`）；
+  - 严格规范 6 种错误提示前缀，提供机器可判定的诊断契约。
+
+### 测试套件扩充与独立解析核算 (`tests/test_mesh_environment_query.py`)
+* **全 8 字段契约断言升级 (T01)**：
+  - 升级 `_assert_surface_contract()`：增加完整 3D 接触点、3D 法向量（单位长度误差 $< 10^{-5}$）、独立欧几里得射线距离与方向夹角验证、独立带符号距离二次验证，以及 `allowed_objects` 允许物体归属权断言；
+  - 升级历史测试 09 至 23 全量接入完整三维向量核验。
+* **非轴对齐旋转场景独立数学检验 (`test_24_non_axis_aligned_rotated_scene`)**：
+  - 构造中心 $(3.0, 4.0, 2.0)$、欧拉角 $(30^\circ, 45^\circ, 0^\circ)$ 的倾斜表面，查询点设在 $(3.5, 4.2, 5.0)$；
+  - 基于理论三维空间旋转矩阵导出精确解析解，与 Blender C-BVHTree 计算结果对比，法向量误差 $< 10^{-5}$，接触坐标与距离完全吻合。
+* **射线迭代 8 项极端边界覆盖 (T03, `test_25` 至 `test_32`)**：
+  - 覆盖单表面、三层穿透过滤、跨过滤缓存复用、`max_steps=5` 恰好命中、`max_steps=4` 预算耗尽、超薄 $50\mu m$ 障碍穿透、表面边界起点穿透、以及距离阈值 $6.0001\text{m}$ vs $5.9990\text{m}$ 临界区分；
+  - 全套件测试数量增至 32 项，Blender Headless 运行全部一次性通过（32/32 PASS in 1.74s）。
+
+### 真实故障注入实证产物归档 (T02, `docs/evidence/environment_gate01_ru1/`)
+* **真实独立执行日志生成**：
+  - 在受控临时运行环境中分别注入 A03、A01、A02 逻辑变异，执行真实 Blender 命令，捕获非零退出码（Exit Code 1）与精确失败断言 Traceback，归档至：
+    * `fault_injection_a03.log` (Collection 范围越界捕获)
+    * `fault_injection_a01.log` (射线前序障碍过滤短路捕获)
+    * `fault_injection_a02.log` (最近表面类型过滤短路捕获)
+* **结构化证据文档体系编纂**：
+  - `fault_injection_summary.md`：详细记录代码变异对比、执行命令、退出码与生产恢复记录；
+  - `test_coverage_matrix.md`：详尽列出全 32 项测试的输入几何、预期目标、3D 接触点、法向、距离、支撑标志及测试断言；
+  - `ray_iteration_boundary_report.md`：详尽分析 8 项边界情况与标准化错误前缀。
+
+### 自动化回归与受控保护检验
+* **统一测试分级套件全量全绿**：
+  - `quick`: 13/13 PASS (18.74s)
+  - `physics`: 19/19 PASS (82.39s)
+  - `motion`: 8/8 PASS (23.18s)
+  - `full`: 30/30 PASS (107.94s)
+  - `audit_c2_final_inspector.py --verify-docs`: 0 errors (PASS)
+* **受保护资产检验**：`git diff output/` 严格为 0 字节。
+* **阶段状态裁定**：`ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`。
+
+---
+
+
 ## [2026-10-27] Environment Gate 01 — Repair Unit 1: Blender Mesh 环境查询候选范围隔离与表面筛选语义修复 (Candidate Scope Isolation & Surface Filter Semantics Repair)
 
 ### 缺陷修复与语义重构 (`src/scene/blender_mesh_query_adapter.py`)

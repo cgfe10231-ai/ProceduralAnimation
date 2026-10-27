@@ -70,12 +70,14 @@ class BlenderMeshEnvironmentAdapter:
         object_names: Optional[Sequence[str]] = None,
         default_friction: float = 0.65,
         min_support_normal_z: float = 0.50,
+        step_epsilon: float = 1e-6,
     ) -> None:
         self._scene = scene or bpy.context.scene
         self._collection_names = list(collection_names) if collection_names is not None else None
         self._object_names = set(object_names) if object_names is not None else None
         self._default_friction = float(default_friction)
         self._min_support_normal_z = float(min_support_normal_z)
+        self._step_epsilon = float(step_epsilon)
 
         # Cached spatial data
         self._bvh: Optional[BVHTree] = None
@@ -306,6 +308,8 @@ class BlenderMeshEnvironmentAdapter:
         direction: Tuple[float, float, float],
         distance: float = 10.0,
         surface_type_filter: Optional[str] = None,
+        max_steps: int = 64,
+        step_epsilon: Optional[float] = None,
     ) -> SurfaceQueryResult:
         """Cast a directional ray into the evaluated mesh BVH tree.
 
@@ -315,6 +319,9 @@ class BlenderMeshEnvironmentAdapter:
         - Filtered (`surface_type_filter is not None`):
           Searches forward along ray path up to `distance` for the closest surface matching filter.
           NOTE: This is a geometric query and does not imply human penetration feasibility.
+        - Failure Classification (T03):
+          Distinguishes between NO_HIT (search completed up to distance without match) and
+          SEARCH_LIMIT_REACHED (iteration budget exhausted before reaching distance).
         """
         self.refresh()
 
@@ -329,7 +336,7 @@ class BlenderMeshEnvironmentAdapter:
                 allows_regular_support=False,
                 success=False,
                 ray_hit_distance=float("inf"),
-                error_reason="No evaluated meshes available in environment adapter",
+                error_reason="NO_HIT: No evaluated meshes available in environment adapter",
                 source_type="none",
             )
 
@@ -356,7 +363,7 @@ class BlenderMeshEnvironmentAdapter:
                     allows_regular_support=False,
                     success=False,
                     ray_hit_distance=float("inf"),
-                    error_reason=f"No mesh surface intersected along ray within {distance:.2f}m",
+                    error_reason=f"NO_HIT: No mesh surface intersected along ray within {distance:.2f}m",
                     source_type="none",
                 )
 
@@ -381,8 +388,9 @@ class BlenderMeshEnvironmentAdapter:
         # Filtered query: search forward along ray direction for closest matching surface
         filter_str = surface_type_filter.value if hasattr(surface_type_filter, "value") else str(surface_type_filter)
         current_origin = orig_vec.copy()
-        max_steps = 64
-        step_epsilon = 1e-4  # 0.1mm forward push to prevent re-hitting same polygon
+        budget_exhausted = False
+        last_hit_idx = None
+        current_epsilon = self._step_epsilon if step_epsilon is None else float(step_epsilon)
 
         found_hit = False
         target_loc = None
@@ -390,10 +398,10 @@ class BlenderMeshEnvironmentAdapter:
         target_idx = None
         target_dist = 0.0
 
-        for _ in range(max_steps):
+        for step_i in range(max_steps):
             dist_from_orig = float((current_origin - orig_vec).dot(dir_vec))
             remaining_dist = distance - dist_from_orig
-            if remaining_dist <= 1e-6:
+            if remaining_dist <= 1e-7:
                 break
 
             hit_loc, hit_norm, hit_idx, hit_dist = self._bvh.ray_cast(
@@ -402,6 +410,15 @@ class BlenderMeshEnvironmentAdapter:
 
             if hit_loc is None or hit_idx is None:
                 break
+
+            # Handle numerical re-hit on exact same polygon
+            if hit_idx == last_hit_idx and hit_dist < 1e-6:
+                current_epsilon = max(current_epsilon * 2.0, 1e-5)
+                current_origin = current_origin + dir_vec * current_epsilon
+                continue
+
+            last_hit_idx = hit_idx
+            current_epsilon = self._step_epsilon if step_epsilon is None else float(step_epsilon)
 
             cum_dist = float((hit_loc - orig_vec).dot(dir_vec))
             if cum_dist > distance + 1e-6:
@@ -416,14 +433,23 @@ class BlenderMeshEnvironmentAdapter:
                 target_dist = max(0.0, cum_dist)
                 break
 
+            # If this was the last iteration step and we haven't found target, budget is exhausted
+            if step_i == max_steps - 1:
+                budget_exhausted = True
+                break
+
             # Strictly advance forward past current intersection
-            forward_from_hit = hit_loc + dir_vec * step_epsilon
-            if (forward_from_hit - current_origin).dot(dir_vec) < step_epsilon:
-                current_origin = current_origin + dir_vec * step_epsilon
+            forward_from_hit = hit_loc + dir_vec * current_epsilon
+            if (forward_from_hit - current_origin).dot(dir_vec) < current_epsilon:
+                current_origin = current_origin + dir_vec * current_epsilon
             else:
                 current_origin = forward_from_hit
 
         if not found_hit or target_loc is None or target_idx is None:
+            if budget_exhausted:
+                err = f"SEARCH_LIMIT_REACHED: Exceeded maximum ray iteration budget ({max_steps} steps) while searching for filter '{filter_str}' within {distance:.2f}m"
+            else:
+                err = f"NO_HIT: No mesh surface matching filter '{filter_str}' intersected along ray within {distance:.2f}m"
             return SurfaceQueryResult(
                 surface_id="none",
                 surface_type="none",
@@ -434,7 +460,7 @@ class BlenderMeshEnvironmentAdapter:
                 allows_regular_support=False,
                 success=False,
                 ray_hit_distance=float("inf"),
-                error_reason=f"No mesh surface matching filter '{filter_str}' intersected along ray within {distance:.2f}m",
+                error_reason=err,
                 source_type="none",
             )
 
@@ -483,7 +509,7 @@ class BlenderMeshEnvironmentAdapter:
                 allows_regular_support=False,
                 success=False,
                 ray_hit_distance=None,
-                error_reason="No evaluated meshes available in environment adapter",
+                error_reason="NO_HIT: No evaluated meshes available in environment adapter",
                 source_type="none",
             )
 
@@ -504,7 +530,7 @@ class BlenderMeshEnvironmentAdapter:
                     allows_regular_support=False,
                     success=False,
                     ray_hit_distance=None,
-                    error_reason=f"No mesh surface found within max_distance={max_distance:.2f}m",
+                    error_reason=f"NO_HIT: No mesh surface found within max_distance={max_distance:.2f}m",
                     source_type="none",
                 )
 
@@ -542,7 +568,7 @@ class BlenderMeshEnvironmentAdapter:
                 allows_regular_support=False,
                 success=False,
                 ray_hit_distance=None,
-                error_reason=f"No mesh surface found within max_distance={max_distance:.2f}m",
+                error_reason=f"NO_HIT: No mesh surface found within max_distance={max_distance:.2f}m",
                 source_type="none",
             )
 
@@ -562,7 +588,7 @@ class BlenderMeshEnvironmentAdapter:
                 allows_regular_support=False,
                 success=False,
                 ray_hit_distance=None,
-                error_reason=f"No mesh surface matching filter '{filter_str}' found within max_distance={max_distance:.2f}m",
+                error_reason=f"NO_HIT: No mesh surface matching filter '{filter_str}' found within max_distance={max_distance:.2f}m",
                 source_type="none",
             )
 

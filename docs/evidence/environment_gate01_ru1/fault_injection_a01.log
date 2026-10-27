@@ -1,0 +1,34 @@
+COMMAND: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --python-expr <A01_MUTATION>
+EXIT_CODE: 1
+=== STDOUT ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+=== STDERR ===
+test_14_a01_2_ray_filtered_finds_second_surface (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_14_a01_2_ray_filtered_finds_second_surface)
+A01-2: Filtered ray skips front surface to find matching back surface at Z=2.0. ... FAIL
+
+======================================================================
+FAIL: test_14_a01_2_ray_filtered_finds_second_surface (tests.test_mesh_environment_query.TestMeshEnvironmentQuery.test_14_a01_2_ray_filtered_finds_second_surface)
+A01-2: Filtered ray skips front surface to find matching back surface at Z=2.0.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 619, in test_14_a01_2_ray_filtered_finds_second_surface
+    self._assert_surface_contract(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        res,
+        ^^^^
+    ...<10 lines>...
+        ray_direction=(0.0, 0.0, -1.0),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_mesh_environment_query.py", line 361, in _assert_surface_contract
+    self.assertIn(expected_id_substr, res.surface_id)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Ground_Back' not found in 'mesh:Box_Front:5'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.238s
+
+FAILED (failures=1)
+

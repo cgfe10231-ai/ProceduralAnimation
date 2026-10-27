@@ -338,11 +338,18 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
         expected_success: bool,
         expected_surface_type: Optional[str] = None,
         expected_source_type: Optional[str] = None,
+        expected_contact_point: Optional[Sequence[float]] = None,
+        expected_surface_normal: Optional[Sequence[float]] = None,
         expected_contact_z: Optional[float] = None,
         expected_normal_z: Optional[float] = None,
         expected_ray_dist: Optional[float] = None,
+        expected_signed_dist: Optional[float] = None,
         expected_support: Optional[bool] = None,
         expected_id_substr: Optional[str] = None,
+        allowed_objects: Optional[Sequence[str]] = None,
+        query_origin: Optional[Sequence[float]] = None,
+        ray_direction: Optional[Sequence[float]] = None,
+        expected_error_prefix: Optional[str] = None,
         places: int = 3,
     ) -> None:
         """Verify all 8 physical fields of SurfaceQueryResult without exception."""
@@ -352,21 +359,66 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             self.assertNotEqual(res.surface_id, "none")
             if expected_id_substr:
                 self.assertIn(expected_id_substr, res.surface_id)
+            if allowed_objects is not None:
+                parts = res.surface_id.split(":")
+                obj_name = parts[1] if len(parts) >= 2 and parts[0] == "mesh" else res.surface_id
+                self.assertIn(obj_name, allowed_objects, f"Hit object '{obj_name}' not in allowed set {allowed_objects}")
             if expected_surface_type:
                 self.assertEqual(res.surface_type, expected_surface_type)
             if expected_source_type:
                 self.assertEqual(res.source_type, expected_source_type)
+
+            # Full 3D Contact Point Verification
+            if expected_contact_point is not None:
+                for i in range(3):
+                    self.assertAlmostEqual(res.contact_point_world[i], expected_contact_point[i], places=places)
             if expected_contact_z is not None:
                 self.assertAlmostEqual(res.contact_point_world[2], expected_contact_z, places=places)
+
+            # Full 3D Outward Normal Verification (Unit length error < 1e-5)
+            norm_len = math.sqrt(sum(c * c for c in res.surface_normal_world))
+            self.assertAlmostEqual(norm_len, 1.0, places=5)
+            if expected_surface_normal is not None:
+                for i in range(3):
+                    self.assertAlmostEqual(res.surface_normal_world[i], expected_surface_normal[i], places=places)
             if expected_normal_z is not None:
                 self.assertAlmostEqual(res.surface_normal_world[2], expected_normal_z, places=places)
+
+            # Independent Ray Hit Distance & Ray Direction Alignment
             if expected_ray_dist is not None:
                 self.assertIsNotNone(res.ray_hit_distance)
                 self.assertAlmostEqual(res.ray_hit_distance, expected_ray_dist, places=places)
-            if expected_support is not None:
-                self.assertEqual(res.allows_regular_support, expected_support)
+            if query_origin is not None and ray_direction is not None:
+                dx = res.contact_point_world[0] - query_origin[0]
+                dy = res.contact_point_world[1] - query_origin[1]
+                dz = res.contact_point_world[2] - query_origin[2]
+                euclid_dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+                self.assertIsNotNone(res.ray_hit_distance)
+                self.assertAlmostEqual(res.ray_hit_distance, euclid_dist, places=places)
+                dir_len = math.sqrt(sum(d * d for d in ray_direction))
+                if euclid_dist > 1e-5 and dir_len > 1e-5:
+                    dot = (dx * ray_direction[0] + dy * ray_direction[1] + dz * ray_direction[2]) / (euclid_dist * dir_len)
+                    self.assertAlmostEqual(dot, 1.0, places=4)
+
+            # Signed Distance & Orientation Verification
             self.assertIsNotNone(res.signed_distance)
             self.assertFalse(math.isinf(res.signed_distance))
+            if expected_signed_dist is not None:
+                self.assertAlmostEqual(res.signed_distance, expected_signed_dist, places=places)
+            if query_origin is not None and ray_direction is None:
+                dx = query_origin[0] - res.contact_point_world[0]
+                dy = query_origin[1] - res.contact_point_world[1]
+                dz = query_origin[2] - res.contact_point_world[2]
+                geom_dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+                self.assertAlmostEqual(abs(res.signed_distance), geom_dist, places=places)
+                dot_n = dx * res.surface_normal_world[0] + dy * res.surface_normal_world[1] + dz * res.surface_normal_world[2]
+                expected_sign = 1.0 if dot_n >= 0 else -1.0
+                actual_sign = 1.0 if res.signed_distance >= 0 else -1.0
+                if geom_dist > 1e-4:
+                    self.assertEqual(actual_sign, expected_sign)
+
+            if expected_support is not None:
+                self.assertEqual(res.allows_regular_support, expected_support)
         else:
             self.assertEqual(res.surface_id, "none")
             self.assertEqual(res.surface_type, "none")
@@ -374,6 +426,11 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             self.assertTrue(math.isinf(res.signed_distance))
             self.assertFalse(res.allows_regular_support)
             self.assertIsNotNone(res.error_reason)
+            if expected_error_prefix:
+                self.assertTrue(
+                    res.error_reason.startswith(expected_error_prefix),
+                    f"Error reason '{res.error_reason}' does not start with '{expected_error_prefix}'",
+                )
 
     # -------------------------------------------------------------------------
     # Repair Unit 1 / Defect A03: Collection & Object Scope Isolation
@@ -394,7 +451,7 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
 
         # Query toward where RealGround is physically located
         res = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
-        self._assert_surface_contract(res, expected_success=False)
+        self._assert_surface_contract(res, expected_success=False, expected_error_prefix="NO_HIT:")
 
     def test_10_a03_2_collection_empty(self):
         """A03-2: Empty collection must NOT fall back to other collections in scene."""
@@ -416,7 +473,7 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
         self.assertEqual(adapter.polygon_count, 0)
 
         res = adapter.ray_cast(origin=(0.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
-        self._assert_surface_contract(res, expected_success=False)
+        self._assert_surface_contract(res, expected_success=False, expected_error_prefix="NO_HIT:")
 
     def test_11_a03_3_collection_isolation(self):
         """A03-3: Query must strictly isolate allowed collection from forbidden collection."""
@@ -451,11 +508,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="horizontal_ground",
             expected_source_type="mesh",
-            expected_contact_z=2.0,  # Must be Z=2.0, NEVER closer Z=4.0!
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
             expected_ray_dist=8.0,
             expected_support=True,
             expected_id_substr="Surface_Allowed",
+            allowed_objects=["Surface_Allowed"],
+            query_origin=(0.0, 0.0, 10.0),
+            ray_direction=(0.0, 0.0, -1.0),
         )
 
     def test_12_a03_4_explicit_all_scene_mode(self):
@@ -480,8 +540,29 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
 
         res1 = adapter.ray_cast(origin=(-5.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
         self.assertTrue(res1.success)
+        self._assert_surface_contract(
+            res1,
+            expected_success=True,
+            expected_contact_point=(-5.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=3.0,
+            allowed_objects=[cube1.name, cube2.name],
+            query_origin=(-5.0, 0.0, 5.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
         res2 = adapter.ray_cast(origin=(5.0, 0.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
         self.assertTrue(res2.success)
+        self._assert_surface_contract(
+            res2,
+            expected_success=True,
+            expected_contact_point=(5.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=3.0,
+            allowed_objects=[cube1.name, cube2.name],
+            query_origin=(5.0, 0.0, 5.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
 
     # -------------------------------------------------------------------------
     # Repair Unit 1 / Defect A01: ray_cast Surface Filtering Semantics
@@ -516,11 +597,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="box_top",
             expected_source_type="mesh",
-            expected_contact_z=5.0,
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 5.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
             expected_ray_dist=3.0,
             expected_support=True,
             expected_id_substr="Box_Front",
+            allowed_objects=["Box_Front"],
+            query_origin=(0.0, 0.0, 8.0),
+            ray_direction=(0.0, 0.0, -1.0),
         )
 
     def test_14_a01_2_ray_filtered_finds_second_surface(self):
@@ -537,11 +621,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="horizontal_ground",
             expected_source_type="mesh",
-            expected_contact_z=2.0,
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
             expected_ray_dist=6.0,
             expected_support=True,
             expected_id_substr="Ground_Back",
+            allowed_objects=["Ground_Back"],
+            query_origin=(0.0, 0.0, 8.0),
+            ray_direction=(0.0, 0.0, -1.0),
         )
 
     def test_15_a01_3_ray_filtered_nonexistent_type(self):
@@ -553,7 +640,7 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             distance=10.0,
             surface_type_filter="sloped_ramp",
         )
-        self._assert_surface_contract(res, expected_success=False)
+        self._assert_surface_contract(res, expected_success=False, expected_error_prefix="NO_HIT:")
 
     def test_16_a01_4_ray_filtered_insufficient_distance(self):
         """A01-4: Filtered ray fails when max_distance reaches front (3m) but cannot reach back (6m)."""
@@ -564,7 +651,7 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             distance=4.0,  # 8.0 - 4.0 = 4.0m, cannot reach Z=2.0 (needs 6.0m)
             surface_type_filter="horizontal_ground",
         )
-        self._assert_surface_contract(res, expected_success=False)
+        self._assert_surface_contract(res, expected_success=False, expected_error_prefix="NO_HIT:")
 
     def test_17_a01_5_ray_direction_scale_invariance(self):
         """A01-5: Ray direction scaling (0,0,-1) vs (0,0,-5) yields identical Euclidean hit distance."""
@@ -581,11 +668,28 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             distance=10.0,
             surface_type_filter="horizontal_ground",
         )
-        self.assertTrue(res1.success)
-        self.assertTrue(res2.success)
-        self.assertAlmostEqual(res1.ray_hit_distance, 6.0, places=3)
-        self.assertAlmostEqual(res2.ray_hit_distance, 6.0, places=3)
-        self.assertAlmostEqual(res1.contact_point_world[2], res2.contact_point_world[2], places=4)
+        self._assert_surface_contract(
+            res1,
+            expected_success=True,
+            expected_surface_type="horizontal_ground",
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=6.0,
+            allowed_objects=["Ground_Back"],
+            query_origin=(0.0, 0.0, 8.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+        self._assert_surface_contract(
+            res2,
+            expected_success=True,
+            expected_surface_type="horizontal_ground",
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=6.0,
+            allowed_objects=["Ground_Back"],
+            query_origin=(0.0, 0.0, 8.0),
+            ray_direction=(0.0, 0.0, -5.0),
+        )
 
     def test_18_a01_6_ray_origin_on_surface(self):
         """A01-6: Ray origin on surface terminates correctly without infinite loop."""
@@ -602,11 +706,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="horizontal_ground",
             expected_source_type="mesh",
-            expected_contact_z=2.0,
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
             expected_ray_dist=0.0,
             expected_support=True,
             expected_id_substr="Ground_Back",
+            allowed_objects=["Ground_Back"],
+            query_origin=(0.0, 0.0, 2.0),
+            ray_direction=(0.0, 0.0, -1.0),
         )
 
         # Origin on Box_Front (Z=5.0), filtering for horizontal_ground: must advance past Box_Front to Z=2.0
@@ -621,11 +728,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="horizontal_ground",
             expected_source_type="mesh",
-            expected_contact_z=2.0,
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
             expected_ray_dist=3.0,
             expected_support=True,
             expected_id_substr="Ground_Back",
+            allowed_objects=["Ground_Back"],
+            query_origin=(0.0, 0.0, 5.0),
+            ray_direction=(0.0, 0.0, -1.0),
         )
 
     # -------------------------------------------------------------------------
@@ -663,12 +773,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="box_top",
             expected_source_type="mesh",
-            expected_contact_z=0.8,
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 0.8),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_signed_dist=0.2,
             expected_support=True,
             expected_id_substr="Box_Near",
+            allowed_objects=["Box_Near"],
+            query_origin=(0.0, 0.0, 1.0),
         )
-        self.assertAlmostEqual(res.signed_distance, 0.2, places=3)
 
     def test_20_a02_2_nearest_filtered_finds_target_surface(self):
         """A02-2: Filtered find_nearest finds closest matching surface B (dist 0.8m)."""
@@ -683,12 +795,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="horizontal_ground",
             expected_source_type="mesh",
-            expected_contact_z=0.2,
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 0.2),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_signed_dist=0.8,
             expected_support=True,
             expected_id_substr="Plane_Far",
+            allowed_objects=["Plane_Far"],
+            query_origin=(0.0, 0.0, 1.0),
         )
-        self.assertAlmostEqual(res.signed_distance, 0.8, places=3)
 
     def test_21_a02_3_nearest_filtered_insufficient_radius(self):
         """A02-3: Filtered find_nearest fails when max_distance (0.5m) cannot reach target B (0.8m)."""
@@ -698,7 +812,7 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             max_distance=0.5,
             surface_type_filter="horizontal_ground",
         )
-        self._assert_surface_contract(res, expected_success=False)
+        self._assert_surface_contract(res, expected_success=False, expected_error_prefix="NO_HIT:")
 
     def test_22_a02_4_nearest_filtered_moved_query_point(self):
         """A02-4: Moving query point closer to B updates distance and contact point."""
@@ -714,12 +828,14 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="horizontal_ground",
             expected_source_type="mesh",
-            expected_contact_z=0.2,
-            expected_normal_z=1.0,
+            expected_contact_point=(0.0, 0.0, 0.2),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_signed_dist=0.1,
             expected_support=True,
             expected_id_substr="Plane_Far",
+            allowed_objects=["Plane_Far"],
+            query_origin=(0.0, 0.0, 0.3),
         )
-        self.assertAlmostEqual(res.signed_distance, 0.1, places=3)
 
     def test_23_a02_5_nearest_filtered_rotated_surface_normal(self):
         """A02-5: Rotating target surface updates outward world normal upon refresh."""
@@ -734,6 +850,7 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
         adapter.refresh()
 
         # Plane rotated by 30 deg has normal (0, -sin(30), cos(30)) = (0, -0.5, 0.866) -> type: "sloped_ramp"
+        expected_norm = (0.0, -math.sin(angle_rad), math.cos(angle_rad))
         res = adapter.find_nearest(
             point_world=(0.0, 0.0, 1.0),
             max_distance=5.0,
@@ -744,11 +861,430 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
             expected_success=True,
             expected_surface_type="sloped_ramp",
             expected_source_type="mesh",
+            expected_surface_normal=expected_norm,
             expected_support=True,
             expected_id_substr="Plane_Far",
+            allowed_objects=["Plane_Far"],
+            query_origin=(0.0, 0.0, 1.0),
         )
-        self.assertAlmostEqual(res.surface_normal_world[1], -math.sin(angle_rad), places=3)
-        self.assertAlmostEqual(res.surface_normal_world[2], math.cos(angle_rad), places=3)
+
+    # -------------------------------------------------------------------------
+    # Repair Unit 1 / T01: Non-Axis-Aligned Rotated 3D Analytical Scene
+    # -------------------------------------------------------------------------
+
+    def test_24_non_axis_aligned_rotated_scene(self):
+        """T01: Non-axis-aligned rotated 3D mesh scene verified against exact independent analytical math."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("RotatedSceneCol")
+        bpy.context.scene.collection.children.link(col)
+
+        # Plane at (3.0, 4.0, 2.0), rotated by Euler (30 deg, 45 deg, 0 deg)
+        bpy.ops.mesh.primitive_plane_add(size=6.0, location=(3.0, 4.0, 2.0))
+        plane = bpy.context.active_object
+        plane.name = "Rotated_Plane"
+        plane.rotation_euler = (math.radians(30.0), math.radians(45.0), 0.0)
+        bpy.context.view_layer.update()
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("RotatedSceneCol",))
+        self.assertIn("Rotated_Plane", adapter.tracked_objects)
+
+        # Analytical normal for Euler (alpha=30 deg, beta=45 deg, gamma=0 deg):
+        # Outward unit normal: (sin(45)*cos(30), -sin(30), cos(45)*cos(30))
+        alpha = math.radians(30.0)
+        beta = math.radians(45.0)
+        nx = math.sin(beta) * math.cos(alpha)
+        ny = -math.sin(alpha)
+        nz = math.cos(beta) * math.cos(alpha)
+        normal_analytical = (nx, ny, nz)
+
+        # Query point NOT at (0, 0): (3.5, 4.2, 5.0)
+        # Downward ray: dir = (0, 0, -1)
+        z_hit_analytical = 2.0 - (0.5 * nx + 0.2 * ny) / nz
+        dist_analytical = 5.0 - z_hit_analytical
+        contact_point_analytical = (3.5, 4.2, z_hit_analytical)
+
+        res_ray = adapter.ray_cast(
+            origin=(3.5, 4.2, 5.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=10.0,
+        )
+        self._assert_surface_contract(
+            res_ray,
+            expected_success=True,
+            expected_surface_type="sloped_ramp",
+            expected_source_type="mesh",
+            expected_contact_point=contact_point_analytical,
+            expected_surface_normal=normal_analytical,
+            expected_ray_dist=dist_analytical,
+            expected_support=True,
+            expected_id_substr="Rotated_Plane",
+            allowed_objects=["Rotated_Plane"],
+            query_origin=(3.5, 4.2, 5.0),
+            ray_direction=(0.0, 0.0, -1.0),
+            places=4,
+        )
+
+        # Nearest query from (3.5, 4.2, 5.0):
+        d_signed_analytical = (3.5 - 3.0) * nx + (4.2 - 4.0) * ny + (5.0 - 2.0) * nz
+        near_x = 3.5 - d_signed_analytical * nx
+        near_y = 4.2 - d_signed_analytical * ny
+        near_z = 5.0 - d_signed_analytical * nz
+        near_point_analytical = (near_x, near_y, near_z)
+
+        res_near = adapter.find_nearest(
+            point_world=(3.5, 4.2, 5.0),
+            max_distance=10.0,
+        )
+        self._assert_surface_contract(
+            res_near,
+            expected_success=True,
+            expected_surface_type="sloped_ramp",
+            expected_source_type="mesh",
+            expected_contact_point=near_point_analytical,
+            expected_surface_normal=normal_analytical,
+            expected_signed_dist=d_signed_analytical,
+            expected_support=True,
+            expected_id_substr="Rotated_Plane",
+            allowed_objects=["Rotated_Plane"],
+            query_origin=(3.5, 4.2, 5.0),
+            places=4,
+        )
+
+    # -------------------------------------------------------------------------
+    # Repair Unit 1 / T03: Ray Iteration & Boundary Checks (8 Cases)
+    # -------------------------------------------------------------------------
+
+    def test_25_t03_single_surface_query(self):
+        """T03-1: Single surface ray query hits on initial step 0 without looping."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_Single")
+        bpy.context.scene.collection.children.link(col)
+
+        bpy.ops.mesh.primitive_plane_add(size=4.0, location=(1.0, 2.0, 0.0))
+        plane = bpy.context.active_object
+        plane.name = "Plane_Ground"
+        col.objects.link(plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_Single",))
+        res = adapter.ray_cast(origin=(1.0, 2.0, 5.0), direction=(0.0, 0.0, -1.0), distance=10.0)
+        self._assert_surface_contract(
+            res,
+            expected_success=True,
+            expected_surface_type="horizontal_ground",
+            expected_contact_point=(1.0, 2.0, 0.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=5.0,
+            expected_support=True,
+            allowed_objects=["Plane_Ground"],
+            query_origin=(1.0, 2.0, 5.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
+    def test_26_t03_multi_surface_query(self):
+        """T03-2: Multi-surface scene query correctly filters through 3 stacked surfaces."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_Multi")
+        bpy.context.scene.collection.children.link(col)
+
+        # Top box at Z=6.0
+        bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 5.0))
+        top_box = bpy.context.active_object
+        top_box.name = "Box_Top"
+        col.objects.link(top_box)
+
+        # Mid ramp at Z=4.0
+        bpy.ops.mesh.primitive_plane_add(size=3.0, location=(0.0, 0.0, 4.0))
+        mid_ramp = bpy.context.active_object
+        mid_ramp.name = "Ramp_Mid"
+        mid_ramp.rotation_euler.x = math.radians(20.0)
+        bpy.context.view_layer.update()
+        col.objects.link(mid_ramp)
+
+        # Bottom ground plane at Z=2.0
+        bpy.ops.mesh.primitive_plane_add(size=4.0, location=(0.0, 0.0, 2.0))
+        bot_plane = bpy.context.active_object
+        bot_plane.name = "Ground_Bottom"
+        col.objects.link(bot_plane)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_Multi",))
+
+        # Unfiltered query hits Top Box (Z=6.0)
+        res_unfiltered = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0), distance=15.0)
+        self._assert_surface_contract(
+            res_unfiltered,
+            expected_success=True,
+            expected_surface_type="box_top",
+            expected_contact_point=(0.0, 0.0, 6.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=4.0,
+            allowed_objects=["Box_Top"],
+            query_origin=(0.0, 0.0, 10.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
+        # Filtered for horizontal_ground skips Box_Top and Ramp_Mid, hits Ground_Bottom at Z=2.0
+        res_filtered = adapter.ray_cast(
+            origin=(0.0, 0.0, 10.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=15.0,
+            surface_type_filter="horizontal_ground",
+        )
+        self._assert_surface_contract(
+            res_filtered,
+            expected_success=True,
+            expected_surface_type="horizontal_ground",
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=8.0,
+            allowed_objects=["Ground_Bottom"],
+            query_origin=(0.0, 0.0, 10.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
+    def test_27_t03_consecutive_filters(self):
+        """T03-3: Consecutive ray queries with different filters execute cleanly against same adapter cache."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_Consecutive")
+        bpy.context.scene.collection.children.link(col)
+
+        # Box top at Z=6.0
+        bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 5.0))
+        box = bpy.context.active_object
+        box.name = "Box_Surface"
+        col.objects.link(box)
+
+        # Ramp at Z=4.0
+        bpy.ops.mesh.primitive_plane_add(size=3.0, location=(0.0, 0.0, 4.0))
+        ramp = bpy.context.active_object
+        ramp.name = "Ramp_Surface"
+        ramp.rotation_euler.x = math.radians(20.0)
+        bpy.context.view_layer.update()
+        col.objects.link(ramp)
+
+        # Ground at Z=2.0
+        bpy.ops.mesh.primitive_plane_add(size=4.0, location=(0.0, 0.0, 2.0))
+        ground = bpy.context.active_object
+        ground.name = "Ground_Surface"
+        col.objects.link(ground)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_Consecutive",))
+
+        # Query 1: Filter box_top
+        res1 = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0), distance=15.0, surface_type_filter="box_top")
+        self.assertEqual(res1.surface_type, "box_top")
+        self.assertAlmostEqual(res1.contact_point_world[2], 6.0, places=3)
+
+        # Query 2: Filter sloped_ramp
+        res2 = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0), distance=15.0, surface_type_filter="sloped_ramp")
+        self.assertEqual(res2.surface_type, "sloped_ramp")
+        self.assertAlmostEqual(res2.contact_point_world[2], 4.0, places=3)
+
+        # Query 3: Filter horizontal_ground
+        res3 = adapter.ray_cast(origin=(0.0, 0.0, 10.0), direction=(0.0, 0.0, -1.0), distance=15.0, surface_type_filter="horizontal_ground")
+        self.assertEqual(res3.surface_type, "horizontal_ground")
+        self.assertAlmostEqual(res3.contact_point_world[2], 2.0, places=3)
+
+    def test_28_t03_exact_budget_reach(self):
+        """T03-4: Ray query succeeds when target is hit exactly on the final budgeted step."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_Budget")
+        bpy.context.scene.collection.children.link(col)
+
+        # Stack 4 obstacle planes at Z=5, 4, 3, 2 (type: box_top)
+        for i in range(1, 5):
+            bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 6.0 - i))
+            p = bpy.context.active_object
+            p.name = f"Box_Obstacle_{i}"
+            col.objects.link(p)
+
+        # Target ground plane at Z=1.0 (type: horizontal_ground)
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        target = bpy.context.active_object
+        target.name = "Ground_Target"
+        col.objects.link(target)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_Budget",))
+
+        # With max_steps=5, steps 0..3 reject obstacles 1..4, and step 4 hits Ground_Target
+        res = adapter.ray_cast(
+            origin=(0.0, 0.0, 8.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=10.0,
+            surface_type_filter="horizontal_ground",
+            max_steps=5,
+        )
+        self._assert_surface_contract(
+            res,
+            expected_success=True,
+            expected_surface_type="horizontal_ground",
+            expected_contact_point=(0.0, 0.0, 1.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=7.0,
+            allowed_objects=["Ground_Target"],
+            query_origin=(0.0, 0.0, 8.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
+    def test_29_t03_budget_exhaustion(self):
+        """T03-5: Ray query reports SEARCH_LIMIT_REACHED when step budget is exhausted before match."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_Exhaust")
+        bpy.context.scene.collection.children.link(col)
+
+        # Stack 4 obstacle planes at Z=5, 4, 3, 2 (type: box_top)
+        for i in range(1, 5):
+            bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 6.0 - i))
+            p = bpy.context.active_object
+            p.name = f"Box_Obstacle_{i}"
+            col.objects.link(p)
+
+        # Target ground plane at Z=1.0 (type: horizontal_ground)
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        target = bpy.context.active_object
+        target.name = "Ground_Target"
+        col.objects.link(target)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_Exhaust",))
+
+        # With max_steps=4, budget runs out on obstacle 4 before evaluating target
+        res = adapter.ray_cast(
+            origin=(0.0, 0.0, 8.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=10.0,
+            surface_type_filter="horizontal_ground",
+            max_steps=4,
+        )
+        self._assert_surface_contract(
+            res,
+            expected_success=False,
+            expected_error_prefix="SEARCH_LIMIT_REACHED:",
+        )
+        self.assertIn("Exceeded maximum ray iteration budget (4 steps)", res.error_reason)
+
+    def test_30_t03_ultra_thin_layer(self):
+        """T03-6: Ultra-thin 50-micrometer obstacle layer is cleanly resolved using step_epsilon=1e-6."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_Thin")
+        bpy.context.scene.collection.children.link(col)
+
+        # 50-micrometer thick obstacle box at Z=3.0 (height 0.00005m = 50um)
+        bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 3.0))
+        box = bpy.context.active_object
+        box.name = "Box_Thin"
+        box.scale = (1.0, 1.0, 0.000025)
+        bpy.context.view_layer.update()
+        col.objects.link(box)
+
+        # Ground target at Z=1.0
+        bpy.ops.mesh.primitive_plane_add(size=2.0, location=(0.0, 0.0, 1.0))
+        target = bpy.context.active_object
+        target.name = "Ground_Target"
+        col.objects.link(target)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_Thin",), step_epsilon=1e-6)
+
+        res = adapter.ray_cast(
+            origin=(0.0, 0.0, 5.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=10.0,
+            surface_type_filter="horizontal_ground",
+        )
+        self._assert_surface_contract(
+            res,
+            expected_success=True,
+            expected_surface_type="horizontal_ground",
+            expected_contact_point=(0.0, 0.0, 1.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=4.0,
+            allowed_objects=["Ground_Target"],
+            query_origin=(0.0, 0.0, 5.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
+    def test_31_t03_ray_origin_on_surface_boundary(self):
+        """T03-7: Ray origin positioned directly on obstacle boundary cleanly advances past it."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_Boundary")
+        bpy.context.scene.collection.children.link(col)
+
+        # Obstacle box with top face at Z=5.0
+        bpy.ops.mesh.primitive_cube_add(size=2.0, location=(0.0, 0.0, 4.0))
+        box = bpy.context.active_object
+        box.name = "Box_Obstacle"
+        col.objects.link(box)
+
+        # Target plane at Z=2.0
+        bpy.ops.mesh.primitive_plane_add(size=4.0, location=(0.0, 0.0, 2.0))
+        target = bpy.context.active_object
+        target.name = "Ground_Target"
+        col.objects.link(target)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_Boundary",))
+
+        # Ray origin placed exactly on top surface of obstacle at Z=5.0
+        res = adapter.ray_cast(
+            origin=(0.0, 0.0, 5.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=10.0,
+            surface_type_filter="horizontal_ground",
+        )
+        self._assert_surface_contract(
+            res,
+            expected_success=True,
+            expected_surface_type="horizontal_ground",
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=3.0,
+            allowed_objects=["Ground_Target"],
+            query_origin=(0.0, 0.0, 5.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
+    def test_32_t03_distance_almost_exhausted(self):
+        """T03-8: Ray query correctly discriminates boundary when remaining distance is barely sufficient vs insufficient."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        col = bpy.data.collections.new("T03_DistBoundary")
+        bpy.context.scene.collection.children.link(col)
+
+        # Ground target at Z=2.0 (distance from Z=8.0 is exactly 6.0m)
+        bpy.ops.mesh.primitive_plane_add(size=4.0, location=(0.0, 0.0, 2.0))
+        target = bpy.context.active_object
+        target.name = "Ground_Target"
+        col.objects.link(target)
+
+        adapter = BlenderMeshEnvironmentAdapter(collection_names=("T03_DistBoundary",))
+
+        # Case A: distance=6.0001 (barely sufficient) -> hits target
+        res_hit = adapter.ray_cast(
+            origin=(0.0, 0.0, 8.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=6.0001,
+            surface_type_filter="horizontal_ground",
+        )
+        self._assert_surface_contract(
+            res_hit,
+            expected_success=True,
+            expected_contact_point=(0.0, 0.0, 2.0),
+            expected_surface_normal=(0.0, 0.0, 1.0),
+            expected_ray_dist=6.0,
+            allowed_objects=["Ground_Target"],
+            query_origin=(0.0, 0.0, 8.0),
+            ray_direction=(0.0, 0.0, -1.0),
+        )
+
+        # Case B: distance=5.9990 (barely insufficient) -> returns NO_HIT
+        res_miss = adapter.ray_cast(
+            origin=(0.0, 0.0, 8.0),
+            direction=(0.0, 0.0, -1.0),
+            distance=5.9990,
+            surface_type_filter="horizontal_ground",
+        )
+        self._assert_surface_contract(
+            res_miss,
+            expected_success=False,
+            expected_error_prefix="NO_HIT:",
+        )
 
 
 def run_tests() -> int:

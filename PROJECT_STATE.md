@@ -1,13 +1,36 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-27  
-> **当前阶段**：Environment Gate 01 — Repair Unit 1（Blender Mesh 环境查询候选范围隔离与表面筛选语义修复）已全部完成并通过 15 项新增反例及全量 23 项单元验证。重构了 `BlenderMeshEnvironmentAdapter` 的候选对象采集逻辑，确立规则 A（显式 Collection 模式绝不回退）、规则 B（显式 Object 模式去重防泄漏）、规则 C（显式全场景模式）；重构了 `ray_cast` 推进式表面过滤逻辑，在保持无过滤最近物理命中前提下，支持沿射线方向正向步进检索最近目标表面，累计计算真实欧氏距离；重构了 `find_nearest` 范围搜索逻辑，支持基于 `find_nearest_range` 筛选最近目标表面；实施了全 8 字段数据契约严密断言与隔离受控故障注入，严格证明测试的反例检出能力。全套测试回归：`quick` (13/13 PASS), `physics` (19/19 PASS), `motion` (8/8 PASS), `full` (30/30 PASS), `--verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动。当前状态：`ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Phase 7B。  
+> **当前阶段**：Environment Gate 01 — Repair Unit 1 Final Acceptance（数值覆盖提升、独立数学验证、真实故障注入证据链与射线边界闭环）已全部完成并通过 32 项完整验证。重构升级了 `_assert_surface_contract()` 断言体系，对齐完整 3D 接触点、3D 法向量（单位长度误差 $< 10^{-5}$）、独立欧氏距离与带符号距离二次解析数学核算、以及允许物体归属权校验；新增并验证了非轴对齐旋转 3D 场景测试（`test_24`），对齐独立解析公式与 Blender C-BVHTree 计算结果（误差 $< 10^{-5}$）；在白名单目录 `docs/evidence/environment_gate01_ru1/` 中实际运行 Blender 5.1.1 Headless 生成归档了真实故障注入日志（`fault_injection_a03.log`、`fault_injection_a01.log`、`fault_injection_a02.log`，退出码均为 1）及结构化总结报告；优化了 `ray_cast` 推进机制，基准步长设为 `step_epsilon = 1e-6`（$1\mu m$），支持动态自适应缩放与超薄 $50\mu m$ 障碍层解析，明确区分 `SEARCH_LIMIT_REACHED:` 与 `NO_HIT:` 失败原因，全量覆盖 8 项极端边界（`test_25` 至 `test_32`）；编写并归档了全 32 项测试覆盖矩阵与射线迭代边界报告。全套分级测试回归：`quick` (13/13 PASS), `physics` (19/19 PASS), `motion` (8/8 PASS), `full` (30/30 PASS), `--verify-docs` (PASS)；受保护 `.blend` 资产 0 字节变动。当前状态：`ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`，严格停止等待人类审批，严禁擅自进入 Repair Unit 2 或 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01 — Repair Unit 1 Final Acceptance: 数值覆盖提升、独立数学验证、真实故障注入证据链与射线边界闭环 (Final Acceptance & Evidence Closure)**：
+  * **全 8 字段物理契约断言升级与独立解析验证 (T01)**：
+    - 升级 `_assert_surface_contract()`：严格核验完整 3D 接触点、3D 法向量（单位长度误差 $< 10^{-5}$）、独立欧几里得射线距离 $\|\mathbf{p}_{\text{hit}} - \mathbf{p}_{\text{orig}}\|$ 与射线方向夹角对齐、独立带符号距离二次验证，以及 `allowed_objects` 表面所属权校验；
+    - 升级历史测试 09 至 23 全量接入完整三维向量核验；
+    - 新增 `test_24_non_axis_aligned_rotated_scene`：采用中心 $(3.0, 4.0, 2.0)$、欧拉角 $(30^\circ, 45^\circ, 0^\circ)$ 的非轴对齐斜面，查询点位于 $(3.5, 4.2, 5.0)$，对齐独立解析公式与 Blender C-BVHTree 计算结果（误差 $< 10^{-5}$）；
+    - 生成覆盖 32 个测试的完整测试覆盖矩阵 [`docs/evidence/environment_gate01_ru1/test_coverage_matrix.md`](docs/evidence/environment_gate01_ru1/test_coverage_matrix.md)。
+  * **真实故障注入实证产物与独立日志归档 (T02)**：
+    - 在白名单目录 [`docs/evidence/environment_gate01_ru1/`](docs/evidence/environment_gate01_ru1/) 真实运行 Blender 5.1.1 Headless 生成三个独立故障注入日志：
+      * `fault_injection_a03.log` (Exit code 1, `Surface_Forbidden` 越界捕获)
+      * `fault_injection_a01.log` (Exit code 1, `Box_Front` 提前阻断捕获)
+      * `fault_injection_a02.log` (Exit code 1, `Box_Near` 筛选短路捕获)
+    - 编写结构化总结报告 [`fault_injection_summary.md`](docs/evidence/environment_gate01_ru1/fault_injection_summary.md)，详述代码变异、命令、退出码及生产恢复通过记录。
+  * **射线迭代机制优化与 8 项极端边界检验 (T03)**：
+    - 优化 `BlenderMeshEnvironmentAdapter.ray_cast()`：默认步进推进设为 `step_epsilon = 1e-6`（$1\mu m$），支持动态自适应缩放（防止数值同面重复判定），并暴露 `max_steps` 与 `step_epsilon`；
+    - 失败原因严格标准化：`SEARCH_LIMIT_REACHED:` vs `NO_HIT:`；
+    - 新增 8 项极端边界测试（`test_25` 至 `test_32`）：单表面、三层多表面过滤、跨过滤缓存复用、`max_steps=5` 恰好命中、`max_steps=4` 预算耗尽、超薄 $50\mu m$ 障碍穿透、表面边界起点穿透、以及距离阈值 $6.0001\text{m}$ vs $5.9990\text{m}$ 临界区分；
+    - 编写射线迭代与边界报告 [`ray_iteration_boundary_report.md`](docs/evidence/environment_gate01_ru1/ray_iteration_boundary_report.md)。
+  * **全量回归与受保护资产验证**：
+    - 32 项环境查询测试全通（32/32 PASS in 1.74s）；
+    - `run_test_suite.py` 全分级通过：`quick` (13/13 PASS), `physics` (19/19 PASS), `motion` (8/8 PASS), `full` (30/30 PASS)；
+    - `audit_c2_final_inspector.py --verify-docs` 校验 0 错误；
+    - `output/` 历史 `.blend` 资产 0 字节变动；
+    - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`，严禁未经人类指令自动跨入 Repair Unit 2 或 Phase 7B。
 * **Environment Gate 01 — Repair Unit 1: Blender Mesh 环境查询候选范围隔离与表面筛选语义修复 (Candidate Scope Isolation & Surface Filter Semantics Repair)**：
   * **候选范围隔离机制重构 (Defect A03 修复)**：
     - 规则 A (显式 Collection 模式)：`collection_names is not None` 时仅检索指定集合（保留递归子集合），若集合不存在或无网格严格返回空集 $\emptyset$，绝不回退全场景；

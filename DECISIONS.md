@@ -1251,3 +1251,39 @@
      - 全量回归全绿：`quick` (13/13), `physics` (19/19), `motion` (8/8), `full` (30/30), `--verify-docs` (PASS)；受保护资产 0 字节变动。
 * **影响**：
   - 彻底消除了几何查询范围越界与表面过滤提前短路的缺陷，为上层足底落脚点规划提供了精准、可靠的环境几何契约。
+
+---
+
+### [DEC-055] 2026-10-27: Environment Gate 01 — Repair Unit 1 Final Acceptance: 数值覆盖提升、真实故障注入证据链与边界闭环 (T01/T02/T03)
+
+* **状态**：已采纳并完成 (Accepted & Completed)
+* **日期**：2026-10-27
+* **背景**：在 Repair Unit 1 验收闭环阶段，依据最新验收要求执行三项深化闭环：
+  1. **T01 (数值覆盖与独立解析校验不足)**：旧测试断言仅覆盖局部 Z 轴高程，缺少完整三维接触点 $(x, y, z)$、完整三维法向量 $(nx, ny, nz)$ 单位化精度 $< 10^{-5}$、独立欧几里得距离与带符号距离二次解析数学核算，且缺少非坐标轴对齐的倾斜三维场景验证；
+  2. **T02 (故障注入实证产物缺失)**：故障注入证据此前仅记录于会话过程，缺少可独立审查的真实执行日志与结构化证据产物；
+  3. **T03 (射线迭代边界与失败原因模糊)**：缺少多表面穿透、预算步数耗尽（`max_steps`）、超薄层穿透（$50\mu m$）、表面交界起点以及距离阈值临界耗尽等极端边界的独立覆盖，且失败原因未区分几何脱靶（`NO_HIT:`）与预算耗尽（`SEARCH_LIMIT_REACHED:`）。
+* **决策与方案**：
+  1. **T01: 全 8 字段物理契约升级与独立解析验证**：
+     - 重构 `_assert_surface_contract()`：严格核验完整 3D 接触点、3D 法向量（单位长度误差 $< 10^{-5}$）、独立欧几里得射线距离 $\|\mathbf{p}_{\text{hit}} - \mathbf{p}_{\text{orig}}\|$ 与射线方向夹角对齐、独立带符号距离二次验证，以及 `allowed_objects` 表面所属权校验；
+     - 新增 `test_24_non_axis_aligned_rotated_scene`：采用位置 $(3.0, 4.0, 2.0)$、欧拉角 $(30^\circ, 45^\circ, 0^\circ)$ 的非轴对齐斜面，查询点位于 $(3.5, 4.2, 5.0)$，对齐独立解析公式与 Blender C-BVHTree 计算结果（误差 $< 10^{-5}$）；
+     - 生成覆盖 32 个测试的完整测试覆盖矩阵 [`docs/evidence/environment_gate01_ru1/test_coverage_matrix.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/test_coverage_matrix.md)。
+  2. **T02: 真实故障注入实证产物与独立日志归档**：
+     - 在白名单目录 [`docs/evidence/environment_gate01_ru1/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/) 真实运行 Blender 5.1.1 Headless 生成三个独立故障注入日志：
+       * `fault_injection_a03.log` (Exit code 1, `Surface_Forbidden` 越界捕获)
+       * `fault_injection_a01.log` (Exit code 1, `Box_Front` 提前阻断捕获)
+       * `fault_injection_a02.log` (Exit code 1, `Box_Near` 筛选短路捕获)
+     - 编写结构化总结报告 [`fault_injection_summary.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/fault_injection_summary.md)，详述代码变异、命令、退出码及生产恢复通过记录。
+  3. **T03: 射线迭代机制优化与 8 项极端边界检验**：
+     - 优化 `BlenderMeshEnvironmentAdapter.ray_cast()`：默认步进推进设为 `step_epsilon = 1e-6`（$1\mu m$），支持动态自适应缩放（防止数值同面重复判定），并暴露 `max_steps` 与 `step_epsilon`；
+     - 失败原因严格标准化：`SEARCH_LIMIT_REACHED:` vs `NO_HIT:`；
+     - 新增 8 项极端边界测试（`test_25` 至 `test_32`）：单表面、三层多表面过滤、跨过滤缓存复用、`max_steps=5` 恰好命中、`max_steps=4` 预算耗尽、超薄 $50\mu m$ 障碍穿透、表面边界起点穿透、以及距离阈值 $6.0001\text{m}$ vs $5.9990\text{m}$ 临界区分；
+     - 编写射线迭代与边界报告 [`ray_iteration_boundary_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/ray_iteration_boundary_report.md)。
+  4. **全量回归与受保护资产验证**：
+     - 32 项环境查询测试全通（32/32 PASS in 1.74s）；
+     - `run_test_suite.py` 全分级通过：`quick` (13/13), `physics` (19/19), `motion` (8/8), `full` (30/30)；
+     - `audit_c2_final_inspector.py --verify-docs` 校验 0 错误；
+     - `output/` 历史 `.blend` 资产 0 字节变动；
+     - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 1 — AWAITING HUMAN REVIEW`，严禁擅自推进至 Repair Unit 2 或 Phase 7B。
+* **影响**：
+  - 全面补齐了环境网格查询系统的数值精度验证、边界条件鲁棒性与故障注入可证伪证据链；
+  - 维持零历史退化与零架构违规。

@@ -135,13 +135,14 @@ When gathering target mesh objects from the scene, the adapter strictly adheres 
 **Data Invariant**:
 $$\text{QueriedObjects} \subseteq \text{ExplicitlyAllowedObjects}, \quad \text{NonExistentCollection} \implies \text{QueriedObjects} = \emptyset$$
 
-### 6.2 Raycast Surface Filtering Semantics (Defect A01)
+### 6.2 Raycast Surface Filtering Semantics (Defect A01 & T03 Iteration Mechanics)
 1. **Unfiltered Raycast (`surface_type_filter is None`)**:
    Returns the nearest physical surface hit along the ray path. Never penetrates or searches behind the first intersection.
 2. **Filtered Raycast (`surface_type_filter is not None`)**:
    Searches forward along the ray path up to `distance` for the closest surface matching `surface_type_filter`.
-   * Advances forward past non-matching intersections by $\Delta s \ge 10^{-4}\text{ m}$.
-   * Guaranteed positive progression and termination within at most 64 steps.
+   * Advances forward past non-matching intersections using high-precision step push `step_epsilon = 1e-6` ($1\mu m$), with dynamic adaptive scaling if numerical polygon re-hits occur.
+   * Resolves thin geometric layers down to $50\mu m$ without skipping.
+   * Guaranteed positive progression and termination within at most `max_steps` (default 64 steps).
    * `ray_hit_distance` strictly reports the cumulative Euclidean distance from the original ray origin, not a local step distance.
    * *Note*: This is a geometric query and does not imply human body penetration feasibility across obstacle surfaces.
 
@@ -150,4 +151,11 @@ $$\text{QueriedObjects} \subseteq \text{ExplicitlyAllowedObjects}, \quad \text{N
    Returns the globally nearest mesh surface to the query point within `max_distance`.
 2. **Filtered Nearest Point (`surface_type_filter is not None`)**:
    Performs a native accelerated range search (`find_nearest_range(point, max_distance)`) and selects the surface matching `surface_type_filter` with the minimal Euclidean distance to the query point. If no matching surface exists within `max_distance`, strictly returns `success = False`.
+
+### 6.4 Error Reason Disambiguation & Diagnostics (T03)
+When a query returns `success=False`, `error_reason` explicitly distinguishes between geometric misses and iteration limits:
+* `SEARCH_LIMIT_REACHED:` Step budget (`max_steps`) was exhausted before reaching query distance while searching for filtered surface.
+* `NO_HIT:` Ray completed search up to query distance without intersecting any surface matching the filter (or no surface at all).
+
+Evidence artifacts, coverage matrices, and real fault injection execution logs are preserved in [`docs/evidence/environment_gate01_ru1/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/environment_gate01_ru1/).
 
