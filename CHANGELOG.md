@@ -3,6 +3,46 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-28] Environment Gate 01 — Repair Unit 3: 真实 Blender Mesh 环境查询与 19 骨骼人体连续运动主链接入及反事实实证闭环 (U3-01 至 U3-14)
+
+### 地面单次命中支撑查询合同落地 (`src/scene/environment_query.py`)
+* **统一单次命中查询契约 (`query_ground_support_at`)**：
+  - 在 `EnvironmentQuery` 与 `DynamicsEnvironmentQuery` 实现 `query_ground_support_at(x, y, start_z=50.0, max_fall=100.0) -> SurfaceQueryResult`；
+  - 终结分散的 `ground_height_at`、`surface_normal_at` 与 `query_surface_at_point` 调用，保证足部落点高度 $Z$、法向量、`surface_id` 及支撑适格性来自单次物理命中；
+  - 网格模式下垂直向下投射射线，未命中时严格返回 `success=False`（`error_reason="NO_HIT: ..."`，`source_type="mesh"`），彻底消除静默伪造 $Z=0.0\text{m}$ 虚假地面；
+  - 命中非支撑表面（`allows_regular_support=False`）时返回 `success=False`（`NON_SUPPORT_SURFACE`）；
+  - 解析模式与基类保持向下兼容（回退至解析表面或默认平地，`source_type="analytical"` / `"default"`）。
+
+### 运动规划与执行接入真实网格与严格拒绝 (`src/motion/terrain_walk.py`)
+* **单次命中集成与严格阻断**：
+  - 在 `plan_terrain_footsteps`、`build_terrain_step_schedule`、`_adjust_footfall_for_seams_and_edges` 与 `execute` 中全面接入 `query_ground_support_at`；
+  - 起始站立脚、每步摆动着地、支撑脚参考及足部刚体包围盒清除均由统一单次命中决定；
+  - 网格模式下遇到 `NO_HIT` 或非支撑表面显式抛出 `ValueError` 阻断规划；
+  - 零侵入保持 6 阶段权威主链（`MotionPlanner` → `TerrainWalkAction` → `KinematicPlannedPose` → `KinematicBridgeExecutor` → `WholeBodyController` → `Rig/IK/FK`），`WholeBodyController`、`KinematicBridgeExecutor` 与角色骨骼模块保持 0 改动。
+
+### 独立场景装配与进出坡道实网格补全 (`src/scene/playground_terrain_traversal.py`)
+* **真实网格集成场景生成入口 (`generate_dynamics_playground_environment_gate01_u3_blend`)**：
+  - 在装配场景中补全坡道引桥与着地出口平地支撑块（`Surface_Ramp_ApproachGround`, `Surface_Ramp_ExitGround`）并纳入 `Playground_Surfaces`，确保全路段落点 100% 命中真实网格；
+  - 顶面多边形采用逆时针缠绕顺序生成向上法线 $(0, 0, 1)$；
+  - 产物持久化至 `output/dynamics_playground_environment_gate01_u3.blend`（700 帧连续动画、主相机、诊断场景、逐帧遥测与 JSON 伴随数据）；
+  - 实现反事实网格微扰生成函数 `apply_ramp_mesh_perturbation(delta_z=0.05)`，生成对照场景 `output/dynamics_playground_environment_gate01_u3_perturbed.blend`；
+  - 历史基准资产 `output/dynamics_playground.blend` 保持 0 字节变动。
+
+### 真实网格重新评估验证器 (`src/scene/playground_terrain_validation.py`)
+* **重开文件网格逐帧核验 (`validate_dynamics_playground_environment_gate01_u3`)**：
+  - 重新打开产物场景并实例化 `BlenderMeshEnvironmentAdapter` 针对真实网格逐帧核验；
+  - 700 帧全量零豁免 Root C0 连续性（$< 0.12\text{ m/frame}$）、骨骼拉伸（$< 0.1\text{ mm}$）、旋转抖动（$< 35^\circ$）、锁定支撑脚滑移（$< 0.1\text{ mm}$）、ROM 违规（0 处）与真实网格表面接触检验。
+
+### 14 项完整测试与反事实实证归档 (`tests/test_environment_gate01_unit3.py`, `docs/evidence/environment_gate01_ru3/`)
+* **完整测试套件 (U3-T01 至 U3-T14)**：
+  - 编写 `tests/test_environment_gate01_unit3.py` 并注册至 `tests/test_registry.py`，14 项测试全绿（14/14 PASS in 14.8s）；
+  - 全量分级回归通过：`quick` (14/14), `physics` (19/19), `motion` (9/9), `full` (31/31)；
+  - `audit_c2_final_inspector.py --verify-docs` 校验 0 错误；
+  - 生成反事实对比报告 `counter_factual_summary.md` 与技术集成报告 `unit3_integration_report.md`；
+  - 证实网格微扰驱动运动主链产生真实物理偏移（落地高程与 Root 高程均抬升 $+0.05\text{m}$），同时证实旧版解析查询器对网格微扰脱敏（高程差异恒为 $0.0\text{m}$）；
+  - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 3 — AWAITING HUMAN VISUAL REVIEW`。
+
+
 ## [2026-10-28] Environment Gate 01 — Repair Unit 2 Final Closure: C05-1至C05-4深度集合生命周期、C06异常安全加固与F01-F03反事实实证闭环
 
 ### 生产适配器异常安全与状态加固 (`src/scene/blender_mesh_query_adapter.py`)

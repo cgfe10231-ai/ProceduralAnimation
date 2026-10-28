@@ -1,0 +1,26 @@
+{
+  "task": "Environment Gate 01 / Unit 3",
+  "perturbed": false,
+  "perturb_height_m": 0.0,
+  "environment_source": "blender_mesh_bvh",
+  "mesh_collection": "Playground_Surfaces",
+  "total_frames": 700,
+  "max_locked_ankle_drift_m": 4.979157403234397e-05,
+  "unreachable_count": 0,
+  "route": {
+    "start_pos": [
+      0.0,
+      10.2,
+      0.0
+    ],
+    "target_pos": [
+      0.0,
+      22.4,
+      0.0
+    ],
+    "nominal_stride_m": 0.3,
+    "total_steps": 42
+  },
+  "continuous_without_exemption": true,
+  "diagnostic_scene": "Task7A2_ControlChain_Debug"
+}

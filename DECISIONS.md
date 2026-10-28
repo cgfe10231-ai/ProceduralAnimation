@@ -1373,3 +1373,41 @@
 * **影响**：
   - 彻底完成了 Environment Gate 01 Repair Unit 2 的收口闭环，为后续足底精确落脚点规划与高程查询提供了具备百分之百确定性、异常安全与物理可证伪性的底层网格适配器；
   - 维持零历史退化与零架构违规。
+
+---
+
+### [DEC-058] 2026-10-28: Environment Gate 01 — Repair Unit 3: 真实 Blender Mesh 环境查询与 19 骨骼人体连续运动主链接入及反事实实证闭环
+
+* **状态**：已采纳并完成实施 (Accepted & Implemented)
+* **日期**：2026-10-28
+* **背景**：在完成 Repair Unit 1（语义与候选筛选隔离）与 Repair Unit 2（BVH 失效与场景一致性）之后，必须将由 Live Blender evaluated mesh 构建的 BVH 树查询系统接入现有 19 骨骼人体连续运动主链：
+  1. **单次命中唯一性原则 (Single-Hit Support Contract, U3-02)**：以往运动规划与执行中分别调用 `ground_height_at()`、`surface_normal_at()` 与 `query_surface_at_point()`，可能查询到不同几何表面或产生不同回退；需建立统一单次命中支撑查询合同 `query_ground_support_at()`，保证足部高度 $Z$、法向量、`surface_id` 及支撑适格性来自单次物理命中；
+  2. **严格无支撑拒绝 (Strict No-Support Rejection, U3-03)**：在网格查询模式下，垂直射线未命中任何 `Playground_Surfaces` 网格时严格返回 `success=False`（`NO_HIT`），绝对禁止静默伪造 $Z=0.0\text{m}$ 虚假地面；非支撑表面（`allows_regular_support=False`）显式阻断规划；
+  3. **现有 19 骨骼控制管线零破坏 (Zero Controller Modification, U3-04)**：严格保持 6 阶段权威主链（$\text{MotionPlanner} \to \text{TerrainWalkAction} \to \text{KinematicPlannedPose} \to \text{KinematicBridgeExecutor} \to \text{WholeBodyController} \to \text{Rig/IK/FK}$），严禁修改 `WholeBodyController`、`KinematicBridgeExecutor`、`ContactConstraintAdapter` 或 `CharacterArmature`；
+  4. **反事实实证可证伪性 (Counter-Factual Verification, U3-05)**：设置实验 A（基准网格）与实验 B（斜坡顶台抬升 5cm 网格微扰），证实 Mesh 微扰驱动运动主链产生真实物理偏移，同时证实旧版解析查询器对网格微扰脱敏；
+  5. **场景文件与验证隔离 (U3-01, U3-06, U3-07)**：新增独立入口 `generate_dynamics_playground_environment_gate01_u3_blend` 与验证器 `validate_dynamics_playground_environment_gate01_u3`，绝对保护基准文件 `output/dynamics_playground.blend` 0 字节变动。
+* **决策与方案**：
+  1. **地面单次命中支撑查询契约落地 (`src/scene/environment_query.py`)**：
+     - 在 `EnvironmentQuery` 与 `DynamicsEnvironmentQuery` 实现 `query_ground_support_at(x, y, start_z=50.0, max_fall=100.0) -> SurfaceQueryResult`；
+     - 网格模式下垂直向下投射射线，未命中时严格返回 `success=False`（`error_reason="NO_HIT: ..."`，`source_type="mesh"`）；命中非支撑表面返回 `success=False`（`NON_SUPPORT_SURFACE`）；命中有效支撑表面返回单次物理命中结果；
+     - 解析模式与基类保持向下兼容（回退至解析表面或默认平地，`source_type="analytical"` / `"default"`）。
+  2. **运动规划与执行接入单次命中与严格拒绝 (`src/motion/terrain_walk.py`)**：
+     - 在 `plan_terrain_footsteps`、`build_terrain_step_schedule`、`_adjust_footfall_for_seams_and_edges` 与 `execute` 中全面接入 `query_ground_support_at`；
+     - 起始站立脚、每步摆动着地、支撑脚参考及足部刚体包围盒清除均由统一单次命中决定；
+     - 网格模式下遇到 `NO_HIT` 或非支撑表面显式抛出 `ValueError` 拒绝规划。
+  3. **独立场景装配与进出坡道实网格补全 (`src/scene/playground_terrain_traversal.py`)**：
+     - 实现 `generate_dynamics_playground_environment_gate01_u3_blend()`；
+     - 在装配场景中补全坡道引桥与着地出口平地支撑块（`Surface_Ramp_ApproachGround`, `Surface_Ramp_ExitGround`）并纳入 `Playground_Surfaces`，确保全路段落点 100% 命中真实网格；
+     - 产物持久化至 `output/dynamics_playground_environment_gate01_u3.blend`（700 帧连续动画、主相机、诊断场景、逐帧遥测与 JSON 伴随数据）。
+  4. **真实网格重新评估验证器 (`src/scene/playground_terrain_validation.py`)**：
+     - 实现 `validate_dynamics_playground_environment_gate01_u3`，重新打开产物场景并实例化 `BlenderMeshEnvironmentAdapter` 针对真实网格逐帧核验；
+     - 700 帧零豁免 Root C0 连续性（$< 0.12\text{ m/frame}$）、骨骼拉伸（$< 0.1\text{ mm}$）、旋转抖动（$< 35^\circ$）、锁定支撑脚滑移（$< 0.1\text{ mm}$）、ROM 违规（0 处）与真实网格顶点穿透。
+  5. **14 项完整测试与反事实实证归档 (`tests/test_environment_gate01_unit3.py`, `docs/evidence/environment_gate01_ru3/`)**：
+     - 编写 U3-T01 至 U3-T14 测试套件并注册至 `tests/test_registry.py`，14 项测试全绿（14/14 PASS in 14.8s）；
+     - 生成反事实对比报告 `counter_factual_summary.md` 与技术集成报告 `unit3_integration_report.md`；
+     - 全量分级测试通过：`quick` (14/14), `physics` (19/19), `motion` (9/9), `full` (31/31), `--verify-docs` (PASS)；
+     - 受保护资产 `output/dynamics_playground.blend` 0 字节变动；
+     - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 3 — AWAITING HUMAN VISUAL REVIEW`。
+* **影响**：
+  - 成功实现了 19 骨骼人体动力学主链与真实 Blender Mesh BVH 环境查询的无缝集成，彻底摆脱了解析假地面的束缚；
+  - 维持零历史退化与零架构违规，停留在 Unit 3 等待人类目视审查。

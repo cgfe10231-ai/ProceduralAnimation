@@ -372,6 +372,39 @@ class EnvironmentQuery:
             error_reason=f"No surface intersected along ray within {max_distance}m",
         )
 
+    def query_ground_support_at(
+        self,
+        x: float,
+        y: float,
+        start_z: float = 50.0,
+        max_fall: float = 100.0,
+    ) -> SurfaceQueryResult:
+        """Query primary walkable ground support at (x, y) along a vertical downward ray.
+
+        Base implementation delegates to ground_height_at, surface_normal_at, and query_surface_at_point.
+        """
+        gz = self.ground_height_at(x, y)
+        norm = self.surface_normal_at(x, y)
+        surf_res = self.query_surface_at_point((x, y, gz))
+        surf_id = surf_res.surface_id if hasattr(surf_res, "surface_id") and surf_res.surface_id not in ("none", "") else "default_ground"
+        surf_type = surf_res.surface_type if hasattr(surf_res, "surface_type") and surf_res.surface_type not in ("none", "") else SurfaceGeometryType.HORIZONTAL_GROUND.value
+        allows_support = getattr(surf_res, "allows_regular_support", True)
+        friction = getattr(surf_res, "friction_coeff", 0.70)
+
+        return SurfaceQueryResult(
+            surface_id=surf_id,
+            surface_type=surf_type,
+            contact_point_world=(x, y, gz),
+            surface_normal_world=norm,
+            signed_distance=0.0,
+            friction_coeff=friction,
+            allows_regular_support=allows_support,
+            success=True,
+            ray_hit_distance=start_z - gz,
+            error_reason=None if allows_support else f"Surface '{surf_id}' does not allow regular support",
+            source_type="default",
+        )
+
     def get_surface_by_id(self, surface_id: str) -> Optional[OrientedSurface]:
         """Lookup surface definition by ID (always None on default ground)."""
         return None
@@ -437,6 +470,101 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
     def register_surface(self, surface: OrientedSurface) -> None:
         """Register an analytical environmental surface patch."""
         self._surfaces[surface.surface_id] = surface
+
+    def query_ground_support_at(
+        self,
+        x: float,
+        y: float,
+        start_z: float = 50.0,
+        max_fall: float = 100.0,
+    ) -> SurfaceQueryResult:
+        """Query primary walkable ground support at (x, y) along a vertical downward ray.
+
+        Guarantees single-hit authenticity:
+        - When prefer_mesh is active: casts a downward ray against evaluated scene meshes.
+          If no mesh is intersected, returns success=False with 'NO_HIT: ...' (NEVER fakes Z=0).
+          If a mesh is intersected but allows_regular_support is False (steep slope, wall, ceiling),
+          returns success=False with 'NON_SUPPORT_SURFACE: ...'.
+        - When analytical mode is active: casts downward ray against registered analytical surfaces;
+          if hit and allows_regular_support, returns it. If no analytical surface hit, falls back
+          to horizontal ground at ground_z.
+        """
+        if self._prefer_mesh and self._mesh_adapter is not None:
+            res = self._mesh_adapter.ray_cast(
+                origin=(x, y, start_z),
+                direction=(0.0, 0.0, -1.0),
+                distance=max_fall,
+            )
+            if not res.success:
+                return SurfaceQueryResult(
+                    surface_id="none",
+                    surface_type="none",
+                    contact_point_world=(x, y, 0.0),
+                    surface_normal_world=(0.0, 0.0, 1.0),
+                    signed_distance=float("inf"),
+                    friction_coeff=0.0,
+                    allows_regular_support=False,
+                    success=False,
+                    ray_hit_distance=float("inf"),
+                    error_reason=f"NO_HIT: No mesh support surface intersected at ({x:.3f}, {y:.3f}) along downward ray",
+                    source_type="mesh",
+                )
+            if not res.allows_regular_support:
+                return SurfaceQueryResult(
+                    surface_id=res.surface_id,
+                    surface_type=res.surface_type,
+                    contact_point_world=res.contact_point_world,
+                    surface_normal_world=res.surface_normal_world,
+                    signed_distance=res.signed_distance,
+                    friction_coeff=res.friction_coeff,
+                    allows_regular_support=False,
+                    success=False,
+                    ray_hit_distance=res.ray_hit_distance,
+                    error_reason=f"NON_SUPPORT_SURFACE: Mesh surface '{res.surface_id}' at ({x:.3f}, {y:.3f}) does not allow regular support",
+                    source_type="mesh",
+                )
+            return res
+
+        # Analytical mode: find highest walkable analytical surface at (x, y)
+        best_z: Optional[float] = None
+        best_surface: Optional[OrientedSurface] = None
+        for s in self._surfaces.values():
+            if not s.allows_regular_support:
+                continue
+            z = s.elevation_at_xy(x, y)
+            if z is not None and (best_z is None or z > best_z):
+                best_z = z
+                best_surface = s
+
+        if best_surface is not None and best_z is not None:
+            return SurfaceQueryResult(
+                surface_id=best_surface.surface_id,
+                surface_type=best_surface.surface_type.value,
+                contact_point_world=(x, y, best_z),
+                surface_normal_world=best_surface.normal,
+                signed_distance=0.0,
+                friction_coeff=best_surface.friction_coeff,
+                allows_regular_support=True,
+                success=True,
+                ray_hit_distance=start_z - best_z,
+                error_reason=None,
+                source_type="analytical",
+            )
+
+        # Base fallback to analytical default ground
+        return SurfaceQueryResult(
+            surface_id="default_ground",
+            surface_type=SurfaceGeometryType.HORIZONTAL_GROUND.value,
+            contact_point_world=(x, y, self.ground_z),
+            surface_normal_world=(0.0, 0.0, 1.0),
+            signed_distance=0.0,
+            friction_coeff=0.70,
+            allows_regular_support=True,
+            success=True,
+            ray_hit_distance=start_z - self.ground_z,
+            error_reason=None,
+            source_type="analytical",
+        )
 
     def get_surface_by_id(self, surface_id: str) -> Optional[OrientedSurface]:
         """Lookup surface definition by its unique identifier."""

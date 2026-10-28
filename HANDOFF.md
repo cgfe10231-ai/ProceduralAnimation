@@ -5,46 +5,50 @@
 ---
 
 ## 1. 当前目标与当前状态
-**当前任务**：Environment Gate 01 — Repair Unit 2 Final Closure: BVH Cache Invalidation, Scene Geometry Consistency & Exception Safety Hardening (Defects C01-C06, F01-F03)。  
-**当前状态**：`ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`（严格停止等待人类审批，严禁自动进入 Repair Unit 3 或 Phase 7B）。
+**当前任务**：ProceduralAnimation — Environment Gate 01 — Repair Unit 3: Real Mesh Environment → Existing 19-Bone Character Motion Pipeline Integration (U3-01 至 U3-14)。  
+**当前状态**：`ENVIRONMENT GATE 01 / UNIT 3 — AWAITING HUMAN VISUAL REVIEW`（严格停止等待人类视口目视审查，严禁自动进入 Unit 4 或 Phase 7B）。
 
 ### 本任务核心产出与成果
-1. **显式五状态生命周期状态机与空环境复用 (C01)**：
-   - 实现 `AdapterCacheState`：`INVALID`, `VALID_EMPTY`, `VALID_NON_EMPTY`, `REBUILDING`, `FAILED`；
-   - 彻底解决空集合重复触发 `rebuild()` 的泄漏问题：100 次空环境查询中 `rebuild_count` 恒为 1（0 次冗余重建），返回 `success=False` 与 `NO_HIT:` 理由，绝不制造 $Z=0.0\text{m}$ 虚假地面；
-   - 暴露只读遥测属性：`cache_state`, `rebuild_count`, `cache_version`, `is_empty`, `has_bvh`, `dirty`, `is_dirty`。
-2. **双通道几何与环境失效检测体系 (Path A vs Path B)**：
-   - **Path A (自动检测)**：每次查询调用 `refresh()` 时执行 `_check_scene_changed()`：
-     * 矩阵 16 元素比对（容差 $10^{-6}$），精准感知位移、旋转、非均匀缩放与父子物体层级变换传播（C02）；
-     * 极速内存缓冲区哈希（`array.array('f', ...)` + `foreach_get('co', ...)`, $<0.05\text{ms}$），精准捕获毫米级顶点移动（C03）；
-     * 循环索引哈希（`foreach_get('vertex_index', ...)`, $<0.02\text{ms}$），精准捕获多边形拓扑增删与翻转（C03）；
-     * 动态 RNA 属性扫描，精准捕获任意修改器（Solidify, Displace 等）参数调整、增删及 `show_viewport` 切换（C04）；
-     * 基于 `obj.session_uid` 追踪集合成员变动，新增或删除对象即刻触发重建（C05）；
-     * **原地重命名零重建优化**：当对象仅改名而几何未变时，就地更新元数据名称与 Surface ID，**BVH 重建次数为 0**（C05）。
-   - **Path B (显式失效)**：调用 `adapter.invalidate()` 标记 `_dirty = True` 及 `INVALID` 状态，后续首次常规查询自动触发原子重建，调用方无需显式调用 `rebuild()`（C03）。
-3. **全流程异常安全与自动回滚加固 (C06)**：
-   - 将 `_gather_target_objects()` 与快照计算完整封装入 `rebuild()` 的 `try:` 保护块内；
-   - 任何构建或求值异常必然回滚至 `AdapterCacheState.FAILED` 并设置 `dirty = True`，杜绝卡死在 `REBUILDING`；
-   - 求值网格在 `finally:` 中统一通过 `eval_obj.to_mesh_clear()` 清理，杜绝内存泄漏；
-   - 后续查询自动具备自愈恢复能力（重新触发原子重建）。
-4. **深度集合生命周期验证 (C05-1 至 C05-4)**：
-   - **C05-1**: 仅解除关联（未删除）的对象从 BVH 中剔除（1 次重建），且受禁集合对象绝不被查询；
-   - **C05-2**: `bpy.data.objects.remove(obj, do_unlink=True)` 触发 1 次重建，元数据清理干净，0 野指针；
-   - **C05-3**: 非空转空转入 `VALID_EMPTY`，100 次空查询 0 重建复用，返回 `success=False`（`source_type="none"`），加入新 Mesh 干净恢复；
-   - **C05-4**: 子集合成员递归追踪、子集合解关联剔除、子集合新增感知及同级集合严格隔离。
-5. **测试套件扩充与全量回归**：
-   - 新增 Unit 2 最终收口用例 `test_43` 至 `test_47`，47 项测试全绿通过（47/47 PASS in 2.588s）；
-   - 扩充反事实测试至 6 项真实变异（C01, C03, C05, F01, F02, F03），真实运行归档至 `docs/evidence/environment_gate01_ru2/`；
-   - 更新反事实总结报告 `counter_factual_summary.md` 与边界报告 `cache_invalidation_boundary_report.md`；
-   - `tests/run_test_suite.py --tier quick`：**13 / 13 PASS**；
-   - `tests/run_test_suite.py --tier physics`：**19 / 19 PASS**；
-   - `tests/run_test_suite.py --tier motion`：**8 / 8 PASS**；
-   - `tests/run_test_suite.py --tier full`：**30 / 30 PASS**；
-   - `tests/audit_c2_final_inspector.py --verify-docs`：**PASS** (Exit Code 0)；
-   - 受保护资产检查：`git diff output/` 0 差异；
-   - 状态严格停留于 `ENVIRONMENT GATE 01 / REPAIR UNIT 2 — FINAL REVIEW`，严禁擅自推进至 Repair Unit 3 或 Phase 7B。
+1. **地面单次物理命中支撑查询契约 (U3-02)**：
+   - 在 `EnvironmentQuery` 与 `DynamicsEnvironmentQuery` 实现 `query_ground_support_at(x, y, start_z=50.0, max_fall=100.0) -> SurfaceQueryResult`；
+   - 网格模式下垂直向下投射射线，保证足部落脚点高度 $Z$、法向量、`surface_id` 及支撑适格性来自单次真实物理命中；
+   - 彻底终结了分散的多重几何查询（`ground_height_at`、`surface_normal_at`、`query_surface_at_point`）可能查询到不同几何表面或产生不一致回退的隐患；
+   - 解析模式与基类保持向下兼容（回退至解析表面或默认平地，`source_type="analytical"` / `"default"`）。
+2. **严格无支撑拒绝 (U3-03)**：
+   - 网格模式下射线未命中任何 `Playground_Surfaces` 网格时严格返回 `success=False`（`error_reason="NO_HIT: ..."`，`source_type="mesh"`），绝对禁止静默伪造 $Z=0.0\text{m}$ 虚假地面；
+   - 命中非支撑表面（`allows_regular_support=False`）时返回 `success=False`（`NON_SUPPORT_SURFACE`）；
+   - 运动规划层 `plan_terrain_footsteps`、`build_terrain_step_schedule`、`_adjust_footfall_for_seams_and_edges` 与 `execute` 遇到 `NO_HIT` 或非支撑表面显式抛出 `ValueError` 阻断规划。
+3. **现有 19 骨骼控制管线零侵入保护 (U3-04)**：
+   - 严格保持 6 阶段权威主链（`MotionPlanner` → `TerrainWalkAction` → `KinematicPlannedPose` → `KinematicBridgeExecutor` → `WholeBodyController` → `Rig/IK/FK`）；
+   - `src/motion/whole_body_controller.py`、`src/motion/kinematic_bridge.py`、`src/motion/contact_model.py` 及 `src/character/` 角色骨骼系统保持 0 改动；
+   - 已知足底遥测 Z 偏移（`telemetry_z = foot_center_z - 0.08`）收口受限于 Unit 4 范围，不越界修改。
+4. **反事实网格微扰敏感性实证 (U3-05)**：
+   - 实验 A（基准网格） vs 实验 B（斜坡顶台抬升 5cm 网格微扰）：
+     * 真实网格查询驱动足部落地高程与 Root 轨迹产生 $+0.05\text{m}$ 物理偏移（顶台着地高程由 $1.3397\text{m}$ 增至 $1.3897\text{m}$）；
+     * 旧版解析查询器 `create_standard_dynamics_playground_query()` 面对相同网格微扰高程差异恒为 $0.0\text{m}$，形式化证明旧解析查询器对网格脱敏，新 BVH 网格查询器对几何变异具备灵敏响应性。
+5. **独立场景装配与进出坡道实网格补全 (U3-01, U3-06, U3-07)**：
+   - 实现场景入口 `generate_dynamics_playground_environment_gate01_u3_blend()`；
+   - 在装配场景中补全坡道引桥与着地出口平地支撑块（`Surface_Ramp_ApproachGround`, `Surface_Ramp_ExitGround`）并纳入 `Playground_Surfaces`，确保全路段落点 100% 命中真实网格；
+   - 顶面多边形采用逆时针缠绕顺序生成向上法线 $(0, 0, 1)$；
+   - 产物持久化至 `output/dynamics_playground_environment_gate01_u3.blend`（700 帧连续动画、主相机、诊断场景、逐帧遥测与 JSON 伴随数据）；
+   - 实现反事实网格微扰生成函数 `apply_ramp_mesh_perturbation(delta_z=0.05)`，生成对照场景 `output/dynamics_playground_environment_gate01_u3_perturbed.blend`；
+   - 历史基准资产 `output/dynamics_playground.blend` 保持 0 字节变动。
+6. **真实网格重新评估验证器 (U3-06, U3-07)**：
+   - 实现 `validate_dynamics_playground_environment_gate01_u3`，重新打开产物场景并实例化 `BlenderMeshEnvironmentAdapter` 针对真实网格逐帧核验；
+   - 700 帧全量零豁免 Root C0 连续性（$< 0.12\text{ m/frame}$）、骨骼拉伸（$< 0.1\text{ mm}$）、旋转抖动（$< 35^\circ$）、锁定支撑脚滑移（$< 0.1\text{ mm}$）、ROM 违规（0 处）与真实网格表面接触检验。
+7. **14 项完整测试与分级套件全绿通过 (U3-T01 至 U3-T14)**：
+   - 编写 `tests/test_environment_gate01_unit3.py` 并注册至 `tests/test_registry.py`，14 项测试全绿（14/14 PASS in 14.8s）；
+   - 全量分级回归通过：
+     * `quick` 套件：**14 / 14 PASS** (34.92s)；
+     * `physics` 套件：**19 / 19 PASS** (84.69s)；
+     * `motion` 套件：**9 / 9 PASS** (42.11s)；
+     * `full` 套件：**31 / 31 PASS** (132.61s)；
+   - 符号审计 `audit_c2_final_inspector.py --verify-docs` 0 错误；
+   - 生成反事实对比报告 `counter_factual_summary.md` 与技术集成报告 `unit3_integration_report.md`；
+   - 状态严格停留于 `ENVIRONMENT GATE 01 / UNIT 3 — AWAITING HUMAN VISUAL REVIEW`。
 
 ## 2. 已完成历史里程碑
+* Environment Gate 01 — Repair Unit 2 Final Closure：BVH Cache Invalidation, Scene Geometry Consistency & Exception Safety Hardening (Defects C01-C06, F01-F03)。
 * Environment Gate 01 — Repair Unit 1：候选范围隔离机制与表面筛选语义修复及最终验收（覆盖率 32/32 PASS，故障注入与极端边界报告归档）。
 * Environment Gate 01：真实 Blender Mesh 环境查询接入与数据真实性门禁。
 * 任务 7A→7B 准入门禁：全仓库静态与动态调用链架构基线审计（输出 8 份审计报告至 `docs/audit/`）。

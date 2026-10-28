@@ -387,6 +387,27 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Read-only verification of 19-bone character continuous terrain traversal in DynamicsPlayground, 700-frame mathematical evaluation, zero ROM violations, zero ankle drift, dedicated diagnostic scene, and visual evidence.",
     ),
+    "environment_gate01_unit3": TestDefinition(
+        test_id="environment_gate01_unit3",
+        name="Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification",
+        script_path="tests/test_environment_gate01_unit3.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.MOTION, TestTier.FULL],
+        timeout_sec=60.0,
+        expected_artifacts=[
+            "output/dynamics_playground.blend",
+            "output/dynamics_playground_environment_gate01_u3.blend",
+            "output/dynamics_playground_environment_gate01_u3_perturbed.blend",
+            "docs/evidence/environment_gate01_ru3/u3_contact_state_records.json",
+            "docs/evidence/environment_gate01_ru3/u3_execution_summary.json",
+            "docs/evidence/environment_gate01_ru3/u3_control_chain_diagnostics.json",
+            "docs/evidence/environment_gate01_ru3/u3_perturbed_contact_state_records.json",
+            "docs/evidence/environment_gate01_ru3/u3_perturbed_execution_summary.json",
+            "docs/evidence/environment_gate01_ru3/u3_perturbed_control_chain_diagnostics.json",
+        ],
+        is_visual_acceptance=True,
+        description="Comprehensive 14-point regression verifying real mesh BVH environment query injection, single-hit consistency, strict no-support rejection, 6-phase pipeline preservation, counter-factual perturbation sensitivity, and 700-frame unexempted continuity.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection
