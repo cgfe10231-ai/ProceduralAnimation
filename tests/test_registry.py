@@ -408,6 +408,25 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Comprehensive 14-point regression verifying real mesh BVH environment query injection, single-hit consistency, strict no-support rejection, 6-phase pipeline preservation, counter-factual perturbation sensitivity, and 700-frame unexempted continuity.",
     ),
+    "environment_gate01_u3_s1": TestDefinition(
+        test_id="environment_gate01_u3_s1",
+        name="Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps",
+        script_path="tests/test_environment_gate01_u3_s1.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.MOTION, TestTier.FULL],
+        timeout_sec=60.0,
+        expected_artifacts=[
+            "output/dynamics_playground_environment_gate01_u3_s1.blend",
+            "docs/evidence/environment_gate01_u3_s1/root_velocity_before.csv",
+            "docs/evidence/environment_gate01_u3_s1/root_velocity_after.csv",
+            "docs/evidence/environment_gate01_u3_s1/root_acceleration_after.csv",
+            "docs/evidence/environment_gate01_u3_s1/root_step_boundary_report.json",
+            "docs/evidence/environment_gate01_u3_s1/root_continuity_comparison.json",
+            "docs/evidence/environment_gate01_u3_s1/u3_s1_visual_review.md",
+        ],
+        is_visual_acceptance=True,
+        description="Verifies decoupling of Root forward motion from single-step swing foot interpolation, elimination of boundary velocity collapse, 0 ROM violations, and foot contact preservation.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection

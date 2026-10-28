@@ -502,6 +502,91 @@ def build_terrain_step_schedule(
 
 
 # =============================================================================
+# Continuous Root Forward Motion Spline Helper Functions
+# =============================================================================
+
+def _build_continuous_root_forward_spline(
+    schedule: List[TerrainStepPlan],
+    fps: float,
+) -> Tuple[List[int], List[float], List[float]]:
+    """Build knot points and boundary velocities for monotonic, C1-continuous Root forward motion.
+
+    Derives knot positions and boundary velocities purely from TerrainStepPlan
+    and actual footstep positions without hardcoded coordinates.
+    """
+    K = len(schedule)
+    if K == 0:
+        return [0], [0.0], [0.0]
+
+    knot_frames = [schedule[k].frame_start for k in range(K)] + [schedule[K - 1].frame_end]
+    knot_y = [
+        0.5 * (schedule[k].stance_xyz[1] + schedule[k].swing_start_xyz[1])
+        for k in range(K)
+    ] + [0.5 * (schedule[K - 1].stance_xyz[1] + schedule[K - 1].swing_end_xyz[1])]
+
+    knot_v = [0.0] * (K + 1)
+    if K == 1:
+        knot_v[0] = 0.0
+        knot_v[1] = 0.0
+        return knot_frames, knot_y, knot_v
+
+    # Interior knots: transition velocities
+    for k in range(1, K):
+        dt_prev = (knot_frames[k] - knot_frames[k - 1]) / fps
+        dt_next = (knot_frames[k + 1] - knot_frames[k]) / fps
+        dy_prev = knot_y[k] - knot_y[k - 1]
+        dy_next = knot_y[k + 1] - knot_y[k]
+
+        v_prev = dy_prev / dt_prev if dt_prev > 1e-6 else 0.0
+        v_next = dy_next / dt_next if dt_next > 1e-6 else 0.0
+
+        # Central difference slope ensures C1 velocity continuity across the boundary
+        avg_v = 0.5 * (v_prev + v_next)
+        knot_v[k] = max(0.0, avg_v)
+
+    return knot_frames, knot_y, knot_v
+
+
+def _evaluate_root_y_hermite(
+    current_frame: int,
+    step_k: int,
+    knot_frames: List[int],
+    knot_y: List[float],
+    knot_v: List[float],
+    fps: float,
+) -> float:
+    """Evaluate monotonic cubic Hermite spline for Root Y position at current_frame."""
+    if step_k < 0 or step_k >= len(knot_frames) - 1:
+        return knot_y[0] if step_k < 0 else knot_y[-1]
+
+    f0 = knot_frames[step_k]
+    f1 = knot_frames[step_k + 1]
+    if f1 <= f0:
+        return knot_y[step_k]
+
+    u = (current_frame - f0) / float(f1 - f0)
+    u = max(0.0, min(1.0, u))
+
+    y0 = knot_y[step_k]
+    y1 = knot_y[step_k + 1]
+    delta = y1 - y0
+    if abs(delta) < 1e-9:
+        return y0
+
+    dur_sec = (f1 - f0) / fps
+    m0 = (knot_v[step_k] * dur_sec) / delta
+    m1 = (knot_v[step_k + 1] * dur_sec) / delta
+
+    # Fritsch-Carlson bounds to guarantee strict monotonicity (no backward motion)
+    m0 = max(0.0, min(3.0, m0))
+    m1 = max(0.0, min(3.0, m1))
+
+    # Hermite basis expansion
+    h = (3.0 * u * u - 2.0 * u * u * u) + m0 * (u * u * u - 2.0 * u * u + u) + m1 * (u * u * u - u * u)
+    return y0 + delta * h
+
+
+# =============================================================================
 # Terrain Locomotion Action Implementation
 # =============================================================================
 
@@ -622,6 +707,9 @@ class TerrainWalkAction(MotionAction):
             schedule, total_frames = build_terrain_step_schedule(
                 self.spec, environment, start_frame=start_frame
             )
+
+        # Monotonic, C1-continuous Hermite knot parameters for Root forward motion
+        knot_frames, knot_y, knot_v = _build_continuous_root_forward_spline(schedule, fps)
 
         # Initial reference positions
         init_corridor_x = initial_state.position[0]
@@ -848,7 +936,14 @@ class TerrainWalkAction(MotionAction):
                 }
 
                 root_x = init_corridor_x
-                root_y = 0.5 * (st_xyz[1] + sw_y)
+                root_y = _evaluate_root_y_hermite(
+                    current_frame=current_frame,
+                    step_k=active_step.k,
+                    knot_frames=knot_frames,
+                    knot_y=knot_y,
+                    knot_v=knot_v,
+                    fps=fps,
+                )
                 root_z = 0.5 * (st_xyz[2] + z_base)
 
                 gait_u = (active_step.k % 2) * 0.5 + 0.5 * step_alpha

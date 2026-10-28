@@ -1411,3 +1411,33 @@
 * **影响**：
   - 成功实现了 19 骨骼人体动力学主链与真实 Blender Mesh BVH 环境查询的无缝集成，彻底摆脱了解析假地面的束缚；
   - 维持零历史退化与零架构违规，停留在 Unit 3 等待人类目视审查。
+
+---
+
+### [DEC-059] 2026-10-28: Environment Gate 01 — Unit 3 / Atomic Repair S1: Root 前进轨迹与单步摆动脚时间参数解耦及 C1 连续性闭环
+
+* **状态**：已采纳并完成实施 (Accepted & Implemented)
+* **日期**：2026-10-28
+* **背景**：在 Unit 3 视口审查中发现人体步行存在周期性速度顿挫：
+  1. **缺陷根因定位 (S1-A)**：`TerrainWalkAction.execute()` 中 Root 前向坐标历史实现为 `root_y = 0.5 * (st_xyz[1] + sw_y)`，其中 `sw_y` 采用单步缓入缓出插值 `sw_y = (1.0 - step_alpha) * sw_start + step_alpha * sw_end`，`step_alpha = _smoothstep01(progress)`。由于 `_smoothstep01` 在单步边界导数为 0，导致每个 16 帧换脚边界处 Root 前向速度人为归零（由稳态 ~0.50 m/s 骤降至 0.035 m/s，发生 41/41 处 100% 速度塌陷）；
+  2. **解耦原则 (S1-B, 规则 A~E)**：摆动脚轨迹仍需在着地时缓停（保留 `sw_y` 计算不变），但 Root 前向运动不得继续直接依赖 `sw_y`；
+  3. **权威控制链与历史资产零破坏**：严禁引入全局后处理平滑滤波、严禁修改 WBC 或骨骼控制器、严禁修改成熟步态路线或历史 Blend 资产。
+* **决策与方案**：
+  1. **纯数学单调 C1 连续 Hermite 样条落地 (`src/motion/terrain_walk.py`)**：
+     - 实现私有辅助函数 `_build_continuous_root_forward_spline(schedule, fps)` 与 `_evaluate_root_y_hermite(...)`；
+     - 基于当前 `TerrainStepPlan` 与相邻步态真实落脚位置，提取 $K+1$ 个双足几何中心节点 $Y_k$ 与节点时间 $T_k$；
+     - 起步节点（$k=0$）与终止节点（$k=K$）速度严格为 $0.0\text{ m/s}$（真实平滑起步与制动）；
+     - 内部换脚节点采用中心差分计算连续边界速度 $v_k = 0.5 \times (V_{k-1} + V_k)$；
+     - 步内采用三次 Hermite 样条插值，配合 Fritsch-Carlson 单调性钳位（$m_0, m_1 \in [0, 3]$），严格保证 $v_{forward} \ge 0.0\text{ m/s}$（零倒退运动）；
+     - 换脚边界速度塌陷异常数由 41/41 (100%) 彻底降至 0/41 (0%)，最低边界速度由 0.0346 m/s 提升至 0.2722 m/s，平均边界速度提升至 0.4423 m/s。
+  2. **独立产物生成与重开严苛验证 (`src/scene/playground_terrain_traversal.py`)**：
+     - 新增独立入口 `generate_dynamics_playground_environment_gate01_u3_s1_blend()`，持久化至 `output/dynamics_playground_environment_gate01_u3_s1.blend`（历史 Unit 3 Blend 0 变动）；
+     - 重新打开场景执行 700 帧全量零豁免核验：Root C0 连续（$< 0.023\text{ m/frame}$）、0 ROM 违规、0 骨骼拉伸（$< 1.8\times 10^{-6}\text{ m}$）、锁定支撑脚滑移 $< 1.2\times 10^{-5}\text{ m}$。
+  3. **实证测试与分级套件全绿回归 (`tests/test_environment_gate01_u3_s1.py`, `tests/verify_environment_gate01_u3_s1.py`)**：
+     - S1-T01 证实旧逻辑 100% 塌陷，S1-T02 证实新逻辑 0 塌陷且足部接触零退化，S1-T03 证实 0.20m/0.40m 步长参数无关泛化性，S1-T04 证实纯数学边界与单调性；
+     - 归档前/后速度数据 `root_velocity_before.csv`、`root_velocity_after.csv`、`root_acceleration_after.csv`、对比 JSON `root_continuity_comparison.json` 及视口审查指引 `u3_s1_visual_review.md` 至 `docs/evidence/environment_gate01_u3_s1/`；
+     - 全量分级测试通过：`quick` (15/15), `physics` (19/19), `motion` (10/10), `full` (32/32), `--verify-docs` (PASS)；
+     - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 3-S1 — AWAITING HUMAN VISUAL REVIEW`。
+* **影响**：
+  - 彻底解决了换脚交替过程中 Root 周期性减速顿挫缺陷，实现了连续平滑的前向人体运动，同时保持了物理接触模型和 19 骨骼主链的完整性；
+  - 维持零历史退化与零架构违规。

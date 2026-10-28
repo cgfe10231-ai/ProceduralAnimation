@@ -1,13 +1,33 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-28  
-> **当前阶段**：Environment Gate 01 — Repair Unit 3（真实 Blender Mesh 环境查询与 19 骨骼人体连续运动主链接入及反事实实证闭环）已全部完成并通过 14 项完整验证。实现了单次物理命中查询契约 `query_ground_support_at()`，终结分散的多重环境查询，保证足部落脚点高度 $Z$、法向量、`surface_id` 及支撑适格性来自单次物理命中；在网格模式下实现严格无支撑拒绝（`NO_HIT` 与非支撑表面显式抛出 `ValueError`），彻底消除了 $Z=0.0\text{m}$ 虚假地面回退；严格保持 6 阶段权威主链（`MotionPlanner` → `TerrainWalkAction` → `KinematicPlannedPose` → `KinematicBridgeExecutor` → `WholeBodyController` → `Rig/IK/FK`），`WholeBodyController`、`KinematicBridgeExecutor` 与角色骨骼模块保持 0 改动；实现了 `generate_dynamics_playground_environment_gate01_u3_blend()` 与 `validate_dynamics_playground_environment_gate01_u3`，在装配场景中补全坡道引桥与出口支撑块（`Surface_Ramp_ApproachGround`, `Surface_Ramp_ExitGround`）并纳入 `Playground_Surfaces`，确保全路段落点 100% 命中真实网格；产物持久化至 `output/dynamics_playground_environment_gate01_u3.blend`（700 帧连续动画、主相机、诊断场景、逐帧遥测与 JSON 伴随数据），重新打开场景逐帧核验 700 帧全量零豁免 C0 连续性、骨骼拉伸（$< 0.1\text{mm}$）、旋转抖动（$< 35^\circ$）、锁定支撑脚滑移（$< 0.1\text{mm}$）、0 处 ROM 违规；通过反事实对比实证（实验 A 基准 vs 实验 B 抬升 5cm 网格微扰），证实 Mesh 微扰驱动落脚点与 Root 高程产生 $+0.05\text{m}$ 真实物理偏移，同时证实旧版解析查询器对网格微扰脱敏；全量分级测试通过：`quick` (14/14 PASS), `physics` (19/19 PASS), `motion` (9/9 PASS), `full` (31/31 PASS), `--verify-docs` (PASS)；受保护资产 `output/dynamics_playground.blend` 保持 0 字节变动。当前状态：`ENVIRONMENT GATE 01 / UNIT 3 — AWAITING HUMAN VISUAL REVIEW`，严格停止等待人类视口目视审查，严禁擅自进入 Unit 4 或 Phase 7B。  
+> **当前阶段**：Environment Gate 01 — Unit 3 / Atomic Repair S1（Root 前进轨迹与单步摆动脚时间参数解耦及 C1 连续性闭环）已全部完成并通过 4 项单元测试与 32 项全量回归。查明历史实现 `root_y = 0.5 * (st_xyz[1] + sw_y)` 导致 Root 前向速度与单步摆动脚缓入缓出强耦合（41/41 步态交替边界处发生速度塌陷至 0.035 m/s）；保持摆动脚着地平缓减速不变，实现了纯数学单调 C1 连续 Hermite 样条，基于真实 `TerrainStepPlan` 节点计算连续过渡边界速度；彻底消除 41/41 处速度塌陷（塌陷异常数由 41 降至 0），换脚边界最低前向速度提升至 0.2722 m/s，平均边界速度提升至 0.4423 m/s；生成独立场景 `output/dynamics_playground_environment_gate01_u3_s1.blend`（历史资产 0 变动）；重开核验 700 帧全量零豁免通过：Root C0 连续（$< 0.023\text{ m/frame}$）、0 ROM 违规、0 骨骼拉伸（$< 1.8\times 10^{-6}\text{ m}$）、锁定支撑脚滑移 $< 1.2\times 10^{-5}\text{ m}$；全量分级测试全绿：`quick` (15/15), `physics` (19/19), `motion` (10/10), `full` (32/32)；当前状态：`ENVIRONMENT GATE 01 / UNIT 3-S1 — AWAITING HUMAN VISUAL REVIEW`，严格停止等待人类视口目视审查，严禁擅自进入 S2、S3、Unit 4 或 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01 — Unit 3 / Atomic Repair S1: Root 前进轨迹与单步摆动脚时间参数解耦及 C1 连续性闭环 (S1-A 至 S1-F)**：
+  * **换脚边界速度塌陷根因查明与数据实证 (S1-A)**：
+    - 针对基准场景 `output/dynamics_playground_environment_gate01_u3.blend` 提取 700 帧 `CharacterRoot` 真实运动学；
+    - 证实历史代码 `root_y = 0.5 * (st_xyz[1] + sw_y)` 导致 Root 前向速度直接继承摆动脚单步缓入缓出导数；
+    - 41/41 (100%) 步态边界处前向速度塌陷至接近归零（最低 0.0346 m/s，平均 0.0680 m/s，相对稳态速度塌陷 85%~92%）；
+    - 生成并归档实证数据：`root_velocity_before.csv`、`root_acceleration_before.csv`、`root_step_boundary_report.json`。
+  * **单调 C1 连续 Hermite 样条解耦落地 (S1-B, 规则 A~E)**：
+    - 严格保持摆动脚轨迹 `sw_y` 计算不变（规则 A：足部接近着地点自然减速）；
+    - 实现私有纯数学辅助函数 `_build_continuous_root_forward_spline(schedule, fps)` 与 `_evaluate_root_y_hermite(...)`；
+    - 提取双足几何中心节点序列 $Y_k$ 与时间节点 $T_k$，起始与终止节点速度为 $0.0\text{ m/s}$，内部节点采用中心差分计算连续过渡边界速度；
+    - 步内采用三次 Hermite 样条插值，配合 Fritsch-Carlson 单调性钳位（$m_0, m_1 \in [0, 3]$），严格消除倒退运动；
+    - 步态边界速度塌陷异常数彻底清零（由 41/41 降至 0/41），最低边界速度提升至 0.2722 m/s，平均边界速度提升至 0.4423 m/s。
+  * **独立产物生成与重开严苛物理验证 (S1-F)**：
+    - 新增独立入口 `generate_dynamics_playground_environment_gate01_u3_s1_blend()`，持久化至 `output/dynamics_playground_environment_gate01_u3_s1.blend`（历史资产 0 变动）；
+    - 重新打开场景执行 700 帧全量零豁免核验：Root C0 连续（$< 0.023\text{ m/frame}$）、0 ROM 违规、0 骨骼拉伸（$< 1.8\times 10^{-6}\text{ m}$）、锁定支撑脚滑移 $< 1.2\times 10^{-5}\text{ m}$；
+    - 伴随生成 `root_velocity_after.csv`、`root_acceleration_after.csv`、对比 JSON `root_continuity_comparison.json` 及视口指引 `u3_s1_visual_review.md`。
+  * **4 项单元测试全绿与分层回归套件通过 (`tests/test_environment_gate01_u3_s1.py`)**：
+    - S1-T01 证实旧逻辑 100% 塌陷可证伪性；S1-T02 证实新逻辑 0 塌陷且足部接触零退化；S1-T03 证实 0.20m/0.40m 步长参数无关泛化性；S1-T04 证实纯数学边界与单调性；
+    - 统一分级套件全绿：`quick` (15/15), `physics` (19/19), `motion` (10/10), `full` (32/32)；
+    - 状态严格停留于 `ENVIRONMENT GATE 01 / UNIT 3-S1 — AWAITING HUMAN VISUAL REVIEW`。
 * **Environment Gate 01 — Repair Unit 3: 真实 Blender Mesh 环境查询与 19 骨骼人体连续运动主链接入及反事实实证闭环 (U3-01 至 U3-14)**：
   * **单次物理命中支撑查询契约 (`query_ground_support_at`, U3-02)**：
     - 在 `EnvironmentQuery` 与 `DynamicsEnvironmentQuery` 实现 `query_ground_support_at(x, y, start_z=50.0, max_fall=100.0) -> SurfaceQueryResult`；

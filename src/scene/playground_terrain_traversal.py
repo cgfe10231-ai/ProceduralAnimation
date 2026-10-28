@@ -727,6 +727,21 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
     }
 
 
+def generate_dynamics_playground_environment_gate01_u3_s1_blend(
+    output_blend_path: str = "output/dynamics_playground_environment_gate01_u3_s1.blend",
+    evidence_dir: str = "docs/evidence/environment_gate01_u3_s1",
+) -> Dict[str, Any]:
+    """Execute Environment Gate 01 / Unit 3 / Atomic Repair S1 pipeline.
+
+    Generates 700-frame continuous locomotion scene with decoupled, C1-continuous Root forward motion.
+    """
+    return generate_dynamics_playground_environment_gate01_u3_blend(
+        output_blend_path=output_blend_path,
+        evidence_dir=evidence_dir,
+        perturbed=False,
+    )
+
+
 if __name__ == "__main__":
     res = generate_dynamics_playground_task7a2_corrected_blend()
     print(f"[SUCCESS] Generated Task 7A-2 corrected blend: {res['output_blend_path']} ({res['total_frames']} frames)")

@@ -1,0 +1,430 @@
+{
+  "task": "Environment Gate 01 / Unit 3 / Atomic Repair S1",
+  "description": "Root Forward Motion Continuity Across Alternating Footsteps",
+  "metrics_summary": {
+    "total_step_boundaries": 41,
+    "anomalies_before": 41,
+    "anomalies_after": 0,
+    "minimum_boundary_velocity_before_m_s": 0.03456,
+    "minimum_boundary_velocity_after_m_s": 0.27216,
+    "mean_boundary_velocity_before_m_s": 0.06801,
+    "mean_boundary_velocity_after_m_s": 0.4423,
+    "steady_state_mean_velocity_before_m_s": 0.44441,
+    "steady_state_mean_velocity_after_m_s": 0.44546,
+    "max_adjacent_frame_velocity_diff_before_m_s": 0.1536,
+    "max_adjacent_frame_velocity_diff_after_m_s": 0.0396,
+    "velocity_collapse_eliminated": true
+  },
+  "boundary_comparisons": [
+    {
+      "step_from": 0,
+      "step_to": 1,
+      "boundary_frame": 29,
+      "v_at_before_m_s": 0.03456,
+      "v_at_after_m_s": 0.33696,
+      "ratio_before": 0.1023,
+      "ratio_after": 0.8432,
+      "improved": true
+    },
+    {
+      "step_from": 1,
+      "step_to": 2,
+      "boundary_frame": 45,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45648,
+      "ratio_before": 0.1267,
+      "ratio_after": 0.9449,
+      "improved": true
+    },
+    {
+      "step_from": 2,
+      "step_to": 3,
+      "boundary_frame": 61,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 3,
+      "step_to": 4,
+      "boundary_frame": 77,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 4,
+      "step_to": 5,
+      "boundary_frame": 93,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 5,
+      "step_to": 6,
+      "boundary_frame": 109,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 6,
+      "step_to": 7,
+      "boundary_frame": 125,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 7,
+      "step_to": 8,
+      "boundary_frame": 141,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 8,
+      "step_to": 9,
+      "boundary_frame": 157,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 9,
+      "step_to": 10,
+      "boundary_frame": 173,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 10,
+      "step_to": 11,
+      "boundary_frame": 189,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 11,
+      "step_to": 12,
+      "boundary_frame": 205,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 12,
+      "step_to": 13,
+      "boundary_frame": 221,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 13,
+      "step_to": 14,
+      "boundary_frame": 237,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 14,
+      "step_to": 15,
+      "boundary_frame": 253,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 15,
+      "step_to": 16,
+      "boundary_frame": 269,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 16,
+      "step_to": 17,
+      "boundary_frame": 285,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 0.9843,
+      "improved": true
+    },
+    {
+      "step_from": 17,
+      "step_to": 18,
+      "boundary_frame": 301,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.4236,
+      "ratio_before": 0.1282,
+      "ratio_after": 0.9582,
+      "improved": true
+    },
+    {
+      "step_from": 18,
+      "step_to": 19,
+      "boundary_frame": 317,
+      "v_at_before_m_s": 0.06,
+      "v_at_after_m_s": 0.41472,
+      "ratio_before": 0.1113,
+      "ratio_after": 0.9659,
+      "improved": true
+    },
+    {
+      "step_from": 19,
+      "step_to": 20,
+      "boundary_frame": 333,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.47808,
+      "ratio_before": 0.1118,
+      "ratio_after": 0.949,
+      "improved": true
+    },
+    {
+      "step_from": 20,
+      "step_to": 21,
+      "boundary_frame": 349,
+      "v_at_before_m_s": 0.07848,
+      "v_at_after_m_s": 0.48528,
+      "ratio_before": 0.1269,
+      "ratio_after": 0.9506,
+      "improved": true
+    },
+    {
+      "step_from": 21,
+      "step_to": 22,
+      "boundary_frame": 365,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.44832,
+      "ratio_before": 0.1267,
+      "ratio_after": 0.9963,
+      "improved": true
+    },
+    {
+      "step_from": 22,
+      "step_to": 23,
+      "boundary_frame": 381,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 23,
+      "step_to": 24,
+      "boundary_frame": 397,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 24,
+      "step_to": 25,
+      "boundary_frame": 413,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.4764,
+      "ratio_before": 0.1118,
+      "ratio_after": 0.9457,
+      "improved": true
+    },
+    {
+      "step_from": 25,
+      "step_to": 26,
+      "boundary_frame": 429,
+      "v_at_before_m_s": 0.07848,
+      "v_at_after_m_s": 0.48528,
+      "ratio_before": 0.1269,
+      "ratio_after": 0.9506,
+      "improved": true
+    },
+    {
+      "step_from": 26,
+      "step_to": 27,
+      "boundary_frame": 445,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.42192,
+      "ratio_before": 0.1282,
+      "ratio_after": 0.974,
+      "improved": true
+    },
+    {
+      "step_from": 27,
+      "step_to": 28,
+      "boundary_frame": 461,
+      "v_at_before_m_s": 0.06,
+      "v_at_after_m_s": 0.41472,
+      "ratio_before": 0.1113,
+      "ratio_after": 0.9505,
+      "improved": true
+    },
+    {
+      "step_from": 28,
+      "step_to": 29,
+      "boundary_frame": 477,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45168,
+      "ratio_before": 0.1267,
+      "ratio_after": 0.9843,
+      "improved": true
+    },
+    {
+      "step_from": 29,
+      "step_to": 30,
+      "boundary_frame": 493,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 30,
+      "step_to": 31,
+      "boundary_frame": 509,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 31,
+      "step_to": 32,
+      "boundary_frame": 525,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 32,
+      "step_to": 33,
+      "boundary_frame": 541,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 33,
+      "step_to": 34,
+      "boundary_frame": 557,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 34,
+      "step_to": 35,
+      "boundary_frame": 573,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 1.0,
+      "improved": true
+    },
+    {
+      "step_from": 35,
+      "step_to": 36,
+      "boundary_frame": 589,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.45,
+      "ratio_before": 0.1267,
+      "ratio_after": 0.9843,
+      "improved": true
+    },
+    {
+      "step_from": 36,
+      "step_to": 37,
+      "boundary_frame": 605,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.4236,
+      "ratio_before": 0.1282,
+      "ratio_after": 0.9582,
+      "improved": true
+    },
+    {
+      "step_from": 37,
+      "step_to": 38,
+      "boundary_frame": 621,
+      "v_at_before_m_s": 0.06,
+      "v_at_after_m_s": 0.41472,
+      "ratio_before": 0.1113,
+      "ratio_after": 0.9659,
+      "improved": true
+    },
+    {
+      "step_from": 38,
+      "step_to": 39,
+      "boundary_frame": 637,
+      "v_at_before_m_s": 0.06912,
+      "v_at_after_m_s": 0.47808,
+      "ratio_before": 0.1118,
+      "ratio_after": 0.9326,
+      "improved": true
+    },
+    {
+      "step_from": 39,
+      "step_to": 40,
+      "boundary_frame": 653,
+      "v_at_before_m_s": 0.07848,
+      "v_at_after_m_s": 0.4524,
+      "ratio_before": 0.1513,
+      "ratio_after": 0.9036,
+      "improved": true
+    },
+    {
+      "step_from": 40,
+      "step_to": 41,
+      "boundary_frame": 669,
+      "v_at_before_m_s": 0.0576,
+      "v_at_after_m_s": 0.27216,
+      "ratio_before": 0.1544,
+      "ratio_after": 0.8381,
+      "improved": true
+    }
+  ]
+}

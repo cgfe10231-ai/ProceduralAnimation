@@ -5,39 +5,50 @@
 ---
 
 ## 1. 当前目标与当前状态
-**当前任务**：ProceduralAnimation — Environment Gate 01 — Repair Unit 3: Real Mesh Environment → Existing 19-Bone Character Motion Pipeline Integration (U3-01 至 U3-14)。  
-**当前状态**：`ENVIRONMENT GATE 01 / UNIT 3 — AWAITING HUMAN VISUAL REVIEW`（严格停止等待人类视口目视审查，严禁自动进入 Unit 4 或 Phase 7B）。
+**当前任务**：ProceduralAnimation — Environment Gate 01 — Unit 3 / Atomic Repair S1: Root Forward Motion Continuity Across Alternating Footsteps (S1-A 至 S1-F)。  
+**当前状态**：`ENVIRONMENT GATE 01 / UNIT 3-S1 — AWAITING HUMAN VISUAL REVIEW`（严格停止等待人类视口目视审查，严禁自动进入 S2、S3、Unit 4 或 Phase 7B）。
 
 ### 本任务核心产出与成果
-1. **地面单次物理命中支撑查询契约 (U3-02)**：
-   - 在 `EnvironmentQuery` 与 `DynamicsEnvironmentQuery` 实现 `query_ground_support_at(x, y, start_z=50.0, max_fall=100.0) -> SurfaceQueryResult`；
-   - 网格模式下垂直向下投射射线，保证足部落脚点高度 $Z$、法向量、`surface_id` 及支撑适格性来自单次真实物理命中；
-   - 彻底终结了分散的多重几何查询（`ground_height_at`、`surface_normal_at`、`query_surface_at_point`）可能查询到不同几何表面或产生不一致回退的隐患；
-   - 解析模式与基类保持向下兼容（回退至解析表面或默认平地，`source_type="analytical"` / `"default"`）。
-2. **严格无支撑拒绝 (U3-03)**：
-   - 网格模式下射线未命中任何 `Playground_Surfaces` 网格时严格返回 `success=False`（`error_reason="NO_HIT: ..."`，`source_type="mesh"`），绝对禁止静默伪造 $Z=0.0\text{m}$ 虚假地面；
-   - 命中非支撑表面（`allows_regular_support=False`）时返回 `success=False`（`NON_SUPPORT_SURFACE`）；
-   - 运动规划层 `plan_terrain_footsteps`、`build_terrain_step_schedule`、`_adjust_footfall_for_seams_and_edges` 与 `execute` 遇到 `NO_HIT` 或非支撑表面显式抛出 `ValueError` 阻断规划。
-3. **现有 19 骨骼控制管线零侵入保护 (U3-04)**：
-   - 严格保持 6 阶段权威主链（`MotionPlanner` → `TerrainWalkAction` → `KinematicPlannedPose` → `KinematicBridgeExecutor` → `WholeBodyController` → `Rig/IK/FK`）；
-   - `src/motion/whole_body_controller.py`、`src/motion/kinematic_bridge.py`、`src/motion/contact_model.py` 及 `src/character/` 角色骨骼系统保持 0 改动；
-   - 已知足底遥测 Z 偏移（`telemetry_z = foot_center_z - 0.08`）收口受限于 Unit 4 范围，不越界修改。
-4. **反事实网格微扰敏感性实证 (U3-05)**：
-   - 实验 A（基准网格） vs 实验 B（斜坡顶台抬升 5cm 网格微扰）：
-     * 真实网格查询驱动足部落地高程与 Root 轨迹产生 $+0.05\text{m}$ 物理偏移（顶台着地高程由 $1.3397\text{m}$ 增至 $1.3897\text{m}$）；
-     * 旧版解析查询器 `create_standard_dynamics_playground_query()` 面对相同网格微扰高程差异恒为 $0.0\text{m}$，形式化证明旧解析查询器对网格脱敏，新 BVH 网格查询器对几何变异具备灵敏响应性。
-5. **独立场景装配与进出坡道实网格补全 (U3-01, U3-06, U3-07)**：
-   - 实现场景入口 `generate_dynamics_playground_environment_gate01_u3_blend()`；
-   - 在装配场景中补全坡道引桥与着地出口平地支撑块（`Surface_Ramp_ApproachGround`, `Surface_Ramp_ExitGround`）并纳入 `Playground_Surfaces`，确保全路段落点 100% 命中真实网格；
-   - 顶面多边形采用逆时针缠绕顺序生成向上法线 $(0, 0, 1)$；
-   - 产物持久化至 `output/dynamics_playground_environment_gate01_u3.blend`（700 帧连续动画、主相机、诊断场景、逐帧遥测与 JSON 伴随数据）；
-   - 实现反事实网格微扰生成函数 `apply_ramp_mesh_perturbation(delta_z=0.05)`，生成对照场景 `output/dynamics_playground_environment_gate01_u3_perturbed.blend`；
-   - 历史基准资产 `output/dynamics_playground.blend` 保持 0 字节变动。
-6. **真实网格重新评估验证器 (U3-06, U3-07)**：
-   - 实现 `validate_dynamics_playground_environment_gate01_u3`，重新打开产物场景并实例化 `BlenderMeshEnvironmentAdapter` 针对真实网格逐帧核验；
-   - 700 帧全量零豁免 Root C0 连续性（$< 0.12\text{ m/frame}$）、骨骼拉伸（$< 0.1\text{ mm}$）、旋转抖动（$< 35^\circ$）、锁定支撑脚滑移（$< 0.1\text{ mm}$）、ROM 违规（0 处）与真实网格表面接触检验。
-7. **14 项完整测试与分级套件全绿通过 (U3-T01 至 U3-T14)**：
-   - 编写 `tests/test_environment_gate01_unit3.py` 并注册至 `tests/test_registry.py`，14 项测试全绿（14/14 PASS in 14.8s）；
+1. **换脚边界速度塌陷根因查明与数据实证 (S1-A)**：
+   - 提取 Baseline `output/dynamics_playground_environment_gate01_u3.blend` 中 `CharacterRoot` 真实运动学；
+   - 证实历史代码 `root_y = 0.5 * (st_xyz[1] + sw_y)` 导致 Root 前向速度与单步摆动脚缓入缓出插值强耦合；
+   - 41/41 (100%) 步态边界处前向速度发生塌陷（最低 0.0346 m/s，平均 0.0680 m/s，相对稳态速度塌陷达 85%~92%）；
+   - 输出客观证据：`root_velocity_before.csv`、`root_acceleration_before.csv`、`root_step_boundary_report.json` 至 `docs/evidence/environment_gate01_u3_s1/`。
+2. **单调 C1 连续 Hermite 样条解耦落地 (S1-B, 规则 A~E)**：
+   - 严格保持摆动脚轨迹 `sw_y` 计算不变（规则 A：足部接近着地点自然减速）；
+   - 实现私有纯数学辅助函数 `_build_continuous_root_forward_spline(schedule, fps)` 与 `_evaluate_root_y_hermite(...)`；
+   - 提取双足几何中心节点序列 $Y_k$ 与时间节点 $T_k$，起始与终止节点速度为 $0.0\text{ m/s}$，内部节点采用中心差分计算连续过渡边界速度；
+   - 步内采用三次 Hermite 样条插值，配合 Fritsch-Carlson 单调性钳位（$m_0, m_1 \in [0, 3]$），严格消除倒退运动；
+   - 步态边界速度塌陷异常数彻底清零（由 41/41 降至 0/41），最低边界速度提升至 0.2722 m/s，平均边界速度提升至 0.4423 m/s。
+3. **独立产物生成与重开严苛物理验证 (S1-F)**：
+   - 新增独立入口 `generate_dynamics_playground_environment_gate01_u3_s1_blend()`，持久化至 `output/dynamics_playground_environment_gate01_u3_s1.blend`（历史资产 0 变动）；
+   - 重新打开场景执行 700 帧全量零豁免核验：Root C0 连续（$< 0.023\text{ m/frame}$）、0 ROM 违规、0 骨骼拉伸（$< 1.8\times 10^{-6}\text{ m}$）、锁定支撑脚滑移 $< 1.2\times 10^{-5}\text{ m}$；
+   - 伴随生成 `root_velocity_after.csv`、`root_acceleration_after.csv`、对比 JSON `root_continuity_comparison.json` 及视口审查指引 `u3_s1_visual_review.md`。
+4. **4 项单元测试全绿与分层回归套件通过 (`tests/test_environment_gate01_u3_s1.py`)**：
+   - S1-T01 证实旧逻辑 100% 塌陷可证伪性；S1-T02 证实新逻辑 0 塌陷且足部接触零退化；S1-T03 证实 0.20m/0.40m 步长参数无关泛化性；S1-T04 证实纯数学边界与单调性；
+   - 统一分级套件全绿：
+     * `quick` 套件：**15 / 15 PASS** (39.34s)；
+     * `physics` 套件：**19 / 19 PASS** (85.23s)；
+     * `motion` 套件：**10 / 10 PASS** (43.22s)；
+     * `full` 套件：**32 / 32 PASS** (132.32s)；
+   - 状态严格停留于 `ENVIRONMENT GATE 01 / UNIT 3-S1 — AWAITING HUMAN VISUAL REVIEW`。
+
+## 2. 已完成历史里程碑
+* Environment Gate 01 — Repair Unit 3: 真实 Blender Mesh 环境查询与 19 骨骼人体连续运动主链接入及反事实实证闭环 (U3-01 至 U3-14)。
+* Environment Gate 01 — Repair Unit 2 Final Closure：BVH Cache Invalidation, Scene Geometry Consistency & Exception Safety Hardening (Defects C01-C06, F01-F03)。
+* Environment Gate 01 — Repair Unit 1：候选范围隔离机制与表面筛选语义修复及最终验收（覆盖率 32/32 PASS，故障注入与极端边界报告归档）。
+* Environment Gate 01：真实 Blender Mesh 环境查询接入与数据真实性门禁。
+* 任务 7A→7B 准入门禁：全仓库静态与动态调用链架构基线审计（输出 8 份审计报告至 `docs/audit/`）。
+* 任务 7A-2：架构修复、P0 空间瞬移缺陷根除、内置数据诊断视窗与权威连续地形验收（700 帧连续地形行走）。
+* 任务 7A-1：历史角色资产复用、接入 DynamicsPlayground 训练场与最小控制闭环验证（204 帧连续平地行走）。
+* 任务 6G-D：单刚体集总质心动力学前向积分与多接触力二次规划求解器（C2-FINAL 冻结）。
+* 任务 6G-C：接触模型几何计算与最小兼容桥接层落地。
+* 任务 6G-A / 6G-B：人体刚体运动学微分器与转动惯量张量计算。
+* 任务 6F-A 至 6F-D：双臂 IK、全身质心 (CoM)、解剖学关节 ROM 模型与全身姿态协调器 (WBC)。
+* 任务 6A 至 6D：统一运动框架 `MotionPlanner`、跑步模式、冲刺加速与急停制动。
+* 任务 4A 至 5C：19 骨骼标准人形角色构建、双腿 IK 约束、足部世界接触锁定与行走步态。
+* 确认环境隔离（保护桌面无关 Unity 及实验报告等工程）。
+* 建立统一物理世界坐标约定（$Z$ 轴向上，地表精准对齐 $Z=0.0\text{ m}$，单位米）。
    - 全量分级回归通过：
      * `quick` 套件：**14 / 14 PASS** (34.92s)；
      * `physics` 套件：**19 / 19 PASS** (84.69s)；
