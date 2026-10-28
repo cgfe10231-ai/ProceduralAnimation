@@ -1441,3 +1441,41 @@
 * **影响**：
   - 彻底解决了换脚交替过程中 Root 周期性减速顿挫缺陷，实现了连续平滑的前向人体运动，同时保持了物理接触模型和 19 骨骼主链的完整性；
   - 维持零历史退化与零架构违规。
+
+---
+
+### [DEC-060] 2026-10-29: Environment Gate 01 — Unit 3 / Atomic Repair S2: 摆动脚至支撑脚切换着地目标连续性修复与越障高度包络收敛
+
+* **状态**：已采纳并完成实施 (Accepted & Implemented)
+* **日期**：2026-10-29
+* **背景**：在 Unit 3 视口审查与定点检查中发现，在摆动脚切换为支撑脚的离散交界帧存在垂直下砸跳变（尤以 Frame 188 $\to$ 189 右脚着地处最为剧烈，存在 40.4mm 瞬时高度落差）：
+  1. **缺陷根因 1 (末帧离散采样未闭合)**：单步持续 `dur` 帧（16 帧）中，原实现 `step_progress = (current_frame - frame_start) / float(dur)`。在单步最后一帧 $f_{last} = frame\_end - 1$ 时，采样点仅达到 $15 / 16 = 0.9375$，对应 $step\_alpha = 0.98877$。摆动脚尚未抵达预定落点（距离目标仍有 5mm~40mm 差距），就在下一帧被硬性切换为世界空间锁定的支撑脚，产生离散阶跃；
+  2. **缺陷根因 2 (斜坡静态足框越障抬升未衰减收敛)**：为防足尖踢地，原公式直接对足底三点地形取最大值：`sw_z_clean = max(z_base + arc_z, z_terr_foot + min_clearance)`。在 10°~15° 坡道上，位于脚踝前方 0.15m 处的足尖地形比脚踝高出 40.2mm。旧公式在末帧即便 $step\_alpha = 1.0$，$sw\_z\_clean$ 依然被静态足尖地形硬顶在空中高出脚踝落点 40mm，导致在下一帧锁定支撑脚时瞬间下砸 40.4mm；
+  3. **缺陷根因 3 (起步足踝倾角截断)**：旧代码在起飞阶段将 `sw_pitch_start` 人为截断至 `min(10.0, ...)`，导致在 15° 坡面起飞瞬间足部倾角突变 5°，造成足尖下扎穿透斜面；
+  4. **严格控制链与资产保护约束**：严禁修改 `WholeBodyController`、`KinematicBridgeExecutor`、`ContactModel` 或角色骨架；严禁破坏 Unit 3-S1 Root Hermite 样条前向连续性；所有 42 处换脚边界落点目标偏差必须满足 $\| \mathbf{sw\_target}(f_{last}) - \mathbf{st\_target}(f_{first}) \| \le 1\text{e-}4\text{ m}$；历史 Blend 资产 0 变动。
+* **决策与方案**：
+  1. **离散末帧闭合采样与连续起步倾角落地 (`src/motion/terrain_walk.py`)**：
+     - 在 `TerrainWalkAction.execute()` 中将采样调整为有效跨度 `dur - 1`：
+       `step_progress = (current_frame - active_step.frame_start) / float(dur - 1) if dur > 1 else 1.0`，确保最后一帧精确达到 $step\_progress = 1.0$ 与 $step\_alpha = 1.0$；
+     - 将起飞倾角对齐支撑状态：`sw_pitch_start = active_step.swing_start_pitch_deg`，消除起步 5° 倾角跳变与足尖穿透。
+  2. **纯数学越障抬升平滑包络辅助函数 (`src/motion/terrain_walk.py`)**：
+     - 新增纯数学无状态函数 `_compute_swing_clearance_z(step_alpha, z_base, arc_z, z_terr_foot, min_clearance_amp=0.045)`；
+     - 引入正弦加权包络 $envelope = \sin(\pi \cdot step\_alpha)$；
+     - 地形越障抬升量定义为 $terrain\_lift = \max(0.0, (z\_terr\_foot + min\_clearance) - z\_base) \times envelope$；
+     - 最终摆动高程 $sw\_z\_clean = z\_base + \max(arc\_z, terrain\_lift)$；
+     - 在起飞（$\alpha=0$）与着地（$\alpha=1$）两端 $envelope=0$，$sw\_z\_clean$ 严格收敛至 $z\_base$（C0 完美接合）；在摆动中段（$\alpha \approx 0.5$）$envelope \approx 1.0$，提供充分越障高度，全程零地形穿透。
+  3. **独立场景生成与全量零豁免验证 (`src/scene/playground_terrain_traversal.py`)**：
+     - 新增独立入口 `generate_dynamics_playground_environment_gate01_u3_s2_blend()`，生成 `output/dynamics_playground_environment_gate01_u3_s2.blend`（700 帧连续动画）；
+     - 重新打开场景执行 700 帧物理检验：`validate_dynamics_playground_environment_gate01_u3` 返回 `PASS`，0 ROM 违规，0 地形穿透，骨骼拉伸 $< 1.8\times 10^{-6}\text{ m}$，支撑脚滑移 $< 1.4\times 10^{-5}\text{ m}$。
+  4. **全量 42 步边界高精度核验与测试套件 (`tests/test_environment_gate01_u3_s2.py`, `tests/verify_environment_gate01_u3_s2.py`)**：
+     - 42/42 步边界 100% 达成 $\le 1\text{e-}4\text{ m}$ 门禁要求；
+     - 全场最大规划落点目标偏差由 40.517 mm 降至 **0.000000 mm**；
+     - Frame 188 $\to$ 189 规划目标差由 40.418 mm 彻底消除为 **0.000000 mm**，实际骨骼踝关节差为 **0.100 mm**；
+     - 归档前/后 42 步边界数据 `landing_boundary_before.json`、`landing_boundary_after.json`、对比分析 JSON `landing_boundary_comparison.json` 及视口审查指引 `u3_s2_visual_review.md` 至 `docs/evidence/environment_gate01_u3_s2/`；
+     - 注册 `environment_gate01_u3_s2` 至 `tests/test_registry.py`；
+     - 全量分级测试通过：`quick` (16/16), `physics` (19/19), `motion` (11/11), `full` (33/33), `--verify-docs` (PASS)；
+     - 历史资产 `output/dynamics_playground.blend` 0 字节变动；
+     - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 3-S2 — AWAITING HUMAN VISUAL REVIEW`。
+* **影响**：
+  - 彻底消除了摆动脚着地切换瞬间的下砸跳变缺陷，实现了足部规划轨迹与实际骨骼姿态在时空两端的完美 C0 连续闭合；
+  - 维持零历史退化与零架构违规。

@@ -1,13 +1,41 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-28  
-> **当前阶段**：Environment Gate 01 — Unit 3 / Atomic Repair S1（Root 前进轨迹与单步摆动脚时间参数解耦及 C1 连续性闭环）已全部完成并通过 4 项单元测试与 32 项全量回归。查明历史实现 `root_y = 0.5 * (st_xyz[1] + sw_y)` 导致 Root 前向速度与单步摆动脚缓入缓出强耦合（41/41 步态交替边界处发生速度塌陷至 0.035 m/s）；保持摆动脚着地平缓减速不变，实现了纯数学单调 C1 连续 Hermite 样条，基于真实 `TerrainStepPlan` 节点计算连续过渡边界速度；彻底消除 41/41 处速度塌陷（塌陷异常数由 41 降至 0），换脚边界最低前向速度提升至 0.2722 m/s，平均边界速度提升至 0.4423 m/s；生成独立场景 `output/dynamics_playground_environment_gate01_u3_s1.blend`（历史资产 0 变动）；重开核验 700 帧全量零豁免通过：Root C0 连续（$< 0.023\text{ m/frame}$）、0 ROM 违规、0 骨骼拉伸（$< 1.8\times 10^{-6}\text{ m}$）、锁定支撑脚滑移 $< 1.2\times 10^{-5}\text{ m}$；全量分级测试全绿：`quick` (15/15), `physics` (19/19), `motion` (10/10), `full` (32/32)；当前状态：`ENVIRONMENT GATE 01 / UNIT 3-S1 — AWAITING HUMAN VISUAL REVIEW`，严格停止等待人类视口目视审查，严禁擅自进入 S2、S3、Unit 4 或 Phase 7B。  
+> **记录时间**：2026-10-29  
+> **当前阶段**：Environment Gate 01 — Unit 3 / Atomic Repair S2（Swing-to-Stance Landing Continuity Repair）已全部完成并通过 6 项单元测试与 33 项全量回归。查明 42 处换脚边界垂直下砸跳变根因（末帧离散采样未闭合、斜坡静态足框越障抬升未衰减、起步倾角截断）；实现了离散有效跨度采样与连续起飞倾角，并新增纯数学无状态辅助函数 `_compute_swing_clearance_z`（基于正弦加权包络平滑起落）；全场 42/42 换脚边界 100% 达成 $\le 1\text{e-}4\text{ m}$ 门禁要求；Frame 188 $\to$ 189 规划目标差由 40.418 mm 彻底消除为 0.000000 mm，骨骼实际姿态差为 0.100 mm；全场 42 步最大规划目标差 0.000000 mm，最大骨骼姿态差 0.100 mm；独立生成 `output/dynamics_playground_environment_gate01_u3_s2.blend`，重开核验 700 帧 0 ROM 违规、0 地形穿透、0 骨骼拉伸，Unit 3-S1 Root 前向连续性 100% 保留；全量分级测试全绿：`quick` (16/16), `physics` (19/19), `motion` (11/11), `full` (33/33)；当前状态：`ENVIRONMENT GATE 01 / UNIT 3-S2 — AWAITING HUMAN VISUAL REVIEW`，严格停止等待人类视口目视审查，严禁擅自进入 Unit 4 或 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01 — Unit 3 / Atomic Repair S2: 摆动脚至支撑脚切换着地目标连续性修复与越障高度包络收敛 (S2-A 至 S2-F)**：
+  * **换脚边界着地垂直跳变根因查明与数据实证 (S2-A)**：
+    - 针对基准场景 `output/dynamics_playground_environment_gate01_u3_s1.blend` 提取 42 处步态交替边界；
+    - 查明根因 1（末帧离散采样未闭合）：`step_progress = (frame - start) / float(dur)` 在末帧仅为 $15/16=0.9375$（$\alpha=0.98877$），末帧脚踝尚未抵达落点即在下一帧锁定；
+    - 查明根因 2（斜坡静态足框越障抬升未衰减）：`sw_z_clean = max(z_base + arc_z, z_terr_foot + min_clearance)` 中 `z_terr_foot`（取足底前中后三点最高点）在 10°~15° 斜坡上比脚踝落点高出 40.2mm，末帧即便 $\alpha=1.0$ 依然将脚踝顶在空中，导致下一帧锁定支撑脚时瞬间下砸 40.4mm（Frame 188 $\to$ 189）；
+    - 查明根因 3（起步足踝倾角截断）：`sw_pitch_start = min(10.0, ...)` 导致在 15° 坡面起飞瞬间倾角突变 5°，造成足尖下扎穿透斜面；
+    - 提取并保存基准数据至 `docs/evidence/environment_gate01_u3_s2/landing_boundary_before.json`。
+  * **生产控制修复与平滑包络辅助函数落地 (S2-B)**：
+    - `step_progress = (current_frame - active_step.frame_start) / float(dur - 1) if dur > 1 else 1.0`，保证单步末帧精确达到 $\alpha=1.0$；
+    - `sw_pitch_start = active_step.swing_start_pitch_deg`，消除起步 5° 倾角跳变与足尖穿透；
+    - 新增纯数学无状态函数 `_compute_swing_clearance_z(step_alpha, z_base, arc_z, z_terr_foot, min_clearance_amp=0.045)`；
+    - 引入正弦加权包络 $envelope = \sin(\pi \cdot step\_alpha)$；
+    - 地形越障抬升量定义为 $terrain\_lift = \max(0.0, (z\_terr\_foot + min\_clearance) - z\_base) \times envelope$；
+    - 摆动高程 $sw\_z\_clean = z\_base + \max(arc\_z, terrain\_lift)$；
+    - 起飞与着地两端严格收敛至 $z\_base$（C0 完美接合），摆动中段保证充足越障间隙，全程零地形穿透。
+  * **独立产物生成与重开严苛验证 (S2-F)**：
+    - 新增独立入口 `generate_dynamics_playground_environment_gate01_u3_s2_blend()`，产物持久化至 `output/dynamics_playground_environment_gate01_u3_s2.blend`，历史 Unit 3 及 S1 资产 0 字节变动；
+    - 重新打开场景执行 700 帧全量零豁免核验：`validate_dynamics_playground_environment_gate01_u3` 返回 `PASS`，0 ROM 违规，0 地形穿透，骨骼拉伸 $< 1.8\times 10^{-6}\text{ m}$，支撑脚滑移 $< 1.4\times 10^{-5}\text{ m}$，Root C0 连续；
+    - 生成 `landing_boundary_after.json`、`landing_boundary_comparison.json` 及视口审查指引 `u3_s2_visual_review.md`。
+  * **6 项单元测试全绿与分层回归套件通过 (`tests/test_environment_gate01_u3_s2.py`)**：
+    - S2-T01: 基准数据 Frame 188 $\to$ 189 存在 40.4mm 垂直跳变可证伪性实证；
+    - S2-T02: Frame 188 $\to$ 189 着地目标差降至 0.000000 mm，骨骼姿态差 $\le 0.1\text{ mm}$；
+    - S2-T03: 全场 42 处换脚边界 100% 达成 $\le 1\text{e-}4\text{ m}$ 门禁要求；
+    - S2-T04: 重开 Blend 场景 700 帧无 ROM 违规、无地形穿透、无骨骼拉伸；
+    - S2-T05: 纯数学越障包络在 $\alpha=0$ 与 $\alpha=1$ 严格保持 C0 连续性合同；
+    - S2-T06: 回归验证 Unit 3-S1 Root 前向连续性 100% 保留（0 速度塌陷，无倒退）；
+    - 统一分级套件全绿：`quick` (16/16), `physics` (19/19), `motion` (11/11), `full` (33/33)；
+    - 状态严格停留于 `ENVIRONMENT GATE 01 / UNIT 3-S2 — AWAITING HUMAN VISUAL REVIEW`。
 * **Environment Gate 01 — Unit 3 / Atomic Repair S1: Root 前进轨迹与单步摆动脚时间参数解耦及 C1 连续性闭环 (S1-A 至 S1-F)**：
   * **换脚边界速度塌陷根因查明与数据实证 (S1-A)**：
     - 针对基准场景 `output/dynamics_playground_environment_gate01_u3.blend` 提取 700 帧 `CharacterRoot` 真实运动学；

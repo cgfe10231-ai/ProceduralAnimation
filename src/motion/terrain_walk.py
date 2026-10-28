@@ -64,6 +64,24 @@ def _smooth_bell01(x: float) -> float:
     return math.sin(math.pi * t) ** 2
 
 
+def _compute_swing_clearance_z(
+    step_alpha: float,
+    z_base: float,
+    arc_z: float,
+    z_terr_foot: float,
+    min_clearance_amp: float = 0.045,
+) -> float:
+    """Compute swing foot elevation with smooth terrain clearance tapering to zero at boundaries.
+
+    Ensures that swing foot targets match takeoff (alpha=0) and landing (alpha=1)
+    elevations with C0 continuity, while maintaining clearance during mid-swing.
+    """
+    envelope = math.sin(math.pi * step_alpha)
+    min_clearance = min_clearance_amp * envelope
+    terrain_lift = max(0.0, (z_terr_foot + min_clearance) - z_base) * envelope
+    return z_base + max(arc_z, terrain_lift)
+
+
 def pitch_from_surface_normal(normal_world: Tuple[float, float, float]) -> float:
     """Compute anatomical foot pitch angle (deg) parallel to a 3D terrain surface.
 
@@ -836,7 +854,9 @@ class TerrainWalkAction(MotionAction):
             else:
                 # Active step transition
                 mode = MotionMode.WALK
-                step_progress = (current_frame - active_step.frame_start) / float(active_step.duration_frames)
+                dur = active_step.duration_frames
+                step_progress = (current_frame - active_step.frame_start) / float(dur - 1) if dur > 1 else 1.0
+                step_progress = max(0.0, min(1.0, step_progress))
                 step_alpha = _smoothstep01(step_progress)
 
                 st_side = active_step.stance_side
@@ -875,13 +895,18 @@ class TerrainWalkAction(MotionAction):
                 z_terr_ankle = res_ankle.contact_point_world[2] if res_ankle.success else z_base
                 z_terr_toe = res_toe.contact_point_world[2] if res_toe.success else z_base
                 z_terr_foot = max(z_terr_heel, z_terr_ankle, z_terr_toe)
-                min_clearance = 0.045 * math.sin(math.pi * step_alpha)
-                sw_z_clean = max(z_base + arc_z, z_terr_foot + min_clearance)
+                sw_z_clean = _compute_swing_clearance_z(
+                    step_alpha=step_alpha,
+                    z_base=z_base,
+                    arc_z=arc_z,
+                    z_terr_foot=z_terr_foot,
+                    min_clearance_amp=0.045,
+                )
 
                 # Natural swing foot ankle pitch coordination:
-                # Toe-off extension capped to 10.0 deg on steep slopes.
+                # Continuous pitch takeoff from stance pitch.
                 # Mid-swing relaxation (plantarflexion) prevents shin-ankle ROM conflict.
-                sw_pitch_start = min(10.0, active_step.swing_start_pitch_deg)
+                sw_pitch_start = active_step.swing_start_pitch_deg
                 sw_pitch_base = (1.0 - step_alpha) * sw_pitch_start + step_alpha * active_step.swing_end_pitch_deg
 
                 # Pure geometric determination of swing relaxation amplitude:

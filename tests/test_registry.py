@@ -427,6 +427,23 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Verifies decoupling of Root forward motion from single-step swing foot interpolation, elimination of boundary velocity collapse, 0 ROM violations, and foot contact preservation.",
     ),
+    "environment_gate01_u3_s2": TestDefinition(
+        test_id="environment_gate01_u3_s2",
+        name="Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair",
+        script_path="tests/test_environment_gate01_u3_s2.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.MOTION, TestTier.FULL],
+        timeout_sec=60.0,
+        expected_artifacts=[
+            "output/dynamics_playground_environment_gate01_u3_s2.blend",
+            "docs/evidence/environment_gate01_u3_s2/landing_boundary_before.json",
+            "docs/evidence/environment_gate01_u3_s2/landing_boundary_after.json",
+            "docs/evidence/environment_gate01_u3_s2/landing_boundary_comparison.json",
+            "docs/evidence/environment_gate01_u3_s2/u3_s2_visual_review.md",
+        ],
+        is_visual_acceptance=True,
+        description="Verifies Swing-to-Stance landing continuity across all 42 step boundaries (target diff <= 1e-4m), elimination of 40.4mm drop at Frame 188->189, 0 ROM violations, and 0 terrain penetrations.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection

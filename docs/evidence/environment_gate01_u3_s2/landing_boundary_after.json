@@ -1,0 +1,1178 @@
+[
+  {
+    "step_k": 0,
+    "swing_side": "R",
+    "frame_last_swing": 28,
+    "frame_first_stance": 29,
+    "planned_last_swing": [
+      0.11,
+      10.5,
+      0.07
+    ],
+    "planned_first_stance": [
+      0.11,
+      10.5,
+      0.07
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      10.5,
+      0.07
+    ],
+    "ik_first_stance": [
+      0.11,
+      10.5,
+      0.07
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 1,
+    "swing_side": "L",
+    "frame_last_swing": 44,
+    "frame_first_stance": 45,
+    "planned_last_swing": [
+      -0.11,
+      10.8,
+      0.07
+    ],
+    "planned_first_stance": [
+      -0.11,
+      10.8,
+      0.07
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      10.8,
+      0.07
+    ],
+    "ik_first_stance": [
+      -0.11,
+      10.8,
+      0.07
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 2,
+    "swing_side": "R",
+    "frame_last_swing": 60,
+    "frame_first_stance": 61,
+    "planned_last_swing": [
+      0.11,
+      11.1,
+      0.0968
+    ],
+    "planned_first_stance": [
+      0.11,
+      11.1,
+      0.0968
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      11.1,
+      0.0968
+    ],
+    "ik_first_stance": [
+      0.11,
+      11.1,
+      0.0968
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 3,
+    "swing_side": "L",
+    "frame_last_swing": 76,
+    "frame_first_stance": 77,
+    "planned_last_swing": [
+      -0.11,
+      11.4,
+      0.1772
+    ],
+    "planned_first_stance": [
+      -0.11,
+      11.4,
+      0.1772
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      11.4,
+      0.1772
+    ],
+    "ik_first_stance": [
+      -0.11,
+      11.4,
+      0.1771
+    ],
+    "ik_diff_m": 9.999999999998899e-05
+  },
+  {
+    "step_k": 4,
+    "swing_side": "R",
+    "frame_last_swing": 92,
+    "frame_first_stance": 93,
+    "planned_last_swing": [
+      0.11,
+      11.7,
+      0.2576
+    ],
+    "planned_first_stance": [
+      0.11,
+      11.7,
+      0.2576
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      11.7,
+      0.2575
+    ],
+    "ik_first_stance": [
+      0.11,
+      11.7,
+      0.2575
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 5,
+    "swing_side": "L",
+    "frame_last_swing": 108,
+    "frame_first_stance": 109,
+    "planned_last_swing": [
+      -0.11,
+      12.0,
+      0.3379
+    ],
+    "planned_first_stance": [
+      -0.11,
+      12.0,
+      0.3379
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      12.0,
+      0.3379
+    ],
+    "ik_first_stance": [
+      -0.11,
+      12.0,
+      0.3379
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 6,
+    "swing_side": "R",
+    "frame_last_swing": 124,
+    "frame_first_stance": 125,
+    "planned_last_swing": [
+      0.11,
+      12.3,
+      0.4183
+    ],
+    "planned_first_stance": [
+      0.11,
+      12.3,
+      0.4183
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      12.3,
+      0.4183
+    ],
+    "ik_first_stance": [
+      0.11,
+      12.3,
+      0.4183
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 7,
+    "swing_side": "L",
+    "frame_last_swing": 140,
+    "frame_first_stance": 141,
+    "planned_last_swing": [
+      -0.11,
+      12.6,
+      0.4987
+    ],
+    "planned_first_stance": [
+      -0.11,
+      12.6,
+      0.4987
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      12.6,
+      0.4987
+    ],
+    "ik_first_stance": [
+      -0.11,
+      12.6,
+      0.4987
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 8,
+    "swing_side": "R",
+    "frame_last_swing": 156,
+    "frame_first_stance": 157,
+    "planned_last_swing": [
+      0.11,
+      12.9,
+      0.5791
+    ],
+    "planned_first_stance": [
+      0.11,
+      12.9,
+      0.5791
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      12.9,
+      0.5791
+    ],
+    "ik_first_stance": [
+      0.11,
+      12.9,
+      0.5791
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 9,
+    "swing_side": "L",
+    "frame_last_swing": 172,
+    "frame_first_stance": 173,
+    "planned_last_swing": [
+      -0.11,
+      13.2,
+      0.6595
+    ],
+    "planned_first_stance": [
+      -0.11,
+      13.2,
+      0.6595
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      13.2,
+      0.6595
+    ],
+    "ik_first_stance": [
+      -0.11,
+      13.2,
+      0.6595
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 10,
+    "swing_side": "R",
+    "frame_last_swing": 188,
+    "frame_first_stance": 189,
+    "planned_last_swing": [
+      0.11,
+      13.5,
+      0.7399
+    ],
+    "planned_first_stance": [
+      0.11,
+      13.5,
+      0.7399
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      13.5,
+      0.7399
+    ],
+    "ik_first_stance": [
+      0.11,
+      13.5,
+      0.7398
+    ],
+    "ik_diff_m": 9.999999999998899e-05
+  },
+  {
+    "step_k": 11,
+    "swing_side": "L",
+    "frame_last_swing": 204,
+    "frame_first_stance": 205,
+    "planned_last_swing": [
+      -0.11,
+      13.8,
+      0.8203
+    ],
+    "planned_first_stance": [
+      -0.11,
+      13.8,
+      0.8203
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      13.8,
+      0.8202
+    ],
+    "ik_first_stance": [
+      -0.11,
+      13.8,
+      0.8202
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 12,
+    "swing_side": "R",
+    "frame_last_swing": 220,
+    "frame_first_stance": 221,
+    "planned_last_swing": [
+      0.11,
+      14.1,
+      0.9006
+    ],
+    "planned_first_stance": [
+      0.11,
+      14.1,
+      0.9006
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      14.1,
+      0.9006
+    ],
+    "ik_first_stance": [
+      0.11,
+      14.1,
+      0.9006
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 13,
+    "swing_side": "L",
+    "frame_last_swing": 236,
+    "frame_first_stance": 237,
+    "planned_last_swing": [
+      -0.11,
+      14.4,
+      0.981
+    ],
+    "planned_first_stance": [
+      -0.11,
+      14.4,
+      0.981
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      14.4,
+      0.981
+    ],
+    "ik_first_stance": [
+      -0.11,
+      14.4,
+      0.981
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 14,
+    "swing_side": "R",
+    "frame_last_swing": 252,
+    "frame_first_stance": 253,
+    "planned_last_swing": [
+      0.11,
+      14.7,
+      1.0614
+    ],
+    "planned_first_stance": [
+      0.11,
+      14.7,
+      1.0614
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      14.7,
+      1.0614
+    ],
+    "ik_first_stance": [
+      0.11,
+      14.7,
+      1.0614
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 15,
+    "swing_side": "L",
+    "frame_last_swing": 268,
+    "frame_first_stance": 269,
+    "planned_last_swing": [
+      -0.11,
+      15.0,
+      1.1418
+    ],
+    "planned_first_stance": [
+      -0.11,
+      15.0,
+      1.1418
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      15.0,
+      1.1418
+    ],
+    "ik_first_stance": [
+      -0.11,
+      15.0,
+      1.1418
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 16,
+    "swing_side": "R",
+    "frame_last_swing": 284,
+    "frame_first_stance": 285,
+    "planned_last_swing": [
+      0.11,
+      15.3,
+      1.2222
+    ],
+    "planned_first_stance": [
+      0.11,
+      15.3,
+      1.2222
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      15.3,
+      1.2222
+    ],
+    "ik_first_stance": [
+      0.11,
+      15.3,
+      1.2222
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 17,
+    "swing_side": "L",
+    "frame_last_swing": 300,
+    "frame_first_stance": 301,
+    "planned_last_swing": [
+      -0.11,
+      15.6,
+      1.3026
+    ],
+    "planned_first_stance": [
+      -0.11,
+      15.6,
+      1.3026
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      15.6,
+      1.3025
+    ],
+    "ik_first_stance": [
+      -0.11,
+      15.6,
+      1.3025
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 18,
+    "swing_side": "R",
+    "frame_last_swing": 316,
+    "frame_first_stance": 317,
+    "planned_last_swing": [
+      0.11,
+      15.82,
+      1.3615
+    ],
+    "planned_first_stance": [
+      0.11,
+      15.82,
+      1.3615
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      15.82,
+      1.3615
+    ],
+    "ik_first_stance": [
+      0.11,
+      15.82,
+      1.3615
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 19,
+    "swing_side": "L",
+    "frame_last_swing": 332,
+    "frame_first_stance": 333,
+    "planned_last_swing": [
+      -0.11,
+      16.2,
+      1.4097
+    ],
+    "planned_first_stance": [
+      -0.11,
+      16.2,
+      1.4097
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      16.2,
+      1.4097
+    ],
+    "ik_first_stance": [
+      -0.11,
+      16.2,
+      1.4097
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 20,
+    "swing_side": "R",
+    "frame_last_swing": 348,
+    "frame_first_stance": 349,
+    "planned_last_swing": [
+      0.11,
+      16.5,
+      1.4097
+    ],
+    "planned_first_stance": [
+      0.11,
+      16.5,
+      1.4097
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      16.5,
+      1.4097
+    ],
+    "ik_first_stance": [
+      0.11,
+      16.5,
+      1.4097
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 21,
+    "swing_side": "L",
+    "frame_last_swing": 364,
+    "frame_first_stance": 365,
+    "planned_last_swing": [
+      -0.11,
+      16.8,
+      1.4097
+    ],
+    "planned_first_stance": [
+      -0.11,
+      16.8,
+      1.4097
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      16.8,
+      1.4097
+    ],
+    "ik_first_stance": [
+      -0.11,
+      16.8,
+      1.4097
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 22,
+    "swing_side": "R",
+    "frame_last_swing": 380,
+    "frame_first_stance": 381,
+    "planned_last_swing": [
+      0.11,
+      17.1,
+      1.4097
+    ],
+    "planned_first_stance": [
+      0.11,
+      17.1,
+      1.4097
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      17.1,
+      1.4097
+    ],
+    "ik_first_stance": [
+      0.11,
+      17.1,
+      1.4097
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 23,
+    "swing_side": "L",
+    "frame_last_swing": 396,
+    "frame_first_stance": 397,
+    "planned_last_swing": [
+      -0.11,
+      17.4,
+      1.4097
+    ],
+    "planned_first_stance": [
+      -0.11,
+      17.4,
+      1.4097
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      17.4,
+      1.4097
+    ],
+    "ik_first_stance": [
+      -0.11,
+      17.4,
+      1.4097
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 24,
+    "swing_side": "R",
+    "frame_last_swing": 412,
+    "frame_first_stance": 413,
+    "planned_last_swing": [
+      0.11,
+      17.7,
+      1.4097
+    ],
+    "planned_first_stance": [
+      0.11,
+      17.7,
+      1.4097
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      17.7,
+      1.4097
+    ],
+    "ik_first_stance": [
+      0.11,
+      17.7,
+      1.4097
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 25,
+    "swing_side": "L",
+    "frame_last_swing": 428,
+    "frame_first_stance": 429,
+    "planned_last_swing": [
+      -0.11,
+      18.08,
+      1.3806
+    ],
+    "planned_first_stance": [
+      -0.11,
+      18.08,
+      1.3806
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      18.08,
+      1.3806
+    ],
+    "ik_first_stance": [
+      -0.11,
+      18.08,
+      1.3806
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 26,
+    "swing_side": "R",
+    "frame_last_swing": 444,
+    "frame_first_stance": 445,
+    "planned_last_swing": [
+      0.11,
+      18.3,
+      1.3006
+    ],
+    "planned_first_stance": [
+      0.11,
+      18.3,
+      1.3006
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      18.3,
+      1.3005
+    ],
+    "ik_first_stance": [
+      0.11,
+      18.3,
+      1.3005
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 27,
+    "swing_side": "L",
+    "frame_last_swing": 460,
+    "frame_first_stance": 461,
+    "planned_last_swing": [
+      -0.11,
+      18.6,
+      1.1914
+    ],
+    "planned_first_stance": [
+      -0.11,
+      18.6,
+      1.1914
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      18.6,
+      1.1914
+    ],
+    "ik_first_stance": [
+      -0.11,
+      18.6,
+      1.1914
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 28,
+    "swing_side": "R",
+    "frame_last_swing": 476,
+    "frame_first_stance": 477,
+    "planned_last_swing": [
+      0.11,
+      18.9,
+      1.0822
+    ],
+    "planned_first_stance": [
+      0.11,
+      18.9,
+      1.0822
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      18.9,
+      1.0822
+    ],
+    "ik_first_stance": [
+      0.11,
+      18.9,
+      1.0822
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 29,
+    "swing_side": "L",
+    "frame_last_swing": 492,
+    "frame_first_stance": 493,
+    "planned_last_swing": [
+      -0.11,
+      19.2,
+      0.973
+    ],
+    "planned_first_stance": [
+      -0.11,
+      19.2,
+      0.973
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      19.2,
+      0.973
+    ],
+    "ik_first_stance": [
+      -0.11,
+      19.2,
+      0.973
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 30,
+    "swing_side": "R",
+    "frame_last_swing": 508,
+    "frame_first_stance": 509,
+    "planned_last_swing": [
+      0.11,
+      19.5,
+      0.8638
+    ],
+    "planned_first_stance": [
+      0.11,
+      19.5,
+      0.8638
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      19.5,
+      0.8638
+    ],
+    "ik_first_stance": [
+      0.11,
+      19.5,
+      0.8638
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 31,
+    "swing_side": "L",
+    "frame_last_swing": 524,
+    "frame_first_stance": 525,
+    "planned_last_swing": [
+      -0.11,
+      19.8,
+      0.7546
+    ],
+    "planned_first_stance": [
+      -0.11,
+      19.8,
+      0.7546
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      19.8,
+      0.7546
+    ],
+    "ik_first_stance": [
+      -0.11,
+      19.8,
+      0.7546
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 32,
+    "swing_side": "R",
+    "frame_last_swing": 540,
+    "frame_first_stance": 541,
+    "planned_last_swing": [
+      0.11,
+      20.1,
+      0.6454
+    ],
+    "planned_first_stance": [
+      0.11,
+      20.1,
+      0.6454
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      20.1,
+      0.6454
+    ],
+    "ik_first_stance": [
+      0.11,
+      20.1,
+      0.6454
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 33,
+    "swing_side": "L",
+    "frame_last_swing": 556,
+    "frame_first_stance": 557,
+    "planned_last_swing": [
+      -0.11,
+      20.4,
+      0.5362
+    ],
+    "planned_first_stance": [
+      -0.11,
+      20.4,
+      0.5362
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      20.4,
+      0.5362
+    ],
+    "ik_first_stance": [
+      -0.11,
+      20.4,
+      0.5362
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 34,
+    "swing_side": "R",
+    "frame_last_swing": 572,
+    "frame_first_stance": 573,
+    "planned_last_swing": [
+      0.11,
+      20.7,
+      0.427
+    ],
+    "planned_first_stance": [
+      0.11,
+      20.7,
+      0.427
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      20.7,
+      0.427
+    ],
+    "ik_first_stance": [
+      0.11,
+      20.7,
+      0.427
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 35,
+    "swing_side": "L",
+    "frame_last_swing": 588,
+    "frame_first_stance": 589,
+    "planned_last_swing": [
+      -0.11,
+      21.0,
+      0.3178
+    ],
+    "planned_first_stance": [
+      -0.11,
+      21.0,
+      0.3178
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      21.0,
+      0.3178
+    ],
+    "ik_first_stance": [
+      -0.11,
+      21.0,
+      0.3178
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 36,
+    "swing_side": "R",
+    "frame_last_swing": 604,
+    "frame_first_stance": 605,
+    "planned_last_swing": [
+      0.11,
+      21.3,
+      0.2086
+    ],
+    "planned_first_stance": [
+      0.11,
+      21.3,
+      0.2086
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      21.3,
+      0.2086
+    ],
+    "ik_first_stance": [
+      0.11,
+      21.3,
+      0.2086
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 37,
+    "swing_side": "L",
+    "frame_last_swing": 620,
+    "frame_first_stance": 621,
+    "planned_last_swing": [
+      -0.11,
+      21.52,
+      0.1286
+    ],
+    "planned_first_stance": [
+      -0.11,
+      21.52,
+      0.1286
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      21.52,
+      0.1285
+    ],
+    "ik_first_stance": [
+      -0.11,
+      21.52,
+      0.1286
+    ],
+    "ik_diff_m": 9.999999999998899e-05
+  },
+  {
+    "step_k": 38,
+    "swing_side": "R",
+    "frame_last_swing": 636,
+    "frame_first_stance": 637,
+    "planned_last_swing": [
+      0.11,
+      21.9,
+      0.07
+    ],
+    "planned_first_stance": [
+      0.11,
+      21.9,
+      0.07
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      21.9,
+      0.07
+    ],
+    "ik_first_stance": [
+      0.11,
+      21.9,
+      0.07
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 39,
+    "swing_side": "L",
+    "frame_last_swing": 652,
+    "frame_first_stance": 653,
+    "planned_last_swing": [
+      -0.11,
+      22.2,
+      0.07
+    ],
+    "planned_first_stance": [
+      -0.11,
+      22.2,
+      0.07
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      22.2,
+      0.07
+    ],
+    "ik_first_stance": [
+      -0.11,
+      22.2,
+      0.07
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 40,
+    "swing_side": "R",
+    "frame_last_swing": 668,
+    "frame_first_stance": 669,
+    "planned_last_swing": [
+      0.11,
+      22.4,
+      0.07
+    ],
+    "planned_first_stance": [
+      0.11,
+      22.4,
+      0.07
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      0.11,
+      22.4,
+      0.07
+    ],
+    "ik_first_stance": [
+      0.11,
+      22.4,
+      0.07
+    ],
+    "ik_diff_m": 0.0
+  },
+  {
+    "step_k": 41,
+    "swing_side": "L",
+    "frame_last_swing": 684,
+    "frame_first_stance": 685,
+    "planned_last_swing": [
+      -0.11,
+      22.4,
+      0.07
+    ],
+    "planned_first_stance": [
+      -0.11,
+      22.4,
+      0.07
+    ],
+    "target_diff_m": 0.0,
+    "ik_last_swing": [
+      -0.11,
+      22.4,
+      0.07
+    ],
+    "ik_first_stance": [
+      -0.11,
+      22.4,
+      0.07
+    ],
+    "ik_diff_m": 0.0
+  }
+]
