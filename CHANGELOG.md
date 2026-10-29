@@ -3,6 +3,26 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Environment Gate 01 — Unit 4 Final Closure: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)
+
+### 根因实证与缺陷修复 (`src/motion/kinematic_bridge.py`, `docs/evidence/environment_gate01_ru4/closure/`)
+* **U4-CLOSE-01: 排除不可支撑表面建立虚假支撑**：
+  - 针对受控环境 `SurfaceQueryResult(success=True, allows_regular_support=False)` 执行真实反例；
+  - 证实原代码仅判断 `if query_res.success:`，导致垂直墙壁被错误接受为有效支撑并建立 `ESTABLISHED` 与 `double_stance`；
+  - 实施最小手术式修复：`if query_res.success and query_res.allows_regular_support:`，否则记为 `ContactLifecycle.BROKEN` 并生成 `NO_SUPPORT_SURFACE` 几何违规；
+  - 实测输出归档至 `docs/evidence/environment_gate01_ru4/closure/u4_close_01_before.log` 与 `docs/evidence/environment_gate01_ru4/closure/u4_close_01_after.log`。
+* **U4-CLOSE-02: 真实 Mesh 模式禁止虚假默认平地接触**：
+  - 全面覆盖 Case A（空 Mesh 集合）、Case B（足部落空 / 虚空）、Case C（命中不可支撑面）、Case D（双脚均无支撑）；
+  - 澄清第 472 行 `if not surfaces:` 仅为兼容兜底，实证确认未进入 `active_limb_targets` 或 `ContactRecord`，未产生虚假接触；
+  - 实测输出归档至 `docs/evidence/environment_gate01_ru4/closure/u4_close_02_before.log` 与 `docs/evidence/environment_gate01_ru4/closure/u4_close_02_after.log`，总结文档为 `docs/evidence/environment_gate01_ru4/closure/unit4_closure_summary.md`。
+
+### 自动化测试与全量回归
+* 新增 5 项专用测试套件 `tests/test_environment_gate01_unit4_closure.py`（5/5 PASS in 0.23s）；
+* 原有 Unit 4 8 项全地形单元测试全绿（8/8 PASS in 0.27s）；
+* 统一测试分级套件全绿：`quick` (18/18), `physics` (21/21), `motion` (11/11), `full` (35/35)；
+* 状态置为 `ENVIRONMENT GATE 01 / UNIT 4 — READY FOR REVIEW`。
+
+
 ## [2026-10-29] Environment Gate 01 — Repair Unit 4: 真实Mesh接触高程、几何接触点与接触状态一致性修复 (U4-A 至 U4-I)
 
 ### 根因实证与三坐标合同确立 (`docs/evidence/environment_gate01_ru4/`, U4-A, U4-E)

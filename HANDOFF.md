@@ -5,43 +5,35 @@
 ---
 
 ## 1. 当前目标与当前状态
-**当前任务**：ProceduralAnimation — Environment Gate 01 — Repair Unit 4: Real Mesh Contact Elevation & Contact-State Consistency (U4-A 至 U4-I)。  
-**当前状态**：`ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`（严格停止等待人类审查，严禁自动进入 Final Audit 或 Phase 7B）。
+**当前任务**：ProceduralAnimation — Environment Gate 01 — Unit 4 Final Closure: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)。  
+**当前状态**：`ENVIRONMENT GATE 01 / UNIT 4 — READY FOR REVIEW`（严格停止等待审查，严禁自动进入 Final Architecture Audit 或 Phase 7B）。
 
 ### 本任务核心产出与成果
-1. **三坐标合同确立与局部足底锚点几何校准 (U4-A, U4-D)**：
-   - 严格确立三坐标分工合同：
-     * **Point A**：规划脚踝 IK 目标 `PlannedFootTarget.world_xyz` $(x_a, y_a, z_a)$；
-     * **Point B**：真实地面接触点 `SurfaceQueryResult.contact_point_world` $(x_c, y_c, z_c)$，保存在 `active_limb_targets["target_world"]` 与 `ContactRecord.world_position`；
-     * **Point C**：人体脚底实际接触锚点 $\mathbf{p}_{\text{sole}} = \mathbf{M}_{\text{bone\_world}} \cdot \mathbf{a}_{\text{bone\_local}}$；
-   - 查明骨骼倾角几何偏差：`foot.L`/`foot.R` 编辑骨存在 $-13.134^\circ$ 俯仰倾角，原 `DEFAULT_LIMB_LOCAL_ANCHORS` `(0, 0.077, -0.070)` 未考虑倾角导致静止状态足底产生 $-15.7\text{ mm}$ 穿透；
-   - 校准局部锚点为 `(0.0, 0.015906, -0.068169)`，在静止状态与地面达成 $< 0.001\text{ mm}$ 零误差贴合；
-   - 编写并归档详尽规范文档 `docs/evidence/environment_gate01_ru4/foot_contact_coordinate_contract.md`。
-2. **生产管线消除 Z=0.0m 扁平化与多曲面动态发现落地 (U4-B, U4-C)**：
-   - 彻底消除 `KinematicBridgeExecutor.execute_frame()` 原第 404 行 $Z=0.0\text{ m}$ 扁平化硬编码，改为根据真实足底投影 $(p_{\text{sole}}.x, p_{\text{sole}}.y)$ 调用 `self.environment.query_ground_support_at()` 获取真实 3D 表面高程与法线；
-   - 动态从查询结果提取并维护 `EnvironmentalSurface`，杜绝单一水平平地硬编码回退；
-   - 真实处理查询失败情况：未击中或非支撑面记录 `ContactLifecycle.BROKEN` 并生成真实几何违规，杜绝伪造地面接触；
-   - 摆动脚（`is_locked=False`）严格标记为 `ContactLifecycle.RELEASED` 与 `ContactType.FREE`；
-   - 实际脚底接触点直接通过姿态骨世界变换矩阵真实计算；
-   - 在 Bridge 执行结果和 Executor 上记录并导出 `multi_contact` 与 `last_active_limb_targets`。
-3. **基准缺陷复现与修复验证套件重构 (U4-E)**：
-   - 重构 `tests/test_contact_elevation_gap_repro.py` 为直接检验生产路径返回值（`res.motion_state.contacts['foot_L'].contact_world_xyz[2]` 及 `bridge.last_multi_contact`）；
-   - 归档前置缺陷日志 `docs/evidence/environment_gate01_ru4/production_defect_pre_fix.log`（证实高程差高达 1339.7mm，虚假超差 2191.33mm）；
-   - 归档后置修复日志 `docs/evidence/environment_gate01_ru4/production_defect_post_fix.log`（实测平台高程 $1.339746\text{ m}$，误差 $< 4\times 10^{-8}\text{ m}$，几何违规数 0，执行成功率 True）。
-4. **全地形单元测试与独立场景全帧审计 (U4-F, U4-G)**：
-   - 编写 `tests/test_environment_gate01_unit4.py`，覆盖 8 项核心测试用例（8/8 PASS in 0.27s）；
-   - 编写并执行全 700 帧独立场景几何接触审计 `tests/verify_environment_gate01_unit4.py`（审核全部 728 次支撑事件，544 次高程支撑事件，最大气隙 0.0mm，最大穿透 4.27mm，最大切向滑移 1.55mm，零扁平化缺陷，0 几何违规，生成 `verification_report.json`）；
-   - 注册进入 `tests/test_registry.py`，全量分级回归通过：
-     * `quick` 套件：**17 / 17 PASS** (47.28s)；
-     * `physics` 套件：**20 / 20 PASS** (86.74s)；
-     * `motion` 套件：**11 / 11 PASS** (49.50s)；
-     * `full` 套件：**34 / 34 PASS** (134.47s)；
+1. **U4-CLOSE-01: 排除不可支撑表面建立虚假支撑**：
+   - 针对受控环境 `SurfaceQueryResult(success=True, allows_regular_support=False)` 执行真实反例；
+   - 证实原代码仅判断 `if query_res.success:`，导致垂直墙壁被错误接受为有效支撑并建立 `ESTABLISHED` 与 `double_stance`；
+   - 实施最小手术式修复：`if query_res.success and query_res.allows_regular_support:`，否则记为 `ContactLifecycle.BROKEN` 并生成 `NO_SUPPORT_SURFACE` 几何违规；
+   - 修复后证实：`result.success=False`，`contact_geometry_errors` 报告两足违规，`active_contacts` 为空，`support_type` 为 `flight`，`lifecycle` 标定为 `broken`；
+   - 实测日志归档至 `docs/evidence/environment_gate01_ru4/closure/u4_close_01_before.log` 与 `docs/evidence/environment_gate01_ru4/closure/u4_close_01_after.log`。
+2. **U4-CLOSE-02: 真实 Mesh 模式禁止虚假默认平地接触**：
+   - 全面覆盖 Case A（空 Mesh 集合）、Case B（足部落空 / 虚空）、Case C（命中不可支撑面）、Case D（双脚均无支撑）；
+   - 实证确认：第 472 行 `if not surfaces:` 仅为兼容兜底，未进入 `active_limb_targets` 或 `ContactRecord`，未产生虚假接触；
+   - 四类场景实测日志归档至 `docs/evidence/environment_gate01_ru4/closure/u4_close_02_before.log` 与 `docs/evidence/environment_gate01_ru4/closure/u4_close_02_after.log`，总结文档为 `docs/evidence/environment_gate01_ru4/closure/unit4_closure_summary.md`。
+3. **单元测试与分级回归套件全绿**：
+   - 编写并全绿通过 5 项专用测试 `tests/test_environment_gate01_unit4_closure.py`（5/5 PASS in 0.23s）；
+   - 原有 Unit 4 8 项全地形单元测试全绿（8/8 PASS in 0.27s）；
+   - 统一分级套件全绿：
+     * `quick` 套件：**18 / 18 PASS** (48.01s)；
+     * `physics` 套件：**21 / 21 PASS** (85.05s)；
+     * `motion` 套件：**11 / 11 PASS** (48.97s)；
+     * `full` 套件：**35 / 35 PASS** (137.18s)；
    - 历史资产 `output/dynamics_playground.blend` 严格 0 字节变动；
-   - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`。
+   - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 4 — READY FOR REVIEW`。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Environment Gate 01 — Repair Unit 4**: 真实Mesh接触高程、几何接触点与接触状态一致性修复 (U4-A 至 U4-I)。
 * **Environment Gate 01 — Unit 3 / Atomic Repair S2**: Swing-to-Stance Landing Continuity Repair (S2-A 至 S2-F)。
 * **Environment Gate 01 — Unit 3 / Atomic Repair S1**: Root 前进轨迹与单步摆动脚时间参数解耦及 C1 连续性闭环 (S1-A 至 S1-F)。
 * **Environment Gate 01 — Repair Unit 3**: 真实 Blender Mesh 环境查询与 19 骨骼人体连续运动主链接入及反事实实证闭环 (U3-01 至 U3-14)。
@@ -64,32 +56,32 @@
 
 ## 3. 已验证
 * 单元测试与分层回归套件实测全绿：
+  * `environment_gate01_unit4_closure`: **5 / 5 PASS** (0.23s)；
   * `environment_gate01_unit4`: **8 / 8 PASS** (0.27s)；
   * `test_contact_elevation_gap_repro`: **PASS** (0.22s)；
-  * `verify_environment_gate01_unit4`: **PASS** (728 次支撑事件 0 违规，最大气隙 0.0mm，最大穿透 4.27mm，最大滑移 1.55mm)；
-  * `quick` 套件：**17 / 17 PASS** (47.28s)；
-  * `physics` 套件：**20 / 20 PASS** (86.74s)；
-  * `motion` 套件：**11 / 11 PASS** (49.50s)；
-  * `full` 套件：**34 / 34 PASS** (134.47s)；
+  * `verify_environment_gate01_unit4`: **PASS** (728 次支撑事件 0 违规)；
+  * `quick` 套件：**18 / 18 PASS** (48.01s)；
+  * `physics` 套件：**21 / 21 PASS** (85.05s)；
+  * `motion` 套件：**11 / 11 PASS** (48.97s)；
+  * `full` 套件：**35 / 35 PASS** (137.18s)；
   * `audit_c2_final_inspector.py --verify-docs`: **PASS (Exit Code 0)**（0 缺失路径，0 幻觉符号）；
-* 状态严格停留于 `ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`。
+* 状态严格停留于 `ENVIRONMENT GATE 01 / UNIT 4 — READY FOR REVIEW`。
 
 ---
 
 ## 4. 关键文件与产物清单
-* **生产代码**：
-  - `src/motion/contact_model.py`：足底局部锚点校准 `(0.0, 0.015906, -0.068169)`
-  - `src/motion/kinematic_bridge.py`：消除 Z=0.0m 扁平化，引入 `query_ground_support_at`，导出 `multi_contact`
+* **生产代码修复**：
+  - `src/motion/kinematic_bridge.py`：`if query_res.success and query_res.allows_regular_support:` 最小修复
 * **核心测试与验证工具**：
+  - `tests/test_environment_gate01_unit4_closure.py`：5 项收尾专用反例与隔离测试
   - `tests/test_environment_gate01_unit4.py`：8 项全地形单元测试
-  - `tests/verify_environment_gate01_unit4.py`：700 帧独立场景逐帧几何接触审计工具
-  - `tests/test_contact_elevation_gap_repro.py`：生产路径缺陷复现与修复验证
-  - `tests/test_registry.py`：测试套件注册
+  - `tests/test_registry.py`：注册 `environment_gate01_unit4_closure` 进入 QUICK/PHYSICS/FULL
 * **证据与文档**：
-  - `docs/evidence/environment_gate01_ru4/foot_contact_coordinate_contract.md`
-  - `docs/evidence/environment_gate01_ru4/production_defect_pre_fix.log`
-  - `docs/evidence/environment_gate01_ru4/production_defect_post_fix.log`
-  - `docs/evidence/environment_gate01_ru4/verification_report.json`
+  - `docs/evidence/environment_gate01_ru4/closure/u4_close_01_before.log`
+  - `docs/evidence/environment_gate01_ru4/closure/u4_close_01_after.log`
+  - `docs/evidence/environment_gate01_ru4/closure/u4_close_02_before.log`
+  - `docs/evidence/environment_gate01_ru4/closure/u4_close_02_after.log`
+  - `docs/evidence/environment_gate01_ru4/closure/unit4_closure_summary.md`
 * **历史保护场景**：
   - `output/dynamics_playground.blend`（严格 0 字节变动）
   - `output/dynamics_playground_environment_gate01_u3_s2.blend`（严格 0 字节变动）
@@ -97,11 +89,11 @@
 ---
 
 ## 5. 已知问题与遗留说明
-1. `src/motion/kinematic_bridge.py:507` 存在休眠引用 `ContactLifecycle.TOUCHDOWN`（手臂主动触碰分支未激活代码，属于未来 Phase 7B 范围）。
+1. `src/motion/kinematic_bridge.py:512` 存在休眠引用 `ContactLifecycle.TOUCHDOWN`（手臂主动触碰分支未激活代码，属于未来 Phase 7B 范围）。
 2. 历史双管线汇流（Phase 7A 角色放入 Playground，Phase 7C 动力学与 KinematicBridge 闭环汇流）按规划待后续任务开展。
 
 ---
 
 ## 6. 下一步
-* **严格停止，等待人类复核 Environment Gate 01 / Repair Unit 4 验收结果**；
-* **严禁擅自进入 Final Audit 或 Phase 7B**。
+* **严格停止，等待 ChatGPT 与用户审查 Environment Gate 01 / Unit 4 Final Closure 验收结果**；
+* **严禁擅自进入 Final Architecture Audit 或 Phase 7B**。

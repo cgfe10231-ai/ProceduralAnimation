@@ -1,0 +1,32 @@
+================================================================================
+U4-CLOSE-01 POST-FIX VERIFICATION LOG (AFTER)
+================================================================================
+Target Method: KinematicBridgeExecutor.execute_frame()
+Input Environment Query: success=True, allows_regular_support=False
+Surface ID: 'mesh:non_support_surface', Surface Type: 'wall'
+Foot Intent: foot_L.is_locked=True, foot_R.is_locked=True
+--------------------------------------------------------------------------------
+OBSERVED OUTPUTS ON FIXED PRODUCTION CODE:
+  result.success: False
+  result.contact_geometry_errors: ['foot_L', 'foot_R']
+  foot_L geometry error reason: NO_SUPPORT_SURFACE: NON_SUPPORT_SURFACE: surface 'mesh:non_support_surface' does not allow regular support
+  foot_R geometry error reason: NO_SUPPORT_SURFACE: NON_SUPPORT_SURFACE: surface 'mesh:non_support_surface' does not allow regular support
+  multi_contact.support_type: flight
+  multi_contact.active_contacts: []
+  foot_L lifecycle: broken
+  foot_L is_active: False
+  foot_L surface_id: none
+--------------------------------------------------------------------------------
+CONTRACT COMPLIANCE EVALUATION:
+  [REQ 1] Must NOT establish valid ESTABLISHED contact: SATISFIED (lifecycle=broken, is_active=False)
+  [REQ 2] Must NOT generate fake DOUBLE_STANCE: SATISFIED (support_type=flight)
+  [REQ 3] Must NOT return error-free success: SATISFIED (result.success=False)
+  [REQ 4] Must flag contact_geometry_errors on non-support limbs: SATISFIED (both limbs flagged)
+--------------------------------------------------------------------------------
+FIX VERIFICATION CONCLUSION:
+  Minimal fix in KinematicBridgeExecutor.execute_frame():
+    if query_res.success and query_res.allows_regular_support:
+  ensures that any surface with allows_regular_support=False is truthfully rejected,
+  marked as ContactLifecycle.BROKEN, rejected from active_contacts, classified as FLIGHT,
+  and flagged with explicit NO_SUPPORT_SURFACE geometric constraint violations.
+================================================================================

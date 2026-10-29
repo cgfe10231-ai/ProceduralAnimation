@@ -1,13 +1,28 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-29  
-> **当前阶段**：Environment Gate 01 — Repair Unit 4（Real Mesh Contact Elevation & Contact-State Consistency）已全部完成并通过 8 项核心单元测试、1 项全量场景审计与 34 项全量分级回归。彻底消除了 `KinematicBridgeExecutor` 内部硬编码 $Z=0.0\text{ m}$ 扁平化投影与单地面 fallback，建立真实环境多接触表面动态查询与注册闭环；校准了足底接触局部锚点 `(0.0, 0.015906, -0.068169)` 补偿 $-13.134^\circ$ 骨骼俯仰倾角，静止状态接触高程误差 $\le 0.001\text{ mm}$；严格执行三坐标分工合同（规划脚踝目标 Point A、真实网格接触点 Point B、角色物理足底 Point C）；重构修复并全绿通过基准复现测试 `tests/test_contact_elevation_gap_repro.py` 与 Unit 4 单元测试 `tests/test_environment_gate01_unit4.py` (8/8 PASS)；独立执行真实场景 728 次支撑事件全量逐帧接触审计 `tests/verify_environment_gate01_unit4.py` 达成 0 违规、0 悬空 (max air gap 0.0mm)、最大穿透 4.27mm、最大切向滑移 1.55mm；分级测试全绿：`quick` (17/17), `physics` (20/20), `motion` (11/11), `full` (34/34)；历史 Unit 3 及 S1/S2 动画资产 0 字节变动；当前状态：`ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`，严格停止等待人类审查，严禁擅自进入 Final Audit 或 Phase 7B。  
+> **当前阶段**：Environment Gate 01 — Unit 4 Final Closure（不可支撑表面排除与默认平地隔离收口）已全部完成并通过 5 项专用测试、8 项全地形单元测试与 35 项全量分级回归。已成功关闭 Unit 4 剩余两个接触合同验证缺口（U4-CLOSE-01: `success=True` 但 `allows_regular_support=False` 时严格拒绝建立足部支撑并记为 `ContactLifecycle.BROKEN` 与 `NO_SUPPORT_SURFACE` 违规；U4-CLOSE-02: 真实 Mesh 模式四类场景 Case A/B/C/D 零虚假 ESTABLISHED、零虚假 DOUBLE_STANCE、零虚假 ground 分配，确认兼容表面未污染足部接触记录）；分级测试全绿：`quick` (18/18), `physics` (21/21), `motion` (11/11), `full` (35/35)；历史资产严格 0 字节变动；当前状态：`ENVIRONMENT GATE 01 / UNIT 4 — READY FOR REVIEW`，严格停止等待审查，严禁擅自进入 Final Architecture Audit 或 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01 — Unit 4 Final Closure: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)**：
+  * **U4-CLOSE-01: 排除不可支撑表面建立虚假有效支撑**：
+    - 针对受控环境 `SurfaceQueryResult(success=True, allows_regular_support=False)` 执行真实反例；
+    - 证实原代码仅判断 `if query_res.success:`，导致垂直墙壁被错误接受为有效支撑并建立 `ESTABLISHED` 与 `double_stance`；
+    - 实施最小手术式修复：`if query_res.success and query_res.allows_regular_support:`，否则记为 `ContactLifecycle.BROKEN` 并生成 `NO_SUPPORT_SURFACE` 几何违规；
+    - 修复后证实：`result.success=False`，`contact_geometry_errors` 报告两足违规，`active_contacts` 为空，`support_type` 为 `flight`，`lifecycle` 标定为 `broken`；
+    - 实测日志归档至 `docs/evidence/environment_gate01_ru4/closure/u4_close_01_before.log` 与 `docs/evidence/environment_gate01_ru4/closure/u4_close_01_after.log`。
+  * **U4-CLOSE-02: 真实 Mesh 模式禁止虚假默认平地接触**：
+    - 全面覆盖 Case A（空 Mesh 集合）、Case B（足部落空 / 虚空）、Case C（命中不可支撑面）、Case D（双脚均无支撑）；
+    - 实证确认：第 472 行 `if not surfaces:` 仅为兼容兜底，未进入 `active_limb_targets` 或 `ContactRecord`，未产生虚假接触；
+    - 四类场景实测日志归档至 `docs/evidence/environment_gate01_ru4/closure/u4_close_02_before.log` 与 `docs/evidence/environment_gate01_ru4/closure/u4_close_02_after.log`，总结文档为 `docs/evidence/environment_gate01_ru4/closure/unit4_closure_summary.md`。
+  * **测试与回归**：
+    - 编写并全绿通过 5 项专用测试 `tests/test_environment_gate01_unit4_closure.py`（5/5 PASS in 0.23s）；
+    - 统一分级套件全绿：`quick` (18/18), `physics` (21/21), `motion` (11/11), `full` (35/35)；
+    - 状态置为 `ENVIRONMENT GATE 01 / UNIT 4 — READY FOR REVIEW`。
 * **Environment Gate 01 — Repair Unit 4: 真实Mesh接触高程、几何接触点与接触状态一致性修复 (U4-A 至 U4-I)**：
   * **三坐标合同确立与局部足底锚点几何校准 (U4-A, U4-D)**：
     - 明确区分三类足部坐标空间合同：
@@ -911,5 +926,5 @@
 ---
 
 ## 2. 下一步建议
-* **严格停止，等待人类复核 Environment Gate 01 / Repair Unit 4 验收结果**；
-* **暂停且严禁提前进入 Final Audit 或 Phase 7B**。
+* **严格停止，等待 ChatGPT 与用户审查 Environment Gate 01 / Unit 4 Final Closure 验收结果**；
+* **暂停且严禁擅自进入 Final Architecture Audit 或 Phase 7B**。

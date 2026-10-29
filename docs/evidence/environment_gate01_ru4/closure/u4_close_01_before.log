@@ -1,0 +1,30 @@
+================================================================================
+U4-CLOSE-01 PRE-FIX DEFECT VERIFICATION LOG (BEFORE)
+================================================================================
+Target Method: KinematicBridgeExecutor.execute_frame()
+Input Environment Query: success=True, allows_regular_support=False
+Surface ID: 'mesh:non_support_surface', Surface Type: 'wall'
+Foot Intent: foot_L.is_locked=True, foot_R.is_locked=True
+--------------------------------------------------------------------------------
+OBSERVED OUTPUTS ON UNMODIFIED CODE:
+  result.success: True
+  result.contact_geometry_errors: []
+  multi_contact.support_type: double_stance
+  multi_contact.active_contacts: ['foot_L', 'foot_R']
+  foot_L lifecycle: established
+  foot_L is_active: True
+  foot_L surface_id: mesh:non_support_surface
+--------------------------------------------------------------------------------
+CONTRACT COMPLIANCE EVALUATION:
+  [REQ 1] Must NOT establish valid ESTABLISHED contact: VIOLATED (established active contact)
+  [REQ 2] Must NOT generate fake DOUBLE_STANCE: VIOLATED (generated double_stance)
+  [REQ 3] Must NOT return error-free success: VIOLATED (returned success=True)
+  [REQ 4] Must flag contact_geometry_errors on non-support limbs: VIOLATED (zero geometry errors flagged)
+--------------------------------------------------------------------------------
+ROOT CAUSE DIAGNOSIS:
+  In src/motion/kinematic_bridge.py line 411:
+    if query_res.success:
+  The check solely evaluates boolean query_res.success, completely ignoring
+  query_res.allows_regular_support. As a result, walls and non-support obstacles
+  are erroneously accepted as regular foot contact ground.
+================================================================================

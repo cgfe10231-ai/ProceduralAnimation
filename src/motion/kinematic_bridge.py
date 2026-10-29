@@ -408,7 +408,7 @@ class KinematicBridgeExecutor:
                     query_x, query_y = ft.world_xyz[0], ft.world_xyz[1]
 
                 query_res = self.environment.query_ground_support_at(query_x, query_y)
-                if query_res.success:
+                if query_res.success and query_res.allows_regular_support:
                     target_pos = query_res.contact_point_world
                     target_normal = query_res.surface_normal_world
                     surf_id = query_res.surface_id if query_res.surface_id not in ("none", "") else ft.surface_id
@@ -439,7 +439,12 @@ class KinematicBridgeExecutor:
                         "friction_dynamic": friction_d,
                     }
                 else:
-                    # Query failed: no valid mesh support found (never fake Z=0.0m ground)
+                    # Query failed or surface does not allow regular support (never fake Z=0.0m ground)
+                    err_reason = query_res.error_reason or (
+                        f"NON_SUPPORT_SURFACE: surface '{query_res.surface_id}' does not allow regular support"
+                        if not query_res.allows_regular_support
+                        else "No valid ground support surface intersected"
+                    )
                     active_limb_targets[limb_key] = {
                         "surface_id": "none",
                         "target_world": query_res.contact_point_world,
@@ -447,7 +452,7 @@ class KinematicBridgeExecutor:
                         "contact_type": ContactType.FREE,
                         "lifecycle": ContactLifecycle.BROKEN,
                         "local_anchor": local_anchor,
-                        "error_reason": query_res.error_reason,
+                        "error_reason": err_reason,
                     }
             elif ft.contact_intent:
                 active_limb_targets[limb_key] = {
@@ -570,7 +575,11 @@ class KinematicBridgeExecutor:
                     )
                 )
             elif rec is not None and rec.lifecycle == ContactLifecycle.BROKEN:
-                reason = rec.metadata.get("error_reason") or "No valid ground support surface intersected"
+                reason = (
+                    active_limb_targets.get(limb, {}).get("error_reason")
+                    or rec.metadata.get("error_reason")
+                    or "No valid ground support surface intersected"
+                )
                 broken_res = GeometricConstraintResult(
                     is_valid=False,
                     total_position_error_m=float("inf"),

@@ -1,0 +1,46 @@
+================================================================================
+U4-CLOSE-02 PRE-FIX FOUR-CASE VERIFICATION LOG (BEFORE)
+================================================================================
+CASE A: Empty Mesh Collection (Real Mesh adapter with empty collection)
+  result.success: False (expected False)
+  contact_geometry_errors: ['foot_L'] (expected ['foot_L'])
+  active_contacts: [] (expected [])
+  support_type: flight (expected flight)
+  foot_L surface_id: none (expected 'none', NOT 'ground')
+  foot_L lifecycle: broken (expected broken)
+  Fallback ground surface in surfaces list entered contact record: NO (COMPLIANT: compatibility surface only)
+--------------------------------------------------------------------------------
+CASE B: Foot Not on Any Support Surface (Foot over void / outside mesh)
+  result.success: False (expected False)
+  contact_geometry_errors: ['foot_L'] (expected ['foot_L'])
+  active_contacts: [] (expected [])
+  support_type: flight (expected flight)
+  foot_L surface_id: none (expected 'none')
+  foot_L lifecycle: broken (expected broken)
+  Fake established contact created: NO (COMPLIANT)
+--------------------------------------------------------------------------------
+CASE C: Hitting Non-Support Surface (Mesh hit, but allows_regular_support=False)
+  result.success: False (expected False)
+  contact_geometry_errors: ['foot_L'] (expected ['foot_L'])
+  active_contacts: ['foot_L'] (expected [])
+  support_type: single_stance_l (expected flight)
+  foot_L surface_id: mesh:barrier_wall (expected 'none')
+  foot_L lifecycle: established (expected broken)
+  Fake established contact created: YES (DEFECT: established active contact on non-support surface)
+  Fake single-stance created on obstacle: YES (DEFECT)
+--------------------------------------------------------------------------------
+CASE D: Both Feet Have No Valid Support (Both feet locked over void)
+  result.success: False (expected False)
+  contact_geometry_errors: ['foot_L', 'foot_R'] (expected ['foot_L', 'foot_R'])
+  active_contacts: [] (expected [])
+  support_type: flight (expected flight, NOT double_stance)
+  foot_L lifecycle: broken (expected broken)
+  foot_R lifecycle: broken (expected broken)
+  Fake double_stance created: NO (COMPLIANT)
+================================================================================
+SUMMARY OF BEFORE STATUS:
+  Case A: PASS (Analytical fallback does not contaminate contact records)
+  Case B: PASS (Void properly refused)
+  Case C: FAIL (Non-support mesh incorrectly accepted due to missing allows_regular_support check)
+  Case D: PASS (Both feet over void correctly report FLIGHT and zero active contacts)
+================================================================================

@@ -460,6 +460,23 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=False,
         description="Verifies real mesh contact elevation, elimination of Z=0.0m hardcoding, bone matrix sole anchor calibration, support surface consistency, and counter-factual elevation/normal variations.",
     ),
+    "environment_gate01_unit4_closure": TestDefinition(
+        test_id="environment_gate01_unit4_closure",
+        name="Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure",
+        script_path="tests/test_environment_gate01_unit4_closure.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=60.0,
+        expected_artifacts=[
+            "docs/evidence/environment_gate01_ru4/closure/u4_close_01_before.log",
+            "docs/evidence/environment_gate01_ru4/closure/u4_close_01_after.log",
+            "docs/evidence/environment_gate01_ru4/closure/u4_close_02_before.log",
+            "docs/evidence/environment_gate01_ru4/closure/u4_close_02_after.log",
+            "docs/evidence/environment_gate01_ru4/closure/unit4_closure_summary.md",
+        ],
+        is_visual_acceptance=False,
+        description="Verifies non-support surface rejection (allows_regular_support=False) and real mesh analytical fallback isolation across four edge cases.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection
