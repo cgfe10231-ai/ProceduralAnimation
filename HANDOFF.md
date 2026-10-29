@@ -6,29 +6,38 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — Production Interface Audit (生产接口复核与缺陷归档)。  
-* **当前状态**：`PRODUCTION INTERFACE AUDIT — AUDITED / PENDING REPAIR`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R3）。
-* **纠正此前结论**：此前 Final Architecture Audit 的 `AUDITED / NO BLOCKERS` 仅证明全工程 61 个模块宏观接入正常无孤立旁路，**不能代表生产接口复核通过**。本轮逐方法深入审查查实了多项影响后续开发的真实代码与合同缺陷。
+* **当前任务**：ProceduralAnimation — Production Interface Audit R2 — Evidence Correction & Closure (R2-CLOSE)。  
+* **当前状态**：`PRODUCTION INTERFACE AUDIT / R2 — EVIDENCE VERIFIED`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R3）。
+* **任务性质**：仅纠正 R1/R2 审计文档中的错误证据、签名与行号，完成正式归档与交接。零生产代码修改，零测试代码修改。
 
-### 本任务核心产出与成果
-1. **全套生产接口审计报告交付 (`docs/audit/production_interface/`)**：
-   - `R1_TERRAIN_WALK.md` (Audit R1): 对 `src/motion/terrain_walk.py` 14 个函数/方法逐行排查，证实失败吞没、接触覆写、接缝偏置等漏洞；
-   - `R2_CORE_EXECUTION.md` (Audit R2): 对 `kinematic_bridge.py`、`framework.py`、`contact_model.py`、`whole_body_controller.py` 四大核心脚本逐方法排查，并完成 E1-E7 执行链一致性核对；
-   - `OPEN_FINDINGS.md` (Master Register): 统一登记 3 项确认缺陷、5 项接口合同缺口、3 项设计限制与 2 项未验证项，并划定 4 个原子维护包。
-2. **核心发现汇总 (Key Findings)**：
-   - **FIND-R2-01 (CONFIRMED_DEFECT, Blocks 7B: YES)**: `kinematic_bridge.py:512` 引用不存在的枚举 `ContactLifecycle.TOUCHDOWN`，手部接触意图触发时必定崩溃；
-   - **FIND-R2-02 / FIND-T01-02 (CONFIRMED_DEFECT, Blocks 7B: YES)**: `terrain_walk.py:1138` 强制以 `c_dict` 覆写 `ms.contacts`，抹杀 Bridge 物理测量数据与上肢接触；
-   - **FIND-R2-03 / FIND-T01-01 (CONTRACT_GAP, Blocks 7B: YES)**: `terrain_walk.py:988-1025` 丢弃 `bridge_res.success` 与 unmet constraints，对底层物理与 IK 失败静默掩盖；
-   - **FIND-R2-04 / FIND-T01-03 (CONTRACT_GAP, Blocks 7B: YES)**: `framework.py:405, 832` `ActionExecutionResult` 缺失失败状态合同，`MotionPlanner` 盲目顺序执行无法阻断级联错误；
-   - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO)**: `contact_model.py:180, 243` 几何合规性校验与 `SupportType` 判定脱节；
-   - **FIND-R2-06 / FIND-T01-05 (CONTRACT_GAP, Blocks 7B: NO)**: `build_terrain_step_schedule` 查询失败静默回退默认平地，与严格拒绝合同冲突；
-   - **FIND-R2-07 / FIND-T01-04 (CONFIRMED_DEFECT, Blocks 7B: NO)**: `terrain_walk.py:950` 接缝探测传入中心线 `corridor_x` 而非实际摆动脚侧向落点 `sw_x`。
-3. **严格遵守只读纪律**：
-   - 生产源码 `src/` 严格 0 变更，测试源码 `tests/` 严格 0 变更，历史 `.blend` 场景资产严格 0 变动。
+### 本任务核心修正与核准成果 (R2-CLOSE)
+1. **R2-CLOSE-01 (`MultiContactState.support_type` 定义纠正)**：
+   - 核准 `MultiContactState.support_type` 为只读动态计算属性（`@property`，`contact_model.py:304–340`），彻底清除不存在的 `update_support_type()` 方法描述；
+   - 核准多边形方法为 `get_coplanar_support_polygon()` (`contact_model.py:356–407`)，清除 `get_support_polygon_2d()`；
+   - 明确几何约束失败只读返回，与属性判定脱节的客观机制。
+2. **R2-CLOSE-02 (`KinematicBridgeExecutor.__init__()` 现行签名核准)**：
+   - 彻底删除旧版不存在的形参（`wbc`, `ground_query_func`, `mesh_query_func`, `mesh_adapter`）；
+   - 核准现行 8 参数物理签名：`armature_obj`, `root_obj`, `controller`, `kinematics_tracker`, `inertia_model`, `environment`, `surfaces`, `default_fps` (`kinematic_bridge.py:265–291`)。
+3. **R2-CLOSE-03 (核心执行链签名与行号全面校准)**：
+   - `ActionExecutionResult`: `framework.py:405–416`，确认完全缺失 `success: bool` 和 `unmet_constraints`；
+   - `MotionPlanner.execute()`: `framework.py:915–1010`，确认返回 `Dict[str, Any]`，循环点 L967–L981 无条件迭代流转；
+   - `KinematicBridgeExecutor.execute_frame()`: `kinematic_bridge.py:302–692`；
+   - `WholeBodyController.execute_frame()`: `whole_body_controller.py:305–654`，确认无 `keyframe: bool` 参数；
+   - `evaluate_limb_contacts_from_armature()`: `contact_model.py:512–553`，确认真实签名为 `(armature_obj, surfaces, active_limb_targets)`，在 Bridge L532 调用。
+4. **R2-CLOSE-04 (`OPEN_FINDINGS.md` 统计与唯一性核对)**：
+   - 确认 9 项唯一缺陷（3 项 `CONFIRMED_DEFECT`、6 项 `CONTRACT_GAP`），历史编号完整映射，无重复计数；
+   - 全量完成证据分级标注（全部基于现行物理源码标定为 `STATIC_CONFIRMED`）；
+   - 明确标注 4 项阻碍后续 7B 开发的真实 BLOCKER（FIND-R2-01 至 FIND-R2-04）。
+5. **R2-CLOSE-05 (`MotionState.contacts` 覆盖证据严格区分)**：
+   - 覆写行为客观存在（`terrain_walk.py:1138`，`STATIC_CONFIRMED`）；
+   - 澄清丢失字段：上肢接触被遗漏，接触坐标退化为规划落点 Point A，法线与锁定为规划预期值；
+   - 澄清保留数据：`ms.params` 中的支撑多边形、支撑类型及 Bridge 内部对象保持完好；
+   - 澄清运行现状：当前平地与地形测试仅依赖下肢且主要检查 WBC 遥测，故未发生崩溃，但进入 Phase 7B 激活上肢或动力学依赖时将构成破坏。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Production Interface Audit R2-CLOSE**: 证据校准、签名行号核实与正式闭环归档 (`EVIDENCE VERIFIED`)。
 * **Production Interface Audit (R1, R2)**: 生产接口逐方法联合审计与缺陷登记归档 (R1/R2 已执行，R3/R4 待授权)。
 * **Environment Gate 01 — Final Architecture Audit**: 全仓库独立架构审计、状态物理语义与文档同步 (Audit A 至 Audit J)。
 * **Environment Gate 01 — Unit 4 Final Closure**: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)。
@@ -54,22 +63,18 @@
 ---
 
 ## 3. 已验证
-* 单元测试与分层回归套件基准全绿记录：
-  * `quick` 套件：**18 / 18 PASS** (44.53s)；
-  * `physics` 套件：**21 / 21 PASS** (83.07s)；
-  * `motion` 套件：**11 / 11 PASS** (45.42s)；
-  * `full` 套件：**35 / 35 PASS** (136.34s)；
-  * `audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**。
-* 历史资产 `output/dynamics_playground.blend` 严格 0 字节变动；
-* 本轮归档文档经过本地核实与路径校验。
+* 架构文档与 AST 符号门禁 (`tests/audit_c2_final_inspector.py --verify-docs`)：**PASS (0 errors, 0 phantom symbols)**；
+* 单元测试与分层回归套件基准全绿记录：`quick` (18/18), `physics` (21/21), `motion` (11/11), `full` (35/35)；
+* 生产源码与测试源码严格 0 变更，历史资产 `output/dynamics_playground.blend` 严格 0 字节变动；
+* 本轮归档文档中所有引用函数、类、行号与签名经物理检验 100% 吻合。
 
 ---
 
 ## 4. 下一步行动与严格禁止事项
 
 * **下一步行动**：
-  1. 等待用户和人类团队审查 R1/R2 审计结果及 `docs/audit/production_interface/OPEN_FINDINGS.md`；
-  2. 针对 4 个维护包（Bridge 枚举修复、状态保护、失败传播闭环、规划精度）进行排期与授权；
+  1. 等待用户和人类团队对闭环归档文档（`OPEN_FINDINGS.md`、`R1_TERRAIN_WALK.md`、`R2_CORE_EXECUTION.md`）进行正式审核；
+  2. 针对划定的 4 个维护包进行修复授权排期；
   3. 若用户指示继续审计，按指令开展 R3（动力学与遥测接口）或 R4；若用户指示开展修复，按原子维护包逐步推进。
 * **严格禁止事项**：
   * **严禁自行启动 R3 或 R4**；

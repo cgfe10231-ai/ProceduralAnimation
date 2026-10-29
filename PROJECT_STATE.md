@@ -1,27 +1,27 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-29  
-> **当前阶段**：Production Interface Audit（生产接口复核与缺陷归档）。R1（`terrain_walk.py` 逐方法审查）与 R2（`kinematic_bridge.py`、`framework.py`、`contact_model.py`、`whole_body_controller.py` 核心执行链审查）已全部完成，全量归档至 `docs/audit/production_interface/`。  
-> **重要纠偏说明**：此前 Final Architecture Audit 的 `ENVIRONMENT GATE 01 — AUDITED / NO BLOCKERS` 仅证明了宏观模块依赖与顶层调用链无孤立双轨制，**绝不能代表生产接口复核通过**。本轮生产接口逐方法联合审计查实了 3 项确认代码缺陷与 5 项接口合同缺口，其中 4 项属于严重阻碍后续 Phase 7B 开展的真实 BLOCKER 级别缺陷（FIND-R2-01 非法枚举、FIND-R2-02 接触字典恶意覆写、FIND-R2-03 吞没底层失败、FIND-R2-04 规划器缺失失败处理合同），统一登记于 `docs/audit/production_interface/OPEN_FINDINGS.md`，状态标记为待修复；当前门禁最终状态更新为：`PRODUCTION INTERFACE AUDIT — AUDITED / PENDING REPAIR`，严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R3。  
+> **当前阶段**：Production Interface Audit — Evidence Correction & Closure (R2-CLOSE)。R1（`terrain_walk.py` 逐方法审查）与 R2（`kinematic_bridge.py`、`framework.py`、`contact_model.py`、`whole_body_controller.py` 核心执行链审查）审计证据已完成 100% 物理源码核对与闭环归档至 `docs/audit/production_interface/`。  
+> **重要纠偏与证据核准**：此前 Final Architecture Audit 的 `ENVIRONMENT GATE 01 — AUDITED / NO BLOCKERS` 仅证明了宏观模块依赖与顶层调用链无孤立双轨制，**绝不能代表生产接口复核通过**。本轮 R2-CLOSE 闭环核准查实了 3 项确认代码缺陷与 6 项接口合同缺口（共 9 项唯一缺陷），其中 4 项属于严重阻碍后续 Phase 7B 开展的真实 BLOCKER 级别缺陷（FIND-R2-01 非法枚举、FIND-R2-02 接触字典覆写、FIND-R2-03 吞没底层失败、FIND-R2-04 规划器缺失失败处理合同），全量标注 `STATIC_CONFIRMED` 证据等级并统一登记于 `docs/audit/production_interface/OPEN_FINDINGS.md`，状态标记为待修复；当前门禁最终状态更新为：`PRODUCTION INTERFACE AUDIT / R2 — EVIDENCE VERIFIED`，严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R3。  
 
 ---
 
 ## 1. 状态分类一览
 
-### [已发现缺陷与待修复接口合同 (Production Interface Audit)]
+### [已发现缺陷与待修复接口合同 (Production Interface Audit / R2-CLOSE 核准)]
 * **Audit R1 / R2 生产接口复核成果与待修复缺陷清单 (`docs/audit/production_interface/`)**：
-  * **R1_TERRAIN_WALK.md**: 对 `src/motion/terrain_walk.py` 14 个函数/方法逐项排查，定位失败吞没、接触覆写、接缝偏置等漏洞；
-  * **R2_CORE_EXECUTION.md**: 对核心执行链四大脚本逐方法排查并核对 E1-E7 数据流，定位 Bridge 非法枚举与规划器断约；
-  * **OPEN_FINDINGS.md (统一登记总表)**:
-    - **FIND-R2-01 (CONFIRMED_DEFECT, Blocks 7B: YES)**: `kinematic_bridge.py:512` 引用不存在的枚举 `ContactLifecycle.TOUCHDOWN`，手部接触意图触发时必定崩溃；
-    - **FIND-R2-02 (CONFIRMED_DEFECT, Blocks 7B: YES)**: `terrain_walk.py:1138` 强制以 `c_dict` 覆写 `ms.contacts`，抹杀 Bridge 物理测量数据与上肢接触；
-    - **FIND-R2-03 (CONTRACT_GAP, Blocks 7B: YES)**: `terrain_walk.py:988-1025` 丢弃 `bridge_res.success` 与 unmet constraints，对底层物理与 IK 失败静默掩盖；
-    - **FIND-R2-04 (CONTRACT_GAP, Blocks 7B: YES)**: `framework.py:405, 832` `ActionExecutionResult` 缺失失败状态合同，`MotionPlanner` 盲目顺序执行无法阻断级联错误；
-    - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO)**: `contact_model.py:180, 243` 几何合规性校验与 `SupportType` 判定脱节；
-    - **FIND-R2-06 (CONTRACT_GAP, Blocks 7B: NO)**: `build_terrain_step_schedule` 查询失败静默回退默认平地，与严格拒绝合同冲突；
-    - **FIND-R2-07 (CONFIRMED_DEFECT, Blocks 7B: NO)**: `terrain_walk.py:950` 接缝探测传入中心线 `corridor_x` 而非实际摆动脚侧向落点 `sw_x`；
-    - **FIND-T01-06 (CONTRACT_GAP, Blocks 7B: NO)**: `TerrainWalkAction.estimate_duration_frames` 环境源脱节；
-    - **FIND-T01-07 (CONTRACT_GAP, Blocks 7B: NO)**: 负向行进步态规划跳步与终止缺陷；
+  * **R1_TERRAIN_WALK.md**: 对 `src/motion/terrain_walk.py` 14 个函数/方法逐项排查，物理校准行号与签名，定位失败吞没、接触覆写、接缝偏置等漏洞；
+  * **R2_CORE_EXECUTION.md**: 对核心执行链四大脚本逐方法排查并核对 E1-E7 数据流，校准 `support_type` 为只读动态属性、校准 Bridge 8 参构造签名及 WBC 执行签名；
+  * **OPEN_FINDINGS.md (统一登记总表，全量核准)**:
+    - **FIND-R2-01 (CONFIRMED_DEFECT, Blocks 7B: YES, STATIC_CONFIRMED)**: `kinematic_bridge.py:512` 引用不存在的枚举 `ContactLifecycle.TOUCHDOWN`，手部接触意图触发时必定崩溃；
+    - **FIND-R2-02 (CONFIRMED_DEFECT, Blocks 7B: YES, STATIC_CONFIRMED)**: `terrain_walk.py:1138` 强制以 `c_dict` 覆写 `ms.contacts`，抹杀 Bridge 物理测量数据与上肢接触；
+    - **FIND-R2-03 (CONTRACT_GAP, Blocks 7B: YES, STATIC_CONFIRMED)**: `terrain_walk.py:1080–1091` 丢弃 `bridge_res.success` 与 unmet constraints，对底层物理与 IK 失败静默掩盖；
+    - **FIND-R2-04 (CONTRACT_GAP, Blocks 7B: YES, STATIC_CONFIRMED)**: `framework.py:405–416, 915–1010` `ActionExecutionResult` 缺失失败状态合同，`MotionPlanner` 盲目顺序执行无法阻断级联错误；
+    - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `contact_model.py:214–273, 304–340` 几何合规性校验只读返回，与动态属性 `support_type` 判定脱节；
+    - **FIND-R2-06 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:223–401, 404–520` 步态预规划查询失败静默回退默认平地，与严格拒绝合同冲突；
+    - **FIND-R2-07 (CONFIRMED_DEFECT, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:310–312` 接缝探测传入中心线 `corridor_x` 而非实际摆动脚侧向落点 `sw_x`；
+    - **FIND-T01-06 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:654–681` `TerrainWalkAction.estimate_duration_frames` 环境源脱节；
+    - **FIND-T01-07 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:304–318` 负向行进步态规划跳步与终止缺陷；
   * **修复状态**: 4 个原子维护包（Bridge 健壮性、状态保护、失败传播闭环、规划精度）已完成划分，生产代码维持只读，等待授权排期修复。
 
 ### [已验证]

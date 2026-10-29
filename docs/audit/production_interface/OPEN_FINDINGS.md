@@ -1,9 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Audit (生产接口复核与缺陷归档)  
+> **当前阶段**：Production Interface Audit — Evidence Correction & Closure (R2-CLOSE)  
 > **审计基准 Commit**：`3fc9896f6867d49a01f6d5c39b9819d51200c7a0`  
+> **复核闭环 Commit**：`c2bd19696aa3c2ae31fc8408ba031ab157a166e1`  
 > **最后更新时间**：2026-10-29  
-> **当前状态**：`AUDIT_ARCHIVED / PENDING_REPAIR`  
+> **当前状态**：`PRODUCTION INTERFACE AUDIT / R2 — EVIDENCE VERIFIED`  
 > **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。所有生产代码维持只读，待用户与人类团队审查批准后按维护包开展修复。
 
 ---
@@ -13,7 +14,7 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **3** | FIND-R2-01 (非法枚举崩溃), FIND-R2-02/T01-02 (接触状态覆盖), FIND-R2-07/T01-04 (接缝横向偏置) |
-| **接口合同缺口 (CONTRACT_GAP)** | **5** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进) |
+| **接口合同缺口 (CONTRACT_GAP)** | **6** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收) |
 | **阻碍后续开发 (Blocks Further Dev: YES)** | **4** | FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04 |
@@ -22,17 +23,17 @@
 
 ## 2. 问题统一登记总表 (Master Register Table)
 
-| Finding ID | 对应历史编号 | 源码文件 | 类 / 函数 | 影响类别 | 阻碍后续开发 | 状态 | 负责模块 |
-| :--- | :--- | :--- | :--- | :--- | :---: | :---: | :--- |
-| **FIND-R2-01** | - | `src/motion/kinematic_bridge.py` | `KinematicBridgeExecutor.execute_frame()` | CONFIRMED_DEFECT | **YES** | OPEN | `kinematic_bridge.py` |
-| **FIND-R2-02** | FIND-T01-02 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | CONFIRMED_DEFECT | **YES** | OPEN | `terrain_walk.py` |
-| **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | CONTRACT_GAP | **YES** | OPEN | `terrain_walk.py` |
-| **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | CONTRACT_GAP | **YES** | OPEN | `framework.py` |
-| **FIND-R2-05** | - | `src/motion/contact_model.py` | `ContactRecord` / `MultiContactState` | CONTRACT_GAP | NO | OPEN | `contact_model.py` |
-| **FIND-R2-06** | FIND-T01-05 | `src/motion/terrain_walk.py` | `build_terrain_step_schedule()` | CONTRACT_GAP | NO | OPEN | `terrain_walk.py` |
-| **FIND-R2-07** | FIND-T01-04 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | CONFIRMED_DEFECT | NO | OPEN | `terrain_walk.py` |
-| **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | CONTRACT_GAP | NO | OPEN | `terrain_walk.py` |
-| **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | CONTRACT_GAP | NO | OPEN | `terrain_walk.py` |
+| Finding ID | 对应历史编号 | 源码文件 | 类 / 函数 | 源码行号 (核准) | 影响类别 | 证据等级 | 阻碍后续开发 | 负责模块 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :---: | :---: | :--- |
+| **FIND-R2-01** | - | `src/motion/kinematic_bridge.py` | `KinematicBridgeExecutor.execute_frame()` | Line 512 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | **YES** | `kinematic_bridge.py` |
+| **FIND-R2-02** | FIND-T01-02 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1100–1138 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | **YES** | `terrain_walk.py` |
+| **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1080–1091 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `terrain_walk.py` |
+| **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | Lines 405–416 / 915–1010 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `framework.py` |
+| **FIND-R2-05** | - | `src/motion/contact_model.py` | `ContactRecord` / `MultiContactState` | Lines 214–273 / 304–340 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `contact_model.py` |
+| **FIND-R2-06** | FIND-T01-05 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps` vs `build_terrain_step_schedule` | Lines 223–401 vs 404–520 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
+| **FIND-R2-07** | FIND-T01-04 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 310–312 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
+| **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
+| **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 304–318 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
 
 ---
 
@@ -42,13 +43,14 @@
 * **Source File**: `src/motion/kinematic_bridge.py`
 * **Class / Function**: `KinematicBridgeExecutor.execute_frame()`
 * **Exact Line Range**: Line 512
-* **Trigger Condition**: 任何规划的手部目标启用接触意图（`pht.enabled=True`, `pht.contact_intent=True`），但尚未锁定（`pht.is_locked=False`）且手部到接触面距离 $> 0.015$m。
+* **Evidence Grade**: `STATIC_CONFIRMED`
+* **Trigger Condition**: 任何规划的手部目标启用接触意图（`ht.enabled=True`, `ht.contact_intent=True`, `not ht.is_locked`），且手部到接触面距离 $> 0.015$m。
 * **Actual Behavior**: 试图访问 `ContactLifecycle.TOUCHDOWN`，引发 `AttributeError: type object 'ContactLifecycle' has no attribute 'TOUCHDOWN'` 致命崩溃。
-* **Expected Contract**: `ContactLifecycle` 枚举（`contact_model.py:45-51`）仅定义了 `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`。接触意图初期应标定为 `ContactLifecycle.CANDIDATE`。
+* **Expected Contract**: `ContactLifecycle` 枚举（`contact_model.py:53–59`）仅定义了 `CANDIDATE`, `ESTABLISHED`, `RELEASED`, `BROKEN`。接触意图初期应标定为 `ContactLifecycle.CANDIDATE`。
 * **Evidence**:
   ```python
   # src/motion/kinematic_bridge.py:512
-  lifecycle = ContactLifecycle.ESTABLISHED if (dist <= 0.015 or pht.is_locked) else ContactLifecycle.TOUCHDOWN
+  "lifecycle": ContactLifecycle.ESTABLISHED if dist <= 0.015 else ContactLifecycle.TOUCHDOWN,
   ```
 * **Responsible Module**: `src/motion/kinematic_bridge.py`
 * **Downstream Impact**: 一旦开启上肢环境接触或支撑攀爬（Phase 7B 核心目标），主执行链立即崩溃。
@@ -59,22 +61,35 @@
 
 ---
 
-### FIND-R2-02 (FIND-T01-02): `TerrainWalkAction` 强制覆盖 `MotionState.contacts` 导致上肢接触丢失与虚假物理确认
+### FIND-R2-02 (对应历史 FIND-T01-02): `TerrainWalkAction` 强制覆盖 `MotionState.contacts`
 * **Source File**: `src/motion/terrain_walk.py`
 * **Class / Function**: `TerrainWalkAction.execute()`
-* **Exact Line Range**: Lines 1137-1138
+* **Exact Line Range**: Lines 1100–1138 (覆写点: Line 1138)
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 正常运行 `TerrainWalkAction.execute()` 的每一帧。
 * **Actual Behavior**:
   ```python
+  # src/motion/terrain_walk.py:1138
   ms = ms.clone_with(contacts=c_dict, mode=mode)
   ```
-  Action 内部基于规划意图自行构造仅含 `foot_L` 与 `foot_R` 的字典 `c_dict`，并调用 `clone_with(contacts=c_dict)`，直接覆盖掉此前由 Bridge Phase 5 通过 `enrich_motion_state_with_contacts()` 计算出的真实物理接触记录。
+  Action 内部基于规划意图自行构造仅含 `foot_L` 与 `foot_R` 的字典 `c_dict`，并调用 `clone_with(contacts=c_dict)`，直接覆盖掉此前由 Bridge Phase 6 通过 `enrich_motion_state_with_contacts()` (L668) 注入的真实物理接触记录。
+* **核实与证据区分 (R2-CLOSE-05)**:
+  * **已确认事实**：`ms.contacts` 确实被 `c_dict` 覆写（`STATIC_CONFIRMED`）。
+  * **实际字段影响**：
+    1. 遗漏上肢：`c_dict` 仅硬编码构造左右脚，如果 Bridge/ContactModel 产生了手部接触（`hand_L`/`hand_R`），在进入 `ms.contacts` 时会被销毁；
+    2. 坐标差异：`c_dict` 中的 `contact_world_xyz` 存入的是规划落点 `last_known_xyz`，而非由真实 Mesh 射线相交解算出的真实接触点 Point B；
+    3. 法线差异：`surface_normal` 存入的是规划预期的目标法线，而非足底实际受力点法线；
+    4. 状态锁定：`is_locked` 直接跟随规划布尔值，忽略了 Bridge 判定的 `BROKEN` 状态。
+  * **仍被妥善保存的数据**：
+    1. `ms.params` 中的 `support_type`、`supporting_limbs`、`active_contact_count`、`support_polygon_2d` 未被覆盖，依然完整保留；
+    2. `bridge_res.multi_contact` 与 `bridge_executor.last_multi_contact` 保持完整对象，未被破坏。
+  * **下游影响与复现性**：在当前双脚平地与地形测试中，未引发运行时崩溃（因为现有验证脚本多直接读取 WBC 或 Bridge 遥测），但在进入 Phase 7B 激活上肢接触或依赖 `MotionState.contacts` 做动力学解算时将产生严重数据失真。
 * **Expected Contract**:
   1. `ms.contacts` 必须保留物理测量接触状态（Point B 接触坐标、法线、间隙、穿透量）；
   2. 若 Bridge 判定某脚几何约束失败（如落在悬崖外 `BROKEN`），Action 不得将其强行置为 `is_locked=True` 的稳定支撑；
   3. Action 不得擅自擦除上肢（如 `hand_L` / `hand_R`）可能存在的接触记录。
 * **Evidence**:
-  在 `kinematic_bridge.py:557`，Bridge 已经完成了 `ms = enrich_motion_state_with_contacts(ms, multi_contact)`。`terrain_walk.py:1138` 无条件将 `ms.contacts` 覆盖为由 `last_known_xyz` 拼凑的简化字典。
+  在 `kinematic_bridge.py:668`，Bridge 已经完成了 `ms = enrich_motion_state_with_contacts(ms, multi_contact)`。`terrain_walk.py:1138` 无条件将 `ms.contacts` 覆盖为由 `last_known_xyz` 拼凑的简化字典。
 * **Responsible Module**: `src/motion/terrain_walk.py`
 * **Downstream Impact**: 物理遥测与动力学计算无法获取真实法线与滑动状态；手部接触在进入 MotionState 时被完全销毁；下游模块读取到虚假接触锁定。
 * **Classification**: `CONFIRMED_DEFECT`
@@ -84,15 +99,16 @@
 
 ---
 
-### FIND-R2-07 (FIND-T01-04): 边缘与接缝横向探测位置偏置缺陷
+### FIND-R2-07 (对应历史 FIND-T01-04): 边缘与接缝横向探测位置偏置缺陷
 * **Source File**: `src/motion/terrain_walk.py`
-* **Class / Function**: `TerrainWalkAction.execute()`
-* **Exact Line Range**: Line 950
+* **Class / Function**: `plan_terrain_footsteps()`
+* **Exact Line Range**: Lines 310–312
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 在具有横向凹凸、边缘或接缝的地形上行走。
 * **Actual Behavior**:
-  调用 `_adjust_footfall_for_seams_and_edges(env, corridor_x, forward_y, ...)` 时，传入的是走廊中心线坐标 `corridor_x`（通常为 $0.0$），而不是摆动脚真实的横向落点位置 `sw_x`（左右脚偏移通常为 $\pm 0.13$m）。
+  调用 `_adjust_footfall_for_seams_and_edges(environment, corridor_x, curr_lead_y, y0, y_tgt)` 时，传入的是走廊中心线坐标 `corridor_x`（通常为 $0.0$），而不是摆动脚真实的横向落点位置 `sw_x`（左右脚偏移通常为 $\pm 0.13$m）。
 * **Expected Contract**: 边缘与接缝探测必须以真实预计着地点 `(sw_x, forward_y)` 为中心进行射线与梯度检测。
-* **Evidence**: `terrain_walk.py:950` 实参为 `corridor_x`，导致系统始终在身体正中线检测地形边缘，无法感知位于身体侧面 $\pm 13$cm 处踩在台阶边缘的情况。
+* **Evidence**: `terrain_walk.py:310–312` 实参为 `corridor_x`，导致系统始终在身体正中线检测地形边缘，无法感知位于身体侧面 $\pm 13$cm 处踩在台阶边缘的情况。
 * **Responsible Module**: `src/motion/terrain_walk.py`
 * **Downstream Impact**: 脚部落在台阶或接缝边缘时未触发避障微调，容易出现脚底悬空或踩入接缝。
 * **Classification**: `CONFIRMED_DEFECT`
@@ -104,16 +120,17 @@
 
 ## 4. 接口合同缺口详情 (Interface Contract Gaps)
 
-### FIND-R2-03 (FIND-T01-01): `TerrainWalkAction` 吞没 `BridgeExecutionResult.success` 与物理约束失败
+### FIND-R2-03 (对应历史 FIND-T01-01): `TerrainWalkAction` 吞没 `BridgeExecutionResult.success` 与物理约束失败
 * **Source File**: `src/motion/terrain_walk.py`
 * **Class / Function**: `TerrainWalkAction.execute()`
-* **Exact Line Range**: Lines 988-1025
+* **Exact Line Range**: Lines 1080–1091
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 发生 IK 不可达、关节越界（ROM 违规）或接触表面无效（`allows_regular_support=False`）。
 * **Actual Behavior**:
-  `bridge_res = bridge_executor.execute_frame(...)` 执行后，代码仅读取了 `bridge_res.wbc_result.end_effectors`，对 `bridge_res.success` 与 `bridge_res.unmet_constraints` 完全不作检查。IK 超限仅打印 Warning 并自增计数器，整个 Action 照常返回完成状态。
+  `bridge_res = bridge_executor.execute_frame(...)` 执行后，代码仅读取了 `bridge_res.wbc_result.end_effectors`，对 `bridge_res.success` 与 `bridge_res.unmet_constraints` 完全不作检查。IK 超限仅打印 `[WARN]` 并自增计数器，整个 Action 照常返回完成状态。
 * **Expected Contract**:
   遵循统一执行协议，当底层 `bridge_res.success == False` 时，Action 层必须能够捕获该失败；要么阻断当前动作并触发回退/报警，要么在返回的 `ActionExecutionResult` 中显式标定执行失败并携带错误详情。严禁在骨骼未成功就位或受力违规时伪造动作成功。
-* **Evidence**: 对比 `src/motion/framework.py:745-753`（`StartStopWalkAction` 规范实现），`terrain_walk.py` 全文没有任何一处引用 `bridge_res.success` 或 `bridge_res.unmet_constraints`。
+* **Evidence**: 对比 `src/motion/framework.py:745–754`（`StartStopWalkAction` 规范实现），`terrain_walk.py` 全文没有任何一处引用 `bridge_res.success` 或 `bridge_res.unmet_constraints`。
 * **Responsible Module**: `src/motion/terrain_walk.py`
 * **Downstream Impact**: 当地形崎岖导致完全脱离人体解剖学极限时，系统不报错、不重试，生成断裂扭曲的无意义动画，使得自动化测试管线失去门禁拦截能力。
 * **Classification**: `CONTRACT_GAP`
@@ -123,16 +140,17 @@
 
 ---
 
-### FIND-R2-04 (FIND-T01-03): `ActionExecutionResult` 与 `MotionPlanner.execute()` 缺失动作失败处理合同
+### FIND-R2-04 (对应历史 FIND-T01-03): `ActionExecutionResult` 与 `MotionPlanner.execute()` 缺失动作失败处理合同
 * **Source File**: `src/motion/framework.py`
 * **Class / Function**: `ActionExecutionResult` / `MotionPlanner.execute()`
-* **Exact Line Range**: Lines 405-419, Lines 832-865
+* **Exact Line Range**: Lines 405–416 (`ActionExecutionResult`), Lines 915–1010 (`MotionPlanner.execute()`, 循环点 L967–L981)
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 序列化多动作规划中，前序 Action 发生不可达或物理违规。
 * **Actual Behavior**:
   `ActionExecutionResult` 数据类缺少 `success: bool` 和 `unmet_constraints` 字段。`MotionPlanner.execute()` 采用盲目顺序流：
   ```python
-  result = action.execute(current_state, ctx)
-  results.append(result)
+  result = action.execute(current_state, context)
+  action_results.append(result)
   current_state = result.final_state
   ```
 * **Expected Contract**:
@@ -147,28 +165,30 @@
 
 ---
 
-### FIND-R2-05: `ContactModel` 几何合规性校验与 `SupportType` 拓扑判定脱节
+### FIND-R2-05: `ContactModel` 几何合规性校验与 `SupportType` 动态属性脱节
 * **Source File**: `src/motion/contact_model.py`
-* **Class / Function**: `ContactRecord.check_geometric_compliance()` / `MultiContactState.update_support_type()`
-* **Exact Line Range**: Lines 180-213, Lines 243-263
+* **Class / Function**: `ContactRecord.check_geometric_compliance()` / `MultiContactState.support_type`
+* **Exact Line Range**: Lines 214–273 (`check_geometric_compliance`), Lines 304–340 (`support_type` property)
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 脚部处于 `ContactLifecycle.ESTABLISHED`，但在物理测量时发生穿透超过阈值（如 $> 10$mm）或悬空离开接触面（如 $> 15$mm）。
 * **Actual Behavior**:
-  `check_geometric_compliance()` 返回 `GeometricConstraintResult(is_valid=False)`，但该函数属于只读方法，不会修改 `ContactRecord` 本身；随后 `MultiContactState.update_support_type()` 仅依靠 `[c for c in feet if c.is_active]` 计数，仍将该脚计为有效支撑，判定为 `SupportType.DOUBLE_STANCE`。
+  `check_geometric_compliance()` 返回 `GeometricConstraintResult(is_valid=False)`，但该函数属于只读方法，不会修改 `ContactRecord.lifecycle` 本身；随后访问动态属性 `MultiContactState.support_type` 时，由于其仅依靠 `[c for c in self.contacts.values() if c.is_active]` 计数，仍将该脚计为有效支撑，判定为 `SupportType.DOUBLE_STANCE`。
 * **Expected Contract**: 当几何接触严重失效或离开支撑面时，支撑拓扑状态应能感知到该接触已失效（或由 Bridge 协同置为 `BROKEN`），避免在无物理支撑的情况下误判为双脚着地。
-* **Evidence**: `MultiContactState.update_support_type()` 源码统计仅判断 `c.is_active`，而 `is_active` 仅要求 `lifecycle == ESTABLISHED and contact_type != FREE`，完全不耦合 `GeometricConstraintResult`。
+* **Evidence**: `MultiContactState.support_type` 是一个动态 `@property`，统计仅判断 `c.is_active`，而 `is_active` (L181–L184) 仅要求 `lifecycle == ESTABLISHED and contact_type != FREE`，完全不耦合 `GeometricConstraintResult`。
 * **Responsible Module**: `src/motion/contact_model.py`
 * **Downstream Impact**: 动力学计算（如重力平衡、质心支撑多边形计算）在足部严重悬空或穿透时，仍按正常双支撑多边形计算，导致物理遥测数据失真。
 * **Classification**: `CONTRACT_GAP`
 * **Blocks Further Development**: `NO`
 * **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**: 在 `kinematic_bridge.py` Phase 5 中，当 `check_geometric_compliance()` 返回 `is_valid=False` 且间隙过大时，显式将该记录标记为 `ContactLifecycle.BROKEN`，并同步刷新 `multi_contact.update_support_type()`。
+* **Suggested Repair Boundary**: 在 `kinematic_bridge.py` Phase 5 中，当 `check_geometric_compliance()` 返回 `is_valid=False` 且间隙过大时，显式将该记录标记为 `ContactLifecycle.BROKEN`。
 
 ---
 
-### FIND-R2-06 (FIND-T01-05): 地形步态预规划在环境查询未命中时的回退语义不一致
+### FIND-R2-06 (对应历史 FIND-T01-05): 步态调度生成函数在环境查询未命中时的回退语义不一致
 * **Source File**: `src/motion/terrain_walk.py`
 * **Class / Function**: `build_terrain_step_schedule()` vs `plan_terrain_footsteps()`
-* **Exact Line Range**: Lines 473-510, Lines 577-628
+* **Exact Line Range**: Lines 223–401 (`plan_terrain_footsteps`), Lines 404–520 (`build_terrain_step_schedule`)
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 在复杂 Mesh 地形边界或断崖边缘执行步态预规划。
 * **Actual Behavior**:
   * `plan_terrain_footsteps()`：当 `query_surface_at` 失败或落点在不可支撑表面时，严格抛出 `ValueError`；
@@ -187,8 +207,9 @@
 ### FIND-T01-06: `TerrainWalkAction.estimate_duration_frames` 环境源脱节
 * **Source File**: `src/motion/terrain_walk.py`
 * **Class / Function**: `TerrainWalkAction.estimate_duration_frames()`
-* **Exact Line Range**: Lines 654-681
-* **Trigger Condition**: 在调用 `estimate_duration_frames` 时，Action 初始化时未显式传入 `environment`，而是在 `execute()` 时才通过 `context.environment` 获取真实网格环境。
+* **Exact Line Range**: Lines 654–681
+* **Evidence Grade**: `STATIC_CONFIRMED`
+* **Trigger Condition**: 当 `TerrainWalkAction` 实例化时未显式传入 `environment`，而在 `execute()` 时才通过 `context.environment` 获取真实网格环境。
 * **Actual Behavior**:
   `estimate_duration_frames` 检查 `self.environment` 为空，静默回退至解析平地假定计算步数与耗时。
 * **Expected Contract**: 预估函数应接受 `context` 或统一从环境源读取，保证规划耗时与实际执行耗时一致。
@@ -202,11 +223,12 @@
 ### FIND-T01-07: 负向行进步态规划跳步与终止缺陷
 * **Source File**: `src/motion/terrain_walk.py`
 * **Class / Function**: `plan_terrain_footsteps()`
-* **Exact Line Range**: Lines 280-320
+* **Exact Line Range**: Lines 304–318
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 当 `route.target_pos` 的 $Y$ 坐标小于 `route.start_pos` 的 $Y$ 坐标（即需要倒退行走或向 $-Y$ 方向行走）时。
 * **Actual Behavior**:
-  循环终止条件 `while current_y < target_y:` 立即判定为 False，直接跳过所有步态规划，返回仅含初始站立步的调度表。
-* **Expected Contract**: 循环条件应基于标量有向距离或步数计数器判断，支持任意方向路线规划。
+  循环终止条件 `while curr_lead_y + stride < y_tgt - (route.min_step_length_m * 0.5):` 立即判定为 False，直接跳过所有步态规划，返回仅含两个终点步的异常调度表。
+* **Expected Contract**: 步态规划循环条件应基于标量有向距离或步数计数器判断，支持任意方向路线规划。
 * **Responsible Module**: `src/motion/terrain_walk.py`
 * **Classification**: `CONTRACT_GAP`
 * **Blocks Further Development**: `NO`

@@ -3,6 +3,24 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Audit R2-CLOSE: 审计证据校准与归档闭环
+
+### 证据核对与签名行号校准 (`docs/audit/production_interface/`)
+* **R2-CLOSE-01 (`MultiContactState.support_type`)**:
+  - 纠正 `MultiContactState.support_type` 为只读动态计算属性（`@property`，`contact_model.py:304–340`），清除虚构的 `update_support_type()` 方法描述；
+  - 核准多边形方法为 `get_coplanar_support_polygon()` (`contact_model.py:356–407`)；
+  - 阐明几何合规性校验只读返回与拓扑判定解耦的客观机制。
+* **R2-CLOSE-02 (`KinematicBridgeExecutor.__init__`)**:
+  - 核准现行 8 参数真实签名，彻底清除旧版虚构构造参数（`wbc`, `ground_query_func`, `mesh_query_func`, `mesh_adapter`）。
+* **R2-CLOSE-03 (核心执行链签名与行号全面核准)**:
+  - 核准 `ActionExecutionResult` (L405–L416)、`MotionPlanner.execute()` (L915–L1010)、Bridge `execute_frame()` (L302–L692)、WBC `execute_frame()` (L305–L654) 及 `evaluate_limb_contacts_from_armature()` (L512–L553) 现行签名与物理行号。
+* **R2-CLOSE-04 (统一登记总表与证据分级)**:
+  - `OPEN_FINDINGS.md` 统一登记 9 项唯一缺陷（3 项 `CONFIRMED_DEFECT`、6 项 `CONTRACT_GAP`），消除重复计算，全量标注 `STATIC_CONFIRMED` 证据等级。
+* **R2-CLOSE-05 (`MotionState.contacts` 覆盖证据明确界定)**:
+  - 覆写行为客观存在（`terrain_walk.py:1138`），上肢接触丢失与 Point B 被规划点覆盖属实，但 `ms.params` 中支撑数据保持完好，当前测试未发生崩溃，确认为阻碍 Phase 7B 的严重合同缺陷。
+* **状态标定**: 门禁最终状态更新为 `PRODUCTION INTERFACE AUDIT / R2 — EVIDENCE VERIFIED`。
+
+
 ## [2026-10-29] Production Interface Audit: R1/R2 逐方法联合审查与缺陷归档
 
 ### 生产接口审计报告交付 (`docs/audit/production_interface/`)
