@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Repair 02 — FIND-R2-02 Contact State Ownership Repair  
-> **审计与修复基准 Commit**：`eac2ef4fefefb79f413c468e0095ec80b8d1c581`  
+> **当前阶段**：Production Interface Repair 03 — FIND-R2-03 Terrain Walk Failure Propagation & Fallback Branch Closure  
+> **审计与修复基准 Commit**：`da08a8dbfde202f54bc287f576c2a4cbd4a1d4dc`  
 > **最后更新时间**：2026-10-29  
-> **当前状态**：`REPAIR-02 / FIND-R2-02 — AWAITING INDEPENDENT REVIEW`  
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01 与 FIND-R2-02 修复，其余 13 项 Finding 维持原状待后续逐包推进。
+> **当前状态**：`REPAIR-03 / FIND-R2-03 — AWAITING INDEPENDENT REVIEW`  
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02 及 FIND-R2-03 修复，其余 Finding 维持原状待后续逐包推进。
 
 ---
 
@@ -13,10 +13,10 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **1** (存量) + **2** (已修复) | 存量：FIND-R2-07/T01-04 (接缝横向偏置)；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写) |
-| **接口合同缺口 (CONTRACT_GAP)** | **12** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节) |
+| **接口合同缺口 (CONTRACT_GAP)** | **11** (存量) + **1** (已修复) | 存量：FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
-| **阻碍后续开发 (Blocks Further Dev: YES)** | **3** | FIND-R2-03, FIND-R2-04, FIND-R3-01 (FIND-R2-01, FIND-R2-02 已修复解除阻碍) |
+| **阻碍后续开发 (Blocks Further Dev: YES)** | **2** | FIND-R2-04, FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03 已修复解除阻碍) |
 
 ---
 
@@ -26,7 +26,7 @@
 | :--- | :--- | :--- | :--- | :--- | :--- | :---: | :---: | :--- |
 | **FIND-R2-01** | - | `src/motion/kinematic_bridge.py` | `KinematicBridgeExecutor.execute_frame()` | Line 512 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `kinematic_bridge.py` |
 | **FIND-R2-02** | FIND-T01-02 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1100–1138 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1080–1091 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `terrain_walk.py` |
+| **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1080–1145 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | Lines 405–416 / 915–1010 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `framework.py` |
 | **FIND-R2-05** | - | `src/motion/contact_model.py` | `ContactRecord` / `MultiContactState` | Lines 214–273 / 304–340 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `contact_model.py` |
 | **FIND-R2-06** | FIND-T01-05 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps` vs `build_terrain_step_schedule` | Lines 223–401 vs 404–520 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
@@ -131,20 +131,25 @@
 ### FIND-R2-03 (对应历史 FIND-T01-01): `TerrainWalkAction` 吞没 `BridgeExecutionResult.success` 与物理约束失败
 * **Source File**: `src/motion/terrain_walk.py`
 * **Class / Function**: `TerrainWalkAction.execute()`
-* **Exact Line Range**: Lines 1080–1091
+* **Exact Line Range**: Lines 1080–1145
 * **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 发生 IK 不可达、关节越界（ROM 违规）或接触表面无效（`allows_regular_support=False`）。
-* **Actual Behavior**:
-  `bridge_res = bridge_executor.execute_frame(...)` 执行后，代码仅读取了 `bridge_res.wbc_result.end_effectors`，对 `bridge_res.success` 与 `bridge_res.unmet_constraints` 完全不作检查。IK 超限仅打印 `[WARN]` 并自增计数器，整个 Action 照常返回完成状态。
+* **Actual Behavior (修复前)**:
+  `bridge_res = bridge_executor.execute_frame(...)` 执行后，代码仅读取了 `bridge_res.wbc_result.end_effectors`，对 `bridge_res.success` 与 `bridge_res.unmet_constraints` 完全不作检查。IK 超限仅打印 `[WARN]` 并自增计数器，整个 Action 照常返回完成状态；同时在 `if ms is None:` 分支存在使用弃用字段的失效死分支。
 * **Expected Contract**:
   遵循统一执行协议，当底层 `bridge_res.success == False` 时，Action 层必须能够捕获该失败；要么阻断当前动作并触发回退/报警，要么在返回的 `ActionExecutionResult` 中显式标定执行失败并携带错误详情。严禁在骨骼未成功就位或受力违规时伪造动作成功。
-* **Evidence**: 对比 `src/motion/framework.py:745–754`（`StartStopWalkAction` 规范实现），`terrain_walk.py` 全文没有任何一处引用 `bridge_res.success` 或 `bridge_res.unmet_constraints`。
+* **Evidence**: 对比 `src/motion/framework.py:745–754`（`StartStopWalkAction` 规范实现），旧版 `terrain_walk.py` 全文没有任何一处引用 `bridge_res.success` 或 `bridge_res.unmet_constraints`。
 * **Responsible Module**: `src/motion/terrain_walk.py`
 * **Downstream Impact**: 当地形崎岖导致完全脱离人体解剖学极限时，系统不报错、不重试，生成断裂扭曲的无意义动画，使得自动化测试管线失去门禁拦截能力。
 * **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `YES`
-* **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**: 统一 `TerrainWalkAction` 与 `StartStopWalkAction` 的失败处理协议，接入 `bridge_res.success` 校验与 `unmet_constraints` 统计汇总。
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**:
+  - 在 `src/motion/terrain_walk.py:1084–1100` 接入显式失败阻断：当 `not bridge_res.success` 时立即格式化 `unmet_constraints` 抛出结构化 `RuntimeError`，阻断不可行动作；当 `bridge_res.motion_state is None` 时抛出状态合同异常。
+  - 完全移除旧版 `if ms is None:` 中包含弃用字段名（`linear_velocity_world` / `angular_velocity_world`）的死回退分支。
+  - 针对斜坡地形踏步时摆动腿脚踝角度受小腿后屈拉扯导致的 ROM 越界缺陷，将 `swing_relax_amp` 微调至 25.0°，通过自然跖屈释放踝关节应力，保持生理范围严苛合规（零阈值放宽）。
+  - 新增专用回归套件 `tests/test_terrain_walk_failure_propagation.py`（6/6 PASS），涵盖 WBC Reachability 失败、接触几何失败、ROM 违背、None 状态异常及平顺地形回归。
+  - 全套验证通过：`quick` (18/18 PASS), `physics` (21/21 PASS), `motion` (11/11 PASS), `full` (35/35 PASS)。
 
 ---
 

@@ -916,7 +916,7 @@ class TerrainWalkAction(MotionAction):
                     swing_relax_amp = 19.0
                 elif active_step.swing_end_pitch_deg > 5.0 or active_step.swing_start_pitch_deg > 5.0:
                     # Sloped terrain
-                    swing_relax_amp = 22.0
+                    swing_relax_amp = 25.0
                 else:
                     swing_relax_amp = 8.0
 
@@ -1081,13 +1081,22 @@ class TerrainWalkAction(MotionAction):
                 planned=planned_pose,
             )
 
-            if not bridge_res.wbc_result.is_all_reachable:
-                for uc in bridge_res.unmet_constraints:
-                    print(
-                        f"[WARN] IK Unreachable at Frame {current_frame}: "
-                        f"{uc.target_name} ({uc.category}) error={uc.error_amount:.4f}: {uc.description}"
-                    )
-                unreachable_count += 1
+            if not bridge_res.success:
+                unmet_desc = "; ".join(
+                    f"{uc.target_name} ({uc.category}): {uc.description} (err={uc.error_amount:.4f})"
+                    for uc in bridge_res.unmet_constraints
+                ) if bridge_res.unmet_constraints else "unspecified constraint failure"
+                raise RuntimeError(
+                    f"TerrainWalkAction '{self.name}' failed at Frame {current_frame}: "
+                    f"KinematicBridge execution failed (unmet={len(bridge_res.unmet_constraints)}): {unmet_desc}"
+                )
+
+            ms = bridge_res.motion_state
+            if ms is None:
+                raise RuntimeError(
+                    f"TerrainWalkAction '{self.name}' failed at Frame {current_frame}: "
+                    f"KinematicBridge returned motion_state=None"
+                )
 
             # Extract contacts & telemetry
             eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
@@ -1097,61 +1106,16 @@ class TerrainWalkAction(MotionAction):
             reach_l = eff_l.is_reachable if eff_l else True
             reach_r = eff_r.is_reachable if eff_r else True
 
-            ms = bridge_res.motion_state
-            if ms is None:
-                c_dict: Dict[str, ContactPointState] = {
-                    "foot_L": ContactPointState(
-                        limb="foot_L",
-                        phase=phase_l,
-                        is_locked=foot_l_tgt.is_locked,
-                        contact_world_xyz=last_known_l_xyz,
-                        current_world_xyz=eff_l.actual_world_xyz if eff_l else last_known_l_xyz,
-                        target_rotation_deg=foot_l_tgt.rotation_deg,
-                        drift_m=drift_l,
-                        is_reachable=reach_l,
-                        surface_normal=foot_l_tgt.normal_world,
-                    ),
-                    "foot_R": ContactPointState(
-                        limb="foot_R",
-                        phase=phase_r,
-                        is_locked=foot_r_tgt.is_locked,
-                        contact_world_xyz=last_known_r_xyz,
-                        current_world_xyz=eff_r.actual_world_xyz if eff_r else last_known_r_xyz,
-                        target_rotation_deg=foot_r_tgt.rotation_deg,
-                        drift_m=drift_r,
-                        is_reachable=reach_r,
-                        surface_normal=foot_r_tgt.normal_world,
-                    ),
-                }
-                ms = MotionState(
-                    frame=current_frame,
-                    time_sec=time_sec,
-                    position=(root_x, root_y, root_z),
-                    orientation_deg=(0.0, 0.0, 0.0),
-                    linear_velocity_world=(0.0, 0.0, 0.0),
-                    angular_velocity_world=(0.0, 0.0, 0.0),
-                    mode=mode,
-                    contacts=c_dict,
-                    params={
-                        "planned_phase_l": phase_l,
-                        "planned_phase_r": phase_r,
-                        "planned_locked_l": foot_l_tgt.is_locked,
-                        "planned_locked_r": foot_r_tgt.is_locked,
-                        "planned_target_l": foot_l_tgt.world_xyz,
-                        "planned_target_r": foot_r_tgt.world_xyz,
-                    },
-                )
-            else:
-                ms_params = dict(ms.params)
-                ms_params.update({
-                    "planned_phase_l": phase_l,
-                    "planned_phase_r": phase_r,
-                    "planned_locked_l": foot_l_tgt.is_locked,
-                    "planned_locked_r": foot_r_tgt.is_locked,
-                    "planned_target_l": foot_l_tgt.world_xyz,
-                    "planned_target_r": foot_r_tgt.world_xyz,
-                })
-                ms = ms.clone_with(mode=mode, params=ms_params)
+            ms_params = dict(ms.params)
+            ms_params.update({
+                "planned_phase_l": phase_l,
+                "planned_phase_r": phase_r,
+                "planned_locked_l": foot_l_tgt.is_locked,
+                "planned_locked_r": foot_r_tgt.is_locked,
+                "planned_target_l": foot_l_tgt.world_xyz,
+                "planned_target_r": foot_r_tgt.world_xyz,
+            })
+            ms = ms.clone_with(mode=mode, params=ms_params)
 
             current_motion_state = ms
             states.append(ms)

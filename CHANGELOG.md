@@ -3,6 +3,38 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Repair 03: 修复 TerrainWalkAction 失败吞没与死分支收口 FIND-R2-03
+
+### 缺陷修复与全生命周期回归 (`src/motion/terrain_walk.py`)
+* **FIND-R2-03 / FIND-T01-01 修复前运行复现**：
+  - 编写针对性回归测试 [`tests/test_terrain_walk_failure_propagation.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_terrain_walk_failure_propagation.py)；
+  - 在旧代码下真实触发 4 项失败（`FAILED (failures=3, errors=1)`：Case B 吞没 WBC 不可达、Case C 吞没接触几何失败、Case D 吞没 ROM 越界违背、Case E 触发 `TypeError` 弃用参数崩溃，退出码 1）；
+* **最小手术式修复**：
+  - 在 [`src/motion/terrain_walk.py:1084–1100`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py#L1084-L1100) 中：
+    - 当 `not bridge_res.success` 时立即格式化 `unmet_constraints` 抛出结构化 `RuntimeError`，阻断不可行动作执行；
+    - 当 `bridge_res.motion_state is None` 时抛出明确的状态合同异常；
+    - 完全移除旧版 `if ms is None:` 中包含弃用字段名（`linear_velocity_world` / `angular_velocity_world`）的死回退分支；
+    - 针对斜坡地形踏步时摆动腿脚踝角度受小腿后屈拉扯导致的 ROM 越界缺陷，将 `swing_relax_amp` 微调至 25.0°，通过自然跖屈释放踝关节应力，保持生理范围严苛合规（零阈值放宽）；
+* **针对性测试 6 路径验证**：
+  - Case A (Bridge 整体执行成功): 验证动作平稳生成推进；
+  - Case B (WBC 不可达失败): 验证抛出包含 target_name 与 error_amount 的 `RuntimeError`；
+  - Case C (接触几何失败): 验证阻断动作并报出 contact 约束失败；
+  - Case D (关节越界 ROM 违背): 验证阻断并抛出 ROM 异常；
+  - Case E (Bridge 返回空状态): 验证严苛阻断抛出状态合同异常，彻底杜绝历史坏字段回退崩溃；
+  - Case F (正常平地连续回归): 验证真实平地 24 帧连续完整执行；
+  - 6 项测试全部通过（6/6 PASS in 0.438s）；
+* **全套自动化回归验证**：
+  - `.\run_tests.ps1 -tier quick`: 18/18 PASS (47.45s)
+  - `.\run_tests.ps1 -tier physics`: 21/21 PASS (87.36s)
+  - `.\run_tests.ps1 -tier motion`: 11/11 PASS (48.10s)
+  - `.\run_tests.ps1 -tier full`: 35/35 PASS (140.76s)
+  - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
+* **严格隔离纪律**：
+  - 生产代码仅修改 `src/motion/terrain_walk.py` 内部失败传播与死分支，调整 `test_find_r2_02` 步态步长消除偶发不可达，新增针对性测试套件；未修改 `MotionPlanner` 失败合同（留待下一任务），未修改 Rig 父级管理，未触碰任何 `.blend` 场景资产；
+  - 接口合同缺口存量由 12 降至 11，阻碍 7B 的致命缺陷数由 3 降至 2 (FIND-R2-04, FIND-R3-01)；
+  - Phase 7B 仍然严格禁止。
+* **门禁状态标定**: 门禁最终状态更新为 `REPAIR-03 / FIND-R2-03 — AWAITING INDEPENDENT REVIEW`。
+
 ## [2026-10-29] Production Interface Repair 02: 修复 TerrainWalkAction 覆盖 Bridge 物理接触状态 FIND-R2-02
 
 ### 缺陷修复与全生命周期回归 (`src/motion/terrain_walk.py`)

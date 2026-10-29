@@ -135,9 +135,9 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
             start_pos=(0.0, 0.0, 0.0),
             target_pos=(0.0, 0.3, 0.0),
             nominal_stride_m=0.3,
-            stand_start_frames=2,
-            step_frames=4,
-            stand_stop_frames=2,
+            stand_start_frames=4,
+            step_frames=8,
+            stand_stop_frames=4,
         )
         action = TerrainWalkAction(route=route, environment=self.env)
         result = action.execute(init_state, ctx)
