@@ -3,6 +3,33 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Audit R3: 底层绑定、足部接触与 IK 执行合同审计归档
+
+### 底层绑定与 IK 执行合同审计交付 (`docs/audit/production_interface/R3_RIG_IK.md`)
+* **R3-A 审计归档 (`src/rig/foot_contact.py`, 333 行, 7 个函数)**：
+  - 逐方法审查足部接触锁定、支撑评估与漂移监测；
+  - 证实 FIND-R3-01：`unlock_foot_contact(L152)` 默认参数 `reparent_to_root: bool = True` 动态挂载父级，违反门禁清规 Rule 7（控制器全生命周期保持在绝对世界空间 `parent = None`）；
+  - 证实 FIND-R3-03：`unlock_foot_contact(L168–L170)` 解锁仅将 `is_locked` 置为 False，未清理历史锁定坐标元数据。
+* **R3-B 审计归档 (`src/rig/ik.py`, 404 行, 8 个函数)**：
+  - 逐方法审查下肢双骨 IK、膝盖极向防翻转与足部姿态拷贝约束；
+  - 证实 FIND-R3-02：`set_foot_ik_target(L334–L346)` 地面防穿透硬编码根节点高程，阻断下坡与起伏地形下潜，迫使上层全流程传 `clamp_ground=False`；
+  - 证实 FIND-R3-01 关联项：行 380–384 在父级存在时世界欧拉角未进行逆旋转反解即赋给局部属性，产生姿态偏角。
+* **R3-C 审计归档 (`src/rig/arm_ik.py`, 510 行, 9 个函数)**：
+  - 逐方法审查上肢双骨 IK、手腕三维旋转拷贝与约束权重调制；
+  - 验证上肢两骨 IK 左右严格解耦，肘关节 $0^\circ \sim 150^\circ$ 解剖铰链与极向角匹配严密；
+  - 验证约束重建具备幂等性，FK/IK 权重在 $[0.0, 1.0]$ 平滑缩放；
+  - 验证手腕超限球形截断至最大臂长 ($0.56$m) 极限球面，并如实输出可达性与截断标记；
+  - 验证父矩阵逆向坐标与逆向旋转变换完备无缺漏。
+* **R3-D 跨模块调用与执行链核对**：
+  - 确认 `WholeBodyController` 在单帧执行中维持单权威写入原则，底层 Rig 模块严格定位为纯粹目标应用器；
+  - 确认锁态支撑切换时序闭环（先解锁后设目标，或直接世界锁定）；
+  - 确认 IK 跟踪误差与物理超限违规忠实转化为 `UnmetConstraint(category="REACHABILITY")` 回传上层，未吞没。
+* **统一问题总表更新 (`OPEN_FINDINGS.md`)**：
+  - 增量登记 3 项底层合同缺口（全仓库累计 12 项缺陷：3 项 `CONFIRMED_DEFECT`、9 项 `CONTRACT_GAP`；5 项阻碍 7B）；
+  - 增设维护包 5：Package 5 (Rig 与 IK 空间坐标与支撑锁定修复)。
+* **零生产与测试代码变更**：`src/` 与 `tests/` 目录严格 0 变动，历史 `.blend` 资产严格 0 字节变动，严格禁止擅自进入 Phase 7B，严格禁止擅自开启 R4。
+* **门禁状态标定**: 门禁最终状态更新为 `PRODUCTION INTERFACE AUDIT / R3 — ARCHIVED`。
+
 ## [2026-10-29] Production Interface Audit R2-CLOSE: 审计证据校准与归档闭环
 
 ### 证据核对与签名行号校准 (`docs/audit/production_interface/`)

@@ -6,39 +6,38 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — Production Interface Audit R2 — Evidence Correction & Closure (R2-CLOSE)。  
-* **当前状态**：`PRODUCTION INTERFACE AUDIT / R2 — EVIDENCE VERIFIED`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R3）。
-* **任务性质**：仅纠正 R1/R2 审计文档中的错误证据、签名与行号，完成正式归档与交接。零生产代码修改，零测试代码修改。
+* **当前任务**：ProceduralAnimation — Production Interface Audit R3: Rig, Foot Contact & IK Execution Contract Audit。  
+* **当前状态**：`PRODUCTION INTERFACE AUDIT / R3 — ARCHIVED`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R4）。
+* **任务性质**：底层绑定、足部接触与 IK 执行合同只读审查，零生产代码修改，零测试代码修改。
 
-### 本任务核心修正与核准成果 (R2-CLOSE)
-1. **R2-CLOSE-01 (`MultiContactState.support_type` 定义纠正)**：
-   - 核准 `MultiContactState.support_type` 为只读动态计算属性（`@property`，`contact_model.py:304–340`），彻底清除不存在的 `update_support_type()` 方法描述；
-   - 核准多边形方法为 `get_coplanar_support_polygon()` (`contact_model.py:356–407`)，清除 `get_support_polygon_2d()`；
-   - 明确几何约束失败只读返回，与属性判定脱节的客观机制。
-2. **R2-CLOSE-02 (`KinematicBridgeExecutor.__init__()` 现行签名核准)**：
-   - 彻底删除旧版不存在的形参（`wbc`, `ground_query_func`, `mesh_query_func`, `mesh_adapter`）；
-   - 核准现行 8 参数物理签名：`armature_obj`, `root_obj`, `controller`, `kinematics_tracker`, `inertia_model`, `environment`, `surfaces`, `default_fps` (`kinematic_bridge.py:265–291`)。
-3. **R2-CLOSE-03 (核心执行链签名与行号全面校准)**：
-   - `ActionExecutionResult`: `framework.py:405–416`，确认完全缺失 `success: bool` 和 `unmet_constraints`；
-   - `MotionPlanner.execute()`: `framework.py:915–1010`，确认返回 `Dict[str, Any]`，循环点 L967–L981 无条件迭代流转；
-   - `KinematicBridgeExecutor.execute_frame()`: `kinematic_bridge.py:302–692`；
-   - `WholeBodyController.execute_frame()`: `whole_body_controller.py:305–654`，确认无 `keyframe: bool` 参数；
-   - `evaluate_limb_contacts_from_armature()`: `contact_model.py:512–553`，确认真实签名为 `(armature_obj, surfaces, active_limb_targets)`，在 Bridge L532 调用。
-4. **R2-CLOSE-04 (`OPEN_FINDINGS.md` 统计与唯一性核对)**：
-   - 确认 9 项唯一缺陷（3 项 `CONFIRMED_DEFECT`、6 项 `CONTRACT_GAP`），历史编号完整映射，无重复计数；
-   - 全量完成证据分级标注（全部基于现行物理源码标定为 `STATIC_CONFIRMED`）；
-   - 明确标注 4 项阻碍后续 7B 开发的真实 BLOCKER（FIND-R2-01 至 FIND-R2-04）。
-5. **R2-CLOSE-05 (`MotionState.contacts` 覆盖证据严格区分)**：
-   - 覆写行为客观存在（`terrain_walk.py:1138`，`STATIC_CONFIRMED`）；
-   - 澄清丢失字段：上肢接触被遗漏，接触坐标退化为规划落点 Point A，法线与锁定为规划预期值；
-   - 澄清保留数据：`ms.params` 中的支撑多边形、支撑类型及 Bridge 内部对象保持完好；
-   - 澄清运行现状：当前平地与地形测试仅依赖下肢且主要检查 WBC 遥测，故未发生崩溃，但进入 Phase 7B 激活上肢或动力学依赖时将构成破坏。
+### 本任务核心审查与核准成果 (Audit R3)
+1. **R3-A (`src/rig/foot_contact.py`, 333 行, 7 个函数)**：
+   - `lock_foot_contact` 解耦世界坐标系并在 Empty 上持久化锁定元数据；
+   - 发现 FIND-R3-01：`unlock_foot_contact` 默认形参 `reparent_to_root: bool = True` (L152) 动态挂载父级，违反 `ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条（控制器全生命周期恒定世界空间 `parent = None`）；
+   - 发现 FIND-R3-03：`unlock_foot_contact` 仅置 `is_locked = False`，未清理历史锁定坐标元数据。
+2. **R3-B (`src/rig/ik.py`, 404 行, 8 个函数)**：
+   - 证实下肢两骨 IK 与膝盖极向防翻转逻辑严密，脚部姿态通过 `COPY_ROTATION` 正确解耦；
+   - 发现 FIND-R3-02：`set_foot_ik_target:334–346` 地面防穿透硬编码根高程 (`root_obj.z + 0.07`m)，下坡时强制抬升导致悬空，迫使上层全流程传 `clamp_ground=False`；
+   - 发现 FIND-R3-01 关联项：行 380–384 在父级存在时世界欧拉角未进行逆旋转反解即赋给局部属性，产生姿态偏角。
+3. **R3-C (`src/rig/arm_ik.py`, 510 行, 9 个函数)**：
+   - 验证上肢两骨 IK 左右严格解耦，肘关节单自由度铰链 ($0^\circ \sim 150^\circ$) 与极向角匹配严密；
+   - 验证约束重建具备幂等性，FK/IK 权重在 $[0.0, 1.0]$ 平滑缩放；
+   - 验证手腕超限球形截断至最大臂长 ($0.56$m) 极限球面，并如实输出可达性与截断标记；
+   - 验证父矩阵逆向坐标与逆向旋转变换完备无缺漏。
+4. **R3-D (WBC $\to$ Rig 跨模块联合核验)**：
+   - 确认 `WholeBodyController` 在帧执行中维持单权威独占写入，底层模块为纯粹目标应用器；
+   - 锁态判断时序闭环（先检测 `was_locked` 并显式传 `reparent_to_root=False` 解锁，再设目标）；
+   - IK 跟踪误差与超限违规忠实转化为 `UnmetConstraint(category="REACHABILITY")` 回传上层，未吞没。
+5. **缺陷登记总表与维护包更新**：
+   - `OPEN_FINDINGS.md` 增量登记 3 项底层合同缺口（全仓库累计 12 项缺陷：3 项 `CONFIRMED_DEFECT`、9 项 `CONTRACT_GAP`；5 项阻碍 7B）；
+   - 增设维护包 5：Package 5 (Rig 与 IK 空间坐标与支撑锁定修复)。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Production Interface Audit R3**: 底层绑定、足部接触与 IK 执行合同只读审查归档 (`docs/audit/production_interface/R3_RIG_IK.md`)。
 * **Production Interface Audit R2-CLOSE**: 证据校准、签名行号核实与正式闭环归档 (`EVIDENCE VERIFIED`)。
-* **Production Interface Audit (R1, R2)**: 生产接口逐方法联合审计与缺陷登记归档 (R1/R2 已执行，R3/R4 待授权)。
+* **Production Interface Audit (R1, R2)**: 生产接口逐方法联合审计与缺陷登记归档。
 * **Environment Gate 01 — Final Architecture Audit**: 全仓库独立架构审计、状态物理语义与文档同步 (Audit A 至 Audit J)。
 * **Environment Gate 01 — Unit 4 Final Closure**: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)。
 * **Environment Gate 01 — Repair Unit 4**: 真实Mesh接触高程、几何接触点与接触状态一致性修复 (U4-A 至 U4-I)。
@@ -73,11 +72,10 @@
 ## 4. 下一步行动与严格禁止事项
 
 * **下一步行动**：
-  1. 等待用户和人类团队对闭环归档文档（`OPEN_FINDINGS.md`、`R1_TERRAIN_WALK.md`、`R2_CORE_EXECUTION.md`）进行正式审核；
-  2. 针对划定的 4 个维护包进行修复授权排期；
-  3. 若用户指示继续审计，按指令开展 R3（动力学与遥测接口）或 R4；若用户指示开展修复，按原子维护包逐步推进。
+  1. 等待用户和人类团队对闭环归档文档（`OPEN_FINDINGS.md`、`R1_TERRAIN_WALK.md`、`R2_CORE_EXECUTION.md`、`R3_RIG_IK.md`）进行正式审核；
+  2. 针对划定的 5 个维护包进行修复授权排期；
+  3. 若用户指示继续审计，按指令开展 R4（动力学与遥测接口审查）；若用户指示开展修复，按原子维护包逐步推进。
 * **严格禁止事项**：
-  * **严禁自行启动 R3 或 R4**；
-  * **严禁擅自修改 `src/` 或修复任何发现的缺陷**；
+  * **严禁自行启动 R4**；
   * **严禁擅自进入 Phase 7B**；
-  * **严禁提前开发双向动力学环境交互**。
+  * **严禁自行修改任何生产代码或重新实现 IK 算法**。
