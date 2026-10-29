@@ -3,6 +3,28 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Audit R4: 环境查询、网格适配器与场景集成生产接口审计与全仓库修复分组归档
+
+### 环境查询、网格适配器与场景集成生产接口审计 (`docs/audit/production_interface/R4_ENVIRONMENT_SCENE.md`)
+* **R4-A 环境查询接口排查 (`src/scene/environment_query.py`, 1196 行)**：
+  - 确证环境查询对象单一所有权，单例 `create_mesh_backed_dynamics_query()` 从场景生成入口注入下游；
+  - 证实 FIND-R4-02：2.5D 高程查询 `ground_height_at:588–593` 在未击中或非支撑面静默回退 0.0m 平地，法线查询 `surface_normal_at:610–615` 静默返回垂直向量；基类 `EnvironmentQuery.query_ground_support_at:402` 在不可支撑表面返回 `success=True`。
+* **R4-B 网格适配器排查 (`src/scene/blender_mesh_query_adapter.py`, 952 行)**：
+  - 逐方法排查适配器生命周期，确认基于顶点/循环哈希与修改器指纹的 BVH 缓存失效机制健全；
+  - 证实 FIND-R4-02 关联项：`surface_normal_at:885–892` 仅检查 `res.success` 脱节 `allows_regular_support`，在不可支撑悬崖峭壁处返回峭壁法线，导致高程与法线空间语义脱节。
+* **R4-C 场景集成排查 (`src/scene/playground_terrain_traversal.py`, 762 行)**：
+  - 确证 `ensure_ramp_corridor_ground_surfaces` 为标准 `TEST_FIXTURE`（内存补全实体网格，未污染磁盘只读 Blend 资产）；
+  - 排查并分类全部硬编码参数，确认当前走廊宽度、步长与帧率常数范围。
+* **R4-D 跨模块全链路失败传播中断确证 (FIND-R4-01)**：
+  - 确认跨模块失败传播链断裂（Environment $	o$ Action $	o$ Planner $	o$ Scene $	o$ Blend $	o$ Validator）；
+  - 证实 `playground_terrain_traversal.py:633–640, 689, 704` 在遇到不可达或物理接触违背时，无视错误计数器无条件写盘生成 `.blend` 文件并导出 `"continuous_without_exemption": True`，伪造成功交付。
+* **全生命周期维护包归敛交付 ([`docs/audit/production_interface/REPAIR_GROUPING.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/REPAIR_GROUPING.md))**：
+  - 将 R1–R4 全部去重 15 项问题归敛为 5 个原子维护包（PKG-1 至 PKG-5），建立清晰依赖拓扑、明确修复边界与具体回归测试命令。
+* **统一问题总表更新 (`OPEN_FINDINGS.md`)**：
+  - 增量登记 FIND-R4-01 与 FIND-R4-02（全仓库累计 15 项缺陷：3 项 `CONFIRMED_DEFECT`、12 项 `CONTRACT_GAP`；5 项阻碍 7B；3 项设计限制；2 项未验证项）。
+* **零生产与测试代码变更**：`src/` 与 `tests/` 目录严格 0 变动，历史 `.blend` 资产严格 0 字节变动，严格禁止擅自进入 Phase 7B，生产代码维持只读。
+* **门禁状态标定**: 门禁最终状态更新为 `PRODUCTION INTERFACE AUDIT / R1-R4 — COMPLETE / REPAIR PENDING`。
+
 ## [2026-10-29] Production Interface Audit R3-CLOSE: 全生命周期合同闭环与副作用纠错
 
 ### 底层绑定与 IK 执行合同审计纠偏 (`docs/audit/production_interface/R3_RIG_IK.md`)

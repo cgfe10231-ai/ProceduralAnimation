@@ -1,9 +1,9 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Audit — Full Lifecycle Contract Closure (R3-CLOSE)  
-> **审计基准 Commit**：`ff7232d2a77335d64091576d8f5293c097044d00`  
+> **当前阶段**：Production Interface Audit — Environment Query, Mesh Adapter & Scene Integration Contract Audit (R4-FINAL)  
+> **审计基准 Commit**：`94222ddcba3fabbc3a01b4f9d6e1eca6776b4b5d`  
 > **最后更新时间**：2026-10-29  
-> **当前状态**：`PRODUCTION INTERFACE AUDIT / R3 — EVIDENCE VERIFIED`  
+> **当前状态**：`PRODUCTION INTERFACE AUDIT / R1-R4 — COMPLETE / REPAIR PENDING`  
 > **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。所有生产代码维持只读，待用户与人类团队审查批准后按维护包开展修复。
 
 ---
@@ -13,7 +13,7 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **3** | FIND-R2-01 (非法枚举崩溃), FIND-R2-02/T01-02 (接触状态覆盖), FIND-R2-07/T01-04 (接缝横向偏置) |
-| **接口合同缺口 (CONTRACT_GAP)** | **10** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器) |
+| **接口合同缺口 (CONTRACT_GAP)** | **12** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
 | **阻碍后续开发 (Blocks Further Dev: YES)** | **5** | FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04, FIND-R3-01 |
@@ -37,6 +37,8 @@
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `ik.py` |
 | **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
 | **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | Lines 207–235 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
+| **FIND-R4-01** | - | `src/scene/playground_terrain_traversal.py` | `generate_dynamics_playground_environment_gate01_u3_blend()` | Lines 633–640, 689, 704 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `playground_terrain_traversal.py` |
+| **FIND-R4-02** | - | `src/scene/environment_query.py` / `src/scene/blender_mesh_query_adapter.py` | `ground_height_at()` / `surface_normal_at()` / `query_ground_support_at()` | `eq:402, 588–593, 610–615` / `bmqa:885–892` | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `environment_query.py` / `blender_mesh_query_adapter.py` |
 
 ---
 
@@ -338,6 +340,63 @@
   1. 严禁简单删除现有写入；
   2. 应在架构重构时将职责拆分为显式的 `enforce_foot_support_lock()`（负责写入与约束刷新）与真正纯只读的 `query_foot_support_state()`（负责遥测提取与漂移计算）。
 
+---
+
+### FIND-R4-01: 场景装配与生成函数缺乏执行失败阻断合同，无条件标定通过并写盘生成 Blend 文件
+* **Source File**: `src/scene/playground_terrain_traversal.py`
+* **Class / Function**: `generate_dynamics_playground_environment_gate01_u3_blend()`
+* **Exact Line Range**: Lines 633–640, 689, 704
+* **Evidence Grade**: `STATIC_CONFIRMED`
+* **Trigger Condition**: 规划步态在物理执行时遇到不可达、断崖踩空或 IK 严重超限，但场景生成脚本无条件执行。
+* **Actual Behavior**:
+  行 633–640 打印 `[WARN] Frame ... IK unreachable: ...`，仅累加计数器 `unreachable_count`。在行 689, 704 无视计数器，无条件保存 `.blend` 文件，并在导出的 JSON 元数据中硬编码 `"continuous_without_exemption": True`。
+* **Expected Contract**:
+  场景集成生产脚本在存在不可达帧或接触违背时，应根据容差阈值抛出异常或在报告中如实标定失败，阻止在致命物理违规下伪造成功交付。
+* **Evidence**:
+  ```python
+  # src/scene/playground_terrain_traversal.py:689
+  bpy.ops.wm.save_as_mainfile(filepath=blend_path)
+  # src/scene/playground_terrain_traversal.py:704
+  "continuous_without_exemption": True,
+  ```
+* **Responsible Module**: `src/scene/playground_terrain_traversal.py`
+* **Downstream Impact**: 测试套件若仅检查 `.blend` 文件存在与 JSON 元数据，将无法感知动作执行中的隐蔽物理崩溃。
+* **Classification**: `CONTRACT_GAP`
+* **Blocks Further Development**: `NO` (归属于 PKG-3 失败传播与执行器合同闭环)
+* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Suggested Repair Boundary**: 在 `playground_terrain_traversal.py` 中引入 `strict_validation: bool = False` 参数，若开启且 `unreachable_count > 0`，标定动作失败并抛出异常，或在 summary JSON 中如实记录 `continuous_without_exemption = (unreachable_count == 0)`。
+
+---
+
+### FIND-R4-02: 2.5D 高程与法线查询接口在未命中时隐式回退平地并脱节支撑有效性校验
+* **Source Files**: `src/scene/environment_query.py` / `src/scene/blender_mesh_query_adapter.py`
+* **Class / Function**: `DynamicsEnvironmentQuery.ground_height_at()`, `surface_normal_at()` / `BlenderMeshQueryAdapter.surface_normal_at()`, `query_ground_support_at()` / `EnvironmentQuery.query_ground_support_at()`
+* **Exact Line Range**: `environment_query.py:402, 588–593, 610–615`; `blender_mesh_query_adapter.py:885–892`
+* **Evidence Grade**: `STATIC_CONFIRMED`
+* **Trigger Condition**: 在地形外部（边界外）或落点在垂直陡峭岩壁（`allows_regular_support=False`）时调用 2.5D 查询接口。
+* **Actual Behavior**:
+  1. `environment_query.py:592–593`，当 `support.allows_regular_support == False` 或未击中 Mesh 时，无声回退到 `self.ground_z` (0.0m)；`surface_normal_at` (L614–615) 静默返回 `(0.0, 0.0, 1.0)`；
+  2. `blender_mesh_query_adapter.py:890`，`surface_normal_at` 仅检查 `res.success`，完全忽略 `allows_regular_support`，导致在不可支撑的断崖峭壁上返回了峭壁法线，而在相同位置调用 `ground_height_at` 却返回了 0.0m，造成高程与法线空间语义脱节；
+  3. 基类 `EnvironmentQuery.query_ground_support_at:402` 在几何非支撑表面上仍然返回 `success=True`。
+* **Expected Contract**: 2.5D 适配器应与 3D 几何支撑判定严格对齐，支持显式未命中返回（如 `default=None`）或在非支撑表面引发清晰报警，杜绝在复杂地形外部伪造 0.0m 平地。
+* **Evidence**:
+  ```python
+  # src/scene/environment_query.py:592-593
+  if not support.allows_regular_support:
+      return self.ground_z
+  # src/scene/blender_mesh_query_adapter.py:890
+  if res.success:
+      return res.normal_world
+  ```
+* **Responsible Module**: `src/scene/environment_query.py` / `src/scene/blender_mesh_query_adapter.py`
+* **Downstream Impact**: 当上层动作或步态规划直接调用 2.5D 查询快捷接口时，无法感知足底悬空或悬崖边界，可能误入悬崖外部。
+* **Classification**: `CONTRACT_GAP`
+* **Blocks Further Development**: `NO` (归属于 PKG-4 步态规划精度与环境感知健壮性)
+* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Suggested Repair Boundary**: 增强 2.5D 查询的可配置失败策略，统一对齐 `SurfaceSupportResult.allows_regular_support`。
+
+---
+
 ## 5. 已知设计限制 (Known Design Limitations)
 
 * **LIMIT-01: 单一前进走廊 $+Y$ 导航假定**:
@@ -360,28 +419,30 @@
 
 ## 7. 集中修复建议与维护包划分 (Remediation Roadmap)
 
-根据门禁规则与依赖拓扑，将上述未关闭问题划分为 4 个原子维护包：
+> **权威修复方案与详细回归规划**：详见独立维护包文档 [`docs/audit/production_interface/REPAIR_GROUPING.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/REPAIR_GROUPING.md)。
+
+根据门禁规则与依赖拓扑，将全生命周期 R1–R4 全部去重问题（共 15 项：3 项缺陷，12 项合同缺口）划分为 5 个原子维护包：
 
 ```mermaid
 flowchart TD
     PKG1["Package 1: Bridge 健壮性与枚举修复<br>(FIND-R2-01)"] --> PKG2["Package 2: 状态所有权与接触记录保护<br>(FIND-R2-02)"]
-    PKG2 --> PKG3["Package 3: 失败传播与执行器合同闭环<br>(FIND-R2-03, FIND-R2-04)"]
-    PKG3 --> PKG4["Package 4: 规划精度与健壮性优化<br>(FIND-R2-05, FIND-R2-06, FIND-R2-07, FIND-T01-06, FIND-T01-07)"]
+    PKG2 --> PKG3["Package 3: 全链路失败传播与执行器合同闭环<br>(FIND-R2-03, FIND-R2-04, FIND-R4-01)"]
+    PKG3 --> PKG4["Package 4: 规划精度与健壮性优化<br>(FIND-R2-05, FIND-R2-06, FIND-R2-07, FIND-T01-06, FIND-T01-07, FIND-R4-02)"]
     PKG3 --> PKG5["Package 5: Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复<br>(FIND-R3-01, FIND-R3-02, FIND-R3-03, FIND-R3-04)"]
 ```
 
-1. **维护包 1: Bridge 健壮性与枚举修复 (Bridge Robustness)**:
-   - 修复 FIND-R2-01。
+1. **维护包 1: Bridge 执行器异常安全与枚举修复 (Bridge Robustness)**:
+   - 修复目标：`FIND-R2-01`。
    - 消除 `ContactLifecycle.TOUCHDOWN` 致命崩溃隐患。
-2. **维护包 2: 状态所有权与接触记录保护 (State Integrity)**:
-   - 修复 FIND-R2-02。
+2. **维护包 2: 状态所有权与物理接触记录保护 (State Integrity)**:
+   - 修复目标：`FIND-R2-02`。
    - 移除 `terrain_walk.py:1138` 对 `contacts` 字典的恶意覆写，保护真实物理接触数据。
-3. **维护包 3: 失败传播与执行器合同闭环 (Error Propagation Contract)**:
-   - 修复 FIND-R2-03 与 FIND-R2-04。
-   - 在 `ActionExecutionResult` 增加成功状态，在 `TerrainWalkAction` 接入 `bridge_res.success` 校验。
-4. **维护包 4: 规划精度与健壮性优化 (Footfall Planning Precision & Robustness)**:
-   - 修复 FIND-R2-05, FIND-R2-06, FIND-R2-07, FIND-T01-06, FIND-T01-07。
-   - 消除接缝探测坐标偏置，统一步态规划未命中策略与负向行进支持。
-5. **维护包 5: Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复 (Rig & IK Spatial Invariance & Side Effects)**:
-   - 修复 FIND-R3-01, FIND-R3-02, FIND-R3-03, FIND-R3-04。
+3. **维护包 3: 全链路失败传播与执行器合同闭环 (Error Propagation Contract)**:
+   - 修复目标：`FIND-R2-03`, `FIND-R2-04`, `FIND-R4-01`。
+   - 在 `ActionExecutionResult` 增加成功状态，在 `TerrainWalkAction` 接入 `bridge_res.success` 校验，在 `playground_terrain_traversal.py` 接入失败阻断合同。
+4. **维护包 4: 步态规划精度与环境感知健壮性 (Footfall Planning Precision & Robustness)**:
+   - 修复目标：`FIND-R2-05`, `FIND-R2-06`, `FIND-R2-07`, `FIND-T01-06`, `FIND-T01-07`, `FIND-R4-02`。
+   - 消除接缝探测坐标偏置，统一步态规划未命中策略、负向行进支持与 2.5D 高程/法线支撑有效性对齐。
+5. **维护包 5: Rig 与 IK 空间坐标不变量、支撑锁定与副作用解耦 (Rig & IK Spatial Invariance & Side Effects)**:
+   - 修复目标：`FIND-R3-01`, `FIND-R3-02`, `FIND-R3-03`, `FIND-R3-04`。
    - 彻底废除跨生命周期动态父级切换，全生命周期维持绝对世界空间；解耦底层地面防穿透与根节点高程绑定；区分历史落点快照与重置清理；将 `evaluate_foot_support` 拆分为显式锁态维持器与纯只读状态查询器。

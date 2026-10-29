@@ -1,18 +1,20 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-29  
-> **当前阶段**：Production Interface Audit — Full Lifecycle Contract Closure (R3-CLOSE)。R1（`terrain_walk.py`）、R2（核心执行链四大脚本）及 R3（`foot_contact.py`、`ik.py`、`arm_ik.py` 底层绑定、全生命周期与 IK 执行合同）审计与副作用纠偏已完成 100% 物理源码核对与闭环归档至 `docs/audit/production_interface/`。  
-> **重要纠偏与证据核准**：此前 Final Architecture Audit 的 `ENVIRONMENT GATE 01 — AUDITED / NO BLOCKERS` 仅证明了宏观模块依赖与顶层调用链无孤立双轨制，**绝不能代表生产接口复核通过**。历经 R1、R2、R3 逐方法与全生命周期复核，全仓库共查实 3 项确认代码缺陷与 10 项接口合同缺口（累计 13 项唯一缺陷），其中 5 项属于严重阻碍后续 Phase 7B 开展的真实 BLOCKER 级别缺陷（FIND-R2-01 非法枚举、FIND-R2-02 接触字典覆写、FIND-R2-03 吞没底层失败、FIND-R2-04 规划器缺失失败处理合同、FIND-R3-01 全生命周期动态父级违规与姿态旋转未反解），全量标注 `STATIC_CONFIRMED` 证据等级并统一登记于 `docs/audit/production_interface/OPEN_FINDINGS.md`；划定 5 个原子维护包，生产代码维持只读；当前门禁最终状态更新为：`PRODUCTION INTERFACE AUDIT / R3 — EVIDENCE VERIFIED`，严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R4。  
+> **当前阶段**：Production Interface Audit — Environment Query, Mesh Adapter & Scene Integration Contract Audit (R4-FINAL)。R1（`terrain_walk.py`）、R2（核心执行链四大脚本）、R3（底层绑定、全生命周期与 IK 执行合同）及 R4（环境查询、网格适配器与场景集成三核心脚本）审计与全生命周期维护包收敛已完成 100% 物理源码核对与闭环归档至 `docs/audit/production_interface/`。  
+> **重要纠偏与证据核准**：此前 Final Architecture Audit 的 `ENVIRONMENT GATE 01 — AUDITED / NO BLOCKERS` 仅证明了宏观模块依赖与顶层调用链无孤立双轨制，**绝不能代表生产接口复核通过**。历经 R1、R2、R3、R4 逐方法、状态流与全链路复核，全仓库共查实 3 项确认代码缺陷与 12 项接口合同缺口（累计 15 项唯一缺陷），其中 5 项属于严重阻碍后续 Phase 7B 开展的真实 BLOCKER 级别缺陷（FIND-R2-01 非法枚举、FIND-R2-02 接触字典覆写、FIND-R2-03 吞没底层失败、FIND-R2-04 规划器缺失失败处理合同、FIND-R3-01 全生命周期动态父级违规与姿态旋转未反解），全量标注 `STATIC_CONFIRMED` 证据等级并统一登记于 `docs/audit/production_interface/OPEN_FINDINGS.md`；全生命周期 R1–R4 去重问题已收敛划分为 5 个原子维护包（PKG-1 至 PKG-5）并详尽归档于 `docs/audit/production_interface/REPAIR_GROUPING.md`，生产代码维持只读；当前门禁最终状态更新为：`PRODUCTION INTERFACE AUDIT / R1-R4 — COMPLETE / REPAIR PENDING`，严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
-### [已发现缺陷与待修复接口合同 (Production Interface Audit / R2-CLOSE 核准)]
-* **Audit R1 / R2 生产接口复核成果与待修复缺陷清单 (`docs/audit/production_interface/`)**：
+### [已发现缺陷与待修复接口合同 (Production Interface Audit / R4-FINAL 核准)]
+* **Audit R1 / R2 / R3 / R4 生产接口复核成果与待修复缺陷清单 (`docs/audit/production_interface/`)**：
   * **R1_TERRAIN_WALK.md**: 对 `src/motion/terrain_walk.py` 14 个函数/方法逐项排查，物理校准行号与签名，定位失败吞没、接触覆写、接缝偏置等漏洞；
   * **R2_CORE_EXECUTION.md**: 对核心执行链四大脚本逐方法排查并核对 E1-E7 数据流，校准 `support_type` 为只读动态属性、校准 Bridge 8 参构造签名及 WBC 执行签名；
-  * **R3_RIG_IK.md**: 对底层 Rig 3 脚本（`foot_contact.py`, `ik.py`, `arm_ik.py`）24 个函数逐项排查并完成 R3-CLOSE 全生命周期闭环，证实动态父级循环违规 (FIND-R3-01)、地面硬编码根高程 (FIND-R3-02)、元数据混淆 (FIND-R3-03)、evaluate 隐式约束维持强副作用 (FIND-R3-04)，验证上肢两骨铰链与 WBC 单权威写入；
+  * **R3_RIG_IK.md**: 对底层 Rig 3 脚本（`foot_contact.py`, `ik.py`, `arm_ik.py`）24 个函数逐项排查并完成全生命周期闭环，证实动态父级循环违规 (FIND-R3-01)、地面硬编码根高程 (FIND-R3-02)、元数据混淆 (FIND-R3-03)、evaluate 隐式约束维持强副作用 (FIND-R3-04)；
+  * **R4_ENVIRONMENT_SCENE.md**: 对环境查询与场景集成 3 核心脚本逐方法排查，确证跨模块失败传播中断伪造 Blend (FIND-R4-01)、2.5D 高程法线回退脱节 (FIND-R4-02)、硬编码分类与测试夹具安全性；
+  * **REPAIR_GROUPING.md**: 全仓库 R1–R4 全部去重 15 项问题收敛划分为 5 个原子维护包（PKG-1 至 PKG-5），建立清晰依赖拓扑、明确修复边界与具体回归测试命令；
   * **OPEN_FINDINGS.md (统一登记总表，全量核准)**:
     - **FIND-R2-01 (CONFIRMED_DEFECT, Blocks 7B: YES, STATIC_CONFIRMED)**: `kinematic_bridge.py:512` 引用不存在的枚举 `ContactLifecycle.TOUCHDOWN`，手部接触意图触发时必定崩溃；
     - **FIND-R2-02 (CONFIRMED_DEFECT, Blocks 7B: YES, STATIC_CONFIRMED)**: `terrain_walk.py:1138` 强制以 `c_dict` 覆写 `ms.contacts`，抹杀 Bridge 物理测量数据与上肢接触；
@@ -27,7 +29,9 @@
     - **FIND-R3-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `ik.py:334–346` `set_foot_ik_target` 地面防穿透硬编码根高程，阻断 3D 起伏地形下潜，迫使上层全流程传 `clamp_ground=False`；
     - **FIND-R3-03 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:168–170, ik.py:219` `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留；
     - **FIND-R3-04 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用；
-  * **修复状态**: 5 个原子维护包（Bridge 健壮性、状态保护、失败传播闭环、规划精度、Rig/IK空间坐标、支撑锁定与副作用拆分）已完成划分，生产代码维持只读，等待授权排期修复。
+    - **FIND-R4-01 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:633–640, 689, 704` 场景装配缺乏执行失败阻断合同，无视不可达错误无条件保存 Blend 文件并导出连续通过；
+    - **FIND-R4-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:402, 588–593, 610–615` 与 `blender_mesh_query_adapter.py:885–892` 2.5D 高程与法线查询在未命中时隐式回退平地并脱节支撑有效性校验；
+  * **修复状态**: 5 个原子维护包（Bridge 健壮性、状态保护、失败传播闭环、规划精度、Rig/IK空间坐标、支撑锁定与副作用解耦）已完成划分，生产代码维持只读，等待授权排期修复。
 
 ### [已验证]
 * **Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计 (Audit A 至 Audit J)**：

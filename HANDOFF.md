@@ -6,29 +6,31 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — Production Interface Audit R3 — Full Lifecycle Contract Closure (R3-CLOSE)。  
-* **当前状态**：`PRODUCTION INTERFACE AUDIT / R3 — EVIDENCE VERIFIED`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R4）。
-* **任务性质**：R3 专项审计证据补全、全生命周期合同闭环与副作用纠错，零生产代码修改，零测试代码修改。
+* **当前任务**：ProceduralAnimation — Production Interface Audit R4 — Environment Query, Mesh Adapter & Scene Integration Contract Audit (R4-FINAL)。  
+* **当前状态**：`PRODUCTION INTERFACE AUDIT / R1-R4 — COMPLETE / REPAIR PENDING`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁自行修改生产代码）。
+* **任务性质**：环境查询、网格适配器与场景集成生产接口审查、全链路失败传播断裂确证与全生命周期维护包收敛分组，零生产代码修改，零测试代码修改。
 
-### 本任务核心审查与核准成果 (R3-CLOSE)
-1. **R3-CLOSE-01 控制器完整生命周期核查 (FIND-R3-01)**：
-   - 确证跨生命周期动态父级循环：`setup_leg_ik()` 与 `reset_leg_ik()` 强制 `parent = root_obj` $\to$ 行走锁定 `lock_foot_contact()` 设 `parent = None` $\to$ 离地解锁 `unlock_foot_contact()` 默认重新挂载回 Root $\to$ 动作重置 `wbc.reset_all_controls()` 再次挂载回 Root；
-   - 确证该循环直接违反 `ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条（控制器全生命周期恒定世界空间 `parent = None`）；
-   - 确证父级非空时 `set_foot_ik_target:380–384` 欧拉角未进行逆矩阵反解即赋给局部属性，产生姿态偏角（非零偏航下旋转偏差数值量测标定为 `UNVERIFIED / RUNTIME PENDING`）。
-2. **R3-CLOSE-02 地面防穿透调用合同 (FIND-R3-02)**：
-   - 确证 `set_foot_ik_target:334–346` 硬编码 `min_ankle_z = root_obj.z + 0.07`m，阻断 3D 起伏地形与下坡，迫使生产代码全流程传 `clamp_ground=False`。
-3. **R3-CLOSE-03 evaluate_foot_support 副作用纠错 (FIND-R3-04)**：
-   - 纠正原报告“纯只读”描述，确证该函数执行 7 项强写入（改写 `shin.L/R` 骨骼局部旋转、2 次全场景视图层更新、强制解绑父级、强制覆写 FootIK 世界位置与旋转、动态刷新 KneePole 世界位置），充当了隐式约束维持器；
-   - 澄清调用权衡：现有 WBC 步态正是依赖该写入维持零滑移，严禁暴力删除写入，应重构拆分为显式锁态维持器与只读查询器。
-4. **R3-CLOSE-04 支撑元数据混淆与重置残留 (FIND-R3-03)**：
-   - 确证现有生产消费者均严格前置检查 `is_locked`，摆动期间属于有意保留的历史快照，未发生有效支撑误读，但全局 `reset_leg_ik` 时未彻底清理。
-5. **缺陷登记总表与维护包更新**：
-   - `OPEN_FINDINGS.md` 增量登记 FIND-R3-04（全仓库累计 13 项缺陷：3 项 `CONFIRMED_DEFECT`、10 项 `CONTRACT_GAP`；5 项阻碍 7B）；
-   - 维护包 5 扩充为：Package 5 (Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复)。
+### 本任务核心审查与核准成果 (R4-FINAL)
+1. **R4-A 环境查询接口排查 (`environment_query.py`)**：
+   - 确证环境单一所有权，单例 `create_mesh_backed_dynamics_query()` 从场景生成入口注入下游；
+   - 确证 FIND-R4-02：2.5D 高程查询 `ground_height_at:588–593` 在未击中或非支撑面静默回退 0.0m 平地，法线查询 `surface_normal_at:610–615` 静默返回垂直向量；基类 `EnvironmentQuery.query_ground_support_at:402` 在不可支撑表面返回 `success=True`。
+2. **R4-B 网格适配器排查 (`blender_mesh_query_adapter.py`)**：
+   - 确证适配器生命周期、基于顶点/循环哈希与修改器指纹的 BVH 缓存失效机制健全；
+   - 确证 `surface_normal_at:885–892` 仅检查 `res.success` 脱节 `allows_regular_support`，在悬崖峭壁处返回峭壁法线导致与高程脱节。
+3. **R4-C 场景集成排查 (`playground_terrain_traversal.py`)**：
+   - 确证 `ensure_ramp_corridor_ground_surfaces` 为标准 `TEST_FIXTURE`（内存补全实体网格，未污染磁盘只读 Blend 资产）；排查并分类全部硬编码参数。
+4. **R4-D 跨模块全链路失败传播中断确证 (FIND-R4-01)**：
+   - 确证跨模块失败传播链断裂（Environment $\to$ Action $\to$ Planner $\to$ Scene $\to$ Blend $\to$ Validator）；
+   - 确证 `playground_terrain_traversal.py:633–640, 689, 704` 在遇到不可达或物理接触违背时，无视错误计数器无条件写盘生成 `.blend` 文件并导出 `"continuous_without_exemption": True`，伪造成功交付。
+5. **全生命周期维护包归敛交付 ([`docs/audit/production_interface/REPAIR_GROUPING.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/REPAIR_GROUPING.md))**：
+   - 将 R1–R4 全部去重 15 项问题归敛为 5 个原子维护包（PKG-1 至 PKG-5），建立清晰依赖拓扑、明确修复边界与具体回归测试命令。
+6. **缺陷登记总表更新 ([`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md))**：
+   - 增量登记 FIND-R4-01 与 FIND-R4-02（全仓库累计 15 项缺陷：3 项 `CONFIRMED_DEFECT`、12 项 `CONTRACT_GAP`；5 项阻碍 7B；3 项设计限制；2 项未验证项）。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Production Interface Audit R4**: 环境查询、网格适配器与场景集成生产接口审计及全仓库修复分组归档 (`REPAIR PENDING`)。
 * **Production Interface Audit R3-CLOSE**: 全生命周期合同闭环与副作用纠错归档 (`EVIDENCE VERIFIED`)。
 * **Production Interface Audit R3**: 底层绑定、足部接触与 IK 执行合同只读审查归档 (`docs/audit/production_interface/R3_RIG_IK.md`)。
 * **Production Interface Audit R2-CLOSE**: 证据校准、签名行号核实与正式闭环归档 (`EVIDENCE VERIFIED`)。
@@ -67,10 +69,10 @@
 ## 4. 下一步行动与严格禁止事项
 
 * **下一步行动**：
-  1. 等待用户和人类团队对闭环归档文档（`OPEN_FINDINGS.md`、`R1_TERRAIN_WALK.md`、`R2_CORE_EXECUTION.md`、`R3_RIG_IK.md`）进行正式审核；
-  2. 针对划定的 5 个维护包进行修复授权排期；
-  3. 若用户指示继续审计，按指令开展 R4（动力学与遥测接口审查）；若用户指示开展修复，按原子维护包逐步推进。
+  1. 等待用户和人类团队对生产接口审计终局归档文档（`OPEN_FINDINGS.md`、`R1_TERRAIN_WALK.md`、`R2_CORE_EXECUTION.md`、`R3_RIG_IK.md`、`R4_ENVIRONMENT_SCENE.md`、`REPAIR_GROUPING.md`）进行正式审核；
+  2. 针对划定的 5 个原子维护包（PKG-1 至 PKG-5）进行顺序修复授权；
+  3. 待授权后，按原子维护包逐步推进生产代码手术式修复与针对性回归测试。
 * **严格禁止事项**：
-  * **严禁自行启动 R4**；
+  * **严禁擅自修改任何生产代码**；
   * **严禁擅自进入 Phase 7B**；
-  * **严禁自行修改任何生产代码或重新实现 IK 算法**。
+  * **严禁自行开发环境双向动力学**。
