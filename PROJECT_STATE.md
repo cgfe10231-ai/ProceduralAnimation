@@ -1,13 +1,50 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-29  
-> **当前阶段**：Environment Gate 01 — Unit 3 / Atomic Repair S2（Swing-to-Stance Landing Continuity Repair）已全部完成并通过 6 项单元测试与 33 项全量回归。查明 42 处换脚边界垂直下砸跳变根因（末帧离散采样未闭合、斜坡静态足框越障抬升未衰减、起步倾角截断）；实现了离散有效跨度采样与连续起飞倾角，并新增纯数学无状态辅助函数 `_compute_swing_clearance_z`（基于正弦加权包络平滑起落）；全场 42/42 换脚边界 100% 达成 $\le 1\text{e-}4\text{ m}$ 门禁要求；Frame 188 $\to$ 189 规划目标差由 40.418 mm 彻底消除为 0.000000 mm，骨骼实际姿态差为 0.100 mm；全场 42 步最大规划目标差 0.000000 mm，最大骨骼姿态差 0.100 mm；独立生成 `output/dynamics_playground_environment_gate01_u3_s2.blend`，重开核验 700 帧 0 ROM 违规、0 地形穿透、0 骨骼拉伸，Unit 3-S1 Root 前向连续性 100% 保留；全量分级测试全绿：`quick` (16/16), `physics` (19/19), `motion` (11/11), `full` (33/33)；当前状态：`ENVIRONMENT GATE 01 / UNIT 3-S2 — AWAITING HUMAN VISUAL REVIEW`，严格停止等待人类视口目视审查，严禁擅自进入 Unit 4 或 Phase 7B。  
+> **当前阶段**：Environment Gate 01 — Repair Unit 4（Real Mesh Contact Elevation & Contact-State Consistency）已全部完成并通过 8 项核心单元测试、1 项全量场景审计与 34 项全量分级回归。彻底消除了 `KinematicBridgeExecutor` 内部硬编码 $Z=0.0\text{ m}$ 扁平化投影与单地面 fallback，建立真实环境多接触表面动态查询与注册闭环；校准了足底接触局部锚点 `(0.0, 0.015906, -0.068169)` 补偿 $-13.134^\circ$ 骨骼俯仰倾角，静止状态接触高程误差 $\le 0.001\text{ mm}$；严格执行三坐标分工合同（规划脚踝目标 Point A、真实网格接触点 Point B、角色物理足底 Point C）；重构修复并全绿通过基准复现测试 `tests/test_contact_elevation_gap_repro.py` 与 Unit 4 单元测试 `tests/test_environment_gate01_unit4.py` (8/8 PASS)；独立执行真实场景 728 次支撑事件全量逐帧接触审计 `tests/verify_environment_gate01_unit4.py` 达成 0 违规、0 悬空 (max air gap 0.0mm)、最大穿透 4.27mm、最大切向滑移 1.55mm；分级测试全绿：`quick` (17/17), `physics` (20/20), `motion` (11/11), `full` (34/34)；历史 Unit 3 及 S1/S2 动画资产 0 字节变动；当前状态：`ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`，严格停止等待人类审查，严禁擅自进入 Final Audit 或 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01 — Repair Unit 4: 真实Mesh接触高程、几何接触点与接触状态一致性修复 (U4-A 至 U4-I)**：
+  * **三坐标合同确立与局部足底锚点几何校准 (U4-A, U4-D)**：
+    - 明确区分三类足部坐标空间合同：
+      * **点 A (Point A)**：规划脚踝 IK 目标 `PlannedFootTarget.world_xyz` $(x_a, y_a, z_a)$；
+      * **点 B (Point B)**：真实网格地面接触点 `SurfaceQueryResult.contact_point_world` $(x_c, y_c, z_c)$，记录于 `active_limb_targets["target_world"]` 与 `ContactRecord.world_position`；
+      * **点 C (Point C)**：人体物理足底接触锚点 $\mathbf{p}_{\text{sole}} = \mathbf{M}_{\text{bone\_world}} \cdot \mathbf{a}_{\text{bone\_local}}$；
+    - 查明骨骼倾角几何偏差根因：`foot.L`/`foot.R` 编辑骨存在 $-13.134^\circ$ 初始倾角，原 `DEFAULT_LIMB_LOCAL_ANCHORS` `(0, 0.077, -0.070)` 未考虑倾角导致静止状态足底产生 $-15.7\text{ mm}$ 穿透；
+    - 校准局部锚点为 `(0.0, 0.015906, -0.068169)`，在静止状态与 $Z=0.0\text{ m}$ 地面达成 $< 0.001\text{ mm}$ 零误差贴合；
+    - 编写并归档详尽规范文档 `docs/evidence/environment_gate01_ru4/foot_contact_coordinate_contract.md`。
+  * **生产管线消除 Z=0.0m 扁平化与多曲面感知落地 (U4-B, U4-C)**：
+    - 彻底消除 `KinematicBridgeExecutor.execute_frame()` 原第 404 行 $Z=0.0\text{ m}$ 扁平化硬编码，改为根据真实足底世界投影 $(p_{\text{sole}}.x, p_{\text{sole}}.y)$ 调用 `self.environment.query_ground_support_at()` 获取真实 3D 表面高程与法线；
+    - 动态从查询结果提取并维护 `EnvironmentalSurface`，杜绝单一水平平地硬编码回退；
+    - 真实处理查询失败情况：未击中或非支撑面记录 `ContactLifecycle.BROKEN` 并生成真实几何违规，杜绝伪造地面接触；
+    - 摆动脚（`is_locked=False`）严格标记为 `ContactLifecycle.RELEASED` 与 `ContactType.FREE`；
+    - 实际脚底接触点直接通过姿态骨世界变换矩阵真实计算；
+    - 在 Bridge 执行结果和 Executor 上记录并导出 `multi_contact` 与 `last_active_limb_targets`。
+  * **基准缺陷复现与修复验证套件重构 (U4-E)**：
+    - 重构 `tests/test_contact_elevation_gap_repro.py` 为直接检验生产路径返回值（`res.motion_state.contacts['foot_L'].contact_world_xyz[2]` 及 `bridge.last_multi_contact`）；
+    - 归档前置缺陷日志 `docs/evidence/environment_gate01_ru4/production_defect_pre_fix.log`（证实高程差高达 1339.7mm，虚假超差 2191.33mm）；
+    - 归档后置修复日志 `docs/evidence/environment_gate01_ru4/production_defect_post_fix.log`（实测平台高程 $1.339746\text{ m}$，误差 $< 4\times 10^{-8}\text{ m}$，几何违规数 0，执行成功率 True）。
+  * **全地形单元测试与独立场景全帧审计 (U4-F, U4-G)**：
+    - 编写 `tests/test_environment_gate01_unit4.py`，覆盖 8 项核心测试用例（8/8 PASS in 0.27s）：
+      * U4-T01: 平地接触保持 Z=0.0m、法线(0, 0, 1)与合规性；
+      * U4-T02: 15° 上坡接触真实记录斜坡高程与法线；
+      * U4-T03: 顶台接触真实记录 1.3397m 高程与 `ramp_top_platform` ID；
+      * U4-T04: 20° 下坡接触真实记录下坡高程与前倾法线；
+      * U4-T05: 步态交替解耦与支撑状态 SupportType 分类；
+      * U4-T06: 虚空查询失败真实性（无伪造地面）；
+      * U4-T07: 反事实实验 A（顶台网格高程 +0.05m 位移，接触高程精准位移 +0.05m）；
+      * U4-T08: 反事实实验 B（坡道法线角度变化，接触法线精准随动）。
+    - 编写并执行全 700 帧独立场景几何接触审计 `tests/verify_environment_gate01_unit4.py`：
+      * 审核全部 728 次支撑事件，544 次高程支撑事件；
+      * 最大气隙 0.0mm，最大穿透 4.27mm（容差 10mm），最大切向滑移 1.55mm（容差 20mm）；
+      * 零扁平化缺陷，0 几何违规，生成 `docs/evidence/environment_gate01_ru4/verification_report.json`。
+    - 注册进入 `tests/test_registry.py`，全量分级回归通过：`quick` (17/17), `physics` (20/20), `motion` (11/11), `full` (34/34)；
+    - 历史资产 `output/dynamics_playground.blend` 严格 0 字节变动；
+    - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`。
 * **Environment Gate 01 — Unit 3 / Atomic Repair S2: 摆动脚至支撑脚切换着地目标连续性修复与越障高度包络收敛 (S2-A 至 S2-F)**：
   * **换脚边界着地垂直跳变根因查明与数据实证 (S2-A)**：
     - 针对基准场景 `output/dynamics_playground_environment_gate01_u3_s1.blend` 提取 42 处步态交替边界；
@@ -866,7 +903,7 @@
 ### [已知缺陷与遗留说明]
 1. **双管线尚未汇流（计划于 Phase 7A / 7C 解决）**：当前 `output/dynamics_playground.blend` 仅包含 14 区环境网格与 6G-D 刚体代理可视化（`Playground_Dynamics_Visualization`，0 骨骼），尚未放入 19 骨骼 `CharacterArmature`（定位于 **Phase 7A**），且 6G-D 质心动力学尚未与 `KinematicBridgeExecutor` + `WholeBodyController` 闭环汇流（定位于 **Phase 7C**）。
 2. **Station 2 / 3 / 4 模型边界**：Station 2 为空中自由落体弹道（不含触地回弹碰撞）；Station 3 与 4 在训练场代理阶段采用连续移动接触点（待 7A/7C 替换为真实 19 骨骼双足交替落脚）。
-3. **`src/motion/kinematic_bridge.py:447` 存在休眠引用 `ContactLifecycle.TOUCHDOWN`**：在手臂主动触碰障碍物表面的未激活分支中，存在一行休眠代码引用了不存在的枚举成员 `ContactLifecycle.TOUCHDOWN`；由于本任务严格禁止修改任何 `src/` 文件，该缺陷已明确登记为已知缺陷，待后续允许修改生产代码的任务统一修复。
+3. **`src/motion/kinematic_bridge.py:507` 存在休眠引用 `ContactLifecycle.TOUCHDOWN`**：在手臂主动触碰障碍物表面的未激活分支中，存在一行休眠代码引用了不存在的枚举成员 `ContactLifecycle.TOUCHDOWN`；由于本任务严格限定于下肢足部接触高程与一致性修复，该缺陷已明确登记为已知缺陷，待后续允许修改手臂上肢控制代码的任务统一修复。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
@@ -874,5 +911,5 @@
 ---
 
 ## 2. 下一步建议
-* **严格停止，等待人类与 ChatGPT 复核 Task 6G-D-C2-FINAL 验收纠偏结果**；
-* **暂停且严禁提前进入 Phase 7A 或 Phase 6H**。
+* **严格停止，等待人类复核 Environment Gate 01 / Repair Unit 4 验收结果**；
+* **暂停且严禁提前进入 Final Audit 或 Phase 7B**。

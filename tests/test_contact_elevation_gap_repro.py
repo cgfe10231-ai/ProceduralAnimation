@@ -1,22 +1,23 @@
-"""Isolated Defect Reproduction Test for KinematicBridge Foot Contact Elevation Gap.
+"""Verified Post-Fix Test for KinematicBridge Foot Contact Elevation Gap & Surface Consistency.
 
-Task: Environment Gate 01 (Contact Chain Discrepancy Reproduction).
-Target: `src/motion/kinematic_bridge.py` lines 401-408 & 388-394.
+Task: Environment Gate 01 / Repair Unit 4.
+Target: `src/motion/kinematic_bridge.py` lines 390-440 & 530-580.
 
-Defect Summary:
-When `ft.is_locked` is True, `KinematicBridgeExecutor.execute_frame` hardcodes
-`target_world = (ft.world_xyz[0], ft.world_xyz[1], 0.0)` instead of preserving
-the true 3D surface contact height `ft.world_xyz[2]`. Furthermore, `surfaces` passed
-to `evaluate_limb_contacts_from_armature` is hardcoded to a single horizontal ground
-plane at Z=0.0m.
+Fix Summary:
+1. `KinematicBridgeExecutor.execute_frame()` dynamically queries `self.environment.query_ground_support_at()`
+   to obtain the authentic 3D surface elevation and surface normal for locked stance feet.
+2. The hardcoded `Z=0.0m` flattening is completely eliminated.
+3. `EnvironmentalSurface` is populated dynamically from evaluated environment queries.
+4. Body contact anchors are evaluated through the bone's world matrix with calibrated sole offset.
+5. `last_multi_contact` and `last_active_limb_targets` are recorded on the executor and attached
+   to `BridgeExecutionResult.multi_contact`.
 
 This test:
-1. Configures a stance contact on an elevated platform (Z = 1.3397m, e.g. Ramp Bridge).
-2. Proves that `KinematicBridgeExecutor` flattens the contact target height to Z = 0.0m.
-3. Quantifies the resulting 1.3397m discrepancy between the true contact surface and the
-   recorded telemetry target.
-4. Confirms that no production code is modified in this gate, and logs the defect for the
-   subsequent integration proposal (`docs/proposals/CONTACT_CHAIN_BRIDGE_ELEVATION_GAP.md`).
+1. Configures a stance contact on an elevated platform (Z = 1.3397m, e.g. Ramp Bridge Platform).
+2. Executes through the real production `KinematicBridgeExecutor.execute_frame()`.
+3. Asserts that `result.motion_state.contacts['foot_L'].contact_world_xyz[2]` equals the true 3D surface elevation.
+4. Asserts that `bridge.last_multi_contact.contacts['foot_L'].world_position[2]` equals the true 3D surface elevation.
+5. Asserts that geometric constraint checking reports valid contact with zero excessive gap.
 """
 
 import os
@@ -39,11 +40,12 @@ from src.motion.kinematic_bridge import (
     PlannedFootTarget,
 )
 from src.rig.builder import bind_character_to_rig, build_rig
-from src.rig.ik import setup_leg_ik
+from src.rig.ik import setup_leg_ik, ANKLE_REST_Z
+from src.scene.playground_terrain_traversal import create_standard_dynamics_playground_query
 
 
 class TestContactElevationGapRepro(unittest.TestCase):
-    """Demonstrate the foot contact target elevation flattening defect in KinematicBridge."""
+    """Verify foot contact target elevation and surface consistency in KinematicBridge."""
 
     @classmethod
     def setUpClass(cls):
@@ -56,67 +58,75 @@ class TestContactElevationGapRepro(unittest.TestCase):
         cls.armature = build_rig(cls.config)
         bind_character_to_rig(cls.armature, cls.parts)
         setup_leg_ik(cls.armature)
+        cls.env = create_standard_dynamics_playground_query()
 
-    def test_reproduce_locked_foot_elevation_flattening_to_zero(self):
-        """Prove that locked foot contact targets are flattened to Z=0.0m in KinematicBridge."""
+    def test_verify_locked_foot_elevation_preservation(self):
+        """Verify that locked foot contact targets preserve authentic 3D mesh surface elevation."""
         bridge = KinematicBridgeExecutor(
             armature_obj=self.armature,
             root_obj=self.root,
+            environment=self.env,
         )
 
-        elevated_z = 1.3397  # Exact elevation of Dynamics Playground Bridge Platform
+        elevated_z = 1.339746  # Exact elevation of Dynamics Playground Bridge Platform
         planned = KinematicPlannedPose(
             frame=1,
             time_seconds=0.0417,
-            root_position=(0.0, 17.0, elevated_z + 0.85),
+            root_position=(0.0, 17.0, elevated_z),
             foot_L=PlannedFootTarget(
-                world_xyz=(0.0, 17.0, elevated_z),
+                world_xyz=(-0.11, 17.0, elevated_z + ANKLE_REST_Z),
                 is_locked=True,
-                surface_id="Surface_Ramp_TopPlatform",
+                surface_id="ramp_top_platform",
                 contact_intent=True,
                 contact_type=ContactType.UNILATERAL,
             ),
             foot_R=PlannedFootTarget(
-                world_xyz=(0.3, 16.5, elevated_z + 0.10),
-                is_locked=False,
-                surface_id="free",
-                contact_intent=False,
-                contact_type=ContactType.FREE,
+                world_xyz=(0.11, 17.0, elevated_z + ANKLE_REST_Z),
+                is_locked=True,
+                surface_id="ramp_top_platform",
+                contact_intent=True,
+                contact_type=ContactType.UNILATERAL,
             ),
         )
 
-        # Execute bridge frame
+        # Execute bridge frame through real production pipeline
         result = bridge.execute_frame(planned, keyframe=False)
 
-        # Inspect internal active limb targets passed to contact model
-        # In src/motion/kinematic_bridge.py:404:
-        # active_limb_targets[limb_key] = {
-        #     "surface_id": ft.surface_id,
-        #     "target_world": (ft.world_xyz[0], ft.world_xyz[1], 0.0), # <-- BUG!
-        # }
-        
-        # We verify that KinematicBridgeExecutor stored target_world with Z=0.0
-        # By inspecting the bridge code directly or evaluating the telemetry:
-        # Let's verify by reproducing the exact logic in KinematicBridgeExecutor:
-        target_world_z_in_code = 0.0  # As hardcoded on line 404
-        true_surface_z = elevated_z
+        # 1. Verify MotionState legacy contact telemetry
+        contact_l = result.motion_state.contacts.get("foot_l") or result.motion_state.contacts.get("foot_L")
+        self.assertIsNotNone(contact_l, "foot_L missing from motion_state.contacts")
+        recorded_ms_z = contact_l.contact_world_xyz[2]
 
-        discrepancy = abs(true_surface_z - target_world_z_in_code)
-        
+        # 2. Verify MultiContactState telemetry on bridge executor and execution result
+        self.assertIsNotNone(bridge.last_multi_contact, "bridge.last_multi_contact was not recorded")
+        self.assertIsNotNone(result.multi_contact, "result.multi_contact was not populated")
+        rec_l = bridge.last_multi_contact.contacts.get("foot_L")
+        self.assertIsNotNone(rec_l, "foot_L missing from last_multi_contact.contacts")
+        recorded_mc_z = rec_l.world_position[2]
+
+        discrepancy_ms = abs(elevated_z - recorded_ms_z)
+        discrepancy_mc = abs(elevated_z - recorded_mc_z)
+
         print("\n" + "=" * 70)
-        print("CONTACT ELEVATION GAP REPRODUCTION EVIDENCE:")
-        print(f"  Planned Stance Foot Contact Z: {true_surface_z:.4f} m (Elevated Platform)")
-        print(f"  KinematicBridge Line 404 Target Z: {target_world_z_in_code:.4f} m (Hardcoded Flat Ground)")
-        print(f"  Elevation Error Discrepancy:   {discrepancy:.4f} m")
+        print("CONTACT ELEVATION POST-FIX VERIFICATION EVIDENCE:")
+        print(f"  True Evaluated Platform Ground Z: {elevated_z:.6f} m")
+        print(f"  MotionState Recorded Contact Z:   {recorded_ms_z:.6f} m (Diff: {discrepancy_ms:.6e} m)")
+        print(f"  MultiContact Recorded Target Z:   {recorded_mc_z:.6f} m (Diff: {discrepancy_mc:.6e} m)")
+        print(f"  Contact Geometry Errors:          {result.contact_geometry_errors}")
+        print(f"  Overall Execution Success:        {result.success}")
         print("=" * 70)
 
-        # Assert that the discrepancy is real and non-zero
-        self.assertAlmostEqual(discrepancy, 1.3397, places=3)
-        self.assertNotEqual(
-            target_world_z_in_code,
-            true_surface_z,
-            "DEFECT REPRODUCED: KinematicBridge hardcodes Z=0.0m for locked foot contacts!",
-        )
+        # Assert zero flattening to 0.0m
+        self.assertGreater(recorded_ms_z, 1.0, "Contact Z must not be flattened to 0.0m")
+        self.assertGreater(recorded_mc_z, 1.0, "Contact Z must not be flattened to 0.0m")
+
+        # Assert elevation agreement with evaluated surface within 1e-4m
+        self.assertLess(discrepancy_ms, 1e-4, f"MotionState Z discrepancy {discrepancy_ms:.6e}m exceeds 1e-4m")
+        self.assertLess(discrepancy_mc, 1e-4, f"MultiContact Z discrepancy {discrepancy_mc:.6e}m exceeds 1e-4m")
+
+        # Assert geometric compliance
+        self.assertEqual(len(result.contact_geometry_errors), 0, f"Unexpected geometric errors: {result.contact_geometry_errors}")
+        self.assertTrue(result.success, "Bridge execution must succeed for valid stance foot contact on platform")
 
 
 def run_tests() -> int:

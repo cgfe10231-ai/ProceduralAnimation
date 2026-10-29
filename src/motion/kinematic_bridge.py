@@ -256,6 +256,7 @@ class BridgeExecutionResult:
     support_type: str
     inertia_state: Optional[WholeBodyInertiaState] = None
     contact_geometry_errors: Dict[str, GeometricConstraintResult] = field(default_factory=dict)
+    multi_contact: Optional[MultiContactState] = None
 
 
 class KinematicBridgeExecutor:
@@ -286,11 +287,15 @@ class KinematicBridgeExecutor:
         self.default_fps = float(default_fps)
         self._last_time_sec: Optional[float] = None
         self._last_frame: Optional[int] = None
+        self.last_multi_contact: Optional[MultiContactState] = None
+        self.last_active_limb_targets: Optional[Dict[str, Dict[str, Any]]] = None
 
     def reset(self) -> None:
         """Reset internal sequential state tracker and differential kinematics cache."""
         self._last_time_sec = None
         self._last_frame = None
+        self.last_multi_contact = None
+        self.last_active_limb_targets = None
         if hasattr(self.kinematics_tracker, "reset"):
             self.kinematics_tracker.reset()
 
@@ -384,35 +389,74 @@ class KinematicBridgeExecutor:
         )
 
         # Telemetry D: Multi-Limb Contact State & Decoupled Semantics
-        surfaces = list(self.surfaces) if self.surfaces else [
-            EnvironmentalSurface(
-                surface_id="ground",
-                surface_type="ground",
-                center_world=(0.0, 0.0, 0.0),
-                normal_world=(0.0, 0.0, 1.0),
-            )
-        ]
-
+        surfaces: List[EnvironmentalSurface] = list(self.surfaces) if self.surfaces else []
         active_limb_targets: Dict[str, Dict[str, Any]] = {}
 
         # Foot contact intent & locking
         for side, ft in [("L", planned.foot_L), ("R", planned.foot_R)]:
             limb_key = f"foot_{side}"
+            local_anchor = DEFAULT_LIMB_LOCAL_ANCHORS.get(limb_key, (0.0, 0.015906, -0.068169))
+            p_foot = arm.pose.bones.get(f"foot.{side}")
+
             if ft.is_locked:
-                active_limb_targets[limb_key] = {
-                    "surface_id": ft.surface_id,
-                    "target_world": (ft.world_xyz[0], ft.world_xyz[1], 0.0),
-                    "normal_world": ft.normal_world,
-                    "contact_type": ft.contact_type,
-                    "lifecycle": ContactLifecycle.ESTABLISHED,
-                }
+                # Query ground support at the evaluated foot sole XY (or planned XY if bone missing)
+                if p_foot is not None:
+                    foot_mat_world = arm.matrix_world @ p_foot.matrix
+                    sole_world_p = foot_mat_world @ Vector(local_anchor)
+                    query_x, query_y = sole_world_p.x, sole_world_p.y
+                else:
+                    query_x, query_y = ft.world_xyz[0], ft.world_xyz[1]
+
+                query_res = self.environment.query_ground_support_at(query_x, query_y)
+                if query_res.success:
+                    target_pos = query_res.contact_point_world
+                    target_normal = query_res.surface_normal_world
+                    surf_id = query_res.surface_id if query_res.surface_id not in ("none", "") else ft.surface_id
+                    friction_s = getattr(query_res, "friction_coeff", 0.60)
+                    friction_d = max(0.0, friction_s - 0.10)
+
+                    # Ensure environmental surface is registered in surfaces list
+                    if not any(s.surface_id == surf_id for s in surfaces):
+                        surfaces.append(
+                            EnvironmentalSurface(
+                                surface_id=surf_id,
+                                surface_type=query_res.surface_type,
+                                center_world=target_pos,
+                                normal_world=target_normal,
+                                friction_static=friction_s,
+                                friction_dynamic=friction_d,
+                            )
+                        )
+
+                    active_limb_targets[limb_key] = {
+                        "surface_id": surf_id,
+                        "target_world": target_pos,
+                        "normal_world": target_normal,
+                        "contact_type": ft.contact_type,
+                        "lifecycle": ContactLifecycle.ESTABLISHED,
+                        "local_anchor": local_anchor,
+                        "friction_static": friction_s,
+                        "friction_dynamic": friction_d,
+                    }
+                else:
+                    # Query failed: no valid mesh support found (never fake Z=0.0m ground)
+                    active_limb_targets[limb_key] = {
+                        "surface_id": "none",
+                        "target_world": query_res.contact_point_world,
+                        "normal_world": query_res.surface_normal_world,
+                        "contact_type": ContactType.FREE,
+                        "lifecycle": ContactLifecycle.BROKEN,
+                        "local_anchor": local_anchor,
+                        "error_reason": query_res.error_reason,
+                    }
             elif ft.contact_intent:
                 active_limb_targets[limb_key] = {
                     "surface_id": ft.surface_id,
                     "target_world": ft.world_xyz,
                     "normal_world": ft.normal_world,
-                    "contact_type": ft.contact_type,
+                    "contact_type": ContactType.FREE,
                     "lifecycle": ContactLifecycle.RELEASED,
+                    "local_anchor": local_anchor,
                 }
             else:
                 active_limb_targets[limb_key] = {
@@ -421,7 +465,20 @@ class KinematicBridgeExecutor:
                     "normal_world": (0.0, 0.0, 1.0),
                     "contact_type": ContactType.FREE,
                     "lifecycle": ContactLifecycle.RELEASED,
+                    "local_anchor": local_anchor,
                 }
+
+        # Ensure at least a fallback analytical ground surface exists in surfaces list if empty
+        if not surfaces:
+            default_gz = self.environment.ground_z if hasattr(self.environment, "ground_z") else 0.0
+            surfaces.append(
+                EnvironmentalSurface(
+                    surface_id="ground",
+                    surface_type="ground",
+                    center_world=(0.0, 0.0, default_gz),
+                    normal_world=(0.0, 0.0, 1.0),
+                )
+            )
 
         # Hand contact intent & locking: clean separation between IK enablement and contact intent
         for side, ht in [("L", planned.hand_L), ("R", planned.hand_R)]:
@@ -477,12 +534,20 @@ class KinematicBridgeExecutor:
         contact_geom_errors: Dict[str, GeometricConstraintResult] = {}
         actual_positions: Dict[str, Tuple[float, float, float]] = {}
         for side in ("L", "R"):
-            p_shin = arm.pose.bones.get(f"shin.{side}")
-            if p_shin:
-                ankle_world = arm.matrix_world @ p_shin.tail
-                actual_positions[f"foot_{side}"] = (ankle_world.x, ankle_world.y, ankle_world.z - ANKLE_REST_Z)
+            limb_key = f"foot_{side}"
+            p_foot = arm.pose.bones.get(f"foot.{side}")
+            if p_foot is not None:
+                foot_mat_world = arm.matrix_world @ p_foot.matrix
+                anchor_local = active_limb_targets.get(limb_key, {}).get("local_anchor", DEFAULT_LIMB_LOCAL_ANCHORS.get(limb_key, (0.0, 0.0, 0.0)))
+                sole_world = foot_mat_world @ Vector(anchor_local)
+                actual_positions[limb_key] = (sole_world.x, sole_world.y, sole_world.z)
+            else:
+                p_shin = arm.pose.bones.get(f"shin.{side}")
+                if p_shin is not None:
+                    ankle_world = arm.matrix_world @ p_shin.tail
+                    actual_positions[limb_key] = (ankle_world.x, ankle_world.y, ankle_world.z - ANKLE_REST_Z)
             p_hand = arm.pose.bones.get(f"hand.{side}")
-            if p_hand:
+            if p_hand is not None:
                 wrist_world = arm.matrix_world @ p_hand.head
                 actual_positions[f"hand_{side}"] = (wrist_world.x, wrist_world.y, wrist_world.z)
 
@@ -502,6 +567,26 @@ class KinematicBridgeExecutor:
                             "slip_m": geom_res.tangential_slip_m,
                             "penetration_m": geom_res.penetration_depth_m,
                         },
+                    )
+                )
+            elif rec is not None and rec.lifecycle == ContactLifecycle.BROKEN:
+                reason = rec.metadata.get("error_reason") or "No valid ground support surface intersected"
+                broken_res = GeometricConstraintResult(
+                    is_valid=False,
+                    total_position_error_m=float("inf"),
+                    distance_normal_m=float("inf"),
+                    penetration_depth_m=0.0,
+                    tangential_slip_m=0.0,
+                    violation_reason=f"NO_SUPPORT_SURFACE: {reason}",
+                )
+                contact_geom_errors[limb] = broken_res
+                unmet.append(
+                    UnmetConstraint(
+                        category="CONTACT_GEOMETRY",
+                        target_name=limb,
+                        description=f"Contact geometric constraint violated: {broken_res.violation_reason}",
+                        error_amount=1.0,
+                        details={"error": reason},
                     )
                 )
 
@@ -577,6 +662,8 @@ class KinematicBridgeExecutor:
         # Update internal temporal progression
         self._last_time_sec = planned.time_seconds
         self._last_frame = frame
+        self.last_multi_contact = multi_contact
+        self.last_active_limb_targets = active_limb_targets
 
         overall_success = wbc_res.success and (len(unmet) == 0)
 
@@ -592,4 +679,5 @@ class KinematicBridgeExecutor:
             support_type=multi_contact.support_type.value,
             inertia_state=inertia_state,
             contact_geometry_errors=contact_geom_errors,
+            multi_contact=multi_contact,
         )

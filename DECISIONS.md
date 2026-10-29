@@ -1479,3 +1479,39 @@
 * **影响**：
   - 彻底消除了摆动脚着地切换瞬间的下砸跳变缺陷，实现了足部规划轨迹与实际骨骼姿态在时空两端的完美 C0 连续闭合；
   - 维持零历史退化与零架构违规。
+
+---
+
+### [DEC-061] 2026-10-29: Environment Gate 01 — Repair Unit 4: 真实Mesh接触高程、几何接触点与接触状态一致性修复
+
+* **状态**：已采纳并完成实施 (Accepted & Implemented)
+* **日期**：2026-10-29
+* **背景**：在 Environment Gate 01 接触语义审计中发现：
+  1. **Z=0.0m 扁平化硬编码缺陷**：`KinematicBridgeExecutor.execute_frame()` 原第 404 行硬编码 `target_world = (ft.world_xyz[0], ft.world_xyz[1], 0.0)`，将任何高程（如坡道 0.7m、顶台 1.3397m）的锁定支撑脚接触目标高度强行抹平至 $Z=0.0\text{ m}$，导致遥测目标与实际物理网格表面产生高达 1.3397m 的巨大高度差；
+  2. **单一平地环境假设缺陷**：原第 388-394 行在 `self.surfaces` 为空时，仅回退至单一片元地面 `EnvironmentalSurface(surface_id="ground", center_world=(0,0,0), normal_world=(0,0,1))`，忽略了真实 Blender 网格的多曲面拓扑结构；
+  3. **足底接触锚点偏置几何漂移缺陷**：`DEFAULT_LIMB_LOCAL_ANCHORS` 中历史脚底锚点 `(0, 0.077, -0.070)` 未考虑脚骨 -13.134° 的初始倾角，导致静止状态足底锚点产生 -15.7mm 的虚假穿透；且原代码在计算实际位置时仅以 `ankle_world.z - ANKLE_REST_Z` 粗暴做单轴平移，丢失了脚踝俯仰滚转旋转对足底接触几何的贡献；
+  4. **严格范围约束**：本任务为环境接触感知真实性修复，非动力学开发；严禁引入主动动力学反馈或修改动作规划器；严禁破坏 Unit 3-S1/S2 动画；历史 Blend 资产 0 变动。
+* **决策与方案**：
+  1. **接触三坐标合同严格确立与物理文档化 (`docs/evidence/environment_gate01_ru4/foot_contact_coordinate_contract.md`)**：
+     - 严格区分点 A（规划脚踝 IK 目标 `PlannedFootTarget.world_xyz`）、点 B（真实地面接触点 `SurfaceQueryResult.contact_point_world`）与点 C（人体脚底实际接触锚点 $\mathbf{M}_{\text{bone\_world}} \cdot \mathbf{a}_{\text{bone\_local}}$）；
+     - 校准脚骨局部锚点为 $\mathbf{a}_{\text{bone\_local}} = (0.0, 0.015906, -0.068169)$，在静止平地与脚踝正下方地面达成 $< 0.001\text{ mm}$ 零误差接合；
+  2. **生产管线接触高程与多曲面动态发现落地 (`src/motion/kinematic_bridge.py`)**：
+     - 彻底消除原第 404 行 $Z=0.0\text{ m}$ 扁平化硬编码，改为调用 `self.environment.query_ground_support_at()` 获取真实高程与法线；
+     - 动态从环境查询结果构建 `EnvironmentalSurface`，杜绝单一硬编码平地回退；
+     - 查询失败（无网格击中或非支撑面）时真实记录 `ContactLifecycle.BROKEN` 与几何不合规，严禁伪造地面接触；
+     - 摆动脚（`is_locked=False`）严格设为 `ContactLifecycle.RELEASED` 与 `ContactType.FREE`；
+     - 实际脚底位置通过姿态骨矩阵直接变换；
+     - 在 Bridge 执行结果与 Executor 上记录并导出 `multi_contact` 与 `last_active_limb_targets`；
+  3. **缺陷复现与修复验证套件重构 (`tests/test_contact_elevation_gap_repro.py`)**：
+     - 重构为真实检验生产路径返回值（`res.motion_state.contacts['foot_L'].contact_world_xyz[2]` 及 `bridge.last_multi_contact`）；
+     - 归档前置缺陷日志 `production_defect_pre_fix.log`（实测 1339.7mm 塌陷与 2191mm 几何超差）与后置修复日志 `production_defect_post_fix.log`（实测平台高程 1.339746m，误差 $< 4\times 10^{-8}\text{ m}$，几何违规数 0）；
+  4. **全地形单元测试与独立场景全帧验证 (`tests/test_environment_gate01_unit4.py`, `tests/verify_environment_gate01_unit4.py`)**：
+     - U4-T01 至 U4-T08 覆盖平地、15°坡道、顶台、20°下坡、步态交替解耦、虚空真实失败以及反事实实验 A（高程 +0.05m 位移）与 B（法线角度变化），8/8 PASS；
+     - 独立场景全 700 帧验证：审核全部 728 次支撑事件，544 次高程支撑事件，最大气隙 0.0mm，最大穿透 4.27mm，最大滑移 1.55mm，零扁平化缺陷，0 几何违规；
+     - 注册 `environment_gate01_unit4` 至 `tests/test_registry.py`；
+     - 全量分级测试通过：`quick` (17/17), `physics` (20/20), `motion` (11/11), `full` (34/34), `--verify-docs` (PASS)；
+     - 历史资产 `output/dynamics_playground.blend` 0 字节变动；
+     - 最终状态判定为 `ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`。
+* **影响**：
+  - 彻底消除了生产动力学桥接层接触高程扁平化为 0.0m 的深层架构隐患，为人体系在复杂 3D 网格环境中的真实物理接触、法线反作用力与足底几何合规提供了 100% 真实可靠的数据源；
+  - 维持零历史退化与零架构违规。

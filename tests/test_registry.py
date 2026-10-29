@@ -444,6 +444,22 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=True,
         description="Verifies Swing-to-Stance landing continuity across all 42 step boundaries (target diff <= 1e-4m), elimination of 40.4mm drop at Frame 188->189, 0 ROM violations, and 0 terrain penetrations.",
     ),
+    "environment_gate01_unit4": TestDefinition(
+        test_id="environment_gate01_unit4",
+        name="Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency",
+        script_path="tests/test_environment_gate01_unit4.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=60.0,
+        expected_artifacts=[
+            "docs/evidence/environment_gate01_ru4/foot_contact_coordinate_contract.md",
+            "docs/evidence/environment_gate01_ru4/production_defect_pre_fix.log",
+            "docs/evidence/environment_gate01_ru4/production_defect_post_fix.log",
+            "docs/evidence/environment_gate01_ru4/verification_report.json",
+        ],
+        is_visual_acceptance=False,
+        description="Verifies real mesh contact elevation, elimination of Z=0.0m hardcoding, bone matrix sole anchor calibration, support surface consistency, and counter-factual elevation/normal variations.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection

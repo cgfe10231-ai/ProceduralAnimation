@@ -1,0 +1,26 @@
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+======================================================================
+PRE-FIX PRODUCTION PIPELINE DEFECT LOG (Unit 4 / Defect Reproduction)
+======================================================================
+Production Class:  KinematicBridgeExecutor.execute_frame()
+Planned Stance Foot:
+  Planned Foot_L Target World XYZ: (0, 17, 1.3397)
+  is_locked: True
+  surface_id: Surface_Ramp_TopPlatform
+Actual Production Bridge Outputs:
+  res.motion_state.contacts['foot_L'].contact_world_xyz: (0, 17, 0.0)  <-- BUG: Z flattened to 0.0!
+  Discrepancy: 1.3397 m
+Contact Model Geometric Evaluation:
+  res.contact_geometry_errors['foot_L']:
+    is_valid: False
+    total_position_error_m: 2.1921 m
+    distance_normal_m: 2.1913 m
+    violation_reason: 'EXCESSIVE_GAP: 2191.33 mm > 15.0 mm'
+======================================================================
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)

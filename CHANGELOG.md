@@ -3,6 +3,51 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Environment Gate 01 — Repair Unit 4: 真实Mesh接触高程、几何接触点与接触状态一致性修复 (U4-A 至 U4-I)
+
+### 根因实证与三坐标合同确立 (`docs/evidence/environment_gate01_ru4/`, U4-A, U4-E)
+* **Z=0.0m 扁平化与接触几何超差根因实证**：
+  - 针对高程平台（$Z = 1.3397\text{ m}$），证实 `KinematicBridgeExecutor.execute_frame()` 原第 404 行硬编码 `target_world = (ft.world_xyz[0], ft.world_xyz[1], 0.0)`，导致高程差高达 1339.7mm；
+  - 证实原代码在接触合规检查中产生 `EXCESSIVE_GAP: 2191.33 mm > 15.0 mm` 严重虚假违规，导致合法步态桥接执行失败；
+  - 输出客观前置证据 `production_defect_pre_fix.log`；
+* **接触三坐标合同与足底锚点几何校准 (`foot_contact_coordinate_contract.md`, U4-A, U4-D)**：
+  - 严格区分点 A（规划踝 IK 目标 `PlannedFootTarget.world_xyz`）、点 B（真实地面接触点 `SurfaceQueryResult.contact_point_world`）与点 C（人体脚底实际接触锚点 $\mathbf{M}_{\text{bone\_world}} \cdot \mathbf{a}_{\text{bone\_local}}$）；
+  - 查明骨骼倾角几何偏差：在 `src/motion/contact_model.py` 中将 `DEFAULT_LIMB_LOCAL_ANCHORS` 由未补偿倾角的 `(0, 0.077, -0.070)` 校准为考虑 -13.134° 倾角的 `(0.0, 0.015906, -0.068169)`，静止平地与地面达成 $< 0.001\text{ mm}$ 零误差贴合。
+
+### 生产管线接触高程动态查询与多曲面感知落地 (`src/motion/kinematic_bridge.py`, U4-B, U4-C)
+* **动态网格查询与消除扁平化**：
+  - 彻底移除原第 404 行 `Z=0.0` 扁平化，改为通过 `self.environment.query_ground_support_at()` 获取真实 3D 表面高程与法线；
+  - 动态搜集并维护 `EnvironmentalSurface`，杜绝单一水平平地硬编码回退；
+  - 真实处理查询失败情况：未击中或非支撑面记录 `ContactLifecycle.BROKEN` 并产生真实几何违规，杜绝伪造地面接触；
+  - 摆动脚严格标记为 `ContactLifecycle.RELEASED` 与 `ContactType.FREE`；
+  - 实际脚底位置通过姿态骨矩阵变换真实评估；
+  - 在 Bridge 执行结果和 Executor 上记录并导出 `multi_contact` 与 `last_active_limb_targets`。
+
+### 缺陷复现与修复验证套件重构 (`tests/test_contact_elevation_gap_repro.py`, U4-E)
+* **生产路径真实检验重构**：
+  - 真实检验生产路径返回值（`res.motion_state.contacts['foot_L'].contact_world_xyz[2]` 及 `bridge.last_multi_contact`）；
+  - 实测高程平台 $Z=1.339746\text{ m}$，误差 $< 4\times 10^{-8}\text{ m}$，几何违规数 0，执行成功率 True；
+  - 归档后置修复日志 `docs/evidence/environment_gate01_ru4/production_defect_post_fix.log`。
+
+### 全地形单元测试与独立场景全帧验证 (`tests/test_environment_gate01_unit4.py`, `tests/verify_environment_gate01_unit4.py`, U4-F, U4-G)
+* **完整 8 项单元测试全绿 (`tests/test_environment_gate01_unit4.py`)**：
+  - U4-T01: 平地接触保持 Z=0.0m、法线(0, 0, 1)与合规性；
+  - U4-T02: 15° 上坡接触真实记录斜坡高程与法线；
+  - U4-T03: 顶台接触真实记录 1.3397m 高程与 `ramp_top_platform` ID；
+  - U4-T04: 20° 下坡接触真实记录下坡高程与前倾法线；
+  - U4-T05: 步态交替解耦与支撑状态 SupportType 分类；
+  - U4-T06: 虚空查询失败真实性（无伪造地面）；
+  - U4-T07: 反事实实验 A（顶台网格高程 +0.05m 位移，接触高程精准位移 +0.05m）；
+  - U4-T08: 反事实实验 B（坡道法线角度变化，接触法线精准随动）。
+* **全 700 帧独立场景几何接触审计 (`tests/verify_environment_gate01_unit4.py`)**：
+  - 审核全部 728 次支撑事件，544 次高程支撑事件；
+  - 最大气隙 0.0mm，最大穿透 4.27mm（容差 10mm），最大滑移 1.55mm（容差 20mm）；
+  - 零扁平化缺陷，0 几何违规，生成 `verification_report.json`；
+* 注册进入 `tests/test_registry.py`，全量分级回归通过：`quick` (17/17), `physics` (20/20), `motion` (11/11), `full` (34/34)；
+* 历史资产 `output/dynamics_playground.blend` 0 字节变动；
+* 状态严格停留于 `ENVIRONMENT GATE 01 / UNIT 4 — AWAITING HUMAN REVIEW`。
+
+
 ## [2026-10-29] Environment Gate 01 — Unit 3 / Atomic Repair S2: 摆动脚至支撑脚切换着地目标连续性修复与越障高度包络收敛 (S2-A 至 S2-F)
 
 ### 根因诊断与数据实证 (`tests/verify_environment_gate01_u3_s2.py`, S2-A)

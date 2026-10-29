@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "blend_path": "output/dynamics_playground_environment_gate01_u3_s2.blend",
+  "total_frames": 700,
+  "audited_stance_frames": 728,
+  "elevated_stance_frames": 544,
+  "max_air_gap_mm": 0.0,
+  "max_penetration_mm": 4.27,
+  "max_tangential_slip_mm": 1.55,
+  "zero_flattening_detected": false,
+  "total_violations": 0,
+  "violations_sample": []
+}

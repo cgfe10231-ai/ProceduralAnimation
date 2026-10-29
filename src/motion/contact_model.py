@@ -72,12 +72,13 @@ class SupportType(str, Enum):
 
 # Standard nominal limb local anchor offsets (meters) in bone local coordinate frames:
 # - Foot bone (foot.L/R): bone head is ankle joint (Z=0.07 m above ground at rest).
-#   Local anchor (0, 0.077, -0.070) places contact point at sole center / ball of foot on ground plane Z=0.
+#   Local anchor (0.0, 0.015906, -0.068169) accounts for bone pitch tilt (-13.13 deg) and places
+#   contact anchor directly beneath the ankle on the sole at rest ground plane Z=0.0m.
 # - Hand bone (hand.L/R): bone head is wrist. Bone length is 0.10 m along +Y.
 #   Local anchor (0, 0.050, -0.015) places contact point at palm center.
 DEFAULT_LIMB_LOCAL_ANCHORS: Dict[str, Tuple[float, float, float]] = {
-    "foot_L": (0.0, 0.077, -0.070),
-    "foot_R": (0.0, 0.077, -0.070),
+    "foot_L": (0.0, 0.015906, -0.068169),
+    "foot_R": (0.0, 0.015906, -0.068169),
     "hand_L": (0.0, 0.050, -0.015),
     "hand_R": (0.0, 0.050, -0.015),
     "knee_L": (0.0, 0.000, 0.050),

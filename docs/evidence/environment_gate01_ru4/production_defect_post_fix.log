@@ -1,0 +1,30 @@
+[PRODUCTION_DEFECT_POST_FIX_VERIFICATION_LOG]
+Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Contact-State Consistency
+Timestamp: 2026-10-29T15:27:28Z
+Platform: Blender 5.1.1 Headless Linux/Windows API
+Test Command: blender -b -P tests/test_contact_elevation_gap_repro.py
+
+[OUTPUT]:
+test_verify_locked_foot_elevation_preservation (__main__.TestContactElevationGapRepro.test_verify_locked_foot_elevation_preservation)
+Verify that locked foot contact targets preserve authentic 3D mesh surface elevation. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.216s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+======================================================================
+CONTACT ELEVATION POST-FIX VERIFICATION EVIDENCE:
+  True Evaluated Platform Ground Z: 1.339746 m
+  MotionState Recorded Contact Z:   1.339746 m (Diff: 3.784439e-08 m)
+  MultiContact Recorded Target Z:   1.339746 m (Diff: 3.784439e-08 m)
+  Contact Geometry Errors:          {}
+  Overall Execution Success:        True
+======================================================================
