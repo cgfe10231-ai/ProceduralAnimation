@@ -1097,33 +1097,32 @@ class TerrainWalkAction(MotionAction):
             reach_l = eff_l.is_reachable if eff_l else True
             reach_r = eff_r.is_reachable if eff_r else True
 
-            c_dict: Dict[str, ContactPointState] = {
-                "foot_L": ContactPointState(
-                    limb="foot_L",
-                    phase=phase_l,
-                    is_locked=foot_l_tgt.is_locked,
-                    contact_world_xyz=last_known_l_xyz,
-                    current_world_xyz=eff_l.actual_world_xyz if eff_l else last_known_l_xyz,
-                    target_rotation_deg=foot_l_tgt.rotation_deg,
-                    drift_m=drift_l,
-                    is_reachable=reach_l,
-                    surface_normal=foot_l_tgt.normal_world,
-                ),
-                "foot_R": ContactPointState(
-                    limb="foot_R",
-                    phase=phase_r,
-                    is_locked=foot_r_tgt.is_locked,
-                    contact_world_xyz=last_known_r_xyz,
-                    current_world_xyz=eff_r.actual_world_xyz if eff_r else last_known_r_xyz,
-                    target_rotation_deg=foot_r_tgt.rotation_deg,
-                    drift_m=drift_r,
-                    is_reachable=reach_r,
-                    surface_normal=foot_r_tgt.normal_world,
-                ),
-            }
-
             ms = bridge_res.motion_state
             if ms is None:
+                c_dict: Dict[str, ContactPointState] = {
+                    "foot_L": ContactPointState(
+                        limb="foot_L",
+                        phase=phase_l,
+                        is_locked=foot_l_tgt.is_locked,
+                        contact_world_xyz=last_known_l_xyz,
+                        current_world_xyz=eff_l.actual_world_xyz if eff_l else last_known_l_xyz,
+                        target_rotation_deg=foot_l_tgt.rotation_deg,
+                        drift_m=drift_l,
+                        is_reachable=reach_l,
+                        surface_normal=foot_l_tgt.normal_world,
+                    ),
+                    "foot_R": ContactPointState(
+                        limb="foot_R",
+                        phase=phase_r,
+                        is_locked=foot_r_tgt.is_locked,
+                        contact_world_xyz=last_known_r_xyz,
+                        current_world_xyz=eff_r.actual_world_xyz if eff_r else last_known_r_xyz,
+                        target_rotation_deg=foot_r_tgt.rotation_deg,
+                        drift_m=drift_r,
+                        is_reachable=reach_r,
+                        surface_normal=foot_r_tgt.normal_world,
+                    ),
+                }
                 ms = MotionState(
                     frame=current_frame,
                     time_sec=time_sec,
@@ -1133,9 +1132,26 @@ class TerrainWalkAction(MotionAction):
                     angular_velocity_world=(0.0, 0.0, 0.0),
                     mode=mode,
                     contacts=c_dict,
+                    params={
+                        "planned_phase_l": phase_l,
+                        "planned_phase_r": phase_r,
+                        "planned_locked_l": foot_l_tgt.is_locked,
+                        "planned_locked_r": foot_r_tgt.is_locked,
+                        "planned_target_l": foot_l_tgt.world_xyz,
+                        "planned_target_r": foot_r_tgt.world_xyz,
+                    },
                 )
             else:
-                ms = ms.clone_with(contacts=c_dict, mode=mode)
+                ms_params = dict(ms.params)
+                ms_params.update({
+                    "planned_phase_l": phase_l,
+                    "planned_phase_r": phase_r,
+                    "planned_locked_l": foot_l_tgt.is_locked,
+                    "planned_locked_r": foot_r_tgt.is_locked,
+                    "planned_target_l": foot_l_tgt.world_xyz,
+                    "planned_target_r": foot_r_tgt.world_xyz,
+                })
+                ms = ms.clone_with(mode=mode, params=ms_params)
 
             current_motion_state = ms
             states.append(ms)

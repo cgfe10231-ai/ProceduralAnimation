@@ -6,36 +6,40 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — Production Interface Repair 01 (FIND-R2-01)。  
-* **当前状态**：`REPAIR-01 / FIND-R2-01 — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
-* **任务性质**：单缺陷生产修复（FIND-R2-01），消除 Bridge 执行器手部接触意图非法枚举引用。
+* **当前任务**：ProceduralAnimation — Production Interface Repair 02 (FIND-R2-02 / FIND-T01-02)。  
+* **当前状态**：`REPAIR-02 / FIND-R2-02 — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
+* **任务性质**：单缺陷生产修复（FIND-R2-02），消除 `TerrainWalkAction.execute()` 对 `KinematicBridgeExecutor` 返回的真实物理接触状态的覆盖。
 
-### 本任务核心修复与核准成果 (REPAIR-01)
+### 本任务核心修复与核准成果 (REPAIR-02)
 1. **修复前真实运行复现**：
-   - 编写针对性回归测试 [`tests/test_find_r2_01_hand_contact_lifecycle.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_01_hand_contact_lifecycle.py)；
-   - 在旧代码下真实触发 `AttributeError: type object 'ContactLifecycle' has no attribute 'TOUCHDOWN'`，测试失败退出码为 1；
+   - 编写针对性回归测试 [`tests/test_find_r2_02_contact_state_ownership.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_02_contact_state_ownership.py)；
+   - 在旧代码下真实触发 5 项失败（`FAILURES=5`，用例 A/B/C/D/E 全部复现失败事实，退出码 1）；
 2. **最小手术式修复**：
-   - 在 [`src/motion/kinematic_bridge.py:512`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py#L512) 将不存在的非法枚举 `ContactLifecycle.TOUCHDOWN` 替换为 `ContactLifecycle.CANDIDATE`；
-   - 确证 `ContactLifecycle.CANDIDATE` 语义为接触意图候选状态，`is_active` 判定为 False，不被误识别为有效物理支撑；
-3. **针对性测试 4 路径验证**：
-   - Case A (普通伸展): `ContactType.FREE`, `ContactLifecycle.RELEASED`, 正常执行 IK 目标；
-   - Case B (接触候选): `dist > 0.015m`, 进入 `ContactLifecycle.CANDIDATE`, 消除 `AttributeError`, 不提前登记为有效支撑；
-   - Case C (接触建立): `dist <= 0.015m`, 正常进入 `ContactLifecycle.ESTABLISHED`, 登记为有效支撑；
-   - Case D (显式锁定): `is_locked=True`, 正常保持锁定路径；
-   - 4 项测试全部通过（4/4 PASS in 0.262s）；
+   - 在 [`src/motion/terrain_walk.py:1125–1145`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py#L1125-L1145) 中，移除在 `ms is not None` 时以本地 `c_dict` 覆盖 `ms.contacts` 的逻辑，严格保留 Bridge 返回的真实物理接触 `ms.contacts`；
+   - 将规划步态调度意图 (`planned_phase_l`, `planned_phase_r`, `planned_locked_l`, `planned_locked_r`, `planned_target_l`, `planned_target_r`) 注入 `ms.params`；
+   - 仅在 `ms is None` 的防御回退路径下使用 `c_dict` 构造初始 `MotionState`；
+3. **针对性测试 5 路径验证**：
+   - Case A (正常双足行走接触状态保留): 验证 `ms.contacts` 来源为 Bridge 物理接触且规划调度参数进入 `params`；
+   - Case B (规划目标与实际接触坐标偏差): 注入实际接触点 $Z=1.3397$，验证 `ms.contacts` 保持 $Z=1.3397$ 未被覆盖为 $Z=0.0$；
+   - Case C (真实接触失败脱空): 模拟 Bridge 检出接触失效 (`is_locked=False`)，验证 `ms.contacts` 保持 False 未被误标为 True；
+   - Case D (上肢接触保留): 模拟 Bridge 返回 `hand_L` 支撑，验证 `ms.contacts` 完整保留 `hand_L` 未被局部字典抹除；
+   - Case E (动作链终态保持): 验证 `result.final_state.contacts` 完整保留实际物理接触供后续动作消费；
+   - 5 项测试全部通过（5/5 PASS in 0.466s）；
 4. **全套自动化回归验证**：
-   - `python tests/run_test_suite.py --tier quick`: 18/18 PASS (48.30s)
-   - `python tests/run_test_suite.py --tier physics`: 21/21 PASS (89.21s)
-   - `python tests/run_test_suite.py --tier motion`: 11/11 PASS (47.79s)
-   - `python tests/run_test_suite.py --tier full`: 35/35 PASS (139.47s)
-   - `python tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
+   - `.\run_tests.ps1 -tier quick`: 18/18 PASS (48.46s)
+   - `.\run_tests.ps1 -tier physics`: 21/21 PASS (86.43s)
+   - `.\run_tests.ps1 -tier motion`: 11/11 PASS (48.63s)
+   - `.\run_tests.ps1 -tier full`: 35/35 PASS (140.71s)
+   - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
 5. **缺陷登记总表更新**：
-   - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 将 FIND-R2-01 状态更新为 `FIXED / VERIFIED`，阻碍 7B 的致命缺陷数由 5 降至 4；
-   - 明确声明其余 14 项缺陷维持未处理原状。
+   - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 将 FIND-R2-02 状态更新为 `FIXED / VERIFIED`，阻碍 7B 的致命缺陷数由 4 降至 3；
+   - 存量确认缺陷由 2 降至 1 (FIND-R2-07)；
+   - 明确声明其余 13 项缺陷维持未处理原状。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Production Interface Repair 02**: FIND-R2-02 / FIND-T01-02 接触状态所有权与 Bridge 物理接触保留修复归档 (`FIXED / VERIFIED`)。
 * **Production Interface Repair 01**: FIND-R2-01 手部接触生命周期枚举修复归档 (`FIXED / VERIFIED`)。
 * **Production Interface Audit R4**: 环境查询、网格适配器与场景集成生产接口审计及全仓库修复分组归档 (`REPAIR PENDING`)。
 * **Production Interface Audit R3-CLOSE**: 全生命周期合同闭环与副作用纠错归档 (`EVIDENCE VERIFIED`)。
@@ -58,25 +62,3 @@
 * **任务 6G-C**: 接触模型几何计算与最小兼容桥接层落地。
 * **任务 6G-A / 6G-B**: 人体刚体运动学微分器与转动惯量张量计算。
 * **任务 6F-A 至 6F-D**: 双臂 IK、全身质心 (CoM)、解剖学关节 ROM 模型与全身姿态协调器 (WBC)。
-* **任务 6A 至 6D**: 统一运动框架 `MotionPlanner`、跑步模式、冲刺加速与急停制动。
-* **任务 4A 至 5C**: 19 骨骼标准人形角色构建、双腿 IK 约束、足部世界接触锁定与行走步态。
-
----
-
-## 3. 已验证
-* 针对性测试 `tests/test_find_r2_01_hand_contact_lifecycle.py`：**4/4 PASS in 0.262s**；
-* 架构文档与 AST 符号门禁 (`tests/audit_c2_final_inspector.py --verify-docs`)：**PASS (0 errors, 0 phantom symbols)**；
-* 单元测试与分层回归套件全绿记录：`quick` (18/18), `physics` (21/21), `motion` (11/11), `full` (35/35)；
-* 生产代码仅修改 `src/motion/kinematic_bridge.py` 1 行，历史资产 `output/dynamics_playground.blend` 严格 0 字节变动。
-
----
-
-## 4. 下一步行动与严格禁止事项
-
-* **下一步行动**：
-  1. 停留在 `REPAIR-01 / FIND-R2-01 — AWAITING INDEPENDENT REVIEW`，等待外部独立审查；
-  2. 待审查批准后，按维护包顺序排期后续修复任务（如 PKG-2 / FIND-R2-02）。
-* **严格禁止事项**：
-  * **严禁自行执行 REPAIR-02 或修复其他 Finding**；
-  * **严禁擅自进入 Phase 7B**；
-  * **严禁自行开发环境双向动力学**。

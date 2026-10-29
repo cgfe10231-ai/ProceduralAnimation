@@ -1,8 +1,8 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-29  
-> **当前阶段**：Production Interface Repair 01 — FIND-R2-01 Hand Contact Lifecycle Enum Repair (REPAIR-01)。已完成针对 FIND-R2-01（`kinematic_bridge.py:512` 非法引用不存在的 `ContactLifecycle.TOUCHDOWN`）的最小手术式修复，新增针对性测试 `tests/test_find_r2_01_hand_contact_lifecycle.py` 覆盖 Case A/B/C/D 四条路径（4/4 PASS），分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）。  
-> **重要修复与证据核准**：FIND-R2-01 缺陷已被彻底解决并标定为 `FIXED / VERIFIED`，解除对后续上肢接触与 Phase 7B 的阻塞。全仓库剩余 14 项 Finding（2 项确认缺陷、12 项合同缺口）严格保持只读与挂起状态；当前门禁终止状态为：`REPAIR-01 / FIND-R2-01 — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。  
+> **当前阶段**：Production Interface Repair 02 — FIND-R2-02 Contact State Ownership Repair (REPAIR-02)。已完成针对 FIND-R2-02（`terrain_walk.py:1100–1145` 覆盖 Bridge 物理接触状态）的最小手术式修复，新增针对性测试 `tests/test_find_r2_02_contact_state_ownership.py` 覆盖 Case A/B/C/D/E 五条路径（5/5 PASS），分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）。  
+> **重要修复与证据核准**：FIND-R2-01 与 FIND-R2-02 缺陷已被彻底解决并标定为 `FIXED / VERIFIED`，解除对后续上肢接触、物理接触真实性与 Phase 7B 的阻塞。全仓库剩余 13 项 Finding（1 项确认缺陷、12 项合同缺口）严格保持只读与挂起状态；当前门禁终止状态为：`REPAIR-02 / FIND-R2-02 — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。  
 
 ---
 
@@ -17,7 +17,7 @@
   * **REPAIR_GROUPING.md**: 全仓库 R1–R4 全部去重 15 项问题收敛划分为 5 个原子维护包（PKG-1 至 PKG-5），建立清晰依赖拓扑、明确修复边界与具体回归测试命令；
   * **OPEN_FINDINGS.md (统一登记总表，全量核准)**:
     - **FIND-R2-01 (CONFIRMED_DEFECT / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `kinematic_bridge.py:512` 引用不存在的枚举 `ContactLifecycle.TOUCHDOWN` 已被修复为 `ContactLifecycle.CANDIDATE`，通过 4 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
-    - **FIND-R2-02 (CONFIRMED_DEFECT, Blocks 7B: YES, STATIC_CONFIRMED)**: `terrain_walk.py:1138` 强制以 `c_dict` 覆写 `ms.contacts`，抹杀 Bridge 物理测量数据与上肢接触；
+    - **FIND-R2-02 (CONFIRMED_DEFECT / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:1125–1145` 移除强制覆写 `contacts=c_dict`，完整保留 Bridge 真实物理测量数据与上肢接触，通过 5 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-03 (CONTRACT_GAP, Blocks 7B: YES, STATIC_CONFIRMED)**: `terrain_walk.py:1080–1091` 丢弃 `bridge_res.success` 与 unmet constraints，对底层物理与 IK 失败静默掩盖；
     - **FIND-R2-04 (CONTRACT_GAP, Blocks 7B: YES, STATIC_CONFIRMED)**: `framework.py:405–416, 915–1010` `ActionExecutionResult` 缺失失败状态合同，`MotionPlanner` 盲目顺序执行无法阻断级联错误；
     - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `contact_model.py:214–273, 304–340` 几何合规性校验只读返回，与动态属性 `support_type` 判定脱节；
@@ -31,7 +31,7 @@
     - **FIND-R3-04 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用；
     - **FIND-R4-01 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:633–640, 689, 704` 场景装配缺乏执行失败阻断合同，无视不可达错误无条件保存 Blend 文件并导出连续通过；
     - **FIND-R4-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:402, 588–593, 610–615` 与 `blender_mesh_query_adapter.py:885–892` 2.5D 高程与法线查询在未命中时隐式回退平地并脱节支撑有效性校验；
-  * **修复状态**: 维护包 PKG-1 (FIND-R2-01) 已修复并验证（`FIXED / VERIFIED`）；维护包 PKG-2 至 PKG-5 维持挂起等待授权排期修复。
+  * **修复状态**: 维护包 PKG-1 (FIND-R2-01) 与 PKG-2 (FIND-R2-02) 已修复并验证（`FIXED / VERIFIED`）；维护包 PKG-3 至 PKG-5 维持挂起等待授权排期修复。
 
 ### [已验证]
 * **Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计 (Audit A 至 Audit J)**：

@@ -3,6 +3,35 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Repair 02: 修复 TerrainWalkAction 覆盖 Bridge 物理接触状态 FIND-R2-02
+
+### 缺陷修复与全生命周期回归 (`src/motion/terrain_walk.py`)
+* **FIND-R2-02 / FIND-T01-02 修复前运行复现**：
+  - 编写针对性回归测试 [`tests/test_find_r2_02_contact_state_ownership.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_02_contact_state_ownership.py)；
+  - 在旧代码下真实触发 5 项断言失败（Case A 规划参数缺失、Case B 接触点被覆盖为 0.0、Case C 失败脱空被篡改为锁定、Case D 上肢接触丢失、Case E 动作链终态失真，退出码 1）；
+* **最小手术式修复**：
+  - 在 [`src/motion/terrain_walk.py:1125–1145`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py#L1125-L1145) 中，移除在 `ms is not None` 时以本地 `c_dict` 覆盖 `ms.contacts` 的逻辑，严格保留 Bridge 返回的真实物理接触 `ms.contacts`；
+  - 将规划步态调度意图 (`planned_phase_l`, `planned_phase_r`, `planned_locked_l`, `planned_locked_r`, `planned_target_l`, `planned_target_r`) 注入 `ms.params`；
+  - 仅在 `ms is None` 的防御回退路径下使用 `c_dict` 构造初始 `MotionState`；
+* **针对性测试 5 路径验证**：
+  - Case A (正常双足行走接触状态保留): 验证 `ms.contacts` 来源为 Bridge 物理接触且规划调度参数进入 `params`；
+  - Case B (规划目标与实际接触坐标偏差): 注入实际接触点 $Z=1.3397$，验证 `ms.contacts` 保持 $Z=1.3397$ 未被覆盖为 $Z=0.0$；
+  - Case C (真实接触失败脱空): 模拟 Bridge 检出接触失效 (`is_locked=False`)，验证 `ms.contacts` 保持 False 未被误标为 True；
+  - Case D (上肢接触保留): 模拟 Bridge 返回 `hand_L` 支撑，验证 `ms.contacts` 完整保留 `hand_L` 未被局部字典抹除；
+  - Case E (动作链终态保持): 验证 `result.final_state.contacts` 完整保留实际物理接触供后续动作消费；
+  - 5 项测试全部通过（5/5 PASS in 0.466s）；
+* **全套自动化回归验证**：
+  - `.\run_tests.ps1 -tier quick`: 18/18 PASS (48.46s)
+  - `.\run_tests.ps1 -tier physics`: 21/21 PASS (86.43s)
+  - `.\run_tests.ps1 -tier motion`: 11/11 PASS (48.63s)
+  - `.\run_tests.ps1 -tier full`: 35/35 PASS (140.71s)
+  - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
+* **严格隔离纪律**：
+  - 生产代码仅修改 `src/motion/terrain_walk.py` 内部数据装配逻辑，未顺手修复 Repair-03，未修改 `MotionPlanner` 失败合同，未修改 Rig 父级管理；
+  - 存量确认缺陷由 2 降至 1 (FIND-R2-07)，阻碍 7B 的致命缺陷数由 4 降至 3；
+  - Phase 7B 仍然严格禁止。
+* **门禁状态标定**: 门禁最终状态更新为 `REPAIR-02 / FIND-R2-02 — AWAITING INDEPENDENT REVIEW`。
+
 ## [2026-10-29] Production Interface Repair 01: 修复 KinematicBridgeExecutor 手部接触意图非法枚举 FIND-R2-01
 
 ### 缺陷修复与全生命周期回归 (`src/motion/kinematic_bridge.py`)
