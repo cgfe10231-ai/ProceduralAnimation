@@ -6,35 +6,30 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — Production Interface Audit R3: Rig, Foot Contact & IK Execution Contract Audit。  
-* **当前状态**：`PRODUCTION INTERFACE AUDIT / R3 — ARCHIVED`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R4）。
-* **任务性质**：底层绑定、足部接触与 IK 执行合同只读审查，零生产代码修改，零测试代码修改。
+* **当前任务**：ProceduralAnimation — Production Interface Audit R3 — Full Lifecycle Contract Closure (R3-CLOSE)。  
+* **当前状态**：`PRODUCTION INTERFACE AUDIT / R3 — EVIDENCE VERIFIED`（严格停止等待人类审查与维护包修复准入，严禁擅自进入 Phase 7B，严禁擅自开启 R4）。
+* **任务性质**：R3 专项审计证据补全、全生命周期合同闭环与副作用纠错，零生产代码修改，零测试代码修改。
 
-### 本任务核心审查与核准成果 (Audit R3)
-1. **R3-A (`src/rig/foot_contact.py`, 333 行, 7 个函数)**：
-   - `lock_foot_contact` 解耦世界坐标系并在 Empty 上持久化锁定元数据；
-   - 发现 FIND-R3-01：`unlock_foot_contact` 默认形参 `reparent_to_root: bool = True` (L152) 动态挂载父级，违反 `ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条（控制器全生命周期恒定世界空间 `parent = None`）；
-   - 发现 FIND-R3-03：`unlock_foot_contact` 仅置 `is_locked = False`，未清理历史锁定坐标元数据。
-2. **R3-B (`src/rig/ik.py`, 404 行, 8 个函数)**：
-   - 证实下肢两骨 IK 与膝盖极向防翻转逻辑严密，脚部姿态通过 `COPY_ROTATION` 正确解耦；
-   - 发现 FIND-R3-02：`set_foot_ik_target:334–346` 地面防穿透硬编码根高程 (`root_obj.z + 0.07`m)，下坡时强制抬升导致悬空，迫使上层全流程传 `clamp_ground=False`；
-   - 发现 FIND-R3-01 关联项：行 380–384 在父级存在时世界欧拉角未进行逆旋转反解即赋给局部属性，产生姿态偏角。
-3. **R3-C (`src/rig/arm_ik.py`, 510 行, 9 个函数)**：
-   - 验证上肢两骨 IK 左右严格解耦，肘关节单自由度铰链 ($0^\circ \sim 150^\circ$) 与极向角匹配严密；
-   - 验证约束重建具备幂等性，FK/IK 权重在 $[0.0, 1.0]$ 平滑缩放；
-   - 验证手腕超限球形截断至最大臂长 ($0.56$m) 极限球面，并如实输出可达性与截断标记；
-   - 验证父矩阵逆向坐标与逆向旋转变换完备无缺漏。
-4. **R3-D (WBC $\to$ Rig 跨模块联合核验)**：
-   - 确认 `WholeBodyController` 在帧执行中维持单权威独占写入，底层模块为纯粹目标应用器；
-   - 锁态判断时序闭环（先检测 `was_locked` 并显式传 `reparent_to_root=False` 解锁，再设目标）；
-   - IK 跟踪误差与超限违规忠实转化为 `UnmetConstraint(category="REACHABILITY")` 回传上层，未吞没。
+### 本任务核心审查与核准成果 (R3-CLOSE)
+1. **R3-CLOSE-01 控制器完整生命周期核查 (FIND-R3-01)**：
+   - 确证跨生命周期动态父级循环：`setup_leg_ik()` 与 `reset_leg_ik()` 强制 `parent = root_obj` $\to$ 行走锁定 `lock_foot_contact()` 设 `parent = None` $\to$ 离地解锁 `unlock_foot_contact()` 默认重新挂载回 Root $\to$ 动作重置 `wbc.reset_all_controls()` 再次挂载回 Root；
+   - 确证该循环直接违反 `ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条（控制器全生命周期恒定世界空间 `parent = None`）；
+   - 确证父级非空时 `set_foot_ik_target:380–384` 欧拉角未进行逆矩阵反解即赋给局部属性，产生姿态偏角（非零偏航下旋转偏差数值量测标定为 `UNVERIFIED / RUNTIME PENDING`）。
+2. **R3-CLOSE-02 地面防穿透调用合同 (FIND-R3-02)**：
+   - 确证 `set_foot_ik_target:334–346` 硬编码 `min_ankle_z = root_obj.z + 0.07`m，阻断 3D 起伏地形与下坡，迫使生产代码全流程传 `clamp_ground=False`。
+3. **R3-CLOSE-03 evaluate_foot_support 副作用纠错 (FIND-R3-04)**：
+   - 纠正原报告“纯只读”描述，确证该函数执行 7 项强写入（改写 `shin.L/R` 骨骼局部旋转、2 次全场景视图层更新、强制解绑父级、强制覆写 FootIK 世界位置与旋转、动态刷新 KneePole 世界位置），充当了隐式约束维持器；
+   - 澄清调用权衡：现有 WBC 步态正是依赖该写入维持零滑移，严禁暴力删除写入，应重构拆分为显式锁态维持器与只读查询器。
+4. **R3-CLOSE-04 支撑元数据混淆与重置残留 (FIND-R3-03)**：
+   - 确证现有生产消费者均严格前置检查 `is_locked`，摆动期间属于有意保留的历史快照，未发生有效支撑误读，但全局 `reset_leg_ik` 时未彻底清理。
 5. **缺陷登记总表与维护包更新**：
-   - `OPEN_FINDINGS.md` 增量登记 3 项底层合同缺口（全仓库累计 12 项缺陷：3 项 `CONFIRMED_DEFECT`、9 项 `CONTRACT_GAP`；5 项阻碍 7B）；
-   - 增设维护包 5：Package 5 (Rig 与 IK 空间坐标与支撑锁定修复)。
+   - `OPEN_FINDINGS.md` 增量登记 FIND-R3-04（全仓库累计 13 项缺陷：3 项 `CONFIRMED_DEFECT`、10 项 `CONTRACT_GAP`；5 项阻碍 7B）；
+   - 维护包 5 扩充为：Package 5 (Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复)。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Production Interface Audit R3-CLOSE**: 全生命周期合同闭环与副作用纠错归档 (`EVIDENCE VERIFIED`)。
 * **Production Interface Audit R3**: 底层绑定、足部接触与 IK 执行合同只读审查归档 (`docs/audit/production_interface/R3_RIG_IK.md`)。
 * **Production Interface Audit R2-CLOSE**: 证据校准、签名行号核实与正式闭环归档 (`EVIDENCE VERIFIED`)。
 * **Production Interface Audit (R1, R2)**: 生产接口逐方法联合审计与缺陷登记归档。

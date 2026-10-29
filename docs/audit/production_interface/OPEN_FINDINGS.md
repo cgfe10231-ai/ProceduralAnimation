@@ -1,9 +1,9 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Audit — Rig, Foot Contact & IK Execution (R3)  
-> **审计基准 Commit**：`9f8fec684637b30b09c278d9726a6f3518dcdb22`  
+> **当前阶段**：Production Interface Audit — Full Lifecycle Contract Closure (R3-CLOSE)  
+> **审计基准 Commit**：`ff7232d2a77335d64091576d8f5293c097044d00`  
 > **最后更新时间**：2026-10-29  
-> **当前状态**：`PRODUCTION INTERFACE AUDIT / R3 — ARCHIVED`  
+> **当前状态**：`PRODUCTION INTERFACE AUDIT / R3 — EVIDENCE VERIFIED`  
 > **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。所有生产代码维持只读，待用户与人类团队审查批准后按维护包开展修复。
 
 ---
@@ -13,9 +13,9 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **3** | FIND-R2-01 (非法枚举崩溃), FIND-R2-02/T01-02 (接触状态覆盖), FIND-R2-07/T01-04 (接缝横向偏置) |
-| **接口合同缺口 (CONTRACT_GAP)** | **9** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (动态挂载父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (解锁残留失效元数据) |
+| **接口合同缺口 (CONTRACT_GAP)** | **10** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
-| **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收) |
+| **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
 | **阻碍后续开发 (Blocks Further Dev: YES)** | **5** | FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04, FIND-R3-01 |
 
 ---
@@ -35,7 +35,8 @@
 | **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 304–318 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
 | **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 152 / 380–384 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `foot_contact.py` / `ik.py` |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `ik.py` |
-| **FIND-R3-03** | - | `src/rig/foot_contact.py` | `unlock_foot_contact()` | Lines 168–170 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
+| **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
+| **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | Lines 207–235 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
 
 ---
 
@@ -241,25 +242,32 @@
 
 ---
 
-### FIND-R3-01: `unlock_foot_contact` 默认动态挂载父级违反门禁清规，且父级非空时 `set_foot_ik_target` 姿态未反解产生旋转偏差
+### FIND-R3-01: 控制器生命周期动态父级违规循环，且父级非空时 `set_foot_ik_target` 姿态未反解产生旋转偏差
 * **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
-* **Class / Function**: `unlock_foot_contact()` / `set_foot_ik_target()`
-* **Exact Line Range**: Line 152 (`foot_contact.py`) / Lines 380–384 (`ik.py`)
-* **Evidence Grade**: `STATIC_CONFIRMED`
+* **Class / Function**: `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `set_foot_ik_target()`
+* **Exact Line Range**: `foot_contact.py:152, 170–179`; `ik.py:127–134, 220–228, 380–384`
+* **Evidence Grade**: `STATIC_CONFIRMED` (父级循环与代码行静态确证)；非零偏航下旋转偏差数值量测标定为 `UNVERIFIED / RUNTIME PENDING`
 * **Trigger Condition**:
-  1. 调用 `unlock_foot_contact(arm, side)` 未显式传入 `reparent_to_root=False`；
-  2. 控制器处于父级非空状态（例如执行重置或遗留代码调用后），且角色 Root 存在非零旋转（偏航或倾斜）。
+  1. 初始化或动作重置（`setup_leg_ik` / `reset_leg_ik`）；
+  2. 调用 `unlock_foot_contact(arm, side)` 未显式传入 `reparent_to_root=False`；
+  3. 控制器处于父级非空状态下，角色 Root 存在非零旋转（偏航、俯仰或倾斜），并调用 `set_foot_ik_target()`。
 * **Actual Behavior**:
-  1. `unlock_foot_contact` 默认形参为 `reparent_to_root: bool = True`，在行 170–179 动态执行 `ik_obj.parent = root_obj` 和 `pole_obj.parent = root_obj`。这直接违反了 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条（控制器在动画全生命周期内必须恒定保持在绝对世界空间 `parent = None`）；
-  2. 在 `set_foot_ik_target` 行 375–378 中，位置正确执行了逆变换 (`ik_obj.parent.matrix_world.inverted() @ applied`)，但在行 380–384 中，`foot_rotation_deg` 却直接以世界欧拉角赋值给 `ik_obj.rotation_euler`（未进行局部旋转矩阵反解）。如果控制器存在父级且父级发生了旋转，脚部朝向将产生严重偏角。
+  1. **跨生命周期父级切换循环**：`setup_leg_ik()` 与 `reset_leg_ik()` 强制设置 `ik_obj.parent = root_obj`；`lock_foot_contact()` 执行 `parent = None` 解绑；`unlock_foot_contact()` 默认参数又重新挂载回 Root。调用 `wbc.reset_all_controls()` 时无条件刷回 Root，构成循环违规，直接违反 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条；
+  2. **局部旋转未反解**：在父级非空时，`set_foot_ik_target()` 行 375–378 对位置执行了逆变换，但在行 380–384 中，`foot_rotation_deg` 直接以世界欧拉角赋值给 `ik_obj.rotation_euler`（未进行局部旋转矩阵反解）。导致脚部实际世界旋转变成 $R_{\text{parent}} \cdot R_{\text{world}}$，产生严重姿态偏角。
 * **Expected Contract**:
-  1. 控制器恒定保持 `parent = None`；`unlock_foot_contact` 默认形参应改为 `reparent_to_root: bool = False`，并逐步废弃动态 reparent 逻辑；
+  1. 控制器全生命周期恒定保持 `parent = None`，彻底废弃跨帧动态 reparent 行为；
   2. `set_foot_ik_target` 姿态赋值应像 `arm_ik.py:468` 一样，在父级存在时执行逆旋转转换防护。
-* **Downstream Impact**: 破坏统一世界空间物理假设；若遗留调用方未显式传参将导致控制器父级突变，引发跳变或多帧坐标系发散。
+* **Affected Callers**:
+  - `WholeBodyController.reset_all_controls()`
+  - `KinematicBridgeExecutor.reset()`
+  - `MotionPlanner.execute()`
+* **Contract Violation**:
+  - 违反 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 恒定世界空间清规；
+  - 违反世界旋转输入数据合同。
 * **Classification**: `CONTRACT_GAP`
 * **Blocks Further Development**: `YES`
 * **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**: 将 `foot_contact.py:152` 默认参数改为 `reparent_to_root: bool = False`；在 `ik.py:380-384` 补齐父级逆旋转变换逻辑。
+* **Suggested Repair Boundary**: 统一 `setup_leg_ik`、`reset_leg_ik`、`unlock_foot_contact`，全生命周期锁定 `parent = None`；在 `set_foot_ik_target` 中防御性补齐逆旋转转换矩阵逻辑。
 
 ---
 
@@ -281,21 +289,54 @@
 
 ---
 
-### FIND-R3-03: `unlock_foot_contact` 解锁后残留过时支撑锁定元数据
-* **Source File**: `src/rig/foot_contact.py`
-* **Class / Function**: `unlock_foot_contact()`
-* **Exact Line Range**: Lines 168–170
+### FIND-R3-03: `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留
+* **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
+* **Class / Function**: `unlock_foot_contact()` / `reset_leg_ik()`
+* **Exact Line Range**: `foot_contact.py:168–170`, `ik.py:219`
 * **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 足部由锁定支撑（Stance）切换为摆动（Swing），调用 `unlock_foot_contact()`。
+* **Trigger Condition**: 足部由锁定支撑（Stance）切换为摆动（Swing），或动作完成调用系统重置。
 * **Actual Behavior**:
-  函数仅将自定义属性 `ik_obj["is_locked"] = False`，但此前在 `lock_foot_contact` 写入的 `contact_world_xyz`、`locked_ankle_world_xyz` 等几何元数据仍然持久留存在 Blender Empty 物体上，未被清除。下游模块若在未严格检查 `is_locked` 前置条件的情况下读取这些属性，将读取到上一周期的失效历史数据。
+  函数仅将自定义属性 `ik_obj["is_locked"] = False`，但此前写入的 `contact_world_xyz`、`locked_ankle_world_xyz` 等几何元数据仍然持久留存在 Blender Empty 物体上。
+* **消费者排查与证据澄清 (R3-CLOSE-04)**：
+  - 经全量排查，现有生产消费者（`whole_body_controller.py:395`、`evaluate_foot_support:213, 260`）均严格前置检查了 `is_locked`，未发生有效支撑的误读；
+  - 这些属性在摆动期间属于有意保留的历史快照（记录最后一次着地锚点）；
+  - 但在系统全局 `reset_leg_ik()` 时，这些历史快照依然残留，可能对跨动作调试或未加锁校验的第三方检查产生脏数据干扰。
 * **Expected Contract**:
-  在解除锁定状态时，应将锁定坐标与几何快照属性清理或安全置空（例如从 Empty 的属性字典中安全删除或赋为 None），避免数据残存。
-* **Downstream Impact**: 遥测与调试检查若未加锁校验会读出脏数据。
+  摆动期间历史快照允许保留但应明确标记为历史态；全局重置时应彻底清空。
 * **Classification**: `CONTRACT_GAP`
 * **Blocks Further Development**: `NO`
 * **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**: 在 `unlock_foot_contact` 中安全清除或置空 `ik_obj` 上的历史锁定坐标。
+* **Suggested Repair Boundary**: 在 `reset_leg_ik()` 中清理 Empty 上的历史锁定属性；在只读查询中明确区分当前活跃支撑点与历史落点快照。
+
+---
+
+### FIND-R3-04: `evaluate_foot_support` 充当隐式约束维持器，具有未声明的控制器强写入与骨骼修改副作用
+* **Source File**: `src/rig/foot_contact.py`
+* **Class / Function**: `evaluate_foot_support()`
+* **Exact Line Range**: Lines 207–235
+* **Evidence Grade**: `STATIC_CONFIRMED`
+* **Trigger Condition**: 任何调用 `evaluate_foot_support()` 或包装函数 `get_foot_support_state()` 的时机。
+* **Actual Behavior**:
+  该函数在名称和文档上声明为“状态与漂移评估”（只读查询），但实际上在执行时具有极其强烈的副作用与写入行为：
+  1. 行 207 调用 `_apply_ik_prebend_hint(arm)`，直接改写了双侧小腿骨骼 `shin.L/R` 的局部欧拉角；
+  2. 行 208 和行 235 两次触发全场景依赖图强制更新 `bpy.context.view_layer.update()`；
+  3. 只要 `is_locked` 为 True，行 219–224 强制解绑 `ik_obj.parent = None` 并将 `ik_obj.location` 和 `rotation_euler` 覆写回锁定点；
+  4. 行 227–234 强制解绑 `pole_obj.parent = None` 并基于当前髋关节重新计算并写入 `pole_obj.location`。
+* **严重性与稳定性权衡 (R3-CLOSE-03)**：
+  - 调用者在仅想查询遥测时（如 `ContactConstraintAdapter` 或测试代码），在未知情情况下触发了骨骼与控制器写操作；
+  - 但在现有执行链中，`WholeBodyController` (L405) 在脚部持续锁定时，**正是依赖调用 `evaluate_foot_support` 来完成每帧对膝盖极向目标的动态更新和对 FootIK 的绝对世界钉死**；
+  - 如果盲目将该函数改为纯只读或删除写入，现有的微米级防滑步态将立即损坏！
+* **Affected Callers**:
+  - `WholeBodyController.execute_frame()`
+  - `ContactConstraintAdapter.to_dict()`
+  - `get_foot_support_state()`
+* **Contract Violation**: 违反函数单一职责原则（SRP）与无副作用查询合同。
+* **Classification**: `CONTRACT_GAP`
+* **Blocks Further Development**: `NO` (现有 WBC 已形成隐式闭环，但阻碍接口正规化)
+* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Suggested Repair Boundary**:
+  1. 严禁简单删除现有写入；
+  2. 应在架构重构时将职责拆分为显式的 `enforce_foot_support_lock()`（负责写入与约束刷新）与真正纯只读的 `query_foot_support_state()`（负责遥测提取与漂移计算）。
 
 ## 5. 已知设计限制 (Known Design Limitations)
 
@@ -326,7 +367,7 @@ flowchart TD
     PKG1["Package 1: Bridge 健壮性与枚举修复<br>(FIND-R2-01)"] --> PKG2["Package 2: 状态所有权与接触记录保护<br>(FIND-R2-02)"]
     PKG2 --> PKG3["Package 3: 失败传播与执行器合同闭环<br>(FIND-R2-03, FIND-R2-04)"]
     PKG3 --> PKG4["Package 4: 规划精度与健壮性优化<br>(FIND-R2-05, FIND-R2-06, FIND-R2-07, FIND-T01-06, FIND-T01-07)"]
-    PKG3 --> PKG5["Package 5: Rig 与 IK 空间坐标与支撑锁定修复<br>(FIND-R3-01, FIND-R3-02, FIND-R3-03)"]
+    PKG3 --> PKG5["Package 5: Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复<br>(FIND-R3-01, FIND-R3-02, FIND-R3-03, FIND-R3-04)"]
 ```
 
 1. **维护包 1: Bridge 健壮性与枚举修复 (Bridge Robustness)**:
@@ -341,6 +382,6 @@ flowchart TD
 4. **维护包 4: 规划精度与健壮性优化 (Footfall Planning Precision & Robustness)**:
    - 修复 FIND-R2-05, FIND-R2-06, FIND-R2-07, FIND-T01-06, FIND-T01-07。
    - 消除接缝探测坐标偏置，统一步态规划未命中策略与负向行进支持。
-5. **维护包 5: Rig 与 IK 空间坐标与支撑锁定修复 (Rig & IK Spatial Invariance)**:
-   - 修复 FIND-R3-01, FIND-R3-02, FIND-R3-03。
-   - 移除动态切换父级逻辑，确保控制器恒定在世界空间；解耦底层地面防穿透与根节点高程的绑定；清理支撑解锁残留元数据。
+5. **维护包 5: Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复 (Rig & IK Spatial Invariance & Side Effects)**:
+   - 修复 FIND-R3-01, FIND-R3-02, FIND-R3-03, FIND-R3-04。
+   - 彻底废除跨生命周期动态父级切换，全生命周期维持绝对世界空间；解耦底层地面防穿透与根节点高程绑定；区分历史落点快照与重置清理；将 `evaluate_foot_support` 拆分为显式锁态维持器与纯只读状态查询器。

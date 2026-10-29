@@ -3,6 +3,26 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Audit R3-CLOSE: 全生命周期合同闭环与副作用纠错
+
+### 底层绑定与 IK 执行合同审计纠偏 (`docs/audit/production_interface/R3_RIG_IK.md`)
+* **R3-CLOSE-01 控制器完整生命周期核查 (FIND-R3-01)**：
+  - 确证控制器跨生命周期动态父级循环：`setup_leg_ik()` 与 `reset_leg_ik()` 强制 `parent = root_obj` $\to$ 行走锁定 `lock_foot_contact()` 设 `parent = None` $\to$ 离地解锁 `unlock_foot_contact()` 默认重新挂载回 Root $\to$ 动作重置 `wbc.reset_all_controls()` 再次挂载回 Root；
+  - 确证该循环直接违反 `ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条；
+  - 确证父级非空时 `set_foot_ik_target:380–384` 欧拉角未进行逆矩阵反解即赋给局部属性，产生姿态偏角（非零偏航下旋转偏差数值量测标定为 `UNVERIFIED / RUNTIME PENDING`）。
+* **R3-CLOSE-02 地面防穿透调用合同 (FIND-R3-02)**：
+  - 确证 `set_foot_ik_target:334–346` 硬编码 `min_ankle_z = root_obj.z + 0.07`m，阻断 3D 起伏地形与下坡，迫使生产代码全流程传 `clamp_ground=False`。
+* **R3-CLOSE-03 evaluate_foot_support 副作用纠错 (FIND-R3-04)**：
+  - 纠正原报告“纯只读”描述，确证该函数执行 7 项强写入（改写 `shin.L/R` 骨骼局部旋转、2 次全场景视图层更新、强制解绑父级、强制覆写 FootIK 世界位置与旋转、动态刷新 KneePole 世界位置），充当了隐式约束维持器；
+  - 澄清调用权衡：现有 WBC 步态正是依赖该写入维持零滑移，严禁暴力删除写入，应重构拆分为显式锁态维持器与只读查询器。
+* **R3-CLOSE-04 支撑元数据混淆与重置残留 (FIND-R3-03)**：
+  - 确证现有生产消费者均严格前置检查 `is_locked`，摆动期间属于有意保留的历史快照，未发生有效支撑误读，但全局 `reset_leg_ik` 时未彻底清理。
+* **统一问题总表更新 (`OPEN_FINDINGS.md`)**：
+  - 增量登记 FIND-R3-04（全仓库累计 13 项缺陷：3 项 `CONFIRMED_DEFECT`、10 项 `CONTRACT_GAP`；5 项阻碍 7B）；
+  - 维护包 5 扩充为：Package 5 (Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复)。
+* **零生产与测试代码变更**：`src/` 与 `tests/` 目录严格 0 变动，历史 `.blend` 资产严格 0 字节变动，严格禁止擅自进入 Phase 7B，严格禁止擅自开启 R4。
+* **门禁状态标定**: 门禁最终状态更新为 `PRODUCTION INTERFACE AUDIT / R3 — EVIDENCE VERIFIED`。
+
 ## [2026-10-29] Production Interface Audit R3: 底层绑定、足部接触与 IK 执行合同审计归档
 
 ### 底层绑定与 IK 执行合同审计交付 (`docs/audit/production_interface/R3_RIG_IK.md`)
