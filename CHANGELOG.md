@@ -3,6 +3,26 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Audit: R1/R2 逐方法联合审查与缺陷归档
+
+### 生产接口审计报告交付 (`docs/audit/production_interface/`)
+* **R1 审计归档 (`R1_TERRAIN_WALK.md`)**：
+  - 对 `src/motion/terrain_walk.py` 14 个函数/方法进行逐项源码排查；
+  - 证实并记录 7 项问题：失败结果吞没 (FIND-T01-01)、接触字典恶意覆写 (FIND-T01-02)、Action 失败合同缺失 (FIND-T01-03)、接缝探测横向坐标偏置 (FIND-T01-04)、步态预规划回退平地双轨制 (FIND-T01-05)、环境源脱节 (FIND-T01-06)、负向行进步态跳步 (FIND-T01-07)。
+* **R2 审计归档 (`R2_CORE_EXECUTION.md`)**：
+  - 对核心执行链 4 大生产脚本（`kinematic_bridge.py`, `framework.py`, `contact_model.py`, `whole_body_controller.py`）进行逐方法排查；
+  - 核查 E1 至 E7 跨模块数据流与控制权限，证实 Bridge 中存在未定义枚举 `ContactLifecycle.TOUCHDOWN` 致命崩溃隐患 (FIND-R2-01) 及规划器无法感知 Action 内部失败 (FIND-R2-04)。
+* **统一问题登记总表 (`OPEN_FINDINGS.md`)**：
+  - 汇总全部 3 项已确认缺陷、5 项接口合同缺口、3 项设计限制与 2 项未验证项；
+  - 明确标注 4 项阻碍后续 7B 开发的真实 BLOCKER（FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04）；
+  - 划定 4 个原子维护包（Bridge 健壮性、状态所有权保护、失败传播合同、规划精度优化），等待授权排期修复。
+
+### 门禁状态纠偏与交接同步
+* **状态纠偏**：澄清此前 Final Architecture Audit 的 `AUDITED / NO BLOCKERS` 不能代表生产接口复核通过，当前门禁状态更新为 `PRODUCTION INTERFACE AUDIT — AUDITED / PENDING REPAIR`；
+* **文档同步**：同步更新 `AI_SYNC.md`、`HANDOFF.md` 与 `PROJECT_STATE.md`；
+* **零生产与测试代码变更**：`src/` 与 `tests/` 目录严格 0 变动，历史 `.blend` 资产严格 0 字节变动，严格禁止擅自进入 Phase 7B。
+
+
 ## [2026-10-29] Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计、状态物理语义与文档同步 (Audit A 至 Audit J)
 
 ### 独立架构审计报告交付 (`docs/audit/environment_gate01_final/`)
