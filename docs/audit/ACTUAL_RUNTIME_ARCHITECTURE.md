@@ -1,5 +1,12 @@
 # ProceduralAnimation: Actual Runtime Architecture Audit (7A→7B Gate)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `670766a`（Phase 7A 阶段审计归档点，2026-10-27）
+> * **历史有效性说明**：本文件为历史阶段性运行时架构分析产物，**严格保留历史事实记录**。
+> * **后续演进与修复现状**：自本报告归档后，工程实施了 Environment Gate 01，彻底消除了解析环境与网格环境的双重事实源，确立了 `BlenderMeshEnvironmentAdapter` 为单一网格几何感知来源。最新全量架构事实请查阅 [`docs/audit/environment_gate01_final/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/)。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md) 与 [`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md)。
+
 > **Document Status**: COMPLETED ARCHITECTURE AUDIT BASELINE  
 > **Target Milestone**: Admission Gate Phase 7A → Phase 7B  
 > **Audit Date**: 2026-10-27  

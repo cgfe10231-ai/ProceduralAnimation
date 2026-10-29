@@ -1,5 +1,12 @@
 # ProceduralAnimation: Full-Repository Production Module Inventory (7A→7B Gate)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `670766a`（Phase 7A 阶段审计归档点，2026-10-27）
+> * **历史有效性说明**：本文件为历史阶段性模块清点产物，**严格保留历史事实记录**。
+> * **最新全量模块集成矩阵**：最新全工程 61 个 Python 模块的 7 级集成状态请查阅 [`docs/audit/environment_gate01_final/MODULE_INTEGRATION_MATRIX.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/MODULE_INTEGRATION_MATRIX.md)。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md) 与 [`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md)。
+
 > **Document Status**: COMPLETED ARCHITECTURE AUDIT BASELINE  
 > **Target Milestone**: Admission Gate Phase 7A → Phase 7B  
 > **Audit Date**: 2026-10-27  

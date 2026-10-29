@@ -1,5 +1,12 @@
 # ProceduralAnimation: Full-Repository Call Graph Audit (7A→7B Gate)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `670766a`（Phase 7A 阶段审计归档点，2026-10-27）
+> * **历史有效性说明**：本文件为历史阶段性调用图谱产物，**严格保留历史事实记录**。
+> * **最新实际生产调用链**：请直接查阅最新经逐行核实并通过验证的 [`docs/audit/environment_gate01_final/PRODUCTION_CALL_CHAIN.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/PRODUCTION_CALL_CHAIN.md)。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md) 与 [`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md)。
+
 > **Document Status**: COMPLETED ARCHITECTURE AUDIT BASELINE  
 > **Target Milestone**: Admission Gate Phase 7A → Phase 7B  
 > **Audit Date**: 2026-10-27  

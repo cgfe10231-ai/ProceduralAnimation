@@ -3,6 +3,47 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计、状态物理语义与文档同步 (Audit A 至 Audit J)
+
+### 独立架构审计报告交付 (`docs/audit/environment_gate01_final/`)
+* **Audit A: 全仓库 61 个模块清点与 7 级集成矩阵 (`MODULE_INTEGRATION_MATRIX.md`)**：
+  - 清点全量模块，严格标定为 `PRODUCTION_ACTIVE` (19 个)、`PARTIALLY_INTEGRATED` (4 个)、`TELEMETRY_ONLY` (6 个)、`TEST_ONLY` (4 个)、`PROTOTYPE_ONLY` (4 个)、`UNUSED` (2 个)；
+  - 确认单一人形控制执行链，零重复控制器。
+* **Audit B: 真实生产调用链逐行追踪 (`PRODUCTION_CALL_CHAIN.md`)**：
+  - 完整追踪并回答 B01 至 B12 关键架构问题，确认单向 `TerrainWalkAction` $\to$ `Bridge` $\to$ `WBC` $\to$ `Rig/IK/FK` 为唯一姿态写入链；
+  - 确认 Root 位置由 Hermite 曲线决定，CoM 与动力学状态未反馈。
+* **Audit C: 全工程硬编码与架构耦合分类登记 (`HARDCODE_REGISTER.md`)**：
+  - 审计 17 项关键参数（HC-01 至 HC-17），严格分类为 `DEMO_CONFIGURATION`、`VALID_PHYSICAL_PARAMETER`、`CONFIGURATION_LIMITATION`、`ARCHITECTURAL_COUPLING`；
+  - 标明单一直线走廊限制（HC-02/HC-03）与上肢摆臂耦合（HC-10）。
+* **Audit D: 未接入人体系统的动力学模块审计 (`UNINTEGRATED_MODULES.md`)**：
+  - 严格以四态法（①算法存在、②测试运行、③接入人体、④闭环反馈）划定边界；
+  - 确认 QP 接触力求解器与正向动力学积分器处于 Level ② (TEST_ONLY)，未驱动 19 骨骼人体。
+* **Audit E: 状态所有权、生命周期与坐标语义 (`STATE_OWNERSHIP_AND_SEMANTICS.md`)**：
+  - 梳理 9 大核心数据结构的单一写者与读写权限；
+  - 明确点 A（踝 IK 目标）、点 B（地面网格点）与点 C（足底接触锚点）的物理几何映射。
+* **Audit F: 物理与数学真实性审计 (`PHYSICS_AND_CONTROL_GAPS.md`)**：
+  - 定量定性判定：19 骨骼人形系统为 **100% 运动学驱动伴随真实几何环境感知**；
+  - 严格禁止在文档中虚构动力学力矩与平衡反馈。
+* **Audit G: 测试真实性与覆盖缺口 (`TEST_EVIDENCE_AUDIT.md`)**：
+  - 区分 Mock 合同测试与真实 Blender BVH 集成测试；
+  - 现场验证通过全量回归套件：`quick` (18/18 PASS in 44.5s), `physics` (21/21 PASS in 83.1s), `motion` (11/11 PASS in 45.4s), `full` (35/35 PASS in 136.3s)，退出码均为 0。
+* **Audit H: 历史文档全面同步报告 (`DOCUMENTATION_SYNC_REPORT.md`)**：
+  - 记录 `ARCHITECTURE.md` 与 `ARCHITECTURE_SYNC.md` 升至 v4.0；
+  - 为 `docs/FOUNDATION_*.md` 与 `docs/audit/*.md` 增加【历史审计快照标识】。
+* **Audit I: 后续架构路线收敛分析 (`ROADMAP_RECONCILIATION.md`)**：
+  - 确立 Phase 7B（独立上肢运动学）准入路径，明确其纯运动学定位；
+  - 规划 Phase 7C 动力学接入与 Phase 7D 通用航点导航解耦。
+* **Audit J: 最终缺陷登记表与门禁状态判定 (`FINAL_FINDINGS.md`)**：
+  - 登记 FIND-01（HIGH: 上肢正弦摆臂耦合，作为 7B 核心解耦任务）、FIND-02（MEDIUM: 手部休眠枚举引用）、FIND-03（MEDIUM: 单走廊限制）、FIND-04（MEDIUM: 动力学分流）、FIND-05（LOW: IK 超程开环告警）；
+  - 最终状态判定为 `ENVIRONMENT GATE 01 — AUDITED / NO BLOCKERS`。
+
+### 核心文档同步与基线锁定
+* `ARCHITECTURE.md` 与 `ARCHITECTURE_SYNC.md` 全面更新至 v4.0；
+* 运行 `tests/audit_c2_final_inspector.py --verify-docs` 校验 0 错误、0 虚构符号；
+* 生产代码与测试代码 0 变更，历史 `.blend` 资产 0 变更。
+
+
+
 ## [2026-10-29] Environment Gate 01 — Unit 4 Final Closure: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)
 
 ### 根因实证与缺陷修复 (`src/motion/kinematic_bridge.py`, `docs/evidence/environment_gate01_ru4/closure/`)

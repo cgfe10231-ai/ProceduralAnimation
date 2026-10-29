@@ -1,5 +1,12 @@
 # ProceduralAnimation: Hardcode & Bypass Audit (7A→7B Gate)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `670766a`（Phase 7A 阶段审计归档点，2026-10-27）
+> * **历史有效性说明**：本文件为历史阶段性硬编码与绕道审计报告，**严格保留历史事实记录**。
+> * **最新全量硬编码登记表**：最新全工程分类硬编码清单请查阅 [`docs/audit/environment_gate01_final/HARDCODE_REGISTER.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/HARDCODE_REGISTER.md)。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md) 与 [`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md)。
+
 > **Document Status**: COMPLETED ARCHITECTURE AUDIT BASELINE  
 > **Target Milestone**: Admission Gate Phase 7A → Phase 7B  
 > **Audit Date**: 2026-10-27  

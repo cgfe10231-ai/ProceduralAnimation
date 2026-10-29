@@ -1,13 +1,35 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-29  
-> **当前阶段**：Environment Gate 01 — Unit 4 Final Closure（不可支撑表面排除与默认平地隔离收口）已全部完成并通过 5 项专用测试、8 项全地形单元测试与 35 项全量分级回归。已成功关闭 Unit 4 剩余两个接触合同验证缺口（U4-CLOSE-01: `success=True` 但 `allows_regular_support=False` 时严格拒绝建立足部支撑并记为 `ContactLifecycle.BROKEN` 与 `NO_SUPPORT_SURFACE` 违规；U4-CLOSE-02: 真实 Mesh 模式四类场景 Case A/B/C/D 零虚假 ESTABLISHED、零虚假 DOUBLE_STANCE、零虚假 ground 分配，确认兼容表面未污染足部接触记录）；分级测试全绿：`quick` (18/18), `physics` (21/21), `motion` (11/11), `full` (35/35)；历史资产严格 0 字节变动；当前状态：`ENVIRONMENT GATE 01 / UNIT 4 — READY FOR REVIEW`，严格停止等待审查，严禁擅自进入 Final Architecture Audit 或 Phase 7B。  
+> **当前阶段**：Environment Gate 01 — Final Architecture Audit（全仓库独立架构审计、状态物理语义与文档同步）已全部完成。全量 10 份审计报告（Audit A 至 Audit J）已交付至 `docs/audit/environment_gate01_final/`。四级回归套件 100% 机器验证通过：`quick` (18/18 PASS in 44.5s), `physics` (21/21 PASS in 83.1s), `motion` (11/11 PASS in 45.4s), `full` (35/35 PASS in 136.3s)，文档校验器 `audit_c2_final_inspector.py --verify-docs` 0 错误通过；核心架构文档 `ARCHITECTURE.md` 与 `ARCHITECTURE_SYNC.md` 升至 v4.0；生产代码与测试代码 0 变更，历史 `.blend` 资产 0 变更；当前门禁最终状态：`ENVIRONMENT GATE 01 — AUDITED / NO BLOCKERS`，严格停止等待人类和 ChatGPT 独立审查，严禁擅自进入 Phase 7B。  
 
 ---
 
 ## 1. 状态分类一览
 
 ### [已验证]
+* **Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计 (Audit A 至 Audit J)**：
+  * **Audit A: 全仓库模块清点与 7 级集成矩阵 (`MODULE_INTEGRATION_MATRIX.md`)**：
+    - 审查全部 61 个 Python 模块与 21 个根运行脚本，确立单一人形控制主执行链，严格划分为 `PRODUCTION_ACTIVE` (19 个)、`PARTIALLY_INTEGRATED` (4 个)、`TELEMETRY_ONLY` (6 个)、`TEST_ONLY` (4 个)、`PROTOTYPE_ONLY` (4 个)、`UNUSED` (2 个)；
+  * **Audit B: 真实生产调用链逐行追踪 (`PRODUCTION_CALL_CHAIN.md`)**：
+    - 回答 B01 至 B12 关键问题，确认 `TerrainWalkAction` $\to$ `Bridge` $\to$ `WBC` $\to$ `Rig/IK/FK` 为唯一骨骼写入链，无旁路双轨制；
+  * **Audit C: 全工程硬编码与架构耦合分类登记 (`HARDCODE_REGISTER.md`)**：
+    - 登记 HC-01 至 HC-17 关键参数，明确单一直线走廊限制（HC-02/03）与上肢正弦摆臂耦合（HC-10）；
+  * **Audit D: 未接入人体系统的动力学模块审计 (`UNINTEGRATED_MODULES.md`)**：
+    - 以严格四态法澄清 QP 接触力求解器与正向动力学积分器处于 Level ② (TEST_ONLY)，未驱动 19 骨骼人形；
+  * **Audit E: 状态所有权、生命周期与坐标语义 (`STATE_OWNERSHIP_AND_SEMANTICS.md`)**：
+    - 明确 9 大核心状态的单一所有权，严密校准点 A（踝 IK 目标）、点 B（网格接触点）与点 C（足底接触锚点）；
+  * **Audit F: 物理与数学真实性审计 (`PHYSICS_AND_CONTROL_GAPS.md`)**：
+    - 定量定性判定系统为 **100% 运动学驱动伴随真实几何环境感知**，杜绝虚假动力学冒充；
+  * **Audit G: 测试真实性与覆盖缺口 (`TEST_EVIDENCE_AUDIT.md`)**：
+    - 现场全量回归：`quick` (18/18), `physics` (21/21), `motion` (11/11), `full` (35/35)，退出码均为 0；
+  * **Audit H: 历史文档全面同步报告 (`DOCUMENTATION_SYNC_REPORT.md`)**：
+    - 同步核心架构文档至 v4.0，为历史审计文档统一添加【历史审计快照标识】；
+  * **Audit I: 后续架构路线收敛分析 (`ROADMAP_RECONCILIATION.md`)**：
+    - 确立 Phase 7B 为纯运动学范畴，明确首要攻坚任务为解耦上肢摆动；
+  * **Audit J: 最终缺陷登记表与门禁状态判定 (`FINAL_FINDINGS.md`)**：
+    - 登记 FIND-01 至 FIND-05，确认无遗留 BLOCKER，最终标定为 `ENVIRONMENT GATE 01 — AUDITED / NO BLOCKERS`。
+
 * **Environment Gate 01 — Unit 4 Final Closure: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)**：
   * **U4-CLOSE-01: 排除不可支撑表面建立虚假有效支撑**：
     - 针对受控环境 `SurfaceQueryResult(success=True, allows_regular_support=False)` 执行真实反例；

@@ -1,5 +1,12 @@
 # ProceduralAnimation: Environment Interaction Gap Analysis (7A→7B Gate)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `670766a`（Phase 7A 阶段审计归档点，2026-10-27）
+> * **历史有效性说明**：本文件为历史阶段性环境交互差距分析报告，**严格保留历史事实记录**。
+> * **后续演进与修复现状**：本报告指出的解析环境与网格几何脱节问题在 Environment Gate 01（Unit 1-4）中完成几何网格对齐；双向动力学受力闭环缺口确认为阶段性未接入项，详见 [`docs/audit/environment_gate01_final/PHYSICS_AND_CONTROL_GAPS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/PHYSICS_AND_CONTROL_GAPS.md)。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md) 与 [`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md)。
+
 > **Document Status**: COMPLETED ARCHITECTURE AUDIT BASELINE  
 > **Target Milestone**: Admission Gate Phase 7A → Phase 7B  
 > **Audit Date**: 2026-10-27  

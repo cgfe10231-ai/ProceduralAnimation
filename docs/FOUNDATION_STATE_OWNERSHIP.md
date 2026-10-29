@@ -1,5 +1,12 @@
 # Foundation State Ownership & Single-Writer Contracts (Task 6G-D-C2-FINAL)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `d0d73d4`（Task 6G-D-C2-FINAL 归档点）
+> * **历史有效性说明**：本文件为历史阶段性状态所有权规范，**严格保留历史事实记录**。
+> * **后续演进与修复现状**：自本规范确立后，Environment Gate 01 引入了 `SurfaceQueryResult`、网格接触记录及三坐标锚点区分。最新全量状态所有权与坐标语义请参见 [`docs/audit/environment_gate01_final/STATE_OWNERSHIP_AND_SEMANTICS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/STATE_OWNERSHIP_AND_SEMANTICS.md)。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md)、[`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md) 及 [`docs/audit/environment_gate01_final/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/) 审计报告集合。
+
 > **Document Purpose**: Establishes the strict Single-Writer / Multi-Reader ownership boundaries across all state structures and Blender scene objects in the repository.  
 > **Anti-Drift Rule**: This document strictly separates **(1) Current Actual Implementation on Disk** from **(2) Unfinished Confluence & Planned Future Responsibilities**. No unimplemented classes, methods, or conversion interfaces are described as existing.
 

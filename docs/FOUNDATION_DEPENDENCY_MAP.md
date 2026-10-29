@@ -1,5 +1,12 @@
 # Foundation Dependency Map & Call Graph (Task 6G-D-C2-FINAL)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `d0d73d4`（Task 6G-D-C2-FINAL 归档点）
+> * **历史有效性说明**：本文件为历史阶段性调用图谱产物，记录当时 AST 静态解析结果，**严格保留历史事实记录**。
+> * **后续演进与修复现状**：自本图谱生成后，系统已于 Environment Gate 01 引入 `BlenderMeshEnvironmentAdapter` 与 `TerrainWalkAction`。最新实际生产调用链请参见 [`docs/audit/environment_gate01_final/PRODUCTION_CALL_CHAIN.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/PRODUCTION_CALL_CHAIN.md)。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md)、[`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md) 及 [`docs/audit/environment_gate01_final/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/) 审计报告集合。
+
 > **Verification Basis**: Machine-extracted AST import and call-site analysis across all 51 `src/` modules and 19 `run_*.py` scripts via [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py) and [`docs/evidence/task6gd_c2a/codebase_and_blend_audit.json`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/task6gd_c2a/codebase_and_blend_audit.json).  
 > **Strict Rule**: Only modules, classes, and functions that physically exist on disk in `master` appear in the current architecture diagrams and dependency tables below. Planned future connections are strictly isolated in Section 4 (`Future Architecture`).
 

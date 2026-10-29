@@ -1,5 +1,12 @@
 # Foundation Architecture & Mathematical Closure Audit (Task 6G-D-C2-FINAL)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `d0d73d4`（Task 6G-D-C2-FINAL 归档点）
+> * **历史有效性说明**：本文件为历史阶段性审计产物，真实反映当时发现的架构状态与分流事实，**严格保留历史事实记录**。
+> * **后续演进与修复现状**：本文件记录的解析环境与双管线分流问题，在后续 **Environment Gate 01（Unit 1 至 Unit 4，Commit `7a3e244`）** 中完成了真实网格环境查询接入、步态速度连续性与着地闭环；最新全工程审计确认 19 骨骼主链稳定运行，动力学算子保持独立。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md)、[`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md) 及 [`docs/audit/environment_gate01_final/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/) 审计报告集合。
+
 > **Document Purpose**: Authoritative engineering and mathematical audit of the actual disk codebase at the conclusion of Task 6G-D-C2-FINAL.  
 > **Verification Basis**: Direct inspection of all 51 `src/` Python modules and 18 `output/*.blend` assets via [`tests/audit_c2_final_inspector.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/audit_c2_final_inspector.py).
 

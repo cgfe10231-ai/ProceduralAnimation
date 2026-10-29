@@ -1,5 +1,12 @@
 # ProceduralAnimation: Architecture Baseline Audit Summary (7A→7B Gate)
 
+> [!NOTE]
+> **历史审计快照标识 (Historical Audit Snapshot)**
+> * **快照归档基准**：Git SHA `670766a`（Phase 7A 阶段审计归档点，2026-10-27）
+> * **历史有效性说明**：本文件为历史阶段性审计产物，真实记录当时发现的架构问题，**严格保留历史事实记录**。
+> * **历史问题处置现状**：本文件中记录的早期缺陷（如网格双真理源 AUDIT-03、文档漂移 AUDIT-05）已在后续 **Environment Gate 01（Unit 1 至 Unit 4，Commit `7a3e244`）** 中完整修复并自动化验证通过。动力学分流事实（AUDIT-01）依然成立，确立为独立演进阶段。
+> * **最新权威架构文档**：请查阅最新权威文档 [`ARCHITECTURE.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE.md)、[`ARCHITECTURE_SYNC.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/ARCHITECTURE_SYNC.md) 及 [`docs/audit/environment_gate01_final/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/environment_gate01_final/) 最终审计报告集合。
+
 > **Document Status**: COMPLETED ARCHITECTURE AUDIT BASELINE  
 > **Target Milestone**: Admission Gate Phase 7A → Phase 7B  
 > **Audit Date**: 2026-10-27  
