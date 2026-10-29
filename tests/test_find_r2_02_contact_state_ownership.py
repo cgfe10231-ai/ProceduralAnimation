@@ -107,6 +107,9 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
         self,
         intercept: bool = False,
         injected_contacts: Optional[Dict[str, ContactPointState]] = None,
+        stand_start_frames: int = 2,
+        step_frames: int = 4,
+        stand_stop_frames: int = 2,
     ) -> Tuple[Any, InspectableBridgeExecutor]:
         bridge = InspectableBridgeExecutor(
             armature_obj=self.armature,
@@ -135,17 +138,60 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
             start_pos=(0.0, 0.0, 0.0),
             target_pos=(0.0, 0.3, 0.0),
             nominal_stride_m=0.3,
-            stand_start_frames=4,
-            step_frames=8,
-            stand_stop_frames=4,
+            stand_start_frames=stand_start_frames,
+            step_frames=step_frames,
+            stand_stop_frames=stand_stop_frames,
         )
         action = TerrainWalkAction(route=route, environment=self.env)
         result = action.execute(init_state, ctx)
         return result, bridge
 
+    def _execute_walk_supplementary(
+        self,
+        intercept: bool = False,
+        injected_contacts: Optional[Dict[str, ContactPointState]] = None,
+    ) -> Tuple[Any, InspectableBridgeExecutor]:
+        """Supplementary execution configuration (stand_start=4, step=8, stand_stop=4).
+
+        Provides sufficient temporal resolution for root spline and swing foot
+        synchronization without triggering reachability hyperextension, allowing full
+        multi-frame verification of contact state ownership (Cases A through E).
+        """
+        return self._execute_walk(
+            intercept=intercept,
+            injected_contacts=injected_contacts,
+            stand_start_frames=4,
+            step_frames=8,
+            stand_stop_frames=4,
+        )
+
+    def test_original_boundary_condition_failure_exposure(self) -> None:
+        """Verify that original boundary conditions (stand_start=2, step=4, stand_stop=2)
+        truthfully expose Frame 6 reachability failure caught by Repair 03's failure check.
+
+        Kinematic Root Cause:
+        In a 4-frame stride with nominal_stride_m=0.30m, swing foot interpolates
+        over dur-1=3 frames reaching alpha=1.0 at Frame 6, while root spline interpolates
+        over dur=4 frames reaching only 75% at Frame 6. This 25% phase lag pulls
+        the diagonal leg distance to 0.8204m (> 0.8200m MAX_LEG_REACH).
+        Repair 03's strict failure check correctly catches this failure and raises RuntimeError.
+        """
+        with self.assertRaises(RuntimeError) as cm:
+            self._execute_walk(
+                intercept=False,
+                stand_start_frames=2,
+                step_frames=4,
+                stand_stop_frames=2,
+            )
+        err_msg = str(cm.exception)
+        self.assertIn("KinematicBridge execution failed", err_msg)
+        self.assertIn("foot_R", err_msg)
+        self.assertIn("REACHABILITY", err_msg)
+        self.assertIn("Frame 6", err_msg)
+
     def test_case_a_normal_walk_contact_state_ownership(self) -> None:
         """Case A: Normal walk preserves actual contact state produced by KinematicBridgeExecutor."""
-        result, bridge = self._execute_walk(intercept=False)
+        result, bridge = self._execute_walk_supplementary(intercept=False)
         self.assertGreater(len(result.states), 0)
 
         # In every frame, ms.contacts must come from bridge_res.motion_state.contacts
@@ -178,7 +224,7 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
                 surface_normal=(0.0, 0.0, 1.0),
             )
         }
-        result, _ = self._execute_walk(intercept=True, injected_contacts=injected)
+        result, _ = self._execute_walk_supplementary(intercept=True, injected_contacts=injected)
         self.assertGreater(len(result.states), 0)
 
         first_ms = result.states[0]
@@ -201,7 +247,7 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
                 surface_normal=(0.0, 0.0, 1.0),
             )
         }
-        result, _ = self._execute_walk(intercept=True, injected_contacts=injected)
+        result, _ = self._execute_walk_supplementary(intercept=True, injected_contacts=injected)
         self.assertGreater(len(result.states), 0)
 
         first_ms = result.states[0]
@@ -222,7 +268,7 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
                 surface_normal=(0.0, 0.0, 1.0),
             )
         }
-        result, _ = self._execute_walk(intercept=True, injected_contacts=injected)
+        result, _ = self._execute_walk_supplementary(intercept=True, injected_contacts=injected)
         self.assertGreater(len(result.states), 0)
 
         first_ms = result.states[0]
@@ -254,7 +300,7 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
                 surface_normal=(0.0, 0.0, 1.0),
             ),
         }
-        result, _ = self._execute_walk(intercept=True, injected_contacts=injected)
+        result, _ = self._execute_walk_supplementary(intercept=True, injected_contacts=injected)
         self.assertGreater(len(result.states), 0)
 
         final_state = result.final_state

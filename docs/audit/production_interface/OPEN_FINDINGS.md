@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Repair 03 — FIND-R2-03 Terrain Walk Failure Propagation & Fallback Branch Closure  
-> **审计与修复基准 Commit**：`da08a8dbfde202f54bc287f576c2a4cbd4a1d4dc`  
-> **最后更新时间**：2026-10-29  
-> **当前状态**：`REPAIR-03 / FIND-R2-03 — AWAITING INDEPENDENT REVIEW`  
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02 及 FIND-R2-03 修复，其余 Finding 维持原状待后续逐包推进。
+> **当前阶段**：Production Interface Repair 03 Closure — Slope Ankle Pitch Parameter Audit & Regression Test Boundary Restoration (REPAIR-03-CLOSE)  
+> **审计与修复基准 Commit**：`ce99ecc137c47bb355babe14debe19cc5be47ac5`  
+> **最后更新时间**：2026-10-30  
+> **当前状态**：`REPAIR-03-CLOSE — AWAITING INDEPENDENT REVIEW`  
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02 及 FIND-R2-03 修复与收尾审核，其余 Finding 维持原状待后续逐包推进。
 
 ---
 
@@ -13,7 +13,7 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **1** (存量) + **2** (已修复) | 存量：FIND-R2-07/T01-04 (接缝横向偏置)；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写) |
-| **接口合同缺口 (CONTRACT_GAP)** | **11** (存量) + **1** (已修复) | 存量：FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口) |
+| **接口合同缺口 (CONTRACT_GAP)** | **12** (存量) + **1** (已修复) | 存量：FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
 | **阻碍后续开发 (Blocks Further Dev: YES)** | **2** | FIND-R2-04, FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03 已修复解除阻碍) |
@@ -33,6 +33,7 @@
 | **FIND-R2-07** | FIND-T01-04 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 310–312 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
 | **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 304–318 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
+| **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 895–905 vs 848–870 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
 | **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 152 / 380–384 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `foot_contact.py` / `ik.py` |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `ik.py` |
 | **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
@@ -147,9 +148,63 @@
 * **Fix & Verification Summary**:
   - 在 `src/motion/terrain_walk.py:1084–1100` 接入显式失败阻断：当 `not bridge_res.success` 时立即格式化 `unmet_constraints` 抛出结构化 `RuntimeError`，阻断不可行动作；当 `bridge_res.motion_state is None` 时抛出状态合同异常。
   - 完全移除旧版 `if ms is None:` 中包含弃用字段名（`linear_velocity_world` / `angular_velocity_world`）的死回退分支。
-  - 针对斜坡地形踏步时摆动腿脚踝角度受小腿后屈拉扯导致的 ROM 越界缺陷，将 `swing_relax_amp` 微调至 25.0°，通过自然跖屈释放踝关节应力，保持生理范围严苛合规（零阈值放宽）。
+  - **斜坡脚踝摆动参数 22.0° vs 25.0° 专项审计与 17 帧遥测对齐 (REPAIR-03-CLOSE)**：
+    - **背景**：上坡行进（15° ramp）第 4 步（Frames 71–87），摆动脚小腿屈曲深达 $-79.7^\circ$。在原 `swing_relax_amp = 22.0°` 下，小腿大角度旋转迫使踝关节背屈超出解剖界限（Frame 75 超出 $+0.364^\circ$，Frame 76 超出 $+0.285^\circ$），触发 Bridge 严格 ROM 门禁阻断。
+    - **逐帧真实对比遥测数据（第 4 步 17 帧全量对比）**：
+      | 帧号 (Frame) | 摆动进度 (alpha) | 22.0° 踝 X 角度 | 22.0° ROM 状态 | 25.0° 踝 X 角度 | 25.0° ROM 状态 | 25.0° 足底净空 (Clearance) |
+      | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+      | 71 | 0.000 | 15.000° | OK | 15.000° | OK | 0.0 mm |
+      | 72 | 0.062 | 26.541° | OK | 25.955° | OK | 18.2 mm |
+      | 73 | 0.125 | 36.877° | OK | 35.732° | OK | 38.6 mm |
+      | 74 | 0.188 | 44.477° | OK (安全裕度 0.523°) | 42.791° | OK (安全裕度 2.209°) | 59.8 mm |
+      | **75** | **0.250** | **45.364°** | <span style="color:red;">**VIOLATION (+0.364°)**</span> | **43.244°** | **OK (安全裕度 1.756°)** | **78.4 mm** |
+      | **76** | **0.312** | **45.285°** | <span style="color:red;">**VIOLATION (+0.285°)**</span> | **42.748°** | **OK (安全裕度 2.252°)** | **91.1 mm** |
+      | 77 | 0.375 | 44.564° | OK (安全裕度 0.436°) | 41.654° | OK (安全裕度 3.346°) | 94.5 mm (最高点) |
+      | 78 | 0.438 | 43.187° | OK | 39.957° | OK | 93.8 mm |
+      | 79 | 0.500 | 41.042° | OK | 37.562° | OK | 90.1 mm |
+      | 80 | 0.562 | 38.005° | OK | 34.398° | OK | 83.2 mm |
+      | 81 | 0.625 | 34.004° | OK | 30.393° | OK | 72.8 mm |
+      | 82 | 0.688 | 29.832° | OK | 26.241° | OK | 58.7 mm |
+      | 83 | 0.750 | 25.864° | OK | 22.316° | OK | 41.5 mm |
+      | 84 | 0.812 | 22.463° | OK | 19.167° | OK | 24.3 mm |
+      | 85 | 0.875 | 19.589° | OK | 17.065° | OK | 10.2 mm |
+      | 86 | 0.938 | 17.180° | OK | 15.753° | OK | 1.8 mm |
+      | 87 | 1.000 | 15.000° | OK (精确对齐坡面) | 15.000° | OK (精确对齐坡面) | 0.0 mm (零穿透/零悬空) |
+    - **独立多配置通用性验证矩阵 (Strides $\times$ Durations)**：
+      | 步长 (Stride) | 单步帧数 (sf) | 22.0° 踝 X 最大超限量 | 25.0° 踝 X 最大值 | 25.0° 安全裕度 |
+      | :---: | :---: | :---: | :---: | :---: |
+      | 0.20 m | 16 frames | +0.000° (无超限) | 41.820° | 3.180° |
+      | 0.25 m | 16 frames | +0.124° | 42.645° | 2.355° |
+      | 0.30 m | 16 frames | +0.364° | 43.244° | 1.756° |
+      | 0.35 m | 16 frames | +0.582° | 44.112° | 0.888° |
+      | 0.30 m | 12 frames | +0.288° | 42.910° | 2.090° |
+      | 0.30 m | 20 frames | +0.426° | 43.511° | 1.489° |
+      | 0.30 m | 24 frames | +0.482° | 43.765° | 1.235° |
+    - **结论与审查状态**：`25.0°` 解决的是上坡膝深屈下的真实人体解剖学应力耦合，全程保持零穿透、零悬空、精确贴坡，未放宽任何生理阈值。当前代码维持 `swing_relax_amp = 25.0°`，全量证据归档待独立审查批准。
+  - **回归测试边界条件恢复与根因定位 (`tests/test_find_r2_02_contact_state_ownership.py`)**：
+    - 恢复原边界条件 `stand_start_frames=2, step_frames=4, stand_stop_frames=2` 作为正式负向回归测试用例 `test_original_boundary_condition_failure_exposure`，严苛断言捕获 Frame 6 的 `KinematicBridge execution failed (unmet=1): foot_R (REACHABILITY)`。
+    - **运动学根因确证**：在 4 帧极短步态中，摆动脚进度分母为 `dur - 1 = 3`，在 Frame 6 达到 $1.0$（落点 $y=0.30\text{m}$）；而根部位移样条分母为 `dur = 4`，在 Frame 6 仅达到 $75\%$（$y=0.1055\text{m}$）。25% 的时间相位差将腿部对角线欧氏距离拉扯至 0.8204m，超出最大腿长极限 0.8200m 0.4mm。Repair 03 严格失败阻断成功捕获了该真实不可达错误。
+    - 针对接触状态所有权（Cases A–E），新增独立补充测试配置 `_execute_walk_supplementary(step_frames=8)`，在消除几何假性过伸的前提下完整覆盖多帧步态的 Bridge 接触状态传递。
   - 新增专用回归套件 `tests/test_terrain_walk_failure_propagation.py`（6/6 PASS），涵盖 WBC Reachability 失败、接触几何失败、ROM 违背、None 状态异常及平顺地形回归。
   - 全套验证通过：`quick` (18/18 PASS), `physics` (21/21 PASS), `motion` (11/11 PASS), `full` (35/35 PASS)。
+
+---
+
+### FIND-T01-08: 短步态周期下根部与摆动足插值分母不一致导致的运动学假性过伸 (Phase Lag Reachability Hyperextension)
+* **Source File**: `src/motion/terrain_walk.py`
+* **Class / Function**: `TerrainWalkAction.execute()`
+* **Exact Line Range**: Lines 895–905 (`step_alpha = (current_frame - active_step.frame_start) / float(dur - 1)`) vs Lines 848–870 (`root_y` spline knots across `dur`)
+* **Evidence Grade**: `STATIC_CONFIRMED`
+* **Trigger Condition**: 步态周期配置极短（如 `step_frames=4`，`nominal_stride_m=0.30`）。
+* **Actual Behavior**:
+  足部进度归一化使用 `dur - 1`，在第 6 帧即达到 $1.0$（摆动脚落在 $y=0.30$m）；而根部位移样条节点基于 `[frame_start, frame_end]`（跨度 `dur=4`），在第 6 帧仅推进至 $u = 3/4 = 75\%$（根部位于 $y=0.1055$m）。根部比足部落点滞后 25%，导致骨盆与踝关节斜向欧氏距离达 0.8204m，超出腿部几何极限 0.8200m 0.4mm，被 Bridge 失败检查捕获抛出 `RuntimeError`。
+* **Expected Contract**:
+  根部推进与摆动足轨迹应严格采用统一的时间归一化基准，或在超短步态下实施步长与腿长几何约束校验，防止根部滞后拉扯造成几何假性过伸。
+* **Responsible Module**: `src/motion/terrain_walk.py`
+* **Downstream Impact**: 步态帧数配置过短时（$\le 4$ 帧），动作在到达落点瞬间由于骨盆未跟进而触发可达性报错。
+* **Classification**: `CONTRACT_GAP`
+* **Blocks Further Development**: `NO`
+* **Repair Status**: `OPEN / PENDING REPAIR`（已在 `tests/test_find_r2_02_contact_state_ownership.py` 中通过 `test_original_boundary_condition_failure_exposure` 作为正式负向断言保留现场，并在补充测试中采用 `step_frames=8` 验证接触状态所有权）。
 
 ---
 

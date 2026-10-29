@@ -3,6 +3,33 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Repair 03 Closure: 斜坡脚踝摆动参数审核与回归测试边界恢复 (REPAIR-03-CLOSE)
+
+### 专项审计、边界恢复与运动学根因闭环
+* **位置一：斜坡脚踝摆动松弛参数审计 (22.0° vs 25.0°)**：
+  - **受控复现**：在基线 15° 斜坡踏步第 4 步（Frames 71–87），摆动脚小腿屈曲深达 $-79.7^\circ$。在原 `swing_relax_amp = 22.0°` 下，小腿大角度旋转迫使踝关节背屈超出解剖界限（Frame 75 超出 $+0.364^\circ$，Frame 76 超出 $+0.285^\circ$），被 Bridge 门禁捕获中断；
+  - **17 帧全量逐帧遥测**：`25.0°` 使 Frame 75 踝背屈降至 43.244°（安全裕度 1.756°），足底净空最高 94.5mm（全程零穿透、零悬空），着地角度精确对齐坡面 15.00°；
+  - **跨步长与跨周期通用性**：步长 0.20m–0.35m 及单步 12–24 帧多配置矩阵全部合规通过；生产代码维持 `25.0°`，全量对比证据归档待独立审查批准；
+* **位置二：回归测试边界恢复与根因定位 (`tests/test_find_r2_02_contact_state_ownership.py`)**：
+  - 恢复原测试边界条件 `stand_start_frames=2, step_frames=4, stand_stop_frames=2` 作为正式负向回归用例 `test_original_boundary_condition_failure_exposure`，严苛断言捕获 Frame 6 的 `KinematicBridge execution failed (unmet=1): foot_R (REACHABILITY)`；
+  - **运动学根因确证**：短步态下摆动足进度分母（`dur - 1 = 3`）比根部位移样条分母（`dur = 4`）超前 25%，导致 Frame 6 骨盆滞后产生 0.4mm 假性过伸；在 `OPEN_FINDINGS.md` 登记为新合同缺口 `FIND-T01-08`；
+  - 为接触状态所有权验证（Cases A–E）引入独立补充配置 `_execute_walk_supplementary(step_frames=8)`，测试集扩充至 6 项全绿（6/6 PASS in 0.734s）；
+* **全套针对性测试与回归套件验证**：
+  - `tests/test_terrain_walk_failure_propagation.py`: 6/6 PASS (0.455s)
+  - `tests/test_find_r2_01_hand_contact_lifecycle.py`: 4/4 PASS (0.269s)
+  - `tests/test_find_r2_02_contact_state_ownership.py`: 6/6 PASS (0.734s)
+  - `tests/test_environment_gate01_unit3.py`: 14/14 PASS (15.68s)
+  - `.\run_tests.ps1 -tier quick`: 18/18 PASS (50.66s)
+  - `.\run_tests.ps1 -tier physics`: 21/21 PASS (88.30s)
+  - `.\run_tests.ps1 -tier motion`: 11/11 PASS (51.57s)
+  - `.\run_tests.ps1 -tier full`: 35/35 PASS (144.99s)
+  - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
+* **严格隔离纪律**：
+  - 生产代码未作额外修改，仅修改 `tests/test_find_r2_02_contact_state_ownership.py` 恢复边界条件并扩充用例；
+  - 登记存量缺陷为 1 项确认缺陷、12 项合同缺口；阻碍后续开发项保持为 2 项 (FIND-R2-04, FIND-R3-01)；
+  - Phase 7B 仍然严格禁止。
+* **门禁状态标定**: 门禁最终状态更新为 `REPAIR-03-CLOSE — AWAITING INDEPENDENT REVIEW`。
+
 ## [2026-10-29] Production Interface Repair 03: 修复 TerrainWalkAction 失败吞没与死分支收口 FIND-R2-03
 
 ### 缺陷修复与全生命周期回归 (`src/motion/terrain_walk.py`)
