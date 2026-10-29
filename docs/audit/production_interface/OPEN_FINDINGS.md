@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Audit — Environment Query, Mesh Adapter & Scene Integration Contract Audit (R4-FINAL)  
-> **审计基准 Commit**：`94222ddcba3fabbc3a01b4f9d6e1eca6776b4b5d`  
+> **当前阶段**：Production Interface Repair 01 — FIND-R2-01 Hand Contact Lifecycle Enum Repair  
+> **审计与修复基准 Commit**：`94a9f0066881804b75a995d56e9d420586dda394`  
 > **最后更新时间**：2026-10-29  
-> **当前状态**：`PRODUCTION INTERFACE AUDIT / R1-R4 — COMPLETE / REPAIR PENDING`  
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。所有生产代码维持只读，待用户与人类团队审查批准后按维护包开展修复。
+> **当前状态**：`REPAIR-01 / FIND-R2-01 — AWAITING INDEPENDENT REVIEW`  
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。仅完成单缺陷 FIND-R2-01 修复，其余 14 项 Finding 维持原状待后续逐包推进。
 
 ---
 
@@ -12,11 +12,11 @@
 
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
-| **已确认缺陷 (CONFIRMED_DEFECT)** | **3** | FIND-R2-01 (非法枚举崩溃), FIND-R2-02/T01-02 (接触状态覆盖), FIND-R2-07/T01-04 (接缝横向偏置) |
+| **已确认缺陷 (CONFIRMED_DEFECT)** | **2** (存量) + **1** (已修复) | 存量：FIND-R2-02/T01-02 (接触状态覆盖), FIND-R2-07/T01-04 (接缝横向偏置)；已修复：FIND-R2-01 |
 | **接口合同缺口 (CONTRACT_GAP)** | **12** | FIND-R2-03/T01-01 (失败吞没), FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
-| **阻碍后续开发 (Blocks Further Dev: YES)** | **5** | FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04, FIND-R3-01 |
+| **阻碍后续开发 (Blocks Further Dev: YES)** | **4** | FIND-R2-02, FIND-R2-03, FIND-R2-04, FIND-R3-01 (FIND-R2-01 已修复解除阻碍) |
 
 ---
 
@@ -24,7 +24,7 @@
 
 | Finding ID | 对应历史编号 | 源码文件 | 类 / 函数 | 源码行号 (核准) | 影响类别 | 证据等级 | 阻碍后续开发 | 负责模块 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :---: | :---: | :--- |
-| **FIND-R2-01** | - | `src/motion/kinematic_bridge.py` | `KinematicBridgeExecutor.execute_frame()` | Line 512 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | **YES** | `kinematic_bridge.py` |
+| **FIND-R2-01** | - | `src/motion/kinematic_bridge.py` | `KinematicBridgeExecutor.execute_frame()` | Line 512 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `kinematic_bridge.py` |
 | **FIND-R2-02** | FIND-T01-02 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1100–1138 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | **YES** | `terrain_walk.py` |
 | **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1080–1091 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `terrain_walk.py` |
 | **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | Lines 405–416 / 915–1010 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `framework.py` |
@@ -59,10 +59,13 @@
   ```
 * **Responsible Module**: `src/motion/kinematic_bridge.py`
 * **Downstream Impact**: 一旦开启上肢环境接触或支撑攀爬（Phase 7B 核心目标），主执行链立即崩溃。
-* **Classification**: `CONFIRMED_DEFECT`
-* **Blocks Further Development**: `YES`
-* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Classification**: `CONFIRMED_DEFECT (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
 * **Suggested Repair Boundary**: 将 `kinematic_bridge.py:512` 的 `ContactLifecycle.TOUCHDOWN` 修正为 `ContactLifecycle.CANDIDATE`，并在单元测试中补全手部接触生命周期流转。
+* **修复前复现与验证**: 运行 `tests/test_find_r2_01_hand_contact_lifecycle.py`，在旧代码下真实触发 `AttributeError: type object 'ContactLifecycle' has no attribute 'TOUCHDOWN'`（退出码 1）；
+* **修复后检验**: 将第 512 行修正为 `ContactLifecycle.CANDIDATE` 后，针对性测试 4 条路径（Case A/B/C/D）4/4 全绿通过，多接触状态与支撑类型经核对完全符合物理设计合同；
+* **回归检验**: 分层回归套件全绿（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），文档门禁 0 错误。
 
 ---
 
@@ -431,9 +434,9 @@ flowchart TD
     PKG3 --> PKG5["Package 5: Rig 与 IK 空间坐标、支撑锁定与副作用拆分修复<br>(FIND-R3-01, FIND-R3-02, FIND-R3-03, FIND-R3-04)"]
 ```
 
-1. **维护包 1: Bridge 执行器异常安全与枚举修复 (Bridge Robustness)**:
+1. **维护包 1: Bridge 执行器异常安全与枚举修复 (Bridge Robustness)** `[FIXED / VERIFIED]`:
    - 修复目标：`FIND-R2-01`。
-   - 消除 `ContactLifecycle.TOUCHDOWN` 致命崩溃隐患。
+   - 状态：**已修复并通过全量回归验证**。已将 `kinematic_bridge.py:512` 非法枚举替换为 `ContactLifecycle.CANDIDATE`，消除致命崩溃隐患。针对性测试 `tests/test_find_r2_01_hand_contact_lifecycle.py` 4/4 PASS。
 2. **维护包 2: 状态所有权与物理接触记录保护 (State Integrity)**:
    - 修复目标：`FIND-R2-02`。
    - 移除 `terrain_walk.py:1138` 对 `contacts` 字典的恶意覆写，保护真实物理接触数据。

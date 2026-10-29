@@ -3,6 +3,33 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-29] Production Interface Repair 01: 修复 KinematicBridgeExecutor 手部接触意图非法枚举 FIND-R2-01
+
+### 缺陷修复与全生命周期回归 (`src/motion/kinematic_bridge.py`)
+* **FIND-R2-01 修复前运行复现**：
+  - 编写针对性回归测试 [`tests/test_find_r2_01_hand_contact_lifecycle.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_01_hand_contact_lifecycle.py)；
+  - 在旧代码下真实触发 `AttributeError: type object 'ContactLifecycle' has no attribute 'TOUCHDOWN'`（退出码 1）；
+* **最小手术式修复**：
+  - 在 [`src/motion/kinematic_bridge.py:512`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py#L512) 将非法枚举引用 `ContactLifecycle.TOUCHDOWN` 替换为 `ContactLifecycle.CANDIDATE`；
+  - 确证 `ContactLifecycle.CANDIDATE` 语义为接触意图候选状态，`is_active` 为 False，不破坏支撑多边形与支撑类型；
+* **针对性测试 4 路径验证**：
+  - Case A (普通伸展): `ContactType.FREE`, `ContactLifecycle.RELEASED`, 正常执行 IK 目标；
+  - Case B (接触候选): `dist > 0.015m`, 正常进入 `ContactLifecycle.CANDIDATE`, 消除 `AttributeError`, 不提前登记为有效支撑；
+  - Case C (接触建立): `dist <= 0.015m`, 正常进入 `ContactLifecycle.ESTABLISHED`, 登记为有效支撑；
+  - Case D (显式锁定): `is_locked=True`, 正常保持锁定路径；
+  - 4 项测试全部通过（4/4 PASS in 0.262s）；
+* **全套自动化回归验证**：
+  - `python tests/run_test_suite.py --tier quick`: 18/18 PASS (48.30s)
+  - `python tests/run_test_suite.py --tier physics`: 21/21 PASS (89.21s)
+  - `python tests/run_test_suite.py --tier motion`: 11/11 PASS (47.79s)
+  - `python tests/run_test_suite.py --tier full`: 35/35 PASS (139.47s)
+  - `python tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
+* **严格隔离纪律**：
+  - 生产代码仅修改 1 行，未触碰其他任何生产模块；
+  - 明确声明其余 14 项 Finding（FIND-R2-02 至 FIND-R4-02）保持原状待审；
+  - Phase 7B 仍然严格禁止。
+* **门禁状态标定**: 门禁最终状态更新为 `REPAIR-01 / FIND-R2-01 — AWAITING INDEPENDENT REVIEW`。
+
 ## [2026-10-29] Production Interface Audit R4: 环境查询、网格适配器与场景集成生产接口审计与全仓库修复分组归档
 
 ### 环境查询、网格适配器与场景集成生产接口审计 (`docs/audit/production_interface/R4_ENVIRONMENT_SCENE.md`)

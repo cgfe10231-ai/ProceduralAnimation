@@ -509,7 +509,7 @@ class KinematicBridgeExecutor:
                         "target_world": ht.world_xyz,
                         "normal_world": ht.normal_world,
                         "contact_type": c_type,
-                        "lifecycle": ContactLifecycle.ESTABLISHED if dist <= 0.015 else ContactLifecycle.TOUCHDOWN,
+                        "lifecycle": ContactLifecycle.ESTABLISHED if dist <= 0.015 else ContactLifecycle.CANDIDATE,
                     }
                 else:
                     # Pure reaching / waving IK: zero contact intent!
