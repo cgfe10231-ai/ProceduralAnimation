@@ -659,9 +659,24 @@ class TerrainWalkAction(MotionAction):
     def name(self) -> str:
         return self._action_name
 
-    def estimate_duration_frames(self, initial_state: MotionState, config: PipelineConfig) -> int:
-        """Estimate timeline duration using the real environment query if available."""
-        env = self.environment or EnvironmentQuery(ground_z=0.0)
+    def bind_environment(self, environment: EnvironmentQuery) -> None:
+        """Bind authoritative environment instance from planner or runtime context."""
+        self.environment = environment
+
+    def estimate_duration_frames(
+        self,
+        initial_state: MotionState,
+        config: PipelineConfig,
+        environment: Optional[EnvironmentQuery] = None,
+    ) -> int:
+        """Estimate timeline duration using the real authoritative environment query."""
+        env = environment or self.environment
+        if env is None:
+            raise ValueError(
+                f"{self.name}.estimate_duration_frames() requires an authoritative environment "
+                f"instance (either bound to action, provided by caller, or injected by planner); "
+                f"silent fallback to synthetic flat ground is prohibited."
+            )
         if self.route is not None:
             # Clone route with current position as start
             current_route = TerrainRouteInput(
@@ -685,6 +700,7 @@ class TerrainWalkAction(MotionAction):
                 self.spec,
                 env,
                 start_frame=initial_state.frame,
+                fps=config.fps,
             )
             return total_frames
 

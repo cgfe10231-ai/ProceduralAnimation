@@ -541,7 +541,12 @@ class MotionAction(ABC):
         return True
 
     @abstractmethod
-    def estimate_duration_frames(self, initial_state: MotionState, config: PipelineConfig) -> int:
+    def estimate_duration_frames(
+        self,
+        initial_state: MotionState,
+        config: PipelineConfig,
+        environment: Optional[EnvironmentQuery] = None,
+    ) -> int:
         """Return the expected number of frames produced by this action."""
 
     @abstractmethod
@@ -594,8 +599,13 @@ class StartStopWalkAction(MotionAction):
     def can_start_from(self, state: MotionState) -> bool:
         return state.mode in (MotionMode.IDLE, MotionMode.STOP, MotionMode.WALK) and not state.is_airborne
 
-    def estimate_duration_frames(self, initial_state: MotionState, config: PipelineConfig) -> int:
-        _ = initial_state
+    def estimate_duration_frames(
+        self,
+        initial_state: MotionState,
+        config: PipelineConfig,
+        environment: Optional[EnvironmentQuery] = None,
+    ) -> int:
+        _ = (initial_state, environment)
         return config.start_stop_total_frames
 
     def execute(
@@ -1017,6 +1027,10 @@ class MotionPlanner:
         return tuple(self._actions)
 
     def add_action(self, action: MotionAction) -> "MotionPlanner":
+        if hasattr(action, "bind_environment"):
+            action.bind_environment(self.environment)
+        elif hasattr(action, "environment") and getattr(action, "environment", None) is None:
+            action.environment = self.environment
         self._actions.append(action)
         return self
 
