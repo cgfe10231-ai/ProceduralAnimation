@@ -31,6 +31,7 @@
   * **门禁终止状态**：`REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行开展下一步修复）。
 * **Git 状态**：
   * **当前分支**：`master`
+  * **当前 Commit SHA**：`dd0fb4d9bde8324e15cfcf13d139ec3dc98f3b62`（已同步至远程 `origin/master`）
   * **起始基准 Commit SHA**：`db9cd4be6174b153da4e3e402f4b78f69e6e5e53`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
