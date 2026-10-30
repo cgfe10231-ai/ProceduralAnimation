@@ -204,7 +204,11 @@ class TestTerrainWalkNegativeAndInvariance(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             plan_terrain_footsteps(self.route, env_hazard)
 
-        self.assertIn("lands on unsupported surface", str(ctx.exception))
+        err_msg = str(ctx.exception)
+        self.assertTrue(
+            "lands on unsupported surface" in err_msg or "straddles unsupported surface boundary" in err_msg,
+            f"Expected unsupported surface rejection message, got: {err_msg}",
+        )
         print(f"[PASS] Test 4: Unsupported surface landing correctly rejected: {ctx.exception}")
 
 

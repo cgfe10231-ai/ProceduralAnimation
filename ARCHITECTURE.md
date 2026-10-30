@@ -134,6 +134,12 @@ flowchart TD
 5. **Unit 4 & Closure：三坐标语义校准与非支撑面拒绝**：
    * 严密校准踝关节 IK 目标 (Point A)、网格高程点 (Point B) 与足底接触锚点 (Point C)；
    * 当表面法线不满足支撑条件（如坚直立面 $n_z < 0.5$）或查询失败时，严格拒绝建立支撑，接触生命周期标定为 `BROKEN`，严禁解析平地回退伪造接触。
+6. **地形规划联合修复：双向走廊、接缝偏置与时间归一化合同 (Terrain Planning Joint Repair)**：
+   * **单一事实源 (SSOT)**：抽取统一内核 `_build_step_schedule_core()`，消除 `plan_terrain_footsteps` 与 `build_terrain_step_schedule` 间分歧，未命中与非支撑表面统一严格抛出 `ValueError`；
+   * **真实侧向采样 (`sw_x`)**：接缝与边缘微调改由当前摆动侧脚部绝对横向坐标 `sw_x` 驱动，彻底消除中线采样偏置盲区；
+   * **双向 (+/- Y) 行走支持**：重构步点规划循环与终止条件，实现固定 X 走廊在 $+Y$ 与 $-Y$ 上的对称步点生成，Hermite 样条切线自适应行进符号保证严格单调性；
+   * **时间基准归一化 (`float(dur)`)**：摆动脚进度归一化统一为 `float(dur)`，彻底消除短步态下 25% 相位差与 0.4mm 假性过伸；
+   * **几何约束与接口修复**：强制执行 `max_step_length_m` 步长约束与 `nominal_stride_m` 严格正数/有限值校验；修复 `estimate_duration_frames` 误传 `fps` 参数导致的运行时异常。
 
 ---
 
@@ -145,4 +151,4 @@ flowchart TD
 * **Phase 7C（动力学主循环接入，NOT AUTHORIZED）**：
   * 将 `contact_force_solver.py` 与 `closed_loop_dynamics.py` 接入 19 骨骼 Armature 主循环，建立真实的地面反作用力与质心扰动平衡。
 * **Phase 7D（通用地形导航，NOT AUTHORIZED）**：
-  * 解耦 `plan_terrain_footsteps` 的单一 $+Y$ 直线走廊，支持任意 2D/3D 样条路径导航。
+  * 拓展通用地形导航：固定 X 走廊双向 (+/- Y) 已在 Phase 7A 联合修复完成；Phase 7D 进一步支持任意偏航角 (Yaw) 与 2D/3D 样条自由路径导航。

@@ -477,6 +477,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         is_visual_acceptance=False,
         description="Verifies non-support surface rejection (allows_regular_support=False) and real mesh analytical fallback isolation across four edge cases.",
     ),
+    "terrain_planning_contract": TestDefinition(
+        test_id="terrain_planning_contract",
+        name="Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts",
+        script_path="tests/test_terrain_planning_contract.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.QUICK, TestTier.MOTION, TestTier.FULL],
+        timeout_sec=120.0,
+        description="Comprehensive verification of terrain planning contracts: lateral seam sampling bias (sw_x), unified schedule consistency, bidirectional +/-Y traversal and input validation, Root-swing foot synchronization (dur normalization), and Spec duration estimation without TypeError.",
+    ),
 
     # -------------------------------------------------------------------------
     # Tier 4: Legacy & Historical Baseline Artifact Inspection

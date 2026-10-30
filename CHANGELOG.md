@@ -3,6 +3,76 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Joint Repair: 地形规划方向、接缝与时间基准合同联合修复 (JOINT-REPAIR-TERRAIN-PLANNING)
+
+### 1. 接缝与边缘检测横向位置偏置修复 (FIND-R2-07, src/motion/terrain_walk.py)
+* **缺陷成因**：
+  - `_adjust_footfall_for_seams_and_edges()` 原代码以走廊中心线 `corridor_x=0.0` 作为探测坐标，忽略了摆动脚的实际侧向偏移 `sw_x`（例如左脚约 -0.10m，右脚约 +0.10m），导致探测结果与足部真实落点脱节，且沿走廊边缘前移时未按双向 Y 范围夹紧。
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py):
+    - 更新 `_adjust_footfall_for_seams_and_edges(environment, sw_x, y, corridor_y_min, corridor_y_max)` 签名，以实际 `sw_x` 探测前掌 (+0.15m)、脚后跟 (-0.07m) 与脚踝 (0.0m) 支撑面合法性；
+    - 探测前移距离 `forward_probe` 时，采用 `min(corridor_y_min, corridor_y_max)` 与 `max(corridor_y_min, corridor_y_max)` 严格双向边界夹紧；
+* **测试用例与验证**：
+  - `tests/test_terrain_planning_contract.py` Group A: `test_seam_adjustment_uses_swing_x` (19/19 PASS)。
+
+### 2. 统一步态落点与 3D 表面几何对齐核心合同 (FIND-R2-06, src/motion/terrain_walk.py)
+* **缺陷成因**：
+  - `plan_terrain_footsteps()` 与遗留 `build_terrain_step_schedule()` 存在双轨分歧：前者在未命中或不可支撑表面直接静默回退默认平地并生成伪造表面 ID `default_ground`，与严格拒绝合同直接冲突。
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py):
+    - 抽取单一权威实现 `_build_step_schedule_core(footfall_points, environment, start_frame, clearance, is_right_first)`；
+    - 遍历落点时查询 3D 表面，未命中或 `not allows_regular_support` 时严格抛出 `ValueError`，彻底移除虚假平地回退；
+    - 严格校验步高差 $|\Delta z| \le 0.35$m；
+    - 依据表面法线计算着地俯仰角 $\theta_{\text{pitch}} = -\arctan2(n_y, n_z)$，并自适应增大坡道抬脚净空；
+* **测试用例与验证**：
+  - `tests/test_terrain_planning_contract.py` Group B: `test_step_schedule_rejects_unsupported_surface`, `test_step_schedule_normal_pitch_alignment`, `test_step_schedule_excessive_step_height_rejection` (19/19 PASS)。
+
+### 3. 负向 Y 行进步态生成与终止条件修复 (FIND-T01-07, src/motion/terrain_walk.py)
+* **缺陷成因**：
+  - 步点生成循环假定前进方向恒为 +Y，负向目标导致死循环或无法正确生成步点；且 `_build_continuous_root_forward_spline()` 将异号斜率强行清零，导致负向行进时根骨前向样条斜率失真。
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py):
+    - `plan_terrain_footsteps` 自适应步长方向符号 `sign = 1.0 if target_y >= start_y else -1.0`；
+    - 循环终止条件更新为 `(curr_y - target_y) * sign >= -stride_len * 0.5`；
+    - `_build_continuous_root_forward_spline` 更新端点斜率判定为 `knot_v[k] = 0.0 if v_prev * v_next <= 0.0 else avg_v`，正确支持全负向速度斜率；
+* **测试用例与验证**：
+  - `tests/test_terrain_planning_contract.py` Group C: `test_negative_y_footstep_generation_and_termination`, `test_negative_y_root_spline_velocity` (19/19 PASS)。
+
+### 4. 短步态周期下摆动足时间基准对齐 (FIND-T01-08, src/motion/terrain_walk.py)
+* **缺陷成因**：
+  - `TerrainWalkAction.execute()` 中摆动足进度分母原本使用 `dur - 1`，而根骨前向位移 Hermite 样条分母使用 `dur`。在短步态周期（如 `dur=4`）下，第 6 帧摆动足已达到目标 1.0，而根骨仅推进 0.75，导致骨盆滞后并在第 6 帧产生 0.4mm 的假性过伸不可达失败。
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py):
+    - 将摆动足进度分母纠正为 `float(dur) if dur > 0 else 1.0`，与根骨样条完全同相；
+* **测试用例与验证**：
+  - `tests/test_find_r2_02_contact_state_ownership.py`: 历史 2/4/2 短步态测试断言从假性失败更新为真实干净成功 (`len(states) == 12, unreachable_count == 0`) (6/6 PASS)；
+  - `tests/test_terrain_planning_contract.py` Group D: `test_short_gait_timebase_synchronization` (19/19 PASS)。
+
+### 5. 路由输入合同加固与遗留接口收口 (src/motion/terrain_walk.py)
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py):
+    - `_validate_route_input` 严格校验 `nominal_stride_m`、`clearance`、`step_width` 为有限正数；校验 `start_frame >= 0`；校验走廊共线 X；
+    - `stride_len = min(route.nominal_stride_m, route.max_step_length_m)`，确保 `max_step_length_m` 严格生效夹紧步长；
+    - `TerrainWalkAction.estimate_duration_frames` 移除遗留 `build_terrain_step_schedule(spec, env, fps=...)` 中未定义的 `fps` 参数，消除运行时 `TypeError`；
+* **测试用例与验证**：
+  - `tests/test_terrain_planning_contract.py` Group C & Group E (19/19 PASS)。
+
+### 6. 全量回归与零退化验证
+* `tests/test_terrain_planning_contract.py`: **19/19 PASS (2.27s)**
+* `tests/test_find_r2_02_contact_state_ownership.py`: **6/6 PASS (0.84s)**
+* `tests/test_terrain_walk_negative.py`: **4/4 PASS (1.93s)**
+* `tests/test_action_environment_binding.py`: **10/10 PASS (0.002s)**
+* `tests/test_scene_save_gate.py`: **6/6 PASS (5.306s)**
+* `tests/test_environment_query_contract.py`: **8/8 PASS (0.557s)**
+* `tests/test_find_r2_01_hand_contact_lifecycle.py`: **4/4 PASS (0.343s)**
+* `tests/test_terrain_walk_failure_propagation.py`: **6/6 PASS (0.562s)**
+* `tests/test_motion_planner_result_contract.py`: **10/10 PASS (1.524s)**
+* `.\run_tests.ps1 -tier quick`: **19/19 PASS (53.36s, Exit Code 0)**
+* `.\run_tests.ps1 -tier physics`: **21/21 PASS (90.73s, Exit Code 0)**
+* `.\run_tests.ps1 -tier motion`: **12/12 PASS (52.74s, Exit Code 0)**
+* `.\run_tests.ps1 -tier full`: **36/36 PASS (144.60s, Exit Code 0)**
+* `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, Exit Code 0)**
+
 ## [2026-10-30] Production Interface Joint Repair Final Closure: MotionPlanner 签名预检与场景保存门禁测试确定性收口 (JOINT-REPAIR-FINAL-CLOSURE)
 
 ### 1. 消除异常捕获漏洞：MotionPlanner.add_action 签名预检前置 (src/motion/framework.py)

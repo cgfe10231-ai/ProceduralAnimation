@@ -1,8 +1,8 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-30
-> **当前阶段**：Production Interface Joint Repair Final Closure — Upfront Signature Inspection & Deterministic Save Gate Verification (JOINT-REPAIR-FINAL-CLOSURE)。已完成生产接口联合修复最终代码收口：1) 动作环境绑定签名预检前置（`src/motion/framework.py` 中 `MotionPlanner.add_action()` 采用 `inspect.signature` 探查支持 `allow_override` 状态，彻底移除对 `bind_fn` 的 `try...except TypeError:` 包裹，确保方法内部发生的真正 `TypeError` 100% 原始抛出，遗留单参接口正常工作，绑定函数严格只执行一次无重试，冲突环境先验拦截）；2) 场景保存门禁测试与旧 ROM 缺陷解耦（`tests/test_scene_save_gate.py` 记录第 323 帧历史 ROM 违规证据，采用确定性失败注入替代长耗时脆弱依赖，测试时间从 25s 降至 5.3s，已存 `.blend` 文件 SHA-256 绝对不变，不产生虚假元数据与伴生文件）；3) 针对性测试 `tests/test_action_environment_binding.py`（10/10 PASS）、`tests/test_scene_save_gate.py`（6/6 PASS）、`tests/test_environment_query_contract.py`（8/8 PASS）全绿，分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），AST 文档门禁 0 错误通过。
-> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R4-02、FIND-T01-06 及 FIND-R4-01 已被彻底解决并标定为 `FIXED / VERIFIED`。全仓库剩余 9 项 Finding（1 项确认缺陷 FIND-R2-07、8 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`JOINT-REPAIR-FINAL-CLOSURE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
+> **当前阶段**：Production Interface Joint Repair — Terrain Planning Contracts (JOINT-REPAIR-TERRAIN-PLANNING)。已完成地形规划四项登记缺陷（FIND-R2-07、FIND-R2-06、FIND-T01-07、FIND-T01-08）与三项关联接口问题联合修复：1) 接缝与边缘检测横向采样位置偏置修复（`src/motion/terrain_walk.py` 中 `_adjust_footfall_for_seams_and_edges` 严格按实际摆动脚侧向位置 `sw_x` 探测前掌、脚后跟与脚踝支撑面合法性，彻底纠正硬编码中心线 `corridor_x=0.0` 盲区，正反双向走廊严格夹紧）；2) 统一步态落点与 3D 表面几何对齐核心合同（抽取 `_build_step_schedule_core` 消除 `plan_terrain_footsteps` 与 `build_terrain_step_schedule` 逻辑分歧，未命中或不可支撑表面严格抛出 `ValueError`，彻底移除虚假平地高程回退与伪造 `default_ground` 表面 ID，严格校验步高差 $|\Delta z| \le 0.35$m 并动态调整坡度抬脚净空与俯仰角）；3) 负向 Y 行进落点生成与终止条件修复（步点循环自适应方向符号，终止条件依据前进剩余余量判定，样条端点斜率 `_build_continuous_root_forward_spline` 正确保留负向速度）；4) 短步态周期下摆动足时间基准对齐（摆动足轨迹时间归一化分母由 `dur - 1` 纠正为 `dur`，与根骨位移 Hermite 样条同相，彻底消除骨盆滞后诱发的假性第 6 帧 0.4mm 过伸不可达失败）；5) 路由输入合同加固（`max_step_length_m` 严格生效夹紧步长，`nominal_stride_m` 严格校验有限正数，`estimate_duration_frames` 移除未定义 `fps` 形参）；6) 针对性测试 `tests/test_terrain_planning_contract.py`（19/19 PASS）、`tests/test_find_r2_02_contact_state_ownership.py`（6/6 PASS）、`tests/test_terrain_walk_negative.py`（4/4 PASS）全绿，分层回归套件全绿通过（Quick 19/19, Physics 21/21, Motion 12/12, Full 36/36），AST 文档门禁 0 错误通过。
+> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R4-02、FIND-T01-06、FIND-R4-01、FIND-R2-06、FIND-R2-07、FIND-T01-07、FIND-T01-08 已被彻底解决并标定为 `FIXED / VERIFIED`。全仓库剩余 5 项 Finding（0 项确认缺陷、5 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`JOINT-REPAIR-TERRAIN-PLANNING — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
 
 ---
 
@@ -21,20 +21,46 @@
     - **FIND-R2-03 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:1084–1100` 接入 `bridge_res.success` 严苛校验与 `RuntimeError` 结构化异常阻断，清理废弃死回退分支，微调斜坡踝关节松弛角度（`swing_relax_amp = 25.0°`）消除踏步 ROM 越界，通过 6 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-04 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `framework.py:455–486, 1045–1120` `ActionExecutionResult` 统一成功/失败合同与防御守卫，`MotionPlanner` 接入五重前置门禁与失败阻断流转，通过 8 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `contact_model.py:214–273, 304–340` 几何合规性校验只读返回，与动态属性 `support_type` 判定脱节；
-    - **FIND-R2-06 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:223–401, 404–520` 步态预规划查询失败静默回退默认平地，与严格拒绝合同冲突；
-    - **FIND-R2-07 (CONFIRMED_DEFECT, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:310–312` 接缝探测传入中心线 `corridor_x` 而非实际摆动脚侧向落点 `sw_x`；
+    - **FIND-R2-06 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:223–401, 404–520` 统一抽取 `_build_step_schedule_core`，未命中或不可支撑表面严格抛出 `ValueError`，消除虚假平地回退与伪造 ID，通过针对性测试与全量回归；
+    - **FIND-R2-07 (CONFIRMED_DEFECT / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:310–312` `_adjust_footfall_for_seams_and_edges` 接缝与边缘检测采用实际摆动脚侧向落点 `sw_x` 探测前掌、脚后跟与脚踝支撑合法性，双向边界安全夹紧，通过针对性测试与全量回归；
     - **FIND-T01-06 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:660–705` `TerrainWalkAction.estimate_duration_frames` 严禁静默平地回退，`MotionPlanner.add_action()` 统一绑定权威环境实例，消除环境分裂，通过 4 项针对性测试与全量回归；
-    - **FIND-T01-07 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:304–318` 负向行进步态规划跳步与终止缺陷；
-    - **FIND-T01-08 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:895–905 vs 848–870` 短步态周期下摆动足进度分母（`dur - 1`）比根部位移样条分母（`dur`）超前 25%，导致骨盆滞后产生 0.4mm 几何假性过伸；
+    - **FIND-T01-07 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:304–318` 负向行进步态规划落点循环自适应方向符号与终止条件，根骨 Hermite 样条保留负向速度，通过针对性测试与全量回归；
+    - **FIND-T01-08 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:895–905` 摆动足时间归一化分母纠正为 `dur`，与根部位移样条完全同相，彻底消除骨盆滞后诱发的 0.4mm 假性过伸，通过针对性测试与全量回归；
     - **FIND-R3-01 (CONTRACT_GAP / ARCHITECTURAL_VIOLATION, Blocks 7B: YES, STATIC_CONFIRMED)**: `foot_contact.py:152` `unlock_foot_contact` 默认形参 `reparent_to_root: bool = True` 动态挂载父级违反门禁 Rule 7，且父级非空时 `ik.py:380–384` 欧拉角未反解导致足部偏角；
     - **FIND-R3-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `ik.py:334–346` `set_foot_ik_target` 地面防穿透硬编码根高程，阻断 3D 起伏地形下潜，迫使上层全流程传 `clamp_ground=False`；
     - **FIND-R3-03 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:168–170, ik.py:219` `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留；
     - **FIND-R3-04 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用；
     - **FIND-R4-01 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:308–355, 450–490, 730–770` 引入 `verify_scene_execution_gate()` 严苛校验规划成功状态、不可达事件、致命未满足约束与连续性，执行失败严禁保存 `.blend` 文件，移除硬编码 `"continuous_without_exemption": True`，通过 3 项针对性测试与全量回归；
     - **FIND-R4-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:385–420, 597–643` 与 `blender_mesh_query_adapter.py:885–892` Mesh 模式下未命中或非支撑面严格返回 `None` 消除虚假 0.0m 回退，`query_ground_support_at` 严格在非支撑面返回 `success=False`，通过 8 项针对性测试与全量回归；
-  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01) 已修复并验证（`FIXED / VERIFIED`）；剩余 8 项缺陷维持挂起等待授权排期修复。
+  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），剩余 5 项合同缺口维持挂起等待授权排期修复。
 
 ### [已验证]
+* **Terrain Planning Joint Repair: 地形规划与时间基准联合修复 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08)**：
+  * **接缝与边缘检测横向采样位置偏置修复 (FIND-R2-07)**：
+    - `_adjust_footfall_for_seams_and_edges(environment, sw_x, y, corridor_y_min, corridor_y_max)` 纠正采样点：以实际摆动脚侧向位置 `sw_x` 取代走廊中心线 `corridor_x=0.0`；
+    - 针对前掌 (+0.15m)、脚后跟 (-0.07m) 及脚踝 (0.0m) 综合探测 `allows_regular_support`；
+    - 支持正向 (+Y) 与负向 (-Y) 走廊范围夹紧 `[corridor_y_min, corridor_y_max]`；
+  * **步态落点与 3D 表面几何对齐核心合同统一 (FIND-R2-06)**：
+    - 统一抽取 `_build_step_schedule_core`，消除 `plan_terrain_footsteps` 与 `build_terrain_step_schedule` 逻辑分歧；
+    - 未命中或不可支撑表面严格抛出 `ValueError`，彻底移除虚假平地高程回退与伪造 `default_ground` 表面 ID；
+    - 严格校验垂直步高限额 $|\Delta z| \le 0.35$m；
+    - 依据表面法线自动计算脚部俯仰角 $\theta_{\text{pitch}} = -\arctan2(n_y, n_z)$，并根据坡度自适应调整抬脚净空；
+  * **负向 Y 行进落点生成与终止条件修复 (FIND-T01-07)**：
+    - 步点推进循环自适应步长方向符号（`sign = 1.0` 或 `-1.0`），依据前进剩余余量正确终止，消除跳步与死循环；
+    - `_build_continuous_root_forward_spline` 样条端点斜率判定更新为 `knot_v[k] = 0.0 if v_prev * v_next <= 0.0 else avg_v`，正向保留负向行进速度；
+  * **短步态周期摆动足时间基准对齐 (FIND-T01-08)**：
+    - 摆动足轨迹时间归一化分母纠正为 `dur`（原 `dur - 1`），与根骨位移 Hermite 样条完全同相；
+    - 消除骨盆滞后导致的摆动足提前落盘与假性第 6 帧 0.4mm 过伸不可达报错；
+  * **路由输入合同与旧接口修复**：
+    - 启用 `max_step_length_m` 生效夹紧步长；
+    - `nominal_stride_m` 严格正数及有限值校验；
+    - `TerrainWalkAction.estimate_duration_frames` 移除未定义 `fps` 形参调用；
+  * **测试与回归**：
+    - 编写并全绿通过 19 项专用测试 `tests/test_terrain_planning_contract.py`（19/19 PASS in 2.27s）；
+    - 历史边界测试 `tests/test_find_r2_02_contact_state_ownership.py` 纠正假性不可达断言，全绿通过（6/6 PASS in 0.84s）；
+    - 负向测试 `tests/test_terrain_walk_negative.py` 全绿通过（4/4 PASS in 1.93s）；
+    - 统一分层全量套件全绿：Quick (19/19 in 53.36s), Physics (21/21 in 90.73s), Motion (12/12 in 52.74s), Full (36/36 in 144.60s)；
+    - 状态置为 `JOINT-REPAIR-TERRAIN-PLANNING — AWAITING INDEPENDENT REVIEW`。
 * **Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计 (Audit A 至 Audit J)**：
   * **Audit A: 全仓库模块清点与 7 级集成矩阵 (`MODULE_INTEGRATION_MATRIX.md`)**：
     - 审查全部 61 个 Python 模块与 21 个根运行脚本，确立单一人形控制主执行链，严格划分为 `PRODUCTION_ACTIVE` (19 个)、`PARTIALLY_INTEGRATED` (4 个)、`TELEMETRY_ONLY` (6 个)、`TEST_ONLY` (4 个)、`PROTOTYPE_ONLY` (4 个)、`UNUSED` (2 个)；

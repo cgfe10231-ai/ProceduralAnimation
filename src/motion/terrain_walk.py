@@ -19,7 +19,7 @@ Architectural Compliance:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -175,9 +175,45 @@ class TerrainTraversalSpec:
     arm_swing_deg: float = 16.0             # Upper arm sagittal swing amplitude (deg)
 
 
+def _validate_route_input(route: TerrainRouteInput) -> None:
+    """Validate route geometric and kinematic bounds before planning."""
+    x0, y0, _ = route.start_pos
+    x_tgt, y_tgt, _ = route.target_pos
+
+    if abs(x_tgt - x0) > 1e-4:
+        raise ValueError(
+            f"Terrain route rejected: requires collinear X corridor: start X {x0:.3f} != target X {x_tgt:.3f}"
+        )
+
+    for name, val in [
+        ("nominal_stride_m", route.nominal_stride_m),
+        ("step_width_m", route.step_width_m),
+        ("max_step_length_m", route.max_step_length_m),
+        ("min_step_length_m", route.min_step_length_m),
+        ("base_clearance_m", route.base_clearance_m),
+    ]:
+        if val is None or not math.isfinite(val) or val <= 0.0:
+            raise ValueError(f"Terrain route parameter '{name}' must be finite and > 0, got {val}")
+
+    for name, val in [
+        ("stand_start_frames", route.stand_start_frames),
+        ("step_frames", route.step_frames),
+        ("stand_stop_frames", route.stand_stop_frames),
+    ]:
+        if val is None or val < 0:
+            raise ValueError(f"Terrain route frame count '{name}' must be non-negative, got {val}")
+
+    if route.min_step_length_m > route.max_step_length_m:
+        raise ValueError(
+            f"min_step_length_m ({route.min_step_length_m:.3f}) cannot exceed "
+            f"max_step_length_m ({route.max_step_length_m:.3f})"
+        )
+
+
+
 def _adjust_footfall_for_seams_and_edges(
     environment: EnvironmentQuery,
-    x: float,
+    sw_x: float,
     y: float,
     corridor_y_min: float,
     corridor_y_max: float,
@@ -191,24 +227,37 @@ def _adjust_footfall_for_seams_and_edges(
 
     If the toe and heel sample different surface normals (straddling a slope seam or ledge),
     shifts y slightly to ensure full-sole planar seating with >= 0.03m margin from the seam.
+    Samples at the true lateral position `sw_x` of the swing foot.
     """
-    res_heel = environment.query_ground_support_at(x, y - 0.07)
-    res_toe = environment.query_ground_support_at(x, y + 0.15)
+    res_heel = environment.query_ground_support_at(sw_x, y - 0.07)
+    res_toe = environment.query_ground_support_at(sw_x, y + 0.15)
+    res_ankle = environment.query_ground_support_at(sw_x, y)
+
     n_heel = res_heel.surface_normal_world if res_heel.success else (0.0, 0.0, 1.0)
     n_toe = res_toe.surface_normal_world if res_toe.success else (0.0, 0.0, 1.0)
     dn = (Vector(n_toe) - Vector(n_heel)).length
 
-    if dn > 0.05:
-        # Straddling a seam or step edge. Probe small shifts (-0.08 to +0.08) to find uniform normal.
-        best_y = y
-        min_dn = dn
+    min_y = min(corridor_y_min, corridor_y_max)
+    max_y = max(corridor_y_min, corridor_y_max)
+
+    all_supported = (
+        res_heel.allows_regular_support
+        and res_toe.allows_regular_support
+        and res_ankle.allows_regular_support
+    )
+
+    if dn > 0.05 or not all_supported:
+        best_y = None
+        min_dn = dn if all_supported else 1e9
+
         for shift in [-0.08, -0.05, -0.03, 0.03, 0.05, 0.08]:
             cand_y = y + shift
-            if cand_y < corridor_y_min or cand_y > corridor_y_max:
+            if cand_y < min_y or cand_y > max_y:
                 continue
-            rh = environment.query_ground_support_at(x, cand_y - 0.07)
-            rt = environment.query_ground_support_at(x, cand_y + 0.15)
-            if not (rh.success and rt.success):
+            rh = environment.query_ground_support_at(sw_x, cand_y - 0.07)
+            rt = environment.query_ground_support_at(sw_x, cand_y + 0.15)
+            ra = environment.query_ground_support_at(sw_x, cand_y)
+            if not (rh.allows_regular_support and rt.allows_regular_support and ra.allows_regular_support):
                 continue
             curr_dn = (Vector(rt.surface_normal_world) - Vector(rh.surface_normal_world)).length
             if curr_dn < min_dn:
@@ -216,33 +265,41 @@ def _adjust_footfall_for_seams_and_edges(
                 best_y = cand_y
                 if curr_dn < 0.02:
                     break
-        return best_y
+        if best_y is not None:
+            return best_y
+        if all_supported:
+            return y
+        raise ValueError(
+            f"Footfall at ({sw_x:.2f}, {y:.2f}) straddles unsupported surface boundary "
+            f"and no valid support shift was found in corridor [{min_y:.2f}, {max_y:.2f}]"
+        )
     return y
 
 
-def plan_terrain_footsteps(
-    route: TerrainRouteInput,
+def _build_step_schedule_core(
+    start_pos: Tuple[float, float, float],
+    target_y_sequence: Sequence[float],
     environment: EnvironmentQuery,
+    step_width_m: float,
+    stand_start_frames: int,
+    step_frames: int,
+    stand_stop_frames: int,
+    clearance_type: str,
+    route_base_clearance: float = 0.12,
+    spec_stairs_clearance: float = 0.14,
+    spec_ramp_clearance: float = 0.10,
     start_frame: int = 1,
+    corridor_y_bounds: Optional[Tuple[float, float]] = None,
 ) -> Tuple[List[TerrainStepPlan], int]:
-    """Dynamically plan discrete alternating footsteps over arbitrary 3D terrain.
+    """Authoritative unified core for discrete footstep planning and 3D surface alignment.
 
-    Separates route goal input from footstep planning:
-    - Automatically steps forward from start_pos to target_pos.
-    - Queries `environment` for 3D elevations and surface normals dynamically via `query_ground_support_at`.
-    - Single-hit contract: height Z, normal, surface_id, and support eligibility come from a single hit.
-    - Strict rejection: misses (NO_HIT) and non-support surfaces raise explicit ValueError.
-    - Detects seams and edge boundaries to place full 22cm soles on safe support patches.
-    - Checks physiological climbing/stepping reach limits (flags unreachable drops/rises).
-    - Computes normal-aligned foot pitches and adaptive swing clearance.
-    - 100% geometric: NO string-based naming checks.
+    Used by both `plan_terrain_footsteps` and `build_terrain_step_schedule`.
+    100% geometric: NO synthetic fallbacks, NO string-based naming checks.
     """
-    x0, y0, _ = route.start_pos
-    x_tgt, y_tgt, _ = route.target_pos
-
-    corridor_x = x0
-    left_x = corridor_x - (route.step_width_m / 2.0)
-    right_x = corridor_x + (route.step_width_m / 2.0)
+    corridor_x = start_pos[0]
+    y0 = start_pos[1]
+    left_x = corridor_x - (step_width_m / 2.0)
+    right_x = corridor_x + (step_width_m / 2.0)
 
     # Initial resting foot placement via single-hit ground support queries
     res0_l = environment.query_ground_support_at(left_x, y0)
@@ -292,31 +349,11 @@ def plan_terrain_footsteps(
         "R": surf0_r_id,
     }
 
-    current_frame = start_frame + route.stand_start_frames
+    current_frame = start_frame + stand_start_frames
     schedule: List[TerrainStepPlan] = []
+    num_steps = len(target_y_sequence)
 
-    dy_total = y_tgt - y0
-    if abs(dy_total) < 1e-4:
-        # Stationary stance throughout
-        total_frames = route.stand_start_frames + route.stand_stop_frames
-        return schedule, total_frames
-
-    # Generate prospective footfall Y positions
-    stride = route.nominal_stride_m
-    step_ys: List[float] = []
-    curr_lead_y = y0
-    while curr_lead_y + stride < y_tgt - (route.min_step_length_m * 0.5):
-        curr_lead_y += stride
-        adjusted_y = _adjust_footfall_for_seams_and_edges(
-            environment, corridor_x, curr_lead_y, y0, y_tgt
-        )
-        step_ys.append(adjusted_y)
-
-    # Closing steps to land side-by-side at target_pos
-    step_ys.append(y_tgt)
-    step_ys.append(y_tgt)
-
-    for k, target_y in enumerate(step_ys):
+    for k, target_y in enumerate(target_y_sequence):
         stance_side = "L" if (k % 2 == 0) else "R"
         swing_side = "R" if (k % 2 == 0) else "L"
         sw_x = right_x if swing_side == "R" else left_x
@@ -344,7 +381,7 @@ def plan_terrain_footsteps(
         st_norm = feet_normal[stance_side]
         st_surf_id = feet_surface_id[stance_side]
 
-        # Check step elevation difference (reachability)
+        # Check step elevation difference (physiological reachability)
         delta_z = sw_landing_z - st_xyz[2]
         if abs(delta_z) > 0.35:
             raise ValueError(
@@ -356,24 +393,26 @@ def plan_terrain_footsteps(
         sw_start_xyz = feet_pos[swing_side]
         sw_start_pitch = feet_pitch[swing_side]
 
-        # Geometric clearance height: based on vertical elevation difference and minimum margin
+        # Geometric clearance height
         is_stepped = (delta_z > 0.05 and abs(sw_landing_pitch) < 3.0)
-        base_lift = route.base_clearance_m + (0.04 if is_stepped else 0.0)
-        clearance = max(base_lift, abs(delta_z) + 0.04)
+        if clearance_type == "route":
+            base_lift = route_base_clearance + (0.04 if is_stepped else 0.0)
+            clearance = max(base_lift, abs(delta_z) + 0.04)
+        else:
+            clearance = spec_stairs_clearance if is_stepped else spec_ramp_clearance
 
         if k == 0:
             stage_name = "start"
-        elif k == len(step_ys) - 1:
+        elif k == num_steps - 1:
             stage_name = "stop_step"
         else:
             stage_name = "steady_traversal"
 
-        step_dur = route.step_frames
         plan = TerrainStepPlan(
             k=k,
             frame_start=current_frame,
-            frame_end=current_frame + step_dur,
-            duration_frames=step_dur,
+            frame_end=current_frame + step_frames,
+            duration_frames=step_frames,
             stance_side=stance_side,
             swing_side=swing_side,
             stance_xyz=st_xyz,
@@ -395,10 +434,74 @@ def plan_terrain_footsteps(
         feet_pitch[swing_side] = sw_landing_pitch
         feet_normal[swing_side] = sw_landing_norm
         feet_surface_id[swing_side] = surf_id
-        current_frame += step_dur
+        current_frame += step_frames
 
-    total_frames = (current_frame - start_frame) + route.stand_stop_frames
+    total_frames = (current_frame - start_frame) + stand_stop_frames
     return schedule, total_frames
+
+
+def plan_terrain_footsteps(
+    route: TerrainRouteInput,
+    environment: EnvironmentQuery,
+    start_frame: int = 1,
+) -> Tuple[List[TerrainStepPlan], int]:
+    """Dynamically plan discrete alternating footsteps over arbitrary 3D terrain.
+
+    Separates route goal input from footstep planning:
+    - Automatically steps along the fixed-X corridor from start_pos to target_pos (+Y and -Y).
+    - Queries `environment` for 3D elevations and surface normals dynamically via `query_ground_support_at`.
+    - Single-hit contract: height Z, normal, surface_id, and support eligibility come from a single hit.
+    - Strict rejection: misses (NO_HIT) and non-support surfaces raise explicit ValueError.
+    - Detects seams and edge boundaries on true lateral footfall positions to place full 22cm soles safely.
+    - Checks physiological climbing/stepping reach limits (flags unreachable drops/rises).
+    - Computes normal-aligned foot pitches and adaptive swing clearance.
+    - 100% geometric: NO string-based naming checks.
+    """
+    _validate_route_input(route)
+    x0, y0, _ = route.start_pos
+    x_tgt, y_tgt, _ = route.target_pos
+
+    dy_total = y_tgt - y0
+    if abs(dy_total) < 1e-4:
+        return [], route.stand_start_frames + route.stand_stop_frames
+
+    dir_sign = 1.0 if dy_total > 0 else -1.0
+    stride_len = min(route.nominal_stride_m, route.max_step_length_m)
+    signed_stride = dir_sign * stride_len
+
+    step_ys: List[float] = []
+    curr_lead_y = y0
+    left_x = x0 - (route.step_width_m / 2.0)
+    right_x = x0 + (route.step_width_m / 2.0)
+    step_idx = 0
+
+    while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:
+        curr_lead_y += signed_stride
+        swing_side = "R" if (step_idx % 2 == 0) else "L"
+        sw_x = right_x if swing_side == "R" else left_x
+        adjusted_y = _adjust_footfall_for_seams_and_edges(
+            environment, sw_x, curr_lead_y, y0, y_tgt
+        )
+        step_ys.append(adjusted_y)
+        step_idx += 1
+
+    # Closing steps to land side-by-side at target_pos
+    step_ys.append(y_tgt)
+    step_ys.append(y_tgt)
+
+    return _build_step_schedule_core(
+        start_pos=route.start_pos,
+        target_y_sequence=step_ys,
+        environment=environment,
+        step_width_m=route.step_width_m,
+        stand_start_frames=route.stand_start_frames,
+        step_frames=route.step_frames,
+        stand_stop_frames=route.stand_stop_frames,
+        clearance_type="route",
+        route_base_clearance=route.base_clearance_m,
+        start_frame=start_frame,
+        corridor_y_bounds=(y0, y_tgt),
+    )
 
 
 def build_terrain_step_schedule(
@@ -411,120 +514,30 @@ def build_terrain_step_schedule(
     Legacy interface preserved for backward compatibility.
     100% geometric: replaces string-based naming with surface normal and height analysis.
     """
-    corridor_x = spec.start_pos[0]
-    left_x = corridor_x - HIP_X_OFFSET
-    right_x = corridor_x + HIP_X_OFFSET
+    if len(spec.waypoint_y) >= 2:
+        diffs = [spec.waypoint_y[i + 1] - spec.waypoint_y[i] for i in range(len(spec.waypoint_y) - 1)]
+        if not (all(d > 0 for d in diffs) or all(d < 0 for d in diffs)):
+            raise ValueError(
+                "TerrainTraversalSpec waypoint_y must be strictly monotonic (unidirectional traversal along fixed corridor)"
+            )
 
     y0 = spec.start_pos[1]
-    res0_l = environment.query_ground_support_at(left_x, y0)
-    res0_r = environment.query_ground_support_at(right_x, y0)
-    z0_l = res0_l.contact_point_world[2] if res0_l.success else environment.ground_height_at(left_x, y0)
-    z0_r = res0_r.contact_point_world[2] if res0_r.success else environment.ground_height_at(right_x, y0)
-    norm0_l = res0_l.surface_normal_world if res0_l.success else environment.surface_normal_at(left_x, y0)
-    norm0_r = res0_r.surface_normal_world if res0_r.success else environment.surface_normal_at(right_x, y0)
-    if z0_l is None or norm0_l is None:
-        raise ValueError(f"Initial left foot support at ({left_x:.2f}, {y0:.2f}) unavailable")
-    if z0_r is None or norm0_r is None:
-        raise ValueError(f"Initial right foot support at ({right_x:.2f}, {y0:.2f}) unavailable")
-    pitch0_l = pitch_from_surface_normal(norm0_l)
-    pitch0_r = pitch_from_surface_normal(norm0_r)
-    surf0_l_id = res0_l.surface_id if res0_l.success else "ground"
-    surf0_r_id = res0_r.surface_id if res0_r.success else "ground"
+    y_end = spec.waypoint_y[-1] if spec.waypoint_y else y0
 
-    feet_pos = {
-        "L": (left_x, y0, z0_l),
-        "R": (right_x, y0, z0_r),
-    }
-    feet_pitch = {
-        "L": pitch0_l,
-        "R": pitch0_r,
-    }
-    feet_normal = {
-        "L": norm0_l,
-        "R": norm0_r,
-    }
-    feet_surface_id = {
-        "L": surf0_l_id,
-        "R": surf0_r_id,
-    }
-
-    current_frame = start_frame + spec.stand_start_frames
-    schedule: List[TerrainStepPlan] = []
-
-    for k, target_y in enumerate(spec.waypoint_y):
-        stance_side = "L" if (k % 2 == 0) else "R"
-        swing_side = "R" if (k % 2 == 0) else "L"
-        sw_x = right_x if swing_side == "R" else left_x
-
-        sw_landing_res = environment.query_ground_support_at(sw_x, target_y)
-        if sw_landing_res.success:
-            sw_landing_z = sw_landing_res.contact_point_world[2]
-            sw_landing_norm = sw_landing_res.surface_normal_world
-            surf_id = sw_landing_res.surface_id
-        else:
-            sw_landing_z = environment.ground_height_at(sw_x, target_y)
-            sw_landing_norm = environment.surface_normal_at(sw_x, target_y)
-            if sw_landing_z is None or sw_landing_norm is None:
-                raise ValueError(
-                    f"Footstep {k} at ({sw_x:.2f}, {target_y:.2f}) rejected: no ground support available"
-                )
-            surf_res = environment.query_surface_at_point((sw_x, target_y, sw_landing_z))
-            surf_id = surf_res.surface_id if hasattr(surf_res, "surface_id") else "ground"
-
-        sw_landing_pitch = pitch_from_surface_normal(sw_landing_norm)
-        sw_landing_xyz = (sw_x, target_y, sw_landing_z)
-
-        st_xyz = feet_pos[stance_side]
-        st_pitch = feet_pitch[stance_side]
-        st_norm = feet_normal[stance_side]
-        st_surf_id = feet_surface_id[stance_side]
-
-        sw_start_xyz = feet_pos[swing_side]
-        sw_start_pitch = feet_pitch[swing_side]
-
-        # Pure geometric clearance: based on elevation difference
-        delta_z = sw_landing_z - st_xyz[2]
-        is_stepped = (delta_z > 0.05 and abs(sw_landing_pitch) < 3.0)
-        clearance = spec.base_clearance_stairs if is_stepped else spec.base_clearance_ramp
-
-        if k == 0:
-            stage_name = "start"
-        elif k == len(spec.waypoint_y) - 1:
-            stage_name = "stop_step"
-        else:
-            stage_name = "steady_traversal"
-
-        step_dur = spec.step_frames
-        plan = TerrainStepPlan(
-            k=k,
-            frame_start=current_frame,
-            frame_end=current_frame + step_dur,
-            duration_frames=step_dur,
-            stance_side=stance_side,
-            swing_side=swing_side,
-            stance_xyz=st_xyz,
-            stance_pitch_deg=st_pitch,
-            stance_surface_id=st_surf_id,
-            stance_normal=st_norm,
-            swing_start_xyz=sw_start_xyz,
-            swing_start_pitch_deg=sw_start_pitch,
-            swing_end_xyz=sw_landing_xyz,
-            swing_end_pitch_deg=sw_landing_pitch,
-            swing_surface_id=surf_id,
-            swing_normal=sw_landing_norm,
-            step_height_clearance=clearance,
-            stage_name=stage_name,
-        )
-        schedule.append(plan)
-
-        feet_pos[swing_side] = sw_landing_xyz
-        feet_pitch[swing_side] = sw_landing_pitch
-        feet_normal[swing_side] = sw_landing_norm
-        feet_surface_id[swing_side] = surf_id
-        current_frame += step_dur
-
-    total_frames = (current_frame - start_frame) + spec.stand_stop_frames
-    return schedule, total_frames
+    return _build_step_schedule_core(
+        start_pos=spec.start_pos,
+        target_y_sequence=list(spec.waypoint_y),
+        environment=environment,
+        step_width_m=2.0 * HIP_X_OFFSET,
+        stand_start_frames=spec.stand_start_frames,
+        step_frames=spec.step_frames,
+        stand_stop_frames=spec.stand_stop_frames,
+        clearance_type="spec",
+        spec_stairs_clearance=spec.base_clearance_stairs,
+        spec_ramp_clearance=spec.base_clearance_ramp,
+        start_frame=start_frame,
+        corridor_y_bounds=(y0, y_end),
+    )
 
 
 # =============================================================================
@@ -566,9 +579,13 @@ def _build_continuous_root_forward_spline(
         v_prev = dy_prev / dt_prev if dt_prev > 1e-6 else 0.0
         v_next = dy_next / dt_next if dt_next > 1e-6 else 0.0
 
-        # Central difference slope ensures C1 velocity continuity across the boundary
-        avg_v = 0.5 * (v_prev + v_next)
-        knot_v[k] = max(0.0, avg_v)
+        # Strict monotonicity: if consecutive slopes have opposite signs, knot velocity must be 0
+        if v_prev * v_next <= 0.0:
+            knot_v[k] = 0.0
+        else:
+            # Monotone tangent preserving travel direction (+Y non-negative, -Y non-positive)
+            avg_v = 0.5 * (v_prev + v_next)
+            knot_v[k] = avg_v
 
     return knot_frames, knot_y, knot_v
 
@@ -721,21 +738,7 @@ class TerrainWalkAction(MotionAction):
             allow_override=(environment is not None),
         )
         if self.route is not None:
-            # Clone route with current position as start
-            current_route = TerrainRouteInput(
-                start_pos=initial_state.position,
-                target_pos=self.route.target_pos,
-                nominal_stride_m=self.route.nominal_stride_m,
-                step_width_m=self.route.step_width_m,
-                stand_start_frames=self.route.stand_start_frames,
-                step_frames=self.route.step_frames,
-                stand_stop_frames=self.route.stand_stop_frames,
-                base_clearance_m=self.route.base_clearance_m,
-                pelvis_drop_uphill_m=self.route.pelvis_drop_uphill_m,
-                pelvis_drop_downhill_m=self.route.pelvis_drop_downhill_m,
-                pelvis_drop_flat_m=self.route.pelvis_drop_flat_m,
-                pelvis_drop_step_m=self.route.pelvis_drop_step_m,
-            )
+            current_route = replace(self.route, start_pos=initial_state.position)
             _, total_frames = plan_terrain_footsteps(current_route, env, start_frame=initial_state.frame)
             return total_frames
         else:
@@ -743,7 +746,6 @@ class TerrainWalkAction(MotionAction):
                 self.spec,
                 env,
                 start_frame=initial_state.frame,
-                fps=config.fps,
             )
             return total_frames
 
@@ -771,23 +773,7 @@ class TerrainWalkAction(MotionAction):
 
         # 1. Build discrete terrain step schedule dynamically from environment
         if self.route is not None:
-            current_route = TerrainRouteInput(
-                start_pos=initial_state.position,
-                target_pos=self.route.target_pos,
-                nominal_stride_m=self.route.nominal_stride_m,
-                step_width_m=self.route.step_width_m,
-                stand_start_frames=self.route.stand_start_frames,
-                step_frames=self.route.step_frames,
-                stand_stop_frames=self.route.stand_stop_frames,
-                base_clearance_m=self.route.base_clearance_m,
-                pelvis_drop_uphill_m=self.route.pelvis_drop_uphill_m,
-                pelvis_drop_downhill_m=self.route.pelvis_drop_downhill_m,
-                pelvis_drop_flat_m=self.route.pelvis_drop_flat_m,
-                pelvis_drop_step_m=self.route.pelvis_drop_step_m,
-                torso_lean_uphill_deg=self.route.torso_lean_uphill_deg,
-                torso_lean_downhill_deg=self.route.torso_lean_downhill_deg,
-                arm_swing_deg=self.route.arm_swing_deg,
-            )
+            current_route = replace(self.route, start_pos=initial_state.position)
             schedule, total_frames = plan_terrain_footsteps(
                 current_route, environment, start_frame=start_frame
             )
@@ -925,7 +911,7 @@ class TerrainWalkAction(MotionAction):
                 # Active step transition
                 mode = MotionMode.WALK
                 dur = active_step.duration_frames
-                step_progress = (current_frame - active_step.frame_start) / float(dur - 1) if dur > 1 else 1.0
+                step_progress = (current_frame - active_step.frame_start) / float(dur) if dur > 0 else 1.0
                 step_progress = max(0.0, min(1.0, step_progress))
                 step_alpha = _smoothstep01(step_progress)
 

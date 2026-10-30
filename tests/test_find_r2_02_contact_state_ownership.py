@@ -166,28 +166,26 @@ class TestFindR202ContactStateOwnership(unittest.TestCase):
         )
 
     def test_original_boundary_condition_failure_exposure(self) -> None:
-        """Verify that original boundary conditions (stand_start=2, step=4, stand_stop=2)
-        truthfully expose Frame 6 reachability failure caught by Repair 03's failure check.
+        """Verify that boundary conditions (stand_start=2, step=4, stand_stop=2)
+        now execute successfully without reachability failure after timebase normalization fix (FIND-T01-08).
 
-        Kinematic Root Cause:
-        In a 4-frame stride with nominal_stride_m=0.30m, swing foot interpolates
-        over dur-1=3 frames reaching alpha=1.0 at Frame 6, while root spline interpolates
-        over dur=4 frames reaching only 75% at Frame 6. This 25% phase lag pulls
+        Historical Context:
+        Prior to FIND-T01-08 fix, in a 4-frame stride with nominal_stride_m=0.30m, swing foot interpolated
+        over dur-1=3 frames reaching alpha=1.0 at Frame 6, while root spline interpolated
+        over dur=4 frames reaching only 75% at Frame 6. This 25% phase lag pulled
         the diagonal leg distance to 0.8204m (> 0.8200m MAX_LEG_REACH).
-        Repair 03's strict failure check correctly catches this failure and raises RuntimeError.
+        With time normalization unified to float(dur), root and foot remain strictly in-phase,
+        achieving 0 reachability violations and clean successful execution.
         """
-        with self.assertRaises(RuntimeError) as cm:
-            self._execute_walk(
-                intercept=False,
-                stand_start_frames=2,
-                step_frames=4,
-                stand_stop_frames=2,
-            )
-        err_msg = str(cm.exception)
-        self.assertIn("KinematicBridge execution failed", err_msg)
-        self.assertIn("foot_R", err_msg)
-        self.assertIn("REACHABILITY", err_msg)
-        self.assertIn("Frame 6", err_msg)
+        result, bridge = self._execute_walk(
+            intercept=False,
+            stand_start_frames=2,
+            step_frames=4,
+            stand_stop_frames=2,
+        )
+        self.assertEqual(len(result.states), 12)
+        self.assertEqual(result.unreachable_count, 0)
+        self.assertIsNotNone(bridge.last_res)
 
     def test_case_a_normal_walk_contact_state_ownership(self) -> None:
         """Case A: Normal walk preserves actual contact state produced by KinematicBridgeExecutor."""

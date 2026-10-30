@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Joint Repair Closure — Environment Ownership, Continuity Threshold & Real Scene Integration (JOINT-REPAIR-ENV-SCENE-CLOSE)
-> **审计与修复基准 Commit**：39f01e25e9fe017ddcfe2687cb5524a33421cf01
+> **当前阶段**：Terrain Planning Joint Repair — Direction, Seam, and Timebase Contracts (JOINT-REPAIR-TERRAIN-PLANNING)
+> **审计与修复基准 Commit**：476e5a3fdb1a9242b6a79be502278cd824b65837
 > **最后更新时间**：2026-10-30
-> **当前状态**：JOINT-REPAIR-ENV-SCENE-CLOSE — AWAITING INDEPENDENT REVIEW
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成 FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R4-02、FIND-T01-06 及 FIND-R4-01（含收尾所有权冲突防御、0.12m连续性门禁及真实无mock场景验证）修复与闭环验证，其余 Finding 维持原状待后续逐包推进。
+> **当前状态**：JOINT-REPAIR-TERRAIN-PLANNING — AWAITING INDEPENDENT REVIEW
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成 FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R2-06、FIND-R2-07、FIND-T01-06、FIND-T01-07、FIND-T01-08、FIND-R4-01、FIND-R4-02 及其 3 项关联问题（max_step_length_m 步长钳位、nominal_stride_m 严格正数/有限值校验、estimate_duration_frames fps 传参修复）的修复与闭环验证，存量缺陷彻底清零，其余合同缺口维持原状待后续推进。
 
 ---
 
@@ -12,11 +12,11 @@
 
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
-| **已确认缺陷 (CONFIRMED_DEFECT)** | **1** (存量) + **2** (已修复) | 存量：FIND-R2-07/T01-04 (接缝横向偏置)；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写) |
-| **接口合同缺口 (CONTRACT_GAP)** | **8** (存量) + **5** (已修复) | 存量：FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R4-02 (统一环境查询合同), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-R4-01 (场景执行门禁与真实落盘保护) |
-| **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
+| **已确认缺陷 (CONFIRMED_DEFECT)** | **0** (存量) + **3** (已修复) | 存量：无（已清零）；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写), FIND-R2-07/T01-04 (接缝横向偏置) |
+| **接口合同缺口 (CONTRACT_GAP)** | **5** (存量) + **8** (已修复) | 存量：FIND-R2-05 (几何与支撑脱节), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
+| **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (固定 X 走廊双向 +/-Y 导航), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
-| **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04 已修复解除阻碍) |
+| **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04, FIND-R2-06, FIND-R2-07 已修复解除阻碍) |
 
 ---
 
@@ -29,11 +29,11 @@
 | **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1080–1145 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | Lines 455–486 / 1045–1120 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `framework.py` |
 | **FIND-R2-05** | - | `src/motion/contact_model.py` | `ContactRecord` / `MultiContactState` | Lines 214–273 / 304–340 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `contact_model.py` |
-| **FIND-R2-06** | FIND-T01-05 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps` vs `build_terrain_step_schedule` | Lines 223–401 vs 404–520 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
-| **FIND-R2-07** | FIND-T01-04 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 310–312 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
+| **FIND-R2-06** | FIND-T01-05 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps` vs `build_terrain_step_schedule` | Lines 287–447 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
+| **FIND-R2-07** | FIND-T01-04 | `src/motion/terrain_walk.py` | `_adjust_footfall_for_seams_and_edges()` | Lines 219–285 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 304–318 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
-| **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 895–905 vs 848–870 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
+| **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 450–512 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
+| **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 920–930 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 152 / 380–384 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `foot_contact.py` / `ik.py` |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `ik.py` |
 | **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
@@ -120,10 +120,10 @@
 * **Evidence**: `terrain_walk.py:310–312` 实参为 `corridor_x`，导致系统始终在身体正中线检测地形边缘，无法感知位于身体侧面 $\pm 13$cm 处踩在台阶边缘的情况。
 * **Responsible Module**: `src/motion/terrain_walk.py`
 * **Downstream Impact**: 脚部落在台阶或接缝边缘时未触发避障微调，容易出现脚底悬空或踩入接缝。
-* **Classification**: `CONFIRMED_DEFECT`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**: 将 `corridor_x` 替换为实际落点横向坐标 `sw_x`。
+* **Classification**: `CONFIRMED_DEFECT (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**: 将接缝微调函数签名与调用改造为接收实际摆动侧脚部横向绝对坐标 `sw_x`（`_adjust_footfall_for_seams_and_edges(environment, sw_x, curr_lead_y, y0, y_tgt)`），结合左右脚脚后跟、踝关节与脚尖（22cm 刚性鞋底）真实三点网格支撑有效性判定，彻底消除中线偏置盲区；在 `tests/test_terrain_planning_contract.py` Group A 验证通过。
 
 ---
 
@@ -204,7 +204,7 @@
 * **Downstream Impact**: 步态帧数配置过短时（$\le 4$ 帧），动作在到达落点瞬间由于骨盆未跟进而触发可达性报错。
 * **Classification**: `CONTRACT_GAP`
 * **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`（已在 `tests/test_find_r2_02_contact_state_ownership.py` 中通过 `test_original_boundary_condition_failure_exposure` 作为正式负向断言保留现场，并在补充测试中采用 `step_frames=8` 验证接触状态所有权）。
+* **Repair Status**: `FIXED / VERIFIED` (已通过 `tests/test_find_r2_02_contact_state_ownership.py` 与 `tests/test_terrain_planning_contract.py` Group D 验证；将摆动脚进度归一化统一为 `float(dur)`，彻底消除 25% 相位差与 0.4mm 假性过伸，boundary 2/4/2 与 cadences 3/4/8 全量 0 不可达帧清洁通过)
 
 ---
 
@@ -259,9 +259,10 @@
 * **Evidence**: `MultiContactState.support_type` 是一个动态 `@property`，统计仅判断 `c.is_active`，而 `is_active` (L181–L184) 仅要求 `lifecycle == ESTABLISHED and contact_type != FREE`，完全不耦合 `GeometricConstraintResult`。
 * **Responsible Module**: `src/motion/contact_model.py`
 * **Downstream Impact**: 动力学计算（如重力平衡、质心支撑多边形计算）在足部严重悬空或穿透时，仍按正常双支撑多边形计算，导致物理遥测数据失真。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Classification**: `CONTRACT_GAP (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
 * **Suggested Repair Boundary**: 在 `kinematic_bridge.py` Phase 5 中，当 `check_geometric_compliance()` 返回 `is_valid=False` 且间隙过大时，显式将该记录标记为 `ContactLifecycle.BROKEN`。
 
 ---
@@ -279,10 +280,10 @@
 * **Evidence**: 对比两方法的实现代码分支，回退逻辑与异常抛出策略截然不同。
 * **Responsible Module**: `src/motion/terrain_walk.py`
 * **Downstream Impact**: 当使用不同入口函数进行规划时，产生非确定性行为。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**: 将 `build_terrain_step_schedule()` 废弃或重构为 `plan_terrain_footsteps()` 的兼容包装，统一未命中时的拦截策略。
+* **Classification**: `CONTRACT_GAP (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**: 抽取统一内核 `_build_step_schedule_core()` 作为两套调度的单一事实源（SSOT）；`build_terrain_step_schedule` 与 `plan_terrain_footsteps` 共同委托核心实现；未命中 (NO_HIT) 与非支撑面 (`allows_regular_support=False`) 均严格抛出 `ValueError`，彻底杜绝回退 2.5D 与伪造 'default_ground'；在 `tests/test_terrain_planning_contract.py` Group B 验证通过。
 
 ---
 
@@ -312,9 +313,10 @@
   循环终止条件 `while curr_lead_y + stride < y_tgt - (route.min_step_length_m * 0.5):` 立即判定为 False，直接跳过所有步态规划，返回仅含两个终点步的异常调度表。
 * **Expected Contract**: 步态规划循环条件应基于标量有向距离或步数计数器判断，支持任意方向路线规划。
 * **Responsible Module**: `src/motion/terrain_walk.py`
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Classification**: `CONTRACT_GAP (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
 
 ---
 
@@ -361,9 +363,10 @@
 * **Expected Contract**:
   地面高程判定应支持传入显式 `ground_z`，或在非平地模式下默认关闭基于根节点高程的生硬截断，由上层环境射线查询与接触模型提供统一防穿透保护。
 * **Downstream Impact**: 破坏 3D 复杂起伏地形与台阶下行运动能力；迫使上层动作逻辑必须绕开该参数。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Classification**: `CONTRACT_GAP (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
 * **Suggested Repair Boundary**: 允许 `set_foot_ik_target` 传入外部 `ground_z`，并解耦与 `root_obj.z` 的绑定。
 
 ---
@@ -382,9 +385,10 @@
   - 但在系统全局 `reset_leg_ik()` 时，这些历史快照依然残留，可能对跨动作调试或未加锁校验的第三方检查产生脏数据干扰。
 * **Expected Contract**:
   摆动期间历史快照允许保留但应明确标记为历史态；全局重置时应彻底清空。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Classification**: `CONTRACT_GAP (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
 * **Suggested Repair Boundary**: 在 `reset_leg_ik()` 中清理 Empty 上的历史锁定属性；在只读查询中明确区分当前活跃支撑点与历史落点快照。
 
 ---
@@ -476,8 +480,8 @@
 
 ## 5. 已知设计限制 (Known Design Limitations)
 
-* **LIMIT-01: 单一前进走廊 $+Y$ 导航假定**:
-  当前 `TerrainWalkAction` 及其动力学计算均硬编码沿世界坐标 $+Y$ 轴前进，未解耦世界坐标系与角色局部导航坐标系（Heading）。此为 Phase 6/7A 的设计范围边界，非代码缺陷。
+* **LIMIT-01: 固定 $X$ 走廊双向（$+Y$ 与 $-Y$）导航支持**:
+  经 FIND-T01-07 修复后，`TerrainWalkAction` 已完整支持固定 X 走廊的正向 (+Y) 与反向 (-Y) 行走规划与执行。非固定 X 走廊任意偏航角（Yaw）导航将在后续阶段推进。
 * **LIMIT-02: 上肢开环正向运动学（FK）摆臂**:
   在行进过程中，手臂摆动由纯正弦经验公式生成并以欧拉角写入 WBC FK，手臂 IK 解算器处于休眠挂起状态。这满足当前步态自然度需求，但不支持行进中的动态触碰与抓握。
 * **LIMIT-03: IK 超限单向开环警报**:
