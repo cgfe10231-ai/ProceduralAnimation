@@ -305,6 +305,55 @@ if update_debug_hud not in bpy.app.handlers.frame_change_post:
     return debug_scene
 
 
+def verify_scene_execution_gate(
+    planner_result: Dict[str, Any],
+    all_states: List[MotionState],
+) -> Tuple[bool, List[str]]:
+    """Verify motion execution quality before permitting .blend file saving or delivery.
+
+    Returns:
+        (is_passed, failure_reasons)
+    """
+    reasons: List[str] = []
+
+    if not planner_result.get("success", False):
+        reasons.append("planner_result['success'] is False")
+
+    unreachable = planner_result.get("unreachable_count", 0)
+    if unreachable > 0:
+        reasons.append(f"unreachable_count is {unreachable} (> 0)")
+
+    fatal_constraints = planner_result.get("fatal_unmet_constraints", [])
+    if fatal_constraints:
+        reasons.append(f"fatal_unmet_constraints count is {len(fatal_constraints)}")
+
+    action_failure = planner_result.get("action_failure")
+    if action_failure:
+        reasons.append(f"action_failure reported: {action_failure}")
+
+    if not all_states:
+        reasons.append("no motion states produced")
+    else:
+        # Check frame continuity: consecutive frames without gaps
+        for i in range(1, len(all_states)):
+            prev_s = all_states[i - 1]
+            curr_s = all_states[i]
+            if curr_s.frame != prev_s.frame + 1:
+                reasons.append(f"frame gap detected between frame {prev_s.frame} and {curr_s.frame}")
+                break
+            # Check spatial continuity (teleportation guard: > 1.0m per frame at typical fps)
+            dx = curr_s.position[0] - prev_s.position[0]
+            dy = curr_s.position[1] - prev_s.position[1]
+            dz = curr_s.position[2] - prev_s.position[2]
+            dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if dist > 1.0:
+                reasons.append(f"spatial jump of {dist:.3f}m (> 1.0m) detected at frame {curr_s.frame}")
+                break
+
+    is_passed = (len(reasons) == 0)
+    return is_passed, reasons
+
+
 def generate_dynamics_playground_task7a2_corrected_blend(
     output_blend_path: str = "output/dynamics_playground_task7a2_corrected.blend",
     evidence_dir: str = "docs/evidence/task7a2",
@@ -403,6 +452,9 @@ def generate_dynamics_playground_task7a2_corrected_blend(
         })
 
     contact_json_str = json.dumps(contact_records_serialized)
+    is_gate_passed, gate_failure_reasons = verify_scene_execution_gate(planner_result, all_states)
+    continuous_without_exemption = is_gate_passed
+
     summary_data = {
         "task": "Task 7A-2 Corrected",
         "total_frames": total_frames,
@@ -414,7 +466,9 @@ def generate_dynamics_playground_task7a2_corrected_blend(
             "nominal_stride_m": route.nominal_stride_m,
             "total_steps": len(planner_result["step_schedule"]),
         },
-        "continuous_without_exemption": True,
+        "continuous_without_exemption": continuous_without_exemption,
+        "gate_passed": is_gate_passed,
+        "gate_failure_reasons": gate_failure_reasons,
         "diagnostic_scene": debug_scene.name,
     }
     summary_json_str = json.dumps(summary_data)
@@ -424,6 +478,12 @@ def generate_dynamics_playground_task7a2_corrected_blend(
         target_scene["task7a2_contact_state_records"] = contact_json_str
         target_scene["task7a2_execution_summary"] = summary_json_str
         target_scene["task7a2_control_chain_diagnostics"] = diag_json_str
+
+    if not is_gate_passed:
+        raise RuntimeError(
+            f"generate_dynamics_playground_task7a2_corrected_blend failed gate verification: "
+            f"{'; '.join(gate_failure_reasons)}. Saving .blend delivery artifact prohibited."
+        )
 
     # 10. Save derived corrected blend artifact
     abs_blend_out = os.path.abspath(output_blend_path)
@@ -671,6 +731,9 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
         })
 
     contact_json_str = json.dumps(contact_records_serialized)
+    is_gate_passed, gate_failure_reasons = verify_scene_execution_gate(planner_result, all_states)
+    continuous_without_exemption = is_gate_passed
+
     summary_data = {
         "task": "Environment Gate 01 / Unit 3",
         "perturbed": perturbed,
@@ -686,7 +749,9 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
             "nominal_stride_m": route.nominal_stride_m,
             "total_steps": len(planner_result["step_schedule"]),
         },
-        "continuous_without_exemption": True,
+        "continuous_without_exemption": continuous_without_exemption,
+        "gate_passed": is_gate_passed,
+        "gate_failure_reasons": gate_failure_reasons,
         "diagnostic_scene": debug_scene.name,
     }
     summary_json_str = json.dumps(summary_data)
@@ -698,6 +763,12 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
         target_scene["task7a2_contact_state_records"] = contact_json_str
         target_scene["task7a2_execution_summary"] = summary_json_str
         target_scene["task7a2_control_chain_diagnostics"] = diag_json_str
+
+    if not is_gate_passed:
+        raise RuntimeError(
+            f"generate_dynamics_playground_environment_gate01_u3_blend failed gate verification: "
+            f"{'; '.join(gate_failure_reasons)}. Saving .blend delivery artifact prohibited."
+        )
 
     # 12. Save derived mesh-driven blend artifact
     abs_blend_out = os.path.abspath(output_blend_path)
