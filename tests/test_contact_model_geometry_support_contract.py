@@ -38,7 +38,7 @@ from src.motion.contact_model import (
     contact_record_to_legacy_contact_point,
     enrich_motion_state_with_contacts,
 )
-from src.motion.framework import ContactPointState, MotionState, SurfaceQueryResult
+from src.motion.framework import ContactPointState, MotionMode, MotionState, SurfaceQueryResult
 from src.motion.kinematic_bridge import (
     KinematicBridgeExecutor,
     KinematicPlannedPose,
@@ -442,6 +442,166 @@ class TestContactModelGeometrySupportContract(unittest.TestCase):
         self.assertEqual(ms.contacts["foot_L"].phase, "swing", "Invalid foot_L must report phase='swing'")
         self.assertTrue(ms.contacts["foot_R"].is_locked, "Valid foot_R must remain is_locked=True")
         self.assertEqual(ms.contacts["foot_R"].phase, "stance", "Valid foot_R must report phase='stance'")
+
+    # -------------------------------------------------------------------------
+    # Final Closure: ISSUE-07-A & ISSUE-07-B Acceptance Tests
+    # -------------------------------------------------------------------------
+
+    def test_issue_07_a_contact_record_uniqueness_and_canonical_mapping(self) -> None:
+        """TEST-A: MotionState.contacts preserves uniqueness, canonical names, and rejects conflicts."""
+        # 1. Standard canonical feet: foot_L, foot_R
+        c_l = ContactRecord("c_l", "foot_L", "ground", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (-0.11, 0.0, 0.0), (0, 0, 1))
+        c_r = ContactRecord("c_r", "foot_R", "ground", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (0.11, 0.0, 0.0), (0, 0, 1))
+        mc_feet = MultiContactState(contacts={"foot_L": c_l, "foot_R": c_r})
+        mc_feet.check_all_contacts({"foot_L": (-0.11, 0.0, 0.0), "foot_R": (0.11, 0.0, 0.0)})
+
+        ms_base = MotionState(
+            frame=1,
+            time_sec=0.0417,
+            position=(0.0, 0.0, 0.0),
+            orientation_deg=(0.0, 0.0, 0.0),
+            velocity=(0.0, 0.0, 0.0),
+            acceleration=(0.0, 0.0, 0.0),
+            mode=MotionMode.IDLE,
+            gait_phase=0.0,
+        )
+        enriched_feet = enrich_motion_state_with_contacts(ms_base, mc_feet)
+
+        # Strictly verify exact keys and count
+        self.assertEqual(set(enriched_feet.contacts.keys()), {"foot_L", "foot_R"})
+        self.assertEqual(len(enriched_feet.contacts), 2)
+        self.assertNotIn("foot_l", enriched_feet.contacts, "foot_l must NOT appear as duplicate key")
+        self.assertNotIn("foot_r", enriched_feet.contacts, "foot_r must NOT appear as duplicate key")
+        self.assertEqual(enriched_feet.params.get("active_contact_count"), 2)
+        self.assertEqual(enriched_feet.params.get("support_type"), "double_stance")
+
+        # 2. Standard canonical hands: hand_L, hand_R
+        c_hl = ContactRecord("c_hl", "hand_L", "ledge", ContactType.GRASP, ContactLifecycle.ESTABLISHED, (-0.20, 0.05, 1.8), (0, 0, -1))
+        c_hr = ContactRecord("c_hr", "hand_R", "ledge", ContactType.GRASP, ContactLifecycle.ESTABLISHED, (0.20, 0.05, 1.8), (0, 0, -1))
+        mc_hands = MultiContactState(contacts={"hand_L": c_hl, "hand_R": c_hr})
+        mc_hands.check_all_contacts({"hand_L": (-0.20, 0.05, 1.8), "hand_R": (0.20, 0.05, 1.8)})
+
+        enriched_hands = enrich_motion_state_with_contacts(ms_base, mc_hands)
+        self.assertEqual(set(enriched_hands.contacts.keys()), {"hand_L", "hand_R"})
+        self.assertEqual(len(enriched_hands.contacts), 2)
+        self.assertNotIn("hand_l", enriched_hands.contacts, "hand_l must NOT appear as duplicate key")
+        self.assertNotIn("hand_r", enriched_hands.contacts, "hand_r must NOT appear as duplicate key")
+        self.assertEqual(enriched_hands.params.get("active_contact_count"), 2)
+        self.assertEqual(enriched_hands.params.get("support_type"), "ledge_hang")
+
+        # 3. Known lowercase legacy keys canonicalized without duplicate keys
+        c_l_legacy = ContactRecord("c_ll", "foot_l", "ground", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (-0.11, 0.0, 0.0), (0, 0, 1))
+        c_r_legacy = ContactRecord("c_rl", "foot_r", "ground", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (0.11, 0.0, 0.0), (0, 0, 1))
+        mc_legacy = MultiContactState(contacts={"foot_l": c_l_legacy, "foot_r": c_r_legacy})
+        mc_legacy.check_all_contacts({"foot_l": (-0.11, 0.0, 0.0), "foot_r": (0.11, 0.0, 0.0)})
+
+        enriched_legacy = enrich_motion_state_with_contacts(ms_base, mc_legacy)
+        self.assertEqual(set(enriched_legacy.contacts.keys()), {"foot_L", "foot_R"}, "Legacy foot_l/foot_r must canonicalize to foot_L/foot_R")
+        self.assertEqual(len(enriched_legacy.contacts), 2)
+        self.assertNotIn("foot_l", enriched_legacy.contacts)
+        self.assertNotIn("foot_r", enriched_legacy.contacts)
+        self.assertEqual(enriched_legacy.params.get("active_contact_count"), 2)
+        self.assertEqual(enriched_legacy.params.get("support_type"), "double_stance")
+
+        # 4. Conflicting input containing both canonical and lowercase alias must be deterministically rejected
+        mc_conflict_feet = MultiContactState(contacts={"foot_L": c_l, "foot_l": c_l_legacy})
+        with self.assertRaises(ValueError) as ctx_feet:
+            enrich_motion_state_with_contacts(ms_base, mc_conflict_feet)
+        self.assertIn("Conflicting contact input", str(ctx_feet.exception))
+        self.assertIn("foot_L", str(ctx_feet.exception))
+
+        c_hl_legacy = ContactRecord("c_hll", "hand_l", "ledge", ContactType.GRASP, ContactLifecycle.ESTABLISHED, (-0.20, 0.05, 1.8), (0, 0, -1))
+        mc_conflict_hands = MultiContactState(contacts={"hand_L": c_hl, "hand_l": c_hl_legacy})
+        with self.assertRaises(ValueError) as ctx_hands:
+            enrich_motion_state_with_contacts(ms_base, mc_conflict_hands)
+        self.assertIn("Conflicting contact input", str(ctx_hands.exception))
+        self.assertIn("hand_L", str(ctx_hands.exception))
+
+    def test_issue_07_b_tolerance_mutation_invalidates_compliance(self) -> None:
+        """TEST-B: Modifying contact geometric tolerances invalidates instantaneous compliance cache."""
+        rec = ContactRecord(
+            contact_id="test_b",
+            limb="foot_L",
+            surface_id="ground",
+            world_position=(0.0, 0.0, 0.0),
+            world_normal=(0.0, 0.0, 1.0),
+        )
+
+        # 1. Normal gap tolerance mutation: 10 mm gap passes default 15 mm tolerance
+        res_gap = rec.check_geometric_compliance((0.0, 0.0, 0.010))
+        self.assertTrue(res_gap.is_valid, "10 mm gap must pass default 15 mm tolerance")
+        rec.set_compliance_result(res_gap)
+        self.assertTrue(rec.is_effective_support, "Initial verification must establish effective support")
+
+        # Mutate max_allowable_gap_m to 5 mm
+        rec.max_allowable_gap_m = 0.005
+        self.assertIsNone(rec.last_compliance_result, "Compliance cache must be invalidated on gap tolerance change")
+        self.assertFalse(rec.is_effective_support, "Effective support must drop to False before re-verification")
+        self.assertEqual(rec.lifecycle, ContactLifecycle.ESTABLISHED, "Lifecycle must remain ESTABLISHED")
+
+        # Re-verify at same position: 10 mm gap must now fail 5 mm tolerance
+        res_gap_re = rec.check_geometric_compliance((0.0, 0.0, 0.010))
+        self.assertFalse(res_gap_re.is_valid, "10 mm gap must fail 5 mm tolerance")
+        rec.set_compliance_result(res_gap_re)
+        self.assertFalse(rec.is_effective_support)
+
+        # 2. Penetration tolerance mutation: -8 mm penetration passes default 10 mm tolerance
+        res_pen = rec.check_geometric_compliance((0.0, 0.0, -0.008))
+        self.assertTrue(res_pen.is_valid, "8 mm penetration must pass default 10 mm tolerance")
+        rec.set_compliance_result(res_pen)
+        self.assertTrue(rec.is_effective_support)
+
+        # Mutate max_allowable_penetration_m to 5 mm
+        rec.max_allowable_penetration_m = 0.005
+        self.assertIsNone(rec.last_compliance_result, "Compliance cache must be invalidated on penetration tolerance change")
+        self.assertFalse(rec.is_effective_support)
+        self.assertEqual(rec.lifecycle, ContactLifecycle.ESTABLISHED)
+
+        # Re-verify at same position: 8 mm penetration must now fail 5 mm tolerance
+        res_pen_re = rec.check_geometric_compliance((0.0, 0.0, -0.008))
+        self.assertFalse(res_pen_re.is_valid, "8 mm penetration must fail 5 mm tolerance")
+        rec.set_compliance_result(res_pen_re)
+        self.assertFalse(rec.is_effective_support)
+
+        # 3. Tangential slip tolerance mutation: 15 mm slip passes default 20 mm tolerance
+        res_slip = rec.check_geometric_compliance((0.015, 0.0, 0.0))
+        self.assertTrue(res_slip.is_valid, "15 mm slip must pass default 20 mm tolerance")
+        rec.set_compliance_result(res_slip)
+        self.assertTrue(rec.is_effective_support)
+
+        # Mutate max_allowable_slip_m to 10 mm
+        rec.max_allowable_slip_m = 0.010
+        self.assertIsNone(rec.last_compliance_result, "Compliance cache must be invalidated on slip tolerance change")
+        self.assertFalse(rec.is_effective_support)
+        self.assertEqual(rec.lifecycle, ContactLifecycle.ESTABLISHED)
+
+        # Re-verify at same position: 15 mm slip must now fail 10 mm tolerance
+        res_slip_re = rec.check_geometric_compliance((0.015, 0.0, 0.0))
+        self.assertFalse(res_slip_re.is_valid, "15 mm slip must fail 10 mm tolerance")
+        rec.set_compliance_result(res_slip_re)
+        self.assertFalse(rec.is_effective_support)
+
+        # 4. Same value assignment must NOT clear cache
+        res_valid = rec.check_geometric_compliance((0.0, 0.0, 0.0))
+        rec.set_compliance_result(res_valid)
+        self.assertTrue(rec.is_effective_support)
+
+        rec.max_allowable_gap_m = rec.max_allowable_gap_m
+        self.assertIsNotNone(rec.last_compliance_result, "Same-value assignment must NOT clear compliance cache")
+        self.assertTrue(rec.is_effective_support)
+
+        rec.max_allowable_penetration_m = rec.max_allowable_penetration_m
+        self.assertIsNotNone(rec.last_compliance_result)
+        self.assertTrue(rec.is_effective_support)
+
+        rec.max_allowable_slip_m = rec.max_allowable_slip_m
+        self.assertIsNotNone(rec.last_compliance_result)
+        self.assertTrue(rec.is_effective_support)
+
+        # 5. Tolerance change to a wider value does NOT magically regenerate a valid result without re-measuring
+        rec.max_allowable_gap_m = 0.050
+        self.assertIsNone(rec.last_compliance_result, "Widening tolerance must still invalidate cache until re-measured")
+        self.assertFalse(rec.is_effective_support)
 
 
 if __name__ == "__main__":

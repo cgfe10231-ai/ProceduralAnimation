@@ -99,6 +99,14 @@ LIMB_TO_BONE_NAME: Dict[str, str] = {
     "elbow_R": "forearm.R",
 }
 
+# Known lowercase legacy keys mapping to canonical public MotionState limb names
+KNOWN_LEGACY_LIMB_MAP: Dict[str, str] = {
+    "foot_l": "foot_L",
+    "foot_r": "foot_R",
+    "hand_l": "hand_L",
+    "hand_r": "hand_R",
+}
+
 
 # =============================================================================
 # 2. Geometric Constraint Checking Result
@@ -167,8 +175,17 @@ class ContactRecord:
     last_compliance_result: Optional[GeometricConstraintResult] = None
 
     def __setattr__(self, name: str, value: Any) -> None:
-        # Invalidate compliance verification if lifecycle, contact type, or geometric targets change
-        if name in ("lifecycle", "contact_type", "world_position", "world_normal", "body_local_anchor"):
+        # Invalidate compliance verification if lifecycle, contact type, geometric targets, or tolerances change
+        if name in (
+            "lifecycle",
+            "contact_type",
+            "world_position",
+            "world_normal",
+            "body_local_anchor",
+            "max_allowable_gap_m",
+            "max_allowable_penetration_m",
+            "max_allowable_slip_m",
+        ):
             if hasattr(self, name) and getattr(self, name) != value:
                 super().__setattr__("last_compliance_result", None)
         super().__setattr__(name, value)
@@ -541,12 +558,16 @@ def enrich_motion_state_with_contacts(
     multi_contact: MultiContactState,
 ) -> MotionState:
     """Enrich a MotionState with multi-contact telemetry, updating contacts dict and params."""
-    legacy_contacts = {}
+    legacy_contacts: Dict[str, ContactPointState] = {}
     for limb, rec in multi_contact.contacts.items():
+        canonical_limb = KNOWN_LEGACY_LIMB_MAP.get(limb, limb)
+        if canonical_limb in legacy_contacts:
+            raise ValueError(
+                f"Conflicting contact input for canonical limb '{canonical_limb}': "
+                f"attempted to register '{limb}' but '{canonical_limb}' is already present in contacts."
+            )
         legacy_point = contact_record_to_legacy_contact_point(rec)
-        legacy_contacts[limb] = legacy_point
-        if limb.lower() != limb:
-            legacy_contacts[limb.lower()] = legacy_point
+        legacy_contacts[canonical_limb] = legacy_point
 
     is_flight = multi_contact.is_flight
     support_str = multi_contact.support_type.value

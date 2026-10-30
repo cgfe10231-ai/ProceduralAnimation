@@ -3,6 +3,32 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] ContactModel 07 最终验收收口: 接触记录唯一性与几何容差失效 (CONTACT-MODEL-07-FINAL-CLOSURE)
+
+### 1. ISSUE-07-A: MotionState.contacts 接触记录唯一性与规范化映射
+* **问题成因**：
+  - `enrich_motion_state_with_contacts()` 曾为兼容小写键额外执行 `legacy_contacts[limb.lower()] = legacy_point`，导致字典中同一物理接触产生两个条目（如 `foot_L` 与 `foot_l`），破坏接触记录唯一性。
+* **生产代码修复**：
+  - [src/motion/contact_model.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py):
+    - 移除额外写入 `limb.lower()` 逻辑，确保每个物理接触在公开接口中仅对应一个规范键；
+    - 引入 `KNOWN_LEGACY_LIMB_MAP`（`foot_l` -> `foot_L`, `foot_r` -> `foot_R`, `hand_l` -> `hand_L`, `hand_r` -> `hand_R`），在函数入口处对旧版小写键进行确定性规范化；
+    - 增加冲突输入防御拦截：当输入字典同时存在规范大写与小写别名时，抛出 `ValueError` 确定性拒绝重复规范身份。
+* **测试用例与验证**：
+  - `tests/test_contact_model_geometry_support_contract.py`:
+    - `test_issue_07_a_contact_record_uniqueness_and_canonical_mapping`: 验证 `foot_L`/`foot_R` 唯一无小写残留（len=2）、`hand_L`/`hand_R` 唯一、小写别名规范化无冗余、冲突输入（如同时传入 `foot_L` 与 `foot_l`）明确抛出 `ValueError`。
+
+### 2. ISSUE-07-B: ContactRecord 几何容差变更即时失效合规缓存
+* **问题成因**：
+  - `ContactRecord.__setattr__()` 属性变动监听集合仅包含生命周期、类型与空间坐标，遗漏了直接决定合规判定的三个容差字段（`max_allowable_gap_m`, `max_allowable_penetration_m`, `max_allowable_slip_m`），导致容差收紧后仍复用旧合规结果。
+* **生产代码修复**：
+  - [src/motion/contact_model.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py):
+    - 在 `__setattr__()` 缓存失效监听集合中补充 `"max_allowable_gap_m"`, `"max_allowable_penetration_m"`, `"max_allowable_slip_m"`；
+    - 修改容差数值时即时清空 `last_compliance_result = None`，使有效支撑资格在未重新测量前严格为 `False`；生命周期恒定保持 `ESTABLISHED`；
+    - 赋相同数值时不产生多余重置，容差放宽不自动伪造有效结果。
+* **测试用例与验证**：
+  - `tests/test_contact_model_geometry_support_contract.py`:
+    - `test_issue_07_b_tolerance_mutation_invalidates_compliance`: 验证法向间隙、法向穿透、切向滑动容差修改后即时失效并重新测量失败、相同值赋值缓存保持、放宽容差不自动生成有效结果。
+
 ## [2026-10-30] Production Interface Joint Repair: ContactModel 几何有效性与支撑拓扑解耦修复 (FIND-R2-05, JOINT-REPAIR-CONTACT-MODEL-07)
 
 ### 1. ContactRecord 接触生命周期与瞬时有效支撑资格严格解耦

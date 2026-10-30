@@ -1,23 +1,21 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-30
-> **当前阶段**：ContactModel Geometry-to-Support Consistency Repair (JOINT-REPAIR-CONTACT-MODEL-07)。已完成 ContactModel 几何有效性与支撑拓扑解耦修复 (FIND-R2-05)：
-> 1) **解耦接触生命周期与瞬时有效支撑资格**：
->    - `ContactRecord.is_lifecycle_active` (`lifecycle == ESTABLISHED and contact_type != FREE`) 与 `ContactRecord.is_effective_support` (`is_lifecycle_active and last_compliance_result is not None and last_compliance_result.is_valid`) 严格解耦；
->    - `ContactRecord.is_active` 对齐为 `is_effective_support` 属性；
->    - 当 `lifecycle`、`contact_type` 或空间目标坐标（`world_position`, `world_normal`, `body_local_anchor`）变更时，通过 `__setattr__` 自动重置合规状态为未验证（`last_compliance_result = None`）；
-> 2) **MultiContactState 支撑拓扑单一事实源 (SSOT) 统一**：
->    - `active_contacts`、`supporting_limbs`、`is_flight`、`support_type`、`active_contact_count` 及 `get_coplanar_support_polygon()` 统一以当前帧真实几何合规的有效支撑集合（`effective_contacts`）为单一事实源；
->    - 未经验证（`UNVALIDATED`）的接触严禁默认具有支撑资格，默认判定为无支撑/腾空（`SupportType.FLIGHT`）；
-> 3) **缺失肢体显式确定性失败与 KinematicBridge 失败传播协同**：
->    - `check_all_contacts()` 彻底移除对 `c.world_position` 的兜底替换，缺失测量显式记录确定性失败（`is_valid=False`, `MISSING_MEASUREMENT`, `total_position_error_m=inf`）；
->    - `KinematicBridgeExecutor.execute_frame()` 针对意图建立接触但几何违规的肢体（`rec.is_lifecycle_active and not geom_res.is_valid`），准确记录 `CONTACT_GEOMETRY` 违规至 `contact_geometry_errors`、`unmet_constraints` 并标记 `BridgeExecutionResult.success = False`，同时支撑拓扑自动剔除违规肢体；
-> 4) **全量回归与测试全绿**：
->    - 专用针对性测试套件 `tests/test_contact_model_geometry_support_contract.py` 14 项全绿通过（14/14 PASS in 0.224s）；
->    - 历史验证套件 `tests/verify_task6gc_contact_model.py` 17 项全绿通过（17/17 PASS in 22.0s）；
->    - 分层自动化套件全量回归全绿通过：Quick 19/19 (49.28s), Physics 22/22 (86.91s), Motion 12/12 (49.54s), Full 37/37 (139.24s)；
+> **当前阶段**：ContactModel 07 最终验收收口 (CONTACT-MODEL-07-FINAL-CLOSURE)。已完成 ContactModel 几何有效性与支撑拓扑解耦修复验收收口 (ISSUE-07-A & ISSUE-07-B)：
+> 1) **ISSUE-07-A: MotionState.contacts 接触记录唯一性与规范化映射**：
+>    - `enrich_motion_state_with_contacts()` 移除额外写入 `limb.lower()` 的重复逻辑，每个物理接触仅输出唯一规范公开名称（`foot_L`, `foot_R`, `hand_L`, `hand_R`）；
+>    - 建立输入映射 `KNOWN_LEGACY_LIMB_MAP`，对已知旧小写键（`foot_l` / `foot_r` / `hand_l` / `hand_r`）进行确定性规范化；
+>    - 输入同时包含规范名称与小写别名时，确定性抛出 `ValueError` 拒绝重复规范身份，杜绝隐式覆盖；
+> 2) **ISSUE-07-B: ContactRecord 几何容差变更即时失效合规缓存**：
+>    - `ContactRecord.__setattr__()` 纳入 `max_allowable_gap_m`、`max_allowable_penetration_m`、`max_allowable_slip_m` 三个容差字段至失效集合；
+>    - 容差修改时立即置 `last_compliance_result = None`，使有效支撑资格在重新测量前严格为 `False`；生命周期恒定保持 `ESTABLISHED`；
+>    - 赋予相同容差数值时不产生无意义的缓存清除；
+> 3) **全量回归与测试全绿**：
+>    - 专用针对性测试套件 `tests/test_contact_model_geometry_support_contract.py` 扩充 TEST-A / TEST-B 后 16 项全绿通过（16/16 PASS in 0.219s）；
+>    - 历史验证套件 `tests/verify_task6gc_contact_model.py` 17 项全绿通过（17/17 PASS in 22.11s）；
+>    - 分层自动化套件全量回归全绿通过：Quick 19/19 (49.31s), Physics 22/22 (86.27s), Motion 12/12 (49.07s), Full 37/37 (140.22s)；
 >    - AST 文档门禁与符号校验 `tests/audit_c2_final_inspector.py --verify-docs` 0 错误通过。
-> **重要修复与证据核准**：全仓库剩余 4 项 Finding（0 项确认缺陷、4 项合同缺口，全部集中于 PKG-5 底层 Rig/IK：FIND-R3-01 至 FIND-R3-04）。阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`CONTACT-MODEL-07 — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
+> **重要修复与证据核准**：全仓库剩余 4 项 Finding（0 项确认缺陷、4 项合同缺口，全部集中于 PKG-5 底层 Rig/IK：FIND-R3-01 至 FIND-R3-04）。阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`CONTACT-MODEL-07-FINAL-CLOSURE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 08，禁止进入 Phase 7B。
 
 ---
 
@@ -50,6 +48,20 @@
   * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），ContactModel 几何支撑一致性修复组 (FIND-R2-05) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），剩余 4 项合同缺口维持挂起等待授权排期修复。
 
 ### [已验证]
+* **ContactModel 07 最终验收收口 (CONTACT-MODEL-07-FINAL-CLOSURE, ISSUE-07-A & ISSUE-07-B)**：
+  * **接触记录唯一性与规范化映射 (ISSUE-07-A)**：
+    - `enrich_motion_state_with_contacts()` 移除写入 `limb.lower()` 逻辑，彻底杜绝 `foot_L` 与 `foot_l` 共存引起的字典键膨胀与记录非唯一性；
+    - 针对旧版小写输入键（`foot_l`, `foot_r`, `hand_l`, `hand_r`）在入口处确定性映射为规范大写名称；
+    - 冲突输入防御性阻断：当同一物理接触被同时传入大写和小写形式时，严格抛出 `ValueError`；
+  * **几何容差变更即时失效合规缓存 (ISSUE-07-B)**：
+    - `ContactRecord.__setattr__()` 拦截 `max_allowable_gap_m`、`max_allowable_penetration_m`、`max_allowable_slip_m` 修改，即时重置 `last_compliance_result = None`；
+    - 保证容差收紧后未重新执行真实测量前，`is_effective_support` 严格为 `False`，同时保持生命周期 `lifecycle == ESTABLISHED`；
+    - 赋相同值时不产生无效重置，容差放宽不自动伪造合规结果；
+  * **测试与回归**：
+    - 专用针对性测试 `tests/test_contact_model_geometry_support_contract.py` 扩充 TEST-A / TEST-B 至 16 项全绿通过（16/16 PASS in 0.219s）；
+    - 历史验证套件 `tests/verify_task6gc_contact_model.py` 17 项全绿通过（17/17 PASS in 22.11s）；
+    - 统一分层全量套件全绿：Quick (19/19 in 49.31s), Physics (22/22 in 86.27s), Motion (12/12 in 49.07s), Full (37/37 in 140.22s)；
+    - 状态置为 `CONTACT-MODEL-07-FINAL-CLOSURE — AWAITING INDEPENDENT REVIEW`。
 * **ContactModel Geometry-to-Support Consistency: 接触几何有效性与支撑拓扑解耦修复 (FIND-R2-05, JOINT-REPAIR-CONTACT-MODEL-07)**：
   * **生命周期与有效支撑解耦 (ContactRecord)**：
     - `is_lifecycle_active` 严格判定原始生命周期：`lifecycle == ESTABLISHED and contact_type != FREE`；
@@ -1033,5 +1045,5 @@
 ---
 
 ## 2. 下一步建议
-* **严格停止，等待审查 ContactModel Geometry-to-Support Consistency (FIND-R2-05 / CONTACT-MODEL-07) 验收结果**；
-* **暂停且严禁擅自进入 Phase 7B 或修复 PKG-5 (FIND-R3-01 至 FIND-R3-04)**。
+* **严格停止，等待审查 ContactModel 07 最终验收收口 (CONTACT-MODEL-07-FINAL-CLOSURE) 验收结果**；
+* **暂停且严禁擅自进入 08、Phase 7B 或修复 PKG-5 (FIND-R3-01 至 FIND-R3-04)**。
