@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Repair 04 — FIND-R2-04 Unified Motion Result Contract & MotionPlanner Failure Handling (REPAIR-04)  
-> **审计与修复基准 Commit**：`0c248122e01e0780140322c150035549e0523b00`  
+> **当前阶段**：Production Interface Repair 04 Closure — FIND-R2-04 Severity Priority & Classification Hardening (REPAIR-04-CLOSE)  
+> **审计与修复基准 Commit**：`db9cd4be6174b153da4e3e402f4b78f69e6e5e53`  
 > **最后更新时间**：2026-10-30  
-> **当前状态**：`REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`  
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02、FIND-R2-03 及 FIND-R2-04 修复与闭环验证，其余 Finding 维持原状待后续逐包推进。
+> **当前状态**：`REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`  
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02、FIND-R2-03 及 FIND-R2-04（含收尾判定优先级加固）修复与闭环验证，其余 Finding 维持原状待后续逐包推进。
 
 ---
 
@@ -241,7 +241,8 @@
     4. 轨迹首帧时间线连续性校验（`states[0].frame == current_state.frame`）；
     5. 终态一致性校验（`final_state.frame == states[-1].frame` 且位置偏差 $\le 0.1\text{mm}$）。
   - 在 `StartStopWalkAction` 与 `TerrainWalkAction` 结果构造中显式填写新字段，保持规范与修复 03 失败阻断无退化。
-  - 编写专用针对性回归测试 `tests/test_motion_planner_result_contract.py`，全覆盖 8 组测试场景（8/8 PASS）。
+  - **修复 04 收尾加固 (REPAIR-04-CLOSE)**：修复 `is_fatal_constraint()` 严重程度判定优先级漏洞，确立致命物理类别（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF`, `COLLISION`, `CONTACT_FAILURE`, `CONTACT_GEOMETRY`, `ORIENTATION_ERROR`, `FATAL`）严格优先于调用方可选的 `is_fatal=False` 或 `severity="warning"` 降级标记，彻底杜绝真实物理失败被降级为普通警告；确立未知类别绝不静默视为安全；普通诊断信息（`WARNING`, `TELEMETRY`, `INFO`, `DIAGNOSTIC`）及无类别的诊断消息仍合规放行。
+  - 专用针对性测试套件 `tests/test_motion_planner_result_contract.py` 扩充冲突严重程度与判定优先级矩阵至 10 项全部通过（10/10 PASS in 1.696s）。
   - 全量分层回归套件全部通过：`quick` (18/18 PASS), `physics` (21/21 PASS), `motion` (11/11 PASS), `full` (35/35 PASS)。
 
 ---

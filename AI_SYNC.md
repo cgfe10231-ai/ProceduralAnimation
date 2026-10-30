@@ -1,37 +1,37 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：Production Interface Repair 04 — FIND-R2-04 Unified Motion Result Contract & MotionPlanner Failure Handling (REPAIR-04)
+* **当前任务编号**：Production Interface Repair 04 Closure: 严重程度判定优先级修复与物理失败防降级加固 (REPAIR-04-CLOSE)
 * **任务状态**：
-  * **单缺陷最小手术式修复完成并通过验证**：
-    1. **修复目标**：FIND-R2-04 / FIND-T01-03（`ActionExecutionResult` 与 `MotionPlanner.execute()` 缺失动作失败处理合同，盲目顺序执行导致脏终态传播与假性全成功）；
-    2. **修复前运行复现**：编写针对性测试 [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py)，在基线代码下真实触发 6 项失败 (`FAILED (failures=3, errors=3)`，用例 2 吞没 `success=False` 强行执行后续动作、用例 4 空轨迹未拦截引发 `IndexError`、用例 5 终态帧/位置错位未检查、用例 6 吞没致死约束、用例 7/8 缺少 `success` 属性报错）；
+  * **单缺陷修复与收尾加固闭环完成**：
+    1. **修复目标**：FIND-R2-04 / FIND-T01-03 收尾（修复 `is_fatal_constraint()` 判定优先级漏洞，确立致命物理类别优先于可选警告标志，杜绝真实物理失败被降级为普通警告，确立未知类别不得静默视为安全）；
+    2. **修复前运行复现**：扩充针对性测试 [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py)，用例 9 捕获 `REACHABILITY + is_fatal=False` 被错误判定为非致命（`AssertionError: False is not true`），用例 10 捕获 `MotionPlanner.execute()` 面对包含 `is_fatal=False` 的失败动作强行调度后序动作执行（`AssertionError: RuntimeError not raised`）；
     3. **最小修复实现**：
-       - 在 [`src/motion/framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py) 中为 `ActionExecutionResult` 新增向后兼容字段：`success: bool = True`、`unmet_constraints: List[Any]`、`failure_reason: Optional[str] = None`、`failure_frame: Optional[int] = None`；
-       - 为 `ActionExecutionResult` 增加 `__post_init__` 守卫，杜绝 `unreachable_count > 0` 或致死约束被默认 `success=True` 掩盖；
-       - 引入 `is_fatal_constraint()` 辅助函数，严格区分致死性物理约束与非致死性诊断/遥测警告；
-       - 在 `MotionPlanner.execute()` 接入 5 重前置合同门禁：结果类型校验、动作成功及致死约束校验、轨迹非空校验（严禁 0 帧动作）、轨迹首帧时间线连续性校验、终态与末帧严格一致性校验（帧号及位置 $\le 0.1\text{mm}$）；
-       - 动作失败时抛出结构化 `RuntimeError`，完整阻断后续动作调用，阻断终态污染，拒绝输出伪造的成功字典；保留动作原发异常的透明抛出；
-       - 最小适配 `StartStopWalkAction` 与 `TerrainWalkAction` 成功返回字段；
+       - 在 [`src/motion/framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py) 中重构 `is_fatal_constraint()` 判定流：
+         1. 规则 1（最高优先级）：已知致命物理类别（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF`, `COLLISION`, `CONTACT_FAILURE`, `CONTACT_GEOMETRY`, `ORIENTATION_ERROR`, `FATAL`）强制返回 `True`，不可被 `is_fatal=False` 或 `severity="warning"` 降级覆盖；
+         2. 规则 2：显式致命标志（`is_fatal=True` 或 `severity in ("fatal", "error", "critical")`）立即返回 `True`；
+         3. 规则 3：已登记的非致命诊断类别（`WARNING`, `WARN`, `INFO`, `DIAGNOSTIC`, `TELEMETRY`, `NON_FATAL`）合规放行返回 `False`；
+         4. 规则 4：无类别标签的纯诊断信息（如 `severity="warning"`）放行返回 `False`；
+         5. 规则 5 & 6（Fail-Safe 兜底）：未知类别及未分类约束绝不静默视为安全，一律视为致命（`return True`）；
+       - `ActionExecutionResult.__post_init__()` 与 `MotionPlanner.execute()` 严格复用统一判定函数，消除前后不一致；
     4. **针对性回归验证**：
-       - [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py): 8/8 PASS (1.264s)
-       - [`tests/test_terrain_walk_failure_propagation.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_terrain_walk_failure_propagation.py): 6/6 PASS (0.433s)
-       - [`tests/test_find_r2_01_hand_contact_lifecycle.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_01_hand_contact_lifecycle.py): 4/4 PASS (0.266s)
-       - [`tests/test_find_r2_02_contact_state_ownership.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_02_contact_state_ownership.py): 6/6 PASS (0.714s)
+       - [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py): **10/10 PASS (1.696s)**
+       - [`tests/test_terrain_walk_failure_propagation.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_terrain_walk_failure_propagation.py): 6/6 PASS (0.438s)
+       - [`tests/test_find_r2_01_hand_contact_lifecycle.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_01_hand_contact_lifecycle.py): 4/4 PASS (0.273s)
+       - [`tests/test_find_r2_02_contact_state_ownership.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_02_contact_state_ownership.py): 6/6 PASS (0.737s)
     5. **分层回归测试全绿**：
-       - `.\run_tests.ps1 -tier quick`: 18/18 PASS (55.97s, Exit Code 0)
-       - `.\run_tests.ps1 -tier physics`: 21/21 PASS (90.12s, Exit Code 0)
-       - `.\run_tests.ps1 -tier motion`: 11/11 PASS (53.53s, Exit Code 0)
-       - `.\run_tests.ps1 -tier full`: 35/35 PASS (145.39s, Exit Code 0)
+       - `.\run_tests.ps1 -tier quick`: 18/18 PASS (50.86s, Exit Code 0)
+       - `.\run_tests.ps1 -tier physics`: 21/21 PASS (90.86s, Exit Code 0)
+       - `.\run_tests.ps1 -tier motion`: 11/11 PASS (48.90s, Exit Code 0)
+       - `.\run_tests.ps1 -tier full`: 35/35 PASS (142.93s, Exit Code 0)
        - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors, Exit Code 0)
-    6. **修复范围隔离确认**：仅修改 `src/motion/framework.py` 与 `src/motion/terrain_walk.py` 返回字段，新增针对性测试 `tests/test_motion_planner_result_contract.py`；未触碰动作核心动力学与步态生成算法，未修改 Rig 父级管理，未触碰任何 `.blend` 场景资产；
+    6. **修复范围隔离确认**：仅修改 `src/motion/framework.py` 内部 `is_fatal_constraint()` 判定逻辑及扩充测试 `tests/test_motion_planner_result_contract.py`；未触碰动作核心动力学与步态生成算法，未修改 Rig 父级管理，未触碰任何 `.blend` 场景资产；
   * **存量问题状态**：剩余 12 项 Finding（1 项确认缺陷 FIND-R2-07、11 项合同缺口）严格保持原状，维持待修复登记；
   * **Phase 7B 状态**：**仍然严格禁止**，禁止提前开发环境双向动力学；
-  * **门禁终止状态**：`REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行开展下一步修复）。
+  * **门禁终止状态**：`REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行开展下一步修复）。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **当前 Commit SHA**：`c6a5560fc4c7568eb25965a18defaf613716971e`（已同步至远程 `origin/master`）
-  * **起始基准 Commit SHA**：`0c248122e01e0780140322c150035549e0523b00`
+  * **起始基准 Commit SHA**：`db9cd4be6174b153da4e3e402f4b78f69e6e5e53`
   * **远程仓库**：`origin https://github.com/cgfe10231-ai/ProceduralAnimation.git` (`master`)
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
@@ -55,9 +55,9 @@
 
 * **架构文档与 AST 符号门禁 (`tests/audit_c2_final_inspector.py --verify-docs`)**：**PASS (Exit Code 0)**
 * **受保护资产检验**：
-  - `git diff -- src/` 仅含 `src/motion/framework.py` 与 `src/motion/terrain_walk.py` 内部修改。
+  - `git diff -- src/` 仅含 `src/motion/framework.py` 内部修改（较基准 commit `db9cd4be6174b153da4e3e402f4b78f69e6e5e53`）。
   - `git diff output/dynamics_playground.blend` 严格为 0 字节。
   - `git diff output/dynamics_playground_environment_gate01_u3_s2.blend` 严格为 0 字节。
 * **当前门禁终止状态**：
-  $$\mathbf{REPAIR-04\ /\ FIND-R2-04\ —\ AWAITING\ INDEPENDENT\ REVIEW}$$
+  $$\mathbf{REPAIR-04-CLOSE\ —\ AWAITING\ INDEPENDENT\ REVIEW}$$
   严格停留在该状态。严禁自行修复其他问题，严禁擅自进入 Phase 7B。

@@ -1,8 +1,8 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-30  
-> **当前阶段**：Production Interface Repair 04 — FIND-R2-04 Unified Motion Result Contract & MotionPlanner Failure Handling (REPAIR-04)。已完成针对 FIND-R2-04 / FIND-T01-03（`ActionExecutionResult` 缺失失败状态合同、`MotionPlanner.execute()` 盲目顺序执行导致脏终态传播与假性全成功）的手术式修复：1) 为 `ActionExecutionResult` 扩展 `success: bool = True`、`unmet_constraints`、`failure_reason`、`failure_frame` 字段并接入 `__post_init__` 防御守卫与 `is_fatal_constraint()` 约束鉴别器；2) 在 `MotionPlanner.execute()` 接入五重前置门禁（类型校验、失败与致死约束校验阻断、轨迹非空校验、时间线连续性校验、终态与末帧严格一致性校验）；3) 适配生产动作构造，新增针对性测试 `tests/test_motion_planner_result_contract.py`（8/8 PASS），分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），AST 文档门禁 0 错误通过。  
-> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03 与 FIND-R2-04 缺陷已被彻底解决并标定为 `FIXED / VERIFIED`，解除对动作失败传播、状态所有权及连续编排的阻塞。全仓库剩余 12 项 Finding（1 项确认缺陷、11 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。  
+> **当前阶段**：Production Interface Repair 04 Closure — FIND-R2-04 Severity Priority & Classification Hardening (REPAIR-04-CLOSE)。已完成针对 FIND-R2-04 / FIND-T01-03 收尾加固：1) 修复 `is_fatal_constraint()` 严重程度判定优先级漏洞，确立致命物理类别（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF`, `COLLISION`, `CONTACT_FAILURE`, `CONTACT_GEOMETRY`, `ORIENTATION_ERROR`, `FATAL`）强制优先于可选的 `is_fatal=False` 或 `severity="warning"` 降级标记，未知类别绝不静默视为安全，普通诊断信息放行；2) 消除 `ActionExecutionResult.__post_init__()` 与 `MotionPlanner.execute()` 判定分歧；3) 扩充针对性测试 `tests/test_motion_planner_result_contract.py`（10/10 PASS in 1.696s），分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），AST 文档门禁 0 错误通过。  
+> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03 与 FIND-R2-04 缺陷已被彻底解决并标定为 `FIXED / VERIFIED`，解除对动作失败传播、状态所有权及连续编排的阻塞。全仓库剩余 12 项 Finding（1 项确认缺陷、11 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。  
 
 ---
 

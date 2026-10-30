@@ -6,45 +6,41 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — Production Interface Repair 04 (REPAIR-04 / FIND-R2-04)。  
-* **当前状态**：`REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
-* **任务性质**：单缺陷生产修复（FIND-R2-04 / FIND-T01-03），统一 `ActionExecutionResult` 成功/失败合同，在 `MotionPlanner.execute()` 建立失败阻断、脏状态隔离与五重前置门禁，收口全动作规划执行合同。
+* **当前任务**：ProceduralAnimation — Production Interface Repair 04 Closure (REPAIR-04-CLOSE)。  
+* **当前状态**：`REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
+* **任务性质**：单缺陷收尾加固，修复 `is_fatal_constraint()` 严重程度判定优先级漏洞，确立致命物理类别优先于可选警告标志，杜绝真实物理失败被降级为普通警告，收口规划器与动作结果鉴别一致性。
 
-### 本任务核心核准成果 (REPAIR-04)
-1. **修复前真实运行复现**：
-   - 编写针对性测试 [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py)；
-   - 在基线代码下真实触发 6 项失败 (`FAILED (failures=3, errors=3)`：用例 2 吞没 `success=False` 强行执行后续动作、用例 4 空轨迹未拦截引发 `IndexError`、用例 5 终态帧/位置错位未检查、用例 6 吞没致死约束、用例 7/8 缺少 `success` 属性报错，退出码 1）；
-2. **最小手术式修复**：
-   - 在 [`src/motion/framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py) 中：
-     - 为 `ActionExecutionResult` 新增向后兼容字段：`success: bool = True`、`unmet_constraints: List[Any]`、`failure_reason: Optional[str] = None`、`failure_frame: Optional[int] = None`；
-     - 新增 `__post_init__` 守卫方法，防止 `unreachable_count > 0` 或致死约束被默认 `success=True` 掩盖；
-     - 引入 `is_fatal_constraint()` 约束鉴别器，严格区分致死性物理约束与非致死性诊断/遥测警告；
-     - 在 `MotionPlanner.execute()` 接入 5 重合同前置校验：结果类型校验、动作成功状态与致死约束校验（捕获失败立即抛出结构化 `RuntimeError`，绝不调用后续动作，绝不传播终态）、轨迹非空校验（严格拒绝 0 帧动作）、轨迹首帧时间线连续性校验、终态一致性校验（`final_state.frame == states[-1].frame` 且位置偏差 $\le 0.1\text{mm}$）；
-     - 保留动作原发异常的透明向外抛出（不吞没、不二次包装抹去原因）；
-   - 在 `StartStopWalkAction` 与 `TerrainWalkAction` 结果构造中显式填写新字段，保持规范与修复 03 失败阻断无退化；
-3. **针对性测试 8 路径验证**：
-   - Test 1 (两个正常动作): 验证顺序执行、状态交接、完整轨迹与时间线起止帧（1..10 帧）；
-   - Test 2 (首个动作返回失败结果): 验证 Planner 立即抛出 `RuntimeError`，后续动作绝不执行，无假性成功字典；
-   - Test 3 (动作直接抛出 RuntimeError): 验证异常完整穿透，原因不被吃掉；
-   - Test 4 (动作声称成功但轨迹为空): 验证 0 帧非法动作被合同严格拒绝；
-   - Test 5 (终态与末帧错位): 验证帧号错位（5A）与位置错位（5B）均被严格拦截；
-   - Test 6 (约束性质区分): 验证非致命诊断警告正常放行（6A），致命约束即便声称 success 仍被拦截阻断（6B）；
-   - Test 7 (StartStopWalkAction 历史兼容): 验证成功返回统一结果；
-   - Test 8 (TerrainWalkAction 历史兼容): 验证与修复 03 失败阻断无缝配合；
-   - 8 项针对性测试全部通过（8/8 PASS in 1.264s）；
-4. **全套自动化回归验证**：
-   - `.\run_tests.ps1 -tier quick`: 18/18 PASS (55.97s)
-   - `.\run_tests.ps1 -tier physics`: 21/21 PASS (90.12s)
-   - `.\run_tests.ps1 -tier motion`: 11/11 PASS (53.53s)
-   - `.\run_tests.ps1 -tier full`: 35/35 PASS (145.39s)
+### 本任务核心核准成果 (REPAIR-04-CLOSE)
+1. **漏洞真实运行复现**：
+   - 扩充针对性测试 [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py)；
+   - 在基线代码下受控复现 2 项失败：用例 9 捕获 `REACHABILITY + is_fatal=False` 错误返回非致命（`AssertionError: False is not true`）；用例 10 捕获 `MotionPlanner.execute()` 面对带 `is_fatal=False` 的失败动作强行调度后续动作执行（`AssertionError: RuntimeError not raised`）；
+2. **判定优先级架构重构与严格分类 (`src/motion/framework.py`)**：
+   - 在 `is_fatal_constraint()` 建立六级判定流水线：
+     1. 致命物理类别（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF`, `COLLISION`, `CONTACT_FAILURE`, `CONTACT_GEOMETRY`, `ORIENTATION_ERROR`, `FATAL`）强制返回 `True`，不可被可选警告标志覆盖；
+     2. 显式致命升级（`is_fatal=True` / `severity in ("fatal", "error", "critical")`）立即返回 `True`；
+     3. 已登记的非致命诊断类别（`WARNING`, `TELEMETRY`, `INFO`, `DIAGNOSTIC`, `NON_FATAL`）放行返回 `False`；
+     4. 无类别的纯诊断信息放行返回 `False`；
+     5. 未知类别及未分类约束绝不静默视为安全，一律视为致命（`return True`）；
+   - `ActionExecutionResult.__post_init__()` 与 `MotionPlanner.execute()` 严格复用统一判定函数，消除前后不一致；
+3. **针对性测试 10 路径全绿验证**：
+   - 用例 1–8（历史合同）完整保留且无修改；
+   - 用例 9: 验证 8 种严重程度/类别组合矩阵（`REACHABILITY+is_fatal=False`, `ROM_VIOLATION+severity=warning`, `CONTACT_FAILURE+is_fatal=False`, `COLLISION+severity=info`, 普通 WARNING, 普通 TELEMETRY, 未知类别, 真实 UnmetConstraint 对象）；
+   - 用例 10: 验证在冲突严重程度下，物理失败坚决阻断后续动作，普通警告与遥测合规放行并顺利执行后续动作；
+   - 10 项针对性测试全部通过（10/10 PASS in 1.696s）；
+4. **全套自动化分层回归验证**：
+   - `.\run_tests.ps1 -tier quick`: 18/18 PASS (50.86s)
+   - `.\run_tests.ps1 -tier physics`: 21/21 PASS (90.86s)
+   - `.\run_tests.ps1 -tier motion`: 11/11 PASS (48.90s)
+   - `.\run_tests.ps1 -tier full`: 35/35 PASS (142.93s)
    - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
 5. **缺陷登记总表更新**：
-   - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 将 FIND-R2-04 标定为 `FIXED / VERIFIED`；
-   - 阻碍后续开发项由 2 降至 1 (仅剩 FIND-R3-01 底层 Rig 动态父级)。
+   - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 同步登记收尾加固细节与优先级流水线；
+   - 阻碍后续开发项维持为 1 (仅剩 FIND-R3-01 底层 Rig 动态父级)。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Production Interface Repair 04 Closure**: 严重程度判定优先级修复与物理失败防降级加固归档 (`FIXED / VERIFIED`)。
 * **Production Interface Repair 04**: FIND-R2-04 / FIND-T01-03 统一动作结果与 MotionPlanner 失败处理合同归档 (`FIXED / VERIFIED`)。
 * **Production Interface Repair 03 Closure**: 斜坡脚踝摆动参数审核、回归测试边界恢复与根因闭环归档 (`AUDITED / PENDING REVIEW`)。
 * **Production Interface Repair 03**: FIND-R2-03 / FIND-T01-01 地形行走执行失败阻断传播与死分支清理归档 (`FIXED / VERIFIED`)。

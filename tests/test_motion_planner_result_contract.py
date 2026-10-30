@@ -41,6 +41,7 @@ from src.motion.framework import (
     MotionState,
     StartStopWalkAction,
     create_initial_motion_state,
+    is_fatal_constraint,
 )
 from src.motion.kinematic_bridge import KinematicBridgeExecutor
 from src.motion.terrain_walk import TerrainRouteInput, TerrainWalkAction
@@ -384,6 +385,125 @@ class TestMotionPlannerResultContract(unittest.TestCase):
         action_res = res["action_results"][0]
         self.assertIsInstance(action_res, ActionExecutionResult)
         self.assertTrue(action_res.success)
+
+    def test_09_is_fatal_constraint_severity_priority_matrix(self) -> None:
+        """Test 9: Verify is_fatal_constraint severity and category determination priority:
+        1. REACHABILITY + is_fatal=False -> FATAL (True)
+        2. ROM_VIOLATION + severity='warning' -> FATAL (True)
+        3. CONTACT_FAILURE + is_fatal=False -> FATAL (True)
+        4. COLLISION + severity='info' -> FATAL (True)
+        5. Ordinary WARNING + is_fatal=False -> NON-FATAL (False)
+        6. Ordinary TELEMETRY + severity='info' -> NON-FATAL (False)
+        7. Unknown category with undeclared severity -> FATAL (True, not silently safe)
+        8. Real UnmetConstraint object -> FATAL (True)
+        """
+        # 1. REACHABILITY + is_fatal=False
+        c1 = {"category": "REACHABILITY", "is_fatal": False}
+        self.assertTrue(is_fatal_constraint(c1), "REACHABILITY with is_fatal=False was mistakenly judged non-fatal!")
+
+        # 2. ROM_VIOLATION + severity='warning'
+        c2 = {"category": "ROM_VIOLATION", "severity": "warning"}
+        self.assertTrue(is_fatal_constraint(c2), "ROM_VIOLATION with severity=warning was mistakenly judged non-fatal!")
+
+        # 3. CONTACT_FAILURE + is_fatal=False
+        c3 = {"category": "CONTACT_FAILURE", "is_fatal": False}
+        self.assertTrue(is_fatal_constraint(c3), "CONTACT_FAILURE with is_fatal=False was mistakenly judged non-fatal!")
+
+        # 4. COLLISION + severity='info'
+        c4 = {"category": "COLLISION", "severity": "info"}
+        self.assertTrue(is_fatal_constraint(c4), "COLLISION with severity=info was mistakenly judged non-fatal!")
+
+        # 5. Ordinary WARNING + is_fatal=False
+        c5 = {"category": "WARNING", "is_fatal": False}
+        self.assertFalse(is_fatal_constraint(c5), "WARNING with is_fatal=False was mistakenly judged fatal!")
+
+        # 6. Ordinary TELEMETRY + severity='info'
+        c6 = {"category": "TELEMETRY", "severity": "info"}
+        self.assertFalse(is_fatal_constraint(c6), "TELEMETRY with severity=info was mistakenly judged fatal!")
+
+        # 7. Unknown category with undeclared severity
+        c7 = {"category": "UNKNOWN_PHYSICAL_PHENOMENON"}
+        self.assertTrue(is_fatal_constraint(c7), "Unknown category without severity was silently judged safe!")
+
+        # 8. Real UnmetConstraint object
+        c8 = UnmetConstraint(
+            category="REACHABILITY",
+            target_name="hand_R",
+            description="Arm target exceeds maximum reach",
+            error_amount=0.035,
+        )
+        self.assertTrue(is_fatal_constraint(c8), "Real UnmetConstraint object was judged non-fatal!")
+
+    def test_10_conflicting_severity_in_planner_execution(self) -> None:
+        """Test 10: Verify MotionPlanner.execute() and ActionExecutionResult contract with conflicting severities:
+        - Physical failure cannot be mistakenly downgraded;
+        - First Action failure blocks second Action from executing;
+        - Ordinary WARNING/TELEMETRY still allows execution to continue;
+        - Normal actions not mistakenly blocked.
+        """
+        init_st = create_initial_motion_state(self.config, start_frame=1)
+
+        # 10A: REACHABILITY with is_fatal=False in action unmet_constraints
+        planner_reach = self._create_planner()
+        act_reach = MockControlledAction(
+            name="ReachActionWithFalseFlag",
+            duration_frames=3,
+            unmet_constraints=[{"category": "REACHABILITY", "target_name": "foot_R", "description": "unreachable", "is_fatal": False}],
+        )
+        subsequent_a = MockControlledAction(name="SubsequentA", duration_frames=3)
+        planner_reach.add_action(act_reach)
+        planner_reach.add_action(subsequent_a)
+        with self.assertRaises(RuntimeError) as cm_reach:
+            planner_reach.execute(initial_state=init_st)
+        self.assertIn("ReachActionWithFalseFlag", str(cm_reach.exception))
+        self.assertIn("REACHABILITY", str(cm_reach.exception))
+        self.assertFalse(subsequent_a.executed, "Second action ran despite first action reachability failure!")
+
+        # 10B: ROM_VIOLATION with severity=warning in action unmet_constraints
+        planner_rom = self._create_planner()
+        act_rom = MockControlledAction(
+            name="RomActionWithWarningSeverity",
+            duration_frames=3,
+            unmet_constraints=[{"category": "ROM_VIOLATION", "target_name": "shin.L", "description": "knee hyperextension", "severity": "warning"}],
+        )
+        subsequent_b = MockControlledAction(name="SubsequentB", duration_frames=3)
+        planner_rom.add_action(act_rom)
+        planner_rom.add_action(subsequent_b)
+        with self.assertRaises(RuntimeError) as cm_rom:
+            planner_rom.execute(initial_state=init_st)
+        self.assertIn("RomActionWithWarningSeverity", str(cm_rom.exception))
+        self.assertIn("ROM_VIOLATION", str(cm_rom.exception))
+        self.assertFalse(subsequent_b.executed, "Second action ran despite first action ROM violation!")
+
+        # 10C: Ordinary WARNING + is_fatal=False allows execution to continue
+        planner_warn = self._create_planner()
+        act_warn = MockControlledAction(
+            name="OrdinaryWarnAction",
+            duration_frames=3,
+            unmet_constraints=[{"category": "WARNING", "description": "Slight pelvis tilt deviation", "is_fatal": False}],
+        )
+        subsequent_c = MockControlledAction(name="SubsequentC", duration_frames=3)
+        planner_warn.add_action(act_warn)
+        planner_warn.add_action(subsequent_c)
+        res_warn = planner_warn.execute(initial_state=init_st)
+        self.assertTrue(act_warn.executed)
+        self.assertTrue(subsequent_c.executed)
+        self.assertEqual(res_warn["total_frames"], 6)
+
+        # 10D: Ordinary TELEMETRY + severity=info allows execution to continue
+        planner_telemetry = self._create_planner()
+        act_telemetry = MockControlledAction(
+            name="OrdinaryTelemetryAction",
+            duration_frames=3,
+            unmet_constraints=[{"category": "TELEMETRY", "description": "CoM acceleration telemetry recorded", "severity": "info"}],
+        )
+        subsequent_d = MockControlledAction(name="SubsequentD", duration_frames=3)
+        planner_telemetry.add_action(act_telemetry)
+        planner_telemetry.add_action(subsequent_d)
+        res_telemetry = planner_telemetry.execute(initial_state=init_st)
+        self.assertTrue(act_telemetry.executed)
+        self.assertTrue(subsequent_d.executed)
+        self.assertEqual(res_telemetry["total_frames"], 6)
 
 
 if __name__ == "__main__":

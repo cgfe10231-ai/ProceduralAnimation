@@ -404,53 +404,87 @@ class MotionRuntimeContext:
 def is_fatal_constraint(constraint: Any) -> bool:
     """Determine whether an unmet constraint represents a fatal execution failure
     rather than a non-fatal diagnostic/telemetry warning.
+
+    Priority rules:
+    1. Fatal physical categories (e.g. REACHABILITY, ROM_VIOLATION, etc.) take strict
+       precedence over optional warning flags (is_fatal=False / severity='warning').
+    2. Explicit fatal escalations (is_fatal=True, severity in ('fatal', 'error', 'critical'))
+       are always fatal.
+    3. Recognized diagnostic categories (WARNING, TELEMETRY, etc.) and non-fatal severity
+       flags (when not attached to a known fatal category) are non-fatal.
+    4. Unknown categories and unrecognized objects must NOT be silently considered safe;
+       they default to fatal (fail-safe).
     """
     if constraint is None:
         return False
 
-    # 1. Explicit boolean fatal flags
-    if hasattr(constraint, "is_fatal"):
-        return bool(constraint.is_fatal)
-    if isinstance(constraint, dict):
-        if "is_fatal" in constraint:
-            return bool(constraint["is_fatal"])
-        if "fatal" in constraint:
-            return bool(constraint["fatal"])
-
-    # 2. Explicit severity attribute or key
-    severity = getattr(constraint, "severity", None)
-    if severity is None and isinstance(constraint, dict):
-        severity = constraint.get("severity")
-    if severity is not None:
-        severity_lower = str(severity).lower()
-        if severity_lower in ("warning", "warn", "info", "diagnostic", "telemetry"):
-            return False
-        if severity_lower in ("fatal", "error", "critical"):
-            return True
-
-    # 3. Category classification
+    # Extract category
     category = getattr(constraint, "category", None)
     if category is None and isinstance(constraint, dict):
         category = constraint.get("category")
-    if category is not None:
-        cat_upper = str(category).upper()
-        if cat_upper in ("WARNING", "WARN", "INFO", "DIAGNOSTIC", "TELEMETRY", "NON_FATAL"):
-            return False
-        if cat_upper in (
-            "REACHABILITY",
-            "ROM_VIOLATION",
-            "ROM_CONFLICT",
-            "DISALLOWED_DOF",
-            "COLLISION",
-            "CONTACT_FAILURE",
-            "FATAL",
-        ):
-            return True
+    cat_upper = str(category).upper() if category is not None else None
 
-    # 4. Physical / kinematic UnmetConstraint instance
+    # Extract explicit boolean fatal flag
+    is_fatal_flag: Optional[bool] = None
+    if hasattr(constraint, "is_fatal"):
+        is_fatal_flag = bool(constraint.is_fatal)
+    elif isinstance(constraint, dict):
+        if "is_fatal" in constraint:
+            is_fatal_flag = bool(constraint["is_fatal"])
+        elif "fatal" in constraint:
+            is_fatal_flag = bool(constraint["fatal"])
+
+    # Extract explicit severity string
+    severity = getattr(constraint, "severity", None)
+    if severity is None and isinstance(constraint, dict):
+        severity = constraint.get("severity")
+    sev_lower = str(severity).lower() if severity is not None else None
+
+    # Rule 1: Fatal physical categories take strict precedence over optional warning flags
+    KNOWN_FATAL_CATEGORIES = {
+        "REACHABILITY",
+        "ROM_VIOLATION",
+        "ROM_CONFLICT",
+        "DISALLOWED_DOF",
+        "COLLISION",
+        "CONTACT_FAILURE",
+        "CONTACT_GEOMETRY",
+        "ORIENTATION_ERROR",
+        "FATAL",
+    }
+    if cat_upper in KNOWN_FATAL_CATEGORIES:
+        return True
+
+    # Rule 2: Explicit fatal escalations on non-fatal or generic items
+    if is_fatal_flag is True:
+        return True
+    if sev_lower in ("fatal", "error", "critical"):
+        return True
+
+    # Rule 3: Recognized non-fatal diagnostic categories
+    KNOWN_NON_FATAL_CATEGORIES = {
+        "WARNING",
+        "WARN",
+        "INFO",
+        "DIAGNOSTIC",
+        "TELEMETRY",
+        "NON_FATAL",
+    }
+    if cat_upper in KNOWN_NON_FATAL_CATEGORIES:
+        return False
+
+    # Rule 4: Explicit non-fatal severity/flag when category is absent (pure diagnostic dict)
+    if cat_upper is None:
+        if is_fatal_flag is False:
+            return False
+        if sev_lower in ("warning", "warn", "info", "diagnostic", "telemetry"):
+            return False
+
+    # Rule 5: Physical / kinematic UnmetConstraint instance
     if hasattr(constraint, "category") and hasattr(constraint, "error_amount"):
         return True
 
+    # Rule 6: Fail-safe: Unknown category or unclassified constraint must NOT be silently safe
     return True
 
 

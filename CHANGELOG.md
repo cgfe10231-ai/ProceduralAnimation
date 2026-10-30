@@ -3,6 +3,36 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Repair 04 Closure: 严重程度判定优先级修复与物理失败防降级加固 (REPAIR-04-CLOSE)
+
+### 约束严重程度判定优先级漏洞修复与单帧门禁加固 (`src/motion/framework.py`)
+* **漏洞受控复现确证**：
+  - 在 `tests/test_motion_planner_result_contract.py` 扩充用例 9 与用例 10，针对基线代码受控复现：
+    - 用例 9: `REACHABILITY + is_fatal=False` 因优先读取 `is_fatal` 标志被错误判定为非致命（`AssertionError: False is not true`）；
+    - 用例 10: `MotionPlanner.execute()` 面对包含 `is_fatal=False` 的可达性失败动作，未能阻断并强行调度后序动作执行（`AssertionError: RuntimeError not raised`）；
+  - 成功捕获旧逻辑存在将 `REACHABILITY`、`ROM_VIOLATION`、`CONTACT_FAILURE`、`COLLISION` 降级为普通警告的合同漏洞；
+* **判定优先级架构重构与严格分类 (`src/motion/framework.py`)**：
+  - 重构 [`src/motion/framework.py:404–473`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py#L404-L473) 中的 `is_fatal_constraint()` 执行流：
+    1. **规则 1（最高优先级）**：已知致命物理类别（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF`, `COLLISION`, `CONTACT_FAILURE`, `CONTACT_GEOMETRY`, `ORIENTATION_ERROR`, `FATAL`）拥有最高裁决权，绝对不可被调用方可选的 `is_fatal=False` 或 `severity="warning"` 降级覆盖；
+    2. **规则 2**：显式致命升级（`is_fatal=True` 或 `severity in ("fatal", "error", "critical")`）立即生效；
+    3. **规则 3**：已登记的非致命诊断类别（`WARNING`, `WARN`, `INFO`, `DIAGNOSTIC`, `TELEMETRY`, `NON_FATAL`）合规放行返回 `False`；
+    4. **规则 4**：当缺少类别标签时，显式诊断严重程度（如 `severity="warning"`）作为纯诊断信息放行；
+    5. **规则 5 & 6（Fail-Safe 兜底）**：未知类别或未分类约束绝不静默视为安全，一律视为致命失败（`return True`）；
+  - `ActionExecutionResult.__post_init__()` 与 `MotionPlanner.execute()` 严格复用完全一致的鉴别函数，消除分类不一致；
+* **测试套件扩充与全量分层回归验证**：
+  - `tests/test_motion_planner_result_contract.py`: **10/10 PASS (1.696s)**（用例 1–8 保持原样，新增用例 9 矩阵与用例 10 规划器冲突严重程度负向阻断）；
+  - 修复 01–03 针对性回归全部通过：`test_find_r2_01` (4/4 PASS), `test_find_r2_02` (6/6 PASS), `test_terrain_walk_failure_propagation` (6/6 PASS)；
+  - `.\run_tests.ps1 -tier quick`: **18/18 PASS (50.86s, Exit Code 0)**；
+  - `.\run_tests.ps1 -tier physics`: **21/21 PASS (90.86s, Exit Code 0)**；
+  - `.\run_tests.ps1 -tier motion`: **11/11 PASS (48.90s, Exit Code 0)**；
+  - `.\run_tests.ps1 -tier full`: **35/35 PASS (142.93s, Exit Code 0)**；
+  - `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, Exit Code 0)**；
+* **严格隔离纪律**：
+  - 仅修改 `src/motion/framework.py` 内部 `is_fatal_constraint()` 函数及对应测试文件 `tests/test_motion_planner_result_contract.py`；
+  - 未触碰 `src/motion/terrain_walk.py`，未修改任何 IK、ROM、接触阈值，未触碰任何 `.blend` 场景资产；
+  - 阻碍 7B 项保持为 1 项 (`FIND-R3-01`)，Phase 7B 仍然严格禁止。
+* **门禁状态标定**: 门禁状态更新为 `REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`。
+
 ## [2026-10-30] Production Interface Repair 04: 统一动作结果与 MotionPlanner 失败处理合同 (FIND-R2-04 / FIND-T01-03)
 
 ### 缺陷修复与规划器执行失败判定收口 (`src/motion/framework.py`, `src/motion/terrain_walk.py`)
