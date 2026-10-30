@@ -23,16 +23,16 @@
     - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `contact_model.py:214–273, 304–340` 几何合规性校验只读返回，与动态属性 `support_type` 判定脱节；
     - **FIND-R2-06 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:223–401, 404–520` 步态预规划查询失败静默回退默认平地，与严格拒绝合同冲突；
     - **FIND-R2-07 (CONFIRMED_DEFECT, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:310–312` 接缝探测传入中心线 `corridor_x` 而非实际摆动脚侧向落点 `sw_x`；
-    - **FIND-T01-06 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:654–681` `TerrainWalkAction.estimate_duration_frames` 环境源脱节；
+    - **FIND-T01-06 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:660–705` `TerrainWalkAction.estimate_duration_frames` 严禁静默平地回退，`MotionPlanner.add_action()` 统一绑定权威环境实例，消除环境分裂，通过 4 项针对性测试与全量回归；
     - **FIND-T01-07 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:304–318` 负向行进步态规划跳步与终止缺陷；
     - **FIND-T01-08 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:895–905 vs 848–870` 短步态周期下摆动足进度分母（`dur - 1`）比根部位移样条分母（`dur`）超前 25%，导致骨盆滞后产生 0.4mm 几何假性过伸；
     - **FIND-R3-01 (CONTRACT_GAP / ARCHITECTURAL_VIOLATION, Blocks 7B: YES, STATIC_CONFIRMED)**: `foot_contact.py:152` `unlock_foot_contact` 默认形参 `reparent_to_root: bool = True` 动态挂载父级违反门禁 Rule 7，且父级非空时 `ik.py:380–384` 欧拉角未反解导致足部偏角；
     - **FIND-R3-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `ik.py:334–346` `set_foot_ik_target` 地面防穿透硬编码根高程，阻断 3D 起伏地形下潜，迫使上层全流程传 `clamp_ground=False`；
     - **FIND-R3-03 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:168–170, ik.py:219` `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留；
     - **FIND-R3-04 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用；
-    - **FIND-R4-01 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:633–640, 689, 704` 场景装配缺乏执行失败阻断合同，无视不可达错误无条件保存 Blend 文件并导出连续通过；
-    - **FIND-R4-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:402, 588–593, 610–615` 与 `blender_mesh_query_adapter.py:885–892` 2.5D 高程与法线查询在未命中时隐式回退平地并脱节支撑有效性校验；
-  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04) 已修复并验证（`FIXED / VERIFIED`）；维护包 PKG-3 后续任务至 PKG-5 维持挂起等待授权排期修复。
+    - **FIND-R4-01 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:308–355, 450–490, 730–770` 引入 `verify_scene_execution_gate()` 严苛校验规划成功状态、不可达事件、致命未满足约束与连续性，执行失败严禁保存 `.blend` 文件，移除硬编码 `"continuous_without_exemption": True`，通过 3 项针对性测试与全量回归；
+    - **FIND-R4-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:385–420, 597–643` 与 `blender_mesh_query_adapter.py:885–892` Mesh 模式下未命中或非支撑面严格返回 `None` 消除虚假 0.0m 回退，`query_ground_support_at` 严格在非支撑面返回 `success=False`，通过 8 项针对性测试与全量回归；
+  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01) 已修复并验证（`FIXED / VERIFIED`）；剩余 8 项缺陷维持挂起等待授权排期修复。
 
 ### [已验证]
 * **Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计 (Audit A 至 Audit J)**：

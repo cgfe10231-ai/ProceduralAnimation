@@ -3,6 +3,56 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Joint Repair: 环境查询、环境所有权与场景交付门禁联合修复 (FIND-R4-02 / FIND-T01-06 / FIND-R4-01)
+
+### 1. 第一部分：统一环境查询合同 (FIND-R4-02)
+* **缺陷复现与确证**：
+  - 编写针对性测试套件 [`tests/test_environment_query_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_environment_query_contract.py)（8 大测试场景），基线代码确证 4 项失败：
+    - `test_02_mesh_raycast_miss`: 网格射线未命中时 `ground_height_at` 静默虚报 0.0m（`AssertionError: 0.0 is not None`）；
+    - `test_03_mesh_hit_non_support_surface`: 击中 60° 陡坡非支撑面时 `ground_height_at` 返回 0.0m（`AssertionError: 0.0 is not None`）；
+    - `test_04_mesh_hit_vertical_wall`: 击中垂直墙面时 `ground_height_at` 返回 0.0m（`AssertionError: 0.0 is not None`）；
+    - `test_08_base_query_ground_support_rejection`: `query_ground_support_at` 在 `allows_regular_support=False` 时仍返回 `success=True`（`AssertionError: True is not false`）；
+* **生产代码修复**：
+  - [`src/scene/blender_mesh_query_adapter.py:885–892`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/blender_mesh_query_adapter.py#L885-L892): `surface_normal_at()` 同步对齐支撑条件，只有 `res.success and res.allows_regular_support` 时返回法线，非支撑面严格返回 `None`；
+  - [`src/scene/environment_query.py:597–643`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/environment_query.py#L597-L643): `DynamicsEnvironmentQuery.ground_height_at()` 与 `surface_normal_at()` 在 Mesh 模式下未命中或非支撑面严格返回 `None`，彻底消除向 `self.ground_z` (0.0m) 与 `(0, 0, 1)` 的静默虚假回退；
+  - [`src/scene/environment_query.py:385–420`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/environment_query.py#L385-L420): `EnvironmentQuery.query_ground_support_at()` 统一支撑成功判定 `is_success = bool(surf_res.success and allows_support)`，当 `allows_regular_support=False` 时严格标定 `success=False`；
+  - 联动修复上游消费端兼容性：`terrain_walk.py` 遥测高度处理 `round(h, 3) if h is not None else None`；`playground_terrain_validation.py:215` 碰撞检测增加 `terr_z is not None` 守卫；`test_mesh_environment_query.py:326` 更新为严苛断言 `assertIsNone`。
+
+### 2. 第二部分：统一动作环境来源与所有权 (FIND-T01-06)
+* **缺陷复现与确证**：
+  - 编写针对性测试套件 [`tests/test_action_environment_binding.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_action_environment_binding.py)（4 项测试用例），基线代码确证 3 项失败：
+    - `test_01`: 未绑定环境的 `TerrainWalkAction` 在调用 `estimate_duration_frames` 时静默实例化虚拟平地 `EnvironmentQuery(ground_z=0.0)`（`AssertionError: ValueError not raised`）；
+    - `test_02`: `MotionPlanner.add_action()` 未将自身权威环境注入动作中，导致动作环境维持 `None`（`AssertionError: None is not <DynamicsEnvironmentQuery>`）；
+    - `test_03`: `estimate_duration_frames` 缺乏显式 `environment` 覆盖参数（`TypeError: unexpected keyword argument 'environment'`）；
+* **生产代码修复**：
+  - [`src/motion/framework.py:544–555, 1025–1035`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py#L544-L555): `MotionAction.estimate_duration_frames()` 补充可选 `environment: Optional[EnvironmentQuery] = None` 形参；`MotionPlanner.add_action()` 接入环境自动绑定合同（优先调用 `action.bind_environment()`，或注入 `action.environment`）；
+  - [`src/motion/terrain_walk.py:660–705`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py#L660-L705): `TerrainWalkAction` 实现 `bind_environment()`，并在 `estimate_duration_frames()` 中严苛禁止静默平地回退（未绑定或未传入环境时抛出 `ValueError`），消除规划估算与实际执行间的环境分裂。
+
+### 3. 第三部分：场景执行与保存门禁 (FIND-R4-01)
+* **缺陷复现与确证**：
+  - 编写故障注入测试套件 [`tests/test_scene_save_gate.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_scene_save_gate.py)，注入动作执行失败（`success=False`、`unreachable_count > 0`、致命物理违规）；
+  - 基线代码无视失败结果，无条件输出 `Info: Saved as "test_gate_fail_delivery.blend"` 并硬编码标记 `"continuous_without_exemption": True`，确证 `AssertionError: RuntimeError not raised`；
+* **生产代码修复**：
+  - [`src/scene/playground_terrain_traversal.py:308–355`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_terrain_traversal.py#L308-L355): 引入统一场景执行门禁检验函数 `verify_scene_execution_gate(planner_result, all_states)`，逐项严格检查规划器成功状态、不可达事件计数（必须为 0）、致命未满足约束计数（必须为 0）、动作失败报告（必须为空）、以及轨迹帧序号与空间距离连续性；
+  - 在 [`generate_dynamics_playground_task7a2_corrected_blend()`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_terrain_traversal.py#L450-L490) 与 [`generate_dynamics_playground_environment_gate01_u3_blend()`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_terrain_traversal.py#L730-L770) 落盘前接入强门禁：门禁未通过时严禁调用 `bpy.ops.wm.save_as_mainfile()`，抛出带结构化失败原因的 `RuntimeError`；
+  - 移除两处硬编码 `"continuous_without_exemption": True`，彻底绑定 `continuous_without_exemption = is_gate_passed` 真实验证结果。
+
+### 4. 全量回归与零退化验证
+* `tests/test_environment_query_contract.py`: **8/8 PASS (0.201s)**；
+* `tests/test_action_environment_binding.py`: **4/4 PASS (0.001s)**；
+* `tests/test_scene_save_gate.py`: **3/3 PASS (0.273s)**；
+* 历史修复针对性测试全量通过：
+  - `tests/test_find_r2_01_hand_contact_lifecycle.py`: **4/4 PASS**；
+  - `tests/test_find_r2_02_contact_state_ownership.py`: **6/6 PASS**；
+  - `tests/test_terrain_walk_failure_propagation.py`: **6/6 PASS**；
+  - `tests/test_motion_planner_result_contract.py`: **10/10 PASS**；
+* `.un_tests.ps1 -tier quick`: **18/18 PASS (47.82s, Exit Code 0)**；
+* `.un_tests.ps1 -tier physics`: **21/21 PASS (86.84s, Exit Code 0)**；
+* `.un_tests.ps1 -tier motion`: **11/11 PASS (47.21s, Exit Code 0)**；
+* `.un_tests.ps1 -tier full`: **35/35 PASS (135.28s, Exit Code 0)**；
+* `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, Exit Code 0)**；
+* 门禁状态标定：`JOINT_REPAIR_ENV_SCENE — AWAITING INDEPENDENT REVIEW`。
+
 ## [2026-10-30] Production Interface Repair 04 Closure: 严重程度判定优先级修复与物理失败防降级加固 (REPAIR-04-CLOSE)
 
 ### 约束严重程度判定优先级漏洞修复与单帧门禁加固 (`src/motion/framework.py`)
