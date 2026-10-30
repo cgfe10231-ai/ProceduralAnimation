@@ -401,6 +401,59 @@ class MotionRuntimeContext:
 # 4. Extensible MotionAction Interface & Action Execution Result
 # ============================================================================
 
+def is_fatal_constraint(constraint: Any) -> bool:
+    """Determine whether an unmet constraint represents a fatal execution failure
+    rather than a non-fatal diagnostic/telemetry warning.
+    """
+    if constraint is None:
+        return False
+
+    # 1. Explicit boolean fatal flags
+    if hasattr(constraint, "is_fatal"):
+        return bool(constraint.is_fatal)
+    if isinstance(constraint, dict):
+        if "is_fatal" in constraint:
+            return bool(constraint["is_fatal"])
+        if "fatal" in constraint:
+            return bool(constraint["fatal"])
+
+    # 2. Explicit severity attribute or key
+    severity = getattr(constraint, "severity", None)
+    if severity is None and isinstance(constraint, dict):
+        severity = constraint.get("severity")
+    if severity is not None:
+        severity_lower = str(severity).lower()
+        if severity_lower in ("warning", "warn", "info", "diagnostic", "telemetry"):
+            return False
+        if severity_lower in ("fatal", "error", "critical"):
+            return True
+
+    # 3. Category classification
+    category = getattr(constraint, "category", None)
+    if category is None and isinstance(constraint, dict):
+        category = constraint.get("category")
+    if category is not None:
+        cat_upper = str(category).upper()
+        if cat_upper in ("WARNING", "WARN", "INFO", "DIAGNOSTIC", "TELEMETRY", "NON_FATAL"):
+            return False
+        if cat_upper in (
+            "REACHABILITY",
+            "ROM_VIOLATION",
+            "ROM_CONFLICT",
+            "DISALLOWED_DOF",
+            "COLLISION",
+            "CONTACT_FAILURE",
+            "FATAL",
+        ):
+            return True
+
+    # 4. Physical / kinematic UnmetConstraint instance
+    if hasattr(constraint, "category") and hasattr(constraint, "error_amount"):
+        return True
+
+    return True
+
+
 @dataclass
 class ActionExecutionResult:
     """Standardized output produced by executing a `MotionAction`."""
@@ -413,6 +466,23 @@ class ActionExecutionResult:
     step_schedule: List[dict] = field(default_factory=list)
     unreachable_count: int = 0
     metrics: Dict[str, Any] = field(default_factory=dict)
+    success: bool = True
+    unmet_constraints: List[Any] = field(default_factory=list)
+    failure_reason: Optional[str] = None
+    failure_frame: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        """Enforce contract consistency: do not let default success=True mask explicit failures."""
+        if self.unreachable_count > 0 and self.success:
+            self.success = False
+            if not self.failure_reason:
+                self.failure_reason = f"Encountered {self.unreachable_count} unreachable IK target(s)"
+
+        fatal_unmet = [c for c in self.unmet_constraints if is_fatal_constraint(c)]
+        if fatal_unmet and self.success:
+            self.success = False
+            if not self.failure_reason:
+                self.failure_reason = f"Encountered {len(fatal_unmet)} fatal unmet constraint(s)"
 
 
 class MotionAction(ABC):
@@ -830,6 +900,10 @@ class StartStopWalkAction(MotionAction):
                 "peak_speed_mps": round(peak_speed, 5),
                 "unreachable_count": len(unreachable_events),
             },
+            success=True,
+            unmet_constraints=[],
+            failure_reason=None,
+            failure_frame=None,
         )
 
 
@@ -973,6 +1047,74 @@ class MotionPlanner:
                     time_sec=(next_frame - 1) / float(self.config.fps),
                 )
             result = action.execute(current_state, context)
+
+            # Contract Validation 1: Verify result type
+            if not isinstance(result, ActionExecutionResult):
+                raise TypeError(
+                    f"MotionPlanner execution failed: Action '{action.name}' returned invalid result type "
+                    f"{type(result).__name__}, expected ActionExecutionResult."
+                )
+
+            # Contract Validation 2: Verify action execution success and absence of fatal constraints
+            fatal_unmet = [c for c in result.unmet_constraints if is_fatal_constraint(c)]
+            if (not result.success) or fatal_unmet or (result.unreachable_count > 0):
+                fail_parts = []
+                if result.failure_reason:
+                    fail_parts.append(result.failure_reason)
+                elif not result.success:
+                    fail_parts.append("Action reported execution failure (success=False)")
+
+                if fatal_unmet:
+                    unmet_details = "; ".join(
+                        f"{getattr(c, 'target_name', 'target')} ({getattr(c, 'category', 'category')}): "
+                        f"{getattr(c, 'description', str(c))}"
+                        for c in fatal_unmet[:3]
+                    )
+                    fail_parts.append(f"fatal unmet constraints ({len(fatal_unmet)}): {unmet_details}")
+
+                if result.unreachable_count > 0:
+                    fail_parts.append(f"unreachable count={result.unreachable_count}")
+
+                reason_str = " | ".join(fail_parts)
+                frame_str = f" at Frame {result.failure_frame}" if result.failure_frame is not None else ""
+                raise RuntimeError(
+                    f"MotionPlanner execution failed: Action '{result.action_name}' failed{frame_str}: {reason_str}"
+                )
+
+            # Contract Validation 3: Verify trajectory is non-empty (motion contract disallows 0-frame actions)
+            if not result.states or not result.frame_records:
+                raise RuntimeError(
+                    f"MotionPlanner execution failed: Action '{result.action_name}' claims success but produced "
+                    f"empty trajectory (states={len(result.states)}, frame_records={len(result.frame_records)})."
+                )
+
+            # Contract Validation 4: Verify trajectory entry frame continuity
+            if result.states[0].frame != current_state.frame:
+                raise RuntimeError(
+                    f"MotionPlanner execution failed: Action '{result.action_name}' first state frame "
+                    f"({result.states[0].frame}) does not match expected entry frame ({current_state.frame})."
+                )
+
+            # Contract Validation 5: Verify final_state consistency with last trajectory frame
+            last_state = result.states[-1]
+            if result.final_state is None:
+                raise RuntimeError(
+                    f"MotionPlanner execution failed: Action '{result.action_name}' returned final_state=None."
+                )
+            if result.final_state.frame != last_state.frame:
+                raise RuntimeError(
+                    f"MotionPlanner execution failed: Action '{result.action_name}' returned final_state.frame "
+                    f"({result.final_state.frame}) mismatch with last state frame ({last_state.frame})."
+                )
+            pos_diff = max(abs(a - b) for a, b in zip(result.final_state.position, last_state.position))
+            if pos_diff > 1e-4:
+                raise RuntimeError(
+                    f"MotionPlanner execution failed: Action '{result.action_name}' returned final_state.position "
+                    f"{result.final_state.position} mismatch with last state position {last_state.position} "
+                    f"(max_diff={pos_diff:.5f}m > 0.0001m)."
+                )
+
+            # Commit action result only after all contract checks pass
             action_results.append(result)
             all_states.extend(result.states)
             all_frame_records.extend(result.frame_records)
@@ -995,6 +1137,7 @@ class MotionPlanner:
         )
 
         return {
+            "success": True,
             "total_frames": len(all_frame_records),
             "fps": self.config.fps,
             "total_root_displacement": round(total_disp, 5),

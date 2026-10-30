@@ -1213,4 +1213,8 @@ class TerrainWalkAction(MotionAction):
                 "unreachable_count": unreachable_count,
                 "schedule_steps": len(schedule),
             },
+            success=True,
+            unmet_constraints=[],
+            failure_reason=None,
+            failure_frame=None,
         )

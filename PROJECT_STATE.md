@@ -1,8 +1,8 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-30  
-> **当前阶段**：Production Interface Repair 03 Closure — Slope Ankle Pitch Parameter Audit & Regression Test Boundary Restoration (REPAIR-03-CLOSE)。已完成对 Repair 03 额外两项修改的专项闭环：1) 斜坡脚踝松弛参数（`swing_relax_amp = 25.0°`）受控复现 22.0° 越界，17 帧全量对比确证生理合规与零穿透/零悬空，跨步长/跨周期通用性验证通过，维持 25.0° 并归档待独立审查核准；2) 恢复 `tests/test_find_r2_02_contact_state_ownership.py` 原测试边界条件（(2, 4, 2)）作为正式负向回归测试（1/1 PASS），定位短步态根足插值滞后运动学根因（登记为 FIND-T01-08），并引入独立补充测试配置（(4, 8, 4)）覆盖接触状态所有权（5/5 PASS，全套 6/6 PASS）。分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），AST 文档门禁 0 错误通过。  
-> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02 与 FIND-R2-03 缺陷已被彻底解决并标定为 `FIXED / VERIFIED`，解除对后续上肢接触、物理接触真实性、失败阻断传播与 Phase 7B 的阻塞。全仓库剩余 13 项 Finding（1 项确认缺陷、12 项合同缺口）严格保持只读与挂起状态；当前门禁终止状态为：`REPAIR-03-CLOSE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。  
+> **当前阶段**：Production Interface Repair 04 — FIND-R2-04 Unified Motion Result Contract & MotionPlanner Failure Handling (REPAIR-04)。已完成针对 FIND-R2-04 / FIND-T01-03（`ActionExecutionResult` 缺失失败状态合同、`MotionPlanner.execute()` 盲目顺序执行导致脏终态传播与假性全成功）的手术式修复：1) 为 `ActionExecutionResult` 扩展 `success: bool = True`、`unmet_constraints`、`failure_reason`、`failure_frame` 字段并接入 `__post_init__` 防御守卫与 `is_fatal_constraint()` 约束鉴别器；2) 在 `MotionPlanner.execute()` 接入五重前置门禁（类型校验、失败与致死约束校验阻断、轨迹非空校验、时间线连续性校验、终态与末帧严格一致性校验）；3) 适配生产动作构造，新增针对性测试 `tests/test_motion_planner_result_contract.py`（8/8 PASS），分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），AST 文档门禁 0 错误通过。  
+> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03 与 FIND-R2-04 缺陷已被彻底解决并标定为 `FIXED / VERIFIED`，解除对动作失败传播、状态所有权及连续编排的阻塞。全仓库剩余 12 项 Finding（1 项确认缺陷、11 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。  
 
 ---
 
@@ -19,7 +19,7 @@
     - **FIND-R2-01 (CONFIRMED_DEFECT / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `kinematic_bridge.py:512` 引用不存在的枚举 `ContactLifecycle.TOUCHDOWN` 已被修复为 `ContactLifecycle.CANDIDATE`，通过 4 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-02 (CONFIRMED_DEFECT / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:1125–1145` 移除强制覆写 `contacts=c_dict`，完整保留 Bridge 真实物理测量数据与上肢接触，通过 6 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-03 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:1084–1100` 接入 `bridge_res.success` 严苛校验与 `RuntimeError` 结构化异常阻断，清理废弃死回退分支，微调斜坡踝关节松弛角度（`swing_relax_amp = 25.0°`）消除踏步 ROM 越界，通过 6 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
-    - **FIND-R2-04 (CONTRACT_GAP, Blocks 7B: YES, STATIC_CONFIRMED)**: `framework.py:405–416, 915–1010` `ActionExecutionResult` 缺失失败状态合同，`MotionPlanner` 盲目顺序执行无法阻断级联错误；
+    - **FIND-R2-04 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `framework.py:455–486, 1045–1120` `ActionExecutionResult` 统一成功/失败合同与防御守卫，`MotionPlanner` 接入五重前置门禁与失败阻断流转，通过 8 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `contact_model.py:214–273, 304–340` 几何合规性校验只读返回，与动态属性 `support_type` 判定脱节；
     - **FIND-R2-06 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:223–401, 404–520` 步态预规划查询失败静默回退默认平地，与严格拒绝合同冲突；
     - **FIND-R2-07 (CONFIRMED_DEFECT, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:310–312` 接缝探测传入中心线 `corridor_x` 而非实际摆动脚侧向落点 `sw_x`；
@@ -32,7 +32,7 @@
     - **FIND-R3-04 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用；
     - **FIND-R4-01 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:633–640, 689, 704` 场景装配缺乏执行失败阻断合同，无视不可达错误无条件保存 Blend 文件并导出连续通过；
     - **FIND-R4-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:402, 588–593, 610–615` 与 `blender_mesh_query_adapter.py:885–892` 2.5D 高程与法线查询在未命中时隐式回退平地并脱节支撑有效性校验；
-  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02) 与 PKG-3 部分 (FIND-R2-03) 已修复并完成专项收尾审核（`AUDITED / PENDING REVIEW`）；维护包 PKG-3 后续任务至 PKG-5 维持挂起等待授权排期修复。
+  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04) 已修复并验证（`FIXED / VERIFIED`）；维护包 PKG-3 后续任务至 PKG-5 维持挂起等待授权排期修复。
 
 ### [已验证]
 * **Environment Gate 01 — Final Architecture Audit: 全仓库独立架构审计 (Audit A 至 Audit J)**：

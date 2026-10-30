@@ -3,6 +3,49 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Repair 04: 统一动作结果与 MotionPlanner 失败处理合同 (FIND-R2-04 / FIND-T01-03)
+
+### 缺陷修复与规划器执行失败判定收口 (`src/motion/framework.py`, `src/motion/terrain_walk.py`)
+* **FIND-R2-04 / FIND-T01-03 修复前复现确证**：
+  - 构建针对性复现测试套件 [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py)，覆盖 Test 1 至 Test 8 八大契约场景；
+  - 在旧版基准下运行触发 6 项断言失败（`FAILED (failures=3, errors=3)`）：
+    - Test 2: 第一动作失败时 Planner 吞没失败并继续调用后续动作；
+    - Test 4: 动作返回空轨迹时 Planner 发生 `IndexError` 崩溃；
+    - Test 5: 动作 `final_state` 与轨迹末尾状态不一致时未被捕获；
+    - Test 6: 未约束不可达失败未被识别为执行失败；
+    - Test 7/8: 旧版 `ActionExecutionResult` 缺乏 `success`、`unmet_constraints`、`failure_reason`、`failure_frame` 等契约字段；
+* **统一动作执行结果结构体契约扩展与自动判定 (`src/motion/framework.py`)**：
+  - 在 `ActionExecutionResult` 中新增关键契约字段：`success: bool = True`、`unmet_constraints: List[Any] = field(default_factory=list)`、`failure_reason: Optional[str] = None`、`failure_frame: Optional[int] = None`；
+  - 引入 `is_fatal_constraint()` 约束分类函数，严谨区分致命物理失败（`REACHABILITY`, `ROM_VIOLATION`, `COLLISION`, `CONTACT_FAILURE` 等）与非致命诊断告警（`WARNING`, `severity="warning"`, `is_fatal=False`）；
+  - 在 `ActionExecutionResult.__post_init__` 中增加严密防御：若 `unreachable_count > 0` 或存在致命未满足约束，强制判定 `success = False`，彻底杜绝虚假成功；
+* **MotionPlanner 执行器五重防御合同校验 (`src/motion/framework.py`)**：
+  - 在 [`src/motion/framework.py:970–1035`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py#L970-L1035) 的 `MotionPlanner.execute()` 循环中加入执行契约验证五道防线：
+    1. **结果类型检查**：必须为 `ActionExecutionResult` 实例；
+    2. **动作执行成败检查**：若 `not result.success`、存在致命约束或不可达，立即抛出包含动作名、帧号与失败原因的结构化 `RuntimeError`，阻断后续动作调用，防止坏状态污染管线；
+    3. **轨迹非空防御**：要求 `result.states` 与 `result.frame_records` 必须非空；
+    4. **起始帧连续性检查**：断言首帧编号严格等于当前规划器帧号（`result.states[0].frame == current_state.frame`）；
+    5. **末尾状态自洽性验证**：严格断言 `result.final_state` 与 `result.states[-1]` 在帧号及三维位置上的一致性（容差 $\le 0.1\text{mm}$），杜绝动作执行瞬移与时间轴错乱；
+  - 原生异常（如 action 内部主动抛出的 `RuntimeError`）保持原样向上传播，保留原始调用栈；
+  - 规划器返回值字典明确补充 `"success": True` 标定；
+* **动作结果生产方对齐更新 (`src/motion/framework.py`, `src/motion/terrain_walk.py`)**：
+  - 更新 `StartStopWalkAction.execute()` 返回构造，显式填充统一契约字段；
+  - 更新 `TerrainWalkAction.execute()` 返回构造，显式填充统一契约字段；
+* **测试验证与回归全绿**：
+  - `tests/test_motion_planner_result_contract.py`: 8/8 PASS (1.264s)
+  - `tests/test_find_r2_01_hand_contact_lifecycle.py`: 4/4 PASS (0.266s)
+  - `tests/test_find_r2_02_contact_state_ownership.py`: 6/6 PASS (0.714s)
+  - `tests/test_terrain_walk_failure_propagation.py`: 6/6 PASS (0.433s)
+  - `.\run_tests.ps1 -tier quick`: 18/18 PASS (55.97s, Exit Code 0)
+  - `.\run_tests.ps1 -tier physics`: 21/21 PASS (90.12s, Exit Code 0)
+  - `.\run_tests.ps1 -tier motion`: 11/11 PASS (53.53s, Exit Code 0)
+  - `.\run_tests.ps1 -tier full`: 35/35 PASS (145.39s, Exit Code 0)
+  - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors, Exit Code 0)
+* **严格隔离纪律**：
+  - 仅修改 `src/motion/framework.py` 与 `src/motion/terrain_walk.py` 内部动作契约；
+  - 未触碰 Rig、环境查询适配器、短步态根部插值或任何 `.blend` 资产；
+  - 阻碍 7B 项降至 1 项 (`FIND-R3-01`)，Phase 7B 仍然严格禁止。
+* **门禁状态标定**: 门禁状态更新为 `REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`。
+
 ## [2026-10-30] Production Interface Repair 03 Closure: 斜坡脚踝摆动参数审核与回归测试边界恢复 (REPAIR-03-CLOSE)
 
 ### 专项审计、边界恢复与运动学根因闭环

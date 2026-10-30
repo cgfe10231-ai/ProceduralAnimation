@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Repair 03 Closure — Slope Ankle Pitch Parameter Audit & Regression Test Boundary Restoration (REPAIR-03-CLOSE)  
-> **审计与修复基准 Commit**：`ce99ecc137c47bb355babe14debe19cc5be47ac5`  
+> **当前阶段**：Production Interface Repair 04 — FIND-R2-04 Unified Motion Result Contract & MotionPlanner Failure Handling (REPAIR-04)  
+> **审计与修复基准 Commit**：`0c248122e01e0780140322c150035549e0523b00`  
 > **最后更新时间**：2026-10-30  
-> **当前状态**：`REPAIR-03-CLOSE — AWAITING INDEPENDENT REVIEW`  
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02 及 FIND-R2-03 修复与收尾审核，其余 Finding 维持原状待后续逐包推进。
+> **当前状态**：`REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`  
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02、FIND-R2-03 及 FIND-R2-04 修复与闭环验证，其余 Finding 维持原状待后续逐包推进。
 
 ---
 
@@ -13,10 +13,10 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **1** (存量) + **2** (已修复) | 存量：FIND-R2-07/T01-04 (接缝横向偏置)；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写) |
-| **接口合同缺口 (CONTRACT_GAP)** | **12** (存量) + **1** (已修复) | 存量：FIND-R2-04/T01-03 (Action失败合同), FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口) |
+| **接口合同缺口 (CONTRACT_GAP)** | **11** (存量) + **2** (已修复) | 存量：FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
-| **阻碍后续开发 (Blocks Further Dev: YES)** | **2** | FIND-R2-04, FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03 已修复解除阻碍) |
+| **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04 已修复解除阻碍) |
 
 ---
 
@@ -27,7 +27,7 @@
 | **FIND-R2-01** | - | `src/motion/kinematic_bridge.py` | `KinematicBridgeExecutor.execute_frame()` | Line 512 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `kinematic_bridge.py` |
 | **FIND-R2-02** | FIND-T01-02 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1100–1138 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1080–1145 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | Lines 405–416 / 915–1010 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `framework.py` |
+| **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | Lines 455–486 / 1045–1120 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `framework.py` |
 | **FIND-R2-05** | - | `src/motion/contact_model.py` | `ContactRecord` / `MultiContactState` | Lines 214–273 / 304–340 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `contact_model.py` |
 | **FIND-R2-06** | FIND-T01-05 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps` vs `build_terrain_step_schedule` | Lines 223–401 vs 404–520 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
 | **FIND-R2-07** | FIND-T01-04 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 310–312 | CONFIRMED_DEFECT | `STATIC_CONFIRMED` | NO | `terrain_walk.py` |
@@ -211,25 +211,38 @@
 ### FIND-R2-04 (对应历史 FIND-T01-03): `ActionExecutionResult` 与 `MotionPlanner.execute()` 缺失动作失败处理合同
 * **Source File**: `src/motion/framework.py`
 * **Class / Function**: `ActionExecutionResult` / `MotionPlanner.execute()`
-* **Exact Line Range**: Lines 405–416 (`ActionExecutionResult`), Lines 915–1010 (`MotionPlanner.execute()`, 循环点 L967–L981)
+* **Exact Line Range**: Lines 455–486 (`ActionExecutionResult`), Lines 1045–1120 (`MotionPlanner.execute()`, 循环点 L1049–L1115)
 * **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 序列化多动作规划中，前序 Action 发生不可达或物理违规。
-* **Actual Behavior**:
+* **Trigger Condition**: 序列化多动作规划中，前序 Action 发生不可达、物理违规或返回显式失败状态。
+* **Actual Behavior (修复前)**:
   `ActionExecutionResult` 数据类缺少 `success: bool` 和 `unmet_constraints` 字段。`MotionPlanner.execute()` 采用盲目顺序流：
   ```python
   result = action.execute(current_state, context)
   action_results.append(result)
   current_state = result.final_state
   ```
+  前序 Action 失败时，Planner 仍强行将失败动作的 `final_state` 作为后继状态调用下一动作，并将部分轨迹作为整体成功轨迹汇报。
 * **Expected Contract**:
-  Action 执行结果必须显式标明自身执行的成功状态；当发生致死性物理违背时，`MotionPlanner` 必须决定是阻断流程、回退重试还是触发应急过渡。
-* **Evidence**: 审查 `MotionPlanner.execute()` 源码，整段循环无任何 `if not result.success` 检查逻辑。
+  Action 执行结果必须显式标明自身执行的成功状态与失败细节；当发生致死性物理违背时，`MotionPlanner` 必须阻断后续动作调用，防止脏状态污染，并抛出携带动作名称、失败原因与帧信息的结构化异常。
+* **Evidence**: 审查修复前 `MotionPlanner.execute()` 源码，整段循环无任何 `if not result.success` 或约束检查逻辑。
 * **Responsible Module**: `src/motion/framework.py`
 * **Downstream Impact**: 复合动作在第一阶段已经失效崩溃的情况下，后续动作仍强行以崩溃状态作为基准继续求解，导致级联错误。
 * **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `YES`
-* **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**: 在 `ActionExecutionResult` 中增加 `success: bool = True` 与 `unmet_constraints: List[Any] = field(default_factory=list)` 字段，并在 `MotionPlanner.execute()` 中建立基于动作执行状态的异常流转合同。
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**:
+  - 在 `src/motion/framework.py` 为 `ActionExecutionResult` 新增向后兼容字段：`success: bool = True`、`unmet_constraints: List[Any] = field(default_factory=list)`、`failure_reason: Optional[str] = None`、`failure_frame: Optional[int] = None`。
+  - 新增 `__post_init__` 守卫方法，防止 `unreachable_count > 0` 或致死性未满足约束被默认 `success=True` 掩盖。
+  - 引入 `is_fatal_constraint()` 约束鉴别器，严格区分致死性物理约束（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF` 等）与非致死性诊断/遥测警告。
+  - 在 `MotionPlanner.execute()` 接入 5 重合同前置校验：
+    1. 结果类型校验（确保为 `ActionExecutionResult`）；
+    2. 动作成功状态与致死约束校验（捕获失败、致死约束或可达性超限，立即阻断并抛出结构化 `RuntimeError`，绝不调用后续动作，绝不传播终态）；
+    3. 轨迹非空校验（严格拒绝声称成功但生成 0 帧轨迹的非法动作）；
+    4. 轨迹首帧时间线连续性校验（`states[0].frame == current_state.frame`）；
+    5. 终态一致性校验（`final_state.frame == states[-1].frame` 且位置偏差 $\le 0.1\text{mm}$）。
+  - 在 `StartStopWalkAction` 与 `TerrainWalkAction` 结果构造中显式填写新字段，保持规范与修复 03 失败阻断无退化。
+  - 编写专用针对性回归测试 `tests/test_motion_planner_result_contract.py`，全覆盖 8 组测试场景（8/8 PASS）。
+  - 全量分层回归套件全部通过：`quick` (18/18 PASS), `physics` (21/21 PASS), `motion` (11/11 PASS), `full` (35/35 PASS)。
 
 ---
 

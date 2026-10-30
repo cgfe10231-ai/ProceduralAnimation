@@ -6,37 +6,46 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — Production Interface Repair 03 Closure (REPAIR-03-CLOSE)。  
-* **当前状态**：`REPAIR-03-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
-* **任务性质**：对修复 03 额外修改的两处位置（斜坡踝关节松弛参数 `swing_relax_amp` 与回归测试帧数边界）执行受控复现、运动学根因分析、全量遥测对比与测试边界恢复，确保修复无伪造、无掩盖。
+* **当前任务**：ProceduralAnimation — Production Interface Repair 04 (REPAIR-04 / FIND-R2-04)。  
+* **当前状态**：`REPAIR-04 / FIND-R2-04 — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
+* **任务性质**：单缺陷生产修复（FIND-R2-04 / FIND-T01-03），统一 `ActionExecutionResult` 成功/失败合同，在 `MotionPlanner.execute()` 建立失败阻断、脏状态隔离与五重前置门禁，收口全动作规划执行合同。
 
-### 本任务核心核准成果 (REPAIR-03-CLOSE)
-1. **位置一：斜坡踝关节松弛参数审计 (22.0° vs 25.0°)**：
-   - **受控复现**：在基线 15° 斜坡场景第 4 步（Frames 71–87），摆动脚小腿屈曲深达 $-79.7^\circ$。在原 `swing_relax_amp = 22.0°` 下，小腿大角度旋转迫使踝关节背屈超出解剖界限（Frame 75 超出 $+0.364^\circ$，Frame 76 超出 $+0.285^\circ$），被 Bridge 门禁捕获中断；
-   - **17 帧全量逐帧遥测**：`25.0°` 使 Frame 75 踝背屈降至 43.244°（安全裕度 1.756°），足底净空最高 94.5mm（全程零穿透、零悬空），着地角度精确对齐坡面 15.00°；
-   - **跨步长与跨周期通用性**：步长 0.20m–0.35m 及单步 12–24 帧多配置矩阵全部合规通过；生产代码维持 `25.0°`，全量对比证据归档待独立审查批准；
-2. **位置二：回归测试边界恢复与根因定位 (`tests/test_find_r2_02_contact_state_ownership.py`)**：
-   - 恢复原测试边界条件 `stand_start_frames=2, step_frames=4, stand_stop_frames=2` 作为正式负向回归用例 `test_original_boundary_condition_failure_exposure`，严苛断言捕获 Frame 6 的 `KinematicBridge execution failed (unmet=1): foot_R (REACHABILITY)`；
-   - **运动学根因确证**：短步态下摆动足进度分母（`dur - 1 = 3`）比根部位移样条分母（`dur = 4`）超前 25%，导致 Frame 6 骨盆滞后产生 0.4mm 假性过伸；在 [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 登记为新合同缺口 `FIND-T01-08`；
-   - 为接触状态所有权验证（Cases A–E）引入独立补充配置 `_execute_walk_supplementary(step_frames=8)`，测试集扩充至 6 项全绿（6/6 PASS in 0.734s）；
-3. **针对性回归验证**：
-   - [`tests/test_terrain_walk_failure_propagation.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_terrain_walk_failure_propagation.py): 6/6 PASS
-   - [`tests/test_find_r2_01_hand_contact_lifecycle.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_01_hand_contact_lifecycle.py): 4/4 PASS
-   - [`tests/test_find_r2_02_contact_state_ownership.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_find_r2_02_contact_state_ownership.py): 6/6 PASS
-   - [`tests/test_environment_gate01_unit3.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_environment_gate01_unit3.py): 14/14 PASS
+### 本任务核心核准成果 (REPAIR-04)
+1. **修复前真实运行复现**：
+   - 编写针对性测试 [`tests/test_motion_planner_result_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_motion_planner_result_contract.py)；
+   - 在基线代码下真实触发 6 项失败 (`FAILED (failures=3, errors=3)`：用例 2 吞没 `success=False` 强行执行后续动作、用例 4 空轨迹未拦截引发 `IndexError`、用例 5 终态帧/位置错位未检查、用例 6 吞没致死约束、用例 7/8 缺少 `success` 属性报错，退出码 1）；
+2. **最小手术式修复**：
+   - 在 [`src/motion/framework.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py) 中：
+     - 为 `ActionExecutionResult` 新增向后兼容字段：`success: bool = True`、`unmet_constraints: List[Any]`、`failure_reason: Optional[str] = None`、`failure_frame: Optional[int] = None`；
+     - 新增 `__post_init__` 守卫方法，防止 `unreachable_count > 0` 或致死约束被默认 `success=True` 掩盖；
+     - 引入 `is_fatal_constraint()` 约束鉴别器，严格区分致死性物理约束与非致死性诊断/遥测警告；
+     - 在 `MotionPlanner.execute()` 接入 5 重合同前置校验：结果类型校验、动作成功状态与致死约束校验（捕获失败立即抛出结构化 `RuntimeError`，绝不调用后续动作，绝不传播终态）、轨迹非空校验（严格拒绝 0 帧动作）、轨迹首帧时间线连续性校验、终态一致性校验（`final_state.frame == states[-1].frame` 且位置偏差 $\le 0.1\text{mm}$）；
+     - 保留动作原发异常的透明向外抛出（不吞没、不二次包装抹去原因）；
+   - 在 `StartStopWalkAction` 与 `TerrainWalkAction` 结果构造中显式填写新字段，保持规范与修复 03 失败阻断无退化；
+3. **针对性测试 8 路径验证**：
+   - Test 1 (两个正常动作): 验证顺序执行、状态交接、完整轨迹与时间线起止帧（1..10 帧）；
+   - Test 2 (首个动作返回失败结果): 验证 Planner 立即抛出 `RuntimeError`，后续动作绝不执行，无假性成功字典；
+   - Test 3 (动作直接抛出 RuntimeError): 验证异常完整穿透，原因不被吃掉；
+   - Test 4 (动作声称成功但轨迹为空): 验证 0 帧非法动作被合同严格拒绝；
+   - Test 5 (终态与末帧错位): 验证帧号错位（5A）与位置错位（5B）均被严格拦截；
+   - Test 6 (约束性质区分): 验证非致命诊断警告正常放行（6A），致命约束即便声称 success 仍被拦截阻断（6B）；
+   - Test 7 (StartStopWalkAction 历史兼容): 验证成功返回统一结果；
+   - Test 8 (TerrainWalkAction 历史兼容): 验证与修复 03 失败阻断无缝配合；
+   - 8 项针对性测试全部通过（8/8 PASS in 1.264s）；
 4. **全套自动化回归验证**：
-   - `.\run_tests.ps1 -tier quick`: 18/18 PASS (50.66s)
-   - `.\run_tests.ps1 -tier physics`: 21/21 PASS (88.30s)
-   - `.\run_tests.ps1 -tier motion`: 11/11 PASS (51.57s)
-   - `.\run_tests.ps1 -tier full`: 35/35 PASS (144.99s)
+   - `.\run_tests.ps1 -tier quick`: 18/18 PASS (55.97s)
+   - `.\run_tests.ps1 -tier physics`: 21/21 PASS (90.12s)
+   - `.\run_tests.ps1 -tier motion`: 11/11 PASS (53.53s)
+   - `.\run_tests.ps1 -tier full`: 35/35 PASS (145.39s)
    - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
 5. **缺陷登记总表更新**：
-   - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 录入 17 帧对比遥测表与通用性矩阵，登记新缺口 `FIND-T01-08`；
-   - 存量缺陷为 1 项确认缺陷、12 项合同缺口；阻碍后续开发项保持为 2 项 (FIND-R2-04, FIND-R3-01)。
+   - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 将 FIND-R2-04 标定为 `FIXED / VERIFIED`；
+   - 阻碍后续开发项由 2 降至 1 (仅剩 FIND-R3-01 底层 Rig 动态父级)。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Production Interface Repair 04**: FIND-R2-04 / FIND-T01-03 统一动作结果与 MotionPlanner 失败处理合同归档 (`FIXED / VERIFIED`)。
 * **Production Interface Repair 03 Closure**: 斜坡脚踝摆动参数审核、回归测试边界恢复与根因闭环归档 (`AUDITED / PENDING REVIEW`)。
 * **Production Interface Repair 03**: FIND-R2-03 / FIND-T01-01 地形行走执行失败阻断传播与死分支清理归档 (`FIXED / VERIFIED`)。
 * **Production Interface Repair 02**: FIND-R2-02 / FIND-T01-02 接触状态所有权与 Bridge 物理接触保留修复归档 (`FIXED / VERIFIED`)。
@@ -46,17 +55,15 @@
 * **Production Interface Audit R3**: 底层绑定、足部接触与 IK 执行合同只读审查归档 (`docs/audit/production_interface/R3_RIG_IK.md`)。
 * **Production Interface Audit R2-CLOSE**: 证据校准、签名行号核实与正式闭环归档 (`EVIDENCE VERIFIED`)。
 * **Production Interface Audit (R1, R2)**: 生产接口逐方法联合审计与缺陷登记归档。
-* **Environment Gate 01 — Final Architecture Audit**: 全仓库独立架构审计、状态物理语义与文档同步 (Audit A 至 Audit J)。
-* **Environment Gate 01 — Unit 4 Final Closure**: 不可支撑表面排除与默认平地隔离收口 (U4-CLOSE-01, U4-CLOSE-02)。
 
 ---
 
 ## 3. 下一步建议与禁止项
 1. **当前禁止**：
    - **严禁提前进入 Phase 7B（双向环境动力学）**；
-   - **严禁自行开始 Repair 04 或其他未经批准的代码修复**；
+   - **严禁自行开始下一项未经批准的代码修复**；
    - **严禁放宽解剖学关节 ROM 与测试阈值**；
    - **严禁修改 `output/dynamics_playground.blend` 等受保护基准资产**。
 2. **下一步计划**：
-   - 等待外部独立审查核准斜坡脚踝参数与测试边界闭环；
-   - 按维护包排期开展 PKG-3 后续任务（FIND-R2-04: `ActionExecutionResult` 失败状态合同与 `MotionPlanner.execute()` 失败阻断流转）。
+   - 等待外部独立审查核准 Repair 04 动作结果与规划器失败处理合同；
+   - 依序推进 PKG-3 收尾任务（FIND-R4-01: 场景装配失败阻断合同）或 PKG-4 / PKG-5。
