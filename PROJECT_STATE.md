@@ -1,8 +1,8 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-30  
-> **当前阶段**：Production Interface Repair 04 Closure — FIND-R2-04 Severity Priority & Classification Hardening (REPAIR-04-CLOSE)。已完成针对 FIND-R2-04 / FIND-T01-03 收尾加固：1) 修复 `is_fatal_constraint()` 严重程度判定优先级漏洞，确立致命物理类别（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF`, `COLLISION`, `CONTACT_FAILURE`, `CONTACT_GEOMETRY`, `ORIENTATION_ERROR`, `FATAL`）强制优先于可选的 `is_fatal=False` 或 `severity="warning"` 降级标记，未知类别绝不静默视为安全，普通诊断信息放行；2) 消除 `ActionExecutionResult.__post_init__()` 与 `MotionPlanner.execute()` 判定分歧；3) 扩充针对性测试 `tests/test_motion_planner_result_contract.py`（10/10 PASS in 1.696s），分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），AST 文档门禁 0 错误通过。  
-> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03 与 FIND-R2-04 缺陷已被彻底解决并标定为 `FIXED / VERIFIED`，解除对动作失败传播、状态所有权及连续编排的阻塞。全仓库剩余 12 项 Finding（1 项确认缺陷、11 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。  
+> **记录时间**：2026-10-30
+> **当前阶段**：Production Interface Joint Repair Closure — Environment Ownership, Continuity Threshold & Real Scene Integration (JOINT-REPAIR-ENV-SCENE-CLOSE)。已完成联合修复收尾三大合同加固：1) 动作环境所有权冲突防御（`TerrainWalkAction.bind_environment` 严禁不同实例静默覆写，提供显式 `rebind_environment()`，`MotionPlanner.add_action()` 接入环境冲突防御，`estimate_duration_frames()` 与 `execute()` 统一来源）；2) 场景连续性门禁阈值统一（彻底移除 1.0m 硬编码，严格对齐权威 `DEFAULT_MAX_ROOT_DISP_M_AT_24FPS = 0.12` 并支持按 FPS 缩放，在生成产物前强阻断瞬移与跳步，并在 `playground_terrain_validation.py` 增加锁定支撑足脱离有效支撑区域的安全防线）；3) 真实 Blender 场景落盘、重开验证与产物防篡改保护测试（构建包含无 mock 真实生成的 Chain 1 与失败阻断/已有产物 SHA256 100% 保护的 Chain 2）；4) 针对性测试 `tests/test_action_environment_binding.py`（8/8 PASS）、`tests/test_scene_save_gate.py`（6/6 PASS）、`tests/test_environment_query_contract.py`（8/8 PASS）全绿，分层全量回归套件全绿通过（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35），AST 文档门禁 0 错误通过。
+> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R4-02、FIND-T01-06 及 FIND-R4-01 已被彻底解决并标定为 `FIXED / VERIFIED`。全仓库剩余 9 项 Finding（1 项确认缺陷 FIND-R2-07、8 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`JOINT-REPAIR-ENV-SCENE-CLOSE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
 
 ---
 

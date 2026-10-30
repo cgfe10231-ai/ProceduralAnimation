@@ -32,12 +32,28 @@ from src.rig.builder import BONE_HIERARCHY, BONE_SPECIFICATIONS
 from src.scene.blender_mesh_query_adapter import BlenderMeshEnvironmentAdapter
 from src.scene.environment_query import create_standard_dynamics_playground_query
 
+DEFAULT_REFERENCE_FPS: float = 24.0
+DEFAULT_MAX_ROOT_DISP_M_AT_24FPS: float = 0.12
+DEFAULT_MAX_ROOT_SPEED_MPS: float = DEFAULT_MAX_ROOT_DISP_M_AT_24FPS * DEFAULT_REFERENCE_FPS
+
+
+def compute_max_root_disp_per_frame(
+    fps: float = DEFAULT_REFERENCE_FPS,
+    max_root_disp_m: Optional[float] = None,
+) -> float:
+    """Compute authoritative per-frame root C0 continuity threshold (0.12m @ 24 FPS = 2.88 m/s)."""
+    if max_root_disp_m is not None:
+        return float(max_root_disp_m)
+    if fps <= 0.0:
+        raise ValueError(f"fps must be positive, got {fps}")
+    return DEFAULT_MAX_ROOT_DISP_M_AT_24FPS * (DEFAULT_REFERENCE_FPS / float(fps))
+
 
 def validate_dynamics_playground_task7a2(
     blend_path: str = "output/dynamics_playground_task7a2_corrected.blend",
     tolerance_drift_m: float = 1.0e-4,
     tolerance_bone_stretch_m: float = 1.0e-4,
-    max_root_disp_m: float = 0.12,
+    max_root_disp_m: float = DEFAULT_MAX_ROOT_DISP_M_AT_24FPS,
     max_rot_jerk_deg: float = 35.0,
 ) -> Dict[str, Any]:
     """Reopen `blend_path` in read-only mode and execute deep unexempted mathematical validation."""
@@ -204,18 +220,37 @@ def validate_dynamics_playground_task7a2(
             total_rom_violation_count += len(rom_res.violations)
             rom_violation_frames.append(frame_num)
 
-        # Check 3D terrain collision penetration: vertex-level collision test against 3D ground height
-        for foot_mesh in [foot_mesh_l, foot_mesh_r]:
+        # Check 3D terrain collision penetration & locked stance support validity
+        contacts_map = record.get("contacts", {})
+        for limb_id, foot_mesh in [("foot_L", foot_mesh_l), ("foot_R", foot_mesh_r)]:
+            is_locked_stance = bool(contacts_map.get(limb_id, {}).get("is_locked", False))
             if foot_mesh is not None:
                 mw = foot_mesh.matrix_world
                 for v in foot_mesh.data.vertices:
                     vw = mw @ v.co
                     terr_z = env.ground_height_at(vw.x, vw.y)
+                    if terr_z is None:
+                        if is_locked_stance:
+                            terrain_penetrations.append({
+                                "frame": frame_num,
+                                "mesh": foot_mesh.name,
+                                "limb_id": limb_id,
+                                "contact_state": "stance_locked",
+                                "reason": "stance_foot_off_walkable_support",
+                                "vert_xyz": [round(vw.x, 4), round(vw.y, 4), round(vw.z, 4)],
+                                "terrain_z": None,
+                                "penetration_depth_m": None,
+                            })
+                            break
+                        continue
                     # Allow 5mm tolerance for surface tangent rounding / contact threshold
-                    if terr_z is not None and vw.z < terr_z - 0.005:
+                    if vw.z < terr_z - 0.005:
                         terrain_penetrations.append({
                             "frame": frame_num,
                             "mesh": foot_mesh.name,
+                            "limb_id": limb_id,
+                            "contact_state": "stance_locked" if is_locked_stance else "swing",
+                            "reason": "vertex_below_surface",
                             "vert_xyz": [round(vw.x, 4), round(vw.y, 4), round(vw.z, 4)],
                             "terrain_z": round(terr_z, 4),
                             "penetration_depth_m": round(terr_z - vw.z, 4),
@@ -424,17 +459,36 @@ def validate_dynamics_playground_environment_gate01_u3(
             total_rom_violation_count += len(rom_res.violations)
             rom_violation_frames.append(frame_num)
 
-        # Check vertex-level terrain penetration against evaluated REAL MESH geometry
-        for foot_mesh in [foot_mesh_l, foot_mesh_r]:
+        # Check vertex-level terrain penetration & locked stance support against evaluated REAL MESH geometry
+        contacts_map = record.get("contacts", {})
+        for limb_id, foot_mesh in [("foot_L", foot_mesh_l), ("foot_R", foot_mesh_r)]:
+            is_locked_stance = bool(contacts_map.get(limb_id, {}).get("is_locked", False))
             if foot_mesh is not None:
                 mw = foot_mesh.matrix_world
                 for v in foot_mesh.data.vertices:
                     vw = mw @ v.co
                     mesh_z = adapter.ground_height_at(vw.x, vw.y)
-                    if mesh_z is not None and vw.z < mesh_z - tolerance_penetration_m:
+                    if mesh_z is None:
+                        if is_locked_stance:
+                            terrain_penetrations.append({
+                                "frame": frame_num,
+                                "mesh": foot_mesh.name,
+                                "limb_id": limb_id,
+                                "contact_state": "stance_locked",
+                                "reason": "stance_foot_off_walkable_support",
+                                "vert_xyz": [round(vw.x, 4), round(vw.y, 4), round(vw.z, 4)],
+                                "mesh_terrain_z": None,
+                                "penetration_depth_m": None,
+                            })
+                            break
+                        continue
+                    if vw.z < mesh_z - tolerance_penetration_m:
                         terrain_penetrations.append({
                             "frame": frame_num,
                             "mesh": foot_mesh.name,
+                            "limb_id": limb_id,
+                            "contact_state": "stance_locked" if is_locked_stance else "swing",
+                            "reason": "vertex_below_surface",
                             "vert_xyz": [round(vw.x, 4), round(vw.y, 4), round(vw.z, 4)],
                             "mesh_terrain_z": round(mesh_z, 4),
                             "penetration_depth_m": round(mesh_z - vw.z, 4),

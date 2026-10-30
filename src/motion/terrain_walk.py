@@ -659,9 +659,55 @@ class TerrainWalkAction(MotionAction):
     def name(self) -> str:
         return self._action_name
 
-    def bind_environment(self, environment: EnvironmentQuery) -> None:
-        """Bind authoritative environment instance from planner or runtime context."""
+    def bind_environment(
+        self,
+        environment: EnvironmentQuery,
+        allow_override: bool = False,
+    ) -> None:
+        """Bind authoritative environment instance from planner or runtime context.
+
+        Contract:
+        - If unbound (self.environment is None), binds environment.
+        - If already bound to the exact same instance (self.environment is environment), no-op.
+        - If already bound to a different instance and allow_override is False, raises ValueError
+          to prevent silent environment overwrite.
+        """
+        if environment is None:
+            raise ValueError(f"{self.name}.bind_environment() requires a non-None EnvironmentQuery instance.")
+        if self.environment is not None and self.environment is not environment and not allow_override:
+            raise ValueError(
+                f"{self.name}: environment ownership conflict — action is already bound to "
+                f"{self.environment!r}, cannot silently overwrite with {environment!r}. "
+                f"Pass allow_override=True or call rebind_environment() explicitly."
+            )
         self.environment = environment
+
+    def rebind_environment(self, environment: EnvironmentQuery) -> None:
+        """Explicitly replace the bound environment instance on this action."""
+        self.bind_environment(environment, allow_override=True)
+
+    def resolve_environment(
+        self,
+        runtime_env: Optional[EnvironmentQuery] = None,
+        allow_override: bool = False,
+    ) -> EnvironmentQuery:
+        """Resolve the single authoritative environment instance for planning and execution."""
+        if runtime_env is not None:
+            if allow_override:
+                return runtime_env
+            if self.environment is not None and self.environment is not runtime_env:
+                raise ValueError(
+                    f"{self.name}: environment ownership conflict — action is bound to "
+                    f"{self.environment!r}, which conflicts with runtime environment {runtime_env!r}."
+                )
+            return runtime_env
+        if self.environment is not None:
+            return self.environment
+        raise ValueError(
+            f"{self.name} requires an authoritative environment "
+            f"instance (either bound to action, provided by caller, or injected by planner); "
+            f"silent fallback to synthetic flat ground is prohibited."
+        )
 
     def estimate_duration_frames(
         self,
@@ -670,13 +716,10 @@ class TerrainWalkAction(MotionAction):
         environment: Optional[EnvironmentQuery] = None,
     ) -> int:
         """Estimate timeline duration using the real authoritative environment query."""
-        env = environment or self.environment
-        if env is None:
-            raise ValueError(
-                f"{self.name}.estimate_duration_frames() requires an authoritative environment "
-                f"instance (either bound to action, provided by caller, or injected by planner); "
-                f"silent fallback to synthetic flat ground is prohibited."
-            )
+        env = self.resolve_environment(
+            runtime_env=environment,
+            allow_override=(environment is not None),
+        )
         if self.route is not None:
             # Clone route with current position as start
             current_route = TerrainRouteInput(
@@ -710,7 +753,10 @@ class TerrainWalkAction(MotionAction):
         context: MotionRuntimeContext,
     ) -> ActionExecutionResult:
         """Execute terrain-aware locomotion through the authoritative 6-phase pipeline."""
-        environment = context.environment
+        environment = self.resolve_environment(
+            runtime_env=context.environment,
+            allow_override=False,
+        )
         fps = float(context.config.fps)
         start_frame = initial_state.frame
 

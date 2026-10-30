@@ -111,6 +111,77 @@ class TestActionEnvironmentBinding(unittest.TestCase):
         _, planned_dur = plan_terrain_footsteps(self.route, elevated_env, start_frame=self.init_state.frame)
         self.assertEqual(est_dur, planned_dur, "Estimated duration must strictly match planned footsteps duration")
 
+    def test_05_planner_rejects_action_with_conflicting_environment(self) -> None:
+        """5. Action bound to env A added to Planner bound to env B must raise ValueError and NOT overwrite A."""
+        env_a = EnvironmentQuery(ground_z=0.0)
+        env_b = DynamicsEnvironmentQuery(ground_z=2.0)
+        self.assertIsNot(env_a, env_b)
+
+        action = TerrainWalkAction(route=self.route, environment=env_a, action_name="WalkBoundToA")
+        planner = MotionPlanner(config=self.config, environment=env_b)
+
+        with self.assertRaises(ValueError) as ctx:
+            planner.add_action(action)
+        self.assertIn("environment", str(ctx.exception).lower())
+        # Verify environment A was NOT silently overwritten by B
+        self.assertIs(action.environment, env_a)
+        self.assertEqual(len(planner.actions), 0)
+
+    def test_06_planner_allows_action_bound_to_identical_environment_instance(self) -> None:
+        """6. Action already bound to the exact same environment instance as Planner is accepted without error."""
+        env_shared = DynamicsEnvironmentQuery(ground_z=1.5)
+        action = TerrainWalkAction(route=self.route, environment=env_shared, action_name="WalkSameEnv")
+        planner = MotionPlanner(config=self.config, environment=env_shared)
+
+        planner.add_action(action)
+        self.assertIs(action.environment, env_shared)
+        self.assertEqual(len(planner.actions), 1)
+
+    def test_07_explicit_rebind_environment_contract(self) -> None:
+        """7. Implicit rebind raises ValueError; explicit allow_override=True or rebind_environment() succeeds."""
+        env_a = EnvironmentQuery(ground_z=0.0)
+        env_b = DynamicsEnvironmentQuery(ground_z=2.0)
+        action = TerrainWalkAction(route=self.route, environment=env_a, action_name="WalkRebindTest")
+
+        # Implicit bind_environment to a different instance must fail
+        with self.assertRaises(ValueError):
+            action.bind_environment(env_b)
+        self.assertIs(action.environment, env_a)
+
+        # Explicit allow_override=True succeeds
+        action.bind_environment(env_b, allow_override=True)
+        self.assertIs(action.environment, env_b)
+
+        # Explicit rebind_environment() succeeds
+        action.rebind_environment(env_a)
+        self.assertIs(action.environment, env_a)
+
+    def test_08_execute_and_estimate_use_identical_authoritative_environment(self) -> None:
+        """8. execute() and estimate_duration_frames() must use the same authoritative environment and reject context conflicts."""
+        from src.motion.framework import MotionRuntimeContext
+
+        env_a = EnvironmentQuery(ground_z=0.0)
+        env_b = DynamicsEnvironmentQuery(ground_z=2.0)
+        action = TerrainWalkAction(route=self.route, environment=env_a, action_name="WalkExecEnvCheck")
+
+        # 1. Conflicting context.environment during execute() must raise ValueError
+        bad_context = MotionRuntimeContext(
+            config=self.config,
+            armature_obj=None,
+            root_obj=None,
+            scene=None,
+            environment=env_b,
+            contact_adapter=None,
+            pose_applicator=None,
+        )
+        with self.assertRaises(ValueError) as ctx:
+            action.execute(self.init_state, bad_context)
+        self.assertIn("environment", str(ctx.exception).lower())
+
+        # 2. Verify resolve_environment returns the exact bound instance
+        self.assertIs(action.resolve_environment(), env_a)
+        self.assertIs(action.resolve_environment(env_a), env_a)
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]])

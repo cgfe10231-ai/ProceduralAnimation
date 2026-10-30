@@ -3,6 +3,54 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Joint Repair Closure: 环境所有权冲突保护、连续性验证阈值统一与真实场景集成验证 (JOINT-REPAIR-ENV-SCENE-CLOSE)
+
+### 1. 动作环境所有权冲突保护与显式重绑定合同 (src/motion/framework.py, src/motion/terrain_walk.py)
+* **缺陷复现与确证**：
+  - 在 [	ests/test_action_environment_binding.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_action_environment_binding.py) 扩充 Test 5 至 Test 8，基线代码确证缺陷：
+    - Test 5: 动作已绑定环境 A，加入绑定环境 B 的 Planner 时，dd_action() 静默覆盖将动作环境改写为 B（AssertionError: ValueError not raised）；
+    - Test 7: 隐式调用 ind_environment(env_b) 静默覆写，缺乏防意外改写防护；
+    - Test 8: 执行器未校验 context.environment 与动作自身绑定环境的冲突风险；
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py:662–720, 750–760](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py#L662-L720):
+    - ind_environment(environment, allow_override=False)：未绑定时允许注入；相同实例允许复用；不同实例且未置 llow_override=True 时严格抛出 ValueError，杜绝静默篡改；
+    -
+ebind_environment(environment)：提供显式重绑定入口（llow_override=True）；
+    -
+esolve_environment(runtime_env, allow_override)：统一收束单一权威环境实例，在 estimate_duration_frames() 与 execute() 中双重阻断环境分裂与冲突；
+  - [src/motion/framework.py:1026–1052](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py#L1026-L1052):
+    - MotionPlanner.add_action(action, allow_env_override=False)：接入冲突防御检查，当动作已绑定不同环境实例且未允许覆盖时抛出结构化 ValueError 并拒绝加入调度队列；
+* **测试验证**：	ests/test_action_environment_binding.py: **8/8 PASS (0.001s)**。
+
+### 2. 场景连续性验证阈值统一与足部支撑有效性加固 (src/scene/playground_terrain_traversal.py, src/scene/playground_terrain_validation.py)
+* **缺陷复现与确证**：
+  - 基线 erify_scene_execution_gate() 使用硬编码 dist > 1.0 阈值，导致 0.25m 单帧瞬移（如历史帧 226->227 缺陷）被错误放行（AssertionError: BUG REPRODUCED: 0.25m single-frame teleport falsely passed gate!）；
+* **生产代码修复**：
+  - [src/scene/playground_terrain_validation.py:35–45](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_terrain_validation.py#L35-L45): 导出权威基准常量 DEFAULT_REFERENCE_FPS = 24.0、DEFAULT_MAX_ROOT_DISP_M_AT_24FPS = 0.12 与 compute_max_root_disp_per_frame(fps, max_root_disp_m)（对应最大根节点速度 2.88 m/s）；
+  - [src/scene/playground_terrain_traversal.py:313–355](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_terrain_traversal.py#L313-L355): erify_scene_execution_gate() 接入 ps 与 max_root_disp_m 参数，彻底移除 1.0m 硬编码；
+  - 在 generate_dynamics_playground_task7a2_corrected_blend() 与 generate_dynamics_playground_environment_gate01_u3_blend() 传入 ps=float(cfg.fps)；
+  - 调整门禁触发时序：在生成 companion JSON 和写入场景属性**之前**执行门禁验证，门禁失败立即阻断，严防残留虚假成功元数据；
+  - [src/scene/playground_terrain_validation.py:220–250, 460–490](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_terrain_validation.py#L220-L250): 增加锁定支撑足有效性校验，当足底处于锁定支撑态（is_locked=True）但在射线查询返回 None 时，标定为 stance_foot_off_walkable_support 违规，严禁静默忽略；
+* **测试验证**：	ests/test_scene_save_gate.py Test 3 & Test 4: 覆盖平地、斜坡、0.25m 瞬移阻断、帧号跳跃、0.119/0.120/0.121m 边界精度、及 48 FPS/12 FPS 帧率缩放。
+
+### 3. 真实 Blender 场景落盘、重开验证与产物防覆盖保护 (	ests/test_scene_save_gate.py)
+* **测试用例构建与验证**：
+  - **真实正常生成链路 (Chain 1)**：通过真实 MotionPlanner 执行无 mock 场景生成，验证门禁通过、.blend 文件实际落盘（尺寸 > 100 KB）、重新在独立 session 打开后提取并核对 Armature/Root/DebugScene 结构、	ask7a2_execution_summary、	ask7a2_contact_state_records，并逐帧核算根轨迹 C0 连续性；
+  - **失败阻断与旧产物保护链路 (Chain 2)**：针对已存在的有效 .blend 场景注入失败（真实未捕获执行异常与 0.25m 空间瞬移），严格验证抛出 RuntimeError，原场景文件的 SHA256 哈希值与文件尺寸 100% 保持不变，且无任何虚假 companion JSON 生成；
+  - **支撑悬空反例验证 (Chain 3)**：验证当模拟地面支撑查询返回 None 时，alidate_dynamics_playground_task7a2 真实触发 RuntimeError；
+* **测试验证**：	ests/test_scene_save_gate.py: **6/6 PASS (6.009s)**。
+
+### 4. 全量回归与零退化验证
+* 	ests/test_action_environment_binding.py: **8/8 PASS (0.001s)**；
+* 	ests/test_scene_save_gate.py: **6/6 PASS (6.009s)**；
+* 	ests/test_environment_query_contract.py: **8/8 PASS (0.211s)**；
+* .\run_tests.ps1 -tier quick: **18/18 PASS (48.54s, Exit Code 0)**；
+* .\run_tests.ps1 -tier physics: **21/21 PASS (86.12s, Exit Code 0)**；
+* .\run_tests.ps1 -tier motion: **11/11 PASS (48.37s, Exit Code 0)**；
+* .\run_tests.ps1 -tier full: **35/35 PASS (138.41s, Exit Code 0)**；
+* 	ests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, Exit Code 0)**；
+* 门禁状态标定：JOINT-REPAIR-ENV-SCENE-CLOSE — AWAITING INDEPENDENT REVIEW。
+
 ## [2026-10-30] Production Interface Joint Repair: 环境查询、环境所有权与场景交付门禁联合修复 (FIND-R4-02 / FIND-T01-06 / FIND-R4-01)
 
 ### 1. 第一部分：统一环境查询合同 (FIND-R4-02)
@@ -46,10 +94,14 @@
   - `tests/test_find_r2_02_contact_state_ownership.py`: **6/6 PASS**；
   - `tests/test_terrain_walk_failure_propagation.py`: **6/6 PASS**；
   - `tests/test_motion_planner_result_contract.py`: **10/10 PASS**；
-* `.un_tests.ps1 -tier quick`: **18/18 PASS (47.82s, Exit Code 0)**；
-* `.un_tests.ps1 -tier physics`: **21/21 PASS (86.84s, Exit Code 0)**；
-* `.un_tests.ps1 -tier motion`: **11/11 PASS (47.21s, Exit Code 0)**；
-* `.un_tests.ps1 -tier full`: **35/35 PASS (135.28s, Exit Code 0)**；
+* `.
+un_tests.ps1 -tier quick`: **18/18 PASS (47.82s, Exit Code 0)**；
+* `.
+un_tests.ps1 -tier physics`: **21/21 PASS (86.84s, Exit Code 0)**；
+* `.
+un_tests.ps1 -tier motion`: **11/11 PASS (47.21s, Exit Code 0)**；
+* `.
+un_tests.ps1 -tier full`: **35/35 PASS (135.28s, Exit Code 0)**；
 * `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, Exit Code 0)**；
 * 门禁状态标定：`JOINT_REPAIR_ENV_SCENE — AWAITING INDEPENDENT REVIEW`。
 

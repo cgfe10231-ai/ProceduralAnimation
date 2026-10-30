@@ -1026,11 +1026,29 @@ class MotionPlanner:
     def actions(self) -> Sequence[MotionAction]:
         return tuple(self._actions)
 
-    def add_action(self, action: MotionAction) -> "MotionPlanner":
+    def add_action(self, action: MotionAction, allow_env_override: bool = False) -> "MotionPlanner":
         if hasattr(action, "bind_environment"):
-            action.bind_environment(self.environment)
-        elif hasattr(action, "environment") and getattr(action, "environment", None) is None:
-            action.environment = self.environment
+            try:
+                action.bind_environment(self.environment, allow_override=allow_env_override)
+            except TypeError:
+                existing_env = getattr(action, "environment", None)
+                if existing_env is not None and existing_env is not self.environment and not allow_env_override:
+                    raise ValueError(
+                        f"MotionPlanner.add_action({action.name}): environment ownership conflict — "
+                        f"action is already bound to {existing_env!r}, which conflicts with planner "
+                        f"environment {self.environment!r}."
+                    )
+                action.bind_environment(self.environment)
+        elif hasattr(action, "environment"):
+            existing_env = getattr(action, "environment", None)
+            if existing_env is None or allow_env_override:
+                action.environment = self.environment
+            elif existing_env is not self.environment:
+                raise ValueError(
+                    f"MotionPlanner.add_action({action.name}): environment ownership conflict — "
+                    f"action is already bound to {existing_env!r}, which conflicts with planner "
+                    f"environment {self.environment!r}."
+                )
         self._actions.append(action)
         return self
 

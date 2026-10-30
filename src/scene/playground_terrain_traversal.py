@@ -65,6 +65,11 @@ from src.scene.blender_mesh_query_adapter import (
 )
 from src.scene.environment_query import create_standard_dynamics_playground_query
 from src.scene.playground_character_assembly import assemble_character_in_playground
+from src.scene.playground_terrain_validation import (
+    DEFAULT_MAX_ROOT_DISP_M_AT_24FPS,
+    DEFAULT_REFERENCE_FPS,
+    compute_max_root_disp_per_frame,
+)
 
 
 def setup_task7a2_cameras_and_markers(
@@ -308,13 +313,19 @@ if update_debug_hud not in bpy.app.handlers.frame_change_post:
 def verify_scene_execution_gate(
     planner_result: Dict[str, Any],
     all_states: List[MotionState],
+    fps: float = DEFAULT_REFERENCE_FPS,
+    max_root_disp_m: Optional[float] = None,
 ) -> Tuple[bool, List[str]]:
     """Verify motion execution quality before permitting .blend file saving or delivery.
+
+    Reuses the authoritative C0 root continuity threshold from playground_terrain_validation
+    (0.12m @ 24 FPS = 2.88 m/s max root velocity, scaled by fps when max_root_disp_m is None).
 
     Returns:
         (is_passed, failure_reasons)
     """
     reasons: List[str] = []
+    disp_limit_m = compute_max_root_disp_per_frame(fps=fps, max_root_disp_m=max_root_disp_m)
 
     if not planner_result.get("success", False):
         reasons.append("planner_result['success'] is False")
@@ -341,13 +352,15 @@ def verify_scene_execution_gate(
             if curr_s.frame != prev_s.frame + 1:
                 reasons.append(f"frame gap detected between frame {prev_s.frame} and {curr_s.frame}")
                 break
-            # Check spatial continuity (teleportation guard: > 1.0m per frame at typical fps)
+            # Check spatial C0 continuity against authoritative per-frame threshold
             dx = curr_s.position[0] - prev_s.position[0]
             dy = curr_s.position[1] - prev_s.position[1]
             dz = curr_s.position[2] - prev_s.position[2]
             dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-            if dist > 1.0:
-                reasons.append(f"spatial jump of {dist:.3f}m (> 1.0m) detected at frame {curr_s.frame}")
+            if dist > disp_limit_m + 1e-9:
+                reasons.append(
+                    f"spatial jump of {dist:.4f}m (> {disp_limit_m:.4f}m @ {fps:.1f}fps) detected at frame {curr_s.frame}"
+                )
                 break
 
     is_passed = (len(reasons) == 0)
@@ -357,6 +370,7 @@ def verify_scene_execution_gate(
 def generate_dynamics_playground_task7a2_corrected_blend(
     output_blend_path: str = "output/dynamics_playground_task7a2_corrected.blend",
     evidence_dir: str = "docs/evidence/task7a2",
+    route: Optional[TerrainRouteInput] = None,
 ) -> Dict[str, Any]:
     """Execute corrected Task 7A-2 pipeline using authoritative MotionPlanner."""
     os.makedirs(evidence_dir, exist_ok=True)
@@ -382,20 +396,21 @@ def generate_dynamics_playground_task7a2_corrected_blend(
     env = create_standard_dynamics_playground_query()
 
     # 5. Build continuous Course B (Ramp) route input
-    route = TerrainRouteInput(
-        start_pos=(0.0, 10.20, 0.0),
-        target_pos=(0.0, 22.40, 0.0),
-        nominal_stride_m=0.30,
-        step_frames=16,
-        stand_start_frames=12,
-        stand_stop_frames=16,
-        base_clearance_m=0.12,
-        pelvis_drop_uphill_m=0.088,
-        pelvis_drop_downhill_m=0.098,
-        pelvis_drop_flat_m=0.035,
-        torso_lean_uphill_deg=6.0,
-        torso_lean_downhill_deg=-2.5,
-    )
+    if route is None:
+        route = TerrainRouteInput(
+            start_pos=(0.0, 10.20, 0.0),
+            target_pos=(0.0, 22.40, 0.0),
+            nominal_stride_m=0.30,
+            step_frames=16,
+            stand_start_frames=12,
+            stand_stop_frames=16,
+            base_clearance_m=0.12,
+            pelvis_drop_uphill_m=0.088,
+            pelvis_drop_downhill_m=0.098,
+            pelvis_drop_flat_m=0.035,
+            torso_lean_uphill_deg=6.0,
+            torso_lean_downhill_deg=-2.5,
+        )
     action = TerrainWalkAction(route=route, environment=env, action_name="TerrainWalk_CourseB_Continuous")
 
     # 6. Execute through AUTHORITATIVE MotionPlanner
@@ -451,9 +466,19 @@ def generate_dynamics_playground_task7a2_corrected_blend(
             },
         })
 
-    contact_json_str = json.dumps(contact_records_serialized)
-    is_gate_passed, gate_failure_reasons = verify_scene_execution_gate(planner_result, all_states)
+    is_gate_passed, gate_failure_reasons = verify_scene_execution_gate(
+        planner_result,
+        all_states,
+        fps=float(cfg.fps),
+    )
+    if not is_gate_passed:
+        raise RuntimeError(
+            f"generate_dynamics_playground_task7a2_corrected_blend failed gate verification: "
+            f"{'; '.join(gate_failure_reasons)}. Saving .blend delivery artifact prohibited."
+        )
+
     continuous_without_exemption = is_gate_passed
+    contact_json_str = json.dumps(contact_records_serialized)
 
     summary_data = {
         "task": "Task 7A-2 Corrected",
@@ -478,12 +503,6 @@ def generate_dynamics_playground_task7a2_corrected_blend(
         target_scene["task7a2_contact_state_records"] = contact_json_str
         target_scene["task7a2_execution_summary"] = summary_json_str
         target_scene["task7a2_control_chain_diagnostics"] = diag_json_str
-
-    if not is_gate_passed:
-        raise RuntimeError(
-            f"generate_dynamics_playground_task7a2_corrected_blend failed gate verification: "
-            f"{'; '.join(gate_failure_reasons)}. Saving .blend delivery artifact prohibited."
-        )
 
     # 10. Save derived corrected blend artifact
     abs_blend_out = os.path.abspath(output_blend_path)
@@ -623,6 +642,7 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
     evidence_dir: str = "docs/evidence/environment_gate01_ru3",
     perturbed: bool = False,
     perturb_height_m: float = 0.08,
+    route: Optional[TerrainRouteInput] = None,
 ) -> Dict[str, Any]:
     """Execute Environment Gate 01 / Unit 3 pipeline: Real Mesh BVH Environment -> 19-Bone Motion Pipeline."""
     os.makedirs(evidence_dir, exist_ok=True)
@@ -660,20 +680,21 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
     )
 
     # 7. Build continuous Course B (Ramp) route input
-    route = TerrainRouteInput(
-        start_pos=(0.0, 10.20, 0.0),
-        target_pos=(0.0, 22.40, 0.0),
-        nominal_stride_m=0.30,
-        step_frames=16,
-        stand_start_frames=12,
-        stand_stop_frames=16,
-        base_clearance_m=0.12,
-        pelvis_drop_uphill_m=0.088,
-        pelvis_drop_downhill_m=0.098,
-        pelvis_drop_flat_m=0.035,
-        torso_lean_uphill_deg=6.0,
-        torso_lean_downhill_deg=-2.5,
-    )
+    if route is None:
+        route = TerrainRouteInput(
+            start_pos=(0.0, 10.20, 0.0),
+            target_pos=(0.0, 22.40, 0.0),
+            nominal_stride_m=0.30,
+            step_frames=16,
+            stand_start_frames=12,
+            stand_stop_frames=16,
+            base_clearance_m=0.12,
+            pelvis_drop_uphill_m=0.088,
+            pelvis_drop_downhill_m=0.098,
+            pelvis_drop_flat_m=0.035,
+            torso_lean_uphill_deg=6.0,
+            torso_lean_downhill_deg=-2.5,
+        )
     action_name = "TerrainWalk_CourseB_Mesh_Perturbed" if perturbed else "TerrainWalk_CourseB_MeshBacked"
     action = TerrainWalkAction(route=route, environment=env, action_name=action_name)
 
@@ -730,9 +751,19 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
             },
         })
 
-    contact_json_str = json.dumps(contact_records_serialized)
-    is_gate_passed, gate_failure_reasons = verify_scene_execution_gate(planner_result, all_states)
+    is_gate_passed, gate_failure_reasons = verify_scene_execution_gate(
+        planner_result,
+        all_states,
+        fps=float(cfg.fps),
+    )
+    if not is_gate_passed:
+        raise RuntimeError(
+            f"generate_dynamics_playground_environment_gate01_u3_blend failed gate verification: "
+            f"{'; '.join(gate_failure_reasons)}. Saving .blend delivery artifact prohibited."
+        )
+
     continuous_without_exemption = is_gate_passed
+    contact_json_str = json.dumps(contact_records_serialized)
 
     summary_data = {
         "task": "Environment Gate 01 / Unit 3",
@@ -763,12 +794,6 @@ def generate_dynamics_playground_environment_gate01_u3_blend(
         target_scene["task7a2_contact_state_records"] = contact_json_str
         target_scene["task7a2_execution_summary"] = summary_json_str
         target_scene["task7a2_control_chain_diagnostics"] = diag_json_str
-
-    if not is_gate_passed:
-        raise RuntimeError(
-            f"generate_dynamics_playground_environment_gate01_u3_blend failed gate verification: "
-            f"{'; '.join(gate_failure_reasons)}. Saving .blend delivery artifact prohibited."
-        )
 
     # 12. Save derived mesh-driven blend artifact
     abs_blend_out = os.path.abspath(output_blend_path)

@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Production Interface Repair 04 Closure — FIND-R2-04 Severity Priority & Classification Hardening (REPAIR-04-CLOSE)  
-> **审计与修复基准 Commit**：`db9cd4be6174b153da4e3e402f4b78f69e6e5e53`  
-> **最后更新时间**：2026-10-30  
-> **当前状态**：`REPAIR-04-CLOSE — AWAITING INDEPENDENT REVIEW`  
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成单缺陷 FIND-R2-01、FIND-R2-02、FIND-R2-03 及 FIND-R2-04（含收尾判定优先级加固）修复与闭环验证，其余 Finding 维持原状待后续逐包推进。
+> **当前阶段**：Production Interface Joint Repair Closure — Environment Ownership, Continuity Threshold & Real Scene Integration (JOINT-REPAIR-ENV-SCENE-CLOSE)
+> **审计与修复基准 Commit**：39f01e25e9fe017ddcfe2687cb5524a33421cf01
+> **最后更新时间**：2026-10-30
+> **当前状态**：JOINT-REPAIR-ENV-SCENE-CLOSE — AWAITING INDEPENDENT REVIEW
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成 FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R4-02、FIND-T01-06 及 FIND-R4-01（含收尾所有权冲突防御、0.12m连续性门禁及真实无mock场景验证）修复与闭环验证，其余 Finding 维持原状待后续逐包推进。
 
 ---
 
@@ -13,7 +13,7 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **1** (存量) + **2** (已修复) | 存量：FIND-R2-07/T01-04 (接缝横向偏置)；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写) |
-| **接口合同缺口 (CONTRACT_GAP)** | **11** (存量) + **2** (已修复) | 存量：FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-06 (环境源脱节), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器), FIND-R4-01 (场景生成缺乏失败阻断), FIND-R4-02 (2.5D查询回退与支撑脱节)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理) |
+| **接口合同缺口 (CONTRACT_GAP)** | **8** (存量) + **5** (已修复) | 存量：FIND-R2-05 (几何与支撑脱节), FIND-R2-06/T01-05 (预规划双轨制), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R4-02 (统一环境查询合同), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-R4-01 (场景执行门禁与真实落盘保护) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (+Y 单一走廊), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
 | **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04 已修复解除阻碍) |
