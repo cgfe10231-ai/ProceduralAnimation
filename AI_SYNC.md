@@ -1,52 +1,34 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：ProceduralAnimation — 地形规划联合修复 (Joint Terrain Planning Repair: Direction, Seam and Timebase Contracts)
+* **当前任务编号**：ProceduralAnimation — Terrain Planning Joint Repair 验收收口 (Acceptance Closure: ISSUE-A & ISSUE-B)
 * **任务状态**：
-  * **地形规划缺陷与时间基准合同联合修复完成**：
-    1. **接缝与边缘检测横向采样位置偏置修复 (FIND-R2-07)**：
-       - `_adjust_footfall_for_seams_and_edges` 严格按实际摆动脚侧向位置 `sw_x` 探测前掌 (+0.15m)、脚后跟 (-0.07m) 与脚踝 (0.0m) 支撑面合法性，彻底纠正中心线 `corridor_x=0.0` 探测盲区，双向走廊严格夹紧；
-       - 针对性测试 `tests/test_terrain_planning_contract.py` Group A (19/19 PASS)。
-    2. **步态落点与 3D 表面几何对齐核心合同统一 (FIND-R2-06)**：
-       - 抽取 `_build_step_schedule_core` 统一步点与 3D 表面对齐，未命中或不可支撑表面严格抛出 `ValueError`，彻底移除虚假平地高程回退与伪造 `default_ground` 表面 ID；
-       - 严格校验步高差 $|\Delta z| \le 0.35$m；依据表面法线对齐俯仰角 $\theta_{\text{pitch}} = -\arctan2(n_y, n_z)$，自适应增大坡道抬脚净空；
-       - 针对性测试 `tests/test_terrain_planning_contract.py` Group B (19/19 PASS)。
-    3. **负向 Y 行进落点生成与终止条件修复 (FIND-T01-07)**：
-       - 步点推进自适应前进符号（+Y / -Y），循环根据剩余余量安全终止，消除跳步与死循环；
-       - `_build_continuous_root_forward_spline` 样条端点斜率判定更新，正确保留负向速度斜率；
-       - 针对性测试 `tests/test_terrain_planning_contract.py` Group C (19/19 PASS)。
-    4. **短步态周期摆动足时间基准对齐 (FIND-T01-08)**：
-       - 摆动足时间归一化分母纠正为 `dur`，与根骨 Hermite 样条完全同相，彻底消除骨盆滞后导致的假性第 6 帧 0.4mm 过伸不可达报错；
-       - 历史 2/4/2 短步态测试 `tests/test_find_r2_02_contact_state_ownership.py` 更新为干净成功 (6/6 PASS)；
-       - 针对性测试 `tests/test_terrain_planning_contract.py` Group D (19/19 PASS)。
-    5. **路由输入合同与遗留接口收口**：
-       - `max_step_length_m` 生效夹紧步长，`nominal_stride_m` 严格正数及有限值校验，`estimate_duration_frames` 移除未定义 `fps` 形参；
-       - 针对性测试 `tests/test_terrain_planning_contract.py` Group C & Group E (19/19 PASS)。
-    6. **全套分层自动化回归**：
-       - `.\run_tests.ps1 -tier quick`: **19/19 PASS (53.36s, Exit Code 0)**
-       - `.\run_tests.ps1 -tier physics`: **21/21 PASS (90.73s, Exit Code 0)**
-       - `.\run_tests.ps1 -tier motion`: **12/12 PASS (52.74s, Exit Code 0)**
-       - `.\run_tests.ps1 -tier full`: **36/36 PASS (144.60s, Exit Code 0)**
-       - `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, Exit Code 0)**
-    7. **历史测试针对性回归**：
-       - `test_terrain_planning_contract.py`: 19/19 PASS
-       - `test_find_r2_02_contact_state_ownership.py`: 6/6 PASS
-       - `test_terrain_walk_negative.py`: 4/4 PASS
-       - `test_action_environment_binding.py`: 10/10 PASS
-       - `test_scene_save_gate.py`: 6/6 PASS
-       - `test_environment_query_contract.py`: 8/8 PASS
-       - `test_find_r2_01_hand_contact_lifecycle.py`: 4/4 PASS
-       - `test_terrain_walk_failure_propagation.py`: 6/6 PASS
-       - `test_motion_planner_result_contract.py`: 10/10 PASS
+  * **地形规划联合修复验收收口完成**：
+    1. **ISSUE-A: 最大步长单脚 3D 空间位移硬约束与自适应步点截断**：
+       - `route.max_step_length_m` 严格作为每个 `TerrainStepPlan` 单脚 3D 空间位移的硬约束（`disp = (Vector(step.swing_end_xyz) - Vector(step.swing_start_xyz)).length <= route.max_step_length_m + tolerance`）；
+       - 双足交替推进量统一为 `step_advance = min(route.nominal_stride_m, route.max_step_length_m / 2.0)`，单步落点与收步时严密检测 3D 位移并自适应夹紧；超限或不可达时抛出确定性 `ValueError`；
+       - `TerrainRouteInput.max_step_length_m` 默认值设为 `0.80m`（与 `MAX_LEG_REACH = 0.82m` 保持解剖学一致）；
+       - 修正收步余量判定：当推进落点距目标在半步内（`abs(y_tgt - cand_land_y) < route.min_step_length_m * 0.5`）时，直接收敛至目标，消除冗余微步并保持 700 帧基准场景对齐；
+       - 针对性用例 A（+Y 轴交替推进，位移严格 <= 0.40m，无 0.80m 单步位移，左右严格交替）、用例 B（-Y 轴交替推进完全对称）、用例 C（收步语义，无越界与超限）、用例 D（接缝调整后位移再校验）、用例 E（物理极限不可达防御性拦截）全部全绿通过。
+    2. **ISSUE-B: 接缝边缘采样复合支持/成功门禁与反事实未命中拦截**：
+       - `_adjust_footfall_for_seams_and_edges()` 统一判定标准为 `res is not None and res.success and res.allows_regular_support`；
+       - 脚后跟 (-0.07m)、脚尖 (+0.15m) 与脚踝 (0.0m) 三点必须全部满足；
+       - 彻底移除 `(0, 0, 1)` 兜底与平地回退；候选位移检索严格执行此复合门禁；
+       - 针对性反事实测试验证：当 `allows_regular_support=True` 但 `success=False`（网格未命中/传感器异常）时，系统坚决拒绝并抛出异常，绝不采纳为落脚点。
+    3. **全套自动化分层回归验证**：
+       - `tests/test_terrain_planning_contract.py`: **25/25 PASS (0.45s)**
+       - `.\run_tests.ps1 -tier quick`: **19/19 PASS (50.53s)**
+       - `.\run_tests.ps1 -tier physics`: **21/21 PASS (84.54s)**
+       - `.\run_tests.ps1 -tier motion`: **12/12 PASS (49.44s)**
+       - `.\run_tests.ps1 -tier full`: **36/36 PASS (138.02s)**
+       - `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors)**
   * **存量问题状态**：确认缺陷归零（0 项），全仓库剩余 5 项 Finding（5 项合同缺口）严格保持原状，维持待修复登记；
   * **Phase 7B 状态**：**仍然严格禁止**，禁止提前开发环境双向动力学；
-  * **门禁终止状态**：`JOINT-REPAIR-TERRAIN-PLANNING — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行开展下一步修复）。
+  * **门禁终止状态**：`JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行开展下一步修复）。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **起始基准 Commit SHA**：`476e5a3fdb1a9242b6a79be502278cd824b65837`
-  * **最新 Commit SHA**：c7164f2bbddcff6d29f8e16acbc06984ba95caaf
-  * **远程仓库同步状态**：已安全同步至 origin/master（待推送验证）
-  * **未提交文件说明**：P2_R1_recovery.patch 为历史中断恢复安全快照，受保护不纳入版本库。
+  * **起始基准 Commit SHA**：`0c200eec43e5ae6dd4ae6f38049392503fa533bf`
+  * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
 ---
 

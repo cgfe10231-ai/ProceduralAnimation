@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Terrain Planning Joint Repair — Direction, Seam, and Timebase Contracts (JOINT-REPAIR-TERRAIN-PLANNING)
-> **审计与修复基准 Commit**：476e5a3fdb1a9242b6a79be502278cd824b65837
+> **当前阶段**：Terrain Planning Joint Repair Acceptance Closure (JOINT-REPAIR-TERRAIN-PLANNING-CLOSE)
+> **审计与修复基准 Commit**：0c200eec43e5ae6dd4ae6f38049392503fa533bf
 > **最后更新时间**：2026-10-30
-> **当前状态**：JOINT-REPAIR-TERRAIN-PLANNING — AWAITING INDEPENDENT REVIEW
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成 FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R2-06、FIND-R2-07、FIND-T01-06、FIND-T01-07、FIND-T01-08、FIND-R4-01、FIND-R4-02 及其 3 项关联问题（max_step_length_m 步长钳位、nominal_stride_m 严格正数/有限值校验、estimate_duration_frames fps 传参修复）的修复与闭环验证，存量缺陷彻底清零，其余合同缺口维持原状待后续推进。
+> **当前状态**：JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成地形规划联合修复验收收口：1) ISSUE-A 单脚 3D 空间位移作为最大步长约束对象，自适应双足步点截断，严格防范超限步长；2) ISSUE-B 接缝与候选位移严格执行 res.success and res.allows_regular_support 复合门禁，彻底拒绝无几何支撑反事实异常，绝不兜底为平地法线；3) 针对性测试扩展至 25/25 PASS，分层自动化套件全量回归（Quick 19/19, Physics 21/21, Motion 12/12, Full 36/36 全 PASS）。存量缺陷彻底清零，其余 5 项合同缺口维持原状待后续推进。
 
 ---
 

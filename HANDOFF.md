@@ -6,44 +6,29 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — 地形规划联合修复 (Joint Terrain Planning Repair: Direction, Seam and Timebase Contracts)。
-* **当前状态**：`JOINT-REPAIR-TERRAIN-PLANNING — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
-* **任务性质**：生产接口联合修复，消除 `src/motion/terrain_walk.py` 中 4 项已登记缺陷（FIND-R2-07、FIND-R2-06、FIND-T01-07、FIND-T01-08）与 3 项关联接口问题（`max_step_length_m` 生效、`nominal_stride_m` 严格校验、`fps` 错误形参清理）。
+* **当前任务**：ProceduralAnimation — 地形规划联合修复验收收口 (Terrain Planning Joint Repair Acceptance Closure: ISSUE-A & ISSUE-B)。
+* **当前状态**：`JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
+* **任务性质**：限定范围验收收口，解决 ISSUE-A（单脚 3D 空间位移作为最大步长约束对象，自适应双足步点截断）与 ISSUE-B（接缝边缘采样复合支持/成功门禁与反事实未命中拒绝）。
 
-### 本任务核心核准成果 (Joint Terrain Planning Repair)
-1. **接缝与边缘检测横向采样位置偏置修复 (FIND-R2-07)**：
-   - `_adjust_footfall_for_seams_and_edges(environment, sw_x, y, corridor_y_min, corridor_y_max)` 采用摆动脚实际横向坐标 `sw_x` 取代走廊中心线 `corridor_x=0.0`；
-   - 综合探测前掌 (+0.15m)、脚后跟 (-0.07m) 与脚踝 (0.0m) 支撑面合法性，双向边界安全夹紧；
-   - 针对性测试 `tests/test_terrain_planning_contract.py` Group A (19/19 PASS)。
-2. **步态落点与 3D 表面几何对齐核心合同统一 (FIND-R2-06)**：
-   - 统一抽取 `_build_step_schedule_core`，消除 `plan_terrain_footsteps` 与 `build_terrain_step_schedule` 逻辑分歧；
-   - 未命中或不可支撑表面严格抛出 `ValueError`，彻底移除虚假平地高程回退与伪造 `default_ground` 表面 ID；
-   - 严格校验垂直步高限额 $|\Delta z| \le 0.35$m；
-   - 依据表面法线自动计算脚部俯仰角 $\theta_{\text{pitch}} = -\arctan2(n_y, n_z)$，并根据坡度自适应调整抬脚净空；
-   - 针对性测试 `tests/test_terrain_planning_contract.py` Group B (19/19 PASS)。
-3. **负向 Y 行进落点生成与终止条件修复 (FIND-T01-07)**：
-   - 步点推进循环自适应步长方向符号（`sign = 1.0` 或 `-1.0`），依据前进剩余余量正确终止，消除跳步与死循环；
-   - `_build_continuous_root_forward_spline` 样条端点斜率判定更新为 `knot_v[k] = 0.0 if v_prev * v_next <= 0.0 else avg_v`，正向保留负向行进速度；
-   - 针对性测试 `tests/test_terrain_planning_contract.py` Group C (19/19 PASS)。
-4. **短步态周期摆动足时间基准对齐 (FIND-T01-08)**：
-   - 摆动足轨迹时间归一化分母纠正为 `dur`（原 `dur - 1`），与根骨位移 Hermite 样条完全同相；
-   - 消除骨盆滞后导致的摆动足提前落盘与假性第 6 帧 0.4mm 过伸不可达报错；
-   - 历史 2/4/2 短步态测试 `tests/test_find_r2_02_contact_state_ownership.py` 纠正假性断言并全绿通过 (6/6 PASS)；
-   - 针对性测试 `tests/test_terrain_planning_contract.py` Group D (19/19 PASS)。
-5. **路由输入合同与遗留接口收口**：
-   - 启用 `max_step_length_m` 生效夹紧步长；
-   - `nominal_stride_m` 严格正数及有限值校验；
-   - `TerrainWalkAction.estimate_duration_frames` 移除未定义 `fps` 形参调用；
-   - 针对性测试 `tests/test_terrain_planning_contract.py` Group C & Group E (19/19 PASS)。
-6. **全套自动化分层回归验证**：
-   - `.\run_tests.ps1 -tier quick`: **19/19 PASS (53.36s)**
-   - `.\run_tests.ps1 -tier physics`: **21/21 PASS (90.73s)**
-   - `.\run_tests.ps1 -tier motion`: **12/12 PASS (52.74s)**
-   - `.\run_tests.ps1 -tier full`: **36/36 PASS (144.60s)**
+### 本任务核心核准成果 (Acceptance Closure: ISSUE-A & ISSUE-B)
+1. **ISSUE-A: 最大步长单脚 3D 空间位移硬约束与自适应截断**：
+   - 将 `route.max_step_length_m` 严格作为每个 `TerrainStepPlan` 单脚真实空间位移约束；
+   - 双足交替推进量统一为 `step_advance = min(route.nominal_stride_m, route.max_step_length_m / 2.0)`；单步落点与收步时严密检测 3D 位移并自适应夹紧；
+   - `TerrainRouteInput.max_step_length_m` 默认值设为 `0.80m`（与 `MAX_LEG_REACH = 0.82m` 保持解剖学一致）；
+   - 修正收步余量判定：当推进落点距目标在半步内（`abs(y_tgt - cand_land_y) < route.min_step_length_m * 0.5`）时，直接收敛至目标，消除冗余微步并保持 700 帧基准场景对齐；
+   - 针对性用例 A（+Y 轴交替推进，位移严格 <= 0.40m，无 0.80m 单步位移，左右严格交替）、用例 B（-Y 轴交替推进完全对称）、用例 C（收步语义，无越界与超限）、用例 D（接缝调整后位移再校验）、用例 E（物理极限不可达防御性拦截）全部全绿通过。
+2. **ISSUE-B: 接缝边缘采样复合门禁与反事实未命中拦截**：
+   - 统一定义复合判定 `res is not None and res.success and res.allows_regular_support`；
+   - 脚后跟 (-0.07m)、脚尖 (+0.15m) 与脚踝 (0.0m) 三点必须全部满足；
+   - 彻底移除 `(0, 0, 1)` 兜底与平地回退；候选位移检索严格执行此复合门禁；
+   - 针对性反事实测试验证：当 `allows_regular_support=True` 但 `success=False`（网格未命中/传感器异常）时，系统坚决拒绝并抛出异常，绝不采纳为落脚点。
+3. **全套自动化分层回归验证**：
+   - `tests/test_terrain_planning_contract.py`: **25/25 PASS (0.45s)**
+   - `.\run_tests.ps1 -tier quick`: **19/19 PASS (50.53s)**
+   - `.\run_tests.ps1 -tier physics`: **21/21 PASS (84.54s)**
+   - `.\run_tests.ps1 -tier motion`: **12/12 PASS (49.44s)**
+   - `.\run_tests.ps1 -tier full`: **36/36 PASS (138.02s)**
    - `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors)**
-7. **缺陷登记总表更新**：
-   - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 登记看板关闭 FIND-R2-06、FIND-R2-07、FIND-T01-07、FIND-T01-08；
-   - 确认缺陷已归零（0 项），全仓库仅剩 5 项合同缺口；阻碍后续开发项维持为 1 (仅剩 FIND-R3-01 底层 Rig 动态父级)。
 
 ---
 

@@ -3,6 +3,37 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Terrain Planning Joint Repair: 验收收口 (ISSUE-A 最大步长单脚位移约束与 ISSUE-B 复合支持门禁)
+
+### 1. ISSUE-A: 最大步长约束测量对象修正与单脚 3D 位移闭环
+* **问题成因**：
+  - 原实现以相邻落点间距 `stride_len = min(nominal, max)` 进行步点递增，未约束左右脚交替时同一单脚从起摆点到落脚点的真实 3D 空间位移，导致在 0.40m 限制下单脚真实摆动可达 0.80m。
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py):
+    - 统一将 `route.max_step_length_m` 作为单脚 3D 空间位移约束，在 `_build_step_schedule_core()` 中逐步断言 `(Vector(sw_landing_xyz) - Vector(sw_start_xyz)).length <= max_step_length_m + 1e-4`；
+    - 在 `plan_terrain_footsteps()` 中，双足交替稳定行进推进量统一为 `step_advance = min(route.nominal_stride_m, route.max_step_length_m / 2.0)`，单步落点与收步时严密检测 3D 位移并自适应夹紧；超限或不可达时抛出确定性 `ValueError`；
+    - `TerrainRouteInput.max_step_length_m` 默认值设为 `0.80m`，与底层人体骨骼最大伸展极限 `MAX_LEG_REACH = 0.82m` 保持解剖学一致；
+    - 修正收步余量判定：当推进落点距目标在半步内（`abs(y_tgt - cand_land_y) < route.min_step_length_m * 0.5`）时，直接收敛至目标，消除冗余微步并保持 700 帧基准场景对齐；
+* **测试用例与验证**：
+  - `tests/test_terrain_planning_contract.py`:
+    - 用例 A (`test_issue_a_case_a_positive_y_alternating`): +Y 轴交替推进，每步位移严格 <= 0.40m，无 0.80m 步长，左右脚严格交替（R, L, R, L...），输出完整位移表；
+    - 用例 B (`test_issue_a_case_b_negative_y_alternating`): -Y 轴交替推进，每步位移严格 <= 0.40m，与用例 A 完全对称；
+    - 用例 C (`test_issue_a_case_c_closing_steps_semantics`): 接近目标点时最后两步平整收拢于 target_pos，位移 <= max_step_length_m，不越过目标；
+    - 用例 D (`test_issue_a_case_d_seam_adjustment_reverified_against_step_length`): 接缝调整后真实位移重新参与 max_step_length_m 校验，超限自动回退或截断；
+    - 用例 E (`test_issue_a_case_e_unsolvable_reach_gap_defensive_interception`): 无法跨越的地形断裂防御性拦截，抛出明确 ValueError，无死循环。
+
+### 2. ISSUE-B: 接缝边缘采样复合门禁与反事实未命中拦截
+* **问题成因**：
+  - `_adjust_footfall_for_seams_and_edges()` 原判定仅检查 `allows_regular_support`，缺失 `res.success == True` 显式判定，且查询失败时将法线兜底为 `(0, 0, 1)`，导致在未命中网格处错误合成平地。
+* **生产代码修复**：
+  - [src/motion/terrain_walk.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py):
+    - 统一定义复合判定 `res is not None and res.success and res.allows_regular_support`；
+    - 脚后跟 (-0.07m)、脚尖 (+0.15m) 与脚踝 (0.0m) 三点必须全部满足；
+    - 彻底移除 `(0, 0, 1)` 兜底与平地回退；候选位移检索严格执行此复合门禁；
+* **测试用例与验证**：
+  - `tests/test_terrain_planning_contract.py`:
+    - `test_issue_b_counterfactual_support_true_but_success_false_rejected`: 构造 `allows_regular_support=True` 但 `success=False`（网格未命中/传感器异常），系统坚决拒绝并抛出异常，绝不采纳为落脚点。
+
 ## [2026-10-30] Production Interface Joint Repair: 地形规划方向、接缝与时间基准合同联合修复 (JOINT-REPAIR-TERRAIN-PLANNING)
 
 ### 1. 接缝与边缘检测横向位置偏置修复 (FIND-R2-07, src/motion/terrain_walk.py)

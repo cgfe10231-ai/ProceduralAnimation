@@ -139,7 +139,7 @@ class TerrainRouteInput:
     target_pos: Tuple[float, float, float]      # Target world destination (x, y, z)
     nominal_stride_m: float = 0.30              # Target step length (m)
     step_width_m: float = 0.22                  # Lateral stance separation (2 * HIP_X_OFFSET)
-    max_step_length_m: float = 0.45             # Maximum reach limit
+    max_step_length_m: float = 0.80             # Maximum reach limit (single swing foot 3D displacement, MAX_LEG_REACH=0.82m)
     min_step_length_m: float = 0.15             # Minimum stride length
     stand_start_frames: int = 12                # Initial idle stabilization frames
     step_frames: int = 16                       # Timeline frames per half-step
@@ -217,6 +217,8 @@ def _adjust_footfall_for_seams_and_edges(
     y: float,
     corridor_y_min: float,
     corridor_y_max: float,
+    sw_start_xyz: Optional[Tuple[float, float, float]] = None,
+    max_step_length_m: Optional[float] = None,
 ) -> float:
     """Adjust prospective footfall Y so that the 22cm foot rigid sole lies flat on one surface.
 
@@ -225,30 +227,61 @@ def _adjust_footfall_for_seams_and_edges(
     - Ankle: y
     - Toe: y + 0.15m
 
-    If the toe and heel sample different surface normals (straddling a slope seam or ledge),
-    shifts y slightly to ensure full-sole planar seating with >= 0.03m margin from the seam.
+    Both initial sampling and candidate shifts strictly enforce:
+        result.success and result.allows_regular_support
+    for heel, toe, and ankle.
+    Query failures (success=False) are never converted into synthetic (0, 0, 1) normals
+    or treated as valid support.
+    If sw_start_xyz and max_step_length_m are provided, prospective and shifted landings
+    must also satisfy distance(sw_start_xyz, candidate_xyz) <= max_step_length_m.
     Samples at the true lateral position `sw_x` of the swing foot.
     """
+    min_y = min(corridor_y_min, corridor_y_max)
+    max_y = max(corridor_y_min, corridor_y_max)
+
+    def _is_support_valid(res: Optional[SurfaceQueryResult]) -> bool:
+        return res is not None and res.success and res.allows_regular_support
+
     res_heel = environment.query_ground_support_at(sw_x, y - 0.07)
     res_toe = environment.query_ground_support_at(sw_x, y + 0.15)
     res_ankle = environment.query_ground_support_at(sw_x, y)
 
-    n_heel = res_heel.surface_normal_world if res_heel.success else (0.0, 0.0, 1.0)
-    n_toe = res_toe.surface_normal_world if res_toe.success else (0.0, 0.0, 1.0)
-    dn = (Vector(n_toe) - Vector(n_heel)).length
-
-    min_y = min(corridor_y_min, corridor_y_max)
-    max_y = max(corridor_y_min, corridor_y_max)
-
     all_supported = (
-        res_heel.allows_regular_support
-        and res_toe.allows_regular_support
-        and res_ankle.allows_regular_support
+        _is_support_valid(res_heel)
+        and _is_support_valid(res_toe)
+        and _is_support_valid(res_ankle)
     )
 
-    if dn > 0.05 or not all_supported:
+    if sw_start_xyz is not None and res_ankle is not None and res_ankle.success:
+        dz = res_ankle.contact_point_world[2] - sw_start_xyz[2]
+        if abs(dz) > 0.35:
+            any_shift_valid = False
+            for shift in [-0.08, -0.05, -0.03, 0.03, 0.05, 0.08]:
+                cand_y = y + shift
+                if min_y <= cand_y <= max_y:
+                    ra = environment.query_ground_support_at(sw_x, cand_y)
+                    if ra is not None and ra.success and abs(ra.contact_point_world[2] - sw_start_xyz[2]) <= 0.35:
+                        any_shift_valid = True
+                        break
+            if not any_shift_valid:
+                raise ValueError(
+                    f"Footstep at ({sw_x:.2f}, {y:.2f}) requires vertical reach {dz:.3f}m, "
+                    f"exceeding physical stepping limit (0.35m)"
+                )
+
+    dn = 1e9
+    within_reach = True
+    if all_supported:
+        dn = (Vector(res_toe.surface_normal_world) - Vector(res_heel.surface_normal_world)).length
+        if sw_start_xyz is not None and max_step_length_m is not None:
+            cand_xyz = (sw_x, y, res_ankle.contact_point_world[2])
+            disp = (Vector(cand_xyz) - Vector(sw_start_xyz)).length
+            if disp > max_step_length_m + 1e-4:
+                within_reach = False
+
+    if dn > 0.05 or not all_supported or not within_reach:
         best_y = None
-        min_dn = dn if all_supported else 1e9
+        min_dn = dn if (all_supported and within_reach) else 1e9
 
         for shift in [-0.08, -0.05, -0.03, 0.03, 0.05, 0.08]:
             cand_y = y + shift
@@ -257,8 +290,13 @@ def _adjust_footfall_for_seams_and_edges(
             rh = environment.query_ground_support_at(sw_x, cand_y - 0.07)
             rt = environment.query_ground_support_at(sw_x, cand_y + 0.15)
             ra = environment.query_ground_support_at(sw_x, cand_y)
-            if not (rh.allows_regular_support and rt.allows_regular_support and ra.allows_regular_support):
+            if not (_is_support_valid(rh) and _is_support_valid(rt) and _is_support_valid(ra)):
                 continue
+            if sw_start_xyz is not None and max_step_length_m is not None:
+                cand_xyz = (sw_x, cand_y, ra.contact_point_world[2])
+                disp = (Vector(cand_xyz) - Vector(sw_start_xyz)).length
+                if disp > max_step_length_m + 1e-4:
+                    continue
             curr_dn = (Vector(rt.surface_normal_world) - Vector(rh.surface_normal_world)).length
             if curr_dn < min_dn:
                 min_dn = curr_dn
@@ -267,11 +305,12 @@ def _adjust_footfall_for_seams_and_edges(
                     break
         if best_y is not None:
             return best_y
-        if all_supported:
+        if all_supported and within_reach:
             return y
         raise ValueError(
-            f"Footfall at ({sw_x:.2f}, {y:.2f}) straddles unsupported surface boundary "
-            f"and no valid support shift was found in corridor [{min_y:.2f}, {max_y:.2f}]"
+            f"Footfall at ({sw_x:.2f}, {y:.2f}) straddles unsupported surface boundary, "
+            f"encountered query failure, or violated step reach, and no valid support shift "
+            f"was found in corridor [{min_y:.2f}, {max_y:.2f}]"
         )
     return y
 
@@ -290,6 +329,7 @@ def _build_step_schedule_core(
     spec_ramp_clearance: float = 0.10,
     start_frame: int = 1,
     corridor_y_bounds: Optional[Tuple[float, float]] = None,
+    max_step_length_m: Optional[float] = None,
 ) -> Tuple[List[TerrainStepPlan], int]:
     """Authoritative unified core for discrete footstep planning and 3D surface alignment.
 
@@ -393,6 +433,14 @@ def _build_step_schedule_core(
         sw_start_xyz = feet_pos[swing_side]
         sw_start_pitch = feet_pitch[swing_side]
 
+        # Verify actual 3D step displacement does not exceed max_step_length_m
+        actual_step_length = (Vector(sw_landing_xyz) - Vector(sw_start_xyz)).length
+        if max_step_length_m is not None and actual_step_length > max_step_length_m + 1e-4:
+            raise ValueError(
+                f"Footstep {k} ({swing_side}) actual step length {actual_step_length:.4f}m "
+                f"exceeds maximum allowed step length ({max_step_length_m:.4f}m)"
+            )
+
         # Geometric clearance height
         is_stepped = (delta_z > 0.05 and abs(sw_landing_pitch) < 3.0)
         if clearance_type == "route":
@@ -452,6 +500,7 @@ def plan_terrain_footsteps(
     - Queries `environment` for 3D elevations and surface normals dynamically via `query_ground_support_at`.
     - Single-hit contract: height Z, normal, surface_id, and support eligibility come from a single hit.
     - Strict rejection: misses (NO_HIT) and non-support surfaces raise explicit ValueError.
+    - Strictly bounds single-foot 3D swing displacement by route.max_step_length_m across all steps.
     - Detects seams and edge boundaries on true lateral footfall positions to place full 22cm soles safely.
     - Checks physiological climbing/stepping reach limits (flags unreachable drops/rises).
     - Computes normal-aligned foot pitches and adaptive swing clearance.
@@ -466,28 +515,134 @@ def plan_terrain_footsteps(
         return [], route.stand_start_frames + route.stand_stop_frames
 
     dir_sign = 1.0 if dy_total > 0 else -1.0
-    stride_len = min(route.nominal_stride_m, route.max_step_length_m)
-    signed_stride = dir_sign * stride_len
+    max_reach = route.max_step_length_m
 
-    step_ys: List[float] = []
-    curr_lead_y = y0
+    # Steady-state maximum advance past stance foot:
+    # In steady alternating bipedal gait, foot swings from behind stance foot to ahead of stance foot.
+    # Total swing displacement is 2 * advance <= max_reach.
+    max_advance = max_reach / 2.0
+    step_advance = min(route.nominal_stride_m, max_advance)
+
     left_x = x0 - (route.step_width_m / 2.0)
     right_x = x0 + (route.step_width_m / 2.0)
+
+    res0_l = environment.query_ground_support_at(left_x, y0)
+    res0_r = environment.query_ground_support_at(right_x, y0)
+    if not (res0_l.success and res0_l.allows_regular_support):
+        reason = res0_l.error_reason if not res0_l.success else f"surface '{res0_l.surface_id}' does not allow regular support"
+        raise ValueError(f"Initial left foot placement at ({left_x:.2f}, {y0:.2f}) rejected: {reason}")
+    if not (res0_r.success and res0_r.allows_regular_support):
+        reason = res0_r.error_reason if not res0_r.success else f"surface '{res0_r.surface_id}' does not allow regular support"
+        raise ValueError(f"Initial right foot placement at ({right_x:.2f}, {y0:.2f}) rejected: {reason}")
+
+    feet_pos = {
+        "L": (left_x, y0, res0_l.contact_point_world[2]),
+        "R": (right_x, y0, res0_r.contact_point_world[2]),
+    }
+
+    step_ys: List[float] = []
     step_idx = 0
 
-    while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:
-        curr_lead_y += signed_stride
+    while True:
         swing_side = "R" if (step_idx % 2 == 0) else "L"
+        stance_side = "L" if (step_idx % 2 == 0) else "R"
         sw_x = right_x if swing_side == "R" else left_x
-        adjusted_y = _adjust_footfall_for_seams_and_edges(
-            environment, sw_x, curr_lead_y, y0, y_tgt
+        sw_start = feet_pos[swing_side]
+        st_pos = feet_pos[stance_side]
+
+        if step_idx == 0:
+            cand_land_y = y0 + dir_sign * step_advance
+        else:
+            cand_land_y = st_pos[1] + dir_sign * step_advance
+
+        # Check if normal step advance reaches or overshoots target (within half min_step_length_m margin)
+        reaches_target = (cand_land_y - y_tgt) * dir_sign >= - (route.min_step_length_m * 0.5)
+
+        if reaches_target:
+            # Land lead foot at target
+            adj_target_y = _adjust_footfall_for_seams_and_edges(
+                environment, sw_x, y_tgt, y0, y_tgt,
+                sw_start_xyz=sw_start, max_step_length_m=max_reach
+            )
+            res_land = environment.query_ground_support_at(sw_x, adj_target_y)
+            if not (res_land.success and res_land.allows_regular_support):
+                raise ValueError(f"Footstep landing near target ({sw_x:.2f}, {adj_target_y:.2f}) rejected")
+
+            disp_sw = (Vector((sw_x, adj_target_y, res_land.contact_point_world[2])) - Vector(sw_start)).length
+            if disp_sw > max_reach + 1e-4:
+                raise ValueError(
+                    f"Footstep {step_idx} ({swing_side}) actual step length {disp_sw:.4f}m "
+                    f"exceeds maximum allowed step length ({max_reach:.4f}m)"
+                )
+            step_ys.append(adj_target_y)
+            feet_pos[swing_side] = (sw_x, adj_target_y, res_land.contact_point_world[2])
+
+            # Closing step for trailing foot to reach side-by-side stance at target
+            close_sw_side = stance_side
+            close_sw_x = right_x if close_sw_side == "R" else left_x
+            close_sw_start = feet_pos[close_sw_side]
+            adj_close_y = _adjust_footfall_for_seams_and_edges(
+                environment, close_sw_x, y_tgt, y0, y_tgt,
+                sw_start_xyz=close_sw_start, max_step_length_m=max_reach
+            )
+            res_close = environment.query_ground_support_at(close_sw_x, adj_close_y)
+            if not (res_close.success and res_close.allows_regular_support):
+                raise ValueError(f"Closing footstep landing near target ({close_sw_x:.2f}, {adj_close_y:.2f}) rejected")
+            disp_close = (Vector((close_sw_x, adj_close_y, res_close.contact_point_world[2])) - Vector(close_sw_start)).length
+            if disp_close > max_reach + 1e-4:
+                raise ValueError(
+                    f"Closing footstep {close_sw_side} actual step length {disp_close:.4f}m "
+                    f"exceeds maximum allowed step length ({max_reach:.4f}m)"
+                )
+            step_ys.append(adj_close_y)
+            feet_pos[close_sw_side] = (close_sw_x, adj_close_y, res_close.contact_point_world[2])
+            break
+
+        # Normal alternating traversal step:
+        adj_y = _adjust_footfall_for_seams_and_edges(
+            environment, sw_x, cand_land_y, y0, y_tgt,
+            sw_start_xyz=sw_start, max_step_length_m=max_reach
         )
-        step_ys.append(adjusted_y)
+        res_step = environment.query_ground_support_at(sw_x, adj_y)
+        if not (res_step.success and res_step.allows_regular_support):
+            raise ValueError(f"Footstep {step_idx} landing at ({sw_x:.2f}, {adj_y:.2f}) rejected: not valid support")
+
+        disp_step = (Vector((sw_x, adj_y, res_step.contact_point_world[2])) - Vector(sw_start)).length
+        if disp_step > max_reach + 1e-4:
+            # Try clamping advance to 3D reach limit
+            delta_z = res_step.contact_point_world[2] - sw_start[2]
+            if abs(delta_z) >= max_reach:
+                raise ValueError(
+                    f"Footstep {step_idx} ({swing_side}) vertical step height {delta_z:.3f}m "
+                    f"exceeds maximum reach limit ({max_reach:.3f}m)"
+                )
+            max_dy = math.sqrt(max(0.0, max_reach * max_reach - delta_z * delta_z))
+            clamped_y = sw_start[1] + dir_sign * max_dy
+            if (clamped_y - st_pos[1]) * dir_sign < -1e-4:
+                raise ValueError(
+                    f"Footstep {step_idx} ({swing_side}) cannot advance past stance foot "
+                    f"without exceeding maximum step length ({max_reach:.4f}m)"
+                )
+            adj_y = _adjust_footfall_for_seams_and_edges(
+                environment, sw_x, clamped_y, y0, y_tgt,
+                sw_start_xyz=sw_start, max_step_length_m=max_reach
+            )
+            res_step = environment.query_ground_support_at(sw_x, adj_y)
+            if not (res_step.success and res_step.allows_regular_support):
+                raise ValueError(f"Footstep {step_idx} landing at ({sw_x:.2f}, {adj_y:.2f}) rejected: not valid support")
+            disp_step = (Vector((sw_x, adj_y, res_step.contact_point_world[2])) - Vector(sw_start)).length
+            if disp_step > max_reach + 1e-4:
+                raise ValueError(
+                    f"Footstep {step_idx} ({swing_side}) actual step length {disp_step:.4f}m "
+                    f"exceeds maximum allowed step length ({max_reach:.4f}m)"
+                )
+
+        step_ys.append(adj_y)
+        feet_pos[swing_side] = (sw_x, adj_y, res_step.contact_point_world[2])
         step_idx += 1
 
-    # Closing steps to land side-by-side at target_pos
-    step_ys.append(y_tgt)
-    step_ys.append(y_tgt)
+        if step_idx > 500:
+            raise ValueError(f"Footstep planning failed to reach target {y_tgt} within 500 steps (loop limit reached)")
 
     return _build_step_schedule_core(
         start_pos=route.start_pos,
@@ -501,6 +656,7 @@ def plan_terrain_footsteps(
         route_base_clearance=route.base_clearance_m,
         start_frame=start_frame,
         corridor_y_bounds=(y0, y_tgt),
+        max_step_length_m=route.max_step_length_m,
     )
 
 

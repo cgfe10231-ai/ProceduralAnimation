@@ -1,8 +1,21 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-30
-> **当前阶段**：Production Interface Joint Repair — Terrain Planning Contracts (JOINT-REPAIR-TERRAIN-PLANNING)。已完成地形规划四项登记缺陷（FIND-R2-07、FIND-R2-06、FIND-T01-07、FIND-T01-08）与三项关联接口问题联合修复：1) 接缝与边缘检测横向采样位置偏置修复（`src/motion/terrain_walk.py` 中 `_adjust_footfall_for_seams_and_edges` 严格按实际摆动脚侧向位置 `sw_x` 探测前掌、脚后跟与脚踝支撑面合法性，彻底纠正硬编码中心线 `corridor_x=0.0` 盲区，正反双向走廊严格夹紧）；2) 统一步态落点与 3D 表面几何对齐核心合同（抽取 `_build_step_schedule_core` 消除 `plan_terrain_footsteps` 与 `build_terrain_step_schedule` 逻辑分歧，未命中或不可支撑表面严格抛出 `ValueError`，彻底移除虚假平地高程回退与伪造 `default_ground` 表面 ID，严格校验步高差 $|\Delta z| \le 0.35$m 并动态调整坡度抬脚净空与俯仰角）；3) 负向 Y 行进落点生成与终止条件修复（步点循环自适应方向符号，终止条件依据前进剩余余量判定，样条端点斜率 `_build_continuous_root_forward_spline` 正确保留负向速度）；4) 短步态周期下摆动足时间基准对齐（摆动足轨迹时间归一化分母由 `dur - 1` 纠正为 `dur`，与根骨位移 Hermite 样条同相，彻底消除骨盆滞后诱发的假性第 6 帧 0.4mm 过伸不可达失败）；5) 路由输入合同加固（`max_step_length_m` 严格生效夹紧步长，`nominal_stride_m` 严格校验有限正数，`estimate_duration_frames` 移除未定义 `fps` 形参）；6) 针对性测试 `tests/test_terrain_planning_contract.py`（19/19 PASS）、`tests/test_find_r2_02_contact_state_ownership.py`（6/6 PASS）、`tests/test_terrain_walk_negative.py`（4/4 PASS）全绿，分层回归套件全绿通过（Quick 19/19, Physics 21/21, Motion 12/12, Full 36/36），AST 文档门禁 0 错误通过。
-> **重要修复与证据核准**：FIND-R2-01、FIND-R2-02、FIND-R2-03、FIND-R2-04、FIND-R4-02、FIND-T01-06、FIND-R4-01、FIND-R2-06、FIND-R2-07、FIND-T01-07、FIND-T01-08 已被彻底解决并标定为 `FIXED / VERIFIED`。全仓库剩余 5 项 Finding（0 项确认缺陷、5 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`JOINT-REPAIR-TERRAIN-PLANNING — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
+> **当前阶段**：Terrain Planning Joint Repair Acceptance Closure (JOINT-REPAIR-TERRAIN-PLANNING-CLOSE)。已完成地形规划联合修复验收收口：
+> 1) **ISSUE-A 最大步长单脚 3D 空间位移约束与自适应双足步点截断**：
+>    - 生产代码将 `route.max_step_length_m` 严格作为每个 `TerrainStepPlan` 单脚 3D 空间位移的硬约束（`disp = (Vector(step.swing_end_xyz) - Vector(step.swing_start_xyz)).length <= route.max_step_length_m + tolerance`）；
+>    - 在 `plan_terrain_footsteps()` 中，双足交替稳定行进推进量统一为 `step_advance = min(route.nominal_stride_m, route.max_step_length_m / 2.0)`，单步落点与收步时严密检测 3D 位移并自适应夹紧；超限或不可达时抛出确定性 `ValueError`；
+>    - `TerrainRouteInput.max_step_length_m` 默认值设为 `0.80m`，与底层人体骨骼最大伸展极限 `MAX_LEG_REACH = 0.82m` 保持解剖学一致；
+>    - 针对性用例 A（+Y 轴交替推进，位移严格 <= 0.40m，无 0.80m 单步位移，左右严格交替）、用例 B（-Y 轴交替推进完全对称）、用例 C（收步语义，无越界与超限）、用例 D（接缝调整后位移再校验）、用例 E（物理极限不可达防御性拦截）全部全绿通过。
+> 2) **ISSUE-B 接缝边缘采样复合门禁与反事实未命中拦截**：
+>    - `_adjust_footfall_for_seams_and_edges()` 统一判定标准为 `res.success and res.allows_regular_support`，脚后跟 (-0.07m)、脚尖 (+0.15m) 与脚踝 (0.0m) 必须全部满足；
+>    - 查询失败时严禁虚构 `(0, 0, 1)` 法线或兜底为平地；候选位移检索严格执行此复合门禁；
+>    - 针对性反事实测试验证：当 `allows_regular_support=True` 但 `success=False`（网格未命中/传感器异常）时，系统坚决拒绝并抛出异常，绝不采纳为落脚点。
+> 3) **全量回归与测试全绿**：
+>    - 针对性测试 `tests/test_terrain_planning_contract.py` 扩充至 25 项测试全绿通过（25/25 PASS in 0.45s）；
+>    - 分层自动化回归套件全绿通过：Quick 19/19 (50.53s), Physics 21/21 (84.54s), Motion 12/12 (49.44s), Full 36/36 (138.02s)；
+>    - AST 文档门禁与符号校验 `tests/audit_c2_final_inspector.py --verify-docs` 0 错误通过。
+> **重要修复与证据核准**：全仓库剩余 5 项 Finding（0 项确认缺陷、5 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
 
 ---
 

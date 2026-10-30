@@ -110,7 +110,7 @@ class MockFlexibleEnvironment(EnvironmentQuery):
                         surface_normal_world=(0.0, 0.0, 1.0),
                         signed_distance=0.0,
                         friction_coeff=0.0,
-                        allows_regular_support=False,
+                        allows_regular_support=p["allows_support"],
                         success=False,
                         error_reason=p["error_reason"] or "query_ground_support_at raycast missed geometry",
                     )
@@ -469,20 +469,189 @@ class TestGroupCBidirectionalAndInputContracts(unittest.TestCase):
             _validate_route_input(route_invalid)
         self.assertIn("cannot exceed max_step_length_m", str(cm.exception))
 
-        # 2. Strict enforcement: nominal_stride_m (0.80m) is clamped to max_step_length_m (0.40m)
-        route_clamped = TerrainRouteInput(
+    def test_issue_a_case_a_positive_y_alternating(self) -> None:
+        """Case A: Positive Y alternating progression bounded strictly by max_step_length_m.
+
+        start_pos = (0, 0, 0), target_pos = (0, 2.0, 0)
+        nominal_stride_m = 0.80, max_step_length_m = 0.40
+        """
+        route = TerrainRouteInput(
             start_pos=(0.0, 0.0, 0.0),
             target_pos=(0.0, 2.0, 0.0),
             nominal_stride_m=0.80,
             max_step_length_m=0.40,
         )
-        sched, _ = plan_terrain_footsteps(route_clamped, self.env)
+        sched, _ = plan_terrain_footsteps(route, self.env)
         self.assertGreater(len(sched), 0)
-        curr_y = 0.0
-        for step in sched:
-            stride_taken = abs(step.swing_end_xyz[1] - curr_y)
-            self.assertLessEqual(stride_taken, 0.40 + 1e-4, f"Step stride {stride_taken:.4f} exceeded max_step_length_m 0.40")
-            curr_y = step.swing_end_xyz[1]
+
+        displacement_table = []
+        for i, step in enumerate(sched):
+            expected_swing = "R" if (i % 2 == 0) else "L"
+            self.assertEqual(step.swing_side, expected_swing, f"Step {i} must alternate strictly")
+            disp = (Vector(step.swing_end_xyz) - Vector(step.swing_start_xyz)).length
+            displacement_table.append((i, step.swing_side, round(disp, 4), round(step.swing_end_xyz[1], 4)))
+
+            self.assertLessEqual(
+                disp, 0.40 + 1e-4,
+                f"Step {i} ({step.swing_side}) displacement {disp:.4f}m exceeds max_step_length_m (0.40m)"
+            )
+            self.assertNotAlmostEqual(
+                disp, 0.80, places=2,
+                msg=f"Step {i} ({step.swing_side}) had unconstrained 0.80m displacement!"
+            )
+
+        print("\n[Case A Displacement Table]")
+        for entry in displacement_table:
+            print(f"  Step {entry[0]}: {entry[1]}, disp={entry[2]:.4f}m, landing_y={entry[3]:.4f}m")
+
+        # Both feet must finish at target_pos side-by-side
+        self.assertAlmostEqual(sched[-2].swing_end_xyz[1], 2.0, places=3)
+        self.assertAlmostEqual(sched[-1].swing_end_xyz[1], 2.0, places=3)
+
+    def test_issue_a_case_b_negative_y_alternating(self) -> None:
+        """Case B: Negative Y alternating progression bounded strictly by max_step_length_m and symmetric to Case A.
+
+        start_pos = (0, 2.0, 0), target_pos = (0, 0, 0)
+        nominal_stride_m = 0.80, max_step_length_m = 0.40
+        """
+        route_pos = TerrainRouteInput(
+            start_pos=(0.0, 0.0, 0.0),
+            target_pos=(0.0, 2.0, 0.0),
+            nominal_stride_m=0.80,
+            max_step_length_m=0.40,
+        )
+        sched_pos, _ = plan_terrain_footsteps(route_pos, self.env)
+
+        route_neg = TerrainRouteInput(
+            start_pos=(0.0, 2.0, 0.0),
+            target_pos=(0.0, 0.0, 0.0),
+            nominal_stride_m=0.80,
+            max_step_length_m=0.40,
+        )
+        sched_neg, _ = plan_terrain_footsteps(route_neg, self.env)
+
+        self.assertEqual(len(sched_neg), len(sched_pos), "Case B step count must match Case A symmetrically")
+
+        print("\n[Case B Displacement Table]")
+        for i, (step_neg, step_pos) in enumerate(zip(sched_neg, sched_pos)):
+            expected_swing = "R" if (i % 2 == 0) else "L"
+            self.assertEqual(step_neg.swing_side, expected_swing)
+
+            disp_neg = (Vector(step_neg.swing_end_xyz) - Vector(step_neg.swing_start_xyz)).length
+            disp_pos = (Vector(step_pos.swing_end_xyz) - Vector(step_pos.swing_start_xyz)).length
+
+            self.assertLessEqual(disp_neg, 0.40 + 1e-4)
+            self.assertNotAlmostEqual(disp_neg, 0.80, places=2)
+            self.assertAlmostEqual(disp_neg, disp_pos, places=4, msg=f"Step {i} asymmetry between +Y and -Y")
+            print(f"  Step {i}: {step_neg.swing_side}, disp={disp_neg:.4f}m, landing_y={step_neg.swing_end_xyz[1]:.4f}m")
+
+        self.assertAlmostEqual(sched_neg[-2].swing_end_xyz[1], 0.0, places=3)
+        self.assertAlmostEqual(sched_neg[-1].swing_end_xyz[1], 0.0, places=3)
+
+    def test_issue_a_case_c_closing_steps_semantics(self) -> None:
+        """Case C: Closing steps semantics when normal steps would overshoot target.
+
+        Target at 0.70m with nominal_stride_m=0.30, max_step_length_m=0.80.
+        Both feet must neatly close at target without overshooting or exceeding max_step_length_m.
+        """
+        route = TerrainRouteInput(
+            start_pos=(0.0, 0.0, 0.0),
+            target_pos=(0.0, 0.70, 0.0),
+            nominal_stride_m=0.30,
+            max_step_length_m=0.80,
+        )
+        sched, _ = plan_terrain_footsteps(route, self.env)
+        self.assertGreaterEqual(len(sched), 2)
+
+        for i, step in enumerate(sched):
+            self.assertLessEqual(step.swing_end_xyz[1], 0.70 + 1e-4, f"Step {i} overshot target 0.70m")
+            disp = (Vector(step.swing_end_xyz) - Vector(step.swing_start_xyz)).length
+            self.assertLessEqual(disp, 0.80 + 1e-4, f"Step {i} exceeded max_step_length_m")
+
+        step_lead_close = sched[-2]
+        step_trail_close = sched[-1]
+        self.assertAlmostEqual(step_lead_close.swing_end_xyz[1], 0.70, places=3)
+        self.assertAlmostEqual(step_trail_close.swing_end_xyz[1], 0.70, places=3)
+        self.assertNotEqual(step_lead_close.swing_side, step_trail_close.swing_side)
+
+    def test_issue_a_case_d_seam_adjustment_reverified_against_step_length(self) -> None:
+        """Case D: Seam adjustment re-verified against max_step_length_m.
+
+        Seam at y=0.30 causes forward shift to y=0.38.
+        When max_step_length_m=0.35, forward shift of 0.38m violates 0.35m limit.
+        System must reject forward shift and select compliant shift or clamp.
+        """
+        ramp_normal = (0.0, -0.342, 0.940)
+        self.env.add_patch(
+            x_min=0.05, x_max=0.30,
+            y_min=0.30, y_max=1.00,
+            z_func=lambda x, y: (y - 0.30) * 0.364,
+            normal=ramp_normal,
+            allows_support=True,
+            surface_id="right_ramp_d",
+        )
+        route = TerrainRouteInput(
+            start_pos=(0.0, 0.0, 0.0),
+            target_pos=(0.0, 0.90, 0.0),
+            nominal_stride_m=0.30,
+            step_width_m=0.22,
+            max_step_length_m=0.35,
+        )
+        sched, _ = plan_terrain_footsteps(route, self.env)
+        step_0 = sched[0]
+        disp_0 = (Vector(step_0.swing_end_xyz) - Vector(step_0.swing_start_xyz)).length
+        self.assertLessEqual(disp_0, 0.35 + 1e-4, f"Adjusted step displacement {disp_0:.4f}m exceeds max_step_length_m 0.35m")
+        for i, step in enumerate(sched):
+            disp = (Vector(step.swing_end_xyz) - Vector(step.swing_start_xyz)).length
+            self.assertLessEqual(disp, 0.35 + 1e-4, f"Step {i} displacement {disp:.4f}m exceeds 0.35m")
+
+    def test_issue_a_case_e_unsolvable_reach_gap_defensive_interception(self) -> None:
+        """Case E: Defensive interception of unsolvable reach gap without infinite loops.
+
+        A 0.50m chasm between y=0.20 and y=0.70 cannot be stepped into or crossed when max_step_length_m=0.40.
+        Must raise explicit ValueError without hanging in infinite loop.
+        """
+        self.env.add_patch(
+            x_min=-0.5, x_max=0.5,
+            y_min=0.20, y_max=0.70,
+            allows_support=False,
+            surface_id="unsolvable_chasm",
+        )
+        route = TerrainRouteInput(
+            start_pos=(0.0, 0.0, 0.0),
+            target_pos=(0.0, 1.0, 0.0),
+            nominal_stride_m=0.30,
+            max_step_length_m=0.40,
+        )
+        with self.assertRaises(ValueError) as cm:
+            plan_terrain_footsteps(route, self.env)
+        err = str(cm.exception)
+        self.assertTrue("rejected" in err or "unsupported" in err or "cannot advance" in err)
+
+    def test_issue_b_counterfactual_support_true_but_success_false_rejected(self) -> None:
+        """ISSUE-B: Counterfactual test where allows_regular_support=True but success=False (raycast miss/failure).
+
+        System must strictly require result.success AND result.allows_regular_support for heel, toe, ankle,
+        and must never synthesize (0, 0, 1) flat ground fallback.
+        """
+        self.env.add_patch(
+            x_min=-0.5, x_max=0.5,
+            y_min=0.20, y_max=0.40,
+            allows_support=True,
+            success=False,
+            error_reason="Counterfactual sensor failure: raycast failed to hit mesh",
+            surface_id="sensor_glitch_zone",
+        )
+        route = TerrainRouteInput(
+            start_pos=(0.0, 0.0, 0.0),
+            target_pos=(0.0, 0.60, 0.0),
+            nominal_stride_m=0.30,
+            max_step_length_m=0.80,
+        )
+        with self.assertRaises(ValueError) as cm:
+            plan_terrain_footsteps(route, self.env)
+        err = str(cm.exception)
+        self.assertTrue("straddles unsupported surface boundary" in err or "encountered query failure" in err or "rejected" in err)
 
     def test_non_collinear_x_corridor_rejection(self) -> None:
         """Verify non-collinear X corridor (start X != target X) is strictly rejected."""
