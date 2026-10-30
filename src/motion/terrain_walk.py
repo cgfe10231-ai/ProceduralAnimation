@@ -325,7 +325,7 @@ def plan_terrain_footsteps(
         sw_landing_res = environment.query_ground_support_at(sw_x, target_y)
         if not sw_landing_res.allows_regular_support:
             raise ValueError(
-                f"Footstep {k} at ({sw_x:.2f}, {target_y:.2f}) lands on unsupported surface '{sw_landing_res.surface_id}'"
+                f"Footstep {k} at ({sw_x:.2f}, {target_y:.2f}) rejected: lands on unsupported surface '{sw_landing_res.surface_id}'"
             )
         if not sw_landing_res.success:
             raise ValueError(
