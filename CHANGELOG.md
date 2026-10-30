@@ -3,6 +3,48 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Joint Repair Final Closure: MotionPlanner 签名预检与场景保存门禁测试确定性收口 (JOINT-REPAIR-FINAL-CLOSURE)
+
+### 1. 消除异常捕获漏洞：MotionPlanner.add_action 签名预检前置 (src/motion/framework.py)
+* **缺陷成因**：
+  - 此前 `MotionPlanner.add_action()` 采用 `try...except TypeError:` 调用 `action.bind_environment(self.environment, allow_override=allow_env_override)` 并回退至 `action.bind_environment(self.environment)`。该方案存在严重合同漏洞：若 `bind_environment` 内部在执行计算或逻辑时发生真正的 `TypeError`，会被误判为签名不兼容而进行二次调用并吞没真实错误。
+* **生产代码修复**：
+  - [src/motion/framework.py:1028–1052](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/framework.py#L1028-L1052):
+    - 引入 `inspect.signature` 对 `bind_environment` 方法签名进行前置静态探查，先验判定是否支持 `allow_override` 形参或可变关键字参数（`**kwargs`）；
+    - 若支持，则直接以两参调用；若仅支持单参（遗留旧接口），则先检查环境冲突（若已绑定不同环境且未允许覆写，直接抛出 `ValueError`），再以单参调用；
+    - 移除了包围在 `bind_fn(...)` 外部的 `try...except TypeError`，保证绑定函数内部发生的真正 `TypeError` 100% 原始抛出；
+    - 保证绑定函数严格只执行一次，杜绝任何重复执行风险；
+* **测试用例扩充与验证**：
+  - [tests/test_action_environment_binding.py:185–250](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_action_environment_binding.py#L185-L250):
+    - `test_09_internal_type_error_in_bind_environment_propagates_unswallowed`: 验证现代接口内部发生 `TypeError` 时直接抛出且调用计数为 1；
+    - `test_10_legacy_bind_environment_interface_support`: 验证遗留单参接口的正常绑定、冲突拦截（抛出 `ValueError` 且未调用 bind）、显式覆盖成功及内部 `TypeError` 原始抛出；
+    - 结果：**10/10 PASS (0.002s)**。
+
+### 2. 场景保存门禁回归测试解耦：消除对旧第323帧ROM缺陷的依赖 (tests/test_scene_save_gate.py)
+* **缺陷成因**：
+  - `tests/test_scene_save_gate.py` 中的 Chain 2A 测试原本调用未做 mock 的完整全场景生成（遍历 Course B 默认路径），依赖执行到第 323 帧触发的历史 ROM 违规（`ROM_VIOLATION: foot.R max 0.13 deg`）来充当失败输入。该缺陷属于待修复的问题，一旦未来任务修复了脚部摆动或步态规划，该测试将发生脆弱的意外断言失败，且单次测试耗时高达 25 秒。
+* **测试重构与加固**：
+  - [tests/test_scene_save_gate.py:324–345](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_scene_save_gate.py#L324-L345):
+    - 在注释中完备记录第 323 帧 ROM 违规的历史事实与物理量测证据；
+    - 引入确定性失败注入（`patch.object(MotionPlanner, "execute", side_effect=RuntimeError("Deterministic physical failure: unreachable footstep target (ROM_VIOLATION)"))`），实现对物理执行失败的确定性模拟；
+    - 完整保留核心门禁功能验证：已有有效 `.blend` 场景的 SHA-256 绝对不变（100% 防覆盖保护）、不写出伴生 summary JSON、场景不残留虚假成功元数据、原始错误信息完整保留；
+    - 完整保留 Chain 1 的真实无 mock 执行、磁盘保存与重新打开验证；
+    - 结果：**6/6 PASS (5.306s)**。
+
+### 3. 全量回归与零退化验证
+* `tests/test_action_environment_binding.py`: **10/10 PASS (0.002s)**
+* `tests/test_scene_save_gate.py`: **6/6 PASS (5.306s)**
+* `tests/test_environment_query_contract.py`: **8/8 PASS (0.557s)**
+* `tests/test_find_r2_01_hand_contact_lifecycle.py`: **4/4 PASS (0.343s)**
+* `tests/test_find_r2_02_contact_state_ownership.py`: **6/6 PASS (0.840s)**
+* `tests/test_terrain_walk_failure_propagation.py`: **6/6 PASS (0.562s)**
+* `tests/test_motion_planner_result_contract.py`: **10/10 PASS (1.524s)**
+* `.\run_tests.ps1 -tier quick`: **18/18 PASS (61.26s, Exit Code 0)**
+* `.\run_tests.ps1 -tier physics`: **21/21 PASS (95.67s, Exit Code 0)**
+* `.\run_tests.ps1 -tier motion`: **11/11 PASS (52.62s, Exit Code 0)**
+* `.\run_tests.ps1 -tier full`: **35/35 PASS (150.16s, Exit Code 0)**
+* `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, Exit Code 0)**
+
 ## [2026-10-30] Production Interface Joint Repair Closure: 环境所有权冲突保护、连续性验证阈值统一与真实场景集成验证 (JOINT-REPAIR-ENV-SCENE-CLOSE)
 
 ### 1. 动作环境所有权冲突保护与显式重绑定合同 (src/motion/framework.py, src/motion/terrain_walk.py)

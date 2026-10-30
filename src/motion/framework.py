@@ -24,6 +24,7 @@ Establishes the minimal, modular architecture required to chain and compose proc
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import Enum
+import inspect
 import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -1027,10 +1028,20 @@ class MotionPlanner:
         return tuple(self._actions)
 
     def add_action(self, action: MotionAction, allow_env_override: bool = False) -> "MotionPlanner":
-        if hasattr(action, "bind_environment"):
+        bind_fn = getattr(action, "bind_environment", None)
+        if callable(bind_fn):
+            supports_allow_override = False
             try:
-                action.bind_environment(self.environment, allow_override=allow_env_override)
-            except TypeError:
+                sig = inspect.signature(bind_fn)
+                supports_allow_override = "allow_override" in sig.parameters or any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+                )
+            except (ValueError, TypeError):
+                supports_allow_override = False
+
+            if supports_allow_override:
+                bind_fn(self.environment, allow_override=allow_env_override)
+            else:
                 existing_env = getattr(action, "environment", None)
                 if existing_env is not None and existing_env is not self.environment and not allow_env_override:
                     raise ValueError(
@@ -1038,7 +1049,7 @@ class MotionPlanner:
                         f"action is already bound to {existing_env!r}, which conflicts with planner "
                         f"environment {self.environment!r}."
                     )
-                action.bind_environment(self.environment)
+                bind_fn(self.environment)
         elif hasattr(action, "environment"):
             existing_env = getattr(action, "environment", None)
             if existing_env is None or allow_env_override:

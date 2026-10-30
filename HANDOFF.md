@@ -6,11 +6,19 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — 环境与场景联合修复收尾 (Joint Repair Closure: Environment Ownership, Continuity Threshold & Real Scene Integration)。
-* **当前状态**：`JOINT-REPAIR-ENV-SCENE-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
-* **任务性质**：三缺陷联合收尾生产加固与真实场景集成验证，覆盖动作环境所有权冲突防御（FIND-T01-06 收尾）、连续性验证阈值统一（0.12m 替代 1.0m）及真实无 mock Blender 场景落盘/防篡改验证（FIND-R4-01 收尾）。
+* **当前任务**：ProceduralAnimation — 环境与场景最终收尾 (Joint Repair Final Closure: Upfront Signature Inspection & Deterministic Save Gate Verification)。
+* **当前状态**：`JOINT-REPAIR-FINAL-CLOSURE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
+* **任务性质**：生产接口联合修复最终代码收口，消除 `MotionPlanner.add_action()` 异常捕获漏洞，并消除 `tests/test_scene_save_gate.py` 对旧第 323 帧 ROM 违规缺陷的依赖。
 
-### 本任务核心核准成果 (Joint Repair Closure)
+### 本任务核心核准成果 (Joint Repair Final Closure)
+1. **消除异常捕获漏洞：MotionPlanner.add_action 签名预检前置**：
+   - 引入 `inspect.signature` 前置探查 `bind_environment` 是否支持 `allow_override`，彻底移除包裹调用的 `try...except TypeError:`；
+   - 内部发生的真正 `TypeError` 100% 原始抛出；遗留单参接口先验检查冲突并安全执行；绑定函数保证只执行一次且无重复重试；
+   - 针对性测试 `tests/test_action_environment_binding.py` 扩充 Test 9 & Test 10 (10/10 PASS)。
+2. **场景保存门禁测试与旧 ROM 缺陷解耦**：
+   - `tests/test_scene_save_gate.py` 记录第 323 帧 ROM 违规历史证据，采用确定性失败注入替代脆弱长耗时依赖；
+   - 验证已有 `.blend` 场景 SHA-256 绝对不变，不产生伪造元数据与伴生文件；
+   - 测试耗时由 25s 降至 5.3s (6/6 PASS)。
 1. **动作环境所有权冲突保护与显式重绑定合同**：
    - `TerrainWalkAction.bind_environment()`：不同实例且未置 `allow_override=True` 时抛出 `ValueError`，杜绝静默篡改；
    - `TerrainWalkAction.rebind_environment()`：提供显式重绑定入口；
@@ -28,10 +36,10 @@
    - 编写失败阻断与旧产物保护测试（Chain 2：对已存在 `.blend` 场景注入失败，验证抛出 `RuntimeError`，原文件 SHA-256 100% 保持不变，无 companion JSON 产生）；
    - 针对性测试 `tests/test_scene_save_gate.py` 6/6 PASS。
 4. **全套自动化分层回归验证**：
-   - `.\run_tests.ps1 -tier quick`: 18/18 PASS (48.54s)
-   - `.\run_tests.ps1 -tier physics`: 21/21 PASS (86.12s)
-   - `.\run_tests.ps1 -tier motion`: 11/11 PASS (48.37s)
-   - `.\run_tests.ps1 -tier full`: 35/35 PASS (138.41s)
+   - `.\run_tests.ps1 -tier quick`: 18/18 PASS (61.26s)
+   - `.\run_tests.ps1 -tier physics`: 21/21 PASS (95.67s)
+   - `.\run_tests.ps1 -tier motion`: 11/11 PASS (52.62s)
+   - `.\run_tests.ps1 -tier full`: 35/35 PASS (150.16s)
    - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)
 5. **缺陷登记总表更新**：
    - [`docs/audit/production_interface/OPEN_FINDINGS.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/OPEN_FINDINGS.md) 同步登记看板已修复 2 项缺陷与 5 项合同缺口；

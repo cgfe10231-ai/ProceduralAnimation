@@ -182,6 +182,71 @@ class TestActionEnvironmentBinding(unittest.TestCase):
         self.assertIs(action.resolve_environment(), env_a)
         self.assertIs(action.resolve_environment(env_a), env_a)
 
+    def test_09_internal_type_error_in_bind_environment_propagates_unswallowed(self) -> None:
+        """9. Genuine internal TypeError inside bind_environment() must propagate out without being swallowed."""
+        class BuggyModernAction:
+            def __init__(self, name: str = "BuggyModern"):
+                self.name = name
+                self.environment = None
+                self.call_count = 0
+
+            def bind_environment(self, environment: Any, allow_override: bool = False) -> None:
+                self.call_count += 1
+                raise TypeError("Simulated internal TypeError inside modern bind_environment")
+
+        action = BuggyModernAction()
+        planner = MotionPlanner(config=self.config)
+        with self.assertRaises(TypeError) as ctx:
+            planner.add_action(action)
+        self.assertIn("Simulated internal TypeError inside modern bind_environment", str(ctx.exception))
+        self.assertEqual(action.call_count, 1, "bind_environment must be executed exactly once without retry")
+
+    def test_10_legacy_bind_environment_interface_support(self) -> None:
+        """10. Legacy single-argument bind_environment(env) supports binding, conflict rejection, and error propagation."""
+        class LegacyAction:
+            def __init__(self, name: str = "LegacyAction", environment: Any = None, should_fail: bool = False):
+                self.name = name
+                self.environment = environment
+                self.call_count = 0
+                self.should_fail = should_fail
+
+            def bind_environment(self, environment: Any) -> None:
+                self.call_count += 1
+                if self.should_fail:
+                    raise TypeError("Simulated internal TypeError inside legacy bind_environment")
+                self.environment = environment
+
+        env_a = EnvironmentQuery(ground_z=0.0)
+        env_b = DynamicsEnvironmentQuery(ground_z=2.0)
+
+        # Case A: Unbound legacy action binds cleanly
+        unbound_action = LegacyAction(name="UnboundLegacy")
+        planner_b = MotionPlanner(config=self.config, environment=env_b)
+        planner_b.add_action(unbound_action)
+        self.assertIs(unbound_action.environment, env_b)
+        self.assertEqual(unbound_action.call_count, 1)
+
+        # Case B: Conflicting legacy action is rejected before binding
+        conflicting_action = LegacyAction(name="ConflictingLegacy", environment=env_a)
+        with self.assertRaises(ValueError) as ctx:
+            planner_b.add_action(conflicting_action)
+        self.assertIn("environment ownership conflict", str(ctx.exception))
+        self.assertIs(conflicting_action.environment, env_a)
+        self.assertEqual(conflicting_action.call_count, 0, "Conflicting action must not have bind called")
+
+        # Case C: Conflicting legacy action with allow_env_override=True succeeds
+        override_action = LegacyAction(name="OverrideLegacy", environment=env_a)
+        planner_b.add_action(override_action, allow_env_override=True)
+        self.assertIs(override_action.environment, env_b)
+        self.assertEqual(override_action.call_count, 1)
+
+        # Case D: Legacy action with internal TypeError propagates cleanly without retry
+        failing_action = LegacyAction(name="FailingLegacy", should_fail=True)
+        with self.assertRaises(TypeError) as ctx_fail:
+            planner_b.add_action(failing_action)
+        self.assertIn("Simulated internal TypeError inside legacy bind_environment", str(ctx_fail.exception))
+        self.assertEqual(failing_action.call_count, 1, "bind_environment must be executed exactly once without retry")
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]])

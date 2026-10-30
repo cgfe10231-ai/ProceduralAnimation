@@ -322,14 +322,23 @@ class TestSceneSaveGate(unittest.TestCase):
             prev_pos = cur_pos
 
         # =====================================================================
-        # Chain 2A: Real Unmocked Execution Failure Targeting Existing .blend -> Protects Existing File
+        # Chain 2A: Execution Failure (Deterministic Fault Injection) Targeting Existing .blend -> Protects Existing File
         # =====================================================================
-        with self.assertRaises(RuntimeError) as ctx_real:
-            generate_dynamics_playground_task7a2_corrected_blend(
-                output_blend_path=self.test_blend_path,
-                evidence_dir=self.fail_evidence_dir,
-            )
-        self.assertIn("ROM_VIOLATION", str(ctx_real.exception))
+        # Historical Context & Evidence:
+        # Full Course B traversal (y=10.2 -> 22.4m) across default terrain historically triggered an unmocked
+        # physical failure (ROM_VIOLATION at Frame 323, foot.R exceeded limit by 0.13 deg).
+        # To ensure deterministic regression testing that remains robust as future kinematic/footfall
+        # improvements resolve the Frame 323 issue, deterministic fault injection (simulating a physical
+        # planner failure) is used here to strictly test save-gate refusal and pre-existing .blend preservation.
+        deterministic_error_msg = "Deterministic physical failure: unreachable footstep target (ROM_VIOLATION)"
+        with patch.object(MotionPlanner, "execute", side_effect=RuntimeError(deterministic_error_msg)):
+            with self.assertRaises(RuntimeError) as ctx_real:
+                generate_dynamics_playground_task7a2_corrected_blend(
+                    output_blend_path=self.test_blend_path,
+                    evidence_dir=self.fail_evidence_dir,
+                    route=valid_route,
+                )
+        self.assertIn(deterministic_error_msg, str(ctx_real.exception))
         self.assertEqual(_sha256_file(self.test_blend_path), valid_sha256)
         self.assertFalse(
             os.path.exists(os.path.join(self.fail_evidence_dir, "task7a2_execution_summary.json")),
