@@ -385,10 +385,26 @@ class EnvironmentQuery:
         """
         gz = self.ground_height_at(x, y)
         norm = self.surface_normal_at(x, y)
+        if gz is None or norm is None:
+            return SurfaceQueryResult(
+                surface_id="none",
+                surface_type="none",
+                contact_point_world=(x, y, 0.0),
+                surface_normal_world=(0.0, 0.0, 1.0),
+                signed_distance=float("inf"),
+                friction_coeff=0.0,
+                allows_regular_support=False,
+                success=False,
+                ray_hit_distance=float("inf"),
+                error_reason=f"NO_HIT: No walkable ground support found at ({x:.3f}, {y:.3f})",
+                source_type="none",
+            )
+
         surf_res = self.query_surface_at_point((x, y, gz))
         surf_id = surf_res.surface_id if hasattr(surf_res, "surface_id") and surf_res.surface_id not in ("none", "") else "default_ground"
         surf_type = surf_res.surface_type if hasattr(surf_res, "surface_type") and surf_res.surface_type not in ("none", "") else SurfaceGeometryType.HORIZONTAL_GROUND.value
-        allows_support = getattr(surf_res, "allows_regular_support", True)
+        allows_support = bool(getattr(surf_res, "allows_regular_support", True))
+        is_success = bool(getattr(surf_res, "success", True) and allows_support)
         friction = getattr(surf_res, "friction_coeff", 0.70)
 
         return SurfaceQueryResult(
@@ -399,9 +415,9 @@ class EnvironmentQuery:
             signed_distance=0.0,
             friction_coeff=friction,
             allows_regular_support=allows_support,
-            success=True,
+            success=is_success,
             ray_hit_distance=start_z - gz,
-            error_reason=None if allows_support else f"Surface '{surf_id}' does not allow regular support",
+            error_reason=None if (allows_support and is_success) else (getattr(surf_res, "error_reason", None) or f"Surface '{surf_id}' does not allow regular support"),
             source_type="default",
         )
 
@@ -578,18 +594,19 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
     # Backward-Compatible 2.5D Height-Field Queries
     # -------------------------------------------------------------------------
 
-    def ground_height_at(self, x: float, y: float) -> float:
+    def ground_height_at(self, x: float, y: float) -> Optional[float]:
         """Return highest walkable surface Z elevation at World (x, y).
 
         If mesh adapter is active, queries evaluated scene mesh.
+        Returns None if mesh adapter is active and no walkable support surface is hit.
         Otherwise evaluates analytical surface patches.
-        Falls back to default base ground_z (0.0m) if no elevated surface hit.
+        Falls back to default base ground_z (0.0m) in analytical mode if no elevated surface hit.
         """
         if self._prefer_mesh and self._mesh_adapter is not None:
             mesh_z = self._mesh_adapter.ground_height_at(x, y)
             if mesh_z is not None:
                 return float(mesh_z)
-            return self.ground_z
+            return None
 
         best_z = self.ground_z
 
@@ -602,16 +619,17 @@ class DynamicsEnvironmentQuery(EnvironmentQuery):
 
         return best_z
 
-    def surface_normal_at(self, x: float, y: float) -> Tuple[float, float, float]:
+    def surface_normal_at(self, x: float, y: float) -> Optional[Tuple[float, float, float]]:
         """Return unit surface normal vector in World Space at (x, y).
 
-        Returns normal of highest walkable surface at (x, y), or (0, 0, 1) if base ground.
+        Returns normal of highest walkable surface at (x, y), or None if mesh mode and no hit.
+        In analytical mode, returns (0, 0, 1) if base ground.
         """
         if self._prefer_mesh and self._mesh_adapter is not None:
             mesh_n = self._mesh_adapter.surface_normal_at(x, y)
             if mesh_n is not None:
                 return mesh_n
-            return (0.0, 0.0, 1.0)
+            return None
 
         best_z = self.ground_z
         best_normal = (0.0, 0.0, 1.0)

@@ -422,6 +422,10 @@ def build_terrain_step_schedule(
     z0_r = res0_r.contact_point_world[2] if res0_r.success else environment.ground_height_at(right_x, y0)
     norm0_l = res0_l.surface_normal_world if res0_l.success else environment.surface_normal_at(left_x, y0)
     norm0_r = res0_r.surface_normal_world if res0_r.success else environment.surface_normal_at(right_x, y0)
+    if z0_l is None or norm0_l is None:
+        raise ValueError(f"Initial left foot support at ({left_x:.2f}, {y0:.2f}) unavailable")
+    if z0_r is None or norm0_r is None:
+        raise ValueError(f"Initial right foot support at ({right_x:.2f}, {y0:.2f}) unavailable")
     pitch0_l = pitch_from_surface_normal(norm0_l)
     pitch0_r = pitch_from_surface_normal(norm0_r)
     surf0_l_id = res0_l.surface_id if res0_l.success else "ground"
@@ -460,6 +464,10 @@ def build_terrain_step_schedule(
         else:
             sw_landing_z = environment.ground_height_at(sw_x, target_y)
             sw_landing_norm = environment.surface_normal_at(sw_x, target_y)
+            if sw_landing_z is None or sw_landing_norm is None:
+                raise ValueError(
+                    f"Footstep {k} at ({sw_x:.2f}, {target_y:.2f}) rejected: no ground support available"
+                )
             surf_res = environment.query_surface_at_point((sw_x, target_y, sw_landing_z))
             surf_id = surf_res.surface_id if hasattr(surf_res, "surface_id") else "ground"
 
@@ -1134,7 +1142,7 @@ class TerrainWalkAction(MotionAction):
                 # Phase 1: Environment
                 "environment": {
                     "query_pos": [round(root_x, 3), round(root_y, 3), round(root_z, 3)],
-                    "terrain_height": round(environment.ground_height_at(root_x, root_y), 3),
+                    "terrain_height": round(h, 3) if (h := environment.ground_height_at(root_x, root_y)) is not None else None,
                     "surface_normal": [round(v, 3) for v in terr_norm],
                     "slope_pitch_deg": round(slope_pitch_deg, 2),
                     "surface_id_L": getattr(foot_l_tgt, "surface_id", "ground"),

@@ -881,13 +881,16 @@ class BlenderMeshEnvironmentAdapter:
         start_z: float = 50.0,
         max_fall: float = 100.0,
     ) -> Optional[Tuple[float, float, float]]:
-        """Cast a downward ray from (x, y, start_z) to find surface normal."""
+        """Cast a downward ray from (x, y, start_z) to find surface normal.
+
+        Returns None if no walkable surface is intersected along the ray.
+        """
         res = self.ray_cast(
             origin=(x, y, start_z),
             direction=(0.0, 0.0, -1.0),
             distance=max_fall,
         )
-        if res.success:
+        if res.success and res.allows_regular_support:
             return res.surface_normal_world
         return None
 

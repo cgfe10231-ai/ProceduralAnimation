@@ -212,7 +212,7 @@ def validate_dynamics_playground_task7a2(
                     vw = mw @ v.co
                     terr_z = env.ground_height_at(vw.x, vw.y)
                     # Allow 5mm tolerance for surface tangent rounding / contact threshold
-                    if vw.z < terr_z - 0.005:
+                    if terr_z is not None and vw.z < terr_z - 0.005:
                         terrain_penetrations.append({
                             "frame": frame_num,
                             "mesh": foot_mesh.name,

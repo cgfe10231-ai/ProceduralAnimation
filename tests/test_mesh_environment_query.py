@@ -322,8 +322,8 @@ class TestMeshEnvironmentQuery(unittest.TestCase):
         # Query empty air gap at (0.0, 0.0) where no mesh exists:
         # Strict ray_ground_elevation returns None
         self.assertIsNone(env.ray_ground_elevation(0.0, 0.0))
-        # Legacy ground_height_at falls back to base ground_z (0.0)
-        self.assertEqual(env.ground_height_at(0.0, 0.0), 0.0)
+        # In mesh mode, ground_height_at returns None on empty air gap (zero hallucination)
+        self.assertIsNone(env.ground_height_at(0.0, 0.0))
 
         # Spatial raycast via DynamicsEnvironmentQuery returns source_type="mesh"
         q_res = env.query_spatial_surface((0.0, 10.0, 6.0), (0.0, 0.0, -1.0))
