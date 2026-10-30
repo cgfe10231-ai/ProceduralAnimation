@@ -3,6 +3,58 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-30] Production Interface Joint Repair: ContactModel 几何有效性与支撑拓扑解耦修复 (FIND-R2-05, JOINT-REPAIR-CONTACT-MODEL-07)
+
+### 1. ContactRecord 接触生命周期与瞬时有效支撑资格严格解耦
+* **问题成因**：
+  - 原 `ContactRecord.is_active` 仅判断 `lifecycle == ESTABLISHED and contact_type != FREE`，未耦合真实物理测量与几何合规性校验（`GeometricConstraintResult`）；
+  - `check_geometric_compliance()` 仅作为只读函数返回结果，未向 `ContactRecord` 提交合规状态，导致即使严重穿透或悬空，记录仍维持 `is_active=True`。
+* **生产代码修复**：
+  - [src/motion/contact_model.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py):
+    - `ContactRecord` 新增 `last_compliance_result: Optional[GeometricConstraintResult] = None` 字段；
+    - 新增 `is_lifecycle_active` 属性，严格表达原始生命周期意图（`lifecycle == ESTABLISHED and contact_type != FREE`）；
+    - 新增 `is_effective_support` 属性，建立双重门禁：`is_lifecycle_active and last_compliance_result is not None and last_compliance_result.is_valid`；
+    - `is_active` 对齐为 `self.is_effective_support`；
+    - 通过 `__setattr__` 拦截器：当 `lifecycle`、`contact_type`、`world_position`、`world_normal` 或 `body_local_anchor` 发生修改时，自动重置 `last_compliance_result = None`，保证合规状态不可伪造且无法跨状态残留；
+    - 新增 `set_compliance_result()` 与 `reset_compliance()` 方法供状态管理器提交与重置瞬时几何校验结果。
+
+### 2. MultiContactState 支撑拓扑单一事实源 (SSOT) 统一与未经验证隔离
+* **问题成因**：
+  - `MultiContactState.support_type`、`active_contacts`、`supporting_limbs`、`is_flight` 及 `get_coplanar_support_polygon()` 依赖未经验证的 `is_active`，在肢体违规时仍错误汇报双足支撑并计算有效支撑多边形；
+  - 未测量状态（UNVALIDATED）被错误假定为合规；
+  - `MultiContactState.__setattr__` 推进 `frame` 时未重置旧帧几何合规结论。
+* **生产代码修复**：
+  - [src/motion/contact_model.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py):
+    - `MultiContactState` 新增 `effective_contacts` 只读属性（`[c for c in self.contacts.values() if c.is_effective_support]`）；
+    - `active_contacts` 与 `supporting_limbs` 统一以 `effective_contacts` 为单一事实源（SSOT）；
+    - `is_flight`、`active_contact_count` 及 `support_type` 严格基于有效支撑集合计算，未经验证（`UNVALIDATED`）的接触默认判定为无支撑/腾空（`SupportType.FLIGHT`）；
+    - `support_type` 拓扑识别兼容大小写肢体命名（`foot_L`/`foot_l`、`foot_R`/`foot_r`、`hand_L`/`hand_l`、`hand_R`/`hand_r`）；
+    - 当 `frame` 推进时，`MultiContactState.__setattr__` 自动重置所有接触的瞬时合规结果；
+    - `enrich_motion_state_with_contacts()` 统一输出有效支撑元数据，同时写入原始大小写与小写肢体键，并同步 `is_airborne=multi_contact.is_flight`。
+
+### 3. check_all_contacts 缺失测量显式失败与 KinematicBridge 失败传播协同
+* **问题成因**：
+  - `check_all_contacts()` 在缺失肢体坐标时，曾错误回退到 `c.world_position` 构造虚假零误差通过；
+  - `KinematicBridgeExecutor.execute_frame()` 在检测到接触几何违规时，原逻辑 `if rec is not None and rec.is_active and not geom_res.is_valid:` 会因 `rec.is_active` 已变成 False 而漏报未满足约束。
+* **生产代码修复**：
+  - [src/motion/contact_model.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py):
+    - `check_all_contacts()` 彻底移除对 `c.world_position` 的兜底替换；当肢体处于 `ESTABLISHED` 或 `CANDIDATE` 但缺失物理测量坐标时，显式记录确定性失败（`GeometricConstraintResult(is_valid=False, violation_reason="MISSING_MEASUREMENT...", total_position_error_m=inf)`）；
+  - [src/motion/kinematic_bridge.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py):
+    - Line 562 更新为 `if rec is not None and rec.is_lifecycle_active and not geom_res.is_valid:`，准确捕获“生命周期意图建立但几何违规”的肢体，完整记录 `CONTACT_GEOMETRY` 违规至 `unmet_constraints`、`contact_geometry_errors` 并标记 `BridgeExecutionResult.success = False`。
+
+### 4. 测试用例与全量回归验证
+* **新增针对性测试**：
+  - [tests/test_contact_model_geometry_support_contract.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_contact_model_geometry_support_contract.py): 编写 14 项完整覆盖 Group A 至 Group E 的测试（14/14 PASS in 0.224s）；
+* **历史测试与注册中心维护**：
+  - [tests/verify_task6gc_contact_model.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6gc_contact_model.py): 适配 17 项全绿通过（17/17 PASS in 22.0s）；
+  - [tests/test_registry.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_registry.py): 注册 `contact_model_geometry_support_contract` 到 `PHYSICS` 与 `FULL` 梯度；
+* **分层回归与 AST 门禁**：
+  - `.\run_tests.ps1 -tier quick`: 19/19 PASS (49.28s);
+  - `.\run_tests.ps1 -tier physics`: 22/22 PASS (86.91s);
+  - `.\run_tests.ps1 -tier motion`: 12/12 PASS (49.54s);
+  - `.\run_tests.ps1 -tier full`: 37/37 PASS (139.24s);
+  - `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 errors)。
+
 ## [2026-10-30] Terrain Planning Joint Repair: 验收收口 (ISSUE-A 最大步长单脚位移约束与 ISSUE-B 复合支持门禁)
 
 ### 1. ISSUE-A: 最大步长约束测量对象修正与单脚 3D 位移闭环

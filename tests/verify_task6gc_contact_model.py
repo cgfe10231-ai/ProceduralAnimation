@@ -216,6 +216,12 @@ def test_04_double_stance_two_valid_contacts() -> bool:
 
     mc = MultiContactState(contacts={"foot_L": c_l, "foot_R": c_r})
 
+    # Under FIND-R2-05 contract: unvalidated contacts do not constitute effective support before measurement
+    unvalidated_is_flight = mc.is_flight and len(mc.active_contacts) == 0
+
+    # Evaluate instantaneous geometric compliance against target surface positions
+    mc.check_all_contacts({"foot_L": (-0.11, -8.0, 0.0), "foot_R": (0.11, -8.0, 0.0)})
+
     print(f"Active contact count: {len(mc.active_contacts)}")
     print(f"Supporting limbs: {mc.supporting_limbs}")
     print(f"Classified support type: {mc.support_type.value}")
@@ -225,7 +231,8 @@ def test_04_double_stance_two_valid_contacts() -> bool:
     print(f"Coplanar support polygon (is_coplanar={is_coplanar}): {poly}")
 
     passed = (
-        len(mc.active_contacts) == 2
+        unvalidated_is_flight
+        and len(mc.active_contacts) == 2
         and mc.support_type == SupportType.DOUBLE_STANCE
         and not mc.is_flight
         and is_coplanar
@@ -247,6 +254,7 @@ def test_05_single_stance_and_swing_release() -> bool:
     c_r = ContactRecord("g_foot_R", "foot_R", "ground", ContactType.FREE, ContactLifecycle.RELEASED, (0.11, -7.7, 0.15), (0, 0, 1))
 
     mc = MultiContactState(contacts={"foot_L": c_l, "foot_R": c_r})
+    mc.check_all_contacts({"foot_L": (-0.11, -8.0, 0.0), "foot_R": (0.11, -7.7, 0.15)})
 
     print(f"Active contact count: {len(mc.active_contacts)}")
     print(f"Supporting limbs: {mc.supporting_limbs}")
@@ -274,6 +282,7 @@ def test_06_single_hand_support_obstacle() -> bool:
     c_hand = ContactRecord("box_hand_R", "hand_R", "vault_box", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (0.25, -7.5, 0.90), (0, 0, 1))
 
     mc = MultiContactState(contacts={"foot_L": c_foot, "hand_R": c_hand})
+    mc.check_all_contacts({"foot_L": (-0.11, -8.0, 0.0), "hand_R": (0.25, -7.5, 0.90)})
 
     print(f"Active contacts: {list(mc.active_contacts.keys())}")
     print(f"Support type: {mc.support_type.value}")
@@ -305,6 +314,7 @@ def test_07_ground_and_wall_multi_normal() -> bool:
     c_wall = ContactRecord("wall_foot_R", "foot_R", "wall_north", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (0.11, -6.5, 0.40), (0, -1, 0))
 
     mc = MultiContactState(contacts={"foot_L": c_ground, "foot_R": c_wall})
+    mc.check_all_contacts({"foot_L": (-0.11, -7.0, 0.0), "foot_R": (0.11, -6.5, 0.40)})
 
     print(f"Ground normal: {c_ground.world_normal}")
     print(f"Wall normal:   {c_wall.world_normal}")
@@ -337,6 +347,7 @@ def test_08_double_hand_grasp_ledge_hang() -> bool:
     c_foot_r = ContactRecord("free_foot_R", "foot_R", "none", ContactType.FREE, ContactLifecycle.RELEASED, (0.11, -5.0, 0.50), (0, 0, 1))
 
     mc = MultiContactState(contacts={"hand_L": c_hand_l, "hand_R": c_hand_r, "foot_L": c_foot_l, "foot_R": c_foot_r})
+    mc.check_all_contacts({"hand_L": (-0.20, -5.0, 1.80), "hand_R": (0.20, -5.0, 1.80)})
 
     print(f"Active limbs: {mc.supporting_limbs}")
     print(f"Support type: {mc.support_type.value}")
@@ -392,26 +403,32 @@ def test_10_lifecycle_transitions() -> bool:
     print("\n--- Test 10: Contact Lifecycle State Transitions ---")
 
     rec = ContactRecord("c_cycle", "foot_L", "ground", ContactType.UNILATERAL, ContactLifecycle.CANDIDATE, (0, 0, 0))
-    print(f"Initial: {rec.lifecycle.value} (is_active={rec.is_active})")
-    if rec.is_active:
+    print(f"Initial: {rec.lifecycle.value} (is_lifecycle_active={rec.is_lifecycle_active}, is_active={rec.is_active})")
+    if rec.is_active or rec.is_lifecycle_active:
         return False
 
-    # Engagement
+    # Engagement: lifecycle becomes active, but without compliance check, it is UNVALIDATED
     rec.lifecycle = ContactLifecycle.ESTABLISHED
-    print(f"Engaged: {rec.lifecycle.value} (is_active={rec.is_active})")
-    if not rec.is_active:
+    print(f"Engaged: {rec.lifecycle.value} (is_lifecycle_active={rec.is_lifecycle_active}, is_active={rec.is_active})")
+    if not rec.is_lifecycle_active or rec.is_active:
+        return False
+
+    # Compliance verification: now it becomes effective active support
+    comp = rec.check_geometric_compliance((0.0, 0.0, 0.0))
+    rec.set_compliance_result(comp)
+    if not rec.is_active or not rec.is_effective_support:
         return False
 
     # Violation / Broken
     rec.lifecycle = ContactLifecycle.BROKEN
-    print(f"Broken:  {rec.lifecycle.value} (is_active={rec.is_active})")
-    if rec.is_active:
+    print(f"Broken:  {rec.lifecycle.value} (is_lifecycle_active={rec.is_lifecycle_active}, is_active={rec.is_active})")
+    if rec.is_active or rec.is_lifecycle_active:
         return False
 
     # Intentional release
     rec.lifecycle = ContactLifecycle.RELEASED
-    print(f"Released: {rec.lifecycle.value} (is_active={rec.is_active})")
-    if rec.is_active:
+    print(f"Released: {rec.lifecycle.value} (is_lifecycle_active={rec.is_lifecycle_active}, is_active={rec.is_active})")
+    if rec.is_active or rec.is_lifecycle_active:
         return False
 
     print("Lifecycle state transitions: PASSED")
@@ -542,6 +559,8 @@ def test_14_motion_state_legacy_adapter_compatibility() -> bool:
     c_l = ContactRecord("c_l", "foot_L", "ground", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (-0.11, -8.0, 0.0), (0, 0, 1))
     c_r = ContactRecord("c_r", "foot_R", "ground", ContactType.UNILATERAL, ContactLifecycle.ESTABLISHED, (0.11, -8.0, 0.0), (0, 0, 1))
     mc = MultiContactState(contacts={"foot_L": c_l, "foot_R": c_r})
+    # Evaluate geometric compliance
+    mc.check_all_contacts({"foot_L": (-0.11, -8.0, 0.0), "foot_R": (0.11, -8.0, 0.0)})
 
     enriched = enrich_motion_state_with_contacts(m_state, mc)
 
@@ -561,7 +580,7 @@ def test_14_motion_state_legacy_adapter_compatibility() -> bool:
 
     # Reverse conversion test: ContactPointState -> ContactRecord
     rec_converted = legacy_contact_point_to_contact_record(enriched.contacts["foot_L"])
-    roundtrip_ok = rec_converted.limb == "foot_L" and rec_converted.is_active
+    roundtrip_ok = rec_converted.limb == "foot_L" and rec_converted.is_lifecycle_active
 
     passed = has_foot_l and has_foot_r and support_type == "double_stance" and has_poly and roundtrip_ok
     print(f"MotionState bidirectional adapter: {'PASSED' if passed else 'FAILED'}")

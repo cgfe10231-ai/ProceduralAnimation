@@ -1,21 +1,23 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-30
-> **当前阶段**：Terrain Planning Joint Repair Acceptance Closure (JOINT-REPAIR-TERRAIN-PLANNING-CLOSE)。已完成地形规划联合修复验收收口：
-> 1) **ISSUE-A 最大步长单脚 3D 空间位移约束与自适应双足步点截断**：
->    - 生产代码将 `route.max_step_length_m` 严格作为每个 `TerrainStepPlan` 单脚 3D 空间位移的硬约束（`disp = (Vector(step.swing_end_xyz) - Vector(step.swing_start_xyz)).length <= route.max_step_length_m + tolerance`）；
->    - 在 `plan_terrain_footsteps()` 中，双足交替稳定行进推进量统一为 `step_advance = min(route.nominal_stride_m, route.max_step_length_m / 2.0)`，单步落点与收步时严密检测 3D 位移并自适应夹紧；超限或不可达时抛出确定性 `ValueError`；
->    - `TerrainRouteInput.max_step_length_m` 默认值设为 `0.80m`，与底层人体骨骼最大伸展极限 `MAX_LEG_REACH = 0.82m` 保持解剖学一致；
->    - 针对性用例 A（+Y 轴交替推进，位移严格 <= 0.40m，无 0.80m 单步位移，左右严格交替）、用例 B（-Y 轴交替推进完全对称）、用例 C（收步语义，无越界与超限）、用例 D（接缝调整后位移再校验）、用例 E（物理极限不可达防御性拦截）全部全绿通过。
-> 2) **ISSUE-B 接缝边缘采样复合门禁与反事实未命中拦截**：
->    - `_adjust_footfall_for_seams_and_edges()` 统一判定标准为 `res.success and res.allows_regular_support`，脚后跟 (-0.07m)、脚尖 (+0.15m) 与脚踝 (0.0m) 必须全部满足；
->    - 查询失败时严禁虚构 `(0, 0, 1)` 法线或兜底为平地；候选位移检索严格执行此复合门禁；
->    - 针对性反事实测试验证：当 `allows_regular_support=True` 但 `success=False`（网格未命中/传感器异常）时，系统坚决拒绝并抛出异常，绝不采纳为落脚点。
-> 3) **全量回归与测试全绿**：
->    - 针对性测试 `tests/test_terrain_planning_contract.py` 扩充至 25 项测试全绿通过（25/25 PASS in 0.45s）；
->    - 分层自动化回归套件全绿通过：Quick 19/19 (50.53s), Physics 21/21 (84.54s), Motion 12/12 (49.44s), Full 36/36 (138.02s)；
+> **当前阶段**：ContactModel Geometry-to-Support Consistency Repair (JOINT-REPAIR-CONTACT-MODEL-07)。已完成 ContactModel 几何有效性与支撑拓扑解耦修复 (FIND-R2-05)：
+> 1) **解耦接触生命周期与瞬时有效支撑资格**：
+>    - `ContactRecord.is_lifecycle_active` (`lifecycle == ESTABLISHED and contact_type != FREE`) 与 `ContactRecord.is_effective_support` (`is_lifecycle_active and last_compliance_result is not None and last_compliance_result.is_valid`) 严格解耦；
+>    - `ContactRecord.is_active` 对齐为 `is_effective_support` 属性；
+>    - 当 `lifecycle`、`contact_type` 或空间目标坐标（`world_position`, `world_normal`, `body_local_anchor`）变更时，通过 `__setattr__` 自动重置合规状态为未验证（`last_compliance_result = None`）；
+> 2) **MultiContactState 支撑拓扑单一事实源 (SSOT) 统一**：
+>    - `active_contacts`、`supporting_limbs`、`is_flight`、`support_type`、`active_contact_count` 及 `get_coplanar_support_polygon()` 统一以当前帧真实几何合规的有效支撑集合（`effective_contacts`）为单一事实源；
+>    - 未经验证（`UNVALIDATED`）的接触严禁默认具有支撑资格，默认判定为无支撑/腾空（`SupportType.FLIGHT`）；
+> 3) **缺失肢体显式确定性失败与 KinematicBridge 失败传播协同**：
+>    - `check_all_contacts()` 彻底移除对 `c.world_position` 的兜底替换，缺失测量显式记录确定性失败（`is_valid=False`, `MISSING_MEASUREMENT`, `total_position_error_m=inf`）；
+>    - `KinematicBridgeExecutor.execute_frame()` 针对意图建立接触但几何违规的肢体（`rec.is_lifecycle_active and not geom_res.is_valid`），准确记录 `CONTACT_GEOMETRY` 违规至 `contact_geometry_errors`、`unmet_constraints` 并标记 `BridgeExecutionResult.success = False`，同时支撑拓扑自动剔除违规肢体；
+> 4) **全量回归与测试全绿**：
+>    - 专用针对性测试套件 `tests/test_contact_model_geometry_support_contract.py` 14 项全绿通过（14/14 PASS in 0.224s）；
+>    - 历史验证套件 `tests/verify_task6gc_contact_model.py` 17 项全绿通过（17/17 PASS in 22.0s）；
+>    - 分层自动化套件全量回归全绿通过：Quick 19/19 (49.28s), Physics 22/22 (86.91s), Motion 12/12 (49.54s), Full 37/37 (139.24s)；
 >    - AST 文档门禁与符号校验 `tests/audit_c2_final_inspector.py --verify-docs` 0 错误通过。
-> **重要修复与证据核准**：全仓库剩余 5 项 Finding（0 项确认缺陷、5 项合同缺口）严格保持只读与挂起状态；阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
+> **重要修复与证据核准**：全仓库剩余 4 项 Finding（0 项确认缺陷、4 项合同缺口，全部集中于 PKG-5 底层 Rig/IK：FIND-R3-01 至 FIND-R3-04）。阻碍 Phase 7B 的项仅剩 1 项（FIND-R3-01 底层 Rig 动态父级挂载）。当前门禁终止状态为：`CONTACT-MODEL-07 — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B。
 
 ---
 
@@ -33,7 +35,7 @@
     - **FIND-R2-02 (CONFIRMED_DEFECT / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:1125–1145` 移除强制覆写 `contacts=c_dict`，完整保留 Bridge 真实物理测量数据与上肢接触，通过 6 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-03 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:1084–1100` 接入 `bridge_res.success` 严苛校验与 `RuntimeError` 结构化异常阻断，清理废弃死回退分支，微调斜坡踝关节松弛角度（`swing_relax_amp = 25.0°`）消除踏步 ROM 越界，通过 6 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
     - **FIND-R2-04 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `framework.py:455–486, 1045–1120` `ActionExecutionResult` 统一成功/失败合同与防御守卫，`MotionPlanner` 接入五重前置门禁与失败阻断流转，通过 8 项针对性测试与全量回归（Quick 18/18, Physics 21/21, Motion 11/11, Full 35/35）；
-    - **FIND-R2-05 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `contact_model.py:214–273, 304–340` 几何合规性校验只读返回，与动态属性 `support_type` 判定脱节；
+    - **FIND-R2-05 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `contact_model.py:164–220, 312–430` 解耦原始生命周期与瞬时有效支撑资格，MultiContactState 统一支撑拓扑 SSOT，缺失测量确定性失败，Bridge 保留几何错误传播，通过 14 项针对性测试与全量回归（Quick 19/19, Physics 22/22, Motion 12/12, Full 37/37）；
     - **FIND-R2-06 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:223–401, 404–520` 统一抽取 `_build_step_schedule_core`，未命中或不可支撑表面严格抛出 `ValueError`，消除虚假平地回退与伪造 ID，通过针对性测试与全量回归；
     - **FIND-R2-07 (CONFIRMED_DEFECT / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:310–312` `_adjust_footfall_for_seams_and_edges` 接缝与边缘检测采用实际摆动脚侧向落点 `sw_x` 探测前掌、脚后跟与脚踝支撑合法性，双向边界安全夹紧，通过针对性测试与全量回归；
     - **FIND-T01-06 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:660–705` `TerrainWalkAction.estimate_duration_frames` 严禁静默平地回退，`MotionPlanner.add_action()` 统一绑定权威环境实例，消除环境分裂，通过 4 项针对性测试与全量回归；
@@ -45,9 +47,26 @@
     - **FIND-R3-04 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用；
     - **FIND-R4-01 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:308–355, 450–490, 730–770` 引入 `verify_scene_execution_gate()` 严苛校验规划成功状态、不可达事件、致命未满足约束与连续性，执行失败严禁保存 `.blend` 文件，移除硬编码 `"continuous_without_exemption": True`，通过 3 项针对性测试与全量回归；
     - **FIND-R4-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:385–420, 597–643` 与 `blender_mesh_query_adapter.py:885–892` Mesh 模式下未命中或非支撑面严格返回 `None` 消除虚假 0.0m 回退，`query_ground_support_at` 严格在非支撑面返回 `success=False`，通过 8 项针对性测试与全量回归；
-  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），剩余 5 项合同缺口维持挂起等待授权排期修复。
+  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），ContactModel 几何支撑一致性修复组 (FIND-R2-05) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），剩余 4 项合同缺口维持挂起等待授权排期修复。
 
 ### [已验证]
+* **ContactModel Geometry-to-Support Consistency: 接触几何有效性与支撑拓扑解耦修复 (FIND-R2-05, JOINT-REPAIR-CONTACT-MODEL-07)**：
+  * **生命周期与有效支撑解耦 (ContactRecord)**：
+    - `is_lifecycle_active` 严格判定原始生命周期：`lifecycle == ESTABLISHED and contact_type != FREE`；
+    - `is_effective_support` (及对齐后的 `is_active`) 实施双重门禁：`is_lifecycle_active and last_compliance_result is not None and last_compliance_result.is_valid`；
+    - 记录属性或几何目标变更时，通过 `__setattr__` 自动重置为未验证（`last_compliance_result = None`）；
+  * **支撑拓扑单一事实源 (SSOT) 统一 (MultiContactState)**：
+    - `active_contacts`、`supporting_limbs`、`is_flight`、`support_type`、`active_contact_count` 及 `get_coplanar_support_polygon()` 统一以当前帧几何合规的有效支撑集合（`effective_contacts`）为 SSOT；
+    - 未经验证（`UNVALIDATED`）的接触严禁默认具有支撑资格，默认判定为腾空（`SupportType.FLIGHT`）；
+    - 帧号推进时自动清空所有接触的瞬时合规结果；
+  * **缺失肢体显式确定性失败与 KinematicBridge 失败传播协同**：
+    - `check_all_contacts()` 移除对 `c.world_position` 的兜底替换，缺失测量显式记录确定性失败（`is_valid=False`, `MISSING_MEASUREMENT`, `total_position_error_m=inf`）；
+    - `KinematicBridgeExecutor.execute_frame()` 针对意图建立接触但几何违规的肢体（`rec.is_lifecycle_active and not geom_res.is_valid`），准确记录 `CONTACT_GEOMETRY` 违规至 `contact_geometry_errors`、`unmet_constraints` 并标记 `BridgeExecutionResult.success = False`，同时支撑拓扑自动剔除违规肢体；
+  * **测试与回归**：
+    - 专用针对性测试 `tests/test_contact_model_geometry_support_contract.py` 14 项全绿通过（14/14 PASS in 0.224s）；
+    - 历史验证套件 `tests/verify_task6gc_contact_model.py` 17 项全绿通过（17/17 PASS in 22.0s）；
+    - 统一分层全量套件全绿：Quick (19/19 in 49.28s), Physics (22/22 in 86.91s), Motion (12/12 in 49.54s), Full (37/37 in 139.24s)；
+    - 状态置为 `CONTACT-MODEL-07 — AWAITING INDEPENDENT REVIEW`。
 * **Terrain Planning Joint Repair: 地形规划与时间基准联合修复 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08)**：
   * **接缝与边缘检测横向采样位置偏置修复 (FIND-R2-07)**：
     - `_adjust_footfall_for_seams_and_edges(environment, sw_x, y, corridor_y_min, corridor_y_max)` 纠正采样点：以实际摆动脚侧向位置 `sw_x` 取代走廊中心线 `corridor_x=0.0`；
@@ -1014,5 +1033,5 @@
 ---
 
 ## 2. 下一步建议
-* **严格停止，等待 ChatGPT 与用户审查 Environment Gate 01 / Unit 4 Final Closure 验收结果**；
-* **暂停且严禁擅自进入 Final Architecture Audit 或 Phase 7B**。
+* **严格停止，等待审查 ContactModel Geometry-to-Support Consistency (FIND-R2-05 / CONTACT-MODEL-07) 验收结果**；
+* **暂停且严禁擅自进入 Phase 7B 或修复 PKG-5 (FIND-R3-01 至 FIND-R3-04)**。

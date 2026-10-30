@@ -6,33 +6,36 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — 地形规划联合修复验收收口 (Terrain Planning Joint Repair Acceptance Closure: ISSUE-A & ISSUE-B)。
-* **当前状态**：`JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
-* **任务性质**：限定范围验收收口，解决 ISSUE-A（单脚 3D 空间位移作为最大步长约束对象，自适应双足步点截断）与 ISSUE-B（接缝边缘采样复合支持/成功门禁与反事实未命中拒绝）。
+* **当前任务**：ProceduralAnimation — 第 07 组生产接口修复: ContactModel 几何有效性与支撑拓扑解耦修复 (ContactModel Geometry-to-Support Consistency: FIND-R2-05, Task ID: JOINT-REPAIR-CONTACT-MODEL-07)。
+* **当前状态**：`CONTACT-MODEL-07 — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行修复其他问题，禁止进入 Phase 7B）。
+* **任务性质**：生产接口合同修复，解耦 ContactLifecycle 与瞬时有效支撑资格，统一 MultiContactState 支撑拓扑 SSOT，确立缺失测量确定性失败与 KinematicBridge 几何违规失败传播协同。
 
-### 本任务核心核准成果 (Acceptance Closure: ISSUE-A & ISSUE-B)
-1. **ISSUE-A: 最大步长单脚 3D 空间位移硬约束与自适应截断**：
-   - 将 `route.max_step_length_m` 严格作为每个 `TerrainStepPlan` 单脚真实空间位移约束；
-   - 双足交替推进量统一为 `step_advance = min(route.nominal_stride_m, route.max_step_length_m / 2.0)`；单步落点与收步时严密检测 3D 位移并自适应夹紧；
-   - `TerrainRouteInput.max_step_length_m` 默认值设为 `0.80m`（与 `MAX_LEG_REACH = 0.82m` 保持解剖学一致）；
-   - 修正收步余量判定：当推进落点距目标在半步内（`abs(y_tgt - cand_land_y) < route.min_step_length_m * 0.5`）时，直接收敛至目标，消除冗余微步并保持 700 帧基准场景对齐；
-   - 针对性用例 A（+Y 轴交替推进，位移严格 <= 0.40m，无 0.80m 单步位移，左右严格交替）、用例 B（-Y 轴交替推进完全对称）、用例 C（收步语义，无越界与超限）、用例 D（接缝调整后位移再校验）、用例 E（物理极限不可达防御性拦截）全部全绿通过。
-2. **ISSUE-B: 接缝边缘采样复合门禁与反事实未命中拦截**：
-   - 统一定义复合判定 `res is not None and res.success and res.allows_regular_support`；
-   - 脚后跟 (-0.07m)、脚尖 (+0.15m) 与脚踝 (0.0m) 三点必须全部满足；
-   - 彻底移除 `(0, 0, 1)` 兜底与平地回退；候选位移检索严格执行此复合门禁；
-   - 针对性反事实测试验证：当 `allows_regular_support=True` 但 `success=False`（网格未命中/传感器异常）时，系统坚决拒绝并抛出异常，绝不采纳为落脚点。
-3. **全套自动化分层回归验证**：
-   - `tests/test_terrain_planning_contract.py`: **25/25 PASS (0.45s)**
-   - `.\run_tests.ps1 -tier quick`: **19/19 PASS (50.53s)**
-   - `.\run_tests.ps1 -tier physics`: **21/21 PASS (84.54s)**
-   - `.\run_tests.ps1 -tier motion`: **12/12 PASS (49.44s)**
-   - `.\run_tests.ps1 -tier full`: **36/36 PASS (138.02s)**
+### 本任务核心核准成果 (ContactModel Geometry-to-Support Consistency: FIND-R2-05)
+1. **解耦接触生命周期与瞬时有效支撑资格 (ContactRecord)**：
+   - `ContactRecord.is_lifecycle_active` 表达原始生命周期意图（`lifecycle == ESTABLISHED and contact_type != FREE`）；
+   - `ContactRecord.is_effective_support`（及对齐后的 `is_active`）实施双重门禁：`is_lifecycle_active and last_compliance_result is not None and last_compliance_result.is_valid`；
+   - 记录属性或空间目标变更时，通过 `__setattr__` 自动重置合规状态为未验证（`last_compliance_result = None`）；
+2. **MultiContactState 支撑拓扑单一事实源 (SSOT) 统一与未经验证隔离**：
+   - `active_contacts`、`supporting_limbs`、`is_flight`、`support_type`、`active_contact_count` 及 `get_coplanar_support_polygon()` 统一以当前帧真实几何合规的有效支撑集合（`effective_contacts`）为 SSOT；
+   - 未经验证（`UNVALIDATED`）的接触严禁默认具有支撑资格，默认判定为无支撑/腾空（`SupportType.FLIGHT`）；
+   - 推进帧号时自动清空所有接触的瞬时合规结果；
+3. **缺失测量确定性失败与 KinematicBridge 失败传播协同**：
+   - `check_all_contacts()` 彻底移除对 `c.world_position` 的兜底替换，缺失测量显式记录确定性失败（`is_valid=False`, `MISSING_MEASUREMENT`, `total_position_error_m=inf`）；
+   - `KinematicBridgeExecutor.execute_frame()` (Line 562) 检查 `rec.is_lifecycle_active and not geom_res.is_valid`，准确记录 `CONTACT_GEOMETRY` 违规至 `contact_geometry_errors`、`unmet_constraints` 并标记 `BridgeExecutionResult.success = False`，同时支撑拓扑自动剔除违规肢体；
+4. **全套自动化分层回归验证**：
+   - `tests/test_contact_model_geometry_support_contract.py`: **14/14 PASS (0.224s)**
+   - `tests/verify_task6gc_contact_model.py`: **17/17 PASS (22.0s)**
+   - `.\run_tests.ps1 -tier quick`: **19/19 PASS (49.28s)**
+   - `.\run_tests.ps1 -tier physics`: **22/22 PASS (86.91s)**
+   - `.\run_tests.ps1 -tier motion`: **12/12 PASS (49.54s)**
+   - `.\run_tests.ps1 -tier full`: **37/37 PASS (139.24s)**
    - `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors)**
 
 ---
 
 ## 2. 已完成历史里程碑
+* **Joint Repair (Contact Model)**: FIND-R2-05 ContactModel 几何有效性与支撑拓扑解耦修复归档 (`FIXED / VERIFIED`)。
+* **Joint Repair Acceptance Closure (Terrain Planning)**: ISSUE-A 最大步长单脚 3D 位移硬约束与 ISSUE-B 复合门禁验收收口归档 (`FIXED / VERIFIED`)。
 * **Joint Repair (Terrain Planning)**: FIND-R2-06 / FIND-R2-07 / FIND-T01-07 / FIND-T01-08 地形规划方向、接缝与时间基准联合修复归档 (`FIXED / VERIFIED`)。
 * **Joint Repair Closure (Env & Scene)**: JOINT-REPAIR-ENV-SCENE-CLOSE 动作环境所有权冲突防御、0.12m连续性门禁及真实无mock场景集成验证归档 (`FIXED / VERIFIED`)。
 * **Joint Repair (Env & Scene)**: FIND-R4-02 / FIND-T01-06 / FIND-R4-01 环境查询合同、动作环境所有权与场景交付门禁联合修复归档 (`FIXED / VERIFIED`)。
@@ -56,5 +59,5 @@
    - **严禁自行开始下一项未经批准的代码修复**；
    - **严禁修改任何底层 Rig/IK 父级关系**。
 2. **下一步建议**：
-   - 等待外部独立审查确认联合修复收尾成果；
-   - 待审查批准后，按既定排期推进下一维护包（如 PKG-3 后续或 PKG-5 底层 Rig 动态父级修复 FIND-R3-01）。
+   - 等待外部独立审查确认 ContactModel 几何有效性与支撑拓扑解耦修复成果；
+   - 待审查批准后，按既定排期推进下一维护包（PKG-5 底层 Rig/IK 动态父级挂载与姿态反解 FIND-R3-01 至 FIND-R3-04）。

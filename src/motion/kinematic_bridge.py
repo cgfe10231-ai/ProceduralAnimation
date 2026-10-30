@@ -559,7 +559,7 @@ class KinematicBridgeExecutor:
         geom_compliance = multi_contact.check_all_contacts(actual_positions)
         for limb, geom_res in geom_compliance.items():
             rec = multi_contact.contacts.get(limb)
-            if rec is not None and rec.is_active and not geom_res.is_valid:
+            if rec is not None and rec.is_lifecycle_active and not geom_res.is_valid:
                 contact_geom_errors[limb] = geom_res
                 unmet.append(
                     UnmetConstraint(

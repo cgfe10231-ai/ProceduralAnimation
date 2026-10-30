@@ -210,6 +210,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=90.0,
         description="Validates contact gap, penetration, slip, lifecycle state machine, and 8 support categories.",
     ),
+    "contact_model_geometry_support_contract": TestDefinition(
+        test_id="contact_model_geometry_support_contract",
+        name="ContactModel Geometry-to-Support Consistency Contract (FIND-R2-05)",
+        script_path="tests/test_contact_model_geometry_support_contract.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=60.0,
+        description="Comprehensive verification of ContactModel geometry-to-support qualification: Groups A (geometric failure & support topology), B (violation types & boundary tolerances), C (missing measurements & temporal invalidation), D (multi-contact classification), and E (end-to-end KinematicBridge integration).",
+    ),
     "physics_bridge_contract": TestDefinition(
         test_id="physics_bridge_contract",
         name="Kinematic Bridge 14-Point Architectural Contract",

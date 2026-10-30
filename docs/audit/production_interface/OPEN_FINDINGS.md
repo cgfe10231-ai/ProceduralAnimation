@@ -13,7 +13,7 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **0** (存量) + **3** (已修复) | 存量：无（已清零）；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写), FIND-R2-07/T01-04 (接缝横向偏置) |
-| **接口合同缺口 (CONTRACT_GAP)** | **5** (存量) + **8** (已修复) | 存量：FIND-R2-05 (几何与支撑脱节), FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
+| **接口合同缺口 (CONTRACT_GAP)** | **4** (存量) + **9** (已修复) | 存量：FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-05 (几何合规性与支撑拓扑脱节), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (固定 X 走廊双向 +/-Y 导航), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
 | **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04, FIND-R2-06, FIND-R2-07 已修复解除阻碍) |
@@ -28,7 +28,7 @@
 | **FIND-R2-02** | FIND-T01-02 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1100–1138 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R2-03** | FIND-T01-01 | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 1080–1145 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R2-04** | FIND-T01-03 | `src/motion/framework.py` | `ActionExecutionResult` / `MotionPlanner` | Lines 455–486 / 1045–1120 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `framework.py` |
-| **FIND-R2-05** | - | `src/motion/contact_model.py` | `ContactRecord` / `MultiContactState` | Lines 214–273 / 304–340 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `contact_model.py` |
+| **FIND-R2-05** | - | `src/motion/contact_model.py` | `ContactRecord` / `MultiContactState` | Lines 164–220 / 312–430 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `contact_model.py` |
 | **FIND-R2-06** | FIND-T01-05 | `src/motion/terrain_walk.py` | `plan_terrain_footsteps` vs `build_terrain_step_schedule` | Lines 287–447 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R2-07** | FIND-T01-04 | `src/motion/terrain_walk.py` | `_adjust_footfall_for_seams_and_edges()` | Lines 219–285 | CONFIRMED_DEFECT (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
@@ -250,21 +250,26 @@
 ### FIND-R2-05: `ContactModel` 几何合规性校验与 `SupportType` 动态属性脱节
 * **Source File**: `src/motion/contact_model.py`
 * **Class / Function**: `ContactRecord.check_geometric_compliance()` / `MultiContactState.support_type`
-* **Exact Line Range**: Lines 214–273 (`check_geometric_compliance`), Lines 304–340 (`support_type` property)
+* **Exact Line Range**: Lines 164–220 (`ContactRecord` compliance properties & setters), Lines 312–430 (`MultiContactState` support properties & `check_all_contacts`)
 * **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 脚部处于 `ContactLifecycle.ESTABLISHED`，但在物理测量时发生穿透超过阈值（如 $> 10$mm）或悬空离开接触面（如 $> 15$mm）。
-* **Actual Behavior**:
-  `check_geometric_compliance()` 返回 `GeometricConstraintResult(is_valid=False)`，但该函数属于只读方法，不会修改 `ContactRecord.lifecycle` 本身；随后访问动态属性 `MultiContactState.support_type` 时，由于其仅依靠 `[c for c in self.contacts.values() if c.is_active]` 计数，仍将该脚计为有效支撑，判定为 `SupportType.DOUBLE_STANCE`。
-* **Expected Contract**: 当几何接触严重失效或离开支撑面时，支撑拓扑状态应能感知到该接触已失效（或由 Bridge 协同置为 `BROKEN`），避免在无物理支撑的情况下误判为双脚着地。
-* **Evidence**: `MultiContactState.support_type` 是一个动态 `@property`，统计仅判断 `c.is_active`，而 `is_active` (L181–L184) 仅要求 `lifecycle == ESTABLISHED and contact_type != FREE`，完全不耦合 `GeometricConstraintResult`。
+* **Actual Behavior (Before Fix)**:
+  `check_geometric_compliance()` 返回 `GeometricConstraintResult(is_valid=False)`，但该函数属于只读方法，未将结果提交给 `ContactRecord`；随后访问动态属性 `MultiContactState.support_type` 时，由于其仅依靠 `[c for c in self.contacts.values() if c.is_active]` 计数，仍将该脚计为有效支撑，判定为 `SupportType.DOUBLE_STANCE`。此外，`check_all_contacts()` 在缺失肢体坐标时回退使用 `c.world_position` 导致伪造零误差合规。
+* **Expected Contract**: 接触生命周期与瞬时有效支撑资格严格解耦。有效支撑资格必须同时满足接触生命周期已建立且当前帧几何合规校验通过；未测量状态（UNVALIDATED）严禁默认视为有效；缺失肢体测量显式记录确定性失败（MISSING_MEASUREMENT）；支撑拓扑分类（`active_contacts`, `supporting_limbs`, `is_flight`, `support_type`, `get_coplanar_support_polygon()`）必须作为单一事实源（SSOT）反映同一份有效支撑集合。
+* **Evidence**: 原 `ContactRecord.is_active` 仅判断 `lifecycle == ESTABLISHED and contact_type != FREE`，完全不耦合 `GeometricConstraintResult`；修复后通过 `ContactRecord.is_effective_support` 实现双门禁闭环，`KinematicBridgeExecutor.execute_frame` 协同校验 `rec.is_lifecycle_active and not geom_res.is_valid` 保持错误传播。
 * **Responsible Module**: `src/motion/contact_model.py`
 * **Downstream Impact**: 动力学计算（如重力平衡、质心支撑多边形计算）在足部严重悬空或穿透时，仍按正常双支撑多边形计算，导致物理遥测数据失真。
 * **Classification**: `CONTRACT_GAP (RESOLVED)`
 * **Blocks Further Development**: `NO (RESOLVED)`
 * **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
-* **Suggested Repair Boundary**: 在 `kinematic_bridge.py` Phase 5 中，当 `check_geometric_compliance()` 返回 `is_valid=False` 且间隙过大时，显式将该记录标记为 `ContactLifecycle.BROKEN`。
-
+* **Fix & Verification Summary**: 
+  1. `ContactRecord` 增加 `last_compliance_result` 字段，解耦原始生命周期查询（`is_lifecycle_active`）与瞬时有效支撑资格（`is_effective_support` / `is_active`），并在生命周期、接触类型或空间目标坐标变更时通过 `__setattr__` 自动重置为未验证（`UNVALIDATED`）；
+  2. `MultiContactState` 统一以有效支撑集合作为唯一事实源（SSOT），驱动 `active_contacts`, `supporting_limbs`, `is_flight`, `support_type`, `active_contact_count` 以及 `get_coplanar_support_polygon()` 严格一致；
+  3. `check_all_contacts()` 移除对 `c.world_position` 的兜底替换，确立缺失测量显式失败合同（`is_valid=False`, `MISSING_MEASUREMENT`, `total_position_error_m=inf`）；
+  4. `KinematicBridgeExecutor.execute_frame()` 针对意图建立接触但几何违规的肢体（`rec.is_lifecycle_active and not geom_res.is_valid`）完整保留 `CONTACT_GEOMETRY` 失败报告链（`unmet_constraints`, `contact_geometry_errors`, `BridgeExecutionResult.success=False`）；
+  5. 专用针对性测试套件 `tests/test_contact_model_geometry_support_contract.py` 覆盖 Group A（几何失败支撑拓扑降级）、Group B（违规类型与容差边界）、Group C（测量缺失与时序失效）、Group D（多接触拓扑分类）、Group E（真实 Bridge 几何失败端到端集成）共 14 项全绿通过（14/14 PASS in 0.224s）；
+  6. 全量分层自动化回归全绿通过：`quick` (19/19 PASS), `physics` (22/22 PASS), `motion` (12/12 PASS), `full` (37/37 PASS)。
+* **Suggested Repair Boundary**: `src/motion/contact_model.py` 内部解耦与状态提交，`src/motion/kinematic_bridge.py` 最小协同适配（Line 562）。
 ---
 
 ### FIND-R2-06 (对应历史 FIND-T01-05): 步态调度生成函数在环境查询未命中时的回退语义不一致

@@ -164,6 +164,14 @@ class ContactRecord:
     max_allowable_penetration_m: float = 0.010  # 10 mm allowable penetration
     max_allowable_slip_m: float = 0.020         # 20 mm allowable tangential slip
     metadata: Dict[str, Any] = field(default_factory=dict)
+    last_compliance_result: Optional[GeometricConstraintResult] = None
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Invalidate compliance verification if lifecycle, contact type, or geometric targets change
+        if name in ("lifecycle", "contact_type", "world_position", "world_normal", "body_local_anchor"):
+            if hasattr(self, name) and getattr(self, name) != value:
+                super().__setattr__("last_compliance_result", None)
+        super().__setattr__(name, value)
 
     def __post_init__(self):
         # Guarantee normal is strictly unit length
@@ -179,9 +187,32 @@ class ContactRecord:
             raise ValueError("Friction coefficients must be non-negative")
 
     @property
-    def is_active(self) -> bool:
-        """True if contact is actively established and enforcing physical constraints."""
+    def is_lifecycle_active(self) -> bool:
+        """True if contact lifecycle is ESTABLISHED and type is not FREE."""
         return self.lifecycle == ContactLifecycle.ESTABLISHED and self.contact_type != ContactType.FREE
+
+    @property
+    def is_effective_support(self) -> bool:
+        """True if contact has valid lifecycle AND passed instantaneous geometric compliance check."""
+        if not self.is_lifecycle_active:
+            return False
+        if self.last_compliance_result is None:
+            # UNVALIDATED: unmeasured contacts cannot be assumed valid!
+            return False
+        return self.last_compliance_result.is_valid
+
+    @property
+    def is_active(self) -> bool:
+        """True if contact provides effective physical support (SSOT)."""
+        return self.is_effective_support
+
+    def set_compliance_result(self, result: Optional[GeometricConstraintResult]) -> None:
+        """Set instantaneous geometric compliance result for this contact record."""
+        self.last_compliance_result = result
+
+    def reset_compliance(self) -> None:
+        """Reset instantaneous compliance verification to UNVALIDATED (None)."""
+        self.last_compliance_result = None
 
     def update_from_environment_transform(
         self,
@@ -285,15 +316,37 @@ class MultiContactState:
     contacts: Dict[str, ContactRecord] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        # If frame advances on an existing state, reset compliance on all contacts
+        if name == "frame" and hasattr(self, "frame") and getattr(self, "frame") != value:
+            for c in getattr(self, "contacts", {}).values():
+                c.reset_compliance()
+        super().__setattr__(name, value)
+
+    @property
+    def effective_contacts(self) -> Dict[str, ContactRecord]:
+        """Return subset of contacts providing effective physical support (SSOT)."""
+        return {k: v for k, v in self.contacts.items() if v.is_effective_support}
+
     @property
     def active_contacts(self) -> Dict[str, ContactRecord]:
-        """Return subset of contacts that are currently active/established."""
-        return {k: v for k, v in self.contacts.items() if v.is_active}
+        """Return subset of contacts providing effective physical support (SSOT)."""
+        return self.effective_contacts
+
+    @property
+    def lifecycle_active_contacts(self) -> Dict[str, ContactRecord]:
+        """Return subset of contacts with established lifecycle, regardless of compliance."""
+        return {k: v for k, v in self.contacts.items() if v.is_lifecycle_active}
 
     @property
     def supporting_limbs(self) -> List[str]:
         """List of limb keys currently providing active physical support."""
         return list(self.active_contacts.keys())
+
+    @property
+    def active_contact_count(self) -> int:
+        """Number of contacts providing effective physical support."""
+        return len(self.active_contacts)
 
     @property
     def is_flight(self) -> bool:
@@ -307,10 +360,10 @@ class MultiContactState:
         if not active:
             return SupportType.FLIGHT
 
-        has_foot_l = "foot_L" in active
-        has_foot_r = "foot_R" in active
-        has_hand_l = "hand_L" in active
-        has_hand_r = "hand_R" in active
+        has_foot_l = any(k in active for k in ("foot_L", "foot_l"))
+        has_foot_r = any(k in active for k in ("foot_R", "foot_r"))
+        has_hand_l = any(k in active for k in ("hand_L", "hand_l"))
+        has_hand_r = any(k in active for k in ("hand_R", "hand_r"))
 
         # Ledge hang: hands active with GRASP, feet free
         if (has_hand_l or has_hand_r) and not has_foot_l and not has_foot_r:
@@ -343,15 +396,36 @@ class MultiContactState:
         self,
         current_limb_positions: Dict[str, Tuple[float, float, float]],
     ) -> Dict[str, GeometricConstraintResult]:
-        """Check geometric constraints for all contacts given evaluated limb positions."""
+        """Check geometric constraints for all contacts given evaluated limb positions.
+
+        Evaluates geometric compliance, commits the result to each ContactRecord,
+        and returns the dictionary of results mapping limb -> GeometricConstraintResult.
+        """
         results = {}
         for limb, c in self.contacts.items():
             if limb in current_limb_positions:
                 res = c.check_geometric_compliance(current_limb_positions[limb])
+            elif c.contact_type == ContactType.FREE or c.lifecycle == ContactLifecycle.RELEASED:
+                res = c.check_geometric_compliance((0.0, 0.0, 0.0))
             else:
-                res = c.check_geometric_compliance(c.world_position)
+                # Deterministic failure for missing limb measurement on non-free/non-released contact
+                res = GeometricConstraintResult(
+                    is_valid=False,
+                    total_position_error_m=float("inf"),
+                    distance_normal_m=float("inf"),
+                    penetration_depth_m=0.0,
+                    tangential_slip_m=0.0,
+                    violation_reason=f"MISSING_MEASUREMENT: Limb '{limb}' has no measured position in current_limb_positions",
+                    details={"missing_limb": limb},
+                )
+            c.set_compliance_result(res)
             results[limb] = res
         return results
+
+    def reset_compliance(self) -> None:
+        """Reset instantaneous compliance status for all contacts."""
+        for c in self.contacts.values():
+            c.reset_compliance()
 
     def get_coplanar_support_polygon(
         self,
@@ -426,11 +500,12 @@ def _compute_2d_convex_hull(points: Sequence[Tuple[float, float]]) -> List[Tuple
 
 def contact_record_to_legacy_contact_point(record: ContactRecord) -> ContactPointState:
     """Convert a modern ContactRecord to a legacy ContactPointState for MotionState compatibility."""
-    phase = "stance" if record.is_active else "swing"
+    is_effective = record.is_effective_support
+    phase = "stance" if is_effective else "swing"
     return ContactPointState(
         limb=record.limb,
         phase=phase,
-        is_locked=record.is_active,
+        is_locked=is_effective,
         contact_world_xyz=record.world_position,
         current_world_xyz=record.world_position,
         surface_normal=record.world_normal,
@@ -468,7 +543,10 @@ def enrich_motion_state_with_contacts(
     """Enrich a MotionState with multi-contact telemetry, updating contacts dict and params."""
     legacy_contacts = {}
     for limb, rec in multi_contact.contacts.items():
-        legacy_contacts[limb] = contact_record_to_legacy_contact_point(rec)
+        legacy_point = contact_record_to_legacy_contact_point(rec)
+        legacy_contacts[limb] = legacy_point
+        if limb.lower() != limb:
+            legacy_contacts[limb.lower()] = legacy_point
 
     is_flight = multi_contact.is_flight
     support_str = multi_contact.support_type.value
@@ -476,7 +554,7 @@ def enrich_motion_state_with_contacts(
     updated_params = dict(motion_state.params)
     updated_params["support_type"] = support_str
     updated_params["supporting_limbs"] = multi_contact.supporting_limbs
-    updated_params["active_contact_count"] = len(multi_contact.active_contacts)
+    updated_params["active_contact_count"] = multi_contact.active_contact_count
 
     is_coplanar, poly = multi_contact.get_coplanar_support_polygon()
     if is_coplanar and poly is not None:

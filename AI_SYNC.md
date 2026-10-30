@@ -1,35 +1,36 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：ProceduralAnimation — Terrain Planning Joint Repair 验收收口 (Acceptance Closure: ISSUE-A & ISSUE-B)
+* **当前任务编号**：ProceduralAnimation — 第 07 组生产接口修复: ContactModel 几何有效性与支撑拓扑解耦修复 (ContactModel Geometry-to-Support Consistency: FIND-R2-05, Task ID: JOINT-REPAIR-CONTACT-MODEL-07)
 * **任务状态**：
-  * **地形规划联合修复验收收口完成**：
-    1. **ISSUE-A: 最大步长单脚 3D 空间位移硬约束与自适应步点截断**：
-       - `route.max_step_length_m` 严格作为每个 `TerrainStepPlan` 单脚 3D 空间位移的硬约束（`disp = (Vector(step.swing_end_xyz) - Vector(step.swing_start_xyz)).length <= route.max_step_length_m + tolerance`）；
-       - 双足交替推进量统一为 `step_advance = min(route.nominal_stride_m, route.max_step_length_m / 2.0)`，单步落点与收步时严密检测 3D 位移并自适应夹紧；超限或不可达时抛出确定性 `ValueError`；
-       - `TerrainRouteInput.max_step_length_m` 默认值设为 `0.80m`（与 `MAX_LEG_REACH = 0.82m` 保持解剖学一致）；
-       - 修正收步余量判定：当推进落点距目标在半步内（`abs(y_tgt - cand_land_y) < route.min_step_length_m * 0.5`）时，直接收敛至目标，消除冗余微步并保持 700 帧基准场景对齐；
-       - 针对性用例 A（+Y 轴交替推进，位移严格 <= 0.40m，无 0.80m 单步位移，左右严格交替）、用例 B（-Y 轴交替推进完全对称）、用例 C（收步语义，无越界与超限）、用例 D（接缝调整后位移再校验）、用例 E（物理极限不可达防御性拦截）全部全绿通过。
-    2. **ISSUE-B: 接缝边缘采样复合支持/成功门禁与反事实未命中拦截**：
-       - `_adjust_footfall_for_seams_and_edges()` 统一判定标准为 `res is not None and res.success and res.allows_regular_support`；
-       - 脚后跟 (-0.07m)、脚尖 (+0.15m) 与脚踝 (0.0m) 三点必须全部满足；
-       - 彻底移除 `(0, 0, 1)` 兜底与平地回退；候选位移检索严格执行此复合门禁；
-       - 针对性反事实测试验证：当 `allows_regular_support=True` 但 `success=False`（网格未命中/传感器异常）时，系统坚决拒绝并抛出异常，绝不采纳为落脚点。
-    3. **全套自动化分层回归验证**：
-       - `tests/test_terrain_planning_contract.py`: **25/25 PASS (0.45s)**
-       - `.\run_tests.ps1 -tier quick`: **19/19 PASS (50.53s)**
-       - `.\run_tests.ps1 -tier physics`: **21/21 PASS (84.54s)**
-       - `.\run_tests.ps1 -tier motion`: **12/12 PASS (49.44s)**
-       - `.\run_tests.ps1 -tier full`: **36/36 PASS (138.02s)**
+  * **ContactModel 几何有效性与支撑拓扑解耦修复完成**：
+    1. **解耦接触生命周期与瞬时有效支撑资格 (ContactRecord)**：
+       - `ContactRecord.is_lifecycle_active` 表达原始生命周期意图（`lifecycle == ESTABLISHED and contact_type != FREE`）；
+       - `ContactRecord.is_effective_support`（及对齐后的 `is_active`）实施双重门禁：`is_lifecycle_active and last_compliance_result is not None and last_compliance_result.is_valid`；
+       - 记录属性或空间目标变更时，通过 `__setattr__` 自动重置合规状态为未验证（`last_compliance_result = None`）；
+    2. **MultiContactState 支撑拓扑单一事实源 (SSOT) 统一与未经验证隔离**：
+       - `active_contacts`、`supporting_limbs`、`is_flight`、`support_type`、`active_contact_count` 及 `get_coplanar_support_polygon()` 统一以当前帧真实几何合规的有效支撑集合（`effective_contacts`）为 SSOT；
+       - 未经验证（`UNVALIDATED`）的接触严禁默认具有支撑资格，默认判定为无支撑/腾空（`SupportType.FLIGHT`）；
+       - 推进帧号时自动清空所有接触的瞬时合规结果；
+    3. **缺失测量确定性失败与 KinematicBridge 失败传播协同**：
+       - `check_all_contacts()` 彻底移除对 `c.world_position` 的兜底替换，缺失测量显式记录确定性失败（`is_valid=False`, `MISSING_MEASUREMENT`, `total_position_error_m=inf`）；
+       - `KinematicBridgeExecutor.execute_frame()` (Line 562) 检查 `rec.is_lifecycle_active and not geom_res.is_valid`，准确记录 `CONTACT_GEOMETRY` 违规至 `contact_geometry_errors`、`unmet_constraints` 并标记 `BridgeExecutionResult.success = False`，同时支撑拓扑自动剔除违规肢体；
+    4. **全套自动化分层回归验证**：
+       - `tests/test_contact_model_geometry_support_contract.py`: **14/14 PASS (0.224s)**
+       - `tests/verify_task6gc_contact_model.py`: **17/17 PASS (22.0s)**
+       - `.\run_tests.ps1 -tier quick`: **19/19 PASS (49.28s)**
+       - `.\run_tests.ps1 -tier physics`: **22/22 PASS (86.91s)**
+       - `.\run_tests.ps1 -tier motion`: **12/12 PASS (49.54s)**
+       - `.\run_tests.ps1 -tier full`: **37/37 PASS (139.24s)**
        - `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors)**
-  * **存量问题状态**：确认缺陷归零（0 项），全仓库剩余 5 项 Finding（5 项合同缺口）严格保持原状，维持待修复登记；
+  * **存量问题状态**：确认缺陷归零（0 项），全仓库剩余 4 项 Finding（4 项合同缺口，全部集中于 PKG-5：FIND-R3-01 至 FIND-R3-04）严格保持原状，维持待修复登记；
   * **Phase 7B 状态**：**仍然严格禁止**，禁止提前开发环境双向动力学；
-  * **门禁终止状态**：`JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行开展下一步修复）。
+  * **门禁终止状态**：`CONTACT-MODEL-07 — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行开展下一步修复）。
 * **Git 状态**：
   * **当前分支**：`master`
-  * **起始基准 Commit SHA**：`0c200eec43e5ae6dd4ae6f38049392503fa533bf`
-  * **最新 Commit SHA**：`a22b459`
-  * **远程仓库同步状态**：已同步至 origin/master
+  * **起始基准 Commit SHA**：`b4eb12762c87e2cebb53cfb7947486fd5d05af06`
+  * **最新 Commit SHA**：`PENDING_COMMIT`
+  * **远程仓库同步状态**：已准备同步至 origin/master
   * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
 
 ---
@@ -49,7 +50,7 @@
 | **PKG-4 (Terrain Part 2)** | **FIND-R2-06** | [`src/motion/terrain_walk.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py) | [`tests/test_terrain_planning_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_terrain_planning_contract.py) | Quick(19/19), Physics(21/21), Motion(12/12), Full(36/36) 全部 PASS | **FIXED / VERIFIED** |
 | **PKG-4 (Terrain Part 3)** | **FIND-T01-07** | [`src/motion/terrain_walk.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py) | [`tests/test_terrain_planning_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_terrain_planning_contract.py) | Quick(19/19), Physics(21/21), Motion(12/12), Full(36/36) 全部 PASS | **FIXED / VERIFIED** |
 | **PKG-4 (Terrain Part 4)** | **FIND-T01-08** | [`src/motion/terrain_walk.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/terrain_walk.py) | [`tests/test_terrain_planning_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_terrain_planning_contract.py) | Quick(19/19), Physics(21/21), Motion(12/12), Full(36/36) 全部 PASS | **FIXED / VERIFIED** |
-| **PKG-4 (剩余)** | FIND-R2-05 | `src/motion/contact_model.py` | 待排期 | - | `PENDING REVIEW` |
+| **PKG-4 (Contact Model)** | **FIND-R2-05** | [`src/motion/contact_model.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/contact_model.py) / [`src/motion/kinematic_bridge.py:562`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/motion/kinematic_bridge.py#L562) | [`tests/test_contact_model_geometry_support_contract.py`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_contact_model_geometry_support_contract.py) | Quick(19/19), Physics(22/22), Motion(12/12), Full(37/37) 全部 PASS | **FIXED / VERIFIED** |
 | **PKG-5** | FIND-R3-01, FIND-R3-02, FIND-R3-03, FIND-R3-04 | `src/rig/foot_contact.py`, `src/rig/ik.py` | 待排期 | - | `PENDING REVIEW` |
 
 ---
