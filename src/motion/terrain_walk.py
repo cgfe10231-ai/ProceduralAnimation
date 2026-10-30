@@ -247,14 +247,6 @@ def plan_terrain_footsteps(
     # Initial resting foot placement via single-hit ground support queries
     res0_l = environment.query_ground_support_at(left_x, y0)
     res0_r = environment.query_ground_support_at(right_x, y0)
-    if not res0_l.success:
-        raise ValueError(
-            f"Initial left foot placement at ({left_x:.2f}, {y0:.2f}) rejected: {res0_l.error_reason}"
-        )
-    if not res0_r.success:
-        raise ValueError(
-            f"Initial right foot placement at ({right_x:.2f}, {y0:.2f}) rejected: {res0_r.error_reason}"
-        )
     if not res0_l.allows_regular_support:
         raise ValueError(
             f"Initial left foot placement at ({left_x:.2f}, {y0:.2f}) rejected: "
@@ -264,6 +256,14 @@ def plan_terrain_footsteps(
         raise ValueError(
             f"Initial right foot placement at ({right_x:.2f}, {y0:.2f}) rejected: "
             f"surface '{res0_r.surface_id}' does not allow regular support"
+        )
+    if not res0_l.success:
+        raise ValueError(
+            f"Initial left foot placement at ({left_x:.2f}, {y0:.2f}) rejected: {res0_l.error_reason}"
+        )
+    if not res0_r.success:
+        raise ValueError(
+            f"Initial right foot placement at ({right_x:.2f}, {y0:.2f}) rejected: {res0_r.error_reason}"
         )
 
     z0_l = res0_l.contact_point_world[2]
@@ -323,13 +323,13 @@ def plan_terrain_footsteps(
 
         # Single-hit ground support query for landing surface
         sw_landing_res = environment.query_ground_support_at(sw_x, target_y)
-        if not sw_landing_res.success:
-            raise ValueError(
-                f"Footstep {k} at ({sw_x:.2f}, {target_y:.2f}) rejected: {sw_landing_res.error_reason}"
-            )
         if not sw_landing_res.allows_regular_support:
             raise ValueError(
                 f"Footstep {k} at ({sw_x:.2f}, {target_y:.2f}) lands on unsupported surface '{sw_landing_res.surface_id}'"
+            )
+        if not sw_landing_res.success:
+            raise ValueError(
+                f"Footstep {k} at ({sw_x:.2f}, {target_y:.2f}) rejected: {sw_landing_res.error_reason}"
             )
 
         sw_landing_z = sw_landing_res.contact_point_world[2]
