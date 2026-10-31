@@ -34,7 +34,7 @@ requested_world, applied_world, clamped_reach, clamped_ground, ground_z, constra
 * **Git 状态**：
   * **当前分支**：master
   * **起始基准 Commit SHA**：ee61b307ce67ccdb82d56ef2bf44ceaee35e9963
-  * **最新本地 Commit SHA**：ee86faaaac35d1732a66434001043721a7b495ab
+  * **最新本地 Commit SHA**：2ae92d58af59b8c7c9266c3d6e4ba842eedf48f6
   * **远程仓库同步状态**：已同步至 origin/master（HEAD 一致）
   * **未提交文件说明**：P2_R1_recovery.patch 为受保护历史恢复安全补丁，严禁暂存。
 
