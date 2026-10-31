@@ -1,7 +1,7 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务**：ProceduralAnimation — PKG-5 / 09 Lower-Limb IK: 三维 Ground × Reach 约束求解器最终工程收口 (Task ID: PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)
+* **当前任务**：ProceduralAnimation — PKG-5 / 09-A: 最终代码完整性检查与全仓文档状态一致性门禁收口 (Task ID: PKG5-09A-CODE-DOC-INTEGRITY-CLOSURE)
 * **核心状态**：
   * **PKG-5 / 09-A 最终工程收口**：
     1. **接口算法收口 (src/rig/ik.py:322–640 set_foot_ik_target)**：
@@ -9,8 +9,8 @@
        - **几何全空间分类完备性**：CASE-1 严格空集异常 (GROUND_REACH_INFEASIBLE)、CASE-2 顶部切点、CASE-3/4 地面截断球体候选极值搜索、CASE-5 极低地面退化为 Reach-only（杜绝零半径伪装交圆）；
        - **两阶段执行与原子性保护**：Phase A 校验全部输入、有限性与约束求解；Phase B 仅在通过后写入控制器并触发 prebend hint，前置失败绝不污染骨架；
        - **真实性遥测与求解校验**：内部求解失败抛出 GROUND_REACH_CONSTRAINT_UNSATISFIED；真实返回
-equested_world, pplied_world, clamped_reach, clamped_ground, ground_z, constraints_satisfied, ground_clearance_m, hip_to_target_dist_m；
-    2. **专项测试 (	ests/test_leg_ik_ground_height_contract.py)**：
+requested_world, applied_world, clamped_reach, clamped_ground, ground_z, constraints_satisfied, ground_clearance_m, hip_to_target_dist_m；
+    2. **专项测试 (tests/test_leg_ik_ground_height_contract.py)**：
        - 完整保留 TEST-1 至 TEST-18；
        - 新增 TEST-19（完整几何分类法 Categories A 至 T，20个边界全量检查 8 大字段）；
        - 新增 TEST-20（独立数值网格与边界采样 Oracle 参数化与伪随机交叉验证，5mm网格公差内 100% 吻合）；
@@ -27,13 +27,13 @@ equested_world, pplied_world, clamped_reach, clamped_ground, ground_z, constrai
        - Physics: **24/24 PASSED (94.97s)**；
        - Motion: **12/12 PASSED (48.36s)**；
        - Full: **39/39 PASSED (146.79s)**；
-       - 架构文档与符号物理校验 	ests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
+       - 架构文档与符号物理校验 tests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
   * **缺陷状态**：已确认缺陷归零（0 项）。全局库剩余 3 项同级缺陷（全部在 PKG-5：FIND-R3-01 局部闭合、剩余动态问题，FIND-R3-03、FIND-R3-04 维持待修复登记）；
   * **Phase 7B 状态**：**依然严格禁止开启**（禁止提前跃迁双足动力学）；
-  * **终门禁终止状态**：PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW（严格停止等待外部审查，严禁自行推进 Task 09-B，严禁修改 oot_contact.py，严禁进入 Phase 7B）。
+  * **终门禁终止状态**：PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW（严格停止等待外部审查，严禁自行推进 Task 09-B，严禁修改 foot_contact.py，严禁进入 Phase 7B）。
 * **Git 状态**：
   * **当前分支**：master
-  * **起始基准 Commit SHA**：4efb99307becf3a7fe9f202d111fb29f77c58b6d
+  * **起始基准 Commit SHA**：ee61b307ce67ccdb82d56ef2bf44ceaee35e9963
   * **最新本地 Commit SHA**：ee86faaaac35d1732a66434001043721a7b495ab
   * **远程仓库同步状态**：已同步至 origin/master（HEAD 一致）
   * **未提交文件说明**：P2_R1_recovery.patch 为受保护历史恢复安全补丁，严禁暂存。

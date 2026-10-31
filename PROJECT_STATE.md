@@ -7,7 +7,7 @@
 >    - **几何全空间分类覆盖**：CASE-1 严格空集异常 (GROUND_REACH_INFEASIBLE)、CASE-2 顶部切点、CASE-3/4 地面截断球体候选极值搜索、CASE-5 极低地面退化为 Reach-only（杜绝零半径伪装交圆）；
 >    - **两阶段执行与原子性保护**：Phase A 进行输入与髋关节有限性校验、场景图同步、解析极值求解与约束检验；Phase B 验证通过后方执行 _apply_ik_prebend_hint 并提交控制器写入；
 >    - **真实性遥测与内部异常**：内部违反约束抛出 GROUND_REACH_CONSTRAINT_UNSATISFIED；真实汇报 8 大字段；
-> 2) **专项测试基准全量通过 (	ests/test_leg_ik_ground_height_contract.py)**：
+> 2) **专项测试基准全量通过 (tests/test_leg_ik_ground_height_contract.py)**：
 >    - 包含 TEST-1 至 TEST-18（平地兼容、根节点解耦、负高程、高台、下坡、旋转独立性、双重约束、零退化等）；
 >    - 新增 **TEST-19 (完整几何分类法 Categories A 至 T，20 个几何边界全面验证 8 大字段)**；
 >    - 新增 **TEST-20 (独立数值 Oracle 参数网格与 30 组伪随机交叉验证，5mm 网格公差内 100% 吻合)**；
@@ -24,8 +24,8 @@
 >    - Physics: **24/24 PASSED (94.97s)**；
 >    - Motion: **12/12 PASSED (48.36s)**；
 >    - Full: **39/39 PASSED (146.79s)**；
->    - 架构文档与符号物理校验 	ests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
-> **主要验证依据与基准**：FIND-R3-02 足底高程与可达约束三维解析极值求解器已彻底工程收口，全局仅剩余 3 项同级缺陷（全部在 PKG-5：FIND-R3-01 剩余动态问题、FIND-R3-03、FIND-R3-04）。阻断 Phase 7B 依然为 YES（等待 PKG-5 全部完成）。当前门禁终止状态为：PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW。严格停止并等待审查，严禁自行推进 Task 09-B，严禁修改 oot_contact.py，严禁进入 Phase 7B。
+>    - 架构文档与符号物理校验 tests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
+> **主要验证依据与基准**：FIND-R3-02 足底高程与可达约束三维解析极值求解器已彻底工程收口，全局仅剩余 3 项同级缺陷（全部在 PKG-5：FIND-R3-01 剩余动态问题、FIND-R3-03、FIND-R3-04）。阻断 Phase 7B 依然为 YES（等待 PKG-5 全部完成）。当前门禁终止状态为：PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW。严格停止并等待审查，严禁自行推进 Task 09-B，严禁修改 foot_contact.py，严禁进入 Phase 7B。
 ---
 
 ## 1. 状态分类一览

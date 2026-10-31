@@ -666,16 +666,3 @@ def set_foot_ik_target(
     state["ground_clearance_m"] = ground_clearance_m
     state["hip_to_target_dist_m"] = hip_to_target_dist_m
     return state
-
-    bpy.context.view_layer.update()
-
-    state = get_leg_ik_state(arm, side)
-    state["requested_world"] = requested
-    state["applied_world"] = applied
-    state["clamped_reach"] = clamped_reach
-    state["clamped_ground"] = clamped_ground
-    state["ground_z"] = effective_ground_z
-    state["constraints_satisfied"] = constraints_satisfied
-    state["ground_clearance_m"] = ground_clearance_m
-    state["hip_to_target_dist_m"] = hip_to_target_dist_m
-    return state

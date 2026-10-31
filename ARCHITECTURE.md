@@ -140,6 +140,20 @@ flowchart TD
    * **双向 (+/- Y) 行走支持**：重构步点规划循环与终止条件，实现固定 X 走廊在 $+Y$ 与 $-Y$ 上的对称步点生成，Hermite 样条切线自适应行进符号保证严格单调性；
    * **时间基准归一化 (`float(dur)`)**：摆动脚进度归一化统一为 `float(dur)`，彻底消除短步态下 25% 相位差与 0.4mm 假性过伸；
    * **几何约束与接口修复**：强制执行 `max_step_length_m` 步长约束与 `nominal_stride_m` 严格正数/有限值校验；修复 `estimate_duration_frames` 误传 `fps` 参数导致的运行时异常。
+7. **下肢 IK 目标约束与世界空间高程解耦 (Lower-Limb IK Ground & Reach Constraints Contract, PKG-5 / 09-A)**：
+   * **单一执行入口与接口定义**：[`src/rig/ik.py:set_foot_ik_target()`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py#L322-L668)；
+   * **世界高程解耦**：移除将 `CharacterRoot` 世界高程硬编码为地面的缺陷，引入可选 `ground_z: Optional[float] = None`（未指定时默认平地基准 0.0m），最低踝关节限制严格为 $Z \ge \text{ground\_z} + \text{ANKLE\_REST\_Z}$；
+   * **世界空间不变量**：初始化与重置后控制器满足 `FootIK.parent is None` 且 `KneePole.parent is None`，足部约束求解直接工作于全局世界坐标系；
+   * **四模式解析几何求解**：
+     * 模式 A（`clamp_reach=False, clamp_ground=False`）：保持原样不执行投影；
+     * 模式 B（`clamp_reach=False, clamp_ground=True`）：仅限地面高程截断（$Z \ge z_{\min}$），腿长不限；
+     * 模式 C（`clamp_reach=True, clamp_ground=False`）：仅限腿长球壳截断（$[L_{\min}, L_{\max}]$），地面不限，零距离采用确定性向下方向；
+     * 模式 D（`clamp_reach=True, clamp_ground=True`）：三维欧氏距离最小化解析极值投影；
+   * **两阶段执行与原子性保护 (Two-Phase Execution)**：
+     * **Phase A (Read/Resolve/Validate)**：严格校验所有输入有限性；空可行域抛出 `ValueError("GROUND_REACH_INFEASIBLE: ...")`；内部求解异常抛出 `RuntimeError("GROUND_REACH_CONSTRAINT_UNSATISFIED: ...")`；
+     * **Phase B (Commit)**：仅在 Phase A 验证通过后写入控制器对象位置并调用 `_apply_ik_prebend_hint(arm)`，前置失败绝不污染骨骼姿态；
+   * **真实性遥测输出**：如实返回字典扩充字段 `requested_world`, `applied_world`, `clamped_reach`, `clamped_ground`, `ground_z`, `constraints_satisfied`, `ground_clearance_m`, `hip_to_target_dist_m`；
+   * **集成边界声明**：09-A 属于底层 IK 求解器工程收口，上层 `WholeBodyController` 与 `TerrainWalkAction` 尚未完整启用动态地形高程透传，禁止夸大为动力学闭环。
 
 ---
 

@@ -1532,3 +1532,31 @@
 * **影响**：
   - 彻底厘清了工程全部 61 个模块的集成状态与真实物理语义，消除了自 Task 6G-D 以来累积的文档滞后与认知漂移；
   - 为 Phase 7B（独立上肢运动学）扫清了接口认知障碍，确立了零退化、零造假的工程基线。
+
+---
+
+### [DEC-063] 2026-11-01: PKG-5 / 09-A: 三维 Ground × Reach 约束求解器工程收口与世界空间高程解耦 (FIND-R3-02)
+
+* **状态**：已采纳并完成实施 (Accepted & Implemented)
+* **日期**：2026-11-01
+* **背景**：
+  - 在生产接口审计 R3（FIND-R3-02）中确认：`src/rig/ik.py:set_foot_ik_target()` 将 `root_obj.matrix_world.translation.z` 硬编码为地面参考高度。当下坡或角色根节点抬高时，足部目标被错误截断抬起，导致无法贴合真实地形。
+  - 此前的局部补丁缺乏完备的 3D 欧氏距离极值求解数学论证，存在相切边界与内球相交圆虚构问题、前向远距目标投影误判以及不可达死代码尾部。
+* **决策与结论**：
+  1. **地面高程接口解耦**：在 `set_foot_ik_target` 中引入可选参数 `ground_z: Optional[float] = None`（未指定时默认平地基准 0.0m），最低踝关节高程限制严格基于世界 Z 坐标计算：$z_{\min} = \text{effective\_ground\_z} + \text{ANKLE\_REST\_Z}$，彻底解耦 `CharacterRoot`。
+  2. **三维欧氏距离最小化解析极值求解器**：
+     - 在可行域 $\mathcal{F} = \{ \mathbf{p} \in \mathbb{R}^3 \mid L_{\min} \le \|\mathbf{p} - \mathbf{h}\| \le L_{\max},\ p_z \ge z_{\min} \}$ 上，通过柱面坐标下地面线段、外球面上弧与内球面上弧的三类候选点解析比对，求解距离请求点最近的全局最优合法点；
+     - 覆盖 CASE-1（空集抛出 `GROUND_REACH_INFEASIBLE`）、CASE-2（顶部切点）、CASE-3/4（相交截断）、CASE-5（极低地面退化为 Reach-only，杜绝虚假零半径交圆）。
+  3. **两阶段执行与原子性保护 (Two-Phase Execution)**：
+     - Phase A 完成输入非有限数校验、场景依赖图更新与约束求解，若失败直接抛出异常；
+     - Phase B 仅在 Phase A 成功后调用 `_apply_ik_prebend_hint(arm)` 并写入控制器位置，保证写入原子性；
+     - 清除第一次 `return state` 后的不可达重复死代码尾部。
+  4. **真实性遥测与独立 Oracle 交叉验证**：
+     - 返回字典扩充 8 个真实遥测字段；
+     - 在 `tests/test_leg_ik_ground_height_contract.py` 中保留 TEST-1 至 TEST-18，新增 TEST-19（几何分类法 Categories A 至 T，20 个几何边界全量检验）与 TEST-20（独立的 2D 网格与密集边界采样 Oracle，在 5mm 网格公差内实现参数化网格与 30 组伪随机测试 100% 吻合）。
+  5. **门禁隔离边界**：
+     - 本任务仅限底层 `set_foot_ik_target()` 函数的数学与工程收口，不修改上层 `WholeBodyController` 或 `foot_contact.py`，不代表地形高度已在全身控制器中全链路透传；
+     - 终止状态严格标记为 `PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW`，严禁越界进入 09-B 或 Phase 7B。
+* **影响**：
+  - 为底层双足逆运动学目标设定提供了 100% 数学严密、数值稳定且具备独立验证的几何投影基石；
+  - 维持历史测试（4C、4D、6F-B、6G-B、6G-C、R3B-1）及四级全量回归（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39）100% 零退化通过。
