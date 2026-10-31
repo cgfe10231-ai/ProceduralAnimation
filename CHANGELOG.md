@@ -3,6 +3,33 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-31] PKG-5 / 08 Rig: 历史测试语义修复与 CoM 刚体平移回归收口 (PKG5-RIG08-COM-REGRESSION-CLOSURE)
+
+### 1. 历史刚体测试 Test 8B 局部骨架姿态不变语义修复
+* **问题成因**：
+  - 在 PKG-5 / WS-01 将 FootIK 控制器固定于世界空间（`parent is None`）后，`tests/verify_task6fb_rigid_link.py` Test 8B 在平移 CharacterRoot 时，因世界空间 FootIK 保持原地而激活腿部 IK 解算，改变了局部骨骼姿态，破坏了“身体各部位相对于 Armature 局部姿态保持不变”的刚体平移测试数学前提，导致 0.146m 质心位移偏差并造成三个上层测试（6G-B, 6G-C, R3B-1 Bridge）级联失败。
+* **测试语义修复方案**：
+  - [tests/verify_task6fb_rigid_link.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/verify_task6fb_rigid_link.py):
+    - **Step A (保存实验前状态)**：记录 CharacterRoot 原始位置与欧拉角旋转，收集影响腿部与手臂局部姿态的 IK/旋转约束及其原始 influence；
+    - **Step B (建立固定局部姿态条件)**：临时将 IK/旋转约束影响度设置为 0.0，使骨架在根节点平移期间保持纯刚性局部姿态；
+    - **Step C (重新建立有效基准)**：在局部固定状态下重新通过生产函数 `compute_whole_body_com()` 计算基准质心，并抓取 7 个关键骨骼（pelvis, spine, thigh.L, shin.L, foot.L, upper_arm.L, forearm.L）在 Armature 空间的局部矩阵；
+    - **Step D (执行纯刚体平移与断言)**：执行原始位移 `root_shift = Vector((2.5, 5.0, 0.3))`，断言世界质心误差（实测 $0.0000007907\text{m} \le 10^{-4}\text{m}$）、Armature 空间质心误差（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）及关键骨骼局部矩阵漂移（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）；
+    - **Step E (恢复实验前状态)**：在 `try/finally` 块中精准恢复 CharacterRoot 原始变换、约束 influences 及 pose，杜绝测试副作用污染后续环境；
+    - **约束遵守**：生产代码 0 修改、测试断言阈值 0 放宽、FootIK 世界空间无父级不变量（`parent is None`）100% 保持。
+* **分层回归与全量验证**：
+  - `tests/verify_task6fb_rigid_link.py`: **ALL PASSED (Test 1 至 8B 全绿)**；
+  - 级联测试全部转绿恢复通过：
+    - `tests/verify_task6gb_body_inertia.py`: **13/13 PASSED**；
+    - `tests/verify_task6gc_contact_model.py`: **17/17 PASSED**；
+    - `tests/verify_task6gc_r3b1_bridge.py`: **14/14 PASSED**；
+  - `tests/test_leg_ik_worldspace_init_reset.py`: **6/6 PASSED**（四个控制器恒定 `parent is None`）；
+  - 全套分层自动化回归全量 100% 通过：
+    - `quick`: **19/19 PASSED (50.69s)**；
+    - `physics`: **23/23 PASSED (92.02s)**；
+    - `motion`: **12/12 PASSED (53.22s)**；
+    - `full`: **38/38 PASSED (159.0s)**；
+  - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**。
+
 ## [2026-10-31] PKG-5 / WS-01: 腿部 IK 控制器世界空间初始化与重置不变量修复 (FIND-R3-01 部分子问题)
 
 ### 1. 腿部 IK 控制器世界空间无父级不变量 (Leg IK World-Space Initialization & Reset Invariant)

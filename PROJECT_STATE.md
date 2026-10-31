@@ -1,18 +1,23 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-31
-> **当前阶段**：PKG-5 / WS-01 腿部 IK 控制器世界空间初始化与重置不变量修复 (FIND-R3-01 部分子问题)。已完成腿部 IK 控制器世界空间无父级不变量修复：
-> 1) **生产代码修复 (`src/rig/ik.py`)**：
->    - `_get_or_create_empty()`：当 `parent=None` 时，若获取到的已有对象仍挂在某个父级下，显式执行解绑（`obj.parent = None` 并重置 `obj.matrix_parent_inverse = Matrix.Identity(4)`）；
->    - `setup_leg_ik()`：创建或获取 `FootIK.L`, `FootIK.R`, `KneePole.L`, `KneePole.R` 时显式传入 `parent=None`；显式校验若已有对象存在父级则解绑；通过 `root_mat = root_obj.matrix_world.copy()` 将角色当前根节点空间的中立站立坐标投影至世界坐标（`ik_obj.location = root_mat @ ik_local`, `ik_obj.rotation_euler = root_rot`），重置 `is_locked = False`；
->    - `reset_leg_ik()`：移除 `ik_obj.parent = root_obj` 与 `pole_obj.parent = root_obj` 强行挂载逻辑；若控制器存在残留父级则解绑清理；重新计算根节点世界变换并将控制器准确放回当前根节点对应的世界空间中立站立位置与朝向，重置 `is_locked = False`；
-> 2) **独立单元测试全绿 (`tests/test_leg_ik_worldspace_init_reset.py`)**：
->    - 覆盖 TEST-1 至 TEST-6（初始无父级、非原点根位移、非零偏航旋转、已有父级回收、位移后重置与零累积漂移、后续根运动不拖拽控制器），6 项全绿通过（6/6 PASS in 0.663s）；
-> 3) **分层回归与旧测试假设排查**：
->    - `tests/test_runner_unit.py` 11/11 PASS；`tests/audit_c2_final_inspector.py --verify-docs` 0 错误通过；
->    - `tests/run_test_suite.py --tier motion` 12/12 PASS (100%)；
->    - 历史测试失败登记：`tests/verify_task6fb_rigid_link.py` Test 8 在平移根节点时依赖旧代码中“FootIK 是 CharacterRoot 子级自动跟随”的旧假设，在无父级世界空间不变量下导致腿部拉伸（CoM 偏差 0.146m）。级联调用该测试的 `verify_task6gb_body_inertia.py` Test 13、`verify_task6gc_contact_model.py` Test 15、`verify_task6gc_r3b1_bridge.py` Test 14 同步呈现该失败；严格保留真实失败证据，不擅自修改断言阈值，不回退无父级合同；
-> **重要修复与证据核准**：FIND-R3-01 初始化与重置无父级子问题已关闭；全仓库剩余 4 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期、FIND-R3-02 至 FIND-R3-04）。阻碍 Phase 7B 仍然为 YES（需等待 PKG-5 整体完成）。当前门禁终止状态为：`PKG-5 / WS-01 — AWAITING INDEPENDENT REVIEW`，严格停止等待外部独立审查，禁止自行开始 WS-02，禁止进入 Phase 7B。
+> **当前阶段**：PKG-5 / 08 Rig: 历史测试语义修复与 CoM 刚体平移全量回归收口 (PKG5-RIG08-COM-REGRESSION-CLOSURE)。已完成历史刚体测试 Test 8B 局部姿态不变语义修复与分层回归闭环：
+> 1) **历史测试语义修复 (`tests/verify_task6fb_rigid_link.py` Test 8B)**：
+>    - 严守 5 步原子方案：Step A 记录 Root 变换与影响局部姿态的 IK/旋转约束；Step B 临时将相关约束 influence 置为 0.0，确立固定的局部骨架姿态实验条件；Step C 重新采样局部固定状态下的真实基准 CoM，记录 7 关键骨骼局部矩阵；Step D 执行原位移 `(2.5, 5.0, 0.3)`，断言世界质心误差（实测 $0.0000007907\text{m} \le 10^{-4}\text{m}$）、Armature 空间质心误差（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）及关键骨骼局部矩阵漂移（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）；Step E 在 `try/finally` 中精准恢复 Root 变换、约束 influences 及 pose；
+>    - 生产代码 0 修改、测试断言阈值 0 放宽、FootIK 世界空间无父级不变量（`parent is None`）100% 保持；
+> 2) **级联回归测试全绿**：
+>    - `tests/verify_task6fb_rigid_link.py`: **ALL PASSED (Test 1 至 8B 全绿)**；
+>    - `tests/verify_task6gb_body_inertia.py`: **13/13 PASSED**；
+>    - `tests/verify_task6gc_contact_model.py`: **17/17 PASSED**；
+>    - `tests/verify_task6gc_r3b1_bridge.py`: **14/14 PASSED**；
+>    - `tests/test_leg_ik_worldspace_init_reset.py`: **6/6 PASSED**（四个控制器恒定 `parent is None`）；
+> 3) **全套分层自动化回归全量 100% 通过**：
+>    - Quick: **19/19 PASSED (50.69s)**；
+>    - Physics: **23/23 PASSED (92.02s)**；
+>    - Motion: **12/12 PASSED (53.22s)**；
+>    - Full: **38/38 PASSED (159.0s)**；
+>    - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**；
+> **重要修复与证据核准**：FIND-R3-01 初始化与重置无父级子问题及历史测试已彻底闭环收口；全仓库剩余 4 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期、FIND-R3-02 至 FIND-R3-04）。阻碍 Phase 7B 仍然为 YES（需等待 PKG-5 整体完成）。当前门禁终止状态为：`PKG-5 / 08 Rig — AWAITING FINAL INDEPENDENT REVIEW`，严格停止等待独立审查，禁止自行进入 09 Lower IK，禁止修改 FootContact，禁止进入 Phase 7B。
 ---
 
 ## 1. 状态分类一览
@@ -44,6 +49,18 @@
   * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），ContactModel 几何支撑一致性修复组 (FIND-R2-05) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项）；PKG-5 / WS-01 已关闭 FIND-R3-01 初始化与重置无父级子问题；全仓库剩余 4 项合同缺口中 1 项处于部分修复状态，维持挂起等待授权排期修复。
 
 ### [已验证]
+* **历史测试语义修复与 CoM 刚体平移全量回归收口 (PKG-5 / 08 Rig, PKG5-RIG08-COM-REGRESSION-CLOSURE)**：
+  * **测试语义修复 (`tests/verify_task6fb_rigid_link.py` Test 8B)**：
+    - 修复因世界空间 FootIK 保持原地导致根节点平移时局部姿态变动的问题；
+    - 严格实施 5 步隔离、基准重测、刚体平移断言与 `try/finally` 恢复；
+    - 实测 World 误差 $0.0000007907\text{m} \le 10^{-4}\text{m}$，Armature 误差 $0.0000000000\text{m} \le 10^{-6}\text{m}$，关键骨骼局部矩阵漂移 $0.0000000000\text{m} \le 10^{-6}\text{m}$；
+    - 保持 FootIK `parent is None` 不变量，0 修改生产代码，0 放宽断言精度；
+  * **级联与分层全量自动化回归 100% 全绿**：
+    - 6F-B 本身全绿通过；
+    - 3 项级联测试全绿：6G-B (13/13), 6G-C (17/17), R3B-1 Bridge (14/14)；
+    - 08 世界空间不变量 `test_leg_ik_worldspace_init_reset.py`: 6/6 PASS；
+    - 四级回归全量通过：Quick 19/19 (50.69s), Physics 23/23 (92.02s), Motion 12/12 (53.22s), Full 38/38 (159.0s)；
+    - 门禁终止状态：`PKG-5 / 08 Rig — AWAITING FINAL INDEPENDENT REVIEW`。
 * **腿部 IK 控制器世界空间初始化与重置不变量修复 (PKG-5 / WS-01, FIND-R3-01 Subproblem)**：
   * **生产代码修复 (`src/rig/ik.py`)**：
     - `_get_or_create_empty()`：当 `parent=None` 时，若已有对象仍挂在父级下，显式执行解绑（`obj.parent = None` 并重置 `obj.matrix_parent_inverse = Matrix.Identity(4)`）；

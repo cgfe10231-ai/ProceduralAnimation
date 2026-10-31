@@ -262,32 +262,78 @@ def verify_rigid_link_com() -> None:
 
     # 8B: Armature World Translation & Rotation
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
+
+    # Step A: Save pre-experiment state
     orig_root_loc = root_obj.location.copy()
     orig_root_rot = root_obj.rotation_euler.copy()
 
-    # Move root by (+2.5, +5.0, +0.3)
-    root_shift = Vector((2.5, 5.0, 0.3))
-    root_obj.location = orig_root_loc + root_shift
-    bpy.context.view_layer.update()
+    # Isolate IK and target tracking constraints whose world-space targets would distort local pose on root shift
+    target_constraints = []
+    for bone_name, con_type in (
+        ("shin.L", "IK"),
+        ("shin.R", "IK"),
+        ("foot.L", "COPY_ROTATION"),
+        ("foot.R", "COPY_ROTATION"),
+        ("forearm.L", "IK"),
+        ("forearm.R", "IK"),
+        ("hand.L", "COPY_ROTATION"),
+        ("hand.R", "COPY_ROTATION"),
+    ):
+        pb = arm.pose.bones.get(bone_name)
+        if pb:
+            for con in pb.constraints:
+                if con.type == con_type:
+                    target_constraints.append((con, con.influence))
 
-    res_trans = compute_whole_body_com(arm, DEMPSTER_WINTER_15_SEGMENT_MODEL)
-    expected_world_com = c_w + root_shift
-    trans_err = (res_trans.com_world - expected_world_com).length
-    print(f"  Root Translation (+2.5, +5.0, +0.3)m -> World CoM discrepancy: {trans_err:.10f} m")
-    if trans_err > 1e-4:
-        _fail(f"World transform discrepancy: {trans_err:.6f}m > 1e-4m")
+    try:
+        # Step B: Temporarily set IK constraint influence to 0.0 to fix local skeleton pose
+        for con, _ in target_constraints:
+            con.influence = 0.0
+        bpy.context.view_layer.update()
 
-    # Armature local CoM must remain invariant regardless of root translation
-    arm_space_diff = (res_trans.com_armature - c_a).length
-    print(f"  Armature-space CoM invariance check: diff = {arm_space_diff:.10f} m")
-    if arm_space_diff > 1e-6:
-        _fail(f"Armature-space CoM changed under root translation: diff={arm_space_diff}")
+        # Step C: Re-establish valid baseline CoM with isolated local pose
+        res_baseline = compute_whole_body_com(arm, DEMPSTER_WINTER_15_SEGMENT_MODEL)
+        baseline_world_com = res_baseline.com_world.copy()
+        baseline_armature_com = res_baseline.com_armature.copy()
 
-    # Restore root
-    root_obj.location = orig_root_loc
-    root_obj.rotation_euler = orig_root_rot
-    reset_pose(arm)
-    bpy.context.view_layer.update()
+        # Record key bones armature-space matrices before root shift to verify local pose stability
+        key_bone_names = ("pelvis", "spine", "thigh.L", "shin.L", "foot.L", "upper_arm.L", "forearm.L")
+        key_matrices_before = {name: arm.pose.bones[name].matrix.copy() for name in key_bone_names if name in arm.pose.bones}
+
+        # Step D: Execute pure rigid translation
+        root_shift = Vector((2.5, 5.0, 0.3))
+        root_obj.location = orig_root_loc + root_shift
+        bpy.context.view_layer.update()
+
+        res_trans = compute_whole_body_com(arm, DEMPSTER_WINTER_15_SEGMENT_MODEL)
+        expected_world_com = baseline_world_com + root_shift
+        trans_err = (res_trans.com_world - expected_world_com).length
+        print(f"  Root Translation (+2.5, +5.0, +0.3)m -> World CoM discrepancy: {trans_err:.10f} m")
+        if trans_err > 1e-4:
+            _fail(f"World transform discrepancy: {trans_err:.6f}m > 1e-4m")
+
+        # Armature local CoM must remain invariant regardless of root translation
+        arm_space_diff = (res_trans.com_armature - baseline_armature_com).length
+        print(f"  Armature-space CoM invariance check: diff = {arm_space_diff:.10f} m")
+        if arm_space_diff > 1e-6:
+            _fail(f"Armature-space CoM changed under root translation: diff={arm_space_diff}")
+
+        # Verify key bones armature local matrices remained invariant under root translation
+        for name, mat_before in key_matrices_before.items():
+            mat_after = arm.pose.bones[name].matrix
+            drift = (mat_after - mat_before).to_translation().length
+            if drift > 1e-6:
+                _fail(f"Key bone '{name}' armature-space matrix altered under root translation: drift={drift:.10f}m > 1e-6m")
+
+    finally:
+        # Step E: Restore pre-experiment state
+        root_obj.location = orig_root_loc
+        root_obj.rotation_euler = orig_root_rot
+        for con, orig_infl in target_constraints:
+            con.influence = orig_infl
+        reset_pose(arm)
+        bpy.context.view_layer.update()
+
     print("  -> PASSED: Armature and World coordinate transformations exact with zero double-transform.")
 
     print("\n" + "=" * 74)
