@@ -3,6 +3,57 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-11-01] PKG-5 / 09 Lower-Limb IK: 三维 Ground × Reach 约束求解器最终工程收口 (PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)
+
+### 1. set_foot_ik_target 解析联合约束求解器与独立 Oracle 验证 (FIND-R3-02 完整闭环收口)
+* **任务性质**: 对 `src/rig/ik.py::set_foot_ik_target()` 进行完整三维 Ground × Reach 几何约束求解器数学重构、两阶段写入原子性保护与独立参考 Oracle 数值验证。
+* **背景与缺陷根因**:
+  - 此前针对 Ground × Reach 联合约束的局部补丁存在几何分类不完备、内球相交圆虚构、前向远距目标误判、缺少独立数值 Oracle 交叉对照等问题。
+  - 需要建立严格的解析投影极值求解器，在欧氏空间距离最小化准则下，求解请求点到三维可行域 $\mathcal{F} = \{ \mathbf{p} \in \mathbb{R}^3 \mid L_{\min} \le \|\mathbf{p} - \mathbf{h}\| \le L_{\max},\ p_z \ge z_{\min} \}$ 的全局最近合法点。
+* **修改实现与技术细节**:
+  - [src/rig/ik.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py):
+    - **Phase A (Read / Resolve / Validate)**:
+      - 坐标与参数严格有限性校验（NaN/inf 立即拒绝于 Commit 之前）。
+      - 场景图同步 `bpy.context.view_layer.update()`，读取精确骨骼世界髋关节位置并验证有限性。
+      - 四种约束模式完备支持：
+        - 模式 A (`clamp_reach=False, clamp_ground=False`): 请求目标完全保持不变。
+        - 模式 B (`clamp_reach=False, clamp_ground=True`): 仅执行地面约束截断 ($Z \ge z_{\min}$)，腿长绝对不截断。
+        - 模式 C (`clamp_reach=True, clamp_ground=False`): 仅执行腿长球壳截断 ($L_{\min} \le \|\mathbf{p} - \mathbf{h}\| \le L_{\max}$)，地面绝对不截断；髋关节重合点采用确定性方向。
+        - 模式 D (`clamp_reach=True, clamp_ground=True`): 解析联合极值求解：
+          - **CASE-1 (空可行域)**: $\zeta_{\min} > L_{\max} + 10^{-6}$ 时抛出明确 `ValueError("GROUND_REACH_INFEASIBLE: ...")`。
+          - **CASE-2 (顶部相切)**: $|\zeta_{\min} - L_{\max}| \le 10^{-6}$ 求解唯一顶部极值点 $\mathbf{h} + (0, 0, L_{\max})$。
+          - **CASE-3/4 (地面截断球体)**: 收集地面线段 $[\rho_{\text{ground\_min}}, \rho_{\text{ground\_max}}]$、外球面上弧、内球面上弧候选点集合，在柱面投影平面解析最小化欧氏距离；杜绝零半径伪装交圆。
+          - **CASE-5 (极低地面)**: $\zeta_{\min} < -L_{\max} - 10^{-6}$ 地面不约束球壳，退化为 Reach-only，避免虚假地面相交计算。
+          - **内部状态检验与真实性遥测**: 求解完毕检验约束满足性，若异常则抛出 `RuntimeError("GROUND_REACH_CONSTRAINT_UNSATISFIED: ...")`；真实汇报 `requested_world`, `applied_world`, `clamped_reach`, `clamped_ground`, `ground_z`, `constraints_satisfied`, `ground_clearance_m`, `hip_to_target_dist_m`。
+    - **Phase B (Commit)**:
+      - 仅在 Phase A 几何与数值验证全部通过后，才调用 `_apply_ik_prebend_hint(arm)` 并写入 `ik_obj.location`, `ik_obj.rotation_euler`, `pole_obj.location`。
+      - 严格保护 `FootIK.parent is None` 及 `KneePole.parent is None` 世界空间不变量。
+  - [tests/test_leg_ik_ground_height_contract.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_leg_ik_ground_height_contract.py):
+    - 完整保留原有 TEST-1 至 TEST-18 专项测试。
+    - 新增 `_verify_8_fields` 统一字段校验辅助函数。
+    - 新增 **TEST-19 (完整几何边界分类法 Categories A 至 T)**:
+      - 覆盖确定性失败(A)、顶部单点(B)、高台相交(C)、地面穿过髋关节(D)、地面穿过内球(E)、内球下切点(F)、地面穿过外球低于内球(G)、外球底切点(H)、极低地面(I)、髋关节重合(J)、合法点不变(K)、低且远联合投影(L)、低且近联合投影(M)、高且远外球投影(N)、高且近内球投影(O)、仅Ground(P)、仅Reach(Q)、两者关闭(R)、左右腿镜像(S)、Root平移旋转世界空间一致性(T)。
+    - 新增 **TEST-20 (独立数值 Oracle 参数化与伪随机交叉验证)**:
+      - 实现独立的二维网格搜索 (3mm 步长) + 密集边界采样 Oracle 参考算法。
+      - 覆盖地面高度、髋关节高度、水平偏移、垂直偏移、左右腿及四种 Clamp 模式参数网格。
+      - 包含 30 组固定随机种子 (`random.Random(42)`) 伪随机测试，解析解与 Oracle 距离误差在 5mm 网格公差内 100% 一致。
+* **自动化回归验证**:
+  - 专项测试 `test_leg_ik_ground_height_contract.py`: **20/20 PASSED (2.12s)**
+  - 世界空间初始化/重置 `test_leg_ik_worldspace_init_reset.py`: **6/6 PASSED (0.53s)**
+  - 历史 Leg IK `legacy_leg_ik` (verify_task4c_ik): **PASS (1.58s)**
+  - 历史 Foot Contact `legacy_foot_contact` (verify_task4d_foot_contact): **PASS (1.62s)**
+  - 物理与主调用链回归:
+    - `physics_rigid_link_com` (verify_task6fb_rigid_link): **PASS (1.75s)**
+    - `physics_body_inertia` (verify_task6gb_body_inertia): **PASS (11.45s)**
+    - `physics_contact_model` (verify_task6gc_contact_model): **PASS (22.58s)**
+    - `physics_bridge_contract` (verify_task6gc_r3b1_bridge): **PASS (22.36s)**
+  - 四级全量回归:
+    - Quick: **19/19 PASSED (48.71s)**
+    - Physics: **24/24 PASSED (94.97s)**
+    - Motion: **12/12 PASSED (48.36s)**
+    - Full: **39/39 PASSED (146.79s)**
+    - 架构文档与符号物理校验 `audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**
+
 ## [2026-10-31] PKG-5 / 09 Lower-Limb IK: 地面与可达性几何约束精确求解与真实遥测收口 (PKG5-09A-GROUND-REACH-FINAL-CLOSURE)
 
 ### 1. set_foot_ik_target 地面与可达性约束不可行早期阻断与精确投影 (FIND-R3-02 收口)

@@ -1,25 +1,31 @@
 # PROJECT_STATE: 项目当前真实状态
 
-> **记录时间**：2026-10-31
-> **当前阶段**：PKG-5 / 09 Lower-Limb IK: 地面与可达性约束精确求解与真实遥测收口 (PKG5-09A-GROUND-REACH-FINAL-CLOSURE)。已完成 `set_foot_ik_target` 数学正确性收口、空交集早期阻断、二维柱坐标地平投影、失败状态原子性保证与真实遥测合同扩展，通过全量分层回归闭环：
-> 1) **生产接口与算法收口 (`src/rig/ik.py:322–450` `set_foot_ik_target`)**：
->    - **空可行域冲突早期阻断**：当 $z_{\min} > h_z + L_{\max} + 10^{-6}$ 时，硬性几何约束空间交集为空，严格抛出带 `GROUND_REACH_INFEASIBLE` 关键字的 `ValueError`，杜绝静默失败；
->    - **柱坐标二维几何精确截断**：在地表边界平面 $\zeta = \zeta_{\min} = z_{\min} - h_z$ 上精确求解水平有效半径区间 $[\rho_{\min}, \rho_{\max}]$，其中 $\rho_{\min} = \sqrt{\max(0, L_{\min}^2 - \zeta_{\min}^2)}$，$\rho_{\max} = \sqrt{\max(0, L_{\max}^2 - \zeta_{\min}^2)}$，保持水平方向单位向量不变投影水平距离，确保无论目标过近（$< L_{\min}$）还是过远（$> L_{\max}$），截断结果严格同时满足地面不穿透（$p_z \ge z_{\min}$）与腿长生理范围（$\|\mathbf{p} - \mathbf{h}\| \in [L_{\min}, L_{\max}]$）；
->    - **失败状态原子性保证**：在可行性校验与目标几何求解完成前，绝对不修改 `ik_obj.location`、`ik_obj.rotation_euler`、`pole_obj.location` 或调用改变骨骼局部姿态的 `_apply_ik_prebend_hint`；
->    - **真实遥测与合同扩展**：返回状态字典如实填充 `constraints_satisfied` (bool)、`ground_clearance_m` (float)、`hip_to_target_dist_m` (float)；
-> 2) **针对性单元测试套件完备化 (`tests/test_leg_ik_ground_height_contract.py`)**：
->    - 完整包含 TEST-1 至 TEST-18（覆盖平地兼容、根节点解耦、负高程坑洞、凸起平台、旁路开关、旋转独立性、双重边界几何交互、非法输入防御、空交集不可行阻断、最小/最大腿长地表精确截断、非平地多标高求解、失败原子性保护、真实遥测准确性、历史成熟动作零退化），全部 18 项测试 100% 通过（1.34s）；
-> 3) **历史与分层全量自动化回归 100% 通过**：
->    - `legacy_leg_ik` (verify_task4c_ik): **PASS (1.53s)**；
->    - `legacy_foot_contact` (verify_task4d_foot_contact): **PASS (1.57s)**；
->    - `physics_rigid_link_com` (verify_task6fb_rigid_link): **PASS (1.63s)**；
->    - `leg_ik_worldspace_init_reset` (PKG-5/WS-01): **PASS (2.16s)**；
->    - Quick: **19/19 PASSED (50.41s)**；
->    - Physics: **24/24 PASSED (92.59s)**；
->    - Motion: **12/12 PASSED (48.77s)**；
->    - Full: **39/39 PASSED (146.00s)**；
->    - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**；
-> **重要修复与证据核准**：FIND-R3-02 足部地面防穿透与可达性约束数学求解已彻底闭环收口；全仓库剩余 3 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期与姿态反解、FIND-R3-03、FIND-R3-04）。阻碍 Phase 7B 仍然为 YES（需等待 PKG-5 整体完成）。当前门禁终止状态为：`PKG-5 / 09-A FINAL — AWAITING INDEPENDENT REVIEW`，严格停止等待独立审查，禁止自行进入 Task 09-B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B。
+> **更新时间**：2026-11-01
+> **当前阶段**：PKG-5 / 09 Lower-Limb IK: 三维 Ground × Reach 约束求解器最终工程收口 (PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)，set_foot_ik_target 数学极值解析求解、两阶段写入原子性与独立 Oracle 验证全闭环通过全量回归。
+> 1) **接口算法收口 (src/rig/ik.py:322–640 set_foot_ik_target)**：
+>    - **四种约束模式完备解析**：模式 A (双关保持原样)、模式 B (仅 Ground)、模式 C (仅 Reach 投影)、模式 D (欧氏距离最小化联合极值投影)；
+>    - **几何全空间分类覆盖**：CASE-1 严格空集异常 (GROUND_REACH_INFEASIBLE)、CASE-2 顶部切点、CASE-3/4 地面截断球体候选极值搜索、CASE-5 极低地面退化为 Reach-only（杜绝零半径伪装交圆）；
+>    - **两阶段执行与原子性保护**：Phase A 进行输入与髋关节有限性校验、场景图同步、解析极值求解与约束检验；Phase B 验证通过后方执行 _apply_ik_prebend_hint 并提交控制器写入；
+>    - **真实性遥测与内部异常**：内部违反约束抛出 GROUND_REACH_CONSTRAINT_UNSATISFIED；真实汇报 8 大字段；
+> 2) **专项测试基准全量通过 (	ests/test_leg_ik_ground_height_contract.py)**：
+>    - 包含 TEST-1 至 TEST-18（平地兼容、根节点解耦、负高程、高台、下坡、旋转独立性、双重约束、零退化等）；
+>    - 新增 **TEST-19 (完整几何分类法 Categories A 至 T，20 个几何边界全面验证 8 大字段)**；
+>    - 新增 **TEST-20 (独立数值 Oracle 参数网格与 30 组伪随机交叉验证，5mm 网格公差内 100% 吻合)**；
+>    - 专项测试全部 20 项 100% 通过（2.12s）；
+> 3) **历史与物理全量自动化回归 100% 通过**：
+>    - leg_ik_worldspace_init_reset (PKG-5/WS-01): **6/6 PASS (0.53s)**；
+>    - legacy_leg_ik (verify_task4c_ik): **PASS (1.58s)**；
+>    - legacy_foot_contact (verify_task4d_foot_contact): **PASS (1.62s)**；
+>    - physics_rigid_link_com (verify_task6fb_rigid_link): **PASS (1.75s)**；
+>    - physics_body_inertia (verify_task6gb_body_inertia): **PASS (11.45s)**；
+>    - physics_contact_model (verify_task6gc_contact_model): **PASS (22.58s)**；
+>    - physics_bridge_contract (verify_task6gc_r3b1_bridge): **PASS (22.36s)**；
+>    - Quick: **19/19 PASSED (48.71s)**；
+>    - Physics: **24/24 PASSED (94.97s)**；
+>    - Motion: **12/12 PASSED (48.36s)**；
+>    - Full: **39/39 PASSED (146.79s)**；
+>    - 架构文档与符号物理校验 	ests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
+> **主要验证依据与基准**：FIND-R3-02 足底高程与可达约束三维解析极值求解器已彻底工程收口，全局仅剩余 3 项同级缺陷（全部在 PKG-5：FIND-R3-01 剩余动态问题、FIND-R3-03、FIND-R3-04）。阻断 Phase 7B 依然为 YES（等待 PKG-5 全部完成）。当前门禁终止状态为：PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW。严格停止并等待审查，严禁自行推进 Task 09-B，严禁修改 oot_contact.py，严禁进入 Phase 7B。
 ---
 
 ## 1. 状态分类一览

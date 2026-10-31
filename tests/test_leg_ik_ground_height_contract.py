@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import os
+import random
 import sys
 import unittest
 
@@ -39,6 +40,153 @@ from src.rig.ik import (
     set_foot_ik_target,
     setup_leg_ik,
 )
+
+
+def independent_numerical_oracle(
+    hip_world: Vector,
+    requested_world: Vector,
+    ground_z: float | None,
+    clamp_reach: bool,
+    clamp_ground: bool,
+    grid_res_m: float = 0.003,
+) -> dict:
+    """Independent numerical reference Oracle for 3D Ground x Reach constraint solving."""
+    min_ankle_z = (0.0 if ground_z is None else ground_z) + ANKLE_REST_Z
+    zeta_min = min_ankle_z - hip_world.z
+
+    req = Vector(requested_world)
+    v_from_hip = req - hip_world
+    horiz_vec = Vector((v_from_hip.x, v_from_hip.y, 0.0))
+    rho_r = horiz_vec.length
+    z_r = v_from_hip.z
+
+    if rho_r > 1e-6:
+        u_horiz = horiz_vec / rho_r
+    else:
+        u_horiz = Vector((0.0, 1.0, 0.0))
+
+    if not clamp_reach and not clamp_ground:
+        return {
+            "feasible": True,
+            "applied_world": req.copy(),
+            "dist_to_req": 0.0,
+        }
+
+    if clamp_ground and not clamp_reach:
+        applied = req.copy()
+        if applied.z < min_ankle_z:
+            applied.z = min_ankle_z
+        return {
+            "feasible": True,
+            "applied_world": applied,
+            "dist_to_req": (applied - req).length,
+        }
+
+    if clamp_reach and not clamp_ground:
+        d = v_from_hip.length
+        if d > MAX_LEG_REACH:
+            applied = hip_world + (v_from_hip / d) * MAX_LEG_REACH if d > 1e-6 else hip_world + Vector((0.0, 0.0, -1.0)) * MAX_LEG_REACH
+        elif d < MIN_LEG_REACH:
+            applied = hip_world + (v_from_hip / d) * MIN_LEG_REACH if d > 1e-6 else hip_world + Vector((0.0, 0.0, -1.0)) * MIN_LEG_REACH
+        else:
+            applied = req.copy()
+        return {
+            "feasible": True,
+            "applied_world": applied,
+            "dist_to_req": (applied - req).length,
+        }
+
+    # Mode D: Both enabled
+    if zeta_min > MAX_LEG_REACH + 1e-6:
+        return {"feasible": False, "applied_world": None, "dist_to_req": float("inf")}
+
+    best_rho = 0.0
+    best_z = 0.0
+    min_d_sq = float("inf")
+
+    # 1. Check if requested is already feasible
+    if z_r >= zeta_min - 1e-6:
+        d_req = math.sqrt(rho_r * rho_r + z_r * z_r)
+        if MIN_LEG_REACH - 1e-6 <= d_req <= MAX_LEG_REACH + 1e-6:
+            return {
+                "feasible": True,
+                "applied_world": req.copy(),
+                "dist_to_req": 0.0,
+            }
+
+    # 2. Dense Boundary search:
+    # A. Ground segment z = zeta_min
+    if -MAX_LEG_REACH - 1e-6 <= zeta_min <= MAX_LEG_REACH + 1e-6:
+        rho_g_max = math.sqrt(max(0.0, MAX_LEG_REACH**2 - zeta_min**2))
+        rho_g_min = math.sqrt(max(0.0, MIN_LEG_REACH**2 - zeta_min**2)) if abs(zeta_min) <= MIN_LEG_REACH else 0.0
+        n_pts = max(10, int((rho_g_max - rho_g_min) / 0.001))
+        for i in range(n_pts + 1):
+            rho = rho_g_min + (rho_g_max - rho_g_min) * (i / n_pts)
+            z = zeta_min
+            d_sq = (rho - rho_r)**2 + (z - z_r)**2
+            if d_sq < min_d_sq:
+                min_d_sq = d_sq
+                best_rho, best_z = rho, z
+
+    # B. Outer arc
+    sin_theta_min = max(-1.0, min(1.0, zeta_min / MAX_LEG_REACH))
+    theta_start = math.asin(sin_theta_min)
+    theta_end = math.pi - theta_start
+    n_pts_arc = 1500
+    for i in range(n_pts_arc + 1):
+        th = theta_start + (theta_end - theta_start) * (i / n_pts_arc)
+        z = MAX_LEG_REACH * math.sin(th)
+        rho = MAX_LEG_REACH * math.cos(th)
+        if rho < 0.0:
+            continue
+        d_sq = (rho - rho_r)**2 + (z - z_r)**2
+        if d_sq < min_d_sq:
+            min_d_sq = d_sq
+            best_rho, best_z = rho, z
+
+    # C. Inner arc
+    if zeta_min <= MIN_LEG_REACH:
+        sin_in_min = max(-1.0, min(1.0, zeta_min / MIN_LEG_REACH)) if abs(zeta_min) <= MIN_LEG_REACH else -1.0
+        th_in_start = math.asin(sin_in_min)
+        th_in_end = math.pi - th_in_start
+        for i in range(n_pts_arc + 1):
+            th = th_in_start + (th_in_end - th_in_start) * (i / n_pts_arc)
+            z = MIN_LEG_REACH * math.sin(th)
+            rho = MIN_LEG_REACH * math.cos(th)
+            if rho < 0.0:
+                continue
+            d_sq = (rho - rho_r)**2 + (z - z_r)**2
+            if d_sq < min_d_sq:
+                min_d_sq = d_sq
+                best_rho, best_z = rho, z
+
+    # D. 2D grid interior check
+    z_lo = max(zeta_min, -MAX_LEG_REACH)
+    z_hi = MAX_LEG_REACH
+    nz = max(5, int((z_hi - z_lo) / grid_res_m))
+    nrho = max(5, int(MAX_LEG_REACH / grid_res_m))
+    for iz in range(nz + 1):
+        z = z_lo + (z_hi - z_lo) * (iz / nz)
+        for irho in range(nrho + 1):
+            rho = MAX_LEG_REACH * (irho / nrho)
+            r2 = rho * rho + z * z
+            if MIN_LEG_REACH**2 - 1e-5 <= r2 <= MAX_LEG_REACH**2 + 1e-5:
+                d_sq = (rho - rho_r)**2 + (z - z_r)**2
+                if d_sq < min_d_sq:
+                    min_d_sq = d_sq
+                    best_rho, best_z = rho, z
+
+    applied_world = Vector((
+        hip_world.x + u_horiz.x * best_rho,
+        hip_world.y + u_horiz.y * best_rho,
+        hip_world.z + best_z,
+    ))
+
+    return {
+        "feasible": True,
+        "applied_world": applied_world,
+        "dist_to_req": math.sqrt(min_d_sq),
+    }
 
 
 class TestLegIKGroundHeightContract(unittest.TestCase):
@@ -682,6 +830,412 @@ class TestLegIKGroundHeightContract(unittest.TestCase):
         self.assertFalse(res_swing["clamped_ground"])
         self.assertFalse(res_swing["clamped_reach"])
         self.assertAlmostEqual((res_swing["applied_world"] - Vector(swing_tgt)).length, 0.0, places=5)
+
+    def _verify_8_fields(
+        self,
+        res: dict,
+        ik_obj: bpy.types.Object,
+        side: str,
+        min_ankle_z: float,
+    ) -> None:
+        """Helper verifying all 8 fields of set_foot_ik_target return dictionary."""
+        self.assertIn("requested_world", res)
+        self.assertIn("applied_world", res)
+        self.assertIn("hip_world", res)
+        self.assertIn("clamped_reach", res)
+        self.assertIn("clamped_ground", res)
+        self.assertIn("ground_z", res)
+        self.assertIn("constraints_satisfied", res)
+        self.assertIn("ground_clearance_m", res)
+        self.assertIn("hip_to_target_dist_m", res)
+
+        # FootIK world translation must match applied_world
+        ik_world_pos = ik_obj.matrix_world.translation
+        self.assertAlmostEqual((ik_world_pos - res["applied_world"]).length, 0.0, places=5)
+
+        # Hip world translation must match pose bone
+        p_thigh = self.armature.pose.bones[f"thigh.{side}"]
+        actual_hip = self.armature.matrix_world @ p_thigh.head
+        self.assertAlmostEqual((actual_hip - res["hip_world"]).length, 0.0, places=5)
+
+        # Length must match
+        expected_len = (res["applied_world"] - res["hip_world"]).length
+        self.assertAlmostEqual(res["hip_to_target_dist_m"], expected_len, places=5)
+
+        # Ground clearance must match
+        expected_clearance = res["applied_world"].z - min_ankle_z
+        self.assertAlmostEqual(res["ground_clearance_m"], expected_clearance, places=5)
+
+    def test_19_complete_geometric_boundary_taxonomy(self) -> None:
+        """TEST-19: Complete geometric boundary taxonomy covering Categories A through T."""
+        start_y = self.root.location.y
+        p_thigh_l = self.armature.pose.bones["thigh.L"]
+        hip_l = self.armature.matrix_world @ p_thigh_l.head
+        ik_l = bpy.data.objects[IK_TARGET_NAMES["L"]]
+
+        # Category A: Infeasible domain (zeta_min > MAX_LEG_REACH)
+        with self.assertRaises(ValueError) as cm:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, start_y, 2.5),
+                ground_z=hip_l.z + MAX_LEG_REACH - ANKLE_REST_Z + 0.1,
+            )
+        self.assertIn("GROUND_REACH_INFEASIBLE", str(cm.exception))
+
+        # Category B: Top single apex point (zeta_min = MAX_LEG_REACH)
+        gz_b = hip_l.z + MAX_LEG_REACH - ANKLE_REST_Z
+        res_b = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 0.2, hip_l.z + MAX_LEG_REACH + 0.1),
+            ground_z=gz_b,
+        )
+        self.assertTrue(res_b["constraints_satisfied"])
+        self._verify_8_fields(res_b, ik_l, "L", gz_b + ANKLE_REST_Z)
+        self.assertAlmostEqual(res_b["applied_world"].z, hip_l.z + MAX_LEG_REACH, places=5)
+        self.assertAlmostEqual(res_b["applied_world"].x, hip_l.x, places=5)
+        self.assertAlmostEqual(res_b["applied_world"].y, hip_l.y, places=5)
+
+        # Category C: High platform intersection (0 < zeta_min < MAX_LEG_REACH)
+        zeta_c = 0.40
+        gz_c = hip_l.z + zeta_c - ANKLE_REST_Z
+        res_c = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 1.0, hip_l.z + 0.60),
+            ground_z=gz_c,
+        )
+        self.assertTrue(res_c["constraints_satisfied"])
+        self._verify_8_fields(res_c, ik_l, "L", gz_c + ANKLE_REST_Z)
+        self.assertGreaterEqual(res_c["applied_world"].z, gz_c + ANKLE_REST_Z - 1e-5)
+        self.assertLessEqual(res_c["hip_to_target_dist_m"], MAX_LEG_REACH + 1e-4)
+
+        # Category D: Ground passes through hip (zeta_min = 0.0)
+        gz_d = hip_l.z - ANKLE_REST_Z
+        res_d = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 0.3, hip_l.z - 0.2),
+            ground_z=gz_d,
+        )
+        self.assertTrue(res_d["constraints_satisfied"])
+        self._verify_8_fields(res_d, ik_l, "L", gz_d + ANKLE_REST_Z)
+        self.assertAlmostEqual(res_d["applied_world"].z, hip_l.z, places=5)
+        self.assertGreaterEqual(res_d["hip_to_target_dist_m"], MIN_LEG_REACH - 1e-4)
+        self.assertLessEqual(res_d["hip_to_target_dist_m"], MAX_LEG_REACH + 1e-4)
+
+        # Category E: Ground cuts inner sphere (0 < |zeta_min| < MIN_LEG_REACH)
+        zeta_e = -0.10
+        gz_e = hip_l.z + zeta_e - ANKLE_REST_Z
+        res_e = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y, hip_l.z - 0.05),
+            ground_z=gz_e,
+        )
+        self.assertTrue(res_e["constraints_satisfied"])
+        self._verify_8_fields(res_e, ik_l, "L", gz_e + ANKLE_REST_Z)
+        self.assertGreaterEqual(res_e["applied_world"].z, gz_e + ANKLE_REST_Z - 1e-5)
+        self.assertGreaterEqual(res_e["hip_to_target_dist_m"], MIN_LEG_REACH - 1e-4)
+
+        # Category F: Inner sphere bottom tangent point (zeta_min = -MIN_LEG_REACH)
+        zeta_f = -MIN_LEG_REACH
+        gz_f = hip_l.z + zeta_f - ANKLE_REST_Z
+        res_f = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y, hip_l.z - 0.30),
+            ground_z=gz_f,
+        )
+        self.assertTrue(res_f["constraints_satisfied"])
+        self._verify_8_fields(res_f, ik_l, "L", gz_f + ANKLE_REST_Z)
+
+        # Category G: Ground cuts outer sphere below inner sphere (-MAX_LEG_REACH < zeta_min < -MIN_LEG_REACH)
+        zeta_g = -0.50
+        gz_g = hip_l.z + zeta_g - ANKLE_REST_Z
+        res_g = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 0.1, hip_l.z - 0.70),
+            ground_z=gz_g,
+        )
+        self.assertTrue(res_g["constraints_satisfied"])
+        self._verify_8_fields(res_g, ik_l, "L", gz_g + ANKLE_REST_Z)
+        self.assertAlmostEqual(res_g["applied_world"].z, gz_g + ANKLE_REST_Z, places=5)
+
+        # Category H: Outer sphere bottom tangent point (zeta_min = -MAX_LEG_REACH)
+        zeta_h = -MAX_LEG_REACH
+        gz_h = hip_l.z + zeta_h - ANKLE_REST_Z
+        res_h = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 0.3, hip_l.z - 0.20),
+            ground_z=gz_h,
+        )
+        self.assertTrue(res_h["constraints_satisfied"])
+        self._verify_8_fields(res_h, ik_l, "L", gz_h + ANKLE_REST_Z)
+
+        # Category I: Extremely low ground (zeta_min < -MAX_LEG_REACH)
+        gz_i = hip_l.z - MAX_LEG_REACH - 1.0
+        res_i = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 0.3, hip_l.z - 0.20),
+            ground_z=gz_i,
+        )
+        self.assertTrue(res_i["constraints_satisfied"])
+        self._verify_8_fields(res_i, ik_l, "L", gz_i + ANKLE_REST_Z)
+        self.assertFalse(res_i["clamped_ground"])
+
+        # Category J: Requested point equals hip
+        res_j = set_foot_ik_target(
+            self.armature,
+            "L",
+            tuple(hip_l),
+            ground_z=0.0,
+        )
+        self.assertTrue(res_j["constraints_satisfied"])
+        self._verify_8_fields(res_j, ik_l, "L", ANKLE_REST_Z)
+        self.assertAlmostEqual(res_j["hip_to_target_dist_m"], MIN_LEG_REACH, places=5)
+        self.assertTrue(res_j["clamped_reach"])
+
+        # Category K: Requested point itself strictly legal
+        legal_tgt = (-HIP_X_OFFSET, start_y + 0.2, 0.25)
+        res_k = set_foot_ik_target(self.armature, "L", legal_tgt, ground_z=0.0)
+        self.assertTrue(res_k["constraints_satisfied"])
+        self._verify_8_fields(res_k, ik_l, "L", ANKLE_REST_Z)
+        self.assertFalse(res_k["clamped_ground"])
+        self.assertFalse(res_k["clamped_reach"])
+        self.assertAlmostEqual((res_k["applied_world"] - Vector(legal_tgt)).length, 0.0, places=6)
+
+        # Category L: Target below ground and too far away (steep downward with cutting ground)
+        gz_l = 0.20
+        min_z_l = gz_l + ANKLE_REST_Z
+        res_l = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 0.10, 0.0),
+            ground_z=gz_l,
+        )
+        self.assertTrue(res_l["constraints_satisfied"])
+        self._verify_8_fields(res_l, ik_l, "L", min_z_l)
+        self.assertTrue(res_l["clamped_ground"])
+        self.assertAlmostEqual(res_l["applied_world"].z, min_z_l, places=5)
+
+        # Category M: Target below ground and too close
+        res_m = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y, -0.10),
+            ground_z=0.0,
+        )
+        self.assertTrue(res_m["constraints_satisfied"])
+        self._verify_8_fields(res_m, ik_l, "L", ANKLE_REST_Z)
+        self.assertTrue(res_m["clamped_ground"])
+        self.assertGreaterEqual(res_m["hip_to_target_dist_m"], MIN_LEG_REACH - 1e-4)
+
+        # Category N: Target above ground but too far away
+        res_n = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 1.5, 0.30),
+            ground_z=0.0,
+        )
+        self.assertTrue(res_n["constraints_satisfied"])
+        self._verify_8_fields(res_n, ik_l, "L", ANKLE_REST_Z)
+        self.assertTrue(res_n["clamped_reach"])
+        self.assertAlmostEqual(res_n["hip_to_target_dist_m"], MAX_LEG_REACH, places=5)
+
+        # Category O: Target above ground but too close
+        res_o = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y, hip_l.z - 0.05),
+            ground_z=0.0,
+        )
+        self.assertTrue(res_o["constraints_satisfied"])
+        self._verify_8_fields(res_o, ik_l, "L", ANKLE_REST_Z)
+        self.assertTrue(res_o["clamped_reach"])
+        self.assertAlmostEqual(res_o["hip_to_target_dist_m"], MIN_LEG_REACH, places=5)
+
+        # Category P: Only Ground enabled
+        res_p = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 2.0, -0.20),
+            clamp_reach=False,
+            clamp_ground=True,
+            ground_z=0.0,
+        )
+        self.assertTrue(res_p["constraints_satisfied"])
+        self._verify_8_fields(res_p, ik_l, "L", ANKLE_REST_Z)
+        self.assertTrue(res_p["clamped_ground"])
+        self.assertFalse(res_p["clamped_reach"])
+        self.assertAlmostEqual(res_p["applied_world"].z, ANKLE_REST_Z, places=5)
+        self.assertGreater(res_p["hip_to_target_dist_m"], MAX_LEG_REACH)
+
+        # Category Q: Only Reach enabled
+        res_q = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y, -0.20),
+            clamp_reach=True,
+            clamp_ground=False,
+            ground_z=0.0,
+        )
+        self.assertTrue(res_q["constraints_satisfied"])
+        self._verify_8_fields(res_q, ik_l, "L", ANKLE_REST_Z)
+        self.assertFalse(res_q["clamped_ground"])
+        self.assertTrue(res_q["clamped_reach"])
+        self.assertLess(res_q["applied_world"].z, ANKLE_REST_Z)
+
+        # Category R: Both disabled
+        res_r = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, start_y + 3.0, -1.0),
+            clamp_reach=False,
+            clamp_ground=False,
+            ground_z=0.0,
+        )
+        self.assertTrue(res_r["constraints_satisfied"])
+        self._verify_8_fields(res_r, ik_l, "L", ANKLE_REST_Z)
+        self.assertFalse(res_r["clamped_ground"])
+        self.assertFalse(res_r["clamped_reach"])
+        self.assertAlmostEqual(res_r["applied_world"].z, -1.0, places=5)
+
+        # Category S: Left and right leg mirroring
+        res_s_l = set_foot_ik_target(self.armature, "L", (-HIP_X_OFFSET, start_y + 0.3, 0.15), ground_z=0.0)
+        ik_r = bpy.data.objects[IK_TARGET_NAMES["R"]]
+        res_s_r = set_foot_ik_target(self.armature, "R", (+HIP_X_OFFSET, start_y + 0.3, 0.15), ground_z=0.0)
+        self._verify_8_fields(res_s_l, ik_l, "L", ANKLE_REST_Z)
+        self._verify_8_fields(res_s_r, ik_r, "R", ANKLE_REST_Z)
+        self.assertAlmostEqual(res_s_l["applied_world"].x, -res_s_r["applied_world"].x, places=5)
+        self.assertAlmostEqual(res_s_l["applied_world"].y, res_s_r["applied_world"].y, places=5)
+        self.assertAlmostEqual(res_s_l["applied_world"].z, res_s_r["applied_world"].z, places=5)
+
+        # Category T: Root translation, yaw, pitch, roll
+        self.root.location = Vector((2.0, 3.0, 0.5))
+        self.root.rotation_euler = Euler((math.radians(20), math.radians(-15), math.radians(35)), "XYZ")
+        bpy.context.view_layer.update()
+        p_thigh_rot = self.armature.pose.bones["thigh.L"]
+        hip_rot = self.armature.matrix_world @ p_thigh_rot.head
+
+        # T1: Ground plane within reach under rotated hip
+        gz_t1 = hip_rot.z - 0.65
+        min_z_t1 = gz_t1 + ANKLE_REST_Z
+        res_t1 = set_foot_ik_target(
+            self.armature,
+            "L",
+            (hip_rot.x, hip_rot.y, gz_t1 - 0.10),
+            ground_z=gz_t1,
+        )
+        self.assertTrue(res_t1["constraints_satisfied"])
+        self._verify_8_fields(res_t1, ik_l, "L", min_z_t1)
+        self.assertTrue(res_t1["clamped_ground"])
+        self.assertAlmostEqual(res_t1["applied_world"].z, min_z_t1, places=5)
+
+        # T2: Flat ground 0.0m with elevated root, target below ground
+        res_t2 = set_foot_ik_target(
+            self.armature,
+            "L",
+            (hip_rot.x, hip_rot.y + 0.3, -0.10),
+            ground_z=0.0,
+        )
+        self.assertTrue(res_t2["constraints_satisfied"])
+        self._verify_8_fields(res_t2, ik_l, "L", ANKLE_REST_Z)
+        self.assertGreaterEqual(res_t2["applied_world"].z, ANKLE_REST_Z - 1e-5)
+        self.assertLessEqual(res_t2["hip_to_target_dist_m"], MAX_LEG_REACH + 1e-4)
+
+    def test_20_independent_numerical_oracle_parametric(self) -> None:
+        """TEST-20: Independent numerical Oracle cross-validation across parametric grid and random trials."""
+        start_y = self.root.location.y
+        p_thigh_l = self.armature.pose.bones["thigh.L"]
+        hip_l = self.armature.matrix_world @ p_thigh_l.head
+
+        ground_heights = [-0.20, 0.0, 0.30]
+        clamp_modes = [
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        ]
+        test_offsets = [
+            (0.0, 0.20, 0.10),    # inside shell
+            (0.0, 1.20, -0.40),   # far and below
+            (0.0, 0.05, -0.50),   # steep downward
+            (0.0, 0.0, -0.05),    # inside inner sphere
+            (0.0, 1.50, 0.50),    # far forward above ground
+        ]
+
+        ik_l = bpy.data.objects[IK_TARGET_NAMES["L"]]
+
+        for gz in ground_heights:
+            for cr, cg in clamp_modes:
+                for dx, dy, dz in test_offsets:
+                    tgt = (hip_l.x + dx, hip_l.y + dy, dz)
+                    res = set_foot_ik_target(
+                        self.armature,
+                        "L",
+                        tgt,
+                        clamp_reach=cr,
+                        clamp_ground=cg,
+                        ground_z=gz,
+                    )
+                    oracle_res = independent_numerical_oracle(
+                        hip_l, Vector(tgt), gz, cr, cg
+                    )
+                    self.assertTrue(res["constraints_satisfied"])
+                    self._verify_8_fields(res, ik_l, "L", gz + ANKLE_REST_Z)
+
+                    # Compare distance to requested between analytical and oracle
+                    d_prod = (res["applied_world"] - Vector(tgt)).length
+                    d_oracle = oracle_res["dist_to_req"]
+                    self.assertLess(
+                        abs(d_prod - d_oracle),
+                        0.005,
+                        f"Mismatch with Oracle: d_prod={d_prod:.5f}, d_oracle={d_oracle:.5f} for tgt={tgt}, gz={gz}, cr={cr}, cg={cg}",
+                    )
+
+        # 30 Pseudo-random trials with fixed seed
+        rng = random.Random(42)
+        for i in range(30):
+            gz = rng.uniform(-0.3, 0.4)
+            cr = rng.choice([True, False])
+            cg = rng.choice([True, False])
+            side = rng.choice(["L", "R"])
+            p_thigh_s = self.armature.pose.bones[f"thigh.{side}"]
+            hip_s = self.armature.matrix_world @ p_thigh_s.head
+            ik_s = bpy.data.objects[IK_TARGET_NAMES[side]]
+
+            tgt = (
+                hip_s.x + rng.uniform(-0.4, 0.4),
+                hip_s.y + rng.uniform(-0.5, 1.0),
+                rng.uniform(-0.5, 0.8),
+            )
+
+            res = set_foot_ik_target(
+                self.armature,
+                side,
+                tgt,
+                clamp_reach=cr,
+                clamp_ground=cg,
+                ground_z=gz,
+            )
+            oracle_res = independent_numerical_oracle(
+                hip_s, Vector(tgt), gz, cr, cg
+            )
+            self.assertTrue(res["constraints_satisfied"])
+            self._verify_8_fields(res, ik_s, side, gz + ANKLE_REST_Z)
+
+            d_prod = (res["applied_world"] - Vector(tgt)).length
+            d_oracle = oracle_res["dist_to_req"]
+            self.assertLess(
+                abs(d_prod - d_oracle),
+                0.005,
+                f"Random trial {i} mismatch: d_prod={d_prod:.5f}, d_oracle={d_oracle:.5f}",
+            )
 
 
 if __name__ == "__main__":

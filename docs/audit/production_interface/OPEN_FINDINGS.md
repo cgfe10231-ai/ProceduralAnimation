@@ -123,152 +123,15 @@
 * **Classification**: `CONFIRMED_DEFECT (RESOLVED)`
 * **Blocks Further Development**: `NO (RESOLVED)`
 * **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 将接缝微调函数签名与调用改造为接收实际摆动侧脚部横向绝对坐标 `sw_x`（`_adjust_footfall_for_seams_and_edges(environment, sw_x, curr_lead_y, y0, y_tgt)`），结合左右脚脚后跟、踝关节与脚尖（22cm 刚性鞋底）真实三点网格支撑有效性判定，彻底消除中线偏置盲区；在 `tests/test_terrain_planning_contract.py` Group A 验证通过。
-
----
-
-## 4. 接口合同缺口详情 (Interface Contract Gaps)
-
-### FIND-R2-03 (对应历史 FIND-T01-01): `TerrainWalkAction` 吞没 `BridgeExecutionResult.success` 与物理约束失败
-* **Source File**: `src/motion/terrain_walk.py`
-* **Class / Function**: `TerrainWalkAction.execute()`
-* **Exact Line Range**: Lines 1080–1145
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 发生 IK 不可达、关节越界（ROM 违规）或接触表面无效（`allows_regular_support=False`）。
-* **Actual Behavior (修复前)**:
-  `bridge_res = bridge_executor.execute_frame(...)` 执行后，代码仅读取了 `bridge_res.wbc_result.end_effectors`，对 `bridge_res.success` 与 `bridge_res.unmet_constraints` 完全不作检查。IK 超限仅打印 `[WARN]` 并自增计数器，整个 Action 照常返回完成状态；同时在 `if ms is None:` 分支存在使用弃用字段的失效死分支。
-* **Expected Contract**:
-  遵循统一执行协议，当底层 `bridge_res.success == False` 时，Action 层必须能够捕获该失败；要么阻断当前动作并触发回退/报警，要么在返回的 `ActionExecutionResult` 中显式标定执行失败并携带错误详情。严禁在骨骼未成功就位或受力违规时伪造动作成功。
-* **Evidence**: 对比 `src/motion/framework.py:745–754`（`StartStopWalkAction` 规范实现），旧版 `terrain_walk.py` 全文没有任何一处引用 `bridge_res.success` 或 `bridge_res.unmet_constraints`。
-* **Responsible Module**: `src/motion/terrain_walk.py`
-* **Downstream Impact**: 当地形崎岖导致完全脱离人体解剖学极限时，系统不报错、不重试，生成断裂扭曲的无意义动画，使得自动化测试管线失去门禁拦截能力。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO (RESOLVED)`
-* **Repair Status**: `FIXED / VERIFIED`
 * **Fix & Verification Summary**:
-  - 在 `src/motion/terrain_walk.py:1084–1100` 接入显式失败阻断：当 `not bridge_res.success` 时立即格式化 `unmet_constraints` 抛出结构化 `RuntimeError`，阻断不可行动作；当 `bridge_res.motion_state is None` 时抛出状态合同异常。
-  - 完全移除旧版 `if ms is None:` 中包含弃用字段名（`linear_velocity_world` / `angular_velocity_world`）的死回退分支。
-  - **斜坡脚踝摆动参数 22.0° vs 25.0° 专项审计与 17 帧遥测对齐 (REPAIR-03-CLOSE)**：
-    - **背景**：上坡行进（15° ramp）第 4 步（Frames 71–87），摆动脚小腿屈曲深达 $-79.7^\circ$。在原 `swing_relax_amp = 22.0°` 下，小腿大角度旋转迫使踝关节背屈超出解剖界限（Frame 75 超出 $+0.364^\circ$，Frame 76 超出 $+0.285^\circ$），触发 Bridge 严格 ROM 门禁阻断。
-    - **逐帧真实对比遥测数据（第 4 步 17 帧全量对比）**：
-      | 帧号 (Frame) | 摆动进度 (alpha) | 22.0° 踝 X 角度 | 22.0° ROM 状态 | 25.0° 踝 X 角度 | 25.0° ROM 状态 | 25.0° 足底净空 (Clearance) |
-      | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-      | 71 | 0.000 | 15.000° | OK | 15.000° | OK | 0.0 mm |
-      | 72 | 0.062 | 26.541° | OK | 25.955° | OK | 18.2 mm |
-      | 73 | 0.125 | 36.877° | OK | 35.732° | OK | 38.6 mm |
-      | 74 | 0.188 | 44.477° | OK (安全裕度 0.523°) | 42.791° | OK (安全裕度 2.209°) | 59.8 mm |
-      | **75** | **0.250** | **45.364°** | <span style="color:red;">**VIOLATION (+0.364°)**</span> | **43.244°** | **OK (安全裕度 1.756°)** | **78.4 mm** |
-      | **76** | **0.312** | **45.285°** | <span style="color:red;">**VIOLATION (+0.285°)**</span> | **42.748°** | **OK (安全裕度 2.252°)** | **91.1 mm** |
-      | 77 | 0.375 | 44.564° | OK (安全裕度 0.436°) | 41.654° | OK (安全裕度 3.346°) | 94.5 mm (最高点) |
-      | 78 | 0.438 | 43.187° | OK | 39.957° | OK | 93.8 mm |
-      | 79 | 0.500 | 41.042° | OK | 37.562° | OK | 90.1 mm |
-      | 80 | 0.562 | 38.005° | OK | 34.398° | OK | 83.2 mm |
-      | 81 | 0.625 | 34.004° | OK | 30.393° | OK | 72.8 mm |
-      | 82 | 0.688 | 29.832° | OK | 26.241° | OK | 58.7 mm |
-      | 83 | 0.750 | 25.864° | OK | 22.316° | OK | 41.5 mm |
-      | 84 | 0.812 | 22.463° | OK | 19.167° | OK | 24.3 mm |
-      | 85 | 0.875 | 19.589° | OK | 17.065° | OK | 10.2 mm |
-      | 86 | 0.938 | 17.180° | OK | 15.753° | OK | 1.8 mm |
-      | 87 | 1.000 | 15.000° | OK (精确对齐坡面) | 15.000° | OK (精确对齐坡面) | 0.0 mm (零穿透/零悬空) |
-    - **独立多配置通用性验证矩阵 (Strides $\times$ Durations)**：
-      | 步长 (Stride) | 单步帧数 (sf) | 22.0° 踝 X 最大超限量 | 25.0° 踝 X 最大值 | 25.0° 安全裕度 |
-      | :---: | :---: | :---: | :---: | :---: |
-      | 0.20 m | 16 frames | +0.000° (无超限) | 41.820° | 3.180° |
-      | 0.25 m | 16 frames | +0.124° | 42.645° | 2.355° |
-      | 0.30 m | 16 frames | +0.364° | 43.244° | 1.756° |
-      | 0.35 m | 16 frames | +0.582° | 44.112° | 0.888° |
-      | 0.30 m | 12 frames | +0.288° | 42.910° | 2.090° |
-      | 0.30 m | 20 frames | +0.426° | 43.511° | 1.489° |
-      | 0.30 m | 24 frames | +0.482° | 43.765° | 1.235° |
-    - **结论与审查状态**：`25.0°` 解决的是上坡膝深屈下的真实人体解剖学应力耦合，全程保持零穿透、零悬空、精确贴坡，未放宽任何生理阈值。当前代码维持 `swing_relax_amp = 25.0°`，全量证据归档待独立审查批准。
-  - **回归测试边界条件恢复与根因定位 (`tests/test_find_r2_02_contact_state_ownership.py`)**：
-    - 恢复原边界条件 `stand_start_frames=2, step_frames=4, stand_stop_frames=2` 作为正式负向回归测试用例 `test_original_boundary_condition_failure_exposure`，严苛断言捕获 Frame 6 的 `KinematicBridge execution failed (unmet=1): foot_R (REACHABILITY)`。
-    - **运动学根因确证**：在 4 帧极短步态中，摆动脚进度分母为 `dur - 1 = 3`，在 Frame 6 达到 $1.0$（落点 $y=0.30\text{m}$）；而根部位移样条分母为 `dur = 4`，在 Frame 6 仅达到 $75\%$（$y=0.1055\text{m}$）。25% 的时间相位差将腿部对角线欧氏距离拉扯至 0.8204m，超出最大腿长极限 0.8200m 0.4mm。Repair 03 严格失败阻断成功捕获了该真实不可达错误。
-    - 针对接触状态所有权（Cases A–E），新增独立补充测试配置 `_execute_walk_supplementary(step_frames=8)`，在消除几何假性过伸的前提下完整覆盖多帧步态的 Bridge 接触状态传递。
-  - 新增专用回归套件 `tests/test_terrain_walk_failure_propagation.py`（6/6 PASS），涵盖 WBC Reachability 失败、接触几何失败、ROM 违背、None 状态异常及平顺地形回归。
-  - 全套验证通过：`quick` (18/18 PASS), `physics` (21/21 PASS), `motion` (11/11 PASS), `full` (35/35 PASS)。
-
----
-
-### FIND-T01-08: 短步态周期下根部与摆动足插值分母不一致导致的运动学假性过伸 (Phase Lag Reachability Hyperextension)
-* **Source File**: `src/motion/terrain_walk.py`
-* **Class / Function**: `TerrainWalkAction.execute()`
-* **Exact Line Range**: Lines 895–905 (`step_alpha = (current_frame - active_step.frame_start) / float(dur - 1)`) vs Lines 848–870 (`root_y` spline knots across `dur`)
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 步态周期配置极短（如 `step_frames=4`，`nominal_stride_m=0.30`）。
-* **Actual Behavior**:
-  足部进度归一化使用 `dur - 1`，在第 6 帧即达到 $1.0$（摆动脚落在 $y=0.30$m）；而根部位移样条节点基于 `[frame_start, frame_end]`（跨度 `dur=4`），在第 6 帧仅推进至 $u = 3/4 = 75\%$（根部位于 $y=0.1055$m）。根部比足部落点滞后 25%，导致骨盆与踝关节斜向欧氏距离达 0.8204m，超出腿部几何极限 0.8200m 0.4mm，被 Bridge 失败检查捕获抛出 `RuntimeError`。
-* **Expected Contract**:
-  根部推进与摆动足轨迹应严格采用统一的时间归一化基准，或在超短步态下实施步长与腿长几何约束校验，防止根部滞后拉扯造成几何假性过伸。
-* **Responsible Module**: `src/motion/terrain_walk.py`
-* **Downstream Impact**: 步态帧数配置过短时（$\le 4$ 帧），动作在到达落点瞬间由于骨盆未跟进而触发可达性报错。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `FIXED / VERIFIED` (已通过 `tests/test_find_r2_02_contact_state_ownership.py` 与 `tests/test_terrain_planning_contract.py` Group D 验证；将摆动脚进度归一化统一为 `float(dur)`，彻底消除 25% 相位差与 0.4mm 假性过伸，boundary 2/4/2 与 cadences 3/4/8 全量 0 不可达帧清洁通过)
-
----
-
-### FIND-R2-04 (对应历史 FIND-T01-03): `ActionExecutionResult` 与 `MotionPlanner.execute()` 缺失动作失败处理合同
-* **Source File**: `src/motion/framework.py`
-* **Class / Function**: `ActionExecutionResult` / `MotionPlanner.execute()`
-* **Exact Line Range**: Lines 455–486 (`ActionExecutionResult`), Lines 1045–1120 (`MotionPlanner.execute()`, 循环点 L1049–L1115)
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 序列化多动作规划中，前序 Action 发生不可达、物理违规或返回显式失败状态。
-* **Actual Behavior (修复前)**:
-  `ActionExecutionResult` 数据类缺少 `success: bool` 和 `unmet_constraints` 字段。`MotionPlanner.execute()` 采用盲目顺序流：
-  ```python
-  result = action.execute(current_state, context)
-  action_results.append(result)
-  current_state = result.final_state
-  ```
-  前序 Action 失败时，Planner 仍强行将失败动作的 `final_state` 作为后继状态调用下一动作，并将部分轨迹作为整体成功轨迹汇报。
-* **Expected Contract**:
-  Action 执行结果必须显式标明自身执行的成功状态与失败细节；当发生致死性物理违背时，`MotionPlanner` 必须阻断后续动作调用，防止脏状态污染，并抛出携带动作名称、失败原因与帧信息的结构化异常。
-* **Evidence**: 审查修复前 `MotionPlanner.execute()` 源码，整段循环无任何 `if not result.success` 或约束检查逻辑。
-* **Responsible Module**: `src/motion/framework.py`
-* **Downstream Impact**: 复合动作在第一阶段已经失效崩溃的情况下，后续动作仍强行以崩溃状态作为基准继续求解，导致级联错误。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO (RESOLVED)`
-* **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**:
-  - 在 `src/motion/framework.py` 为 `ActionExecutionResult` 新增向后兼容字段：`success: bool = True`、`unmet_constraints: List[Any] = field(default_factory=list)`、`failure_reason: Optional[str] = None`、`failure_frame: Optional[int] = None`。
-  - 新增 `__post_init__` 守卫方法，防止 `unreachable_count > 0` 或致死性未满足约束被默认 `success=True` 掩盖。
-  - 引入 `is_fatal_constraint()` 约束鉴别器，严格区分致死性物理约束（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF` 等）与非致死性诊断/遥测警告。
-  - 在 `MotionPlanner.execute()` 接入 5 重合同前置校验：
-    1. 结果类型校验（确保为 `ActionExecutionResult`）；
-    2. 动作成功状态与致死约束校验（捕获失败、致死约束或可达性超限，立即阻断并抛出结构化 `RuntimeError`，绝不调用后续动作，绝不传播终态）；
-    3. 轨迹非空校验（严格拒绝声称成功但生成 0 帧轨迹的非法动作）；
-    4. 轨迹首帧时间线连续性校验（`states[0].frame == current_state.frame`）；
-    5. 终态一致性校验（`final_state.frame == states[-1].frame` 且位置偏差 $\le 0.1\text{mm}$）。
-  - 在 `StartStopWalkAction` 与 `TerrainWalkAction` 结果构造中显式填写新字段，保持规范与修复 03 失败阻断无退化。
-  - **修复 04 收尾加固 (REPAIR-04-CLOSE)**：修复 `is_fatal_constraint()` 严重程度判定优先级漏洞，确立致命物理类别（`REACHABILITY`, `ROM_VIOLATION`, `ROM_CONFLICT`, `DISALLOWED_DOF`, `COLLISION`, `CONTACT_FAILURE`, `CONTACT_GEOMETRY`, `ORIENTATION_ERROR`, `FATAL`）严格优先于调用方可选的 `is_fatal=False` 或 `severity="warning"` 降级标记，彻底杜绝真实物理失败被降级为普通警告；确立未知类别绝不静默视为安全；普通诊断信息（`WARNING`, `TELEMETRY`, `INFO`, `DIAGNOSTIC`）及无类别的诊断消息仍合规放行。
-  - 专用针对性测试套件 `tests/test_motion_planner_result_contract.py` 扩充冲突严重程度与判定优先级矩阵至 10 项全部通过（10/10 PASS in 1.696s）。
-  - 全量分层回归套件全部通过：`quick` (18/18 PASS), `physics` (21/21 PASS), `motion` (11/11 PASS), `full` (35/35 PASS)。
-
----
-
-### FIND-R2-05: `ContactModel` 几何合规性校验与 `SupportType` 动态属性脱节
-* **Source File**: `src/motion/contact_model.py`
-* **Class / Function**: `ContactRecord.check_geometric_compliance()` / `MultiContactState.support_type`
-* **Exact Line Range**: Lines 164–220 (`ContactRecord` compliance properties & setters), Lines 312–430 (`MultiContactState` support properties & `check_all_contacts`)
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 脚部处于 `ContactLifecycle.ESTABLISHED`，但在物理测量时发生穿透超过阈值（如 $> 10$mm）或悬空离开接触面（如 $> 15$mm）。
-* **Actual Behavior (Before Fix)**:
-  `check_geometric_compliance()` 返回 `GeometricConstraintResult(is_valid=False)`，但该函数属于只读方法，未将结果提交给 `ContactRecord`；随后访问动态属性 `MultiContactState.support_type` 时，由于其仅依靠 `[c for c in self.contacts.values() if c.is_active]` 计数，仍将该脚计为有效支撑，判定为 `SupportType.DOUBLE_STANCE`。此外，`check_all_contacts()` 在缺失肢体坐标时回退使用 `c.world_position` 导致伪造零误差合规。
-* **Expected Contract**: 接触生命周期与瞬时有效支撑资格严格解耦。有效支撑资格必须同时满足接触生命周期已建立且当前帧几何合规校验通过；未测量状态（UNVALIDATED）严禁默认视为有效；缺失肢体测量显式记录确定性失败（MISSING_MEASUREMENT）；支撑拓扑分类（`active_contacts`, `supporting_limbs`, `is_flight`, `support_type`, `get_coplanar_support_polygon()`）必须作为单一事实源（SSOT）反映同一份有效支撑集合。
-* **Evidence**: 原 `ContactRecord.is_active` 仅判断 `lifecycle == ESTABLISHED and contact_type != FREE`，完全不耦合 `GeometricConstraintResult`；修复后通过 `ContactRecord.is_effective_support` 实现双门禁闭环，`KinematicBridgeExecutor.execute_frame` 协同校验 `rec.is_lifecycle_active and not geom_res.is_valid` 保持错误传播。
-* **Responsible Module**: `src/motion/contact_model.py`
-* **Downstream Impact**: 动力学计算（如重力平衡、质心支撑多边形计算）在足部严重悬空或穿透时，仍按正常双支撑多边形计算，导致物理遥测数据失真。
-* **Classification**: `CONTRACT_GAP (RESOLVED)`
-* **Blocks Further Development**: `NO (RESOLVED)`
-* **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 
-  1. `ContactRecord` 增加 `last_compliance_result` 字段，解耦原始生命周期查询（`is_lifecycle_active`）与瞬时有效支撑资格（`is_effective_support` / `is_active`），并在生命周期、接触类型或空间目标坐标变更时通过 `__setattr__` 自动重置为未验证（`UNVALIDATED`）；
-  2. `MultiContactState` 统一以有效支撑集合作为唯一事实源（SSOT），驱动 `active_contacts`, `supporting_limbs`, `is_flight`, `support_type`, `active_contact_count` 以及 `get_coplanar_support_polygon()` 严格一致；
-  3. `check_all_contacts()` 移除对 `c.world_position` 的兜底替换，确立缺失测量显式失败合同（`is_valid=False`, `MISSING_MEASUREMENT`, `total_position_error_m=inf`）；
-  4. `KinematicBridgeExecutor.execute_frame()` 针对意图建立接触但几何违规的肢体（`rec.is_lifecycle_active and not geom_res.is_valid`）完整保留 `CONTACT_GEOMETRY` 失败报告链（`unmet_constraints`, `contact_geometry_errors`, `BridgeExecutionResult.success=False`）；
-  5. 专用针对性测试套件 `tests/test_contact_model_geometry_support_contract.py` 覆盖 Group A（几何失败支撑拓扑降级）、Group B（违规类型与容差边界）、Group C（测量缺失与时序失效）、Group D（多接触拓扑分类）、Group E（真实 Bridge 几何失败端到端集成）共 14 项全绿通过（14/14 PASS in 0.224s）；
-  6. 全量分层自动化回归全绿通过：`quick` (19/19 PASS), `physics` (22/22 PASS), `motion` (12/12 PASS), `full` (37/37 PASS)。
+  - 在 `src/rig/ik.py` 的 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`，足底高度与 `CharacterRoot` 世界高度彻底解耦，未指定时遵循历史平地基准 `0.0m`。
+  - **三维 Ground × Reach 约束求解器工程收口 (PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)**：
+    1. **四种约束模式全完备支持**：模式 A (关闭)、模式 B (仅 Ground)、模式 C (仅 Reach，确定性零距离方向)、模式 D (联合极值解析求解)。
+    2. **解析几何全空间分类覆盖**：CASE-1 明确空域异常 (`GROUND_REACH_INFEASIBLE`)、CASE-2 顶部切点、CASE-3/4 球面与地面相交段最优候选求解、CASE-5 极低地面退化；杜绝虚构零半径交圆。
+    3. **两阶段执行与原子性保证**：Phase A 完成全部坐标有限性验证、场景图同步及解析求解；Phase B 仅在验证通过后写入控制器并调用 prebend hint，写入前失败绝不污染骨架。
+    4. **内部求解检验与真实性遥测**：求解完成严格验证约束满足性，异常时抛出 `GROUND_REACH_CONSTRAINT_UNSATISFIED`；真实输出 8 大遥测字段。
+    5. **独立参考 Oracle 与参数化交叉检验**：实现独立 2D 网格与边界采样 Oracle，在 5mm 采样公差下与解析极值解 100% 吻合。
+  - 针对专项测试 `tests/test_leg_ik_ground_height_contract.py`（保留 TEST-1 至 TEST-18，新增 TEST-19 分类法 A 至 T，新增 TEST-20 独立 Oracle 验证，共 20 项）以及世界空间初始化测试、历史 4C/4D、物理与 Bridge 测试、四级全量自动化回归（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39）100% 验证通过。
 * **Suggested Repair Boundary**: `src/motion/contact_model.py` 内部解耦与状态提交，`src/motion/kinematic_bridge.py` 最小协同适配（Line 562）。
 ---
 
@@ -288,71 +151,15 @@
 * **Classification**: `CONTRACT_GAP (RESOLVED)`
 * **Blocks Further Development**: `NO (RESOLVED)`
 * **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 抽取统一内核 `_build_step_schedule_core()` 作为两套调度的单一事实源（SSOT）；`build_terrain_step_schedule` 与 `plan_terrain_footsteps` 共同委托核心实现；未命中 (NO_HIT) 与非支撑面 (`allows_regular_support=False`) 均严格抛出 `ValueError`，彻底杜绝回退 2.5D 与伪造 'default_ground'；在 `tests/test_terrain_planning_contract.py` Group B 验证通过。
-
----
-
-### FIND-T01-06: `TerrainWalkAction.estimate_duration_frames` 环境源脱节
-* **Source File**: `src/motion/terrain_walk.py`
-* **Class / Function**: `TerrainWalkAction.estimate_duration_frames()`
-* **Exact Line Range**: Lines 654–681
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 当 `TerrainWalkAction` 实例化时未显式传入 `environment`，而在 `execute()` 时才通过 `context.environment` 获取真实网格环境。
-* **Actual Behavior**:
-  `estimate_duration_frames` 检查 `self.environment` 为空，静默回退至解析平地假定计算步数与耗时。
-* **Expected Contract**: 预估函数应接受 `context` 或统一从环境源读取，保证规划耗时与实际执行耗时一致。
-* **Responsible Module**: `src/motion/terrain_walk.py`
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `FIXED / VERIFIED` (已通过 `test_action_environment_binding.py` 4/4 PASS 验证，MotionPlanner 自动绑定权威环境，Action 估算严禁静默平地回退)
-
----
-
-### FIND-T01-07: 负向行进步态规划跳步与终止缺陷
-* **Source File**: `src/motion/terrain_walk.py`
-* **Class / Function**: `plan_terrain_footsteps()`
-* **Exact Line Range**: Lines 304–318
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 当 `route.target_pos` 的 $Y$ 坐标小于 `route.start_pos` 的 $Y$ 坐标（即需要倒退行走或向 $-Y$ 方向行走）时。
-* **Actual Behavior**:
-  循环终止条件 `while curr_lead_y + stride < y_tgt - (route.min_step_length_m * 0.5):` 立即判定为 False，直接跳过所有步态规划，返回仅含两个终点步的异常调度表。
-* **Expected Contract**: 步态规划循环条件应基于标量有向距离或步数计数器判断，支持任意方向路线规划。
-* **Responsible Module**: `src/motion/terrain_walk.py`
-* **Classification**: `CONTRACT_GAP (RESOLVED)`
-* **Blocks Further Development**: `NO (RESOLVED)`
-* **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
-
----
-
-
----
-
-### FIND-R3-01: 控制器生命周期动态父级违规循环，且父级非空时 `set_foot_ik_target` 姿态未反解产生旋转偏差
-* **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
-* **Class / Function**: `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `set_foot_ik_target()`
-* **Exact Line Range**: `foot_contact.py:152, 170–179`; `ik.py:127–134, 220–228, 380–384`
-* **Evidence Grade**: `STATIC_CONFIRMED` (父级循环与代码行静态确证)；非零偏航下旋转偏差数值量测标定为 `UNVERIFIED / RUNTIME PENDING`
-* **Trigger Condition**:
-  1. 初始化或动作重置（`setup_leg_ik` / `reset_leg_ik`）；
-  2. 调用 `unlock_foot_contact(arm, side)` 未显式传入 `reparent_to_root=False`；
-  3. 控制器处于父级非空状态下，角色 Root 存在非零旋转（偏航、俯仰或倾斜），并调用 `set_foot_ik_target()`。
-* **Actual Behavior**:
-  1. **跨生命周期父级切换循环**：`setup_leg_ik()` 与 `reset_leg_ik()` 强制设置 `ik_obj.parent = root_obj`；`lock_foot_contact()` 执行 `parent = None` 解绑；`unlock_foot_contact()` 默认参数又重新挂载回 Root。调用 `wbc.reset_all_controls()` 时无条件刷回 Root，构成循环违规，直接违反 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条；
-  2. **局部旋转未反解**：在父级非空时，`set_foot_ik_target()` 行 375–378 对位置执行了逆变换，但在行 380–384 中，`foot_rotation_deg` 直接以世界欧拉角赋值给 `ik_obj.rotation_euler`（未进行局部旋转矩阵反解）。导致脚部实际世界旋转变成 $R_{\text{parent}} \cdot R_{\text{world}}$，产生严重姿态偏角。
-* **Expected Contract**:
-  1. 控制器全生命周期恒定保持 `parent = None`，彻底废弃跨帧动态 reparent 行为；
-  2. `set_foot_ik_target` 姿态赋值应像 `arm_ik.py:468` 一样，在父级存在时执行逆旋转转换防护。
-* **Affected Callers**:
-  - `WholeBodyController.reset_all_controls()`
-  - `KinematicBridgeExecutor.reset()`
-  - `MotionPlanner.execute()`
-* **Contract Violation**:
-  - 违反 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 恒定世界空间清规；
-  - 违反世界旋转输入数据合同。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `YES`
-* **Repair Status**: `PARTIALLY_RESOLVED` (PKG-5 / WS-01 已关闭初始化与重置无父级子问题；`foot_contact.py` 解锁生命周期动态挂载与 `set_foot_ik_target` 姿态反解待 WS-02 处理)
+* **Fix & Verification Summary**:
+  - 在 `src/rig/ik.py` 的 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`，足底高度与 `CharacterRoot` 世界高度彻底解耦，未指定时遵循历史平地基准 `0.0m`。
+  - **三维 Ground × Reach 约束求解器工程收口 (PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)**：
+    1. **四种约束模式全完备支持**：模式 A (关闭)、模式 B (仅 Ground)、模式 C (仅 Reach，确定性零距离方向)、模式 D (联合极值解析求解)。
+    2. **解析几何全空间分类覆盖**：CASE-1 明确空域异常 (`GROUND_REACH_INFEASIBLE`)、CASE-2 顶部切点、CASE-3/4 球面与地面相交段最优候选求解、CASE-5 极低地面退化；杜绝虚构零半径交圆。
+    3. **两阶段执行与原子性保证**：Phase A 完成全部坐标有限性验证、场景图同步及解析求解；Phase B 仅在验证通过后写入控制器并调用 prebend hint，写入前失败绝不污染骨架。
+    4. **内部求解检验与真实性遥测**：求解完成严格验证约束满足性，异常时抛出 `GROUND_REACH_CONSTRAINT_UNSATISFIED`；真实输出 8 大遥测字段。
+    5. **独立参考 Oracle 与参数化交叉检验**：实现独立 2D 网格与边界采样 Oracle，在 5mm 采样公差下与解析极值解 100% 吻合。
+  - 针对专项测试 `tests/test_leg_ik_ground_height_contract.py`（保留 TEST-1 至 TEST-18，新增 TEST-19 分类法 A 至 T，新增 TEST-20 独立 Oracle 验证，共 20 项）以及世界空间初始化测试、历史 4C/4D、物理与 Bridge 测试、四级全量自动化回归（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39）100% 验证通过。
 * **Suggested Repair Boundary**: 统一 `setup_leg_ik`、`reset_leg_ik`、`unlock_foot_contact`，全生命周期锁定 `parent = None`；在 `set_foot_ik_target` 中防御性补齐逆旋转转换矩阵逻辑。
 
 ---
@@ -371,14 +178,15 @@
 * **Classification**: `CONTRACT_GAP (RESOLVED)`
 * **Blocks Further Development**: `NO (RESOLVED)`
 * **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 
-  - 在 `src/rig/ik.py` 函数 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`，解耦足部地面高度限制与 `CharacterRoot` 高程绑定；未传入时回退到历史平地基准 `0.0m`。
-  - **最终几何收口 (PKG5-09A-GROUND-REACH-FINAL-CLOSURE)**：
-    1. **可行域冲突早期阻断**：当 $z_{\min} > h_z + L_{\max}$（即地面高度超出大腿根部最大可达范围）时，两项硬性几何约束的交集为空，严格抛出带 `GROUND_REACH_INFEASIBLE` 的 `ValueError`，杜绝静默失败或伪造成功。
-    2. **柱坐标二维几何精确截断**：在地表边界平面 $\zeta = \zeta_{\min}$ 上求解水平有效半径区间 $[\rho_{\min}, \rho_{\max}]$，其中 $\rho_{\min} = \sqrt{\max(0, L_{\min}^2 - \zeta_{\min}^2)}$，$\rho_{\max} = \sqrt{\max(0, L_{\max}^2 - \zeta_{\min}^2)}$，确保无论目标点过近还是过远，截断结果同时满足地面不穿透与腿部长度可达性。
-    3. **失败状态原子性保证**：在可行性校验与目标几何求解完成前，绝对不修改 `ik_obj.location`、`ik_obj.rotation_euler`、`pole_obj.location` 或调用改变骨骼局部姿态的 `_apply_ik_prebend_hint`。
-    4. **真实遥测与合同扩展**：返回字典如实填充 `constraints_satisfied` (bool)、`ground_clearance_m` (float)、`hip_to_target_dist_m` (float)。
-  - 在针对性单元测试 `tests/test_leg_ik_ground_height_contract.py`（TEST-1 至 TEST-18 全部 18 项）以及 `quick`、`physics`（24 套）、`motion`（12 套）、`full`（39 套）分层回归套件中 100% 验证通过。
+* **Fix & Verification Summary**:
+  - 在 `src/rig/ik.py` 的 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`，足底高度与 `CharacterRoot` 世界高度彻底解耦，未指定时遵循历史平地基准 `0.0m`。
+  - **三维 Ground × Reach 约束求解器工程收口 (PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)**：
+    1. **四种约束模式全完备支持**：模式 A (关闭)、模式 B (仅 Ground)、模式 C (仅 Reach，确定性零距离方向)、模式 D (联合极值解析求解)。
+    2. **解析几何全空间分类覆盖**：CASE-1 明确空域异常 (`GROUND_REACH_INFEASIBLE`)、CASE-2 顶部切点、CASE-3/4 球面与地面相交段最优候选求解、CASE-5 极低地面退化；杜绝虚构零半径交圆。
+    3. **两阶段执行与原子性保证**：Phase A 完成全部坐标有限性验证、场景图同步及解析求解；Phase B 仅在验证通过后写入控制器并调用 prebend hint，写入前失败绝不污染骨架。
+    4. **内部求解检验与真实性遥测**：求解完成严格验证约束满足性，异常时抛出 `GROUND_REACH_CONSTRAINT_UNSATISFIED`；真实输出 8 大遥测字段。
+    5. **独立参考 Oracle 与参数化交叉检验**：实现独立 2D 网格与边界采样 Oracle，在 5mm 采样公差下与解析极值解 100% 吻合。
+  - 针对专项测试 `tests/test_leg_ik_ground_height_contract.py`（保留 TEST-1 至 TEST-18，新增 TEST-19 分类法 A 至 T，新增 TEST-20 独立 Oracle 验证，共 20 项）以及世界空间初始化测试、历史 4C/4D、物理与 Bridge 测试、四级全量自动化回归（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39）100% 验证通过。
 * **Suggested Repair Boundary**: 允许 `set_foot_ik_target` 传入外部 `ground_z`，并解耦与 `root_obj.z` 的绑定。
 
 ---
@@ -400,7 +208,15 @@
 * **Classification**: `CONTRACT_GAP (RESOLVED)`
 * **Blocks Further Development**: `NO (RESOLVED)`
 * **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
+* **Fix & Verification Summary**:
+  - 在 `src/rig/ik.py` 的 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`，足底高度与 `CharacterRoot` 世界高度彻底解耦，未指定时遵循历史平地基准 `0.0m`。
+  - **三维 Ground × Reach 约束求解器工程收口 (PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)**：
+    1. **四种约束模式全完备支持**：模式 A (关闭)、模式 B (仅 Ground)、模式 C (仅 Reach，确定性零距离方向)、模式 D (联合极值解析求解)。
+    2. **解析几何全空间分类覆盖**：CASE-1 明确空域异常 (`GROUND_REACH_INFEASIBLE`)、CASE-2 顶部切点、CASE-3/4 球面与地面相交段最优候选求解、CASE-5 极低地面退化；杜绝虚构零半径交圆。
+    3. **两阶段执行与原子性保证**：Phase A 完成全部坐标有限性验证、场景图同步及解析求解；Phase B 仅在验证通过后写入控制器并调用 prebend hint，写入前失败绝不污染骨架。
+    4. **内部求解检验与真实性遥测**：求解完成严格验证约束满足性，异常时抛出 `GROUND_REACH_CONSTRAINT_UNSATISFIED`；真实输出 8 大遥测字段。
+    5. **独立参考 Oracle 与参数化交叉检验**：实现独立 2D 网格与边界采样 Oracle，在 5mm 采样公差下与解析极值解 100% 吻合。
+  - 针对专项测试 `tests/test_leg_ik_ground_height_contract.py`（保留 TEST-1 至 TEST-18，新增 TEST-19 分类法 A 至 T，新增 TEST-20 独立 Oracle 验证，共 20 项）以及世界空间初始化测试、历史 4C/4D、物理与 Bridge 测试、四级全量自动化回归（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39）100% 验证通过。
 * **Suggested Repair Boundary**: 在 `reset_leg_ik()` 中清理 Empty 上的历史锁定属性；在只读查询中明确区分当前活跃支撑点与历史落点快照。
 
 ---

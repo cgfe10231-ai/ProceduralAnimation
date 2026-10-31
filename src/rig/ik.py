@@ -336,9 +336,39 @@ def set_foot_ik_target(
     at Z = 0.0m (decoupled from CharacterRoot elevation). Also positions the knee pole target
     strictly forward (+Y) of the hip-ankle plane to prevent knee flipping.
     """
+    # =========================================================================
+    # Phase A: Read / Resolve / Validate
+    # =========================================================================
     side = side.upper()
     if side not in ("L", "R"):
         raise ValueError(f"Invalid leg side '{side}', expected 'L' or 'R'")
+
+    try:
+        req_coords = (float(world_xyz[0]), float(world_xyz[1]), float(world_xyz[2]))
+    except (TypeError, ValueError, IndexError) as exc:
+        raise TypeError(f"world_xyz must be a sequence of 3 floats, got {world_xyz}") from exc
+
+    if not (math.isfinite(req_coords[0]) and math.isfinite(req_coords[1]) and math.isfinite(req_coords[2])):
+        raise ValueError(f"world_xyz coordinates must be finite numbers, got {world_xyz}")
+
+    if ground_z is not None:
+        try:
+            effective_ground_z = float(ground_z)
+        except (TypeError, ValueError) as exc:
+            raise TypeError(f"ground_z must be a float or None, got {type(ground_z).__name__}") from exc
+        if not math.isfinite(effective_ground_z):
+            raise ValueError(f"ground_z must be finite, got {ground_z}")
+    else:
+        effective_ground_z = 0.0
+
+    rot_coords: Optional[Tuple[float, float, float]] = None
+    if foot_rotation_deg is not None:
+        try:
+            rot_coords = (float(foot_rotation_deg[0]), float(foot_rotation_deg[1]), float(foot_rotation_deg[2]))
+        except (TypeError, ValueError, IndexError) as exc:
+            raise TypeError(f"foot_rotation_deg must be a sequence of 3 floats or None, got {foot_rotation_deg}") from exc
+        if not (math.isfinite(rot_coords[0]) and math.isfinite(rot_coords[1]) and math.isfinite(rot_coords[2])):
+            raise ValueError(f"foot_rotation_deg coordinates must be finite, got {foot_rotation_deg}")
 
     arm = _resolve_armature(armature_obj)
     ik_obj = bpy.data.objects.get(IK_TARGET_NAMES[side])
@@ -354,52 +384,116 @@ def set_foot_ik_target(
             f"call unlock_foot_contact(arm, '{side}') before setting a new IK target."
         )
 
-
+    # Synchronize scene graph to evaluate CharacterRoot and armature pose bone transforms
     bpy.context.view_layer.update()
 
     p_thigh = arm.pose.bones[f"thigh.{side}"]
     hip_world = arm.matrix_world @ p_thigh.head
+    if not (math.isfinite(hip_world.x) and math.isfinite(hip_world.y) and math.isfinite(hip_world.z)):
+        raise RuntimeError(f"hip_world has non-finite coordinates: {hip_world}")
 
-    if ground_z is not None:
-        try:
-            effective_ground_z = float(ground_z)
-        except (TypeError, ValueError) as exc:
-            raise TypeError(f"ground_z must be a float or None, got {type(ground_z).__name__}") from exc
-        if not math.isfinite(effective_ground_z):
-            raise ValueError(f"ground_z must be finite, got {ground_z}")
-    else:
-        effective_ground_z = 0.0
     min_ankle_z = effective_ground_z + ANKLE_REST_Z
+    zeta_min = min_ankle_z - hip_world.z
 
-    requested = Vector(world_xyz)
-    applied = requested.copy()
-    clamped_ground = False
-    clamped_reach = False
+    requested = Vector(req_coords)
+    vec_from_hip = requested - hip_world
+    dist_req = vec_from_hip.length
+    horiz_vec = Vector((vec_from_hip.x, vec_from_hip.y, 0.0))
+    rho_r = horiz_vec.length
+    z_r = vec_from_hip.z
 
     TOL = 1e-6
 
     # =========================================================================
     # Constraint Resolution
     # =========================================================================
-    if clamp_ground and clamp_reach:
-        # 1. Feasibility check: constraint set empty when min_ankle_z > hip_world.z + MAX_LEG_REACH
-        if min_ankle_z > hip_world.z + MAX_LEG_REACH + TOL:
+    if not clamp_reach and not clamp_ground:
+        # Mode A: Both constraints disabled -> strictly unchanged
+        applied = requested.copy()
+        clamped_reach = False
+        clamped_ground = False
+        constraints_satisfied = True
+
+    elif clamp_ground and not clamp_reach:
+        # Mode B: Only Ground enabled -> reach never restricted
+        applied = requested.copy()
+        clamped_reach = False
+        if applied.z < min_ankle_z:
+            applied.z = min_ankle_z
+            clamped_ground = True
+        else:
+            clamped_ground = False
+        constraints_satisfied = (applied.z >= min_ankle_z - 1e-5)
+
+    elif clamp_reach and not clamp_ground:
+        # Mode C: Only Reach enabled -> ground never restricted
+        clamped_ground = False
+        if MIN_LEG_REACH - TOL <= dist_req <= MAX_LEG_REACH + TOL:
+            applied = requested.copy()
+            clamped_reach = False
+        elif dist_req > MAX_LEG_REACH + TOL:
+            clamped_reach = True
+            if dist_req > TOL:
+                applied = hip_world + (vec_from_hip / dist_req) * MAX_LEG_REACH
+            else:
+                applied = hip_world + Vector((0.0, 0.0, -1.0)) * MAX_LEG_REACH
+        elif dist_req < MIN_LEG_REACH - TOL:
+            clamped_reach = True
+            if dist_req > TOL:
+                applied = hip_world + (vec_from_hip / dist_req) * MIN_LEG_REACH
+            else:
+                applied = hip_world + Vector((0.0, 0.0, -1.0)) * MIN_LEG_REACH
+        else:
+            applied = requested.copy()
+            clamped_reach = False
+
+        final_dist = (applied - hip_world).length
+        constraints_satisfied = (MIN_LEG_REACH - 1e-4 <= final_dist <= MAX_LEG_REACH + 1e-4)
+
+    else:
+        # Mode D: Both clamp_reach and clamp_ground enabled (joint optimal projection)
+        # ---------------------------------------------------------------------
+        # CASE-1: Feasibility Check (zeta_min > MAX_LEG_REACH + TOL)
+        # ---------------------------------------------------------------------
+        if zeta_min > MAX_LEG_REACH + TOL:
             raise ValueError(
                 f"GROUND_REACH_INFEASIBLE: min_ankle_z ({min_ankle_z:.6f}m) exceeds "
-                f"hip_world.z ({hip_world.z:.6f}m) + MAX_LEG_REACH ({MAX_LEG_REACH:.6f}m)"
+                f"hip_world.z ({hip_world.z:.6f}m) + MAX_LEG_REACH ({MAX_LEG_REACH:.6f}m). "
+                f"Requested: {tuple(requested)}, hip: {tuple(hip_world)}, "
+                f"min_ankle_z: {min_ankle_z:.6f}, actual distance: {dist_req:.6f}, "
+                f"MIN_LEG_REACH: {MIN_LEG_REACH:.6f}, MAX_LEG_REACH: {MAX_LEG_REACH:.6f}, "
+                f"clamp_reach={clamp_reach}, clamp_ground={clamp_ground}"
             )
 
-        vec_from_hip = requested - hip_world
-        dist = vec_from_hip.length
-        zeta_min = min_ankle_z - hip_world.z
-        horiz_vec = Vector((vec_from_hip.x, vec_from_hip.y, 0.0))
-        rho_r = horiz_vec.length
+        # CASE-2: Tangent to top apex (|zeta_min - MAX_LEG_REACH| <= TOL)
+        if abs(zeta_min - MAX_LEG_REACH) <= TOL:
+            applied = hip_world + Vector((0.0, 0.0, MAX_LEG_REACH))
+            clamped_ground = abs(applied.z - requested.z) > 1e-6
+            clamped_reach = abs((applied - hip_world).length - dist_req) > 1e-6
+            constraints_satisfied = True
 
-        # Check if requested target is already strictly within the feasible set
-        if requested.z >= min_ankle_z - TOL and MIN_LEG_REACH - TOL <= dist <= MAX_LEG_REACH + TOL:
-            applied = requested.copy()
+        # CASE-5: Ground is strictly below the entire outer sphere (zeta_min < -MAX_LEG_REACH - TOL)
+        elif zeta_min < -MAX_LEG_REACH - TOL:
+            # Ground constraint imposes zero restriction on the reach shell. Degenerates to Reach-only.
+            if MIN_LEG_REACH - TOL <= dist_req <= MAX_LEG_REACH + TOL:
+                applied = requested.copy()
+                clamped_reach = False
+            elif dist_req > MAX_LEG_REACH + TOL:
+                clamped_reach = True
+                applied = hip_world + (vec_from_hip / dist_req) * MAX_LEG_REACH if dist_req > TOL else hip_world + Vector((0.0, 0.0, -1.0)) * MAX_LEG_REACH
+            else:
+                clamped_reach = True
+                applied = hip_world + (vec_from_hip / dist_req) * MIN_LEG_REACH if dist_req > TOL else hip_world + Vector((0.0, 0.0, -1.0)) * MIN_LEG_REACH
             clamped_ground = False
+            constraints_satisfied = True
+
+        # Check if requested is already strictly inside the feasible set
+        elif requested.z >= min_ankle_z - TOL and MIN_LEG_REACH - TOL <= dist_req <= MAX_LEG_REACH + TOL:
+            applied = requested.copy()
             clamped_reach = False
+            clamped_ground = False
+            constraints_satisfied = True
+
         else:
             # Deterministic unit horizontal direction from hip
             if rho_r > 1e-6:
@@ -407,131 +501,126 @@ def set_foot_ik_target(
             else:
                 u_horiz = Vector((0.0, 1.0, 0.0))
 
-            # Deterministic unit 3D direction from hip
-            if dist > 1e-6:
-                u_3d = vec_from_hip / dist
+            # Outer ground intersection radius (交圆真实存在或在数值公差内相切判定)
+            if -MAX_LEG_REACH - TOL <= zeta_min <= MAX_LEG_REACH + TOL:
+                rho_ground_max = math.sqrt(max(0.0, MAX_LEG_REACH * MAX_LEG_REACH - zeta_min * zeta_min))
             else:
-                if hip_world.z - MIN_LEG_REACH >= min_ankle_z - TOL:
-                    u_3d = Vector((0.0, 0.0, -1.0))
-                else:
-                    u_3d = Vector((0.0, 1.0, 0.0))
+                rho_ground_max = 0.0
 
-            # Feasible horizontal radius bounds on the ground boundary plane (zeta = zeta_min)
-            rho_bound_max = math.sqrt(max(0.0, MAX_LEG_REACH * MAX_LEG_REACH - zeta_min * zeta_min))
-            rho_bound_min = math.sqrt(max(0.0, MIN_LEG_REACH * MIN_LEG_REACH - zeta_min * zeta_min))
+            # Inner ground intersection radius
+            if -MIN_LEG_REACH - TOL <= zeta_min <= MIN_LEG_REACH + TOL:
+                rho_ground_min = math.sqrt(max(0.0, MIN_LEG_REACH * MIN_LEG_REACH - zeta_min * zeta_min))
+            else:
+                rho_ground_min = 0.0
 
-            # Subcase 1: Requested is below ground plane
-            if requested.z < min_ankle_z - TOL:
-                clamped_ground = True
-                if rho_r > rho_bound_max + TOL:
-                    rho_clamped = rho_bound_max
-                    clamped_reach = True
-                elif rho_r < rho_bound_min - TOL:
-                    rho_clamped = rho_bound_min
-                    clamped_reach = True
+            # Collect candidate points (rho, z) relative to hip
+            candidates: List[Tuple[float, float, str]] = []
+
+            # Candidate 1: Ground line segment [rho_ground_min, rho_ground_max] at z = zeta_min
+            rho_c1 = max(rho_ground_min, min(rho_ground_max, rho_r))
+            candidates.append((rho_c1, zeta_min, "ground_segment"))
+
+            # Candidate 2: Outer circle arc r = MAX_LEG_REACH with z >= zeta_min
+            if dist_req > TOL:
+                rho_c2 = MAX_LEG_REACH * (rho_r / dist_req)
+                z_c2 = MAX_LEG_REACH * (z_r / dist_req)
+            else:
+                rho_c2 = 0.0
+                z_c2 = MAX_LEG_REACH if zeta_min <= MAX_LEG_REACH else -MAX_LEG_REACH
+
+            if z_c2 >= zeta_min - TOL:
+                z_c2_clean = max(zeta_min, z_c2)
+                candidates.append((rho_c2, z_c2_clean, "outer_arc"))
+
+            # Candidate 3: Inner circle arc r = MIN_LEG_REACH with z >= zeta_min
+            if zeta_min <= MIN_LEG_REACH + TOL:
+                if dist_req > TOL:
+                    rho_c3 = MIN_LEG_REACH * (rho_r / dist_req)
+                    z_c3 = MIN_LEG_REACH * (z_r / dist_req)
                 else:
-                    rho_clamped = max(rho_bound_min, min(rho_bound_max, rho_r))
-                    if dist > MAX_LEG_REACH + TOL or dist < MIN_LEG_REACH - TOL or abs(rho_clamped - rho_r) > TOL:
-                        clamped_reach = True
+                    if -MIN_LEG_REACH >= zeta_min - TOL:
+                        rho_c3 = 0.0
+                        z_c3 = -MIN_LEG_REACH
+                    elif zeta_min <= 0:
+                        rho_c3 = rho_ground_min
+                        z_c3 = zeta_min
                     else:
-                        clamped_reach = False
+                        rho_c3 = 0.0
+                        z_c3 = MIN_LEG_REACH
 
-                applied = Vector((
-                    hip_world.x + u_horiz.x * rho_clamped,
-                    hip_world.y + u_horiz.y * rho_clamped,
-                    min_ankle_z,
-                ))
+                if z_c3 >= zeta_min - TOL:
+                    z_c3_clean = max(zeta_min, z_c3)
+                    candidates.append((rho_c3, z_c3_clean, "inner_arc"))
 
-            # Subcase 2: Requested is above ground but exceeds MAX_LEG_REACH
-            elif dist > MAX_LEG_REACH + TOL:
-                clamped_reach = True
-                spherical_p = hip_world + u_3d * MAX_LEG_REACH
-                if spherical_p.z < min_ankle_z - TOL:
-                    clamped_ground = True
-                    applied = Vector((
-                        hip_world.x + u_horiz.x * rho_bound_max,
-                        hip_world.y + u_horiz.y * rho_bound_max,
-                        min_ankle_z,
-                    ))
-                else:
-                    applied = spherical_p
-                    clamped_ground = False
+            # Evaluate best candidate by Euclidean distance to (rho_r, z_r)
+            best_candidate: Optional[Tuple[float, float, str]] = None
+            min_dist_sq = float('inf')
 
-            # Subcase 3: Requested is above ground but smaller than MIN_LEG_REACH
-            elif dist < MIN_LEG_REACH - TOL:
-                clamped_reach = True
-                spherical_p = hip_world + u_3d * MIN_LEG_REACH
-                if spherical_p.z < min_ankle_z - TOL:
-                    clamped_ground = True
-                    rho_clamped = min(max(rho_r, rho_bound_min), rho_bound_max)
-                    applied = Vector((
-                        hip_world.x + u_horiz.x * rho_clamped,
-                        hip_world.y + u_horiz.y * rho_clamped,
-                        min_ankle_z,
-                    ))
-                else:
-                    applied = spherical_p
-                    clamped_ground = False
-            else:
-                applied = requested.copy()
-                clamped_ground = False
-                clamped_reach = False
+            for rho_c, z_c, tag in candidates:
+                rho_clean = max(0.0, rho_c)
+                z_clean = max(zeta_min, z_c)
+                r_c = math.sqrt(rho_clean * rho_clean + z_clean * z_clean)
 
-    elif clamp_ground and not clamp_reach:
-        if requested.z < min_ankle_z:
-            applied.z = min_ankle_z
-            clamped_ground = True
-        clamped_reach = False
+                if z_clean < zeta_min - 1e-5:
+                    continue
+                if r_c > MAX_LEG_REACH + 1e-5 or r_c < MIN_LEG_REACH - 1e-5:
+                    continue
 
-    elif clamp_reach and not clamp_ground:
-        vec_from_hip = requested - hip_world
-        dist = vec_from_hip.length
-        if dist > MAX_LEG_REACH:
-            clamped_reach = True
-            if dist > 1e-6:
-                applied = hip_world + (vec_from_hip / dist) * MAX_LEG_REACH
-            else:
-                applied = hip_world + Vector((0.0, 0.0, -1.0)) * MAX_LEG_REACH
-        elif dist < MIN_LEG_REACH:
-            clamped_reach = True
-            if dist > 1e-6:
-                applied = hip_world + (vec_from_hip / dist) * MIN_LEG_REACH
-            else:
-                applied = hip_world + Vector((0.0, 0.0, -1.0)) * MIN_LEG_REACH
-        clamped_ground = False
+                d_sq = (rho_clean - rho_r) * (rho_clean - rho_r) + (z_clean - z_r) * (z_clean - z_r)
+                if d_sq < min_dist_sq - 1e-9:
+                    min_dist_sq = d_sq
+                    best_candidate = (rho_clean, z_clean, tag)
 
-    else:
-        applied = requested.copy()
-        clamped_ground = False
-        clamped_reach = False
+            if best_candidate is None:
+                raise RuntimeError(
+                    f"GROUND_REACH_CONSTRAINT_UNSATISFIED: solver failed to find a feasible target. "
+                    f"Requested: {tuple(requested)}, hip: {tuple(hip_world)}, "
+                    f"min_ankle_z: {min_ankle_z:.6f}, actual distance: {dist_req:.6f}, "
+                    f"MIN_LEG_REACH: {MIN_LEG_REACH:.6f}, MAX_LEG_REACH: {MAX_LEG_REACH:.6f}, "
+                    f"clamp_reach={clamp_reach}, clamp_ground={clamp_ground}"
+                )
+
+            best_rho, best_z, _ = best_candidate
+            applied = Vector((
+                hip_world.x + u_horiz.x * best_rho,
+                hip_world.y + u_horiz.y * best_rho,
+                hip_world.z + best_z,
+            ))
+
+            final_dist = (applied - hip_world).length
+            constraints_satisfied = (
+                applied.z >= min_ankle_z - 1e-5
+                and MIN_LEG_REACH - 1e-4 <= final_dist <= MAX_LEG_REACH + 1e-4
+            )
+
+            if not constraints_satisfied:
+                raise RuntimeError(
+                    f"GROUND_REACH_CONSTRAINT_UNSATISFIED: solver produced target violating constraints. "
+                    f"Applied: {tuple(applied)}, final_dist: {final_dist:.6f}, z: {applied.z:.6f}, min_z: {min_ankle_z:.6f}. "
+                    f"Requested: {tuple(requested)}, hip: {tuple(hip_world)}, "
+                    f"MIN_LEG_REACH: {MIN_LEG_REACH:.6f}, MAX_LEG_REACH: {MAX_LEG_REACH:.6f}, "
+                    f"clamp_reach={clamp_reach}, clamp_ground={clamp_ground}"
+                )
+
+            # Determine participation flags
+            clamped_ground = abs(applied.z - requested.z) > 1e-6
+            p_ground_only_z = max(requested.z, min_ankle_z)
+            p_ground_only_dist = math.sqrt(rho_r * rho_r + (p_ground_only_z - hip_world.z) ** 2)
+            clamped_reach = (
+                (applied - Vector((requested.x, requested.y, p_ground_only_z))).length > 1e-6
+                or dist_req > MAX_LEG_REACH + 1e-6
+                or dist_req < MIN_LEG_REACH - 1e-6
+                or p_ground_only_dist > MAX_LEG_REACH + 1e-6
+                or p_ground_only_dist < MIN_LEG_REACH - 1e-6
+            )
 
     # Compute truthfulness telemetry and constraint satisfaction flags
     final_dist = (applied - hip_world).length
     ground_clearance_m = applied.z - min_ankle_z
     hip_to_target_dist_m = final_dist
 
-    constraints_satisfied = True
-    if clamp_ground and applied.z < min_ankle_z - 1e-5:
-        constraints_satisfied = False
-    if clamp_reach:
-        if final_dist > MAX_LEG_REACH + 1e-4 or final_dist < MIN_LEG_REACH - 1e-4:
-            constraints_satisfied = False
-
-    # Apply prebend hint and write targets only after successful feasibility check and clamping
-    _apply_ik_prebend_hint(arm)
-    bpy.context.view_layer.update()
-
-    # Convert applied world position to ik_obj parent space
-    if ik_obj.parent is not None:
-        ik_obj.location = ik_obj.parent.matrix_world.inverted() @ applied
-    else:
-        ik_obj.location = applied
-
-    if foot_rotation_deg is not None:
-        rx, ry, rz = (math.radians(v) for v in foot_rotation_deg)
-        ik_obj.rotation_euler = Euler((rx, ry, rz), "XYZ")
-    else:
-        ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+    if not (math.isfinite(applied.x) and math.isfinite(applied.y) and math.isfinite(applied.z)):
+        raise RuntimeError(f"applied_world has non-finite coordinates: {applied}")
 
     # Keep knee pole target strictly forward (+Y) of both hip and foot target to prevent knee flip
     pole_world = Vector((
@@ -539,10 +628,44 @@ def set_foot_ik_target(
         max(hip_world.y, applied.y) + POLE_FORWARD_OFFSET,
         0.5 * (hip_world.z + applied.z),
     ))
+    if not (math.isfinite(pole_world.x) and math.isfinite(pole_world.y) and math.isfinite(pole_world.z)):
+        raise RuntimeError(f"pole_world has non-finite coordinates: {pole_world}")
+
+    # =========================================================================
+    # Phase B: Commit
+    # =========================================================================
+    # Apply prebend hint and write targets only after successful feasibility check and clamping
+    _apply_ik_prebend_hint(arm)
+
+    # Convert applied world position to ik_obj parent space
+    if ik_obj.parent is not None:
+        ik_obj.location = ik_obj.parent.matrix_world.inverted() @ applied
+    else:
+        ik_obj.location = applied
+
+    if rot_coords is not None:
+        rx, ry, rz = (math.radians(v) for v in rot_coords)
+        ik_obj.rotation_euler = Euler((rx, ry, rz), "XYZ")
+    else:
+        ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+
     if pole_obj.parent is not None:
         pole_obj.location = pole_obj.parent.matrix_world.inverted() @ pole_world
     else:
         pole_obj.location = pole_world
+
+    bpy.context.view_layer.update()
+
+    state = get_leg_ik_state(arm, side)
+    state["requested_world"] = requested
+    state["applied_world"] = applied
+    state["clamped_reach"] = clamped_reach
+    state["clamped_ground"] = clamped_ground
+    state["ground_z"] = effective_ground_z
+    state["constraints_satisfied"] = constraints_satisfied
+    state["ground_clearance_m"] = ground_clearance_m
+    state["hip_to_target_dist_m"] = hip_to_target_dist_m
+    return state
 
     bpy.context.view_layer.update()
 

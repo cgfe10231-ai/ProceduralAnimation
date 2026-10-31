@@ -1,32 +1,42 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
-* **项目名称**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务编号**：ProceduralAnimation — 09-A FINAL CLOSURE: Ground × Reach Constraint Feasibility and Truthful Result Contract (Task ID: PKG5-09A-GROUND-REACH-FINAL-CLOSURE)
-* **任务状态**：
-  * **PKG-5 / 09-A FINAL 闭环完成**：
-    1. **生产接口与算法收口 (`src/rig/ik.py:322–450` `set_foot_ik_target`)**：
-       - **空可行域不可行前置阻断**：当 $z_{\min} > h_z + L_{\max} + 10^{-6}$ 时，地面不穿透与最大腿长约束空间交集为空，严格抛出带 `GROUND_REACH_INFEASIBLE` 的 `ValueError`，杜绝静默失败；
-       - **柱坐标二维几何精确截断**：在地表边界平面 $\zeta = \zeta_{\min} = z_{\min} - h_z$ 上精确求解有效半径区间 $[\rho_{\min}, \rho_{\max}]$，其中 $\rho_{\min} = \sqrt{\max(0, L_{\min}^2 - \zeta_{\min}^2)}$，$\rho_{\max} = \sqrt{\max(0, L_{\max}^2 - \zeta_{\min}^2)}$，确保截断结果严格同时满足地面不穿透（$p_z \ge z_{\min}$）与腿长生理范围（$\|\mathbf{p} - \mathbf{h}\| \in [L_{\min}, L_{\max}]$）；
-       - **失败状态原子性保证**：不可行输入抛出异常前，绝对不修改 `ik_obj.location`、`ik_obj.rotation_euler`、`pole_obj.location` 或调用改变骨骼局部姿态的 `_apply_ik_prebend_hint`；
-       - **依赖图刷新保证**：约束求解前置统一依赖图刷新 `bpy.context.view_layer.update()`，彻底消除因骨盆下蹲或姿态变化导致的髋部采样滞后；
-       - **真实遥测与合同扩展**：返回状态字典如实填充 `constraints_satisfied` (bool)、`ground_clearance_m` (float)、`hip_to_target_dist_m` (float)；
-    2. **针对性单元测试 (`tests/test_leg_ik_ground_height_contract.py`)**：
-       - 涵盖 TEST-1 至 TEST-18 全部 18 项测试，在真实 Blender 环境下全部通过（1.34s）；
-    3. **全套分层自动化回归全量 100% 通过**：
-       - Quick: **19/19 PASSED (50.41s)**；
-       - Physics: **24/24 PASSED (92.59s)**；
-       - Motion: **12/12 PASSED (48.77s)**；
-       - Full: **39/39 PASSED (146.00s)**；
-       - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**。
-  * **存量问题状态**：确认缺陷归零（0 项），全仓库剩余 3 项合同缺口（全部集中于 PKG-5：FIND-R3-01 局部关闭、剩余解锁生命周期与姿态反解，FIND-R3-03、FIND-R3-04 维持待修复登记）；
-  * **Phase 7B 状态**：**仍然严格禁止**，禁止提前开发环境双向动力学；
-  * **门禁终止状态**：`PKG-5 / 09-A FINAL — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行进入 Task 09-B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B）。
+* **项目**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
+* **当前任务**：ProceduralAnimation — PKG-5 / 09 Lower-Limb IK: 三维 Ground × Reach 约束求解器最终工程收口 (Task ID: PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)
+* **核心状态**：
+  * **PKG-5 / 09-A 最终工程收口**：
+    1. **接口算法收口 (src/rig/ik.py:322–640 set_foot_ik_target)**：
+       - **四模式完备解耦**：Mode A(原样)、Mode B(仅Ground)、Mode C(仅Reach)、Mode D(欧氏距离最小化联合极值投影)；
+       - **几何全空间分类完备性**：CASE-1 严格空集异常 (GROUND_REACH_INFEASIBLE)、CASE-2 顶部切点、CASE-3/4 地面截断球体候选极值搜索、CASE-5 极低地面退化为 Reach-only（杜绝零半径伪装交圆）；
+       - **两阶段执行与原子性保护**：Phase A 校验全部输入、有限性与约束求解；Phase B 仅在通过后写入控制器并触发 prebend hint，前置失败绝不污染骨架；
+       - **真实性遥测与求解校验**：内部求解失败抛出 GROUND_REACH_CONSTRAINT_UNSATISFIED；真实返回
+equested_world, pplied_world, clamped_reach, clamped_ground, ground_z, constraints_satisfied, ground_clearance_m, hip_to_target_dist_m；
+    2. **专项测试 (	ests/test_leg_ik_ground_height_contract.py)**：
+       - 完整保留 TEST-1 至 TEST-18；
+       - 新增 TEST-19（完整几何分类法 Categories A 至 T，20个边界全量检查 8 大字段）；
+       - 新增 TEST-20（独立数值网格与边界采样 Oracle 参数化与伪随机交叉验证，5mm网格公差内 100% 吻合）；
+       - 专项 20 项 100% 通过（2.12s）；
+    3. **全量分级自动化回归全部 100% 通过**：
+       - legacy_leg_ik (verify_task4c_ik): **PASS (1.58s)**；
+       - legacy_foot_contact (verify_task4d_foot_contact): **PASS (1.62s)**；
+       - leg_ik_worldspace_init_reset (PKG-5/WS-01): **PASS (0.53s)**；
+       - physics_rigid_link_com: **PASS (1.75s)**；
+       - physics_body_inertia: **PASS (11.45s)**；
+       - physics_contact_model: **PASS (22.58s)**；
+       - physics_bridge_contract: **PASS (22.36s)**；
+       - Quick: **19/19 PASSED (48.71s)**；
+       - Physics: **24/24 PASSED (94.97s)**；
+       - Motion: **12/12 PASSED (48.36s)**；
+       - Full: **39/39 PASSED (146.79s)**；
+       - 架构文档与符号物理校验 	ests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
+  * **缺陷状态**：已确认缺陷归零（0 项）。全局库剩余 3 项同级缺陷（全部在 PKG-5：FIND-R3-01 局部闭合、剩余动态问题，FIND-R3-03、FIND-R3-04 维持待修复登记）；
+  * **Phase 7B 状态**：**依然严格禁止开启**（禁止提前跃迁双足动力学）；
+  * **终门禁终止状态**：PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW（严格停止等待外部审查，严禁自行推进 Task 09-B，严禁修改 oot_contact.py，严禁进入 Phase 7B）。
 * **Git 状态**：
-  * **当前分支**：`master`
-  * **起始基准 Commit SHA**：`c637d02ebc1ca179c13f2787049e20828c82c268`
-  * **最新 Commit SHA**：`6ff4463`
-  * **远程仓库同步状态**：已同步至 origin/master
-  * **未提交文件说明**：`P2_R1_recovery.patch` 为历史中断恢复安全快照，受保护不纳入版本库。
+  * **当前分支**：master
+  * **起始基准 Commit SHA**：4efb99307becf3a7fe9f202d111fb29f77c58b6d
+  * **最新本地 Commit SHA**：待提交
+  * **远程仓库同步状态**：待推送至 origin/master
+  * **未提交文件说明**：P2_R1_recovery.patch 为受保护历史恢复安全补丁，严禁暂存。
 
 ---
 
