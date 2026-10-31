@@ -3,6 +3,37 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-31] PKG-5 / WS-01: 腿部 IK 控制器世界空间初始化与重置不变量修复 (FIND-R3-01 部分子问题)
+
+### 1. 腿部 IK 控制器世界空间无父级不变量 (Leg IK World-Space Initialization & Reset Invariant)
+* **问题成因**：
+  - `src/rig/ik.py` 中 `setup_leg_ik()` 与 `reset_leg_ik()` 历史实现中默认传入 `parent=root_obj` 或在重置时强行执行 `ik_obj.parent = root_obj` 与 `pole_obj.parent = root_obj`；
+  - 违反了 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 门禁清规第七条（IK 控制器必须恒定处于世界空间，严禁将局部控制器作为世界控制器使用，亦严禁在动画循环中频繁 reparent）；
+  - 导致角色 Root 移动或偏航时控制器被非预期拖拽，阻碍了足部支撑锁定的确定性与世界空间接触评估。
+* **生产代码修复**：
+  - [src/rig/ik.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py):
+    - **`_get_or_create_empty()`**: 当调用方传入 `parent=None` 时，若获取到的已有对象仍挂在某个父级下，显式执行解绑（`obj.parent = None` 并重置 `obj.matrix_parent_inverse = Matrix.Identity(4)`）；
+    - **`setup_leg_ik()`**: 创建或获取 `FootIK.L`, `FootIK.R`, `KneePole.L`, `KneePole.R` 时显式传入 `parent=None`；显式校验若已有对象存在父级则解绑；通过 `root_mat = root_obj.matrix_world.copy()` 将角色当前根节点空间的中立站立坐标投影至世界坐标（`ik_obj.location = root_mat @ ik_local`, `ik_obj.rotation_euler = root_rot`），重置 `is_locked = False`；
+    - **`reset_leg_ik()`**: 移除 `ik_obj.parent = root_obj` 与 `pole_obj.parent = root_obj` 强行挂载逻辑；若控制器存在残留父级则解绑清理；重新计算根节点世界变换并将控制器准确放回当前根节点对应的世界空间中立站立位置与朝向，重置 `is_locked = False`。
+* **针对性单元测试与验证**：
+  - [tests/test_leg_ik_worldspace_init_reset.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_leg_ik_worldspace_init_reset.py):
+    - `test_1_first_time_initialization`: 验证首次创建时 4 个控制器 `parent is None`，世界坐标与朝向严格吻合根节点世界变换；
+    - `test_2_root_nonzero_translation`: 验证根节点处于非原点位置时，初始化控制器匹配根节点世界中立落点，而非退化回局部原点；
+    - `test_3_root_nonzero_rotation`: 验证根节点带偏航角时，控制器世界坐标与朝向与根节点保持一致；
+    - `test_4_existing_parented_object_recovery`: 验证人为将控制器挂载父级后，重新运行 `setup_leg_ik` 能彻底解绑父级并恢复世界坐标；
+    - `test_5_reset_behavior_and_no_cumulative_drift`: 验证从位移姿态重置后 `parent is None`，且连续 5 次重置无累积漂移；
+    - `test_6_subsequent_root_motion_does_not_drag_controllers`: 验证根节点后续位移与旋转不会拖拽处于世界空间的独立控制器。
+    - **测试结果**：**6/6 PASS in 0.663s**。
+* **分层回归与旧测试假设排查**：
+  - `tests/test_runner_unit.py`: **11/11 PASS (1.107s)**
+  - `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**
+  - `.\run_tests.ps1 -tier motion`: **12/12 PASS (58.9s, 100%)**
+  - `tests/verify_task4c_ik.py` & `tests/verify_task4d_foot_contact.py`: **PASS**
+  - **已知回归测试失败登记 (Legacy Parenting Assumption Regression)**:
+    - `tests/verify_task6fb_rigid_link.py` Test 8: 历史测试在未失活 IK 或未调用重置的情况下，直接在 Pose 模式下平移 `root_obj.location`，依赖“FootIK 会随 root_obj 刚性平移”的旧假设。在 WS-01 确立 `parent is None` 后，FootIK 保持世界原地，IK 解算器将腿部拉伸导致世界 CoM 偏差 0.146m。
+    - 级联子进程测试：`tests/verify_task6gb_body_inertia.py` Test 13、`tests/verify_task6gc_contact_model.py` Test 15、`tests/verify_task6gc_r3b1_bridge.py` Test 14 因调用 `verify_task6fb_rigid_link.py` 同步呈现该项失败；各自本身功能测试全部 PASS。
+    - 依据任务清规，严格保留真实失败证据，不擅自修改测试断言阈值，不回退无父级合同，登记并等待独立审查。
+
 ## [2026-10-30] ContactModel 07 最终验收收口: 接触记录唯一性与几何容差失效 (CONTACT-MODEL-07-FINAL-CLOSURE)
 
 ### 1. ISSUE-07-A: MotionState.contacts 接触记录唯一性与规范化映射

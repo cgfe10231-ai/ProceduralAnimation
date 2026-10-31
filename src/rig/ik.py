@@ -81,6 +81,10 @@ def _get_or_create_empty(
     if parent is not None:
         obj.parent = parent
         obj.matrix_parent_inverse = Matrix.Identity(4)
+    else:
+        if obj.parent is not None:
+            obj.parent = None
+            obj.matrix_parent_inverse = Matrix.Identity(4)
 
     return obj
 
@@ -115,6 +119,11 @@ def setup_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> Dict[str, b
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
     collection = _ensure_character_collection()
 
+    # Synchronize scene graph to evaluate CharacterRoot world matrix
+    bpy.context.view_layer.update()
+    root_mat = root_obj.matrix_world.copy() if root_obj is not None else Matrix.Identity(4)
+    root_rot = root_mat.to_euler("XYZ")
+
     controls: Dict[str, bpy.types.Object] = {}
 
     for side, sign in (("L", -1.0), ("R", 1.0)):
@@ -124,23 +133,35 @@ def setup_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> Dict[str, b
             name=ik_name,
             display_type="CUBE",
             display_size=0.05,
-            parent=root_obj,
+            parent=None,
             collection=collection,
         )
         pole_obj = _get_or_create_empty(
             name=pole_name,
             display_type="SPHERE",
             display_size=0.04,
-            parent=root_obj,
+            parent=None,
             collection=collection,
         )
 
-        # Set neutral rest positions in CharacterRoot local space
-        ik_obj.location = Vector((sign * HIP_X_OFFSET, 0.0, ANKLE_REST_Z))
-        ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+        # Explicitly ensure existing parented objects are unparented
+        if ik_obj.parent is not None:
+            ik_obj.parent = None
+            ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        if pole_obj.parent is not None:
+            pole_obj.parent = None
+            pole_obj.matrix_parent_inverse = Matrix.Identity(4)
 
-        pole_obj.location = Vector((sign * HIP_X_OFFSET, POLE_FORWARD_OFFSET, KNEE_REST_Z))
-        pole_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+        # Set neutral rest positions transformed to World space
+        ik_local = Vector((sign * HIP_X_OFFSET, 0.0, ANKLE_REST_Z))
+        pole_local = Vector((sign * HIP_X_OFFSET, POLE_FORWARD_OFFSET, KNEE_REST_Z))
+
+        ik_obj.location = root_mat @ ik_local
+        ik_obj.rotation_euler = root_rot
+        ik_obj["is_locked"] = False
+
+        pole_obj.location = root_mat @ pole_local
+        pole_obj.rotation_euler = root_rot
 
         controls[ik_name] = ik_obj
         controls[pole_name] = pole_obj
@@ -212,22 +233,28 @@ def reset_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
     """Reset both legs and IK/Pole targets to the neutral grounded standing pose."""
     arm = _resolve_armature(armature_obj)
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
+    bpy.context.view_layer.update()
+    root_mat = root_obj.matrix_world.copy() if root_obj is not None else Matrix.Identity(4)
+    root_rot = root_mat.to_euler("XYZ")
+
     for side, sign in (("L", -1.0), ("R", 1.0)):
         ik_obj = bpy.data.objects.get(IK_TARGET_NAMES[side])
         pole_obj = bpy.data.objects.get(POLE_TARGET_NAMES[side])
         if ik_obj is not None:
             ik_obj["is_locked"] = False
-            if root_obj is not None:
-                ik_obj.parent = root_obj
+            if ik_obj.parent is not None:
+                ik_obj.parent = None
                 ik_obj.matrix_parent_inverse = Matrix.Identity(4)
-            ik_obj.location = Vector((sign * HIP_X_OFFSET, 0.0, ANKLE_REST_Z))
-            ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+            ik_local = Vector((sign * HIP_X_OFFSET, 0.0, ANKLE_REST_Z))
+            ik_obj.location = root_mat @ ik_local
+            ik_obj.rotation_euler = root_rot
         if pole_obj is not None:
-            if root_obj is not None:
-                pole_obj.parent = root_obj
+            if pole_obj.parent is not None:
+                pole_obj.parent = None
                 pole_obj.matrix_parent_inverse = Matrix.Identity(4)
-            pole_obj.location = Vector((sign * HIP_X_OFFSET, POLE_FORWARD_OFFSET, KNEE_REST_Z))
-            pole_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+            pole_local = Vector((sign * HIP_X_OFFSET, POLE_FORWARD_OFFSET, KNEE_REST_Z))
+            pole_obj.location = root_mat @ pole_local
+            pole_obj.rotation_euler = root_rot
 
     _apply_ik_prebend_hint(arm)
     bpy.context.view_layer.update()

@@ -352,7 +352,7 @@
   - 违反世界旋转输入数据合同。
 * **Classification**: `CONTRACT_GAP`
 * **Blocks Further Development**: `YES`
-* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Repair Status**: `PARTIALLY_RESOLVED` (PKG-5 / WS-01 已关闭初始化与重置无父级子问题；`foot_contact.py` 解锁生命周期动态挂载与 `set_foot_ik_target` 姿态反解待 WS-02 处理)
 * **Suggested Repair Boundary**: 统一 `setup_leg_ik`、`reset_leg_ik`、`unlock_foot_contact`，全生命周期锁定 `parent = None`；在 `set_foot_ik_target` 中防御性补齐逆旋转转换矩阵逻辑。
 
 ---
