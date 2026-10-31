@@ -1,26 +1,25 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-31
-> **当前阶段**：PKG-5 / 09 Lower-Limb IK: 足部 IK 地面高度合同与根节点解耦 (PKG5-09-IK-GROUND-A)。已完成 `set_foot_ik_target` 地面防穿透高程解耦修复与全量分层回归闭环：
-> 1) **生产接口合同修复 (`src/rig/ik.py:322–441` `set_foot_ik_target`)**：
->    - 追加可选末尾参数 `ground_z: Optional[float] = None`，严格保持历史实参顺序与默认值完全兼容；
->    - 当显式传入 `ground_z` 时，使用 `effective_ground_z = float(ground_z)` 计算 `min_ankle_z = effective_ground_z + ANKLE_REST_Z`；
->    - 当未传入 `ground_z` 时，回退到历史默认平地基准 `effective_ground_z = 0.0m`；
->    - 彻底废除并移除对 `root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")` 与 `root_obj.matrix_world.translation.z` 的采样，解耦足部高度截断与角色根节点高程的错误绑定；
->    - 保留 `clamp_ground=False` 旁路特性，以及与 `MAX_LEG_REACH` / `MIN_LEG_REACH` 可达性约束的真实几何交互与状态字典返回；
-> 2) **针对性新单元测试 (`tests/test_leg_ik_ground_height_contract.py`)**：
->    - TEST-1（平地默认兼容性）、TEST-2（根节点高度解耦）、TEST-3（凹陷负高程地形）、TEST-4（凸起平台地形）、TEST-5（clamp_ground=False旁路）、TEST-6（根节点旋转/偏航独立性）、TEST-7（双重边界几何交互与控制器坐标对齐）、TEST-8（非法与非有限输入防御）全部 8 项通过（0.69s）；
+> **当前阶段**：PKG-5 / 09 Lower-Limb IK: 地面与可达性约束精确求解与真实遥测收口 (PKG5-09A-GROUND-REACH-FINAL-CLOSURE)。已完成 `set_foot_ik_target` 数学正确性收口、空交集早期阻断、二维柱坐标地平投影、失败状态原子性保证与真实遥测合同扩展，通过全量分层回归闭环：
+> 1) **生产接口与算法收口 (`src/rig/ik.py:322–450` `set_foot_ik_target`)**：
+>    - **空可行域冲突早期阻断**：当 $z_{\min} > h_z + L_{\max} + 10^{-6}$ 时，硬性几何约束空间交集为空，严格抛出带 `GROUND_REACH_INFEASIBLE` 关键字的 `ValueError`，杜绝静默失败；
+>    - **柱坐标二维几何精确截断**：在地表边界平面 $\zeta = \zeta_{\min} = z_{\min} - h_z$ 上精确求解水平有效半径区间 $[\rho_{\min}, \rho_{\max}]$，其中 $\rho_{\min} = \sqrt{\max(0, L_{\min}^2 - \zeta_{\min}^2)}$，$\rho_{\max} = \sqrt{\max(0, L_{\max}^2 - \zeta_{\min}^2)}$，保持水平方向单位向量不变投影水平距离，确保无论目标过近（$< L_{\min}$）还是过远（$> L_{\max}$），截断结果严格同时满足地面不穿透（$p_z \ge z_{\min}$）与腿长生理范围（$\|\mathbf{p} - \mathbf{h}\| \in [L_{\min}, L_{\max}]$）；
+>    - **失败状态原子性保证**：在可行性校验与目标几何求解完成前，绝对不修改 `ik_obj.location`、`ik_obj.rotation_euler`、`pole_obj.location` 或调用改变骨骼局部姿态的 `_apply_ik_prebend_hint`；
+>    - **真实遥测与合同扩展**：返回状态字典如实填充 `constraints_satisfied` (bool)、`ground_clearance_m` (float)、`hip_to_target_dist_m` (float)；
+> 2) **针对性单元测试套件完备化 (`tests/test_leg_ik_ground_height_contract.py`)**：
+>    - 完整包含 TEST-1 至 TEST-18（覆盖平地兼容、根节点解耦、负高程坑洞、凸起平台、旁路开关、旋转独立性、双重边界几何交互、非法输入防御、空交集不可行阻断、最小/最大腿长地表精确截断、非平地多标高求解、失败原子性保护、真实遥测准确性、历史成熟动作零退化），全部 18 项测试 100% 通过（1.34s）；
 > 3) **历史与分层全量自动化回归 100% 通过**：
->    - `legacy_leg_ik` (verify_task4c_ik): **PASS (1.66s)**；
->    - `legacy_foot_contact` (verify_task4d_foot_contact): **PASS (1.61s)**；
->    - `physics_rigid_link_com` (verify_task6fb_rigid_link): **PASS (1.92s)**；
->    - `leg_ik_worldspace_init_reset` (PKG-5/WS-01): **PASS (2.3s)**；
->    - Quick: **19/19 PASSED (53.94s)**；
->    - Physics: **24/24 PASSED (94.26s)**；
->    - Motion: **12/12 PASSED (51.32s)**；
->    - Full: **39/39 PASSED (148.27s)**；
+>    - `legacy_leg_ik` (verify_task4c_ik): **PASS (1.53s)**；
+>    - `legacy_foot_contact` (verify_task4d_foot_contact): **PASS (1.57s)**；
+>    - `physics_rigid_link_com` (verify_task6fb_rigid_link): **PASS (1.63s)**；
+>    - `leg_ik_worldspace_init_reset` (PKG-5/WS-01): **PASS (2.16s)**；
+>    - Quick: **19/19 PASSED (50.41s)**；
+>    - Physics: **24/24 PASSED (92.59s)**；
+>    - Motion: **12/12 PASSED (48.77s)**；
+>    - Full: **39/39 PASSED (146.00s)**；
 >    - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**；
-> **重要修复与证据核准**：FIND-R3-02 足部地面防穿透硬编码根高程已彻底闭环收口；全仓库剩余 3 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期与姿态反解、FIND-R3-03、FIND-R3-04）。阻碍 Phase 7B 仍然为 YES（需等待 PKG-5 整体完成）。当前门禁终止状态为：`PKG-5 / 09 Lower IK / Task A — AWAITING FINAL INDEPENDENT REVIEW`，严格停止等待独立审查，禁止自行进入 Task B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B。
+> **重要修复与证据核准**：FIND-R3-02 足部地面防穿透与可达性约束数学求解已彻底闭环收口；全仓库剩余 3 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期与姿态反解、FIND-R3-03、FIND-R3-04）。阻碍 Phase 7B 仍然为 YES（需等待 PKG-5 整体完成）。当前门禁终止状态为：`PKG-5 / 09-A FINAL — AWAITING INDEPENDENT REVIEW`，严格停止等待独立审查，禁止自行进入 Task 09-B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B。
 ---
 
 ## 1. 状态分类一览

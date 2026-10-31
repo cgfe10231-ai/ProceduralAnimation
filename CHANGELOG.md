@@ -3,6 +3,35 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-31] PKG-5 / 09 Lower-Limb IK: 地面与可达性几何约束精确求解与真实遥测收口 (PKG5-09A-GROUND-REACH-FINAL-CLOSURE)
+
+### 1. set_foot_ik_target 地面与可达性约束不可行早期阻断与精确投影 (FIND-R3-02 收口)
+* **问题成因**：
+  - ISSUE-09A-01：最大腿长与地面约束在几何上可能产生空交集。当地面最小允许踝高度 $z_{\min} > h_z + L_{\max}$（$L_{\max}=0.82$m）时，目标点既要在地面上（$z \ge z_{\min}$）又要在腿部可达球体内（$\|\mathbf{p} - \mathbf{h}\| \le L_{\max}$）在几何上完全不可行。先前实现执行球截断后抬升 Z 破坏了最大距离，或者执行地平面投影破坏了地面约束。
+  - ISSUE-09A-02：最小腿长与地面约束在近处产生互相破坏。当请求目标距离髋部小于 $L_{\min}=0.16$m 且低于地面时，简单地直接抬高 Z 往往会导致其进入 $L_{\min}$ 内部，使得最小腿长和防自穿透失效。
+  - 失败状态原子性缺口：不可行输入抛出异常前，旧代码可能已经执行了 `_apply_ik_prebend_hint(arm)`，导致骨骼局部姿态被意外污染。
+* **生产代码修复**：
+  - [src/rig/ik.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py):
+    - 约束求解前置统一依赖图刷新 `bpy.context.view_layer.update()`，确保骨架当前姿态及髋关节世界坐标 `hip_world` 采样真实可靠；
+    - **可行性前置判定**：当 $z_{\min} > h_z + L_{\max} + 10^{-6}$ 时，两项硬性几何约束在空间中无公共解，立即抛出 `ValueError("GROUND_REACH_INFEASIBLE: ...")`，杜绝静默失败；
+    - **柱坐标二维几何精确截断**：在地表边界平面 $\zeta = \zeta_{\min} = z_{\min} - h_z$ 上精确求解水平有效半径区间 $[\rho_{\min}, \rho_{\max}]$，其中 $\rho_{\min} = \sqrt{\max(0, L_{\min}^2 - \zeta_{\min}^2)}$，$\rho_{\max} = \sqrt{\max(0, L_{\max}^2 - \zeta_{\min}^2)}$；
+    - 当目标低于地面时，保持水平方向单位向量不变，将水平投影距离严谨投影至 $[\rho_{\min}, \rho_{\max}]$，同时严格将 Z 设为 $z_{\min}$，确保 $\|\mathbf{p} - \mathbf{h}\| \in [L_{\min}, L_{\max}]$ 与 $p_z \ge z_{\min}$ 同时严格成立；
+    - 当目标位于地面上方但超出可达球（$< L_{\min}$ 或 $> L_{\max}$）且球向截断下潜至地面以下时，同样执行地平面安全截断；
+    - **失败状态原子性保证**：`_apply_ik_prebend_hint(arm)` 与对 `ik_obj.location`、`ik_obj.rotation_euler`、`pole_obj.location` 的写入严格后置于可行性校验与目标求解之后，任何异常抛出均 100% 保持骨骼与控制器原始状态不变；
+    - **真实结果合同扩展**：返回状态字典如实填充 `constraints_satisfied` (bool)、`ground_clearance_m` (float)、`hip_to_target_dist_m` (float)。
+* **测试套件补全与全量回归**：
+  - [tests/test_leg_ik_ground_height_contract.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_leg_ik_ground_height_contract.py):
+    - 保留原有 TEST-1 至 TEST-8；
+    - 追加 TEST-9 至 TEST-18（包含空可行域阻断、地平截断最小最大距离保持、下潜目标水平位移正确性、零水平位移确定性回退、非平地不同地面高度求解、失败状态原子性无污染、真实遥测准确性、历史成熟动作零退化等）；
+    - 全部 18 项针对性单元测试 100% 通过（1.34s）；
+  - 全套分层自动化回归全量 100% 通过：
+    - `quick`: **19/19 PASSED (50.41s)**；
+    - `physics`: **24/24 PASSED (92.59s)**；
+    - `motion`: **12/12 PASSED (48.77s)**；
+    - `full`: **39/39 PASSED (146.00s)**；
+  - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**.
+
+
 ## [2026-10-31] PKG-5 / 09 Lower-Limb IK: 足部 IK 地面高度合同与根节点解耦 (PKG5-09-IK-GROUND-A)
 
 ### 1. set_foot_ik_target 地面防穿透高程解耦 (FIND-R3-02)

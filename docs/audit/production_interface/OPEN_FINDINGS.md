@@ -371,7 +371,14 @@
 * **Classification**: `CONTRACT_GAP (RESOLVED)`
 * **Blocks Further Development**: `NO (RESOLVED)`
 * **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 在 `src/rig/ik.py` 函数 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`。当显式传入 `ground_z` 时使用其值计算 `min_ankle_z = effective_ground_z + ANKLE_REST_Z`；未传入时回退到历史平地基准 `0.0m`；彻底移除对 `root_obj.matrix_world.translation.z` 的采样，解耦足部地面高度限制与角色根节点高程的绑定；保留 `clamp_ground=False` 旁路与可达性约束交互；在针对性单元测试 `tests/test_leg_ik_ground_height_contract.py`（TEST-1 至 TEST-8 全部 8 项通过）及分层回归套件中验证通过。
+* **Fix & Verification Summary**: 
+  - 在 `src/rig/ik.py` 函数 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`，解耦足部地面高度限制与 `CharacterRoot` 高程绑定；未传入时回退到历史平地基准 `0.0m`。
+  - **最终几何收口 (PKG5-09A-GROUND-REACH-FINAL-CLOSURE)**：
+    1. **可行域冲突早期阻断**：当 $z_{\min} > h_z + L_{\max}$（即地面高度超出大腿根部最大可达范围）时，两项硬性几何约束的交集为空，严格抛出带 `GROUND_REACH_INFEASIBLE` 的 `ValueError`，杜绝静默失败或伪造成功。
+    2. **柱坐标二维几何精确截断**：在地表边界平面 $\zeta = \zeta_{\min}$ 上求解水平有效半径区间 $[\rho_{\min}, \rho_{\max}]$，其中 $\rho_{\min} = \sqrt{\max(0, L_{\min}^2 - \zeta_{\min}^2)}$，$\rho_{\max} = \sqrt{\max(0, L_{\max}^2 - \zeta_{\min}^2)}$，确保无论目标点过近还是过远，截断结果同时满足地面不穿透与腿部长度可达性。
+    3. **失败状态原子性保证**：在可行性校验与目标几何求解完成前，绝对不修改 `ik_obj.location`、`ik_obj.rotation_euler`、`pole_obj.location` 或调用改变骨骼局部姿态的 `_apply_ik_prebend_hint`。
+    4. **真实遥测与合同扩展**：返回字典如实填充 `constraints_satisfied` (bool)、`ground_clearance_m` (float)、`hip_to_target_dist_m` (float)。
+  - 在针对性单元测试 `tests/test_leg_ik_ground_height_contract.py`（TEST-1 至 TEST-18 全部 18 项）以及 `quick`、`physics`（24 套）、`motion`（12 套）、`full`（39 套）分层回归套件中 100% 验证通过。
 * **Suggested Repair Boundary**: 允许 `set_foot_ik_target` 传入外部 `ground_z`，并解耦与 `root_obj.z` 的绑定。
 
 ---

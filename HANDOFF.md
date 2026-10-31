@@ -6,29 +6,25 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — PKG-5 / 09 Lower-Limb IK: 足部 IK 地面高度合同与根节点解耦 (Task ID: PKG5-09-IK-GROUND-A)。
-* **当前状态**：`PKG-5 / 09 Lower IK / Task A — AWAITING FINAL INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行进入 Task B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B）。
-* **任务性质**：底层 Rig 生产接口缺陷修复，解耦足部地面防穿透限制与角色根节点高程的错误绑定。
+* **当前任务**：ProceduralAnimation — 09-A FINAL CLOSURE: Ground × Reach Constraint Feasibility and Truthful Result Contract (Task ID: PKG5-09A-GROUND-REACH-FINAL-CLOSURE)。
+* **当前状态**：`PKG-5 / 09-A FINAL — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行进入 Task 09-B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B）。
+* **任务性质**：对现有 09-A 修复进行最终数学正确性收口，解决空交集不可行阻断、最小/最大腿长地表精确截断、失败状态原子性保证与真实遥测合同。
 
-### 本任务核心核准成果 (PKG5-09-IK-GROUND-A)
-1. **生产接口合同修复 (`src/rig/ik.py:322–441` `set_foot_ik_target`)**：
-   - 追加可选参数 `ground_z: Optional[float] = None`，保持历史调用者完全向后兼容；
-   - 显式传入 `ground_z` 时使用其值计算 `min_ankle_z = effective_ground_z + ANKLE_REST_Z`；未传入时回退到历史平地基准 `0.0m`；
-   - 彻底移除对 `root_obj.matrix_world.translation.z` 的采样，解耦足部高度限制与 CharacterRoot 坐标的绑定；
-   - 保留 `clamp_ground=False` 旁路能力，以及与可达性约束（`MAX_LEG_REACH` / `MIN_LEG_REACH`）的真实几何交互；
-   - 返回状态字典中如实返回 `state["ground_z"] = effective_ground_z`；
+### 本任务核心核准成果 (PKG5-09A-GROUND-REACH-FINAL-CLOSURE)
+1. **算法与生产接口收口 (`src/rig/ik.py:322–450` `set_foot_ik_target`)**：
+   - **空可行域不可行前置阻断**：当 $z_{\min} > h_z + L_{\max} + 10^{-6}$ 时，地面不穿透与最大腿长约束产生空交集，严格抛出带 `GROUND_REACH_INFEASIBLE` 的 `ValueError`，杜绝静默失败；
+   - **柱坐标二维几何精确截断**：在地表边界平面 $\zeta = \zeta_{\min} = z_{\min} - h_z$ 上精确求解有效半径区间 $[\rho_{\min}, \rho_{\max}]$，其中 $\rho_{\min} = \sqrt{\max(0, L_{\min}^2 - \zeta_{\min}^2)}$，$\rho_{\max} = \sqrt{\max(0, L_{\max}^2 - \zeta_{\min}^2)}$，确保无论目标过近还是过远，截断结果严格同时满足地面不穿透（$p_z \ge z_{\min}$）与腿长生理范围（$\|\mathbf{p} - \mathbf{h}\| \in [L_{\min}, L_{\max}]$）；
+   - **失败状态原子性保证**：不可行输入抛出异常前，绝对不修改 `ik_obj.location`、`ik_obj.rotation_euler`、`pole_obj.location` 或调用改变骨骼局部姿态的 `_apply_ik_prebend_hint`；
+   - **依赖图刷新保证**：约束求解前置统一依赖图刷新 `bpy.context.view_layer.update()`，彻底消除因骨盆下蹲或姿态变化导致的髋部采样滞后；
+   - **真实结果遥测扩展**：返回状态字典如实填充 `constraints_satisfied` (bool)、`ground_clearance_m` (float)、`hip_to_target_dist_m` (float)；
 2. **针对性单元测试 (`tests/test_leg_ik_ground_height_contract.py`)**：
-   - 覆盖 TEST-1（平地兼容）、TEST-2（根节点高度解耦）、TEST-3（凹陷负高程）、TEST-4（凸起平台）、TEST-5（clamp_ground=False旁路）、TEST-6（根节点偏航/旋转独立性）、TEST-7（双重边界几何交互与控制器坐标对齐）、TEST-8（非法输入防御）全部 8 项通过（0.69s）；
+   - 完备包含 TEST-1 至 TEST-18 全部 18 项针对性单元测试，在真实 Blender 引擎下 100% 通过（1.34s）；
 3. **全套分层自动化回归全量 100% 通过**：
-   - Quick: **19/19 PASSED (53.94s)**；
-   - Physics: **24/24 PASSED (94.26s)**；
-   - Motion: **12/12 PASSED (51.32s)**；
-   - Full: **39/39 PASSED (148.27s)**；
-   - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**；
-4. **调用链状态澄清**：
-   - 底层 Rig 接口 `set_foot_ik_target` 现已完全支持显式外部 `ground_z` 并与 Root 解耦；
-   - 现有上层调用者（如 `WholeBodyController.execute_frame()`）目前仍通过遗留接口 `ground_z=None` 调用，安全平滑回退至平地 Z=0.0m 基准；
-   - 上层 WBC/Action 地形射线查询结果透传至 `set_foot_ik_target(..., ground_z=...)` 将在后续上层集成任务中完成，本次仅修复底层 Rig 接口合同。
+   - Quick: **19/19 PASSED (50.41s)**；
+   - Physics: **24/24 PASSED (92.59s)**；
+   - Motion: **12/12 PASSED (48.77s)**；
+   - Full: **39/39 PASSED (146.00s)**；
+   - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**。
 
 ---
 
