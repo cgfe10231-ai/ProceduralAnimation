@@ -6,31 +6,34 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — PKG-5 / 08 Rig 最终回归收口 (Task ID: PKG5-RIG08-COM-REGRESSION-CLOSURE)。
-* **当前状态**：`PKG-5 / 08 Rig — AWAITING FINAL INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行进入 09 Lower IK，禁止修改 `foot_contact.py`，禁止进入 Phase 7B）。
-* **任务性质**：历史测试语义修复，恢复 CoM 刚体变换测试及其级联回归，保证 08 原有世界空间不变量继续成立。
+* **当前任务**：ProceduralAnimation — PKG-5 / 09 Lower-Limb IK: 足部 IK 地面高度合同与根节点解耦 (Task ID: PKG5-09-IK-GROUND-A)。
+* **当前状态**：`PKG-5 / 09 Lower IK / Task A — AWAITING FINAL INDEPENDENT REVIEW`（严格停止等待外部独立审查，禁止自行进入 Task B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B）。
+* **任务性质**：底层 Rig 生产接口缺陷修复，解耦足部地面防穿透限制与角色根节点高程的错误绑定。
 
-### 本任务核心核准成果 (PKG5-RIG08-COM-REGRESSION-CLOSURE)
-1. **历史测试语义修复 (`tests/verify_task6fb_rigid_link.py` Test 8B)**：
-   - 彻底解决因世界空间 FootIK 保持原地导致根节点平移时局部姿态变动的语义前提问题；
-   - 严格实施原子 5 步方案：Step A 记录 Root 变换与影响局部姿态的约束；Step B 临时将相关约束 influence 置为 0.0，确立固定的局部骨架姿态实验条件；Step C 重新采样局部固定状态下的真实基准 CoM，记录 7 关键骨骼局部矩阵；Step D 执行原位移 `(2.5, 5.0, 0.3)`，断言世界质心误差（实测 $0.0000007907\text{m} \le 10^{-4}\text{m}$）、Armature 空间质心误差（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）及关键骨骼局部矩阵漂移（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）；Step E 在 `try/finally` 中精准恢复 Root 变换、约束 influences 及 pose；
-   - 生产代码 0 修改、测试断言阈值 0 放宽、FootIK 世界空间无父级不变量（`parent is None`）100% 保持；
-2. **级联回归测试全绿通过**：
-   - `tests/verify_task6fb_rigid_link.py`: **ALL PASSED (Test 1 至 8B 全绿)**；
-   - `tests/verify_task6gb_body_inertia.py`: **13/13 PASSED**；
-   - `tests/verify_task6gc_contact_model.py`: **17/17 PASSED**；
-   - `tests/verify_task6gc_r3b1_bridge.py`: **14/14 PASSED**；
-   - `tests/test_leg_ik_worldspace_init_reset.py`: **6/6 PASSED**（四个控制器恒定 `parent is None`）；
+### 本任务核心核准成果 (PKG5-09-IK-GROUND-A)
+1. **生产接口合同修复 (`src/rig/ik.py:322–441` `set_foot_ik_target`)**：
+   - 追加可选参数 `ground_z: Optional[float] = None`，保持历史调用者完全向后兼容；
+   - 显式传入 `ground_z` 时使用其值计算 `min_ankle_z = effective_ground_z + ANKLE_REST_Z`；未传入时回退到历史平地基准 `0.0m`；
+   - 彻底移除对 `root_obj.matrix_world.translation.z` 的采样，解耦足部高度限制与 CharacterRoot 坐标的绑定；
+   - 保留 `clamp_ground=False` 旁路能力，以及与可达性约束（`MAX_LEG_REACH` / `MIN_LEG_REACH`）的真实几何交互；
+   - 返回状态字典中如实返回 `state["ground_z"] = effective_ground_z`；
+2. **针对性单元测试 (`tests/test_leg_ik_ground_height_contract.py`)**：
+   - 覆盖 TEST-1（平地兼容）、TEST-2（根节点高度解耦）、TEST-3（凹陷负高程）、TEST-4（凸起平台）、TEST-5（clamp_ground=False旁路）、TEST-6（根节点偏航/旋转独立性）、TEST-7（双重边界几何交互与控制器坐标对齐）、TEST-8（非法输入防御）全部 8 项通过（0.69s）；
 3. **全套分层自动化回归全量 100% 通过**：
-   - Quick: **19/19 PASSED (50.69s)**；
-   - Physics: **23/23 PASSED (92.02s)**；
-   - Motion: **12/12 PASSED (53.22s)**；
-   - Full: **38/38 PASSED (159.0s)**；
-   - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**。
+   - Quick: **19/19 PASSED (53.94s)**；
+   - Physics: **24/24 PASSED (94.26s)**；
+   - Motion: **12/12 PASSED (51.32s)**；
+   - Full: **39/39 PASSED (148.27s)**；
+   - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**；
+4. **调用链状态澄清**：
+   - 底层 Rig 接口 `set_foot_ik_target` 现已完全支持显式外部 `ground_z` 并与 Root 解耦；
+   - 现有上层调用者（如 `WholeBodyController.execute_frame()`）目前仍通过遗留接口 `ground_z=None` 调用，安全平滑回退至平地 Z=0.0m 基准；
+   - 上层 WBC/Action 地形射线查询结果透传至 `set_foot_ik_target(..., ground_z=...)` 将在后续上层集成任务中完成，本次仅修复底层 Rig 接口合同。
 
 ---
 
 ## 2. 已完成历史里程碑
+* **PKG-5 / 09 Lower-Limb IK (Task A)**: Foot IK Ground-Height Contract & CharacterRoot Decoupling (FIND-R3-02 归档) (`FIXED / VERIFIED`)。
 * **PKG-5 / 08 Rig (Regression Closure)**: 历史测试语义修复与 CoM 刚体平移全量回归收口归档 (`FIXED / VERIFIED`)。
 * **PKG-5 / WS-01**: Leg IK Controller World-Space Initialization & Reset Invariant (FIND-R3-01 部分子问题归档) (`FIXED / VERIFIED`)。
 * **Final Closure (Contact Model 07)**: CONTACT-MODEL-07-FINAL-CLOSURE 接触记录唯一性与几何容差失效验收收口归档 (`FIXED / VERIFIED`)。
@@ -55,7 +58,7 @@
 
 ## 3. 下一步建议与禁止项
 1. **当前禁止**：
-   - **严禁自行进入 09 Lower IK**；
+   - **严禁自行进入 09 Lower IK Task B**；
    - **严禁提前进入 Phase 7B（双向环境动力学）**；
    - **严禁修改 `src/rig/foot_contact.py`、`src/rig/arm_ik.py`、`src/rig/builder.py`**；
    - **严禁修改 WholeBodyController、KinematicBridge、contact_model.py、terrain_walk.py**；

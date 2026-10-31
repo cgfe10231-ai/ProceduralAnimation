@@ -371,7 +371,7 @@
 * **Classification**: `CONTRACT_GAP (RESOLVED)`
 * **Blocks Further Development**: `NO (RESOLVED)`
 * **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
+* **Fix & Verification Summary**: 在 `src/rig/ik.py` 函数 `set_foot_ik_target` 中追加可选参数 `ground_z: Optional[float] = None`。当显式传入 `ground_z` 时使用其值计算 `min_ankle_z = effective_ground_z + ANKLE_REST_Z`；未传入时回退到历史平地基准 `0.0m`；彻底移除对 `root_obj.matrix_world.translation.z` 的采样，解耦足部地面高度限制与角色根节点高程的绑定；保留 `clamp_ground=False` 旁路与可达性约束交互；在针对性单元测试 `tests/test_leg_ik_ground_height_contract.py`（TEST-1 至 TEST-8 全部 8 项通过）及分层回归套件中验证通过。
 * **Suggested Repair Boundary**: 允许 `set_foot_ik_target` 传入外部 `ground_z`，并解耦与 `root_obj.z` 的绑定。
 
 ---

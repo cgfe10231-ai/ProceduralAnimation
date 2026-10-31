@@ -1,23 +1,26 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **记录时间**：2026-10-31
-> **当前阶段**：PKG-5 / 08 Rig: 历史测试语义修复与 CoM 刚体平移全量回归收口 (PKG5-RIG08-COM-REGRESSION-CLOSURE)。已完成历史刚体测试 Test 8B 局部姿态不变语义修复与分层回归闭环：
-> 1) **历史测试语义修复 (`tests/verify_task6fb_rigid_link.py` Test 8B)**：
->    - 严守 5 步原子方案：Step A 记录 Root 变换与影响局部姿态的 IK/旋转约束；Step B 临时将相关约束 influence 置为 0.0，确立固定的局部骨架姿态实验条件；Step C 重新采样局部固定状态下的真实基准 CoM，记录 7 关键骨骼局部矩阵；Step D 执行原位移 `(2.5, 5.0, 0.3)`，断言世界质心误差（实测 $0.0000007907\text{m} \le 10^{-4}\text{m}$）、Armature 空间质心误差（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）及关键骨骼局部矩阵漂移（实测 $0.0000000000\text{m} \le 10^{-6}\text{m}$）；Step E 在 `try/finally` 中精准恢复 Root 变换、约束 influences 及 pose；
->    - 生产代码 0 修改、测试断言阈值 0 放宽、FootIK 世界空间无父级不变量（`parent is None`）100% 保持；
-> 2) **级联回归测试全绿**：
->    - `tests/verify_task6fb_rigid_link.py`: **ALL PASSED (Test 1 至 8B 全绿)**；
->    - `tests/verify_task6gb_body_inertia.py`: **13/13 PASSED**；
->    - `tests/verify_task6gc_contact_model.py`: **17/17 PASSED**；
->    - `tests/verify_task6gc_r3b1_bridge.py`: **14/14 PASSED**；
->    - `tests/test_leg_ik_worldspace_init_reset.py`: **6/6 PASSED**（四个控制器恒定 `parent is None`）；
-> 3) **全套分层自动化回归全量 100% 通过**：
->    - Quick: **19/19 PASSED (50.69s)**；
->    - Physics: **23/23 PASSED (92.02s)**；
->    - Motion: **12/12 PASSED (53.22s)**；
->    - Full: **38/38 PASSED (159.0s)**；
+> **当前阶段**：PKG-5 / 09 Lower-Limb IK: 足部 IK 地面高度合同与根节点解耦 (PKG5-09-IK-GROUND-A)。已完成 `set_foot_ik_target` 地面防穿透高程解耦修复与全量分层回归闭环：
+> 1) **生产接口合同修复 (`src/rig/ik.py:322–441` `set_foot_ik_target`)**：
+>    - 追加可选末尾参数 `ground_z: Optional[float] = None`，严格保持历史实参顺序与默认值完全兼容；
+>    - 当显式传入 `ground_z` 时，使用 `effective_ground_z = float(ground_z)` 计算 `min_ankle_z = effective_ground_z + ANKLE_REST_Z`；
+>    - 当未传入 `ground_z` 时，回退到历史默认平地基准 `effective_ground_z = 0.0m`；
+>    - 彻底废除并移除对 `root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")` 与 `root_obj.matrix_world.translation.z` 的采样，解耦足部高度截断与角色根节点高程的错误绑定；
+>    - 保留 `clamp_ground=False` 旁路特性，以及与 `MAX_LEG_REACH` / `MIN_LEG_REACH` 可达性约束的真实几何交互与状态字典返回；
+> 2) **针对性新单元测试 (`tests/test_leg_ik_ground_height_contract.py`)**：
+>    - TEST-1（平地默认兼容性）、TEST-2（根节点高度解耦）、TEST-3（凹陷负高程地形）、TEST-4（凸起平台地形）、TEST-5（clamp_ground=False旁路）、TEST-6（根节点旋转/偏航独立性）、TEST-7（双重边界几何交互与控制器坐标对齐）、TEST-8（非法与非有限输入防御）全部 8 项通过（0.69s）；
+> 3) **历史与分层全量自动化回归 100% 通过**：
+>    - `legacy_leg_ik` (verify_task4c_ik): **PASS (1.66s)**；
+>    - `legacy_foot_contact` (verify_task4d_foot_contact): **PASS (1.61s)**；
+>    - `physics_rigid_link_com` (verify_task6fb_rigid_link): **PASS (1.92s)**；
+>    - `leg_ik_worldspace_init_reset` (PKG-5/WS-01): **PASS (2.3s)**；
+>    - Quick: **19/19 PASSED (53.94s)**；
+>    - Physics: **24/24 PASSED (94.26s)**；
+>    - Motion: **12/12 PASSED (51.32s)**；
+>    - Full: **39/39 PASSED (148.27s)**；
 >    - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**；
-> **重要修复与证据核准**：FIND-R3-01 初始化与重置无父级子问题及历史测试已彻底闭环收口；全仓库剩余 4 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期、FIND-R3-02 至 FIND-R3-04）。阻碍 Phase 7B 仍然为 YES（需等待 PKG-5 整体完成）。当前门禁终止状态为：`PKG-5 / 08 Rig — AWAITING FINAL INDEPENDENT REVIEW`，严格停止等待独立审查，禁止自行进入 09 Lower IK，禁止修改 FootContact，禁止进入 Phase 7B。
+> **重要修复与证据核准**：FIND-R3-02 足部地面防穿透硬编码根高程已彻底闭环收口；全仓库剩余 3 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期与姿态反解、FIND-R3-03、FIND-R3-04）。阻碍 Phase 7B 仍然为 YES（需等待 PKG-5 整体完成）。当前门禁终止状态为：`PKG-5 / 09 Lower IK / Task A — AWAITING FINAL INDEPENDENT REVIEW`，严格停止等待独立审查，禁止自行进入 Task B，禁止修改 `foot_contact.py`，禁止进入 Phase 7B。
 ---
 
 ## 1. 状态分类一览
@@ -41,12 +44,12 @@
     - **FIND-T01-07 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:304–318` 负向行进步态规划落点循环自适应方向符号与终止条件，根骨 Hermite 样条保留负向速度，通过针对性测试与全量回归；
     - **FIND-T01-08 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:895–905` 摆动足时间归一化分母纠正为 `dur`，与根部位移样条完全同相，彻底消除骨盆滞后诱发的 0.4mm 假性过伸，通过针对性测试与全量回归；
     - **FIND-R3-01 (CONTRACT_GAP / PARTIALLY_RESOLVED, Blocks 7B: YES, STATIC_CONFIRMED)**: PKG-5 / WS-01 已修复初始化与重置无父级子问题（`ik.py:81–87, 127–160, 232–260`），4 个控制器在 setup 与 reset 后恒定保持 parent=None 并位于正确世界中立位姿，通过 6 项独立测试；`foot_contact.py:152` `unlock_foot_contact` 跨生命周期挂载与局部欧拉角反解待后续 WS-02 处理；
-    - **FIND-R3-02 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `ik.py:334–346` `set_foot_ik_target` 地面防穿透硬编码根高程，阻断 3D 起伏地形下潜，迫使上层全流程传 `clamp_ground=False`；
+    - **FIND-R3-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `ik.py:322–441` `set_foot_ik_target` 地面防穿透解耦角色根高程，新增可选 `ground_z` 参数，默认回退 0.0m，彻底消除 3D 起伏地形与台阶下行高度阻断，通过 8 项针对性单元测试与全量回归；
     - **FIND-R3-03 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:168–170, ik.py:219` `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留；
     - **FIND-R3-04 (CONTRACT_GAP, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用；
     - **FIND-R4-01 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:308–355, 450–490, 730–770` 引入 `verify_scene_execution_gate()` 严苛校验规划成功状态、不可达事件、致命未满足约束与连续性，执行失败严禁保存 `.blend` 文件，移除硬编码 `"continuous_without_exemption": True`，通过 3 项针对性测试与全量回归；
     - **FIND-R4-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:385–420, 597–643` 与 `blender_mesh_query_adapter.py:885–892` Mesh 模式下未命中或非支撑面严格返回 `None` 消除虚假 0.0m 回退，`query_ground_support_at` 严格在非支撑面返回 `success=False`，通过 8 项针对性测试与全量回归；
-  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项），ContactModel 几何支撑一致性修复组 (FIND-R2-05) 已修复并验证（`FIXED / VERIFIED`）；全仓库确认缺陷已归零（0 项）；PKG-5 / WS-01 已关闭 FIND-R3-01 初始化与重置无父级子问题；全仓库剩余 4 项合同缺口中 1 项处于部分修复状态，维持挂起等待授权排期修复。
+  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08)、ContactModel 几何支撑一致性修复组 (FIND-R2-05)、PKG-5 / WS-01 (FIND-R3-01 局部)、PKG-5 / 09-IK-GROUND-A (FIND-R3-02) 已修复并验证（`FIXED / VERIFIED`）；全仓库剩余 3 项合同缺口（全部集中于 PKG-5：FIND-R3-01 剩余解锁生命周期、FIND-R3-03、FIND-R3-04）。
 
 ### [已验证]
 * **历史测试语义修复与 CoM 刚体平移全量回归收口 (PKG-5 / 08 Rig, PKG5-RIG08-COM-REGRESSION-CLOSURE)**：

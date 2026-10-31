@@ -326,13 +326,15 @@ def set_foot_ik_target(
     foot_rotation_deg: Optional[Tuple[float, float, float]] = None,
     clamp_reach: bool = True,
     clamp_ground: bool = True,
+    ground_z: Optional[float] = None,
 ) -> dict:
     """Set the left ('L') or right ('R') foot IK target in world coordinates.
 
     Automatically clamps unreachable targets to `[MIN_LEG_REACH, MAX_LEG_REACH]` from
     the hip joint and prevents foot ground penetration (`Z >= ground_z + ANKLE_REST_Z`)
-    when `clamp_ground=True`. Also positions the knee pole target strictly forward (+Y)
-    of the hip-ankle plane to prevent knee flipping.
+    when `clamp_ground=True`. When `ground_z` is None, defaults to historical flat ground
+    at Z = 0.0m (decoupled from CharacterRoot elevation). Also positions the knee pole target
+    strictly forward (+Y) of the hip-ankle plane to prevent knee flipping.
     """
     side = side.upper()
     if side not in ("L", "R"):
@@ -358,9 +360,17 @@ def set_foot_ik_target(
 
     p_thigh = arm.pose.bones[f"thigh.{side}"]
     hip_world = arm.matrix_world @ p_thigh.head
-    root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
-    ground_z = root_obj.matrix_world.translation.z if root_obj is not None else 0.0
-    min_ankle_z = ground_z + ANKLE_REST_Z
+
+    if ground_z is not None:
+        try:
+            effective_ground_z = float(ground_z)
+        except (TypeError, ValueError) as exc:
+            raise TypeError(f"ground_z must be a float or None, got {type(ground_z).__name__}") from exc
+        if not math.isfinite(effective_ground_z):
+            raise ValueError(f"ground_z must be finite, got {ground_z}")
+    else:
+        effective_ground_z = 0.0
+    min_ankle_z = effective_ground_z + ANKLE_REST_Z
 
     requested = Vector(world_xyz)
     applied = requested.copy()
@@ -428,4 +438,5 @@ def set_foot_ik_target(
     state["applied_world"] = applied
     state["clamped_reach"] = clamped_reach
     state["clamped_ground"] = clamped_ground
+    state["ground_z"] = effective_ground_z
     return state

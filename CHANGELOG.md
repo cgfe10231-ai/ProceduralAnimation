@@ -3,6 +3,40 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-10-31] PKG-5 / 09 Lower-Limb IK: 足部 IK 地面高度合同与根节点解耦 (PKG5-09-IK-GROUND-A)
+
+### 1. set_foot_ik_target 地面防穿透高程解耦 (FIND-R3-02)
+* **问题成因**：
+  - `src/rig/ik.py` 中 `set_foot_ik_target()` 历史实现通过 `root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")` 获取角色根节点并采样其世界高程 `ground_z = root_obj.matrix_world.translation.z`；
+  - 错误地将 CharacterRoot 世界高度作为地面高程，导致角色在非平整 3D 地形（下坡、下阶梯、凹陷坑洞）或根节点发生位移时，足部被强制抬升截断至 `root_obj.z + 0.07`m，引发虚假 IK 超限与悬空，迫使上层动作 `TerrainWalkAction` 曾不得不全流程强制传入 `clamp_ground=False` 绕过该逻辑。
+* **生产代码修复**：
+  - [src/rig/ik.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py):
+    - 函数签名追加可选参数 `ground_z: Optional[float] = None`，保持既有参数顺序与默认值完全兼容；
+    - 当显式传入 `ground_z` 时，使用 `effective_ground_z = float(ground_z)` 计算最小允许踝关节高度 `min_ankle_z = effective_ground_z + ANKLE_REST_Z`；
+    - 当未传入 `ground_z` 时，回退到历史平地基准 `effective_ground_z = 0.0m`；
+    - 彻底移除对 `root_obj` 及 `root_obj.matrix_world.translation.z` 的采样，解除足部高度限制与 CharacterRoot 坐标的绑定；
+    - 严格保持 `clamp_ground=False` 旁路特性，并确保可达性约束（`MAX_LEG_REACH` / `MIN_LEG_REACH`）与地面防穿透双重约束同时触发时的正确几何处理与状态字典返回（`state["ground_z"] = effective_ground_z`）；
+* **针对性新单元测试**：
+  - [tests/test_leg_ik_ground_height_contract.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_leg_ik_ground_height_contract.py):
+    - TEST-1（平地默认兼容性）：默认 `ground_z=None` 使用 Z=0.0m 基准，0.07m 及以上不截断，以下截断至 0.07m；
+    - TEST-2（根节点高度解耦）：CharacterRoot 抬升至 Z=1.0m 时，合法足部高度 0.07m 不被错误抬升到 1.07m，`clamped_ground` 为 False；
+    - TEST-3（凹陷负高程地形）：显式传入 `ground_z=-0.20m` 时，足部被正确截断至 -0.13m（-0.20 + 0.07m），不被截断至 0.07m 或根节点高度；
+    - TEST-4（凸起平台地形）：显式传入 `ground_z=0.50m` 时，足部被正确截断至 0.57m（0.50 + 0.07m）；
+    - TEST-5（clamp_ground=False 旁路）：即使目标低于地面，`clamp_ground=False` 时足部完全不被截断；
+    - TEST-6（根节点旋转/偏航独立性）：根节点具有复杂 3D 旋转与位移时，地面高程判定严格基于世界 Z 坐标；
+    - TEST-7（双重边界几何交互）：当同时触发 reach 与 ground 截断时，同时满足 $Z \ge \text{min\_ankle\_z}$ 与 $\text{dist} \le \text{MAX\_LEG\_REACH}$，控制器 Empty 坐标精准对齐；
+    - TEST-8（非法与非有限输入防御）：`ground_z` 传入非数字类型或 NaN/inf 时严格抛出 `TypeError` / `ValueError`；
+    - 全部 8 项测试在真实 Blender 骨架环境下 100% 通过（0.69s）；
+* **分层回归与全量验证**：
+  - [tests/test_registry.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_registry.py): 登记 `leg_ik_ground_height_contract` 至 PHYSICS 与 FULL 测试层；
+  - 历史原型与刚体测试：`legacy_leg_ik` (PASS 1.66s), `legacy_foot_contact` (PASS 1.61s), `physics_rigid_link_com` (PASS 1.92s), `leg_ik_worldspace_init_reset` (PASS 2.3s)；
+  - 全套分层自动化回归全量 100% 通过：
+    - `quick`: **19/19 PASSED (53.94s)**；
+    - `physics`: **24/24 PASSED (94.26s)**；
+    - `motion`: **12/12 PASSED (51.32s)**；
+    - `full`: **39/39 PASSED (148.27s)**；
+  - 架构文档门禁 `tests/audit_c2_final_inspector.py --verify-docs`: **PASS (0 errors, 0 phantom symbols)**。
+
 ## [2026-10-31] PKG-5 / 08 Rig: 历史测试语义修复与 CoM 刚体平移回归收口 (PKG5-RIG08-COM-REGRESSION-CLOSURE)
 
 ### 1. 历史刚体测试 Test 8B 局部骨架姿态不变语义修复

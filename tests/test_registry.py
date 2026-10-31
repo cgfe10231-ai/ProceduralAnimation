@@ -228,6 +228,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=45.0,
         description="Validates that FootIK and KneePole controllers are unparented (parent is None) upon setup and reset, and adhere to world-space coordinates under translation and rotation.",
     ),
+    "leg_ik_ground_height_contract": TestDefinition(
+        test_id="leg_ik_ground_height_contract",
+        name="Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A)",
+        script_path="tests/test_leg_ik_ground_height_contract.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        description="Validates that set_foot_ik_target ground height clamping accepts external ground_z, defaults to world Z=0.0m, decouples from CharacterRoot elevation, respects clamp_ground=False, and interacts consistently with leg reach boundaries.",
+    ),
     "physics_bridge_contract": TestDefinition(
         test_id="physics_bridge_contract",
         name="Kinematic Bridge 14-Point Architectural Contract",
