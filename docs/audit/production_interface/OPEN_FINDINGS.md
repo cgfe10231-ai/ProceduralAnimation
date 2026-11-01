@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：09-A Documentation Final Gate (PKG5-09A-DOC-STATE-FINAL)
-> **审计与修复基准 Commit**：cf7114c59bc8894b728cbacadcbbe4971593a526
+> **当前阶段**：09-B Lower-Limb IK World Rotation & Controller Lifecycle Closure (PKG5-09B-WORLD-ROTATION-CLOSURE)
+> **审计与修复基准 Commit**：678f6ee1fbc900a3ff6727e5336c516eb2e6265d
 > **最后更新时间**：2026-11-01
-> **当前状态**：09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。08 Rig（刚体平移与世界坐标隔离）已完成；09-A Ground × Reach（三维极值约束求解器与代码文档门禁）已技术修复并全量验证通过（FIND-R3-02 闭环）；下一项为 09-B World Rotation（尚未执行）。全仓库当前剩余 3 项未完全关闭的 Finding（全部集中于 PKG-5：FIND-R3-01 局部完成待 09-B 及生命周期闭环、FIND-R3-03 待处理、FIND-R3-04 待处理）。
+> **当前状态**：09-B WORLD ROTATION GATE — VERIFIED
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。08 Rig（刚体平移与世界坐标隔离）、09-A Ground × Reach（三维极值约束求解器）、09-B World Rotation（世界旋转合同与控制器无父级生命周期）均已技术修复并全量验证通过（FIND-R3-01 与 FIND-R3-02 彻底闭环）；下一项为 PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）。全仓库当前 16 项登记问题中，14 项已完全关闭，仅剩余 2 项未完全关闭的 Finding（全部集中于 PKG-5 / 11 FootLock：FIND-R3-03 待处理、FIND-R3-04 待处理）。
 
 ---
 
@@ -13,10 +13,10 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **0** (存量) + **3** (已修复) | 存量：无（已清零）；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写), FIND-R2-07/T01-04 (接缝横向偏置) |
-| **接口合同缺口 (CONTRACT_GAP)** | **3** (存量) + **10** (已修复) | 存量：FIND-R3-01 (部分完成，待09-B旋转反解及后续生命周期), FIND-R3-03 (元数据混淆与重置残留待修复), FIND-R3-04 (伪只读强副作用维持器待修复)；已修复：FIND-R3-02 (足底高程与可达约束三维解析极值求解器已闭环), FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-05 (几何合规性与支撑拓扑脱节), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
+| **接口合同缺口 (CONTRACT_GAP)** | **2** (存量) + **11** (已修复) | 存量：FIND-R3-03 (元数据混淆与重置残留待 11 FootLock 修复), FIND-R3-04 (伪只读强副作用维持器待 11 FootLock 修复)；已修复：FIND-R3-01 (下肢 IK 世界旋转合同与控制器全生命周期 parentless 已彻底闭环), FIND-R3-02 (足底高程与可达约束三维解析极值求解器已闭环), FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-05 (几何合规性与支撑拓扑脱节), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (固定 X 走廊双向 +/-Y 导航), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
-| **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
-| **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (部分完成，仍存在 09-B 旋转反解及后续生命周期问题，阻碍后续全面双足动态) |
+| **未验证项 (UNVERIFIED)** | **1** | UNVERIFIED-01 (全身4点接触解算稳定性)；注：原 UNVERIFIED-02 非零偏航足部旋转偏差已由 09-B 专项测试与旋转反解闭环完全验证。 |
+| **阻碍后续开发 (Blocks Further Dev: YES)** | **0** | 存量阻碍项已清零（FIND-R3-01 闭环后下肢 IK 控制链彻底解锁；剩余 FIND-R3-03/04 均标定为 Blocks 7B: NO） |
 
 ---
 
@@ -34,7 +34,7 @@
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 450–512 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 920–930 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 152 / 380–384 | CONTRACT_GAP (PARTIALLY_RESOLVED) | `STATIC_CONFIRMED` | **YES** | `foot_contact.py` / `ik.py` |
+| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 149–192 / 637–675 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `foot_contact.py` / `ik.py` |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `ik.py` |
 | **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
 | **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | Lines 207–235 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
@@ -331,29 +331,46 @@
 ### FIND-R3-01: 控制器生命周期动态父级违规循环，且父级非空时 `set_foot_ik_target` 姿态未反解产生旋转偏差
 * **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
 * **Class / Function**: `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `set_foot_ik_target()`
-* **Exact Line Range**: `foot_contact.py:152, 170–179`; `ik.py:127–134, 220–228, 380–384`
-* **Evidence Grade**: `STATIC_CONFIRMED` (父级循环与代码行静态确证)；非零偏航下旋转偏差数值量测标定为 `UNVERIFIED / RUNTIME PENDING`
+* **Exact Line Range**: `foot_contact.py:149–192`; `ik.py:127–160, 232–260, 637–675`
+* **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**:
   1. 初始化或动作重置（`setup_leg_ik` / `reset_leg_ik`）；
   2. 调用 `unlock_foot_contact(arm, side)` 未显式传入 `reparent_to_root=False`；
-  3. 控制器处于父级非空状态下，角色 Root 存在非零旋转（偏航、俯仰或倾斜），并调用 `set_foot_ik_target()`。
-* **Actual Behavior**:
-  1. **跨生命周期父级切换循环**：`setup_leg_ik()` 与 `reset_leg_ik()` 强制设置 `ik_obj.parent = root_obj`；`lock_foot_contact()` 执行 `parent = None` 解绑；`unlock_foot_contact()` 默认参数又重新挂载回 Root。调用 `wbc.reset_all_controls()` 时无条件刷回 Root，构成循环违规，直接违反 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 清规第七条；
-  2. **局部旋转未反解**：在父级非空时，`set_foot_ik_target()` 行 375–378 对位置执行了逆变换，但在行 380–384 中，`foot_rotation_deg` 直接以世界欧拉角赋值给 `ik_obj.rotation_euler`（未进行局部旋转矩阵反解）。导致脚部实际世界旋转变成 $R_{\text{parent}} \cdot R_{\text{world}}$，产生严重姿态偏角。
+  3. 控制器处于父级非空状态下，角色 Root 或父级存在非零旋转（偏航、俯仰或倾斜），并调用 `set_foot_ik_target()`。
+* **Actual Behavior (Before Fix)**:
+  1. **跨生命周期父级切换循环**：`setup_leg_ik()` 与 `reset_leg_ik()` 曾强制设置 `ik_obj.parent = root_obj`；`lock_foot_contact()` 执行 `parent = None` 解绑；`unlock_foot_contact()` 默认参数 `reparent_to_root=True` 又重新挂载回 Root，构成动态挂载循环，直接违反架构门禁 Rule 7 恒定世界空间清规；
+  2. **局部旋转未反解**：在父级非空时，`set_foot_ik_target()` 仅对位置进行了逆变换，`foot_rotation_deg` 却直接以世界欧拉角赋值给 `ik_obj.rotation_euler`（未进行局部旋转矩阵反解），导致脚部实际世界旋转叠加为 $R_{\text{parent}} \cdot R_{\text{world}}$，产生严重姿态偏角。
 * **Expected Contract**:
-  1. 控制器全生命周期恒定保持 `parent = None`，彻底废弃跨帧动态 reparent 行为；
-  2. `set_foot_ik_target` 姿态赋值应像 `arm_ik.py:468` 一样，在父级存在时执行逆旋转转换防护。
+  1. 控制器全生命周期恒定保持 `parent = None`，`unlock_foot_contact` 默认 `reparent_to_root=False`，显式请求 `reparent_to_root=True` 时严格抛出 `ValueError` 阻断非法挂载；
+  2. `set_foot_ik_target` 姿态赋值在父级非空时基于有效父级矩阵 `eff_parent_mat = parent.matrix_world @ matrix_parent_inverse` 进行三维逆旋转转换，提取纯正交四元数姿态隔离缩放/剪切畸变，并将 `foot_rotation_deg=None` 严格映射为水平中立世界姿态；
+  3. 解锁前后控制器世界空间位置、旋转平滑无跳变。
 * **Affected Callers**:
+  - `WholeBodyController.execute_frame()`
   - `WholeBodyController.reset_all_controls()`
   - `KinematicBridgeExecutor.reset()`
   - `MotionPlanner.execute()`
 * **Contract Violation**:
-  - 违反 `docs/ARCHITECTURE_CHANGE_GATE.md:73` 恒定世界空间清规；
+  - 违反 `docs/ARCHITECTURE_CHANGE_GATE.md` 恒定世界空间清规；
   - 违反世界旋转输入数据合同。
-* **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `YES`
-* **Repair Status**: `PARTIALLY_RESOLVED` (PKG-5 / WS-01 已关闭初始化与重置无父级子问题；`foot_contact.py` 解锁生命周期动态挂载与 `set_foot_ik_target` 姿态反解待 WS-02 处理)
-* **Suggested Repair Boundary**: 统一 `setup_leg_ik`、`reset_leg_ik`、`unlock_foot_contact`，全生命周期锁定 `parent = None`；在 `set_foot_ik_target` 中防御性补齐逆旋转转换矩阵逻辑。
+* **Classification**: `CONTRACT_GAP (RESOLVED)`
+* **Blocks Further Development**: `NO (RESOLVED)`
+* **Repair Status**: `FIXED / VERIFIED`
+* **Fix & Verification Summary**:
+  1. **初始化与重置无父级不变量已闭环 (PKG-5 / WS-01)**：`setup_leg_ik()` 与 `reset_leg_ik()` 清除 `root_obj` 父级绑定，恒定保持 `parent = None` 并位于正确世界中立位姿，通过 `tests/test_leg_ik_worldspace_init_reset.py` 6 项独立测试验证。
+  2. **世界旋转三维逆转换与 Phase A 原子性已闭环 (PKG-5 / 09-B)**：
+     - 在 `src/rig/ik.py` 的 `set_foot_ik_target()` Phase A 中，计算 `eff_parent_mat = ik_obj.parent.matrix_world @ ik_obj.matrix_parent_inverse`，提取四元数正交旋转矩阵并反解局部欧拉角，严格避免欧拉角直接相减或缩放/剪切污染；
+     - `foot_rotation_deg=None` 时显式按世界水平中立姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')` 进行世界向局部反解，无论父级是否存在非零 3D 旋转，世界姿态恒定水平；
+     - 校验局部姿态坐标有限性，仅在 Phase A 成功通过后才在 Phase B 提交至控制器，失败绝不污染骨架姿态。
+  3. **解锁全生命周期 Parentless 与世界矩阵无跳变保持已闭环 (PKG-5 / 09-B)**：
+     - 在 `src/rig/foot_contact.py` 的 `unlock_foot_contact()` 中，将默认参数变更为 `reparent_to_root: bool = False`；
+     - 若调用方显式传入 `reparent_to_root=True`，严格抛出 `ValueError`，彻底封死重新挂载分支；
+     - 解锁前捕获 `FootIK` 与 `KneePole` 完整 4x4 世界矩阵，解除父级并设置 `matrix_parent_inverse = Matrix.Identity(4)` 后，通过矩阵分解准确回写世界空间 `location` 与 `rotation_euler`，确保解锁前后世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad。
+  4. **专项测试与全量回归**：
+     - 新增独立专项测试 `tests/test_leg_ik_world_rotation_contract.py`（TEST-01 至 TEST-10）在真实 Headless Blender 中 10/10 独立全绿通过；
+     - 历史测试 `test_leg_ik_worldspace_init_reset.py` (6/6 PASS), `test_leg_ik_ground_height_contract.py` (20/20 PASS), `legacy_leg_ik` (1/1 PASS), `legacy_foot_contact` (1/1 PASS) 全部通过；
+     - 全量分层回归：Quick (19/19 PASS), Physics (25/25 PASS), Motion (12/12 PASS), Full (40/40 PASS) 全部通过；
+     - 文档与符号门禁 `tests/audit_c2_final_inspector.py --verify-docs` 0 报错通过。
+* **Suggested Repair Boundary**: `src/rig/ik.py` (Lines 637–675), `src/rig/foot_contact.py` (Lines 149–192), `tests/test_leg_ik_world_rotation_contract.py`。
 
 ---
 

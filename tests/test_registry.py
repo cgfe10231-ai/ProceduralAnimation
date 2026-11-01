@@ -237,6 +237,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=45.0,
         description="Validates that set_foot_ik_target ground height clamping accepts external ground_z, defaults to world Z=0.0m, decouples from CharacterRoot elevation, respects clamp_ground=False, and interacts consistently with leg reach boundaries.",
     ),
+    "leg_ik_world_rotation_contract": TestDefinition(
+        test_id="leg_ik_world_rotation_contract",
+        name="Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B)",
+        script_path="tests/test_leg_ik_world_rotation_contract.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        description="Validates that set_foot_ik_target correctly sets world-space 3D orientation under arbitrary parent rotation, level neutral default on None, and unlock_foot_contact preserves parentless world transform.",
+    ),
     "physics_bridge_contract": TestDefinition(
         test_id="physics_bridge_contract",
         name="Kinematic Bridge 14-Point Architectural Contract",

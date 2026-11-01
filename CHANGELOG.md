@@ -3,7 +3,61 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
-## [2026-11-01] PKG-5 / 09-A: 09-A 全仓文档状态同步与最终门禁 (PKG5-09A-DOC-STATE-FINAL)
+## [2026-11-01] PKG-5 / 09-B: 下肢 IK 世界旋转合同与控制器全生命周期 Parentless 锁定 (PKG5-09B-WORLD-ROTATION-CLOSURE)
+
+### 1. set_foot_ik_target 世界旋转反解与 Phase A/B 原子性保护 (FIND-R3-01 旋转子问题收口)
+* **任务性质**: 修复 `src/rig/ik.py:set_foot_ik_target()` 在控制器存在父级或父级非空时的局部旋转未反解问题，建立明确的世界空间 3D 旋转合同与水平中立语义。
+* **背景与缺陷根因**:
+  - `set_foot_ik_target()` 曾直接将 `foot_rotation_deg` 以世界欧拉角赋值给 `ik_obj.rotation_euler`，当父级存在旋转时，控制器实际世界旋转被叠加为 $R_{\text{parent}} \cdot R_{\text{world}}$，产生姿态偏角；
+  - `foot_rotation_deg=None` 曾直接赋值 `(0, 0, 0)` 本地欧拉角，在带旋转父级下无法保持世界水平。
+* **修改实现与技术细节 ([src/rig/ik.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py))**:
+  - 在 Phase A 中，计算有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$；
+  - 提取纯正交四元数姿态矩阵以隔离缩放与剪切畸变，通过 $R_{\text{local}} = R_{\text{parent}}^{-1} \cdot R_{\text{world}}$ 将世界空间期望旋转反解为局部欧拉角，严禁欧拉角直接相减；
+  - `foot_rotation_deg=None` 时显式按世界水平中立姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')` 进行世界向局部反解，无论父级是否存在非零 3D 旋转，世界姿态恒定水平；
+  - 严格校验反解后的局部欧拉角坐标有限性（非有限数抛出 `RuntimeError`）；
+  - Phase B 仅在 Phase A 成功通过后才写入 `ik_obj.rotation_euler`，Phase A 校验失败绝不污染骨架姿态。
+
+### 2. unlock_foot_contact 控制器生命周期 Parentless 不变量与位姿保持 (FIND-R3-01 生命周期子问题收口)
+* **任务性质**: 消除 `unlock_foot_contact` 重新挂载父级的违规分支，落实架构门禁 Rule 7 控制器全生命周期绝对世界空间（`parent is None`）不变量。
+* **修改实现与技术细节 ([src/rig/foot_contact.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/foot_contact.py) & [src/scene/playground_character_assembly.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/scene/playground_character_assembly.py))**:
+  - `unlock_foot_contact` 默认参数变更为 `reparent_to_root: bool = False`；
+  - 若调用方显式传入 `reparent_to_root=True`，严格抛出 `ValueError`，彻底封死重新挂载分支；
+  - 解锁前捕获 `FootIK` 与 `KneePole` 完整 4x4 世界矩阵，解绑并重置 `matrix_parent_inverse = Matrix.Identity(4)` 后，通过矩阵分解准确回写世界 `location` 与 `rotation_euler`，保证解锁前后世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad；
+  - 同步平移 `src/scene/playground_character_assembly.py` 内部 16 处旧版显式 `reparent_to_root=True` 调用为 `reparent_to_root=False`，消除失效调用点。
+
+### 3. 专项测试套件与全量回归验证
+* **新增独立专项测试 ([tests/test_leg_ik_world_rotation_contract.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_leg_ik_world_rotation_contract.py))**:
+  - TEST-01: Parentless 世界旋转（控制器 parent=None，非零 XYZ 旋转匹配世界请求，误差 $< 10^{-4}$rad）；
+  - TEST-02: 非零父级偏航（父级存在 45° yaw，控制器世界朝向精确达到请求世界姿态）；
+  - TEST-03: 复合 3D 旋转（父级与目标同时存在复合 yaw/pitch/roll，误差 $< 10^{-4}$rad）；
+  - TEST-04: 3D 旋转非交换性与 None 水平中立语义（真实现象：非正交欧拉相减产生 $> 0.05$rad 明显偏差，而矩阵逆反解精确吻合；`foot_rotation_deg=None` 严格保持水平）；
+  - TEST-05: 解锁世界矩阵保持（位置跳变 $< 10^{-5}$m，旋转跳变 $< 10^{-4}$rad，控制器 parent is None，is_locked=False）；
+  - TEST-06: 双侧全生命周期（`setup -> lock -> unlock -> normal IK -> reset` 全程保持 parent is None）；
+  - TEST-07: 旧版兼容默认调用（不传 `reparent_to_root` 自动保持 parent is None）；
+  - TEST-08: 非法请求拦截（显式传 `reparent_to_root=True` 严格抛出 `ValueError` 且不改变 parent）；
+  - TEST-09: 失败原子性（Phase A 异常保留 FootIK、KneePole 及骨骼姿态原样不动）；
+  - TEST-10: 左右双侧对称与独立性（两侧控制器操作互不干扰）；
+  - 实测结果：在真实 Headless Blender 5.1 中 10/10 PASS (0.841s)。
+* **历史测试与分层回归**:
+  - `tests/test_leg_ik_worldspace_init_reset.py`: 6/6 PASS (0.546s)；
+  - `tests/test_leg_ik_ground_height_contract.py`: 20/20 PASS (2.112s)；
+  - `legacy_leg_ik` (verify_task4c_ik.py): 1/1 PASS (1.53s)；
+  - `legacy_foot_contact` (verify_task4d_foot_contact.py): 1/1 PASS (1.54s)；
+  - Quick Tier: 19/19 PASS (52.09s)；
+  - Physics Tier: 25/25 PASS (95.84s)；
+  - Motion Tier: 12/12 PASS (49.01s)；
+  - Full Tier: 40/40 PASS (155.95s)；
+  - 文档完整性与符号门禁 `tests/audit_c2_final_inspector.py --verify-docs`: 0 错误通过。
+
+### 4. 门禁与 Findings 闭环状态
+* **FIND-R3-01**: `FIXED / VERIFIED`（下肢 IK 控制器生命周期动态父级违规循环与世界旋转反解两项子问题彻底闭环）；
+* **FIND-R3-02**: `FIXED / VERIFIED`（继续保持稳定通过）；
+* **FIND-R3-03**: `OPEN / PENDING REPAIR`（归属 11 FootLock）；
+* **FIND-R3-04**: `OPEN / PENDING REPAIR`（归属 11 FootLock）；
+* **总览**: 全库 16 项登记问题中，14 项彻底关闭，剩余 2 项；阻碍后续开发项（Blocks Further Dev）正式清零；
+* **下一步准入**: PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）；Phase 7B 保持严格未授权。
+
+
 
 ### 1. 全仓审计问题登记表与状态同步 (docs/audit/production_interface/OPEN_FINDINGS.md)
 * **头部基准同步 (D01)**：

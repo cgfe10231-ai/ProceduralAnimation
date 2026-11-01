@@ -1,10 +1,10 @@
 # ARCHITECTURE_SYNC: 架构同步与模块调用规范卡片
 
 > **历史架构审计基准**：v4.0 (Environment Gate 01 最终架构审计，Git SHA: `7a3e244825cd87bf3d787c530318055dc94a3e1f`，历史基准四级测试全绿 35/35)
-> **当前工程进度基准**：PKG-5 / 09 Lower-Limb IK Task A (09-A) 文档状态与门禁最终收口 (`PKG5-09A-DOC-STATE-FINAL`)
-> **当前工程 Git SHA**：`cf7114c59bc8894b728cbacadcbbe4971593a526`
+> **当前工程进度基准**：PKG-5 / 09 Lower-Limb IK Task B (09-B) 世界旋转合同与控制器生命周期最终收口 (`PKG5-09B-WORLD-ROTATION-CLOSURE`)
+> **当前工程 Git SHA**：`678f6ee1fbc900a3ff6727e5336c516eb2e6265d`
 > **权威架构文档集合**：详见 [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`docs/audit/environment_gate01_final/`](docs/audit/environment_gate01_final/)
-> **当前状态**：08 Rig（刚体平移与世界坐标隔离）已完成；09-A 下肢 Ground × Reach 约束求解器技术修复与代码/文档完整性门禁已完成收口；当前门禁标定为 `09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`；下一项任务为 09-B World Rotation（尚未执行）；分层全量自动化回归 100% 通过（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39，09-A 专项 20/20 PASS，WS-01 6/6 PASS，文档物理校验 0 错误）；Phase 7B 仍然严格禁止开启（未获授权，阻断直至 PKG-5 全部闭环）
+> **当前状态**：08 Rig（刚体平移与世界坐标隔离）、09-A（Ground × Reach 极值约束求解器）、09-B（世界旋转合同与全生命周期无父级约束）均已技术修复并全量验证通过；FIND-R3-01 与 FIND-R3-02 彻底闭环；下一项任务为 PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）；分层全量自动化回归 100% 通过（Quick 19/19, Physics 25/25, Motion 12/12, Full 40/40，09-B 专项 10/10 PASS，09-A 专项 20/20 PASS，WS-01 6/6 PASS，文档物理校验 0 错误）；Phase 7B 仍然严格禁止开启（未获授权，阻断直至 PKG-5 全部闭环）
 > **核心原则**：磁盘代码与真实运行调用链是唯一事实依据。19 骨骼人体运动系统为纯运动学驱动伴随真实几何环境感知，底层纯 Python 动力学算子作为算法储备库保持独立。
 
 ---
@@ -15,7 +15,7 @@
 
 1. **MotionAction 是连续运动目标的生成者**：负责解析计算连续时间轴上的根节点运动轨迹、质心高度起伏、四肢末端世界空间期望轨迹及接触意图。它绝不直接操作底层约束 Empty 或骨骼欧拉角。
 2. **WholeBodyController 是统一姿态协调器**：负责统一协调全身姿态分配，集中调度双腿 IK、双臂 IK/FK、骨盆位移与脊柱姿态。**WBC 绝不负责步态调度、步频计算或时间轴演化**。
-3. **现有 IK/FK 是实际骨架求解执行机构**：Blender 的两骨 IK 约束与旋转复制约束是骨架运动解算的真实底层执行机构，WBC 通过控制器 Empty 物体驱动求解器。在 PKG-5 / 09-A 中，底层 `set_foot_ik_target` 实现了世界空间解耦（`FootIK.parent is None`）、地面高程参数 `ground_z` 解耦（不再与 CharacterRoot 绑定）、以及 3D Ground × Reach 解析极值求解器（两阶段执行 Phase A/B，空可行域严格阻断 `GROUND_REACH_INFEASIBLE`，内部校验 `GROUND_REACH_CONSTRAINT_UNSATISFIED`），杜绝了根节点高程误判与骨架姿态污染。
+3. **现有 IK/FK 是实际骨架求解执行机构**：Blender 的两骨 IK 约束与旋转复制约束是骨架运动解算的真实底层执行机构，WBC 通过控制器 Empty 物体驱动求解器。在 PKG-5 / 09-A 与 09-B 中，底层 `set_foot_ik_target` 实现了世界空间解耦（`FootIK.parent is None`）、地面高程参数 `ground_z` 解耦（不再与 CharacterRoot 绑定）、3D Ground × Reach 解析极值求解器（两阶段执行 Phase A/B，空可行域严格阻断 `GROUND_REACH_INFEASIBLE`，内部校验 `GROUND_REACH_CONSTRAINT_UNSATISFIED`）、世界旋转三维逆变换（$R_{\text{local}} = R_{\text{parent}}^{-1} \cdot R_{\text{world}}$ 经四元数正交化隔离缩放剪切，`foot_rotation_deg=None` 水平中立），并在 `unlock_foot_contact` 中确立了全生命周期 Parentless 与世界位姿无跳变保持合同，杜绝了根节点高程误判、姿态偏差与骨架姿态污染。
 4. **JointModel 负责 ROM 检查，严禁截断后虚报成功**：若启用 ROM 投影截断（Clamp Mode），**必须重新检查四肢末端目标误差；若 ROM 截断导致四肢末端脱离规划目标超过公差，必须真实返回 `ROM_CONFLICT` 错误且标记 `success = False`，绝对不得截断后虚报成功**。
 5. **ContactModel 负责接触状态与几何检查，不直接取代脚部锁定执行器**：`ContactModel` 负责四肢接触几何检测（法向间隙、穿透深度、切向滑移）、接触生命周期状态机与支撑状态分类，它不直接操作 `FootIK` Empty 物体。
 6. **FootContactAdapter (foot_contact.py) 负责执行实际世界空间接触锁定**：真实的零漂移足部锁定由 `src/rig/foot_contact.py` 通过解除 `FootIK` 父级并在世界坐标系下原位固定来执行。

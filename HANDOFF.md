@@ -6,14 +6,31 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — 09-A Documentation Final Gate (Task ID: `PKG5-09A-DOC-STATE-FINAL`)。
-* **当前状态**：`09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，严禁自行推进 Task 09-B，严禁修改 `foot_contact.py`，严禁进入 Phase 7B）。
+* **当前任务**：ProceduralAnimation — PKG-5 / 09-B: Lower-Limb IK World Rotation & Controller Lifecycle Closure (Task ID: `PKG5-09B-WORLD-ROTATION-CLOSURE`)。
+* **当前状态**：`09-B WORLD ROTATION GATE — VERIFIED`（下肢 IK 世界旋转合同与控制器全生命周期无父级约束已完成技术修复并全量通过真实机器验证；FIND-R3-01 彻底闭环）。
 * **核心成果**：
-  1. **代码死分支清理**：清理 `src/rig/ik.py:set_foot_ik_target()` 末尾第一次 `return state` 后不可达的 13 行重复死代码尾部，确保依赖图单次在正确位置更新；
-  2. **OPEN_FINDINGS 历史证据恢复**：核对并恢复上一轮提交因正则误删的历史缺陷记录（FIND-R2-03 至 R2-07、FIND-T01-07 等），确保全仓历史审计证据 100% 完整；
-  3. **架构文档同步**：同步 `ARCHITECTURE.md` (增补 Section 5.7 下肢 IK Ground x Reach 约束与解耦合同)、`ARCHITECTURE_SYNC.md` (更新原则 3) 以及 `DECISIONS.md` (追加 DEC-063)；
-  4. **全仓 Markdown 矩阵建立**：对全仓 62 份 Markdown 文件建立全量审查矩阵，核验无异常字节、无格式损坏、无事实冲突；
-  5. **全量自动化回归 100% 通过**：专项 20/20 PASS、世界空间 6/6 PASS、历史 4C/4D PASS、物理与 Bridge PASS、四级回归（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39）100% PASS。
+  1. **三维世界旋转空间映射 (`src/rig/ik.py:set_foot_ik_target`)**：
+     - 在 Phase A 中基于有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$ 计算父级姿态，通过正交四元数姿态提取隔绝缩放与剪切畸变，以三维旋转矩阵反解局部欧拉角（$R_{\text{local}} = R_{\text{parent}}^{-1} \cdot R_{\text{world}}$），严禁欧拉角直接相减；
+     - 当 `foot_rotation_deg=None` 时，显式映射为世界水平中立姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')`，保证无论父级位姿如何，世界姿态恒定水平；
+     - 局部欧拉角计算与坐标有限性检查置于 Phase A，Phase B 仅在校验通过后提交至控制器，前置失败绝不污染骨架。
+  2. **全生命周期 Parentless 不变量与世界矩阵保持 (`src/rig/foot_contact.py:unlock_foot_contact`)**：
+     - `unlock_foot_contact()` 默认参数更新为 `reparent_to_root: bool = False`；
+     - 若调用方显式传入 `reparent_to_root=True`，函数严格抛出 `ValueError` 封死非法挂载分支；
+     - 解锁前捕获 `FootIK` 与 `KneePole` 完整 4x4 世界变换矩阵，解绑父级并设置 `matrix_parent_inverse = Matrix.Identity(4)` 后，通过矩阵分解准确回写世界 `location` 与 `rotation_euler`，保证解锁前后世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad；
+     - 同步平移 `src/scene/playground_character_assembly.py` 内部 16 处旧版显式 `reparent_to_root=True` 调用为 `reparent_to_root=False`，消灭失效调用点。
+  3. **独立专项测试全绿 (`tests/test_leg_ik_world_rotation_contract.py`)**：
+     - 覆盖 TEST-01 至 TEST-10（Parentless 世界旋转、父级偏航反解、复合 3D 旋转、非交换三维旋转验证、解锁世界矩阵保持、双侧全生命周期 parentless、旧版兼容调用、非法请求拦截、Phase A 失败原子性、双侧独立性对称性），10 项在真实 Headless Blender 中 10/10 PASS (0.841s)；
+  4. **历史测试与分层全量自动化回归 100% 全绿**：
+     - 历史测试：`test_leg_ik_worldspace_init_reset.py` (6/6 PASS), `test_leg_ik_ground_height_contract.py` (20/20 PASS), `legacy_leg_ik` (1/1 PASS), `legacy_foot_contact` (1/1 PASS)；
+     - 四级回归全量通过：Quick 19/19 (52.09s), Physics 25/25 (95.84s), Motion 12/12 (49.01s), Full 40/40 (155.95s)；
+     - 文档与符号门禁 `tests/audit_c2_final_inspector.py --verify-docs` 0 报错通过。
+  5. **Findings 状态与后续准入**：
+     - `FIND-R3-01`: `FIXED / VERIFIED`（彻底关闭）；
+     - `FIND-R3-02`: `FIXED / VERIFIED`（继续保持稳定通过）；
+     - `FIND-R3-03`: `OPEN / PENDING REPAIR`（归属 11 FootLock）；
+     - `FIND-R3-04`: `OPEN / PENDING REPAIR`（归属 11 FootLock）；
+     - 全库当前 16 项登记问题中，14 项彻底关闭，剩余 2 项未完全关闭 Finding；阻碍项清零；
+     - **下一准入任务**：PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）；Phase 7B 保持严格未授权。
 
 ---
 
@@ -28,15 +45,15 @@
 | 03 | `GEMINI.md` | Gemini 项目清规与执行协议 | v1.0 | 否 | 否 | 永久清规与 SSOT 门禁规范 | 否 | PASS |
 | 04 | `PROJECT_SPEC.md` | 项目核心功能与阶段规划需求 | v1.0 | 否 | 否 | 需求规范，不随单次原子修复变动 | 否 | PASS |
 | 05 | `README.md` | 项目顶层概述与执行指引 | v1.0 | 否 | 否 | 顶层说明文档，无接口参数变动 | 否 | PASS |
-| 06 | `ARCHITECTURE.md` | 系统物理与接口架构单一事实源 (SSOT) | v4.1 | 是 | 是 | 追加 Section 5.7 下肢 IK Ground x Reach 约束求解与高程解耦合同 | 是 | PASS |
-| 07 | `ARCHITECTURE_SYNC.md` | 架构同步与十项核心原则卡片 | v4.1 | 是 | 是 | 同步原则 3 关于 IK/FK 执行器与 09-A 解耦约束合同 | 是 | PASS |
+| 06 | `ARCHITECTURE.md` | 系统物理与接口架构单一事实源 (SSOT) | v4.2 | 是 | 是 | 追加 Section 5.8 下肢 IK 世界旋转合同与全生命周期无父级约束 | 是 | PASS |
+| 07 | `ARCHITECTURE_SYNC.md` | 架构同步与十项核心原则卡片 | v4.2 | 是 | 是 | 同步原则 3 关于 IK/FK 执行器与 09-B 旋转及 Parentless 合同 | 是 | PASS |
 | 08 | `docs/ARCHITECTURE_CHANGE_GATE.md` | 永久架构门禁与防漂移清规 (ACG) | v1.0 | 否 | 否 | 核心门禁与清规，严禁私自放宽 | 否 | PASS |
-| 09 | `DECISIONS.md` | 重大架构与技术决策记录 (SSOT) | v1.0 | 是 | 是 | 追加 DEC-063 记录 09-A 求解器工程收口决策 | 是 | PASS |
-| 10 | `PROJECT_STATE.md` | 项目核实后的真实工程状态总看板 | 当前 | 是 | 是 | 同步 09-A 最终工程收口与全量分级回归状态 | 是 | PASS |
-| 11 | `CHANGELOG.md` | 不可篡改的历史变更日志记录 | 当前 | 是 | 是 | 记录 09-A 求解器重构与 Oracle 验证条目 | 是 | PASS |
+| 09 | `DECISIONS.md` | 重大架构与技术决策记录 (SSOT) | v1.0 | 是 | 是 | 追加 DEC-064 记录 09-B 世界旋转与无父级生命周期决策 | 是 | PASS |
+| 10 | `PROJECT_STATE.md` | 项目核实后的真实工程状态总看板 | 当前 | 是 | 是 | 同步 09-B 最终工程收口与全量分级回归状态 | 是 | PASS |
+| 11 | `CHANGELOG.md` | 不可篡改的历史变更日志记录 | 当前 | 是 | 是 | 记录 09-B 世界旋转反解、位姿保持与专项测试条目 | 是 | PASS |
 | 12 | `HANDOFF.md` | 跨会话 AI 交接卡片与任务清单 | 当前 | 是 | 是 | 记录本任务成果、文档矩阵与交接指引 | 是 | PASS |
 | 13 | `AI_SYNC.md` | 跨 AI 状态同步与当前门禁卡片 | 当前 | 是 | 是 | 同步当前基准 SHA、修改范围与门禁终止状态 | 是 | PASS |
-| 14 | `docs/audit/production_interface/OPEN_FINDINGS.md` | 生产接口审计统一问题看板与修复跟踪 | v1.0 | 是 | 是 | 恢复误删历史缺陷记录，更新 FIND-R3-02 闭环证据 | 是 | PASS |
+| 14 | `docs/audit/production_interface/OPEN_FINDINGS.md` | 生产接口审计统一问题看板与修复跟踪 | v1.0 | 是 | 是 | 更新 FIND-R3-01 闭环证据与看板指标 | 是 | PASS |
 | 15 | `docs/audit/production_interface/R3_RIG_IK.md` | 生产接口 R3 (Rig & IK) 专项审计报告 | 静态快照 | 是 | 否 | 历史审计原始证据，保留时间语义与原始问题事实 | 否 | PASS |
 | 16 | `docs/audit/production_interface/REPAIR_GROUPING.md` | 生产接口审计五大维护包规划指南 | 静态快照 | 是 | 否 | 维护包分组基准，保留原始规划定义 | 否 | PASS |
 | 17 | `docs/audit/production_interface/R1_TERRAIN_WALK.md` | 生产接口 R1 (TerrainWalk) 专项审计报告 | 静态快照 | 否 | 否 | 历史审计快照，禁止改写 | 否 | PASS |

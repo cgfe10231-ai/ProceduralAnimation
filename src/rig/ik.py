@@ -632,6 +632,31 @@ def set_foot_ik_target(
         raise RuntimeError(f"pole_world has non-finite coordinates: {pole_world}")
 
     # =========================================================================
+    # Phase A: Target Pre-computation and Feasibility Verification
+    # =========================================================================
+    # Compute target local Euler rotation from world foot_rotation_deg
+    if rot_coords is not None:
+        world_rot_euler = Euler((math.radians(v) for v in rot_coords), "XYZ")
+    else:
+        world_rot_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+
+    world_rot_mat = world_rot_euler.to_matrix()
+
+    if ik_obj.parent is not None:
+        # Parent exists: convert world orientation to parent-relative local orientation.
+        # Account for parent world transform and matrix_parent_inverse:
+        # M_world = M_parent @ M_parent_inverse @ M_basis.
+        eff_parent_mat = ik_obj.parent.matrix_world @ ik_obj.matrix_parent_inverse
+        parent_rot_mat = eff_parent_mat.to_quaternion().to_matrix()
+        local_rot_mat = parent_rot_mat.inverted() @ world_rot_mat
+        target_local_euler = local_rot_mat.to_euler("XYZ")
+    else:
+        target_local_euler = world_rot_euler
+
+    if not (math.isfinite(target_local_euler.x) and math.isfinite(target_local_euler.y) and math.isfinite(target_local_euler.z)):
+        raise RuntimeError(f"target_local_euler has non-finite coordinates: {target_local_euler}")
+
+    # =========================================================================
     # Phase B: Commit
     # =========================================================================
     # Apply prebend hint and write targets only after successful feasibility check and clamping
@@ -639,18 +664,16 @@ def set_foot_ik_target(
 
     # Convert applied world position to ik_obj parent space
     if ik_obj.parent is not None:
-        ik_obj.location = ik_obj.parent.matrix_world.inverted() @ applied
+        eff_parent_mat = ik_obj.parent.matrix_world @ ik_obj.matrix_parent_inverse
+        ik_obj.location = eff_parent_mat.inverted() @ applied
     else:
         ik_obj.location = applied
 
-    if rot_coords is not None:
-        rx, ry, rz = (math.radians(v) for v in rot_coords)
-        ik_obj.rotation_euler = Euler((rx, ry, rz), "XYZ")
-    else:
-        ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+    ik_obj.rotation_euler = target_local_euler
 
     if pole_obj.parent is not None:
-        pole_obj.location = pole_obj.parent.matrix_world.inverted() @ pole_world
+        eff_pole_parent = pole_obj.parent.matrix_world @ pole_obj.matrix_parent_inverse
+        pole_obj.location = eff_pole_parent.inverted() @ pole_world
     else:
         pole_obj.location = pole_world
 

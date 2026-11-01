@@ -48,15 +48,30 @@
     - **FIND-T01-06 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:660–705` `TerrainWalkAction.estimate_duration_frames` 严禁静默平地回退，`MotionPlanner.add_action()` 统一绑定权威环境实例，消除环境分裂，通过 4 项针对性测试与全量回归；
     - **FIND-T01-07 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:304–318` 负向行进步态规划落点循环自适应方向符号与终止条件，根骨 Hermite 样条保留负向速度，通过针对性测试与全量回归；
     - **FIND-T01-08 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `terrain_walk.py:895–905` 摆动足时间归一化分母纠正为 `dur`，与根部位移样条完全同相，彻底消除骨盆滞后诱发的 0.4mm 假性过伸，通过针对性测试与全量回归；
-    - **FIND-R3-01 (CONTRACT_GAP / PARTIALLY_RESOLVED, Blocks 7B: YES, STATIC_CONFIRMED)**: PKG-5 / WS-01 已修复初始化与重置无父级子问题（`ik.py:81–87, 127–160, 232–260`），4 个控制器在 setup 与 reset 后恒定保持 parent=None 并位于正确世界中立位姿，通过 6 项独立测试；`foot_contact.py:152` `unlock_foot_contact` 跨生命周期挂载与局部欧拉角反解待后续 WS-02 处理；
-    - **FIND-R3-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `ik.py:322–668` `set_foot_ik_target` 地面防穿透解耦角色根高程，三维解析极值求解器已工程收口并通过 20/20 专项测试与全量回归；
-    - **FIND-R3-03 (CONTRACT_GAP / OPEN, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:168–170, ik.py:219` `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留（待处理）；
-    - **FIND-R3-04 (CONTRACT_GAP / OPEN, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用（待处理）；
+    - **FIND-R3-01 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: PKG-5 / WS-01 已修复初始化与重置无父级子问题，09-B 已闭环 `set_foot_ik_target` 三维世界旋转反解与 `unlock_foot_contact` 全生命周期 parentless 及位姿无跳变保持合同，通过 10/10 专项测试与全量回归；
+    - **FIND-R3-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `ik.py:322–687` `set_foot_ik_target` 地面防穿透解耦角色根高程，三维解析极值求解器已工程收口并通过 20/20 专项测试与全量回归；
+    - **FIND-R3-03 (CONTRACT_GAP / OPEN, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:168–170, ik.py:219` `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留（待 11 FootLock 处理）；
+    - **FIND-R3-04 (CONTRACT_GAP / OPEN, Blocks 7B: NO, STATIC_CONFIRMED)**: `foot_contact.py:207–235` `evaluate_foot_support` 充当隐式约束维持器，具有改写骨骼姿态、解绑父级、覆写控制器坐标与强制更新视图层等未声明强副作用（待 11 FootLock 处理）；
     - **FIND-R4-01 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `playground_terrain_traversal.py:308–355, 450–490, 730–770` 引入 `verify_scene_execution_gate()` 严苛校验规划成功状态、不可达事件、致命未满足约束与连续性，执行失败严禁保存 `.blend` 文件，移除硬编码 `"continuous_without_exemption": True`，通过 3 项针对性测试与全量回归；
     - **FIND-R4-02 (CONTRACT_GAP / FIXED, Blocks 7B: NO, STATIC_CONFIRMED)**: `environment_query.py:385–420, 597–643` 与 `blender_mesh_query_adapter.py:885–892` Mesh 模式下未命中或非支撑面严格返回 `None` 消除虚假 0.0m 回退，`query_ground_support_at` 严格在非支撑面返回 `success=False`，通过 8 项针对性测试与全量回归；
-  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08)、ContactModel 几何支撑一致性修复组 (FIND-R2-05)、PKG-5 / WS-01 (FIND-R3-01 局部)、PKG-5 / 09-IK-GROUND-A (FIND-R3-02) 已修复并验证（`FIXED / VERIFIED`）；全仓库剩余 3 项未完全关闭合同缺口（全部集中于 PKG-5：FIND-R3-01 局部待 09-B、FIND-R3-03、FIND-R3-04）。
+  * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08)、ContactModel 几何支撑一致性修复组 (FIND-R2-05)、PKG-5 / 08 Rig (FIND-R3-01 局部)、PKG-5 / 09-IK-GROUND-A (FIND-R3-02)、PKG-5 / 09-B (FIND-R3-01 彻底收口) 已修复并验证（`FIXED / VERIFIED`）；全仓库 16 项登记问题中，14 项已完全关闭，仅剩余 2 项未完全关闭合同缺口（全部集中于 PKG-5 / 11 FootLock：FIND-R3-03、FIND-R3-04）。
 
 ### [已验证]
+* **下肢 IK 世界旋转合同与控制器生命周期最终收口 (PKG-5 / 09-B, PKG5-09B-WORLD-ROTATION-CLOSURE)**：
+  * **三维世界旋转空间映射 (`src/rig/ik.py:set_foot_ik_target`)**：
+    - 在 Phase A 中基于有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$ 反解局部欧拉角，使用四元数正交化提取隔离缩放与剪切畸变，严禁欧拉角直接相减；
+    - `foot_rotation_deg=None` 严格映射为水平中立世界姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')`；
+    - 局部欧拉角有限性校验通过后才在 Phase B 提交至控制器，失败绝不污染骨架；
+  * **全生命周期 Parentless 与解锁世界位姿无跳变保持 (`src/rig/foot_contact.py:unlock_foot_contact`)**：
+    - 默认参数变更为 `reparent_to_root: bool = False`，显式传入 `True` 严格抛出 `ValueError` 封死非法挂载；
+    - 解锁前捕获完整世界矩阵，解绑并置 `matrix_parent_inverse = Identity` 后矩阵分解回写世界 `location` 与 `rotation_euler`，世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad；
+    - `src/scene/playground_character_assembly.py` 16 处显式 `reparent_to_root=True` 调用同步平移为 `reparent_to_root=False`；
+  * **独立专项测试全绿 (`tests/test_leg_ik_world_rotation_contract.py`)**：
+    - 覆盖 TEST-01 至 TEST-10（Parentless 世界旋转、父级偏航反解、复合 3D 旋转、非交换三维旋转验证、解锁世界矩阵保持、双侧全生命周期 parentless、旧版兼容调用、非法请求拦截、Phase A 失败原子性、双侧独立性对称性），10 项在真实 Headless Blender 中 10/10 PASS (0.841s)；
+  * **历史测试与分层全量自动化回归 100% 全绿**：
+    - 历史测试：`test_leg_ik_worldspace_init_reset.py` (6/6 PASS), `test_leg_ik_ground_height_contract.py` (20/20 PASS), `legacy_leg_ik` (1/1 PASS), `legacy_foot_contact` (1/1 PASS)；
+    - 四级回归全量通过：Quick 19/19 (52.09s), Physics 25/25 (95.84s), Motion 12/12 (49.01s), Full 40/40 (155.95s)；
+    - 门禁状态：`FIND-R3-01 -> FIXED / VERIFIED`，全库仅剩 2 项开放 Finding (`FIND-R3-03`, `FIND-R3-04`)，Phase 7B 保持严格未授权。
 * **历史测试语义修复与 CoM 刚体平移全量回归收口 (PKG-5 / 08 Rig, PKG5-RIG08-COM-REGRESSION-CLOSURE)**：
   * **测试语义修复 (`tests/verify_task6fb_rigid_link.py` Test 8B)**：
     - 修复因世界空间 FootIK 保持原地导致根节点平移时局部姿态变动的问题；

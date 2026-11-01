@@ -149,43 +149,44 @@ def lock_foot_contact(
 def unlock_foot_contact(
     armature_obj: Optional[bpy.types.Object],
     side: str,
-    reparent_to_root: bool = True,
+    reparent_to_root: bool = False,
 ) -> dict:
-    """Release the support lock on the specified foot ('L' or 'R') and return it to normal IK control."""
+    """Release the support lock on the specified foot ('L' or 'R') and return it to normal IK control.
+
+    In accordance with Architecture Invariant (Rule 7: controllers must remain parentless in world space),
+    FootIK and KneePole controllers remain parentless (`parent is None`).
+    If `reparent_to_root=True` is explicitly passed, raises ValueError.
+    """
     side = side.upper()
     if side not in ("L", "R"):
         raise ValueError(f"Invalid leg side '{side}', expected 'L' or 'R'")
 
+    if reparent_to_root:
+        raise ValueError(
+            "reparent_to_root=True is forbidden: leg IK controllers must remain parentless in world space "
+            "across their entire lifecycle (Rule 7 / FIND-R3-01)."
+        )
+
     arm = _resolve_armature(armature_obj)
     ik_obj, pole_obj = _ensure_ik_controls(arm, side)
-    root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
     bpy.context.view_layer.update()
 
-    current_ik_world = ik_obj.matrix_world.translation.copy()
-    current_ik_euler = ik_obj.matrix_world.to_euler("XYZ")
-    current_pole_world = pole_obj.matrix_world.translation.copy()
+    current_ik_world_mat = ik_obj.matrix_world.copy()
+    current_pole_world_mat = pole_obj.matrix_world.copy()
 
     ik_obj["is_locked"] = False
 
-    if reparent_to_root and root_obj is not None:
-        inv_root = root_obj.matrix_world.inverted()
-        ik_obj.parent = root_obj
-        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
-        ik_obj.location = inv_root @ current_ik_world
-        ik_obj.rotation_euler = current_ik_euler
+    # Ensure parentless in world space with identity parent inverse
+    ik_obj.parent = None
+    ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+    loc, rot_quat, _ = current_ik_world_mat.decompose()
+    ik_obj.location = loc
+    ik_obj.rotation_euler = rot_quat.to_euler("XYZ")
 
-        pole_obj.parent = root_obj
-        pole_obj.matrix_parent_inverse = Matrix.Identity(4)
-        pole_obj.location = inv_root @ current_pole_world
-    else:
-        ik_obj.parent = None
-        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
-        ik_obj.location = current_ik_world
-        ik_obj.rotation_euler = current_ik_euler
-
-        pole_obj.parent = None
-        pole_obj.matrix_parent_inverse = Matrix.Identity(4)
-        pole_obj.location = current_pole_world
+    pole_obj.parent = None
+    pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+    pole_loc, _, _ = current_pole_world_mat.decompose()
+    pole_obj.location = pole_loc
 
     bpy.context.view_layer.update()
     return get_foot_support_state(arm, side)

@@ -141,7 +141,7 @@ flowchart TD
    * **时间基准归一化 (`float(dur)`)**：摆动脚进度归一化统一为 `float(dur)`，彻底消除短步态下 25% 相位差与 0.4mm 假性过伸；
    * **几何约束与接口修复**：强制执行 `max_step_length_m` 步长约束与 `nominal_stride_m` 严格正数/有限值校验；修复 `estimate_duration_frames` 误传 `fps` 参数导致的运行时异常。
 7. **下肢 IK 目标约束与世界空间高程解耦 (Lower-Limb IK Ground & Reach Constraints Contract, PKG-5 / 09-A)**：
-   * **单一执行入口与接口定义**：[`src/rig/ik.py:set_foot_ik_target()`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py#L322-L668)；
+   * **单一执行入口与接口定义**：[`src/rig/ik.py:set_foot_ik_target()`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py#L322-L687)；
    * **世界高程解耦**：移除将 `CharacterRoot` 世界高程硬编码为地面的缺陷，引入可选 `ground_z: Optional[float] = None`（未指定时默认平地基准 0.0m），最低踝关节限制严格为 $Z \ge \text{ground\_z} + \text{ANKLE\_REST\_Z}$；
    * **世界空间不变量**：初始化与重置后控制器满足 `FootIK.parent is None` 且 `KneePole.parent is None`，足部约束求解直接工作于全局世界坐标系；
    * **四模式解析几何求解**：
@@ -154,6 +154,16 @@ flowchart TD
      * **Phase B (Commit)**：仅在 Phase A 验证通过后写入控制器对象位置并调用 `_apply_ik_prebend_hint(arm)`，前置失败绝不污染骨骼姿态；
    * **真实性遥测输出**：如实返回字典扩充字段 `requested_world`, `applied_world`, `clamped_reach`, `clamped_ground`, `ground_z`, `constraints_satisfied`, `ground_clearance_m`, `hip_to_target_dist_m`；
    * **集成边界声明**：09-A 属于底层 IK 求解器工程收口，上层 `WholeBodyController` 与 `TerrainWalkAction` 尚未完整启用动态地形高程透传，禁止夸大为动力学闭环。
+8. **下肢 IK 世界旋转合同与控制器全生命周期无父级约束 (Lower-Limb IK World Rotation & Controller Lifecycle Closure, PKG-5 / 09-B)**：
+   * **三维世界旋转空间映射 ([`src/rig/ik.py:set_foot_ik_target()`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/ik.py#L322-L687))**：
+     * `foot_rotation_deg` 严格定义为世界空间 XYZ 欧拉角（度），支持任意非对称复合偏航 (Yaw)、俯仰 (Pitch)、翻滚 (Roll)；
+     * 当控制器存在父级时，基于有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$ 进行三维旋转矩阵反解（$R_{\text{local}} = R_{\text{parent}}^{-1} \cdot R_{\text{world}}$），通过四元数正交化隔绝缩放与剪切畸变，严禁欧拉角直接相减；
+     * `foot_rotation_deg=None` 时显式映射为水平中立世界姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')`，保证无论父级姿态如何，世界姿态恒定水平；
+     * 局部旋转计算与坐标有限性检查严格置于 Phase A，Phase B 仅在通过后写入，前置失败绝不污染骨架姿态。
+   * **全生命周期 Parentless 不变量与解锁世界变换保持 ([`src/rig/foot_contact.py:unlock_foot_contact()`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/foot_contact.py#L149-L192))**：
+     * 核心不变量：四个控制器 `FootIK.L/R` 与 `KneePole.L/R` 在初始化、锁定、解锁、正常 IK、重置的全生命周期中恒定满足 `controller.parent is None` 与 `matrix_parent_inverse = Matrix.Identity(4)`（彻底践行架构门禁 Rule 7 恒定世界空间清规）；
+     * 接口合同：`unlock_foot_contact` 默认参数变更为 `reparent_to_root=False`；若调用方显式传入 `reparent_to_root=True`，函数严格抛出 `ValueError` 阻断非法挂载；
+     * 解锁平滑：解锁前捕获完整世界矩阵，解除父级后通过矩阵分解回写世界位姿，保证世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad。
 
 ---
 

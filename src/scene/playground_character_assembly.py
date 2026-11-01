@@ -389,8 +389,8 @@ def run_minimal_control_stages_verification(
     # -------------------------------------------------------------------------
     # Stage A: Static Standing Pose at (0.0, -8.0, 0.0) on Surface_FlatGround
     # -------------------------------------------------------------------------
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
     reset_pose(arm_obj)
     reset_leg_ik(arm_obj)
     reset_arm_ik(arm_obj)
@@ -466,8 +466,8 @@ def run_minimal_control_stages_verification(
     # -------------------------------------------------------------------------
     # Stage B: Finite Root Displacement & Non-Zero Yaw via Unified Control Chain
     # -------------------------------------------------------------------------
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
 
     target_root_b = (0.25, -7.65, 0.0)
     target_yaw_b = 6.0
@@ -560,8 +560,8 @@ def run_minimal_control_stages_verification(
     # -------------------------------------------------------------------------
     # Stage C: Independent Single-Foot IK Control (Distinct L/R World Targets)
     # -------------------------------------------------------------------------
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
 
     target_l_c = (-0.11, -8.05, 0.07)
     target_r_c = (0.14, -7.82, 0.21)
@@ -666,8 +666,8 @@ def run_minimal_control_stages_verification(
     # -------------------------------------------------------------------------
     # Stage D: Support-Foot World Locking under Root Displacement Sequence
     # -------------------------------------------------------------------------
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
 
     locked_l_anchor_world = (-0.11, -8.00, 0.07)
     root_shift_steps = [
@@ -801,8 +801,8 @@ def run_mathematical_consistency_verifications(
     # -------------------------------------------------------------------------
     # 4.1 Five Coordinate Spaces Round-Trip Consistency
     # -------------------------------------------------------------------------
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
 
     test_root_pos = (1.35, -7.25, 0.0)
     test_yaw_deg = 6.5
@@ -915,8 +915,8 @@ def run_mathematical_consistency_verifications(
     # -------------------------------------------------------------------------
     # 4.2 Mass Distribution & Whole-Body Center of Mass (src/motion/rigid_link.py)
     # -------------------------------------------------------------------------
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
     reset_pose(arm_obj)
     reset_leg_ik(arm_obj)
     reset_arm_ik(arm_obj)
@@ -1192,8 +1192,8 @@ def run_mathematical_consistency_verifications(
     # 4.4 Constraint Truthfulness Verification (JointModel & WholeBodyController)
     # -------------------------------------------------------------------------
     wbc = WholeBodyController(armature_obj=arm_obj, root_obj=root_obj)
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
     wbc.reset_all_controls()
 
     # Case 4A: Valid pose
@@ -1294,8 +1294,8 @@ def run_stage_e_continuous_walk_in_playground(
     `.blend` artifact (`output/dynamics_playground_task7a1.blend`), and render keyframe PNGs.
     """
     scene = bpy.context.scene
-    unlock_foot_contact(arm_obj, "L", reparent_to_root=True)
-    unlock_foot_contact(arm_obj, "R", reparent_to_root=True)
+    unlock_foot_contact(arm_obj, "L", reparent_to_root=False)
+    unlock_foot_contact(arm_obj, "R", reparent_to_root=False)
     reset_pose(arm_obj)
     reset_leg_ik(arm_obj)
     reset_arm_ik(arm_obj)
