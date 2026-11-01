@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：09-B Lower-Limb IK World Rotation & Controller Lifecycle Closure (PKG5-09B-WORLD-ROTATION-CLOSURE)
-> **审计与修复基准 Commit**：678f6ee1fbc900a3ff6727e5336c516eb2e6265d
+> **当前阶段**：PKG-5 / 09-B Lower-Limb IK World Rotation & Controller Lifecycle Re-verification & Correction (PKG5-09B-REVERIFICATION-CORRECTION)
+> **审计与修复基准 Commit**：415bbd5c0d44cd799b7b31c062efce926da6e04b
 > **最后更新时间**：2026-11-01
-> **当前状态**：09-B WORLD ROTATION GATE — VERIFIED
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。08 Rig（刚体平移与世界坐标隔离）、09-A Ground × Reach（三维极值约束求解器）、09-B World Rotation（世界旋转合同与控制器无父级生命周期）均已技术修复并全量验证通过（FIND-R3-01 与 FIND-R3-02 彻底闭环）；下一项为 PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）。全仓库当前 16 项登记问题中，14 项已完全关闭，仅剩余 2 项未完全关闭的 Finding（全部集中于 PKG-5 / 11 FootLock：FIND-R3-03 待处理、FIND-R3-04 待处理）。
+> **当前状态**：09-B INDEPENDENT RE-VERIFICATION — ACCEPTED
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。08 Rig（刚体平移与世界坐标隔离）、09-A Ground × Reach（三维极值约束求解器）、09-B World Rotation（世界旋转合同、控制器无父级生命周期及 4x4 世界矩阵 TRS 保持）均已技术修复并全量验证通过（FIND-R3-01 与 FIND-R3-02 彻底闭环）；下一项任务唯一指向 PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）。全仓库当前 16 项登记问题中，14 项已完全关闭，仅剩余 2 项未完全关闭的 Finding（全部集中于 PKG-5 / 11 FootLock：FIND-R3-03 待处理、FIND-R3-04 待处理）。
 
 ---
 
@@ -361,16 +361,20 @@
      - 在 `src/rig/ik.py` 的 `set_foot_ik_target()` Phase A 中，计算 `eff_parent_mat = ik_obj.parent.matrix_world @ ik_obj.matrix_parent_inverse`，提取四元数正交旋转矩阵并反解局部欧拉角，严格避免欧拉角直接相减或缩放/剪切污染；
      - `foot_rotation_deg=None` 时显式按世界水平中立姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')` 进行世界向局部反解，无论父级是否存在非零 3D 旋转，世界姿态恒定水平；
      - 校验局部姿态坐标有限性，仅在 Phase A 成功通过后才在 Phase B 提交至控制器，失败绝不污染骨架姿态。
-  3. **解锁全生命周期 Parentless 与世界矩阵无跳变保持已闭环 (PKG-5 / 09-B)**：
+  3. **解锁全生命周期 Parentless 与 4x4 世界矩阵 TRS 保持已闭环 (PKG-5 / 09-B 补正)**：
      - 在 `src/rig/foot_contact.py` 的 `unlock_foot_contact()` 中，将默认参数变更为 `reparent_to_root: bool = False`；
      - 若调用方显式传入 `reparent_to_root=True`，严格抛出 `ValueError`，彻底封死重新挂载分支；
-     - 解锁前捕获 `FootIK` 与 `KneePole` 完整 4x4 世界矩阵，解除父级并设置 `matrix_parent_inverse = Matrix.Identity(4)` 后，通过矩阵分解准确回写世界空间 `location` 与 `rotation_euler`，确保解锁前后世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad。
-  4. **专项测试与全量回归**：
-     - 新增独立专项测试 `tests/test_leg_ik_world_rotation_contract.py`（TEST-01 至 TEST-10）在真实 Headless Blender 中 10/10 独立全绿通过；
+     - 解锁前捕获 `FootIK` 与 `KneePole` 完整 4x4 世界矩阵并校验元素有限性，严密检测仿射剪切（Shear 偏差 $> 10^{-4}$ 抛出 `RuntimeError`）；
+     - 解除父级并设置 `matrix_parent_inverse = Matrix.Identity(4)` 后，通过矩阵分解准确回写世界空间 `location`、`rotation_euler` 与 `scale`，视图层更新后断言矩阵最大差值 $< 10^{-4}$，确保解锁前后世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad、尺度跳变 $< 10^{-5}$。
+  4. **专项测试修正与全量回归 (PKG5-09B-REVERIFICATION-CORRECTION)**：
+     - 修正 `tests/test_leg_ik_world_rotation_contract.py` 中 TEST-02/03/04 父级逆矩阵抵消父级旋转的缺陷（置 Identity 且断言非零有效父级旋转）；
+     - 扩充 TEST-05 4x4 矩阵与尺度断言、TEST-08 非法挂载不变量保持、TEST-09 16 元素全量不变性；
+     - 新增 TEST-11（组合逆矩阵）、TEST-12（均匀缩放 0 误差与非均匀缩放剪切边界检测）、TEST-13（历史父级控制器解锁非单位尺度与局部旋转全保持场景）；
+     - 专项测试全部 13 项在真实 Headless Blender 5.1 中 13/13 独立全绿通过 (2.38s)；
      - 历史测试 `test_leg_ik_worldspace_init_reset.py` (6/6 PASS), `test_leg_ik_ground_height_contract.py` (20/20 PASS), `legacy_leg_ik` (1/1 PASS), `legacy_foot_contact` (1/1 PASS) 全部通过；
      - 全量分层回归：Quick (19/19 PASS), Physics (25/25 PASS), Motion (12/12 PASS), Full (40/40 PASS) 全部通过；
      - 文档与符号门禁 `tests/audit_c2_final_inspector.py --verify-docs` 0 报错通过。
-* **Suggested Repair Boundary**: `src/rig/ik.py` (Lines 637–675), `src/rig/foot_contact.py` (Lines 149–192), `tests/test_leg_ik_world_rotation_contract.py`。
+* **Suggested Repair Boundary**: `src/rig/ik.py` (Lines 637–675), `src/rig/foot_contact.py` (Lines 149–210), `tests/test_leg_ik_world_rotation_contract.py`。
 
 ---
 

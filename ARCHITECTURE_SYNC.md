@@ -1,10 +1,10 @@
 # ARCHITECTURE_SYNC: 架构同步与模块调用规范卡片
 
 > **历史架构审计基准**：v4.0 (Environment Gate 01 最终架构审计，Git SHA: `7a3e244825cd87bf3d787c530318055dc94a3e1f`，历史基准四级测试全绿 35/35)
-> **当前工程进度基准**：PKG-5 / 09 Lower-Limb IK Task B (09-B) 世界旋转合同与控制器生命周期最终收口 (`PKG5-09B-WORLD-ROTATION-CLOSURE`)
-> **当前工程 Git SHA**：`678f6ee1fbc900a3ff6727e5336c516eb2e6265d`
+> **当前工程进度基准**：PKG-5 / 09 Lower-Limb IK Task B (09-B) 世界旋转合同与控制器生命周期独立验收补正 (`PKG5-09B-REVERIFICATION-CORRECTION`)
+> **当前工程 Git SHA**：`415bbd5c0d44cd799b7b31c062efce926da6e04b`
 > **权威架构文档集合**：详见 [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`docs/audit/environment_gate01_final/`](docs/audit/environment_gate01_final/)
-> **当前状态**：08 Rig（刚体平移与世界坐标隔离）、09-A（Ground × Reach 极值约束求解器）、09-B（世界旋转合同与全生命周期无父级约束）均已技术修复并全量验证通过；FIND-R3-01 与 FIND-R3-02 彻底闭环；下一项任务为 PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）；分层全量自动化回归 100% 通过（Quick 19/19, Physics 25/25, Motion 12/12, Full 40/40，09-B 专项 10/10 PASS，09-A 专项 20/20 PASS，WS-01 6/6 PASS，文档物理校验 0 错误）；Phase 7B 仍然严格禁止开启（未获授权，阻断直至 PKG-5 全部闭环）
+> **当前状态**：08 Rig（刚体平移与世界坐标隔离）、09-A（Ground × Reach 极值约束求解器）、09-B（世界旋转合同、控制器全生命周期无父级约束及 4x4 世界变换 TRS 完整保持）均已技术修复并全量验证通过；FIND-R3-01 与 FIND-R3-02 彻底闭环；下一项任务唯一指向 PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）；分层全量自动化回归 100% 通过（Quick 19/19, Physics 25/25, Motion 12/12, Full 40/40，09-B 专项 13/13 PASS，09-A 专项 20/20 PASS，WS-01 6/6 PASS，文档物理校验 0 错误）；Phase 7B 依然严格禁止开启（未获授权，阻断直至 PKG-5 全部闭环）
 > **核心原则**：磁盘代码与真实运行调用链是唯一事实依据。19 骨骼人体运动系统为纯运动学驱动伴随真实几何环境感知，底层纯 Python 动力学算子作为算法储备库保持独立。
 
 ---
@@ -102,8 +102,8 @@ flowchart TD
 ## 4. 后续任务准入规则 (Next Stage Admission)
 
 1. **Phase 7B (独立上肢运动学)**：
-   * **当前状态**：AUDITED / AUTHORIZED TO PROCEED
-   * **准入约束**：必须首先解耦 `TerrainWalkAction` 中写死的正弦摆臂（FIND-01），利用已就绪的 `arm_ik.py` 和 WBC 槽位实现双臂独立 IK 轨迹控制。
+   * **当前状态**：NOT AUTHORIZED（严格未授权；历史审计曾评估其接口解耦思路，但当前工程实际准入严格阻断，必须等待 PKG-5 全部任务 10、11、12 完成、联合验收通过并经项目负责人明确书面批准后方可准入）
+   * **准入前置条件**：必须首先完成 PKG-5 / 10 Upper-Limb IK/FK（解耦正弦摆臂与双臂独立轨迹控制）、PKG-5 / 11 FootLock 元数据清理与 evaluate 只读化、PKG-5 / 12 综合闭环，并通过全仓联合验收。
 2. **Phase 7C (动力学主循环接入)**：
    * **当前状态**：NOT AUTHORIZED
    * **准入约束**：待 7B 验收后方可准入，届时复用现有 `contact_force_solver.py`。

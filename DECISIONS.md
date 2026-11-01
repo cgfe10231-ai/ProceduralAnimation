@@ -1535,31 +1535,7 @@
 
 ---
 
-### [DEC-064] 2026-11-01: PKG-5 / 09-B: 下肢 IK 世界旋转合同与控制器全生命周期 Parentless 锁定 (FIND-R3-01)
-
-* **状态**：已采纳并完成实施 (Accepted & Implemented)
-* **日期**：2026-11-01
-* **背景**：
-  - 生产接口审计 FIND-R3-01 指出两项严重合同缺口：
-    1. 控制器跨生命周期动态父级违规循环：`setup_leg_ik()` 与 `reset_leg_ik()` 曾设置 `ik_obj.parent = root_obj`，`lock_foot_contact()` 设置 `parent = None`，`unlock_foot_contact()` 默认参数 `reparent_to_root=True` 再次挂载回 Root，动作重置时再次挂载回 Root，违反架构门禁 Rule 7（控制器全生命周期保持在绝对世界空间 `parent = None`）；
-    2. 世界旋转未反解：`src/rig/ik.py:set_foot_ik_target()` 在写入旋转时将世界欧拉角直接赋值给 `ik_obj.rotation_euler`，当父级存在非零旋转时，未执行局部旋转矩阵反解，导致世界姿态偏差；且 `foot_rotation_deg=None` 缺乏明确的水平中立世界姿态语义。
-* **决策与结论**：
-  1. **三维世界旋转空间映射 (`set_foot_ik_target`)**：
-     - 在 Phase A 中，基于有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$ 计算父级姿态，通过正交四元数姿态提取隔绝缩放与剪切畸变，以三维旋转矩阵反解局部欧拉角（$R_{\text{local}} = R_{\text{parent}}^{-1} \cdot R_{\text{world}}$），严禁欧拉角直接相减；
-     - 当 `foot_rotation_deg=None` 时，显式映射为世界水平中立姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')`，保证无论父级位姿如何，世界姿态恒定水平；
-     - 局部欧拉角计算与坐标有限性检查置于 Phase A，Phase B 仅在校验通过后提交至控制器，前置失败绝不污染骨架。
-  2. **全生命周期 Parentless 不变量与世界矩阵平滑保持 (`unlock_foot_contact`)**：
-     - `unlock_foot_contact()` 默认参数更新为 `reparent_to_root: bool = False`；
-     - 若调用方显式传入 `reparent_to_root=True`，函数严格抛出 `ValueError` 封死非法挂载分支；
-     - 解锁前捕获 `FootIK` 与 `KneePole` 完整 4x4 世界变换矩阵，解绑父级并设置 `matrix_parent_inverse = Matrix.Identity(4)` 后，通过矩阵分解准确回写世界 `location` 与 `rotation_euler`，保证解锁前后世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad；
-     - 同步平移 `src/scene/playground_character_assembly.py` 内部 16 处旧版显式 `reparent_to_root=True` 调用为 `reparent_to_root=False`，消灭失效调用点。
-  3. **独立专项测试与全量回归验证**：
-     - 新增专用独立测试 `tests/test_leg_ik_world_rotation_contract.py`（TEST-01 至 TEST-10）覆盖 parentless 旋转、父级偏航、复合 3D 旋转、非交换三维旋转验证、解锁世界矩阵保持、双侧全生命周期 parentless、旧版兼容调用、非法请求拦截、Phase A 失败原子性、双侧独立性对称性，10/10 PASS (0.841s)；
-     - 历史测试及分层全量自动化回归（Quick 19/19, Physics 25/25, Motion 12/12, Full 40/40）100% 零退化通过。
-* **影响**：
-  - 彻底关闭 `FIND-R3-01`，实现下肢 IK 控制器在初始化、正常 IK、锁定、解锁、重置全生命周期中的绝对世界空间不变量（Rule 7 永久合规）；
-  - 全仓库 16 项登记问题中，14 项已完全关闭，仅剩余 2 项开放 Finding（`FIND-R3-03`, `FIND-R3-04`，归属 11 FootLock）；
-  - 下一准入阶段为 PKG-5 / 10 Upper-Limb IK/FK；Phase 7B 保持严格未授权。
+### [DEC-063] 2026-11-01: PKG-5 / 09-A: 三维 Ground × Reach 约束求解器工程收口 (FIND-R3-02)
 
 * **状态**：已采纳并完成实施 (Accepted & Implemented)
 * **日期**：2026-11-01
@@ -1580,7 +1556,42 @@
      - 在 `tests/test_leg_ik_ground_height_contract.py` 中保留 TEST-1 至 TEST-18，新增 TEST-19（几何分类法 Categories A 至 T，20 个几何边界全量检验）与 TEST-20（独立的 2D 网格与密集边界采样 Oracle，在 5mm 网格公差内实现参数化网格与 30 组伪随机测试 100% 吻合）。
   5. **门禁隔离边界**：
      - 本任务仅限底层 `set_foot_ik_target()` 函数的数学与工程收口，不修改上层 `WholeBodyController` 或 `foot_contact.py`，不代表地形高度已在全身控制器中全链路透传；
-     - 终止状态严格标记为 `PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW`，严禁越界进入 09-B 或 Phase 7B。
+     - 终止状态严格标记为 `PKG-5 / 09-A — VERIFIED`，严禁越界进入 Phase 7B。
 * **影响**：
   - 为底层双足逆运动学目标设定提供了 100% 数学严密、数值稳定且具备独立验证的几何投影基石；
   - 维持历史测试（4C、4D、6F-B、6G-B、6G-C、R3B-1）及四级全量回归（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39）100% 零退化通过。
+
+---
+
+### [DEC-064] 2026-11-01: PKG-5 / 09-B: 下肢 IK 世界旋转合同与控制器全生命周期 Parentless 锁定及独立验收补正 (FIND-R3-01)
+
+* **状态**：已采纳并独立验收通过 (Accepted & Verified via Independent Re-verification)
+* **日期**：2026-11-01（架构决策采纳：Task `PKG5-09B-WORLD-ROTATION-CLOSURE`；独立验收补正完成：Task `PKG5-09B-REVERIFICATION-CORRECTION`）
+* **背景**：
+  - 生产接口审计 FIND-R3-01 指出两项严重合同缺口：
+    1. 控制器跨生命周期动态父级违规循环：`setup_leg_ik()` 与 `reset_leg_ik()` 曾设置 `ik_obj.parent = root_obj`，`lock_foot_contact()` 设置 `parent = None`，`unlock_foot_contact()` 默认参数 `reparent_to_root=True` 再次挂载回 Root，动作重置时再次挂载回 Root，违反架构门禁 Rule 7（控制器全生命周期保持在绝对世界空间 `parent = None`）；
+    2. 世界旋转未反解：`src/rig/ik.py:set_foot_ik_target()` 在写入旋转时将世界欧拉角直接赋值给 `ik_obj.rotation_euler`，当父级存在非零旋转时，未执行局部旋转矩阵反解，导致世界姿态偏差；且 `foot_rotation_deg=None` 缺乏明确的水平中立世界姿态语义。
+  - 在独立验收过程中，发现两项缺陷：
+    1. 09-B 专项测试中，TEST-02、TEST-03、TEST-04 设置了 `ik_obj.matrix_parent_inverse = parent.matrix_world.inverted()`，导致父级变换被乘法抵消（$M_{\text{eff}} = I$），未能真实覆盖非单位世界变换与非交换 3D 旋转；
+    2. `unlock_foot_contact()` 在解除父级时，未保持 FootIK 的 Scale，且未保持 KneePole 的 Rotation 与 Scale，存在控制器跨父级跳变隐患。
+* **决策与结论**：
+  1. **三维世界旋转空间映射 (`set_foot_ik_target`)**：
+     - 在 Phase A 中，基于有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$ 计算父级姿态，通过正交四元数姿态提取隔绝缩放与剪切畸变，以三维旋转矩阵反解局部欧拉角（$R_{\text{local}} = R_{\text{parent}}^{-1} \cdot R_{\text{world}}$），严禁欧拉角直接相减；
+     - 当 `foot_rotation_deg=None` 时，显式映射为世界水平中立姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')`，保证无论父级位姿如何，世界姿态恒定水平；
+     - 局部欧拉角计算与坐标有限性检查置于 Phase A，Phase B 仅在校验通过后提交至控制器，前置失败绝不污染骨架。
+  2. **全生命周期 Parentless 不变量与完整 4x4 世界变换矩阵（TRS）保持 (`unlock_foot_contact`)**：
+     - `unlock_foot_contact()` 默认参数更新为 `reparent_to_root: bool = False`；显式传入 `reparent_to_root=True` 严格抛出 `ValueError`；
+     - 解锁前读取 `FootIK` 与 `KneePole` 完整 4x4 世界矩阵，校验所有 16 元素有限性（非有限数抛出 `ValueError`）；
+     - **仿射几何非均匀缩放剪切边界**：在仿射变换分解中，若父级存在非均匀缩放 $S_p = \text{diag}(s_x, s_y, s_z)$，矩阵乘积 $R_p \cdot S_p \cdot R_c$ 将产生列非正交的本质剪切（Shear），无法在无父级 Blender 对象的标准 TRS 表象下无损表达。函数通过比较原始世界矩阵与无剪切重构矩阵 $M_{\text{reconstructed}} = \text{LocRotScale}(\mathbf{t}, \mathbf{q}, \mathbf{s})$ 的最大元素差，若剪切偏差 $> 10^{-4}$ 则明确抛出 `RuntimeError`，杜绝静默几何畸变；在均匀缩放与标准正交变换下，确保 0 误差；
+     - 解绑父级并重置 `matrix_parent_inverse = Matrix.Identity(4)` 后，将分解出的 Location、Rotation（转为欧拉角）、Scale 全量忠实写回 FootIK 与 KneePole；
+     - 刷新视图层后，严格断言控制器世界矩阵与解锁前最大元素差值 $< 10^{-4}$，世界位置跳变 $< 10^{-5}$m、世界旋转跳变 $< 10^{-4}$rad、尺度跳变 $< 10^{-5}$。
+  3. **独立专项测试修正与扩充 (`tests/test_leg_ik_world_rotation_contract.py`)**：
+     - 修正 TEST-02、TEST-03、TEST-04：设置 `matrix_parent_inverse = Matrix.Identity(4)` 并前置断言有效父级旋转偏角 $> 0.1$rad，验证非交换 3D 旋转反解与水平中立语义；
+     - 扩充 TEST-05（4x4 矩阵及 scale 保持断言）、TEST-08（非法挂载不变量保持）、TEST-09（16 元素全量不变性）；
+     - 新增 TEST-11（父级旋转与非单位 parent_inverse 组合验证）、TEST-12（均匀缩放 0 误差与非均匀缩放剪切边界检测）、TEST-13（历史父级控制器解锁非单位尺度与局部旋转全保持场景）；
+     - 专项测试共 13 项在真实 Headless Blender 5.1 中全部通过（13/13 PASS in 2.38s）；
+     - 历史测试及分层全量自动化回归（Quick 19/19, Physics 25/25, Motion 12/12, Full 40/40）100% 零退化通过。
+* **影响**：
+  - 彻底关闭 `FIND-R3-01`，实现下肢 IK 控制器在初始化、正常 IK、锁定、解锁、重置全生命周期中的绝对世界空间不变量与位姿保持合同（Rule 7 永久合规）；
+  - 全仓库 16 项登记问题中，14 项已完全关闭，仅剩余 2 项开放 Finding（`FIND-R3-03`, `FIND-R3-04`，归属 11 FootLock）；
+  - 下一准入阶段为 PKG-5 / 10 Upper-Limb IK/FK；Phase 7B 保持严格未授权。

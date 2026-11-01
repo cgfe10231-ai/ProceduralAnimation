@@ -3,6 +3,47 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-11-01] PKG-5 / 09-B: 下肢 IK 世界旋转合同与控制器生命周期独立验收补正 (PKG5-09B-REVERIFICATION-CORRECTION)
+
+### 1. 09-B 专项测试父级逆矩阵抵消缺陷修正与测试集扩充
+* **任务性质**: 修复 `tests/test_leg_ik_world_rotation_contract.py` 中因 `matrix_parent_inverse = parent.matrix_world.inverted()` 导致父级变换被抵消（$M_{\text{eff}} = I$）的问题，确保测试真正覆盖非单位世界变换与非交换 3D 旋转。
+* **修改实现与技术细节 ([tests/test_leg_ik_world_rotation_contract.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/tests/test_leg_ik_world_rotation_contract.py))**:
+  - TEST-02、TEST-03、TEST-04: 设置 `ik_obj.matrix_parent_inverse = Matrix.Identity(4)`，并前置断言有效父级旋转偏角 $> 0.1$rad，验证非零偏航反解、非零复合 3D 旋转反解与非交换 3D 旋转矩阵计算（并断言朴素欧拉相减偏差 $> 0.05$rad，`foot_rotation_deg=None` 严格保持世界水平中立）；
+  - TEST-05: 扩充解锁世界位姿断言，检查 4x4 矩阵最大元素差值 $< 10^{-5}$、位置跳变 $< 10^{-5}$m、旋转跳变 $< 10^{-4}$rad、尺度跳变 $< 10^{-5}$；
+  - TEST-08: 检查非法挂载请求抛出 `ValueError` 时，`parent`、`is_locked` 及 4x4 世界矩阵严格保持不变；
+  - TEST-09: 扩充 Phase A 失败原子性断言，覆盖 FootIK、KneePole 及 `thigh.L`, `shin.L`, `foot.L` 三骨骼全部 16 个矩阵元素最大差值 $< 10^{-6}$；
+  - 新增 TEST-11: 父级非零旋转与非单位 `matrix_parent_inverse` 组合反解（误差 $< 10^{-4}$rad）；
+  - 新增 TEST-12: 父级均匀缩放（1.8x）0 误差验证与非均匀缩放剪切边界检测（断言非正交列产生的仿射剪切误差 $> 0.01$）；
+  - 新增 TEST-13: 历史父级控制器解锁非单位尺度与局部旋转全保持场景（模拟带复合旋转与尺度 $(1.2, 1.2, 1.2)$ 的旧版父级，解锁后 4x4 矩阵最大差值 $< 10^{-5}$，完全无跳变）；
+  - 实测结果：在真实 Headless Blender 5.1 中 13/13 PASS (2.38s)。
+
+### 2. unlock_foot_contact 完整 4x4 世界变换矩阵（TRS）保持补齐
+* **任务性质**: 补齐 `unlock_foot_contact()` 在解除父级时对 FootIK 尺度以及 KneePole 旋转与尺度的保持，集成有限性校验与仿射剪切检测。
+* **修改实现与技术细节 ([src/rig/foot_contact.py](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/src/rig/foot_contact.py))**:
+  - 在解绑父级前读取 FootIK 与 KneePole 完整的 4x4 世界矩阵；
+  - 前置校验：断言矩阵所有 16 个元素均为有限数（非有限数抛出 `ValueError`）；
+  - 仿射剪切检测：分解矩阵为 $(loc, rot\_quat, scale)$ 并重构无剪切矩阵，若最大元素偏差 $> 10^{-4}$ 抛出 `RuntimeError` 拒绝不可表达的剪切畸变；
+  - 解绑并重置 `matrix_parent_inverse = Matrix.Identity(4)` 后，将分解出的 Location、Rotation（转为 XYZ 欧拉角）、Scale 完整忠实写回 FootIK 与 KneePole；
+  - 后验校验：刷新视图层后，断言控制器当前世界矩阵与解锁前最大元素差值 $< 10^{-4}$（实测最大误差 $< 10^{-6}$）。
+
+### 3. 全仓文档状态一致性修正与全量回归
+* **文档冲突修复**:
+  - `PROJECT_STATE.md`: 修正顶部概述停留在 09-A 的滞后记录，统一标定 09-A 与 09-B 均为 `FIXED / VERIFIED`，下一任务唯一指向 `PKG-5 / 10 Upper-Limb IK/FK`；
+  - `ARCHITECTURE_SYNC.md`: 消除 Phase 7B 准入状态的前后矛盾，统一明确为 `NOT AUTHORIZED`（等待 PKG-5 全部完成与联合验收）；
+  - `OPEN_FINDINGS.md`: 同步 09-B 独立验收补正成果，保持 16 项总数，14 项关闭，2 项开放；
+  - `DECISIONS.md`: 更新 DEC-064，明确架构采纳与验收补正阶段，记录仿射非均匀缩放剪切数学边界。
+* **全量自动化回归验证**:
+  - `legacy_leg_ik`: PASS；
+  - `legacy_foot_contact`: PASS；
+  - `test_leg_ik_worldspace_init_reset.py`: 6/6 PASS；
+  - `test_leg_ik_ground_height_contract.py`: 20/20 PASS；
+  - Quick Tier: 19/19 PASSED (93.01s)；
+  - Physics Tier: 25/25 PASSED (185.94s)；
+  - Motion Tier: 12/12 PASSED (93.32s)；
+  - Full Tier: 40/40 PASSED (285.15s)；
+  - 符号与架构物理校验 `tests/audit_c2_final_inspector.py --verify-docs`: PASS (0 错误, 0 虚构符号)。
+
+
 ## [2026-11-01] PKG-5 / 09-B: 下肢 IK 世界旋转合同与控制器全生命周期 Parentless 锁定 (PKG5-09B-WORLD-ROTATION-CLOSURE)
 
 ### 1. set_foot_ik_target 世界旋转反解与 Phase A/B 原子性保护 (FIND-R3-01 旋转子问题收口)

@@ -5,12 +5,15 @@ Validates Lower-Limb IK World Rotation Contract and Controller Lifecycle Closure
 - TEST-02: Non-zero parent Yaw (parent has yaw rotation, controller world orientation matches world request).
 - TEST-03: Composite rotation (composite parent yaw/pitch/roll + composite target yaw/pitch/roll).
 - TEST-04: World rotation composition order (proper 3D rotation math, no Euler subtraction, foot_rotation_deg=None level neutral).
-- TEST-05: Unlock world matrix preservation (FootIK location/rotation and KneePole location preserved, parentless).
+- TEST-05: Unlock world matrix preservation (FootIK location/rotation/scale and KneePole location/rotation/scale preserved, parentless).
 - TEST-06: Bilateral lifecycle (setup -> lock -> unlock -> normal IK target -> reset preserves parentless invariant).
 - TEST-07: Legacy compatibility default call (unlock_foot_contact without reparent_to_root defaults to parentless).
-- TEST-08: Explicit illegal request (reparent_to_root=True raises ValueError and prevents reparenting).
-- TEST-09: Failure atomicity (Phase A failure leaves FootIK, KneePole, and armature pose pristine).
+- TEST-08: Explicit illegal request (reparent_to_root=True raises ValueError, preserves transforms, and prevents reparenting).
+- TEST-09: Failure atomicity (Phase A failure leaves FootIK, KneePole, and armature pose pristine across all 16 matrix elements).
 - TEST-10: Bilateral symmetry & independence (Left and Right controllers operate without mutual contamination).
+- TEST-11: Combination of non-zero parent rotation and non-identity matrix_parent_inverse.
+- TEST-12: Parent uniform scale achieves requested rotation, and non-uniform scale shear boundary is detected.
+- TEST-13: Unlock handles legacy parented controllers with non-unit scale and non-zero rotation faithfully.
 """
 
 from __future__ import annotations
@@ -54,6 +57,11 @@ def _quat_angle_diff(q1: Quaternion, q2: Quaternion) -> float:
     q2_n = q2.normalized()
     diff = q1_n.rotation_difference(q2_n)
     return float(diff.angle)
+
+
+def _max_mat_diff(m1: Matrix, m2: Matrix) -> float:
+    """Return maximum absolute difference across all 16 elements of two 4x4 matrices."""
+    return max(abs(m1[r][c] - m2[r][c]) for r in range(4) for c in range(4))
 
 
 class TestLegIKWorldRotationContract(unittest.TestCase):
@@ -119,10 +127,14 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
 
         for side in ("L", "R"):
             ik_obj = bpy.data.objects[IK_TARGET_NAMES[side]]
-            # Temporarily attach to test parent
+            # Attach to test parent with identity parent inverse to ensure parent transform actively applies
             ik_obj.parent = parent_empty
-            ik_obj.matrix_parent_inverse = parent_empty.matrix_world.inverted()
+            ik_obj.matrix_parent_inverse = Matrix.Identity(4)
             bpy.context.view_layer.update()
+
+            eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+            eff_angle = _quat_angle_diff(eff_parent.to_quaternion(), Quaternion((1.0, 0.0, 0.0, 0.0)))
+            self.assertGreater(eff_angle, 0.1, "Effective parent rotation must be non-zero")
 
             target_pos = (
                 -HIP_X_OFFSET if side == "L" else HIP_X_OFFSET,
@@ -172,8 +184,18 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         for side in ("L", "R"):
             ik_obj = bpy.data.objects[IK_TARGET_NAMES[side]]
             ik_obj.parent = parent_empty
-            ik_obj.matrix_parent_inverse = parent_empty.matrix_world.inverted()
+            ik_obj.matrix_parent_inverse = Matrix.Identity(4)
             bpy.context.view_layer.update()
+
+            # Verify parent rotation has non-zero yaw, pitch, roll
+            parent_rot_euler = parent_empty.rotation_euler
+            self.assertGreater(abs(parent_rot_euler.x), 0.1)
+            self.assertGreater(abs(parent_rot_euler.y), 0.1)
+            self.assertGreater(abs(parent_rot_euler.z), 0.1)
+
+            eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+            eff_angle = _quat_angle_diff(eff_parent.to_quaternion(), Quaternion((1.0, 0.0, 0.0, 0.0)))
+            self.assertGreater(eff_angle, 0.1, "Effective parent rotation must be non-zero")
 
             target_pos = (
                 -HIP_X_OFFSET if side == "L" else HIP_X_OFFSET,
@@ -223,8 +245,12 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
 
         ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
         ik_obj.parent = parent_empty
-        ik_obj.matrix_parent_inverse = parent_empty.matrix_world.inverted()
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
         bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        eff_angle = _quat_angle_diff(eff_parent.to_quaternion(), Quaternion((1.0, 0.0, 0.0, 0.0)))
+        self.assertGreater(eff_angle, 0.1, "Effective parent rotation must be non-zero")
 
         # Part A: With non-zero target rotation
         target_rot_deg = (15.0, -30.0, 20.0)
@@ -280,7 +306,7 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         bpy.data.objects.remove(parent_empty)
 
     def test_05_unlock_world_matrix_preservation(self) -> None:
-        """TEST-05: Unlock preserves world position and orientation of FootIK and KneePole without jump."""
+        """TEST-05: Unlock preserves world position, orientation, scale, and full 4x4 matrix without jump."""
         for side in ("L", "R"):
             contact_xyz = (-HIP_X_OFFSET if side == "L" else HIP_X_OFFSET, -7.90, 0.0)
             target_rot_deg = (5.0, -8.0, 12.0)
@@ -312,30 +338,27 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
             unlocked_ik_mat = ik_obj.matrix_world.copy()
             unlocked_pole_mat = pole_obj.matrix_world.copy()
 
+            # Check 4x4 matrix max element diff
+            ik_mat_diff = _max_mat_diff(locked_ik_mat, unlocked_ik_mat)
+            pole_mat_diff = _max_mat_diff(locked_pole_mat, unlocked_pole_mat)
+            self.assertLess(ik_mat_diff, 1e-5, f"Side {side}: FootIK 4x4 matrix error {ik_mat_diff:.6e} exceeds 1e-5")
+            self.assertLess(pole_mat_diff, 1e-5, f"Side {side}: KneePole 4x4 matrix error {pole_mat_diff:.6e} exceeds 1e-5")
+
             # Check positions
             ik_loc_jump = (unlocked_ik_mat.translation - locked_ik_mat.translation).length
             pole_loc_jump = (unlocked_pole_mat.translation - locked_pole_mat.translation).length
-
-            self.assertLess(
-                ik_loc_jump,
-                1e-5,
-                f"Side {side}: FootIK world position jumped on unlock by {ik_loc_jump:.6f}m",
-            )
-            self.assertLess(
-                pole_loc_jump,
-                1e-5,
-                f"Side {side}: KneePole world position jumped on unlock by {pole_loc_jump:.6f}m",
-            )
+            self.assertLess(ik_loc_jump, 1e-5, f"Side {side}: FootIK world position jumped by {ik_loc_jump:.6f}m")
+            self.assertLess(pole_loc_jump, 1e-5, f"Side {side}: KneePole world position jumped by {pole_loc_jump:.6f}m")
 
             # Check rotations
-            ik_rot_diff = _quat_angle_diff(
-                locked_ik_mat.to_quaternion(), unlocked_ik_mat.to_quaternion()
-            )
-            self.assertLess(
-                ik_rot_diff,
-                1e-4,
-                f"Side {side}: FootIK world orientation jumped on unlock by {math.degrees(ik_rot_diff):.4f} deg",
-            )
+            ik_rot_diff = _quat_angle_diff(locked_ik_mat.to_quaternion(), unlocked_ik_mat.to_quaternion())
+            self.assertLess(ik_rot_diff, 1e-4, f"Side {side}: FootIK world orientation jumped by {math.degrees(ik_rot_diff):.4f} deg")
+
+            # Check scale
+            ik_scale_diff = (unlocked_ik_mat.to_scale() - locked_ik_mat.to_scale()).length
+            pole_scale_diff = (unlocked_pole_mat.to_scale() - locked_pole_mat.to_scale()).length
+            self.assertLess(ik_scale_diff, 1e-5, f"Side {side}: FootIK scale jumped by {ik_scale_diff:.6e}")
+            self.assertLess(pole_scale_diff, 1e-5, f"Side {side}: KneePole scale jumped by {pole_scale_diff:.6e}")
 
             # Check architectural invariants
             self.assertIsNone(ik_obj.parent, f"{ik_obj.name} must remain parentless after unlock")
@@ -401,12 +424,15 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         self.assertFalse(ik_obj.get("is_locked", False))
 
     def test_08_explicit_illegal_request(self) -> None:
-        """TEST-08: Explicitly passing reparent_to_root=True must raise ValueError and not reparent."""
+        """TEST-08: Explicitly passing reparent_to_root=True must raise ValueError, preserve transforms, and not reparent."""
         side = "R"
         ik_obj = bpy.data.objects[IK_TARGET_NAMES[side]]
         pole_obj = bpy.data.objects[POLE_TARGET_NAMES[side]]
 
         lock_foot_contact(self.armature, side, contact_world_xyz=(HIP_X_OFFSET, -8.0, 0.0))
+
+        locked_ik_mat = ik_obj.matrix_world.copy()
+        locked_pole_mat = pole_obj.matrix_world.copy()
 
         with self.assertRaises(ValueError) as ctx:
             unlock_foot_contact(self.armature, side, reparent_to_root=True)
@@ -414,18 +440,32 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         self.assertIn("reparent_to_root=True is forbidden", str(ctx.exception))
         self.assertIsNone(ik_obj.parent, "Must not have reparented on illegal request")
         self.assertIsNone(pole_obj.parent, "Must not have reparented on illegal request")
+        self.assertTrue(ik_obj.get("is_locked", False), "Lock state must remain True on illegal request")
+        self.assertLess(_max_mat_diff(ik_obj.matrix_world, locked_ik_mat), 1e-6)
+        self.assertLess(_max_mat_diff(pole_obj.matrix_world, locked_pole_mat), 1e-6)
 
     def test_09_failure_atomicity(self) -> None:
-        """TEST-09: Phase A failure preserves FootIK, KneePole, and armature pose pristine."""
+        """TEST-09: Phase A failure preserves FootIK, KneePole, and armature pose pristine across all 16 matrix elements."""
         side = "L"
         ik_obj = bpy.data.objects[IK_TARGET_NAMES[side]]
         pole_obj = bpy.data.objects[POLE_TARGET_NAMES[side]]
         p_thigh = self.armature.pose.bones["thigh.L"]
+        p_shin = self.armature.pose.bones["shin.L"]
+        p_foot = self.armature.pose.bones["foot.L"]
 
         # Initial pristine state
         init_ik_mat = ik_obj.matrix_world.copy()
         init_pole_mat = pole_obj.matrix_world.copy()
         init_thigh_mat = p_thigh.matrix.copy()
+        init_shin_mat = p_shin.matrix.copy()
+        init_foot_mat = p_foot.matrix.copy()
+
+        def _assert_state_pristine(case_label: str) -> None:
+            self.assertLess(_max_mat_diff(ik_obj.matrix_world, init_ik_mat), 1e-6, f"{case_label}: FootIK matrix modified")
+            self.assertLess(_max_mat_diff(pole_obj.matrix_world, init_pole_mat), 1e-6, f"{case_label}: KneePole matrix modified")
+            self.assertLess(_max_mat_diff(p_thigh.matrix, init_thigh_mat), 1e-6, f"{case_label}: thigh.L matrix modified")
+            self.assertLess(_max_mat_diff(p_shin.matrix, init_shin_mat), 1e-6, f"{case_label}: shin.L matrix modified")
+            self.assertLess(_max_mat_diff(p_foot.matrix, init_foot_mat), 1e-6, f"{case_label}: foot.L matrix modified")
 
         # Failure Case 1: Non-finite rotation input
         with self.assertRaises(ValueError):
@@ -436,11 +476,7 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
                 foot_rotation_deg=(float("nan"), 0.0, 0.0),
             )
         bpy.context.view_layer.update()
-
-        self.assertLess((ik_obj.matrix_world.translation - init_ik_mat.translation).length, 1e-6)
-        self.assertLess(_quat_angle_diff(ik_obj.matrix_world.to_quaternion(), init_ik_mat.to_quaternion()), 1e-6)
-        self.assertLess((pole_obj.matrix_world.translation - init_pole_mat.translation).length, 1e-6)
-        self.assertLess((p_thigh.matrix.translation - init_thigh_mat.translation).length, 1e-6)
+        _assert_state_pristine("Case 1 (NaN rotation)")
 
         # Failure Case 2: Invalid rotation type
         with self.assertRaises(TypeError):
@@ -451,9 +487,7 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
                 foot_rotation_deg="invalid",
             )
         bpy.context.view_layer.update()
-
-        self.assertLess((ik_obj.matrix_world.translation - init_ik_mat.translation).length, 1e-6)
-        self.assertLess(_quat_angle_diff(ik_obj.matrix_world.to_quaternion(), init_ik_mat.to_quaternion()), 1e-6)
+        _assert_state_pristine("Case 2 (Invalid type)")
 
         # Failure Case 3: Non-finite world_xyz
         with self.assertRaises(ValueError):
@@ -464,9 +498,7 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
                 foot_rotation_deg=(0.0, 0.0, 0.0),
             )
         bpy.context.view_layer.update()
-
-        self.assertLess((ik_obj.matrix_world.translation - init_ik_mat.translation).length, 1e-6)
-        self.assertLess(_quat_angle_diff(ik_obj.matrix_world.to_quaternion(), init_ik_mat.to_quaternion()), 1e-6)
+        _assert_state_pristine("Case 3 (Inf position)")
 
     def test_10_bilateral_symmetry_and_independence(self) -> None:
         """TEST-10: Left and Right controllers operate independently without mutual cross-talk."""
@@ -528,6 +560,159 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         self.assertIsNone(ik_r.parent)
         self.assertIsNone(pole_l.parent)
         self.assertIsNone(pole_r.parent)
+
+    def test_11_nonzero_parent_inverse_combination(self) -> None:
+        """TEST-11: Combination of non-zero parent rotation and non-identity matrix_parent_inverse."""
+        parent_empty = bpy.data.objects.new("TestParentCombo", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.2, -7.8, 0.1))
+        parent_empty.rotation_euler = Euler((0.0, 0.0, math.radians(45.0)), "XYZ")
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        # Non-identity matrix_parent_inverse (e.g. -10 deg Z rotation)
+        ik_obj.matrix_parent_inverse = Euler((0.0, 0.0, math.radians(-10.0)), "XYZ").to_matrix().to_4x4()
+        bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        eff_angle = _quat_angle_diff(eff_parent.to_quaternion(), Quaternion((1.0, 0.0, 0.0, 0.0)))
+        parent_angle = _quat_angle_diff(parent_empty.matrix_world.to_quaternion(), Quaternion((1.0, 0.0, 0.0, 0.0)))
+        self.assertGreater(eff_angle, 0.1, "Effective parent rotation must be non-zero")
+        self.assertGreater(abs(eff_angle - parent_angle), 0.05, "Effective parent must differ from parent alone")
+
+        req_rot_deg = (15.0, -20.0, 30.0)
+        set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, -7.85, 0.18),
+            foot_rotation_deg=req_rot_deg,
+            clamp_ground=False,
+            clamp_reach=False,
+        )
+        bpy.context.view_layer.update()
+
+        expected_world_rot = Euler((math.radians(v) for v in req_rot_deg), "XYZ").to_quaternion()
+        actual_world_rot = ik_obj.matrix_world.to_quaternion()
+        diff_rad = _quat_angle_diff(expected_world_rot, actual_world_rot)
+        self.assertLess(diff_rad, 1e-4, f"Combo world rotation error {math.degrees(diff_rad):.4f} deg exceeds tolerance")
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    def test_12_parent_scale_and_shear_boundary(self) -> None:
+        """TEST-12: Parent uniform scale achieves requested rotation, and non-uniform scale shear boundary is detected."""
+        parent_empty = bpy.data.objects.new("TestParentScale", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.0, -8.0, 0.0))
+        # Part A: Uniform scale (e.g. 1.8) with non-zero rotation
+        parent_empty.rotation_euler = Euler((math.radians(20.0), math.radians(-15.0), math.radians(35.0)), "XYZ")
+        parent_empty.scale = Vector((1.8, 1.8, 1.8))
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.view_layer.update()
+
+        req_rot_deg = (10.0, 20.0, -15.0)
+        set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, -7.85, 0.18),
+            foot_rotation_deg=req_rot_deg,
+            clamp_ground=False,
+            clamp_reach=False,
+        )
+        bpy.context.view_layer.update()
+
+        expected_world_rot = Euler((math.radians(v) for v in req_rot_deg), "XYZ").to_quaternion()
+        actual_world_rot = ik_obj.matrix_world.to_quaternion()
+        diff_rad = _quat_angle_diff(expected_world_rot, actual_world_rot)
+        self.assertLess(diff_rad, 1e-4, f"Uniform parent scale world rotation error {math.degrees(diff_rad):.4f} deg exceeds tolerance")
+
+        # Part B: Non-uniform scale produces shear in child frame: R_p @ S_p @ R_c has non-orthogonal columns
+        parent_empty.scale = Vector((1.5, 2.0, 0.8))
+        bpy.context.view_layer.update()
+        ik_obj.rotation_euler = Euler((math.radians(10.0), math.radians(20.0), math.radians(-15.0)), "XYZ")
+        bpy.context.view_layer.update()
+        loc, rot_q, sc = ik_obj.matrix_world.decompose()
+        reconstructed = Matrix.LocRotScale(loc, rot_q, sc)
+        shear_err = _max_mat_diff(ik_obj.matrix_world, reconstructed)
+        self.assertGreater(shear_err, 0.01, "Non-uniform parent scale must induce non-TRS shear in matrix_world")
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    def test_13_legacy_parented_controller_unlock_preservation(self) -> None:
+        """TEST-13: Unlock handles legacy parented controllers with non-unit scale and non-zero rotation faithfully."""
+        parent_empty = bpy.data.objects.new("LegacyParent", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((1.0, -8.0, 0.5))
+        parent_empty.rotation_euler = Euler((math.radians(15.0), math.radians(20.0), math.radians(-30.0)), "XYZ")
+        bpy.context.view_layer.update()
+
+        for side in ("L", "R"):
+            ik_obj = bpy.data.objects[IK_TARGET_NAMES[side]]
+            pole_obj = bpy.data.objects[POLE_TARGET_NAMES[side]]
+
+            # Manually simulate legacy parented state with non-unit scale and local rotation
+            ik_obj.parent = parent_empty
+            ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+            ik_obj.location = Vector((-HIP_X_OFFSET if side == "L" else HIP_X_OFFSET, 0.1, 0.07))
+            ik_obj.rotation_euler = Euler((math.radians(5.0), math.radians(-10.0), math.radians(15.0)), "XYZ")
+            ik_obj.scale = Vector((1.2, 1.2, 1.2))
+            ik_obj["is_locked"] = True
+
+            pole_obj.parent = parent_empty
+            pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+            pole_obj.location = Vector((-HIP_X_OFFSET if side == "L" else HIP_X_OFFSET, 0.3, 0.5))
+            pole_obj.rotation_euler = Euler((math.radians(-8.0), math.radians(12.0), math.radians(0.0)), "XYZ")
+            pole_obj.scale = Vector((0.9, 0.9, 0.9))
+            bpy.context.view_layer.update()
+
+            # Confirm parent transformation was actively contributing
+            self.assertGreater((ik_obj.matrix_world.translation - ik_obj.location).length, 0.1)
+
+            # Record pre-unlock world matrices
+            pre_ik_mat = ik_obj.matrix_world.copy()
+            pre_pole_mat = pole_obj.matrix_world.copy()
+
+            # Unlock
+            res = unlock_foot_contact(self.armature, side)
+            bpy.context.view_layer.update()
+
+            # Assertions specified in Section 3.4
+            self.assertIsNone(ik_obj.parent, f"{ik_obj.name} must be parentless after unlock")
+            self.assertIsNone(pole_obj.parent, f"{pole_obj.name} must be parentless after unlock")
+            self.assertEqual(ik_obj.matrix_parent_inverse, Matrix.Identity(4))
+            self.assertEqual(pole_obj.matrix_parent_inverse, Matrix.Identity(4))
+
+            # Full 4x4 matrix max element diff < 1e-5
+            self.assertLess(_max_mat_diff(pre_ik_mat, ik_obj.matrix_world), 1e-5)
+            self.assertLess(_max_mat_diff(pre_pole_mat, pole_obj.matrix_world), 1e-5)
+
+            # Position diff < 1e-5 m
+            self.assertLess((pre_ik_mat.translation - ik_obj.matrix_world.translation).length, 1e-5)
+            self.assertLess((pre_pole_mat.translation - pole_obj.matrix_world.translation).length, 1e-5)
+
+            # Rotation diff < 1e-4 rad
+            self.assertLess(_quat_angle_diff(pre_ik_mat.to_quaternion(), ik_obj.matrix_world.to_quaternion()), 1e-4)
+            self.assertLess(_quat_angle_diff(pre_pole_mat.to_quaternion(), pole_obj.matrix_world.to_quaternion()), 1e-4)
+
+            # Scale diff < 1e-5
+            self.assertLess((pre_ik_mat.to_scale() - ik_obj.matrix_world.to_scale()).length, 1e-5)
+            self.assertLess((pre_pole_mat.to_scale() - pole_obj.matrix_world.to_scale()).length, 1e-5)
+
+            # Lock status False
+            self.assertFalse(ik_obj.get("is_locked", False))
+            self.assertFalse(res["is_locked"])
+
+        bpy.data.objects.remove(parent_empty)
 
 
 if __name__ == "__main__":

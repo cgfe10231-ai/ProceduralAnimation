@@ -174,21 +174,57 @@ def unlock_foot_contact(
     current_ik_world_mat = ik_obj.matrix_world.copy()
     current_pole_world_mat = pole_obj.matrix_world.copy()
 
+    # Pre-validation: ensure all 16 elements are finite numbers
+    for name, mat in [("ik_obj", current_ik_world_mat), ("pole_obj", current_pole_world_mat)]:
+        for r in range(4):
+            for c in range(4):
+                val = mat[r][c]
+                if math.isnan(val) or math.isinf(val):
+                    raise ValueError(f"{name} matrix_world element ({r}, {c}) is not finite: {val}")
+
+    # Validate TRS representability (check for non-orthogonal shear)
+    ik_loc, ik_rot_quat, ik_scale = current_ik_world_mat.decompose()
+    ik_reconstructed = Matrix.LocRotScale(ik_loc, ik_rot_quat, ik_scale)
+    max_ik_shear = max(abs(current_ik_world_mat[r][c] - ik_reconstructed[r][c]) for r in range(4) for c in range(4))
+    if max_ik_shear > 1e-4:
+        raise RuntimeError(
+            f"ik_obj world matrix contains non-TRS shear (diff={max_ik_shear:.6f}) which cannot be faithfully represented by a parentless Blender object"
+        )
+
+    pole_loc, pole_rot_quat, pole_scale = current_pole_world_mat.decompose()
+    pole_reconstructed = Matrix.LocRotScale(pole_loc, pole_rot_quat, pole_scale)
+    max_pole_shear = max(abs(current_pole_world_mat[r][c] - pole_reconstructed[r][c]) for r in range(4) for c in range(4))
+    if max_pole_shear > 1e-4:
+        raise RuntimeError(
+            f"pole_obj world matrix contains non-TRS shear (diff={max_pole_shear:.6f}) which cannot be faithfully represented by a parentless Blender object"
+        )
+
     ik_obj["is_locked"] = False
 
-    # Ensure parentless in world space with identity parent inverse
+    # Ensure parentless in world space with identity parent inverse and full TRS restoration
     ik_obj.parent = None
     ik_obj.matrix_parent_inverse = Matrix.Identity(4)
-    loc, rot_quat, _ = current_ik_world_mat.decompose()
-    ik_obj.location = loc
-    ik_obj.rotation_euler = rot_quat.to_euler("XYZ")
+    ik_obj.location = ik_loc
+    ik_obj.rotation_euler = ik_rot_quat.to_euler("XYZ")
+    ik_obj.scale = ik_scale
 
     pole_obj.parent = None
     pole_obj.matrix_parent_inverse = Matrix.Identity(4)
-    pole_loc, _, _ = current_pole_world_mat.decompose()
     pole_obj.location = pole_loc
+    pole_obj.rotation_euler = pole_rot_quat.to_euler("XYZ")
+    pole_obj.scale = pole_scale
 
     bpy.context.view_layer.update()
+
+    # Post-validation: ensure restored matrix_world matches original within 1e-4
+    post_ik_diff = max(abs(ik_obj.matrix_world[r][c] - current_ik_world_mat[r][c]) for r in range(4) for c in range(4))
+    if post_ik_diff > 1e-4:
+        raise RuntimeError(f"unlock_foot_contact failed post-validation: ik_obj matrix_world drifted by {post_ik_diff:.6f}")
+
+    post_pole_diff = max(abs(pole_obj.matrix_world[r][c] - current_pole_world_mat[r][c]) for r in range(4) for c in range(4))
+    if post_pole_diff > 1e-4:
+        raise RuntimeError(f"unlock_foot_contact failed post-validation: pole_obj matrix_world drifted by {post_pole_diff:.6f}")
+
     return get_foot_support_state(arm, side)
 
 
