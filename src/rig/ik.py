@@ -15,7 +15,7 @@ Builds on the existing 19-bone CharacterArmature and 13 rigidly-bound body parts
 """
 
 import math
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import bpy
 from mathutils import Euler, Matrix, Vector
@@ -319,6 +319,194 @@ def get_leg_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dic
     }
 
 
+_LEG_BONES_6: Tuple[str, ...] = (
+    "thigh.L", "thigh.R",
+    "shin.L", "shin.R",
+    "foot.L", "foot.R",
+)
+_LEG_CTRLS_4: Tuple[str, ...] = (
+    "FootIK.L", "FootIK.R",
+    "KneePole.L", "KneePole.R",
+)
+
+
+def _validate_effective_parent_transform(eff_mat: Matrix, target_name: str) -> None:
+    """Validate that the effective parent transform lies within the supported domain.
+
+    The supported domain consists strictly of pure 3D rotations and positive uniform
+    scales combined with rotations. Non-affine matrices, non-finite elements,
+    singular matrices (det <= 1e-7), reflection matrices, non-uniform scaling,
+    and shearing are unsupported and rejected in Phase A before any scene mutation occurs.
+    """
+    for r in range(4):
+        for c in range(4):
+            if not math.isfinite(eff_mat[r][c]):
+                raise ValueError(
+                    f"Phase A effective parent transform validation failed for '{target_name}': "
+                    f"non-finite matrix element at ({r}, {c}). "
+                    f"The interface requires pure rotation or positive uniform scale with rotation."
+                )
+
+    if (
+        abs(eff_mat[3][0]) > 1e-6
+        or abs(eff_mat[3][1]) > 1e-6
+        or abs(eff_mat[3][2]) > 1e-6
+        or abs(eff_mat[3][3] - 1.0) > 1e-6
+    ):
+        raise ValueError(
+            f"Phase A effective parent transform validation failed for '{target_name}': "
+            f"non-affine matrix with bottom row {tuple(eff_mat[3])}. "
+            f"The interface requires pure rotation or positive uniform scale with rotation."
+        )
+
+    a_mat = Matrix((
+        (eff_mat[0][0], eff_mat[0][1], eff_mat[0][2]),
+        (eff_mat[1][0], eff_mat[1][1], eff_mat[1][2]),
+        (eff_mat[2][0], eff_mat[2][1], eff_mat[2][2]),
+    ))
+    det_a = a_mat.determinant()
+    if det_a <= 1e-7:
+        raise ValueError(
+            f"Phase A effective parent transform validation failed for '{target_name}': "
+            f"non-positive or singular determinant det(A)={det_a:.6e}. "
+            f"Singular transforms and reflections are unsupported; "
+            f"the interface requires pure rotation or positive uniform scale with rotation."
+        )
+
+    g_mat = a_mat.transposed() @ a_mat
+    s_sq = (g_mat[0][0] + g_mat[1][1] + g_mat[2][2]) / 3.0
+    if s_sq <= 1e-7:
+        raise ValueError(
+            f"Phase A effective parent transform validation failed for '{target_name}': "
+            f"degenerate scale s^2={s_sq:.6e}."
+        )
+
+    max_rel_dev = 0.0
+    for r in range(3):
+        for c in range(3):
+            target_val = s_sq if r == c else 0.0
+            dev = abs(g_mat[r][c] - target_val) / s_sq
+            if dev > max_rel_dev:
+                max_rel_dev = dev
+
+    if max_rel_dev > 1e-4:
+        raise ValueError(
+            f"Phase A effective parent transform validation failed for '{target_name}': "
+            f"non-conformal transform with relative deviation {max_rel_dev:.6e} > 1e-4. "
+            f"Non-uniform scale and shear are unsupported; "
+            f"the interface requires pure rotation or positive uniform scale with rotation."
+        )
+
+
+def _snapshot_leg_rig_state(arm: bpy.types.Object) -> Tuple[Dict[str, dict], Dict[str, dict]]:
+    """Capture full pre-commit state of the 4 leg controllers and 6 leg pose bones."""
+    ctrl_snap: Dict[str, dict] = {}
+    for name in _LEG_CTRLS_4:
+        obj = bpy.data.objects.get(name)
+        if obj is not None:
+            ctrl_snap[name] = {
+                "parent": obj.parent,
+                "matrix_parent_inverse": obj.matrix_parent_inverse.copy(),
+                "location": obj.location.copy(),
+                "rotation_mode": obj.rotation_mode,
+                "rotation_euler": obj.rotation_euler.copy(),
+                "rotation_quaternion": obj.rotation_quaternion.copy(),
+                "rotation_axis_angle": tuple(obj.rotation_axis_angle),
+                "scale": obj.scale.copy(),
+                "delta_location": obj.delta_location.copy(),
+                "delta_rotation_euler": obj.delta_rotation_euler.copy(),
+                "delta_rotation_quaternion": obj.delta_rotation_quaternion.copy(),
+                "delta_scale": obj.delta_scale.copy(),
+                "has_is_locked": "is_locked" in obj,
+                "is_locked": obj.get("is_locked"),
+                "matrix_world": obj.matrix_world.copy(),
+            }
+
+    bone_snap: Dict[str, dict] = {}
+    for name in _LEG_BONES_6:
+        p_bone = arm.pose.bones.get(name)
+        if p_bone is not None:
+            bone_snap[name] = {
+                "rotation_mode": p_bone.rotation_mode,
+                "location": p_bone.location.copy(),
+                "rotation_euler": p_bone.rotation_euler.copy(),
+                "rotation_quaternion": p_bone.rotation_quaternion.copy(),
+                "rotation_axis_angle": tuple(p_bone.rotation_axis_angle),
+                "scale": p_bone.scale.copy(),
+                "matrix_basis": p_bone.matrix_basis.copy(),
+                "matrix": p_bone.matrix.copy(),
+            }
+
+    return ctrl_snap, bone_snap
+
+
+def _rollback_leg_rig_state(
+    arm: bpy.types.Object,
+    ctrl_snap: Dict[str, dict],
+    bone_snap: Dict[str, dict],
+    primary_exc: Exception,
+) -> None:
+    """Restore rig state from snapshot and verify atomicity. Re-raises or raises RuntimeError."""
+    try:
+        # Restore pose bones
+        for name, snap in bone_snap.items():
+            p_bone = arm.pose.bones.get(name)
+            if p_bone is not None:
+                p_bone.rotation_mode = snap["rotation_mode"]
+                p_bone.location = snap["location"].copy()
+                p_bone.rotation_euler = snap["rotation_euler"].copy()
+                p_bone.rotation_quaternion = snap["rotation_quaternion"].copy()
+                p_bone.rotation_axis_angle = snap["rotation_axis_angle"]
+                p_bone.scale = snap["scale"].copy()
+                p_bone.matrix_basis = snap["matrix_basis"].copy()
+
+        # Restore controllers
+        for name, snap in ctrl_snap.items():
+            obj = bpy.data.objects.get(name)
+            if obj is not None:
+                obj.parent = snap["parent"]
+                obj.matrix_parent_inverse = snap["matrix_parent_inverse"].copy()
+                obj.rotation_mode = snap["rotation_mode"]
+                obj.location = snap["location"].copy()
+                obj.rotation_euler = snap["rotation_euler"].copy()
+                obj.rotation_quaternion = snap["rotation_quaternion"].copy()
+                obj.rotation_axis_angle = snap["rotation_axis_angle"]
+                obj.scale = snap["scale"].copy()
+                obj.delta_location = snap["delta_location"].copy()
+                obj.delta_rotation_euler = snap["delta_rotation_euler"].copy()
+                obj.delta_rotation_quaternion = snap["delta_rotation_quaternion"].copy()
+                obj.delta_scale = snap["delta_scale"].copy()
+                if snap["has_is_locked"]:
+                    obj["is_locked"] = snap["is_locked"]
+                elif "is_locked" in obj:
+                    del obj["is_locked"]
+
+        bpy.context.view_layer.update()
+
+        # Verify restored state
+        for name, snap in ctrl_snap.items():
+            obj = bpy.data.objects.get(name)
+            if obj is not None:
+                diff = max(abs(obj.matrix_world[r][c] - snap["matrix_world"][r][c]) for r in range(4) for c in range(4))
+                if diff > 1e-4:
+                    raise RuntimeError(f"Controller '{name}' rollback verification failed with matrix diff {diff:.6e} > 1e-4")
+
+        for name, snap in bone_snap.items():
+            p_bone = arm.pose.bones.get(name)
+            if p_bone is not None:
+                diff = max(abs(p_bone.matrix[r][c] - snap["matrix"][r][c]) for r in range(4) for c in range(4))
+                if diff > 1e-4:
+                    raise RuntimeError(f"Pose bone '{name}' rollback verification failed with matrix diff {diff:.6e} > 1e-4")
+
+    except Exception as rollback_exc:
+        raise RuntimeError(
+            f"ROLLBACK FAILURE: failed to restore rig state after Phase B error: {primary_exc}; "
+            f"rollback exception: {rollback_exc}"
+        ) from primary_exc
+
+    raise primary_exc
+
+
 def set_foot_ik_target(
     armature_obj: Optional[bpy.types.Object],
     side: str,
@@ -383,6 +571,14 @@ def set_foot_ik_target(
             f"Foot '{side}' is currently locked in ground support state; "
             f"call unlock_foot_contact(arm, '{side}') before setting a new IK target."
         )
+
+    # Phase A: Validate effective parent transform domains before any scene mutation
+    if ik_obj.parent is not None:
+        eff_parent_mat = ik_obj.parent.matrix_world @ ik_obj.matrix_parent_inverse
+        _validate_effective_parent_transform(eff_parent_mat, ik_obj.name)
+    if pole_obj.parent is not None:
+        eff_pole_parent = pole_obj.parent.matrix_world @ pole_obj.matrix_parent_inverse
+        _validate_effective_parent_transform(eff_pole_parent, pole_obj.name)
 
     # Synchronize scene graph to evaluate CharacterRoot and armature pose bone transforms
     bpy.context.view_layer.update()
@@ -659,27 +855,33 @@ def set_foot_ik_target(
     # =========================================================================
     # Phase B: Commit
     # =========================================================================
-    # Apply prebend hint and write targets only after successful feasibility check and clamping
-    _apply_ik_prebend_hint(arm)
+    # Snapshot complete rig state across all 4 controllers and 6 leg pose bones
+    ctrl_snap, bone_snap = _snapshot_leg_rig_state(arm)
 
-    # Convert applied world position to ik_obj parent space
-    if ik_obj.parent is not None:
-        eff_parent_mat = ik_obj.parent.matrix_world @ ik_obj.matrix_parent_inverse
-        ik_obj.location = eff_parent_mat.inverted() @ applied
-    else:
-        ik_obj.location = applied
+    try:
+        # Apply prebend hint and write targets only after successful feasibility check and clamping
+        _apply_ik_prebend_hint(arm)
 
-    ik_obj.rotation_euler = target_local_euler
+        # Convert applied world position to ik_obj parent space
+        if ik_obj.parent is not None:
+            eff_parent_mat = ik_obj.parent.matrix_world @ ik_obj.matrix_parent_inverse
+            ik_obj.location = eff_parent_mat.inverted() @ applied
+        else:
+            ik_obj.location = applied
 
-    if pole_obj.parent is not None:
-        eff_pole_parent = pole_obj.parent.matrix_world @ pole_obj.matrix_parent_inverse
-        pole_obj.location = eff_pole_parent.inverted() @ pole_world
-    else:
-        pole_obj.location = pole_world
+        ik_obj.rotation_euler = target_local_euler
 
-    bpy.context.view_layer.update()
+        if pole_obj.parent is not None:
+            eff_pole_parent = pole_obj.parent.matrix_world @ pole_obj.matrix_parent_inverse
+            pole_obj.location = eff_pole_parent.inverted() @ pole_world
+        else:
+            pole_obj.location = pole_world
 
-    state = get_leg_ik_state(arm, side)
+        bpy.context.view_layer.update()
+
+        state = get_leg_ik_state(arm, side)
+    except Exception as primary_exc:
+        _rollback_leg_rig_state(arm, ctrl_snap, bone_snap, primary_exc)
     state["requested_world"] = requested
     state["applied_world"] = applied
     state["clamped_reach"] = clamped_reach

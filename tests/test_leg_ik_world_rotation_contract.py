@@ -12,8 +12,12 @@ Validates Lower-Limb IK World Rotation Contract and Controller Lifecycle Closure
 - TEST-09: Failure atomicity (Phase A failure leaves FootIK, KneePole, and armature pose pristine across all 16 matrix elements).
 - TEST-10: Bilateral symmetry & independence (Left and Right controllers operate without mutual contamination).
 - TEST-11: Combination of non-zero parent rotation and non-identity matrix_parent_inverse.
-- TEST-12: Parent uniform scale achieves requested rotation, and non-uniform scale shear boundary is detected.
+- TEST-12: Parent uniform scale achieves requested rotation, and non-uniform scale shear boundary is detected and rejected.
 - TEST-13: Unlock handles legacy parented controllers with non-unit scale and non-zero rotation faithfully.
+- TEST-14: Shear parent transform rejection (effective parent transform with shear is rejected in Phase A with full failure atomicity).
+- TEST-15: Singular parent transform rejection (det <= 1e-7 is rejected in Phase A with full failure atomicity).
+- TEST-16: Reflection parent transform rejection (det < 0 is rejected in Phase A with full failure atomicity).
+- TEST-17: Phase B transaction rollback fault injection (catches fault during Phase B, restores all 4 controllers and 6 bones atomically, and re-raises).
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ import math
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if repo_root not in sys.path:
@@ -62,6 +67,74 @@ def _quat_angle_diff(q1: Quaternion, q2: Quaternion) -> float:
 def _max_mat_diff(m1: Matrix, m2: Matrix) -> float:
     """Return maximum absolute difference across all 16 elements of two 4x4 matrices."""
     return max(abs(m1[r][c] - m2[r][c]) for r in range(4) for c in range(4))
+
+
+_LEG_BONES_6 = (
+    "thigh.L", "thigh.R",
+    "shin.L", "shin.R",
+    "foot.L", "foot.R",
+)
+_LEG_CTRLS_4 = (
+    "FootIK.L", "FootIK.R",
+    "KneePole.L", "KneePole.R",
+)
+
+
+def _capture_rig_state(armature: bpy.types.Object) -> dict:
+    """Capture full world and local transform state of all 4 controllers and 6 pose bones."""
+    state = {"ctrls": {}, "bones": {}}
+    for name in _LEG_CTRLS_4:
+        obj = bpy.data.objects.get(name)
+        if obj is not None:
+            state["ctrls"][name] = {
+                "matrix_world": obj.matrix_world.copy(),
+                "location": obj.location.copy(),
+                "rotation_mode": obj.rotation_mode,
+                "rotation_euler": obj.rotation_euler.copy(),
+                "rotation_quaternion": obj.rotation_quaternion.copy(),
+                "rotation_axis_angle": tuple(obj.rotation_axis_angle),
+                "scale": obj.scale.copy(),
+                "parent": obj.parent,
+                "matrix_parent_inverse": obj.matrix_parent_inverse.copy(),
+                "has_is_locked": "is_locked" in obj,
+                "is_locked": obj.get("is_locked"),
+            }
+    for name in _LEG_BONES_6:
+        p_bone = armature.pose.bones.get(name)
+        if p_bone is not None:
+            state["bones"][name] = {
+                "matrix": p_bone.matrix.copy(),
+                "matrix_basis": p_bone.matrix_basis.copy(),
+                "location": p_bone.location.copy(),
+                "rotation_mode": p_bone.rotation_mode,
+                "rotation_euler": p_bone.rotation_euler.copy(),
+                "rotation_quaternion": p_bone.rotation_quaternion.copy(),
+                "rotation_axis_angle": tuple(p_bone.rotation_axis_angle),
+                "scale": p_bone.scale.copy(),
+            }
+    return state
+
+
+def _assert_rig_state_identical(test_case: unittest.TestCase, saved_state: dict, tol: float = 1e-6) -> None:
+    """Assert all 4 controllers and 6 leg pose bones match the saved state within tol."""
+    for name, snap in saved_state["ctrls"].items():
+        obj = bpy.data.objects.get(name)
+        test_case.assertIsNotNone(obj, f"Controller '{name}' missing")
+        mat_diff = _max_mat_diff(obj.matrix_world, snap["matrix_world"])
+        test_case.assertLess(mat_diff, tol, f"Controller '{name}' matrix_world modified: diff {mat_diff:.6e} >= {tol}")
+        test_case.assertLess((obj.location - snap["location"]).length, tol, f"Controller '{name}' location modified")
+        test_case.assertLess((obj.scale - snap["scale"]).length, tol, f"Controller '{name}' scale modified")
+        test_case.assertIs(obj.parent, snap["parent"], f"Controller '{name}' parent modified")
+        test_case.assertEqual(obj.get("is_locked"), snap["is_locked"], f"Controller '{name}' is_locked modified")
+
+    armature = bpy.data.objects.get("CharacterArmature")
+    for name, snap in saved_state["bones"].items():
+        p_bone = armature.pose.bones.get(name)
+        test_case.assertIsNotNone(p_bone, f"Pose bone '{name}' missing")
+        mat_diff = _max_mat_diff(p_bone.matrix, snap["matrix"])
+        test_case.assertLess(mat_diff, tol, f"Pose bone '{name}' matrix modified: diff {mat_diff:.6e} >= {tol}")
+        test_case.assertLess((p_bone.location - snap["location"]).length, tol, f"Pose bone '{name}' location modified")
+        test_case.assertLess((p_bone.scale - snap["scale"]).length, tol, f"Pose bone '{name}' scale modified")
 
 
 class TestLegIKWorldRotationContract(unittest.TestCase):
@@ -633,15 +706,39 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         diff_rad = _quat_angle_diff(expected_world_rot, actual_world_rot)
         self.assertLess(diff_rad, 1e-4, f"Uniform parent scale world rotation error {math.degrees(diff_rad):.4f} deg exceeds tolerance")
 
-        # Part B: Non-uniform scale produces shear in child frame: R_p @ S_p @ R_c has non-orthogonal columns
+        # Part B: Non-uniform scale produces non-conformal transform:
+        # set_foot_ik_target must reject in Phase A and preserve pristine state atomically.
         parent_empty.scale = Vector((1.5, 2.0, 0.8))
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
         bpy.context.view_layer.update()
-        ik_obj.rotation_euler = Euler((math.radians(10.0), math.radians(20.0), math.radians(-15.0)), "XYZ")
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        a_mat = Matrix((
+            (eff_parent[0][0], eff_parent[0][1], eff_parent[0][2]),
+            (eff_parent[1][0], eff_parent[1][1], eff_parent[1][2]),
+            (eff_parent[2][0], eff_parent[2][1], eff_parent[2][2]),
+        ))
+        g_mat = a_mat.transposed() @ a_mat
+        s_sq = (g_mat[0][0] + g_mat[1][1] + g_mat[2][2]) / 3.0
+        max_rel_dev = max(abs(g_mat[r][c] - (s_sq if r == c else 0.0)) / s_sq for r in range(3) for c in range(3))
+        self.assertGreater(max_rel_dev, 1e-4, "Effective parent matrix must violate conformal condition")
+
+        saved_state = _capture_rig_state(self.armature)
+
+        with self.assertRaises(ValueError) as ctx:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, -7.85, 0.18),
+                foot_rotation_deg=(10.0, 20.0, -15.0),
+                clamp_ground=False,
+                clamp_reach=False,
+            )
+
+        self.assertIn("Phase A effective parent transform validation failed", str(ctx.exception))
+        self.assertIn("FootIK.L", str(ctx.exception))
         bpy.context.view_layer.update()
-        loc, rot_q, sc = ik_obj.matrix_world.decompose()
-        reconstructed = Matrix.LocRotScale(loc, rot_q, sc)
-        shear_err = _max_mat_diff(ik_obj.matrix_world, reconstructed)
-        self.assertGreater(shear_err, 0.01, "Non-uniform parent scale must induce non-TRS shear in matrix_world")
+        _assert_rig_state_identical(self, saved_state, tol=1e-6)
 
         # Cleanup
         ik_obj.parent = None
@@ -714,6 +811,163 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
 
         bpy.data.objects.remove(parent_empty)
 
+    def test_14_shear_parent_transform_rejection(self) -> None:
+        """TEST-14: Effective parent transform with shear is rejected in Phase A with failure atomicity."""
+        parent_empty = bpy.data.objects.new("TestParentShear", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.0, -8.0, 0.0))
+        parent_empty.rotation_euler = Euler((0.0, 0.0, math.radians(30.0)), "XYZ")
+        parent_empty.scale = Vector((1.0, 1.0, 1.0))
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        # Introduce shear via matrix_parent_inverse
+        shear_mat = Matrix((
+            (1.0, 0.5, 0.0, 0.0),
+            (0.0, 1.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0, 0.0),
+            (0.0, 0.0, 0.0, 1.0),
+        ))
+        ik_obj.matrix_parent_inverse = shear_mat
+        bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        a_mat = Matrix((
+            (eff_parent[0][0], eff_parent[0][1], eff_parent[0][2]),
+            (eff_parent[1][0], eff_parent[1][1], eff_parent[1][2]),
+            (eff_parent[2][0], eff_parent[2][1], eff_parent[2][2]),
+        ))
+        g_mat = a_mat.transposed() @ a_mat
+        s_sq = (g_mat[0][0] + g_mat[1][1] + g_mat[2][2]) / 3.0
+        max_rel_dev = max(abs(g_mat[r][c] - (s_sq if r == c else 0.0)) / s_sq for r in range(3) for c in range(3))
+        self.assertGreater(max_rel_dev, 1e-4, "Effective parent matrix must have shear violating conformal condition")
+
+        saved_state = _capture_rig_state(self.armature)
+
+        with self.assertRaises(ValueError) as ctx:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, -7.85, 0.18),
+                foot_rotation_deg=(10.0, 20.0, -15.0),
+                clamp_ground=False,
+                clamp_reach=False,
+            )
+
+        self.assertIn("Phase A effective parent transform validation failed", str(ctx.exception))
+        bpy.context.view_layer.update()
+        _assert_rig_state_identical(self, saved_state, tol=1e-6)
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    def test_15_singular_parent_transform_rejection(self) -> None:
+        """TEST-15: Singular effective parent transform (det <= 1e-7) is rejected in Phase A with failure atomicity."""
+        parent_empty = bpy.data.objects.new("TestParentSingular", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.0, -8.0, 0.0))
+        parent_empty.scale = Vector((1.0, 0.0, 1.0))  # Singular (zero Y scale)
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        a_mat = Matrix((
+            (eff_parent[0][0], eff_parent[0][1], eff_parent[0][2]),
+            (eff_parent[1][0], eff_parent[1][1], eff_parent[1][2]),
+            (eff_parent[2][0], eff_parent[2][1], eff_parent[2][2]),
+        ))
+        self.assertLessEqual(a_mat.determinant(), 1e-7, "Determinant must be singular")
+
+        saved_state = _capture_rig_state(self.armature)
+
+        with self.assertRaises(ValueError) as ctx:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, -7.85, 0.18),
+                foot_rotation_deg=(0.0, 0.0, 0.0),
+                clamp_ground=False,
+                clamp_reach=False,
+            )
+
+        self.assertIn("Phase A effective parent transform validation failed", str(ctx.exception))
+        self.assertIn("singular", str(ctx.exception).lower())
+        bpy.context.view_layer.update()
+        _assert_rig_state_identical(self, saved_state, tol=1e-6)
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    def test_16_reflection_parent_transform_rejection(self) -> None:
+        """TEST-16: Reflection effective parent transform (det < 0) is rejected in Phase A with failure atomicity."""
+        parent_empty = bpy.data.objects.new("TestParentReflection", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.0, -8.0, 0.0))
+        parent_empty.scale = Vector((-1.0, 1.0, 1.0))  # Reflection (det = -1)
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        a_mat = Matrix((
+            (eff_parent[0][0], eff_parent[0][1], eff_parent[0][2]),
+            (eff_parent[1][0], eff_parent[1][1], eff_parent[1][2]),
+            (eff_parent[2][0], eff_parent[2][1], eff_parent[2][2]),
+        ))
+        self.assertLess(a_mat.determinant(), 0.0, "Determinant must be negative (reflection)")
+
+        saved_state = _capture_rig_state(self.armature)
+
+        with self.assertRaises(ValueError) as ctx:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, -7.85, 0.18),
+                foot_rotation_deg=(0.0, 0.0, 0.0),
+                clamp_ground=False,
+                clamp_reach=False,
+            )
+
+        self.assertIn("Phase A effective parent transform validation failed", str(ctx.exception))
+        bpy.context.view_layer.update()
+        _assert_rig_state_identical(self, saved_state, tol=1e-6)
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    @patch("src.rig.ik.get_leg_ik_state", side_effect=RuntimeError("INJECTED_PHASE_B_FAILURE"))
+    def test_17_phase_b_transaction_rollback_fault_injection(self, mock_state) -> None:
+        """TEST-17: Phase B transaction rollback catches fault, restores controllers & bones atomically, and re-raises."""
+        saved_state = _capture_rig_state(self.armature)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, self.root.location.y + 0.15, 0.20),
+                foot_rotation_deg=(15.0, -20.0, 35.0),
+                clamp_ground=False,
+                clamp_reach=False,
+            )
+
+        self.assertIn("INJECTED_PHASE_B_FAILURE", str(ctx.exception))
+        bpy.context.view_layer.update()
+        _assert_rig_state_identical(self, saved_state, tol=1e-6)
+
 
 if __name__ == "__main__":
-    unittest.main(argv=[sys.argv[0]])
+    unittest.main(argv=[sys.argv[0], "-v"])
