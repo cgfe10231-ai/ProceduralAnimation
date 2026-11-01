@@ -45,7 +45,7 @@
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 450–512 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 920–930 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 149–192 / 637–675 | CONTRACT_GAP | `STATIC_CONFIRMED` | **NO** | `foot_contact.py` / `ik.py` (历史 09-B 修复与 DEC-064 验收记录保留；当前 09-B-3 对有效父级变换支持域及测试覆盖进行了后续修正，最新 TEST-18 至 TEST-21 没有当前实际运行证据，当前 09-B-3 独立核验未完成，不得宣称 21/21 PASS；09-B-3 RE-VERIFICATION PENDING) |
+| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 149–192 / 637–675 | CONTRACT_GAP (RESOLVED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `foot_contact.py` / `ik.py` (历史 FIND-R3-01 已按原 09-B 修复并验收；当前 09-B-3 是后续独立修复节点，仍在进行中，存在未解决问题，状态为 `IN PROGRESS — NOT ACCEPTED`；TEST-18 至 TEST-21 没有当前实际运行证据，不得宣称 21/21 PASS) |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `ik.py` |
 | **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
 | **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | Lines 207–235 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
@@ -340,6 +340,7 @@
 ---
 
 ### FIND-R3-01: 控制器生命周期动态父级违规循环，且父级非空时 `set_foot_ik_target` 姿态未反解产生旋转偏差
+> **状态边界与历史记录适用范围：** 本节以下的 `CONTRACT_GAP (RESOLVED)`、`NO (RESOLVED)`、`FIXED / VERIFIED` 及修复与测试记录，均描述历史 FIND-R3-01 对应的原 09-B 修复与历史验收事实。上述历史记录继续有效，不得删除或改写为历史未修复。当前 09-B-3 是在历史修复基础上的后续独立修复节点，仍处于进行中，存在未解决问题，状态为 `IN PROGRESS — NOT ACCEPTED`。本节历史修复记录不构成当前 09-B-3 的验收证据。当前节点状态以文件顶部状态摘要及第 8 节 PKG-5 修复节点表为准。
 * **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
 * **Class / Function**: `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `set_foot_ik_target()`
 * **Exact Line Range**: `foot_contact.py:149–192`; `ik.py:127–160, 232–260, 637–675`
