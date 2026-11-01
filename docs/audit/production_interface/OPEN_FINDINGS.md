@@ -1,22 +1,32 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：PKG-5 / 09-B Lower-Limb IK World Rotation & Controller Lifecycle Re-verification & Correction (PKG5-09B-REVERIFICATION-CORRECTION)
-> **审计与修复基准 Commit**：415bbd5c0d44cd799b7b31c062efce926da6e04b
-> **最后更新时间**：2026-11-01
-> **当前状态**：09-B INDEPENDENT RE-VERIFICATION — ACCEPTED
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。08 Rig（刚体平移与世界坐标隔离）、09-A Ground × Reach（三维极值约束求解器）、09-B World Rotation（世界旋转合同、控制器无父级生命周期及 4x4 世界矩阵 TRS 保持）均已技术修复并全量验证通过（FIND-R3-01 与 FIND-R3-02 彻底闭环）；下一项任务唯一指向 PKG-5 / 10 Upper-Limb IK/FK（双臂 IK/FK 接口合同审计与修复）。全仓库当前 16 项登记问题中，14 项已完全关闭，仅剩余 2 项未完全关闭的 Finding（全部集中于 PKG-5 / 11 FootLock：FIND-R3-03 待处理、FIND-R3-04 待处理）。
+> **当前修复节点**：PKG-5 / 09-B-3（Lower-Limb World Rotation）
+> **审计基准仓库 HEAD**：`2904857433af01c2a7991e2da085b3c0f53a145f`
+> **文档更新时间**：2026-11-01
+> **当前修复状态**：`09-B-3 IN PROGRESS — NOT ACCEPTED`
+> **历史验收说明**：DEC-064 与旧 09-B 验收记录保留其当时的历史有效性，但不得据此宣称最新 09-B-3 已通过独立验收。
+> **当前登记基线**：保留原有 16 项 Finding ID，不创建新的 Finding ID。
+> **当前未关闭历史 Finding**：FIND-R3-03、FIND-R3-04，归属 PKG-5 / 11 FootLock。
+> **当前重新核验要求**：09-B-3 已有 TEST-01 至 TEST-21 的测试代码，但现有执行记录只证明此前 17 项测试通过；TEST-18 至 TEST-21 尚无当前实际执行证据。
+> **门禁**：Phase 7B 仍然 `NOT AUTHORIZED`。必须完成 PKG-5 / 09-B-3、10、11、12，并通过全仓联合验收及负责人明确批准。
 
 ---
 
 ## 1. 审计缺陷与问题汇总看板 (Dashboard)
 
+> 本表中的 16 项是现有 Finding 登记基线。历史修复状态与当前修复节点的重新验收状态必须分开记录。09-B-3 的重新核验未完成，不得用历史验收记录替代。
+
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
-| **已确认缺陷 (CONFIRMED_DEFECT)** | **0** (存量) + **3** (已修复) | 存量：无（已清零）；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写), FIND-R2-07/T01-04 (接缝横向偏置) |
-| **接口合同缺口 (CONTRACT_GAP)** | **2** (存量) + **11** (已修复) | 存量：FIND-R3-03 (元数据混淆与重置残留待 11 FootLock 修复), FIND-R3-04 (伪只读强副作用维持器待 11 FootLock 修复)；已修复：FIND-R3-01 (下肢 IK 世界旋转合同与控制器全生命周期 parentless 已彻底闭环), FIND-R3-02 (足底高程与可达约束三维解析极值求解器已闭环), FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-05 (几何合规性与支撑拓扑脱节), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
-| **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (固定 X 走廊双向 +/-Y 导航), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
-| **未验证项 (UNVERIFIED)** | **1** | UNVERIFIED-01 (全身4点接触解算稳定性)；注：原 UNVERIFIED-02 非零偏航足部旋转偏差已由 09-B 专项测试与旋转反解闭环完全验证。 |
-| **阻碍后续开发 (Blocks Further Dev: YES)** | **0** | 存量阻碍项已清零（FIND-R3-01 闭环后下肢 IK 控制链彻底解锁；剩余 FIND-R3-03/04 均标定为 Blocks 7B: NO） |
+| **已确认缺陷 (CONFIRMED_DEFECT)** | **0 项当前未关闭 + 3 项历史已修复** | FIND-R2-01、FIND-R2-02、FIND-R2-07 |
+| **接口合同缺口 (CONTRACT_GAP)** | **2 项待修复 + 11 项历史已修复** | 当前待修复：FIND-R3-03、FIND-R3-04；其余保留历史修复状态 |
+| **历史登记 Finding 总数** | **16** | 保留原有编号，不增删、不合并、不重新编号 |
+| **历史关闭数量** | **14** | 依据原有 Finding 记录；不代表当前 09-B-3 已通过 |
+| **历史未关闭数量** | **2** | FIND-R3-03、FIND-R3-04 |
+| **09-B-3 当前节点** | **1 项待独立核验** | FIND-R3-01 的历史修复事实保留，但最新 09-B-3 边界与新增测试尚未完成当前独立验收 |
+| **已知设计限制** | **3** | LIMIT-01、LIMIT-02、LIMIT-03，不能自动转化为代码缺陷 |
+| **未验证项** | **1** | UNVERIFIED-01：全身四点接触解算稳定性 |
+| **Phase 7B** | **NOT AUTHORIZED** | PKG-5 / 10、11、12 尚未完成联合验收与批准 |
 
 ---
 
@@ -34,7 +44,7 @@
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 450–512 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 920–930 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 149–192 / 637–675 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `foot_contact.py` / `ik.py` |
+| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 149–192 / 637–675 | CONTRACT_GAP | `STATIC_CONFIRMED` | **NO** | `foot_contact.py` / `ik.py` (历史 09-B 修复与 DEC-064 验收记录保留；当前 09-B-3 对有效父级变换支持域及测试覆盖进行了后续修正，最新 TEST-18 至 TEST-21 没有当前实际运行证据，当前 09-B-3 独立核验未完成，不得宣称 21/21 PASS；09-B-3 RE-VERIFICATION PENDING) |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `ik.py` |
 | **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
 | **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | Lines 207–235 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
@@ -565,3 +575,220 @@ flowchart TD
      - `08 Rig`：已完成 `verify_task6fb_rigid_link.py` Test 8B 刚体平移测试语义隔离；
      - `09-A`：已完成 `set_foot_ik_target()` 地面高程解耦、三维极值解析求解器与代码文档门禁收口 (FIND-R3-02 闭环)；
      - **待处理**：`09-B`（FIND-R3-01 姿态反解）、`10 Upper IK/FK`、`11 FootLock`（FIND-R3-03, FIND-R3-04）、`12 联合验收`。
+
+---
+
+## 5. PKG-5 修复节点与 Finding 映射
+
+本节将现有 Finding 与已经确认的修复节点建立对应关系。
+
+不得凭模块名称自行创造任务编号。
+
+| 修复节点 | 对应 Finding / 范围 | 具体内容 | 当前状态 |
+|---|---|---|---|
+| 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | 历史已完成 |
+| 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | 历史已验证 |
+| 09-B-3 | FIND-R3-01 的后续世界旋转与父级变换复核 | 有效父级矩阵支持域、旋转映射、边界条件、控制器状态完整性与失败原子性 | 当前冻结，等待独立验收 |
+| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 待准入 |
+| 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | 待修复 |
+| 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | 待执行 |
+
+### 5.1 既有 Finding 的修复归属
+
+| Finding ID | 归属 | 修复内容 | 状态口径 |
+|---|---|---|---|
+| FIND-R2-01 | 历史 Bridge 修复 | 非法 ContactLifecycle 枚举引用 | 历史已修复 |
+| FIND-R2-02 | 历史 TerrainWalk / Bridge 接口修复 | 接触数据被错误覆写 | 历史已修复 |
+| FIND-R2-03 | 历史 Bridge 执行合同修复 | 执行失败未正确传播 | 历史已修复 |
+| FIND-R2-04 | 历史 MotionPlanner / Bridge 修复 | 统一执行结果和失败阻断 | 历史已修复 |
+| FIND-R2-05 | 历史 ContactModel / Bridge 修复 | 几何合规与支撑拓扑语义不一致 | 历史已修复 |
+| FIND-R2-06 | 历史 TerrainWalk 修复 | 步态计划与步态调度回退语义不一致 | 历史已修复 |
+| FIND-R2-07 | 历史 TerrainWalk 修复 | 接缝和边缘检测横向偏置 | 历史已修复 |
+| FIND-T01-06 | 历史环境所有权修复 | 动作与环境实例绑定不一致 | 历史已修复 |
+| FIND-T01-07 | 历史 TerrainWalk 修复 | 负向方向步态循环错误 | 历史已修复 |
+| FIND-T01-08 | 历史 TerrainWalk 修复 | 根轨迹与摆动脚时间归一化不一致 | 历史已修复 |
+| FIND-R3-01 | 08 Rig / 09-B / 当前 09-B-3 复核 | 控制器父级生命周期与世界旋转合同 | 历史修复已验收；当前 09-B-3 重新核验未完成 |
+| FIND-R3-02 | 09-A | 下肢 Ground × Reach 数学约束 | 历史已验证 |
+| FIND-R3-03 | 11 FootLock | 锁定元数据残留与生命周期状态语义 | 待修复 |
+| FIND-R3-04 | 11 FootLock | `evaluate_foot_support()` 未声明的控制器和骨骼写入副作用 | 待修复 |
+| FIND-R4-01 | 历史场景执行门禁修复 | 失败场景仍可能落盘或伪报成功 | 历史已修复 |
+| FIND-R4-02 | 历史 Environment Query 修复 | 无有效支撑面的错误回退 | 历史已修复 |
+
+## 6. 全项目模块独立审计范围
+
+本表是后续独立审计的覆盖范围，不代表每个模块已经发现缺陷。
+
+一个模块需要先独立审计，再参与跨模块综合验收。
+
+| 模块 | 源码文件 | 必须检查的内容 | 对应节点 | 当前状态 |
+|---|---|---|---|---|
+| Lower-Limb IK | `src/rig/ik.py` | 有效父级变换、空间合同、可达域、有限性、事务与回滚 | 09-A、09-B-3 | 当前复核中 |
+| Upper-Limb IK | `src/rig/arm_ik.py` | 双臂目标、世界空间变换、旋转映射、pole、非有限输入、回滚和左右独立性 | 10 | 待独立审计 |
+| FootLock | `src/rig/foot_contact.py` | 锁定、解锁、元数据、状态读取、副作用与漂移保持 | 11 | 两项既有 Finding 待修 |
+| FK / Pose | `src/rig/pose.py`、`src/motion/whole_body_controller.py` | FK 目标、骨骼本地姿态、约束权重、IK/FK 切换和姿态所有权 | 10 / 12 | 待独立审计 |
+| WBC | `src/motion/whole_body_controller.py` | 分阶段写入、输入输出合同、失败传播、事务原子性、末端追踪与 ROM | 12 | 待独立审计 |
+| Bridge | `src/motion/kinematic_bridge.py` | 帧级协议、WBC 结果、接触遥测、失败处理、关键帧和状态提交 | 12 | 待独立审计 |
+| MotionPlanner / Action | `src/motion/framework.py`、`src/motion/terrain_walk.py` | 时间轴、动作切换、失败阻断、历史动作连续性、环境所有权 | 12 | 待独立审计 |
+| CoM | `src/motion/rigid_link.py` | 质量分布、坐标变换、质量归一化、缺失骨骼处理及非破坏性读取 | 12 | 待独立审计 |
+| BodyKinematics | `src/motion/body_kinematics.py` | 时间步长、快照、速度与角速度差分、历史状态更新和连续帧一致性 | 12 | 待独立审计 |
+| BodyInertia | `src/motion/body_inertia.py` | 局部惯性张量、世界变换、平行轴定理、角动量分解和数值稳定性 | 12 | 待独立审计 |
+| ContactModel | `src/motion/contact_model.py` | 接触生命周期、几何约束、支撑分类、记录更新和状态一致性 | 12 | 待独立审计 |
+| Joint ROM | `src/motion/joint_limits.py` | 关节活动范围、欧拉角与相对旋转、截断后末端冲突和失败语义 | 10 / 12 | 待独立审计 |
+| Environment Query | `src/scene/environment_query.py`、`src/scene/blender_mesh_query_adapter.py` | 网格查询、支撑过滤、几何失效和失败传播 | 历史 R4 基线 | 历史修复，按联合回归复核 |
+| 纯 Python 数值动力学 | `contact_dynamics.py`、`contact_force_solver.py`、`forward_dynamics.py`、`closed_loop_dynamics.py` | 数学内核、物理单位、状态原子性和跨宿主隔离 | 7C 未来合流 | 保持独立，不提前接入 Pipeline A |
+
+## 7. 尚待核验的跨模块审计候选
+
+以下项目是从当前源码结构和历史记录中提取出的核验目标。
+
+**它们不是新的已确认 Finding，不计入原有 16 项。**
+
+没有完成真实触发测试前，不得把它们改写成确认缺陷。
+
+### 7.1 WBC 全帧写入和失败原子性
+
+源码：`src/motion/whole_body_controller.py`
+
+`execute_frame()` 会依次执行：
+
+1. Root / Pelvis 基座写入。
+2. Spine / Neck / Head 与 FK 旋转分发。
+3. 双腿 IK 与 FootLock 调用。
+4. 双臂 IK 调用。
+5. 场景更新和末端追踪。
+6. ROM 校验及可选截断。
+7. CoM 评估。
+
+需核验：
+
+- 某一阶段抛出异常后，前序写入是否可能残留。
+- WBC 的失败结果是否保留真实骨架状态。
+- 两侧 IK 是否可能出现单侧完成、单侧失败。
+- ROM 截断后实际末端误差是否真实反映到结果。
+- 单帧 WBC 执行是否需要事务级快照和回滚。
+
+目前仅登记为独立审计候选，不得直接认定存在缺陷。
+
+### 7.2 Bridge 失败帧提交和关键帧门禁
+
+源码：`src/motion/kinematic_bridge.py`
+
+当前代码的 Phase 6 包含关键帧插入和状态构造；最终 `overall_success` 在后续计算。
+
+需核验：
+
+- WBC 失败时是否仍应写入关键帧。
+- 几何接触失败时是否仍应提交当前帧状态。
+- 失败帧是否更新 `_last_time_sec`、`_last_frame` 与内部接触状态。
+- MotionPlanner 是否正确阻止后续错误状态传播。
+- 失败帧是否可能被误认为有效连续动画的一部分。
+
+目前仅登记为跨模块审计候选，不得直接认定存在缺陷。
+
+### 7.3 上肢 IK 世界空间与失败原子性
+
+源码：`src/rig/arm_ik.py`
+
+需逐项核验：
+
+- `matrix_world` 与 `matrix_parent_inverse` 的组合语义。
+- 世界空间位置转换与世界空间旋转转换是否一致。
+- 父级存在旋转、缩放、非均匀缩放或剪切时的行为。
+- 左右臂控制器是否严格独立。
+- 非有限位置和旋转输入是否在写入前拒绝。
+- Phase A / Phase B 是否具备可靠的失败保护。
+- 异常后 IK、pole、骨骼和约束权重是否保持原状态。
+
+当前不得将这些审计问题直接登记为新 Finding。
+
+### 7.4 CoM 历史回归 Test 8
+
+源码：`tests/verify_task6fb_rigid_link.py`，Test 8。
+
+历史 `PROJECT_STATE.md` 曾记录：
+
+- FootIK 世界空间化以后，旧测试对 Root 平移的假设出现冲突。
+- `verify_task6fb_rigid_link.py` Test 8 曾被报告失败。
+- 相关 `verify_task6gb_body_inertia.py` Test 13、`verify_task6gc_contact_model.py` Test 15 和旧 Bridge 测试也曾出现级联失败记录。
+
+当前源文件仍保留 Test 8 的 Root 世界平移实验。
+
+必须重新核验该历史用例在当前实际合同下的有效性。未重新执行前，状态是 `HISTORICAL FAILURE EVIDENCE — RECHECK REQUIRED`，不能声明已修复或仍然失败。
+
+### 7.5 ContactModel 查询与内部状态更新边界
+
+源码：`src/motion/contact_model.py`
+
+需区分：
+
+- 对 Blender 骨骼和控制器的写入；
+- 对 ContactRecord 的内部合规结果写入；
+- 对跨帧接触生命周期状态的更新。
+
+不得把“没有写入骨架”误称为“完全没有状态副作用”。
+
+## 8. 设计限制和未验证项目
+
+以下内容必须与代码缺陷分开记录。
+
+| ID | 类型 | 内容 | 当前处理 |
+|---|---|---|---|
+| LIMIT-01 | DESIGN_LIMITATION | 当前走廊导航存在固定 X 方向与双向 Y 行进的范围限制 | 保留为现有设计范围 |
+| LIMIT-02 | DESIGN_LIMITATION | 当前 FK 摆臂仍含经验性正弦运动 | 纳入节点 10 的解耦目标，不得提前称为独立上肢控制 |
+| LIMIT-03 | DESIGN_LIMITATION | IK 可达域截断尚不等同于全身主动降低或重规划 | 不得未经决策自动分配修复任务 |
+| UNVERIFIED-01 | UNVERIFIED | 全身四点接触解算稳定性 | 保持未验证，不能宣称通过 |
+
+设计限制不自动转化为 Finding。
+
+未验证项也不等于已确认缺陷。
+
+## 9. 任务编号恢复纪律
+
+当前可确认：
+
+- 09-A：Lower-Limb Ground × Reach。
+- 09-B：Lower-Limb World Rotation 与控制器生命周期合同。
+- 当前第三次修复节点：`09-B-3`。
+- 10：Upper-Limb IK/FK。
+- 11：FootLock。
+- 12：PKG-5 综合闭环与联合验收。
+
+在目前已核验的路线图、决策记录和仓库搜索结果中，没有找到能够证明 13、14、15 正式定义的权威资料。
+
+因此：
+
+- 13、14、15 当前标记为 `UNRECOVERED / PENDING EVIDENCE`。
+- 不得把它们擅自分配给 WBC、CoM、IK 或 FK。
+- 不得因为模块数量多而自动创造新的任务号。
+- 后续只有找到真实决策记录、历史任务卡、提交记录或明确聊天证据，才可以恢复正式定义。
+
+## 10. 验收与证据规则
+
+所有 Finding 状态变更必须具有可追溯证据：
+
+- 代码位置和真实符号。
+- 复现条件。
+- 实际行为与预期合同。
+- 关联测试。
+- 实际执行命令。
+- 执行返回码。
+- 输出日志。
+- 必要时真实 Blender 视觉验收证据。
+- 修复提交 SHA。
+
+必须区分：
+
+- `IMPLEMENTED`
+- `EXECUTED_NOT_FULLY_VERIFIED`
+- `VERIFIED`
+- `UNRESOLVED`
+- `KNOWN_DEFECT`
+- `UNVERIFIED`
+
+不得使用“已经修好”“已完成”替代实际验证记录。
+
+单模块通过不等于跨模块通过。
+
+自动化测试通过不等于 Blender 视觉验收通过。
+
+未实际执行的测试，不得记录为 PASS。
