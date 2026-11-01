@@ -1,5 +1,12 @@
 # ProceduralAnimation: Documentation Drift Audit (7A→7B Gate)
 
+> **当前路线术语边界（历史快照说明）**：
+> 本报告记录的是 2026-10-27 阶段审计现场。正文中 Phase 7B / Phase 7C 的部分描述属于当时的历史路线语境，不得作为当前阶段定义或准入依据。
+> 当前权威路线以 `docs/ROADMAP_FOUNDATION_TO_FULLBODY.md` 和 `ARCHITECTURE_SYNC.md` 为准：
+> - Phase 7B：Upper-Limb Independent Motion & End-Effector Target Verification。
+> - Phase 7C：现有 Pipeline A 与 Pipeline B 的未来合流。
+> 本报告的历史发现、测试证据与当时判断仍然保留其历史有效性，但不得覆盖当前状态文件。
+
 > [!NOTE]
 > **历史审计快照标识 (Historical Audit Snapshot)**
 > * **快照归档基准**：Git SHA `670766a`（Phase 7A 阶段审计归档点，2026-10-27）

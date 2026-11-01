@@ -4,7 +4,8 @@
 >
 > **总架构保护**：`ARCHITECTURE.md` 是全项目总架构蓝图，本文件不得替代、复制、重构或擅自修改总架构。
 >
-> **本次审计基准 HEAD**：`2904857433af01c2a7991e2da085b3c0f53a145f`
+> **最近一次生产源码核验基准 HEAD**：`2904857433af01c2a7991e2da085b3c0f53a145f`
+> **本轮文档审查起点 HEAD**：`7547c91a31f0b97a19de335ad5c61cc617b017a2`（本轮起点，不代表本轮文档提交后的 HEAD）
 >
 > **当前修复节点**：PKG-5 / 09-B-3。
 >
@@ -326,6 +327,14 @@ M_{\mathrm{eff}}=M_{\mathrm{parent}}\cdot M_{\mathrm{parent\_inverse}}
 - 支持纯旋转以及正均匀缩放和旋转组合。
 
 当前测试文件已有 TEST-01 至 TEST-21。
+
+TEST-17 当前还存在测试断言覆盖缺口：
+
+- `_capture_rig_state()` 保存了控制器旋转通道、`matrix_parent_inverse`、骨骼 `matrix_basis` 等字段。
+- `_assert_rig_state_identical()` 没有逐项比较全部已保存字段。
+- 当前主要比较控制器 `matrix_world`、`location`、`scale`、`parent`、`is_locked`，以及骨骼 `matrix`、`location`、`scale`。
+- 因此 TEST-17 不能证明所有已保存状态通道均已完整恢复。
+- 这是测试证据不足，不代表已经证明生产回滚实现必然错误。
 
 但现存 `AI_SYNC.md` 中的最新实际执行记录为此前的 17/17，并且该记录早于 TEST-18 至 TEST-21 的增加。
 

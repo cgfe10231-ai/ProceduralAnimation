@@ -1,27 +1,46 @@
 # PROJECT_STATE: 项目当前真实状态
 
 > **更新时间**：2026-11-01
-> **当前阶段**：PKG-5 / 09-B: 下肢 IK 世界旋转合同与控制器生命周期独立验收补正 (PKG5-09B-REVERIFICATION-CORRECTION)。
-> 1) **接口算法与位姿保持收口 (src/rig/foot_contact.py unlock_foot_contact & src/rig/ik.py set_foot_ik_target)**：
->    - **下肢 IK 世界旋转合同与水平中立**：在 Phase A 中基于有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$ 通过正交四元数提取反解局部欧拉角，严禁欧拉角相减；`foot_rotation_deg=None` 严格映射为世界水平中立姿态 `Euler((0.0, 0.0, 0.0), 'XYZ')`；
->    - **unlock_foot_contact 4x4 世界变换矩阵（TRS）完整保持**：解除父级前读取完整世界矩阵并校验有限性与仿射剪切（Shear）；解绑父级并重置 `matrix_parent_inverse = Identity(4)` 后，完整写回 FootIK 与 KneePole 的 Location、Rotation、Scale，并在更新视图层后断言矩阵最大元素差值 $< 10^{-4}$；
->    - **全生命周期绝对世界空间（Rule 7）**：显式传入 `reparent_to_root=True` 严格抛出 `ValueError`，控制器在 setup/reset/lock/unlock/normal IK 全流程恒定保持 `parent is None`；
-> 2) **专项测试基准全量通过 (tests/test_leg_ik_world_rotation_contract.py)**：
->    - 包含 TEST-01 至 TEST-10，修正 TEST-02/03/04 父级逆矩阵抵消缺陷（置 Identity 且断言非零有效父级旋转）；
->    - 扩充 TEST-05 4x4 矩阵与尺度断言、TEST-08 非法挂载不变量保持、TEST-09 16 元素全量不变性；
->    - 新增 TEST-11（组合逆矩阵）、TEST-12（均匀缩放 0 误差与非均匀缩放剪切边界检测）、TEST-13（历史父级控制器解锁非单位尺度与局部旋转全保持场景）；
->    - 专项测试全部 13 项 100% 通过（2.38s）；
-> 3) **历史与物理全量自动化回归 100% 通过**：
->    - leg_ik_worldspace_init_reset (PKG-5/WS-01): **6/6 PASS**；
->    - leg_ik_ground_height_contract (PKG-5/09-A): **20/20 PASS**；
->    - legacy_leg_ik (verify_task4c_ik): **PASS**；
->    - legacy_foot_contact (verify_task4d_foot_contact): **PASS**；
->    - Quick: **19/19 PASSED (93.01s)**；
->    - Physics: **25/25 PASSED (185.94s)**；
->    - Motion: **12/12 PASSED (93.32s)**；
->    - Full: **40/40 PASSED (285.15s)**；
->    - 架构文档与符号物理校验 tests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
-> **主要验证依据与基准**：09-A 已完成并验证 (FIXED / VERIFIED)；09-B 独立验收补正完成并验证 (FIXED / VERIFIED)；FIND-R3-01 与 FIND-R3-02 彻底闭环。全库 16 项登记问题中，14 项已完全关闭，仅剩余 2 项开放 Finding（全部在 PKG-5 / 11 FootLock：FIND-R3-03、FIND-R3-04）。阻断 Phase 7B 依然为 YES（严格未授权，等待 PKG-5 全部 10、11、12 完成与联合验收）。当前门禁终止状态为：09-B INDEPENDENT RE-VERIFICATION — ACCEPTED。下一开发任务唯一指向：PKG-5 / 10 Upper-Limb IK/FK。
+>
+> **当前任务**：PKG-5 / 09-B-3 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
+>
+> **当前状态**：`IN PROGRESS — NOT ACCEPTED`。修复尚未完成，仍存在未解决问题。
+>
+> **历史状态边界**：
+> - 原 09-B 的历史修复与 DEC-064 验收记录继续有效。
+> - FIND-R3-01 的历史修复状态仍为 `RESOLVED / FIXED / VERIFIED`。
+> - 当前 09-B-3 是在历史修复基础上的后续独立修复节点，不能使用原 09-B 验收记录替代当前验收。
+>
+> **当前生产源码支持域**（`src/rig/ik.py`）：
+> - 有效父级矩阵：`M_eff = M_parent @ matrix_parent_inverse`。
+> - 非有限矩阵元素拒绝。
+> - 非仿射矩阵拒绝，最后一行容差为 `1e-6`。
+> - 负行列式镜像反射拒绝。
+> - 零行列式奇异矩阵拒绝。
+> - `s_sq <= 1e-12` 的退化尺度拒绝。
+> - Gram 矩阵相对偏差大于 `1e-6` 的非共形变换拒绝。
+> - 支持纯旋转与正均匀缩放和旋转的组合。
+>
+> **当前测试状态**：
+> - 测试源码包含 TEST-01 至 TEST-21。
+> - 历史执行记录仅证明此前 17 项测试通过。
+> - TEST-18 至 TEST-21 尚无当前实际运行证据。
+> - 不得声明 21/21 PASS。
+> - TEST-17 的状态快照辅助函数保存了多个变换通道，但断言辅助函数没有逐项比较全部已保存字段；完整状态恢复证据仍不充分。
+> - 测试文件顶部 TEST-15 注释的 `det <= 1e-7` 与当前生产源码的奇异矩阵判定不一致。
+>
+> **当前 Finding 状态**：
+> - `FIND-R3-01`：历史原 09-B 修复已关闭；当前 09-B-3 后续修复仍未验收。
+> - `FIND-R3-03`：当前未关闭，归属 PKG-5 / 11 FootLock。
+> - `FIND-R3-04`：当前未关闭，归属 PKG-5 / 11 FootLock。
+>
+> **当前准入边界**：
+> - 09-B-3 尚未验收。
+> - 10、11、12 尚未完成联合验收。
+> - Phase 7B 仍为 `NOT AUTHORIZED`。
+> - 只有完成 09-B-3、10、11、12 的联合验收并获得项目负责人明确批准后，才允许开启 Phase 7B。
+>
+> **下一步**：继续完成 09-B-3 修复与独立核验，不得提前进入 10 或 Phase 7B。
 ---
 
 ## 1. 状态分类一览
@@ -53,6 +72,9 @@
   * **修复状态**: 维护包 PKG-1 (FIND-R2-01)、PKG-2 (FIND-R2-02)、PKG-3 部分 (FIND-R2-03, FIND-R2-04)、环境场景联合修复组 (FIND-R4-02, FIND-T01-06, FIND-R4-01)、地形规划联合修复组 (FIND-R2-06, FIND-R2-07, FIND-T01-07, FIND-T01-08)、ContactModel 几何支撑一致性修复组 (FIND-R2-05)、PKG-5 / 08 Rig (FIND-R3-01 局部)、PKG-5 / 09-IK-GROUND-A (FIND-R3-02)、PKG-5 / 09-B (FIND-R3-01 彻底收口) 已修复并验证（`FIXED / VERIFIED`）；全仓库 16 项登记问题中，14 项已完全关闭，仅剩余 2 项未完全关闭合同缺口（全部集中于 PKG-5 / 11 FootLock：FIND-R3-03、FIND-R3-04）。
 
 ### [已验证]
+
+> **历史证据适用范围**：本节中原 09-B、DEC-064、13/13 等记录描述的是对应历史提交与历史验收现场，继续保留其历史有效性。它们不代表当前 09-B-3 已经完成。当前 09-B-3 的唯一状态为 `IN PROGRESS — NOT ACCEPTED`，以本文件顶部、`ARCHITECTURE_SYNC.md` 与 `OPEN_FINDINGS.md` 为准。
+
 * **下肢 IK 世界旋转合同与控制器生命周期独立验收补正 (PKG-5 / 09-B, PKG5-09B-REVERIFICATION-CORRECTION)**：
   * **三维世界旋转空间映射 (`src/rig/ik.py:set_foot_ik_target`)**：
     - 在 Phase A 中基于有效父级矩阵 $M_{\text{eff}} = M_{\text{parent}} \cdot M_{\text{parent\_inverse}}$ 反解局部欧拉角，使用四元数正交化提取隔离缩放与剪切畸变，严禁欧拉角直接相减；

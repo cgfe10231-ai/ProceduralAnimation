@@ -25,13 +25,13 @@
 
 后续所有 Antigravity 开发任务，在执行任何代码编写或修改**前**，必须逐条完成以下前置审查；在任务验证完成收尾**后**，必须再次全量核查闭环：
 
-1. **读取规范与门禁**：完整读取 `AGENTS.md`、`GEMINI.md` 与本架构门禁规范 (`docs/ARCHITECTURE_CHANGE_GATE.md`)。
+1. **读取规范与门禁**：完整读取 `AGENTS.md`、`GEMINI.md`、`.agents/rules/project_rules.md` 与本架构门禁规范；同时读取当前状态权威文件 `PROJECT_STATE.md`、`HANDOFF.md`、`AI_SYNC.md`、`ARCHITECTURE_SYNC.md` 和 `docs/audit/production_interface/OPEN_FINDINGS.md`。历史审计快照不得替代当前状态文件。
 2. **读取交接卡片**：完整读取最新版 `AI_SYNC.md`，确认当前 Git HEAD commit SHA 与未提交文件现场。
 3. **查阅真实源码**：深入查阅相关的真实 Python 模块源码，严禁仅凭架构图、文字概述或聊天记忆推断接口。
 4. **核对符号物理存在**：核对所调用的方法、类、枚举成员、数据结构与文件在磁盘上 100% 物理存在（已集成至统一测试系统：`python tests/run_test_suite.py --test-id architecture_integrity_gate` 或 `python tests/audit_c2_final_inspector.py --verify-docs` 严格只读执行，零副作用，严禁引用虚构符号）。
 5. **杜绝功能职责重叠**：确认新开发内容不会创建与现有系统职责重叠的模块（严禁制造第二套控制器、第二套求解器或第二套场景）。
 6. **严禁绕开生产管线**：确认所有运动与骨骼解算接入既有统一管线（$\text{MotionPlanner} \to \text{KinematicBridgeExecutor} \to \text{WholeBodyController} \to \text{Rig/IK/FK}$），严禁私自绕道。
-7. **确认任务当前准入**：确认任务属于当前明确准入的阶段（当前为 Task 6G-D-C2-FINAL 冻结维护，后续阶段必须按 7A $\to$ 7B $\to$ 7C $\to$ 7D $\to$ 7E $\to$ 7F $\to$ 6H 顺序逐级准入，严禁提前越级或自设衍生阶段）。
+7. **确认任务当前准入**：不得在本规范中硬编码某个历史任务为永久当前任务。每次执行前，必须以 `PROJECT_STATE.md`、`HANDOFF.md`、`AI_SYNC.md`、`ARCHITECTURE_SYNC.md` 和 `OPEN_FINDINGS.md` 的一致状态为准，并核对真实 Git HEAD。若状态文件之间存在冲突，立即停止，不得自行选择较宽松的状态继续执行。当前 PKG-5 门禁顺序为 09-B-3、10、11、12；全部完成联合验收并获得项目负责人明确批准前，Phase 7B 必须保持 `NOT AUTHORIZED`。Phase 7B 当前定义为 Upper-Limb Independent Motion & End-Effector Target Verification；Phase 7C 才是两条现有执行管线的未来合流阶段。严禁提前越级或自行创造衍生阶段。
 8. **确保历史零退化**：确认修改不会破坏历史回归基准与测试阈值（严禁篡改成熟动作参数、时间轴或静默放宽 ROM 阈值）。
 9. **保护跨宿主复用边界**：确认纯 Python 动力学内核与 Blender `bpy` 保持解耦，不破坏未来跨宿主/游戏引擎复用边界。
 10. **架构变更事前报批**：核对所有新的架构变更与接口调整是否获得用户明确书面授权并录入 `DECISIONS.md`。
