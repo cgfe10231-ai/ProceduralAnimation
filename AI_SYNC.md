@@ -1,7 +1,7 @@
 # AI_SYNC: 跨 AI 状态同步与交接卡片
 
 * **项目**：ProceduralAnimation（全程序化 3D 连续动画生成系统）
-* **当前任务**：ProceduralAnimation — PKG-5 / 09-A: 最终代码完整性检查与全仓文档状态一致性门禁收口 (Task ID: PKG5-09A-CODE-DOC-INTEGRITY-CLOSURE)
+* **当前任务**：ProceduralAnimation — 09-A Documentation Final Gate (Task ID: PKG5-09A-DOC-STATE-FINAL)
 * **核心状态**：
   * **PKG-5 / 09-A 最终工程收口**：
     1. **接口算法收口 (src/rig/ik.py:322–640 set_foot_ik_target)**：
@@ -30,10 +30,10 @@ requested_world, applied_world, clamped_reach, clamped_ground, ground_z, constra
        - 架构文档与符号物理校验 tests/audit_c2_final_inspector.py --verify-docs: **PASS (0 errors, 0 phantom symbols)**；
   * **缺陷状态**：已确认缺陷归零（0 项）。全局库剩余 3 项同级缺陷（全部在 PKG-5：FIND-R3-01 局部闭合、剩余动态问题，FIND-R3-03、FIND-R3-04 维持待修复登记）；
   * **Phase 7B 状态**：**依然严格禁止开启**（禁止提前跃迁双足动力学）；
-  * **终门禁终止状态**：PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW（严格停止等待外部审查，严禁自行推进 Task 09-B，严禁修改 foot_contact.py，严禁进入 Phase 7B）。
+  * **终门禁终止状态**：09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW（严格停止等待外部独立审查，严禁自行推进 Task 09-B，严禁修改 foot_contact.py，严禁进入 Phase 7B）。
 * **Git 状态**：
   * **当前分支**：master
-  * **起始基准 Commit SHA**：ee61b307ce67ccdb82d56ef2bf44ceaee35e9963
+  * **起始基准 Commit SHA**：cf7114c59bc8894b728cbacadcbbe4971593a526
   * **最新本地 Commit SHA**：2ae92d58af59b8c7c9266c3d6e4ba842eedf48f6
   * **远程仓库同步状态**：已同步至 origin/master（HEAD 一致）
   * **未提交文件说明**：P2_R1_recovery.patch 为受保护历史恢复安全补丁，严禁暂存。

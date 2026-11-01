@@ -159,8 +159,8 @@ flowchart TD
 
 ## 6. 后续演进阶段依赖 (Subsequent Roadmap Dependencies)
 
-* **Phase 7B（独立上肢通用运动学，AUTHORIZED 待进入）**：
-  * **定位**：纯运动学范畴，完全不依赖动力学闭环。
+* **Phase 7B（独立上肢通用运动学，NOT AUTHORIZED / 严格禁止提前开启）**：
+  * **定位**：纯运动学范畴，完全不依赖动力学闭环（阻断直至 PKG-5 全部闭环并获明确授权）。
   * **首要任务**：解耦 `TerrainWalkAction` 中硬编码的正弦摆臂，接入 `src/rig/arm_ik.py` 与 WBC 双臂独立目标槽位。
 * **Phase 7C（动力学主循环接入，NOT AUTHORIZED）**：
   * 将 `contact_force_solver.py` 与 `closed_loop_dynamics.py` 接入 19 骨骼 Armature 主循环，建立真实的地面反作用力与质心扰动平衡。

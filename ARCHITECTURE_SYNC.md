@@ -1,9 +1,10 @@
 # ARCHITECTURE_SYNC: 架构同步与模块调用规范卡片
 
-> **最新架构审计基准版本**：v4.0 (Environment Gate 01 最终架构审计与全工程状态同步)  
-> **审计基准 Git SHA**：`7a3e244825cd87bf3d787c530318055dc94a3e1f`  
-> **权威架构文档集合**：详见 [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`docs/audit/environment_gate01_final/`](docs/audit/environment_gate01_final/)  
-> **当前状态**：Environment Gate 01（Unit 1 至 Unit 4）全部验收并审计通过；四级测试全绿（quick 18/18, physics 21/21, motion 11/11, full 35/35）；无遗留 BLOCKER；底座正式冻结，等待用户确认后进入 Phase 7B  
+> **历史架构审计基准**：v4.0 (Environment Gate 01 最终架构审计，Git SHA: `7a3e244825cd87bf3d787c530318055dc94a3e1f`，历史基准四级测试全绿 35/35)
+> **当前工程进度基准**：PKG-5 / 09 Lower-Limb IK Task A (09-A) 文档状态与门禁最终收口 (`PKG5-09A-DOC-STATE-FINAL`)
+> **当前工程 Git SHA**：`cf7114c59bc8894b728cbacadcbbe4971593a526`
+> **权威架构文档集合**：详见 [`ARCHITECTURE.md`](ARCHITECTURE.md)、[`docs/audit/environment_gate01_final/`](docs/audit/environment_gate01_final/)
+> **当前状态**：08 Rig（刚体平移与世界坐标隔离）已完成；09-A 下肢 Ground × Reach 约束求解器技术修复与代码/文档完整性门禁已完成收口；当前门禁标定为 `09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`；下一项任务为 09-B World Rotation（尚未执行）；分层全量自动化回归 100% 通过（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39，09-A 专项 20/20 PASS，WS-01 6/6 PASS，文档物理校验 0 错误）；Phase 7B 仍然严格禁止开启（未获授权，阻断直至 PKG-5 全部闭环）
 > **核心原则**：磁盘代码与真实运行调用链是唯一事实依据。19 骨骼人体运动系统为纯运动学驱动伴随真实几何环境感知，底层纯 Python 动力学算子作为算法储备库保持独立。
 
 ---

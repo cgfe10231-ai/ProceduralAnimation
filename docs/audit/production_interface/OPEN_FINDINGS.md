@@ -1,10 +1,10 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前阶段**：Terrain Planning Joint Repair Acceptance Closure (JOINT-REPAIR-TERRAIN-PLANNING-CLOSE)
-> **审计与修复基准 Commit**：0c200eec43e5ae6dd4ae6f38049392503fa533bf
-> **最后更新时间**：2026-10-30
-> **当前状态**：JOINT-REPAIR-TERRAIN-PLANNING-CLOSE — AWAITING INDEPENDENT REVIEW
-> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。已完成地形规划联合修复验收收口：1) ISSUE-A 单脚 3D 空间位移作为最大步长约束对象，自适应双足步点截断，严格防范超限步长；2) ISSUE-B 接缝与候选位移严格执行 res.success and res.allows_regular_support 复合门禁，彻底拒绝无几何支撑反事实异常，绝不兜底为平地法线；3) 针对性测试扩展至 25/25 PASS，分层自动化套件全量回归（Quick 19/19, Physics 21/21, Motion 12/12, Full 36/36 全 PASS）。存量缺陷彻底清零，其余 5 项合同缺口维持原状待后续推进。
+> **当前阶段**：09-A Documentation Final Gate (PKG5-09A-DOC-STATE-FINAL)
+> **审计与修复基准 Commit**：cf7114c59bc8894b728cbacadcbbe4971593a526
+> **最后更新时间**：2026-11-01
+> **当前状态**：09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW
+> **门禁约束**：Phase 7B 仍然严格禁止，禁止提前开发环境双向动力学。08 Rig（刚体平移与世界坐标隔离）已完成；09-A Ground × Reach（三维极值约束求解器与代码文档门禁）已技术修复并全量验证通过（FIND-R3-02 闭环）；下一项为 09-B World Rotation（尚未执行）。全仓库当前剩余 3 项未完全关闭的 Finding（全部集中于 PKG-5：FIND-R3-01 局部完成待 09-B 及生命周期闭环、FIND-R3-03 待处理、FIND-R3-04 待处理）。
 
 ---
 
@@ -13,10 +13,10 @@
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **0** (存量) + **3** (已修复) | 存量：无（已清零）；已修复：FIND-R2-01 (手部接触生命周期), FIND-R2-02/T01-02 (接触状态覆写), FIND-R2-07/T01-04 (接缝横向偏置) |
-| **接口合同缺口 (CONTRACT_GAP)** | **4** (存量) + **9** (已修复) | 存量：FIND-R3-01 (全生命周期动态父级与旋转未反解), FIND-R3-02 (地面防穿透硬编码根高程), FIND-R3-03 (元数据混淆与重置残留), FIND-R3-04 (伪只读强副作用维持器)；已修复：FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-05 (几何合规性与支撑拓扑脱节), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
+| **接口合同缺口 (CONTRACT_GAP)** | **3** (存量) + **10** (已修复) | 存量：FIND-R3-01 (部分完成，待09-B旋转反解及后续生命周期), FIND-R3-03 (元数据混淆与重置残留待修复), FIND-R3-04 (伪只读强副作用维持器待修复)；已修复：FIND-R3-02 (足底高程与可达约束三维解析极值求解器已闭环), FIND-R2-03/T01-01 (失败吞没与死分支收口), FIND-R2-04/T01-03 (统一动作结果与规划器失败处理), FIND-R2-05 (几何合规性与支撑拓扑脱节), FIND-R2-06/T01-05 (预规划双轨制与回退一致性), FIND-T01-06 (动作环境所有权与显式重绑定), FIND-T01-07 (负向行进), FIND-T01-08 (短步态根足插值滞后过伸), FIND-R4-01 (场景执行门禁与真实落盘保护), FIND-R4-02 (统一环境查询合同) |
 | **已知设计限制 (DESIGN_LIMITATION)** | **3** | LIMIT-01 (固定 X 走廊双向 +/-Y 导航), LIMIT-02 (FK 正弦摆臂), LIMIT-03 (IK 截断无全身降位) |
 | **未验证项 (UNVERIFIED)** | **2** | UNVERIFIED-01 (全身4点接触解算稳定性), UNVERIFIED-02 (极端负高程断崖吸收；含非零偏航足部旋转偏差数值待量测) |
-| **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (FIND-R2-01, FIND-R2-02, FIND-R2-03, FIND-R2-04, FIND-R2-06, FIND-R2-07 已修复解除阻碍) |
+| **阻碍后续开发 (Blocks Further Dev: YES)** | **1** | FIND-R3-01 (部分完成，仍存在 09-B 旋转反解及后续生命周期问题，阻碍后续全面双足动态) |
 
 ---
 
@@ -34,8 +34,8 @@
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 450–512 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 920–930 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 152 / 380–384 | CONTRACT_GAP | `STATIC_CONFIRMED` | **YES** | `foot_contact.py` / `ik.py` |
-| **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `ik.py` |
+| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 152 / 380–384 | CONTRACT_GAP (PARTIALLY_RESOLVED) | `STATIC_CONFIRMED` | **YES** | `foot_contact.py` / `ik.py` |
+| **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `ik.py` |
 | **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
 | **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | Lines 207–235 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
 | **FIND-R4-01** | - | `src/scene/playground_terrain_traversal.py` | `generate_dynamics_playground_environment_gate01_u3_blend()` | Lines 633–640, 689, 704 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `playground_terrain_traversal.py` |
@@ -398,10 +398,10 @@
   - 但在系统全局 `reset_leg_ik()` 时，这些历史快照依然残留，可能对跨动作调试或未加锁校验的第三方检查产生脏数据干扰。
 * **Expected Contract**:
   摆动期间历史快照允许保留但应明确标记为历史态；全局重置时应彻底清空。
-* **Classification**: `CONTRACT_GAP (RESOLVED)`
-* **Blocks Further Development**: `NO (RESOLVED)`
-* **Repair Status**: `FIXED / VERIFIED`
-* **Fix & Verification Summary**: 修正终止条件为基于有向行进标量判定：`while abs(y_tgt - curr_lead_y) - stride_len >= route.min_step_length_m * 0.5:`；支持固定 X 走廊双向 (+Y / -Y) 对称步点生成；Hermite 样条一阶切线斜率自适应 travel 方向符号，保证 -Y 速度非正且根部位移严格单调递减；在 `tests/test_terrain_planning_contract.py` Group C 验证通过。
+* **Classification**: `CONTRACT_GAP`
+* **Blocks Further Development**: `NO`
+* **Repair Status**: `OPEN / PENDING REPAIR`
+* **Fix & Verification Summary**: 待处理 (PENDING REPAIR)。经排查，现有生产消费者均前置检查了 is_locked，未引发误判；但系统全局重置时历史快照残留问题仍未清理，计划在后续维护包中处理。
 * **Suggested Repair Boundary**: 在 `reset_leg_ik()` 中清理 Empty 上的历史锁定属性；在只读查询中明确区分当前活跃支撑点与历史落点快照。
 
 ---
@@ -539,4 +539,8 @@ flowchart TD
    - 消除接缝探测坐标偏置，统一步态规划未命中策略、负向行进支持与 2.5D 高程/法线支撑有效性对齐。
 5. **维护包 5: Rig 与 IK 空间坐标不变量、支撑锁定与副作用解耦 (Rig & IK Spatial Invariance & Side Effects)**:
    - 修复目标：`FIND-R3-01`, `FIND-R3-02`, `FIND-R3-03`, `FIND-R3-04`。
-   - 彻底废除跨生命周期动态父级切换，全生命周期维持绝对世界空间；解耦底层地面防穿透与根节点高程绑定；区分历史落点快照与重置清理；将 `evaluate_foot_support` 拆分为显式锁态维持器与纯只读状态查询器。
+   - **当前进展**：
+     - `WS-01`：已关闭初始化与重置控制器世界空间无父级子问题 (`ik.py:81–87, 127–160, 232–260`)；
+     - `08 Rig`：已完成 `verify_task6fb_rigid_link.py` Test 8B 刚体平移测试语义隔离；
+     - `09-A`：已完成 `set_foot_ik_target()` 地面高程解耦、三维极值解析求解器与代码文档门禁收口 (FIND-R3-02 闭环)；
+     - **待处理**：`09-B`（FIND-R3-01 姿态反解）、`10 Upper IK/FK`、`11 FootLock`（FIND-R3-03, FIND-R3-04）、`12 联合验收`。

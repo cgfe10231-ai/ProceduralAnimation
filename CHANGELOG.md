@@ -3,6 +3,34 @@
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
 
+## [2026-11-01] PKG-5 / 09-A: 09-A 全仓文档状态同步与最终门禁 (PKG5-09A-DOC-STATE-FINAL)
+
+### 1. 全仓审计问题登记表与状态同步 (docs/audit/production_interface/OPEN_FINDINGS.md)
+* **头部基准同步 (D01)**：
+  - 更新当前阶段为 `09-A Documentation Final Gate (PKG5-09A-DOC-STATE-FINAL)`，基准 Commit 同步为 `cf7114c59bc8894b728cbacadcbbe4971593a526`，状态标定为 `09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`。
+* **Finding 状态与数量统合**：
+  - FIND-R3-02：已修复（09-A 验证完成，标定为 `FIXED / VERIFIED`）；
+  - FIND-R3-01：部分完成（WS-01 已关闭控制器世界空间初始化与重置无父级子问题，仍存在 09-B 旋转反解及后续生命周期问题，标定为 `PARTIALLY_RESOLVED`）；
+  - FIND-R3-03：待处理（清理残留历史快照，标定为 `OPEN / PENDING REPAIR`）；
+  - FIND-R3-04：待处理（强副作用维持器拆分，标定为 `OPEN / PENDING REPAIR`）；
+  - 纠正 FIND-R3-03 中误贴的 T01-07 文本，恢复真实审计事实；确证存量未完全关闭 Finding 严格为 3 项。
+
+### 2. 架构同步卡片基准与测试语义校准 (ARCHITECTURE_SYNC.md)
+* **基准与测试语义校准 (D02)**：
+  - 明确标注 Environment Gate 01 最终审计 (v4.0, Git SHA `7a3e244825cd87bf3d787c530318055dc94a3e1f`) 为历史基准（35/35 测试全绿）；
+  - 增设当前工程进度基准 `PKG5-09A-DOC-STATE-FINAL` 与 Git SHA `cf7114c59bc8894b728cbacadcbbe4971593a526`；
+  - 准确同步当前分层全量自动化回归通过结果（Quick 19/19, Physics 24/24, Motion 12/12, Full 39/39，09-A 专项 20/20 PASS，WS-01 6/6 PASS，文档物理校验 0 错误）；
+  - 严格保持十项核心架构原则实质约束不变。
+
+### 3. 项目状态看板指针纠偏与下一步顺序收敛 (PROJECT_STATE.md)
+* **下一步执行顺序校正 (D03)**：
+  - 移除 07 作为待审查任务的陈旧指针；
+  - 明确执行顺序：08 Rig 已完成；09-A Ground × Reach 技术修复与门禁收口完成，标定为 `09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`；09-B World Rotation 为下一项任务（尚未执行）；10 Upper IK/FK、11 FootLock、12 联合验收尚未执行；Phase 7B 严格未获授权。
+  - 为已知缺陷历史记录增加明确状态标注（如历史休眠引用的枚举项标注 [已修复 / FIXED in PKG-1]）。
+
+### 4. 门禁状态确认
+* **终门禁终止状态**：`09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，严禁自行推进 Task 09-B，严禁修改 `foot_contact.py`，严禁进入 Phase 7B）。
+
 ## [2026-11-01] PKG-5 / 09 Lower-Limb IK: 三维 Ground × Reach 约束求解器最终工程收口 (PKG5-09A-COMPLETE-CONSTRAINT-CLOSURE)
 
 ### 1. set_foot_ik_target 解析联合约束求解器与独立 Oracle 验证 (FIND-R3-02 完整闭环收口)

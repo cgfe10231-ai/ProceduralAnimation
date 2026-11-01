@@ -6,8 +6,8 @@
 
 ## 1. 当前目标与当前状态
 
-* **当前任务**：ProceduralAnimation — PKG-5 / 09 Lower-Limb IK: 最终代码完整性检查、测试验证与全仓文档状态一致性收口 (Task ID: `PKG5-09A-CODE-DOC-INTEGRITY-CLOSURE`)。
-* **当前状态**：`PKG-5 / 09-A — AWAITING INDEPENDENT REVIEW`（严格停止等待外部审查，严禁自行推进 Task 09-B，严禁修改 `foot_contact.py`，严禁进入 Phase 7B）。
+* **当前任务**：ProceduralAnimation — 09-A Documentation Final Gate (Task ID: `PKG5-09A-DOC-STATE-FINAL`)。
+* **当前状态**：`09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`（严格停止等待外部独立审查，严禁自行推进 Task 09-B，严禁修改 `foot_contact.py`，严禁进入 Phase 7B）。
 * **核心成果**：
   1. **代码死分支清理**：清理 `src/rig/ik.py:set_foot_ik_target()` 末尾第一次 `return state` 后不可达的 13 行重复死代码尾部，确保依赖图单次在正确位置更新；
   2. **OPEN_FINDINGS 历史证据恢复**：核对并恢复上一轮提交因正则误删的历史缺陷记录（FIND-R2-03 至 R2-07、FIND-T01-07 等），确保全仓历史审计证据 100% 完整；
