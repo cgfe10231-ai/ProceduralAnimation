@@ -18,6 +18,10 @@ Validates Lower-Limb IK World Rotation Contract and Controller Lifecycle Closure
 - TEST-15: Singular parent transform rejection (det <= 1e-7 is rejected in Phase A with full failure atomicity).
 - TEST-16: Reflection parent transform rejection (det < 0 is rejected in Phase A with full failure atomicity).
 - TEST-17: Phase B transaction rollback fault injection (catches fault during Phase B, restores all 4 controllers and 6 bones atomically, and re-raises).
+- TEST-18: Small-scale positive uniform scale (A = 0.001*R, det=1e-9 > 0 is accepted without scale rejection).
+- TEST-19: Near-threshold non-conformal matrix rejection (1e-6 < epsilon < 1e-4 rejected by Phase A).
+- TEST-20: Conformal boundary tolerance acceptance (epsilon <= 1e-6 accepted by Phase A).
+- TEST-21: KneePole independent shear rejection (FootIK valid, KneePole shear rejected with KneePole.L in exception).
 """
 
 from __future__ import annotations
@@ -967,6 +971,229 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         self.assertIn("INJECTED_PHASE_B_FAILURE", str(ctx.exception))
         bpy.context.view_layer.update()
         _assert_rig_state_identical(self, saved_state, tol=1e-6)
+
+    def test_18_small_scale_positive_uniform_scale(self) -> None:
+        """TEST-18: Small-scale positive uniform scale (A = 0.001*R, det=1e-9) is accepted and achieves world rotation."""
+        parent_empty = bpy.data.objects.new("TestParentSmallScale", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.0, -8.0, 0.0))
+        # Composite 3D rotation R
+        parent_empty.rotation_euler = Euler((math.radians(20.0), math.radians(-15.0), math.radians(35.0)), "XYZ")
+        parent_empty.scale = Vector((0.001, 0.001, 0.001))
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        a_mat = Matrix((
+            (eff_parent[0][0], eff_parent[0][1], eff_parent[0][2]),
+            (eff_parent[1][0], eff_parent[1][1], eff_parent[1][2]),
+            (eff_parent[2][0], eff_parent[2][1], eff_parent[2][2]),
+        ))
+        det_a = a_mat.determinant()
+        self.assertAlmostEqual(det_a, 1e-9, delta=1e-12, msg="det(A) must be 1e-9 for scale=0.001")
+        self.assertGreater(det_a, 0.0, "det(A) must be strictly positive")
+
+        req_rot_deg = (15.0, -25.0, 30.0)
+        res = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, -7.85, 0.18),
+            foot_rotation_deg=req_rot_deg,
+            clamp_ground=False,
+            clamp_reach=False,
+        )
+        bpy.context.view_layer.update()
+
+        self.assertIsInstance(res, dict, "set_foot_ik_target must return a valid state dict")
+        expected_world_rot = Euler((math.radians(v) for v in req_rot_deg), "XYZ").to_quaternion()
+        actual_world_rot = ik_obj.matrix_world.to_quaternion()
+        diff_rad = _quat_angle_diff(expected_world_rot, actual_world_rot)
+        self.assertLess(diff_rad, 1e-4, f"Small scale world rotation error {math.degrees(diff_rad):.4f} deg exceeds tolerance")
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    def test_19_near_threshold_non_conformal_rejection(self) -> None:
+        """TEST-19: Effective parent matrix with 1e-6 < epsilon < 1e-4 is rejected by new tolerance (proved vs old 1e-4)."""
+        parent_empty = bpy.data.objects.new("TestParentConformalThreshold", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.0, -8.0, 0.0))
+        parent_empty.rotation_euler = Euler((math.radians(10.0), math.radians(20.0), math.radians(-15.0)), "XYZ")
+        parent_empty.scale = Vector((1.0, 1.0, 1.0))
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        # Introduce non-conformal deviation: scale_z = 1.000015 yields epsilon ~= 2.0e-5
+        ik_obj.matrix_parent_inverse = Matrix.Diagonal(Vector((1.0, 1.0, 1.000015, 1.0)))
+        bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        a_mat = Matrix((
+            (eff_parent[0][0], eff_parent[0][1], eff_parent[0][2]),
+            (eff_parent[1][0], eff_parent[1][1], eff_parent[1][2]),
+            (eff_parent[2][0], eff_parent[2][1], eff_parent[2][2]),
+        ))
+        g_mat = a_mat.transposed() @ a_mat
+        s_sq = (g_mat[0][0] + g_mat[1][1] + g_mat[2][2]) / 3.0
+        max_rel_dev = max(abs(g_mat[r][c] - (s_sq if r == c else 0.0)) / s_sq for r in range(3) for c in range(3))
+
+        # Explicitly prove condition: 1e-6 < epsilon < 1e-4
+        self.assertGreater(max_rel_dev, 1e-6, "Relative deviation must exceed new threshold 1e-6")
+        self.assertLess(max_rel_dev, 1e-4, "Relative deviation must be below old threshold 1e-4 (proving old allowed it)")
+
+        saved_state = _capture_rig_state(self.armature)
+
+        with self.assertRaises(ValueError) as ctx:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, -7.85, 0.18),
+                foot_rotation_deg=(10.0, 20.0, -15.0),
+                clamp_ground=False,
+                clamp_reach=False,
+            )
+
+        self.assertIn("Phase A effective parent transform validation failed", str(ctx.exception))
+        self.assertIn("non-conformal transform with relative deviation", str(ctx.exception))
+        self.assertIn("FootIK.L", str(ctx.exception))
+        bpy.context.view_layer.update()
+        _assert_rig_state_identical(self, saved_state, tol=1e-6)
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    def test_20_conformal_boundary_tolerance_acceptance(self) -> None:
+        """TEST-20: Effective parent matrix within legal numerical boundary (epsilon <= 1e-6) is accepted."""
+        parent_empty = bpy.data.objects.new("TestParentConformalLegal", None)
+        bpy.context.scene.collection.objects.link(parent_empty)
+        parent_empty.location = Vector((0.0, -8.0, 0.0))
+        parent_empty.rotation_euler = Euler((math.radians(12.0), math.radians(-18.0), math.radians(24.0)), "XYZ")
+        parent_empty.scale = Vector((1.2, 1.2, 1.2))
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = parent_empty
+        # Small perturbation right within tolerance: epsilon ~= 5.2e-7 <= 1e-6
+        ik_obj.matrix_parent_inverse = Matrix.Diagonal(Vector((1.0, 1.0, 1.0000003, 1.0)))
+        bpy.context.view_layer.update()
+
+        eff_parent = parent_empty.matrix_world @ ik_obj.matrix_parent_inverse
+        a_mat = Matrix((
+            (eff_parent[0][0], eff_parent[0][1], eff_parent[0][2]),
+            (eff_parent[1][0], eff_parent[1][1], eff_parent[1][2]),
+            (eff_parent[2][0], eff_parent[2][1], eff_parent[2][2]),
+        ))
+        g_mat = a_mat.transposed() @ a_mat
+        s_sq = (g_mat[0][0] + g_mat[1][1] + g_mat[2][2]) / 3.0
+        max_rel_dev = max(abs(g_mat[r][c] - (s_sq if r == c else 0.0)) / s_sq for r in range(3) for c in range(3))
+
+        # Explicitly prove condition: epsilon <= 1e-6 and > 0
+        self.assertLessEqual(max_rel_dev, 1e-6, "Relative deviation must be within legal tolerance 1e-6")
+        self.assertGreater(max_rel_dev, 0.0, "Relative deviation should test non-trivial boundary")
+
+        req_rot_deg = (15.0, -20.0, 30.0)
+        res = set_foot_ik_target(
+            self.armature,
+            "L",
+            (-HIP_X_OFFSET, -7.85, 0.18),
+            foot_rotation_deg=req_rot_deg,
+            clamp_ground=False,
+            clamp_reach=False,
+        )
+        bpy.context.view_layer.update()
+
+        self.assertIsInstance(res, dict, "set_foot_ik_target must return a valid state dict")
+        expected_world_rot = Euler((math.radians(v) for v in req_rot_deg), "XYZ").to_quaternion()
+        actual_world_rot = ik_obj.matrix_world.to_quaternion()
+        diff_rad = _quat_angle_diff(expected_world_rot, actual_world_rot)
+        self.assertLess(diff_rad, 1e-4, f"Boundary conformal world rotation error {math.degrees(diff_rad):.4f} deg exceeds tolerance")
+
+        # Cleanup
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(parent_empty)
+
+    def test_21_kneepole_independent_shear_rejection(self) -> None:
+        """TEST-21: KneePole independent shear rejection while FootIK remains pristine and valid."""
+        # 1. Setup FootIK in valid parentless state
+        ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+
+        # 2. Setup KneePole with parent having non-conformal shear
+        pole_parent = bpy.data.objects.new("TestPoleParentShear", None)
+        bpy.context.scene.collection.objects.link(pole_parent)
+        pole_parent.location = Vector((0.0, -8.0, 0.0))
+        pole_parent.rotation_euler = Euler((0.0, 0.0, math.radians(20.0)), "XYZ")
+        pole_parent.scale = Vector((1.0, 1.0, 1.0))
+        bpy.context.view_layer.update()
+
+        pole_obj = bpy.data.objects[POLE_TARGET_NAMES["L"]]
+        pole_obj.parent = pole_parent
+        shear_mat = Matrix((
+            (1.0, 0.5, 0.0, 0.0),
+            (0.0, 1.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0, 0.0),
+            (0.0, 0.0, 0.0, 1.0),
+        ))
+        pole_obj.matrix_parent_inverse = shear_mat
+        bpy.context.view_layer.update()
+
+        # 3. Explicitly prove A_pole^T @ A_pole != s^2 * I before calling production
+        eff_pole = pole_parent.matrix_world @ pole_obj.matrix_parent_inverse
+        a_pole = Matrix((
+            (eff_pole[0][0], eff_pole[0][1], eff_pole[0][2]),
+            (eff_pole[1][0], eff_pole[1][1], eff_pole[1][2]),
+            (eff_pole[2][0], eff_pole[2][1], eff_pole[2][2]),
+        ))
+        g_pole = a_pole.transposed() @ a_pole
+        s_sq_pole = (g_pole[0][0] + g_pole[1][1] + g_pole[2][2]) / 3.0
+        max_rel_dev_pole = max(
+            abs(g_pole[r][c] - (s_sq_pole if r == c else 0.0)) / s_sq_pole
+            for r in range(3) for c in range(3)
+        )
+        is_isotropic = all(
+            math.isclose(g_pole[r][c], s_sq_pole if r == c else 0.0, abs_tol=1e-5)
+            for r in range(3) for c in range(3)
+        )
+        self.assertFalse(is_isotropic, "A_pole^T @ A_pole must strictly not equal s^2 * I")
+        self.assertGreater(max_rel_dev_pole, 1e-4, "KneePole matrix must have non-conformal shear")
+
+        saved_state = _capture_rig_state(self.armature)
+
+        # 4. Invoke real set_foot_ik_target
+        with self.assertRaises(ValueError) as ctx:
+            set_foot_ik_target(
+                self.armature,
+                "L",
+                (-HIP_X_OFFSET, -7.85, 0.18),
+                foot_rotation_deg=(10.0, 20.0, -15.0),
+                clamp_ground=False,
+                clamp_reach=False,
+            )
+
+        # 5. Assertions on the rejection path
+        self.assertIn("Phase A effective parent transform validation failed", str(ctx.exception))
+        self.assertIn("KneePole.L", str(ctx.exception), "Exception must explicitly identify KneePole.L")
+        self.assertNotIn("FootIK.L", str(ctx.exception), "FootIK validation must not trigger before KneePole")
+
+        # 6. Verify atomicity across both controllers and all 6 leg bones
+        bpy.context.view_layer.update()
+        _assert_rig_state_identical(self, saved_state, tol=1e-6)
+
+        # Cleanup
+        pole_obj.parent = None
+        pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.data.objects.remove(pole_parent)
 
 
 if __name__ == "__main__":

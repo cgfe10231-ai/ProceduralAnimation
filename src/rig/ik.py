@@ -335,7 +335,7 @@ def _validate_effective_parent_transform(eff_mat: Matrix, target_name: str) -> N
 
     The supported domain consists strictly of pure 3D rotations and positive uniform
     scales combined with rotations. Non-affine matrices, non-finite elements,
-    singular matrices (det <= 1e-7), reflection matrices, non-uniform scaling,
+    singular matrices (det == 0), reflection matrices (det < 0), non-uniform scaling,
     and shearing are unsupported and rejected in Phase A before any scene mutation occurs.
     """
     for r in range(4):
@@ -365,20 +365,27 @@ def _validate_effective_parent_transform(eff_mat: Matrix, target_name: str) -> N
         (eff_mat[2][0], eff_mat[2][1], eff_mat[2][2]),
     ))
     det_a = a_mat.determinant()
-    if det_a <= 1e-7:
+    if det_a < 0.0:
         raise ValueError(
             f"Phase A effective parent transform validation failed for '{target_name}': "
-            f"non-positive or singular determinant det(A)={det_a:.6e}. "
+            f"negative determinant det(A)={det_a:.6e} indicates reflection. "
+            f"Singular transforms and reflections are unsupported; "
+            f"the interface requires pure rotation or positive uniform scale with rotation."
+        )
+    if det_a == 0.0:
+        raise ValueError(
+            f"Phase A effective parent transform validation failed for '{target_name}': "
+            f"singular matrix with zero determinant det(A)={det_a:.6e}. "
             f"Singular transforms and reflections are unsupported; "
             f"the interface requires pure rotation or positive uniform scale with rotation."
         )
 
     g_mat = a_mat.transposed() @ a_mat
     s_sq = (g_mat[0][0] + g_mat[1][1] + g_mat[2][2]) / 3.0
-    if s_sq <= 1e-7:
+    if s_sq <= 1e-12:
         raise ValueError(
             f"Phase A effective parent transform validation failed for '{target_name}': "
-            f"degenerate scale s^2={s_sq:.6e}."
+            f"degenerate scale s^2={s_sq:.6e} <= 1e-12."
         )
 
     max_rel_dev = 0.0
@@ -389,10 +396,10 @@ def _validate_effective_parent_transform(eff_mat: Matrix, target_name: str) -> N
             if dev > max_rel_dev:
                 max_rel_dev = dev
 
-    if max_rel_dev > 1e-4:
+    if max_rel_dev > 1e-6:
         raise ValueError(
             f"Phase A effective parent transform validation failed for '{target_name}': "
-            f"non-conformal transform with relative deviation {max_rel_dev:.6e} > 1e-4. "
+            f"non-conformal transform with relative deviation {max_rel_dev:.6e} > 1e-6. "
             f"Non-uniform scale and shear are unsupported; "
             f"the interface requires pure rotation or positive uniform scale with rotation."
         )
