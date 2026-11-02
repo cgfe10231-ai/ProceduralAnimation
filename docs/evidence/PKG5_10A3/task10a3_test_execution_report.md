@@ -111,6 +111,9 @@ All four tiers were executed via `tests/run_test_suite.py` without fail-fast, wi
 
 * No files in `src/` were modified.
 * No files in `tests/test_arm_ik_lifecycle_world_transform_contract.py` or `tests/test_registry.py` were modified.
-* No `.blend` scenes were generated, overwritten, opened, or rendered.
-* No manual GUI drag-and-drop or character terrain interaction acceptance was performed.
-* Bidirectional environment-character interaction is deferred to subsequent formal tasks and Task 6H.
+* Automated regressions were executed fully, including Headless Blender tests (`blender -b`).
+* Full Tier includes `dynamics_playground_blend`, which reopens the existing `output/dynamics_playground.blend` in Headless Blender for automated integrity assertions.
+* `AUTOMATED_PASS` signifies programmatic check completion only and does not represent user GUI visual acceptance.
+* No Blender GUI visual acceptance was performed during this task.
+* No manual terrain dragging or real-time character response inspection was performed.
+* Bidirectional environment-character interaction visual acceptance remains deferred to subsequent formal phases and Task 6H.
