@@ -2,6 +2,26 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-02] PKG-5：Task 10 / 11 / 12 架构职责冻结与执行路线同步
+
+* **任务性质**：同步 PKG-5 后续任务的模块职责、审计候选、任务依赖和阶段准入边界。
+* **文档提交**：`71983c3e52a15948acb19990d661fa0fe4c54199`。
+* **Task 10**：Upper-Limb IK/FK，状态为 `ROUTE FROZEN — IMPLEMENTATION NOT STARTED`。
+
+  * 10-A：Rig 初始化、控制器生命周期、有效父级矩阵与世界空间合同。
+  * 10-B：输入预验证、事务回滚、Influence 与异常安全合同。
+  * 10-C：PlannedHandTarget、Bridge、WBC 无损接口、FK/IK 仲裁、ROM 与目标反馈。
+  * 10-D：独立上肢轨迹、TerrainWalk 摆臂解耦、历史动作兼容和视觉验收。
+  * 下一具体任务：`10-a-1`。
+* **Task 11**：FootLock，状态为 `PLANNED — NOT STARTED`。
+
+  * 11-A：锁定元数据生命周期，负责 `FIND-R3-03`。
+  * 11-B：只读查询与显式支撑维持副作用分离，负责 `FIND-R3-04`。
+* **Task 12**：PKG-5 跨模块联合验收，等待 Task 10 与 Task 11 独立验收。
+* **Finding 状态**：总数仍为 16 项，14 项关闭，`FIND-R3-03` 和 `FIND-R3-04` 保持 OPEN。没有创建新的 Finding ID。
+* **阶段准入**：Phase 7B 继续保持 `NOT AUTHORIZED`。
+* **实施边界**：本次路线冻结只涉及架构与状态文档，不代表 Task 10、11 或 12 的生产代码已经实施或验收。
+
 ## [2026-11-02] PKG-5 / 09-B-4：下肢 IK 完整状态回滚、解锁事务补强与独立验收收口
 
 * **任务状态**：`ACCEPTED — VERIFIED`。
