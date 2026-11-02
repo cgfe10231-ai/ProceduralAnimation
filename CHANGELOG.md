@@ -6,6 +6,7 @@
 
 * **任务性质**：为现有 Arm IK API（`setup_arm_ik`, `set_hand_ik_target`, `set_arm_ik_influence`, `get_arm_ik_state`）建立统一、严格的输入预验证与零副作用保障合同。
 * **状态**：`IMPLEMENTED — TESTED — ARCHIVED — PENDING INDEPENDENT AUDIT`。
+* **提交记录**：`d56f66c759845a2e1e65ad5ee40358ae839faa87`。
 * **修改范围**：
   - `src/rig/arm_ik.py`：新增私有预验证函数（`_validate_influence`, `_validate_side`, `_validate_vec3`, `_validate_bool`）；所有输入在首次场景状态写入前完成验证；`set_hand_ik_target` 在 Phase A 校验失败时绝对不触发自动初始化（不创建 Empty、不创建约束）；Phase A3 派生世界与局部坐标/四元数有限性严格校验；修复对称 Influence 权重一致性更新。
   - `tests/test_task10b_input_validation.py`：新增 24 项独立专项测试（TEST-01 至 TEST-24），覆盖边界值、非有限数、非法类型、零副作用、未初始化防护、快照比对、L/R 独立性及权重对称性。

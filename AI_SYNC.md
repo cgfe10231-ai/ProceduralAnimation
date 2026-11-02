@@ -2,7 +2,7 @@
 
 > **项目**：ProceduralAnimation
 >
-> **最新已验证工程证据基准**：PKG-5 / Task 10-B-1 交付归档 (`docs/evidence/PKG5_10B1/`)
+> **最新已验证工程证据基准**：`d56f66c759845a2e1e65ad5ee40358ae839faa87` (`docs/evidence/PKG5_10B1/`)
 >
 > **当前分支**：`master`
 >
