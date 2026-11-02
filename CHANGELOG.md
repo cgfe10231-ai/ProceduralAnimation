@@ -2,6 +2,31 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+## [2026-11-02] PKG-5 / 09-B-4：下肢 IK 完整状态回滚、解锁事务补强与独立验收收口
+
+* **任务状态**：`ACCEPTED — VERIFIED`。
+* **任务性质**：在既有 09-B 下肢世界旋转合同基础上，补齐完整状态快照与逐字段回滚校验、FootIK / KneePole 解锁剪切拒绝、解锁 Phase B 事务回滚和有效父级数学边界测试。
+* **生产代码提交**：`52d66dfd529627a9fbc8bae6ffcf6f4fee6c64d8`。
+* **测试断言补充提交**：`3881aaadd58f76ffce18faf5d9e880bc49b82f97`。
+* **测试证据归档提交**：`0b42cb1d7dc685d1be7210bc1280519658f85809`。
+* **核心修改范围**：
+  - `src/rig/ik.py`：统一完整状态快照、完整回滚与逐字段核验。
+  - `src/rig/foot_contact.py`：`unlock_foot_contact()` Phase B 事务安全。
+  - `tests/test_leg_ik_world_rotation_contract.py`：TEST-17、TEST-22 至 TEST-27、TEST-24 元数据完整性。
+* **专项测试**：
+  - 09-B World Rotation：27/27 PASS。
+  - 09-A Ground Height：20/20 PASS。
+  - 08 Worldspace Init/Reset：6/6 PASS。
+* **分层回归**：
+  - Quick 19/19，Physics 25/25，Motion 12/12，Full 40/40。
+  - 所有层级退出码均为 0，FAIL 0、SKIPPED 0、NOT_RUN 0。
+  - Full Tier 中 31 项普通 PASS、9 项 AUTOMATED_PASS；后者仍要求视觉检查，不能标记为视觉验收完成。
+* **文档与符号检查**：C2 Final Inspector 的 6 项验证器自测试通过，`--verify-docs` PASS。
+* **证据位置**：`docs/evidence/PKG5_09B4/`。
+* **Finding 状态**：`FIND-R3-01` 保持 `FIXED / VERIFIED`；`FIND-R3-03` 与 `FIND-R3-04` 保持 OPEN，归属 Task 11。未增加 Finding ID。
+* **后续准入**：下一节点为 Task 10 / Upper-Limb IK/FK。Task 10 尚未开始，等待正式任务卡。Phase 7B 继续 `NOT AUTHORIZED`。
+* **保护纪律**：本次完成 09-B-4 文档状态同步，不修改 `ARCHITECTURE.md`、`DECISIONS.md`、历史测试日志或历史审计结论。
+
 ## [2026-11-01] PKG-5 / 09-B-3：全仓 Markdown 状态审查与文档一致性纠偏
 
 * **任务性质**：对 Git 受控全部 62 份 Markdown 文件进行逐文件审查，修复当前状态文档与历史交接记录之间的状态冲突。

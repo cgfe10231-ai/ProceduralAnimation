@@ -1,33 +1,76 @@
-# PKG-5 / 09-B-4 Complete Test Execution Evidence Archive
+# PKG-5 / 09-B-4 Test Execution Evidence Archive
 
-> **Archive Baseline Commit**: `3881aaadd58f76ffce18faf5d9e880bc49b82f97`  
-> **Generation Date**: 2026-11-02 15:43:00  
-> **Environment**: Windows 11 | Blender 5.1.1 (hash `b70da489d7f4`) | Python 3.11.9 (Blender Foundation)  
-> **Overall Status**: **100% PASSED** (Zero Failures, Zero Errors across all Targeted & Tiered Regression Suites)
-
----
-
-## 1. Directory Structure & Evidence Artifacts
-
-| Subdirectory | Target Suite / Scope | Test / Suite Count | Exit Code | Artifacts |
-|---|---|---|---|---|
-| [`01_world_rotation/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/01_world_rotation) | `leg_ik_world_rotation_contract` (PKG-5/09-B) | 27 inner tests (1 suite) | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt`<br>`inner_tests_console.txt` |
-| [`02_ground_height/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/02_ground_height) | `leg_ik_ground_height_contract` (PKG-5/09-IK-GROUND-A) | 20 inner tests (1 suite) | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt`<br>`inner_tests_console.txt` |
-| [`03_worldspace_init_reset/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/03_worldspace_init_reset) | `leg_ik_worldspace_init_reset` (PKG-5/WS-01) | 6 inner tests (1 suite) | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt`<br>`inner_tests_console.txt` |
-| [`04_tier_quick/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/04_tier_quick) | Quick Tier Regression (`--tier quick --fail-fast`) | 19 suites | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt` |
-| [`05_tier_physics/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/05_tier_physics) | Physics Tier Regression (`--tier physics --fail-fast`) | 25 suites | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt` |
-| [`06_tier_motion/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/06_tier_motion) | Motion Tier Regression (`--tier motion --fail-fast`) | 12 suites | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt` |
-| [`07_tier_full/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/07_tier_full) | Full Tier Regression (`--tier full --fail-fast`) | 40 suites | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt` |
-| [`08_verify_docs/`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_09B4/08_verify_docs) | C2 Final Inspector (`--verify-docs`) | 6 self-tests + repo audit | 0 | `test_report.md`<br>`test_report.json`<br>`console_output.txt` |
+> **Evidence Baseline Commit**: `0b42cb1d7dc685d1be7210bc1280519658f85809`
+>
+> **Generation Date**: 2026-11-02
+>
+> **Environment**: Windows 11 / Blender 5.1.1 / Python 3.11.9
+>
+> **09-B Acceptance Status**: `ACCEPTED — VERIFIED`
 
 ---
 
-## 2. Summary Statistics
+## 1. Evidence Directory
 
-* **Targeted Tests Count**:
-  * 09-B World Rotation Contract: 27/27 PASSED
-  * 09-A Ground Height Contract: 20/20 PASSED
-  * 08 Worldspace Init/Reset: 6/6 PASSED
-* **Full Tier Suites**:
-  * Planned: 40 | Executed: 40 | Passed: 40 | Failed: 0 | Skipped: 0 | Not Run: 0
-* **Documentation & Symbol Audit**: PASS (Zero phantom symbols)
+| Directory | Test Scope | Planned | Executed | Result |
+|---|---|---:|---:|---|
+| [01_world_rotation](01_world_rotation/) | 09-B World Rotation | 1 suite / 27 inner tests | 1 | PASS |
+| [02_ground_height](02_ground_height/) | 09-A Ground Height | 1 suite / 20 inner tests | 1 | PASS |
+| [03_worldspace_init_reset](03_worldspace_init_reset/) | 08 Worldspace Init/Reset | 1 suite / 6 inner tests | 1 | PASS |
+| [04_tier_quick](04_tier_quick/) | Quick Tier | 19 suites | 19 | PASS |
+| [05_tier_physics](05_tier_physics/) | Physics Tier | 25 suites | 25 | PASS |
+| [06_tier_motion](06_tier_motion/) | Motion Tier | 12 suites | 12 | PASS |
+| [07_tier_full](07_tier_full/) | Full Tier | 40 suites | 40 | PASS |
+| [08_verify_docs](08_verify_docs/) | C2 Final Inspector | 6 self-tests + documentation audit | 1 | PASS |
+
+Each test directory contains its own JSON report, Markdown report and console output. The first three targeted suites also include their inner test runner console output.
+
+## 2. Targeted Test Results
+
+| Test Suite | Inner Tests | Result | Exit Code |
+|---|---:|---|---:|
+| `leg_ik_world_rotation_contract` | 27/27 | PASS | 0 |
+| `leg_ik_ground_height_contract` | 20/20 | PASS | 0 |
+| `leg_ik_worldspace_init_reset` | 6/6 | PASS | 0 |
+
+The 09-B World Rotation test output explicitly records:
+
+`Ran 27 tests`
+
+`OK`
+
+## 3. Tiered Regression Results
+
+| Tier | Planned | Executed | Ordinary PASS | AUTOMATED_PASS | FAIL | SKIPPED | NOT_RUN | Exit Code |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Quick | 19 | 19 | 16 | 3 | 0 | 0 | 0 | 0 |
+| Physics | 25 | 25 | 22 | 3 | 0 | 0 | 0 | 0 |
+| Motion | 12 | 12 | 6 | 6 | 0 | 0 | 0 | 0 |
+| Full | 40 | 40 | 31 | 9 | 0 | 0 | 0 | 0 |
+
+All four tier runners exited with code 0.
+
+**AUTOMATED_PASS is not equivalent to visual acceptance.** The 9 Full Tier entries marked AUTOMATED_PASS still require the corresponding visual inspection. They are not represented as visually accepted by this archive.
+
+This visual-review distinction does not alter the 09-B targeted suite result, where all 27 tests returned ordinary PASS.
+
+## 4. Documentation Integrity Check
+
+`tests/audit_c2_final_inspector.py --verify-docs`
+
+Result:
+
+- Validator self-tests: 6/6 PASS.
+- Referenced source and test paths: PASS.
+- Phantom symbol references: 0.
+- Process exit code: 0.
+
+## 5. Acceptance Evidence
+
+The 09-B-4 acceptance is supported by:
+
+- Production repair commit: `52d66dfd529627a9fbc8bae6ffcf6f4fee6c64d8`.
+- TEST-24 assertion extension: `3881aaadd58f76ffce18faf5d9e880bc49b82f97`.
+- This evidence archive commit: `0b42cb1d7dc685d1be7210bc1280519658f85809`.
+
+09-B-4 is accepted and verified. The next PKG-5 node is Task 10 / Upper-Limb IK/FK.

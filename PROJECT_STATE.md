@@ -1,46 +1,69 @@
-# PROJECT_STATE: 项目当前真实状态
+# PROJECT_STATE：项目当前真实状态
 
-> **更新时间**：2026-11-01
+> **更新时间**：2026-11-02
 >
-> **当前任务**：PKG-5 / 09-B-4 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
+> **09-B-4 验收证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **当前状态**：`IN PROGRESS — NOT ACCEPTED`。修复尚未完成，仍存在未解决问题。
+> **最近完成节点**：PKG-5 / 09-B / 09-B-4 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
+>
+> **当前完成状态**：`ACCEPTED — VERIFIED`。
+>
+> **下一执行节点**：PKG-5 / Task 10 — Upper-Limb IK/FK。
+>
+> **下一节点准入状态**：`READY FOR TASK CARD — NOT STARTED`。
 >
 > **历史状态边界**：
-> - 原 09-B 的历史修复与 DEC-064 验收记录继续有效。
-> - FIND-R3-01 的历史修复状态仍为 `RESOLVED / FIXED / VERIFIED`。
-> - 当前 09-B-3 是在历史修复基础上的后续独立修复节点，不能使用原 09-B 验收记录替代当前验收。
+> - DEC-064 与原 09-B 历史验收记录继续有效。
+> - 09-B-4 是在既有 09-B 修复基础上的完整状态回滚、解锁事务与数学边界补强及独立复核。
+> - 不得把已完成的 09-B-4 重新描述为 `IN PROGRESS — NOT ACCEPTED`。
+> - 不得创建未经授权的 09-B-5。
 >
-> **当前生产源码支持域**（`src/rig/ik.py`）：
+> **当前生产源码数学支持域**（`src/rig/ik.py`）：
 > - 有效父级矩阵：`M_eff = M_parent @ matrix_parent_inverse`。
 > - 非有限矩阵元素拒绝。
 > - 非仿射矩阵拒绝，最后一行容差为 `1e-6`。
-> - 负行列式镜像反射拒绝。
-> - 零行列式奇异矩阵拒绝。
+> - `det(A) < 0` 的镜像反射拒绝。
+> - `det(A) == 0` 的奇异矩阵拒绝。
 > - `s_sq <= 1e-12` 的退化尺度拒绝。
 > - Gram 矩阵相对偏差大于 `1e-6` 的非共形变换拒绝。
 > - 支持纯旋转与正均匀缩放和旋转的组合。
 >
-> **当前测试状态**：
-> - 测试源码包含 TEST-01 至 TEST-21。
-> - 历史执行记录仅证明此前 17 项测试通过。
-> - TEST-18 至 TEST-21 尚无当前实际运行证据。
-> - 不得声明 21/21 PASS。
-> - TEST-17 的状态快照辅助函数保存了多个变换通道，但断言辅助函数没有逐项比较全部已保存字段；完整状态恢复证据仍不充分。
-> - 测试文件顶部 TEST-15 注释的 `det <= 1e-7` 与当前生产源码的奇异矩阵判定不一致。
+> **当前完整状态与事务合同**：
+> - `_snapshot_leg_rig_state()` 捕获 4 个腿部控制器的 15 个状态字段，以及 6 根腿部姿态骨骼的 8 个状态字段。
+> - `_rollback_leg_rig_state()` 恢复并核验所有快照字段。
+> - `unlock_foot_contact()` 的 Phase B 修改过程具备失败回滚。
+> - TEST-17、TEST-22 至 TEST-27 已纳入专项测试。
+> - TEST-24 对 7 项锁定元数据执行逐项相等性核验。
+>
+> **当前专项测试状态**：
+> - `test_leg_ik_world_rotation_contract.py`：27/27 PASS。
+> - `test_leg_ik_ground_height_contract.py`：20/20 PASS。
+> - `test_leg_ik_worldspace_init_reset.py`：6/6 PASS。
+> - 文档符号审计及 6 项审计器自测试通过。
+>
+> **当前分层回归状态**：
+> - Quick：19/19，退出码 0。
+> - Physics：25/25，退出码 0。
+> - Motion：12/12，退出码 0。
+> - Full：40/40，退出码 0。
+> - 四级测试均为 FAIL 0、SKIPPED 0、NOT_RUN 0。
+> - `AUTOMATED_PASS` 仍要求相应的视觉检查，不得误写为视觉验收已完成。
 >
 > **当前 Finding 状态**：
-> - `FIND-R3-01`：历史原 09-B 修复已关闭；当前 09-B-3 后续修复仍未验收。
-> - `FIND-R3-03`：当前未关闭，归属 PKG-5 / 11 FootLock。
-> - `FIND-R3-04`：当前未关闭，归属 PKG-5 / 11 FootLock。
+> - `FIND-R3-01`：`FIXED / VERIFIED`。
+> - `FIND-R3-03`：`OPEN`，归属 Task 11。
+> - `FIND-R3-04`：`OPEN`，归属 Task 11。
+> - 全仓 16 项 Finding 基线不变，14 项关闭，2 项开放。
 >
-> **当前准入边界**：
-> - 09-B-3 尚未验收。
-> - 10、11、12 尚未完成联合验收。
-> - Phase 7B 仍为 `NOT AUTHORIZED`。
-> - 只有完成 09-B-3、10、11、12 的联合验收并获得项目负责人明确批准后，才允许开启 Phase 7B。
+> **当前 PKG-5 准入顺序**：
+> - 09-B：已完成，09-B-4 已验收。
+> - 10：下一任务，尚未开始。
+> - 11：FootLock，待修复。
+> - 12：全仓跨模块联合验收，待执行。
 >
-> **下一步**：继续完成 09-B-3 修复与独立核验，不得提前进入 10 或 Phase 7B。
+> **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10、11、12 的独立验收与联合验收，并取得项目负责人明确批准后方可开启。
+>
+> **保护范围**：`ARCHITECTURE.md` 与 `DECISIONS.md` 受保护；本次文档同步不修改生产代码、测试源码或 Blend 资产。
 ---
 
 ## 1. 状态分类一览
@@ -73,7 +96,7 @@
 
 ### [已验证]
 
-> **历史证据适用范围**：本节中原 09-B、DEC-064、13/13 等记录描述的是对应历史提交与历史验收现场，继续保留其历史有效性。它们不代表当前 09-B-3 已经完成。当前 09-B-3 的唯一状态为 `IN PROGRESS — NOT ACCEPTED`，以本文件顶部、`ARCHITECTURE_SYNC.md` 与 `OPEN_FINDINGS.md` 为准。
+> **历史证据适用范围**：本节中原 09-B、DEC-064、13/13 等记录描述的是对应历史提交与历史验收现场，继续保留其历史有效性。09-B-4 已完成并在既有 09-B 修复基础上通过独立验收（`ACCEPTED — VERIFIED`），以本文件顶部、`ARCHITECTURE_SYNC.md` 与 `OPEN_FINDINGS.md` 为准。
 
 * **下肢 IK 世界旋转合同与控制器生命周期独立验收补正 (PKG-5 / 09-B, PKG5-09B-REVERIFICATION-CORRECTION)**：
   * **三维世界旋转空间映射 (`src/rig/ik.py:set_foot_ik_target`)**：
@@ -1117,11 +1140,33 @@
 
 ## 2. 下一步计划
 
-当前任务执行与后续规划顺序明确如下：
-* **08 Rig（刚体平移与世界坐标隔离回归）**：**已完成**并通过独立审查（基准 SHA `8a105a0`）。
-* **09-A Ground × Reach（三维极值约束求解器与代码文档门禁）**：**技术修复与全仓门禁收口已完成**，当前状态标定为 `09-A DOCUMENTATION GATE — AWAITING INDEPENDENT REVIEW`，等待最终独立验收。
-* **09-B World Rotation（偏航旋转逆反解与足部姿态保护）**：下一项任务，**尚未执行**（严禁在 09-A 审查通过前自行推进）。
-* **10 Upper IK/FK（双臂 IK/FK 约束与手部接触接口正规化）**：**尚未执行**。
-* **11 FootLock（脚部世界锁定生命周期与副作用解耦）**：**尚未执行**。
-* **12 联合验收（PKG-5 全包联合回归与门禁验收）**：**尚未执行**。
-* **Phase 7B（双足与环境动力学推进）**：**严格禁止开启**（等待 PKG-5 整体彻底闭环并获用户明确批准）。
+当前任务顺序如下：
+
+| 节点 | 范围 | 状态 |
+|---|---|---|
+| 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
+| 09-A | Lower-Limb Ground × Reach | `COMPLETED / VERIFIED` |
+| 09-B | Lower-Limb World Rotation；最近补强节点 09-B-4 | `ACCEPTED — VERIFIED` |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `READY FOR TASK CARD — NOT STARTED` |
+| 11 | FootLock：元数据生命周期与查询/维持副作用合同 | `PENDING`，负责 FIND-R3-03、FIND-R3-04 |
+| 12 | PKG-5 跨模块接口闭环与全仓联合验收 | `PENDING` |
+
+### 2.1 下一任务：PKG-5 / Task 10
+
+目标为现有双臂 IK/FK 系统的接口合同与独立轨迹控制。
+
+必须复用 `src/rig/arm_ik.py` 和现有 WBC。
+
+尚未发出正式 Task 10 任务卡，因此不得擅自开始实现。
+
+### 2.2 Phase 7B 准入条件
+
+Phase 7B 继续保持 `NOT AUTHORIZED`。
+
+只有 Task 10、Task 11、Task 12 全部完成并通过联合验收，且获得项目负责人明确批准后，才允许进入 Phase 7B。
+
+Phase 7B 的正式定义：
+
+`Upper-Limb Independent Motion & End-Effector Target Verification`
+
+Phase 7C 是 Pipeline A / Pipeline B 的未来系统级合流节点。

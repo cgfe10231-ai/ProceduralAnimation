@@ -1,6 +1,8 @@
 # ProceduralAnimation — Production Interface Audit — R2
 ## Core Execution Chain & State Contract Audit (核心执行链、状态传递和接口合同联合审计报告)
 
+> **历史审计快照（非当前状态源）**：本文件仅描述其 Baseline Commit 和原审计日期对应的历史代码、接口签名、物理行号、Finding 状态及任务规划。上述事实可能已随之后的提交变化。本文件仅用于追溯历史问题与历史审计证据，不得直接作为当前实现说明或当前任务状态依据。使用其中的函数签名、行号、参数或结论进行开发前，必须重新读取当前生产源码及当前状态权威文件。历史正文与历史结论不得改写。
+
 ### 0. 审计基准与工作区状态检查
 * **Repository**: `cgfe10231-ai/ProceduralAnimation`
 * **Branch**: `master`

@@ -31,7 +31,15 @@
 4. **核对符号物理存在**：核对所调用的方法、类、枚举成员、数据结构与文件在磁盘上 100% 物理存在（已集成至统一测试系统：`python tests/run_test_suite.py --test-id architecture_integrity_gate` 或 `python tests/audit_c2_final_inspector.py --verify-docs` 严格只读执行，零副作用，严禁引用虚构符号）。
 5. **杜绝功能职责重叠**：确认新开发内容不会创建与现有系统职责重叠的模块（严禁制造第二套控制器、第二套求解器或第二套场景）。
 6. **严禁绕开生产管线**：确认所有运动与骨骼解算接入既有统一管线（$\text{MotionPlanner} \to \text{KinematicBridgeExecutor} \to \text{WholeBodyController} \to \text{Rig/IK/FK}$），严禁私自绕道。
-7. **确认任务当前准入**：不得在本规范中硬编码某个历史任务为永久当前任务。每次执行前，必须以 `PROJECT_STATE.md`、`HANDOFF.md`、`AI_SYNC.md`、`ARCHITECTURE_SYNC.md` 和 `OPEN_FINDINGS.md` 的一致状态为准，并核对真实 Git HEAD。若状态文件之间存在冲突，立即停止，不得自行选择较宽松的状态继续执行。当前 PKG-5 门禁顺序为 09-B-3、10、11、12；全部完成联合验收并获得项目负责人明确批准前，Phase 7B 必须保持 `NOT AUTHORIZED`。Phase 7B 当前定义为 Upper-Limb Independent Motion & End-Effector Target Verification；Phase 7C 才是两条现有执行管线的未来合流阶段。严禁提前越级或自行创造衍生阶段。
+7. **确认任务当前准入**：不得在本规范中硬编码某个历史任务为永久当前任务。每次执行前，必须以 `PROJECT_STATE.md`、`HANDOFF.md`、`AI_SYNC.md`、`ARCHITECTURE_SYNC.md` 和 `docs/audit/production_interface/OPEN_FINDINGS.md` 的一致状态为准，并核对真实 Git HEAD。若状态文件之间存在冲突，立即停止，不得自行选择较宽松的状态继续执行。
+
+   PKG-5 的固定任务顺序为：09-A Ground × Reach → 09-B Lower-Limb World Rotation → 10 Upper-Limb IK/FK → 11 FootLock → 12 综合接口闭环。
+
+   各节点是否完成，必须动态读取当前状态权威文件，不得把历史任务编号写成永久当前任务。
+
+   Phase 7B 必须等 Task 10、11、12 全部完成联合验收并取得项目负责人明确批准后方可开启。
+
+   Phase 7B 当前定义为 Upper-Limb Independent Motion & End-Effector Target Verification；Phase 7C 才是两条现有执行管线的未来合流阶段。严禁提前越级或自行创造衍生阶段。
 8. **确保历史零退化**：确认修改不会破坏历史回归基准与测试阈值（严禁篡改成熟动作参数、时间轴或静默放宽 ROM 阈值）。
 9. **保护跨宿主复用边界**：确认纯 Python 动力学内核与 Blender `bpy` 保持解耦，不破坏未来跨宿主/游戏引擎复用边界。
 10. **架构变更事前报批**：核对所有新的架构变更与接口调整是否获得用户明确书面授权并录入 `DECISIONS.md`。
@@ -120,3 +128,62 @@
 5. **单元测试与集成验收分级复用规范 (Tiered Verification Reuse)**：
    - 算法底层的纯数学单元测试（如四元数旋转、射线求交、投影点截断），允许使用最小合成数值或独立参数运行纯 Python 测试以保证毫秒级反馈。
    - **凡涉及多表面步态、障碍自适应、力学平衡或场景集成的正式验收（`physics`、`motion`、`full` 级别），必须统一部署并运行于标准 `DynamicsPlayground` 之上**。
+
+---
+
+## 7. 文档内容所有权与历史证据边界 (Documentation Governance)
+
+本项目的当前状态、工程架构、Finding 和任务准入文档属于受控工程资产。
+
+### 7.1 文档内容作者权限
+
+当项目负责人明确提供文档正文、替换段落、删除范围、增加内容或修改指令时：
+
+1. Antigravity 只能按负责人给出的确切内容执行插入、替换或删除。
+2. 不得自行改写、总结、润色、扩写或缩写负责人提供的正文。
+3. 不得为追求“更完整”自行增加未经过确认的技术结论、测试结果、Finding 状态、数学阈值或任务节点。
+4. 不得为了统一格式而改变原文的工程含义。
+5. 若提供的正文与真实源码、测试或既有决策冲突，必须停止并报告具体差异，不得自行选择一方改写。
+6. 没有收到明确内容授权时，不得自行重写权威架构文档或历史审计报告。
+
+### 7.2 精确修改原则
+
+- 必须先检查目标文件当前 Git HEAD 与实际正文。
+- 只修改任务明确列出的文件和段落。
+- 全文件替换必须使用负责人提供的完整正文。
+- 局部修改必须按明确的标题、段落或精确文本定位。
+- 不得使用宽泛全局替换破坏历史状态。
+- 不得盲目删除所谓“过时内容”；必须先区分当前状态、历史记录和已归档证据。
+- 提交前必须审查完整 `git diff`，确保没有额外文档变化。
+
+### 7.3 当前状态与历史证据的层级
+
+当前状态应以以下权威文件为准：
+
+1. `PROJECT_STATE.md`：当前工程状态。
+2. `ARCHITECTURE_SYNC.md`：当前真实架构与任务依赖。
+3. `docs/audit/production_interface/OPEN_FINDINGS.md`：当前 Finding 状态。
+4. `HANDOFF.md` 与 `AI_SYNC.md`：跨会话摘要，不得覆盖前三项事实。
+
+历史文件包括但不限于：
+
+- `DECISIONS.md` 中的已批准历史决策；
+- `CHANGELOG.md` 的旧日期条目；
+- `docs/audit/` 下的历史审计快照；
+- `docs/evidence/` 下的历史测试证据；
+- 已完成任务的历史任务报告。
+
+历史文件只能证明对应提交或审计日期的事实，不得覆盖当前源代码、当前测试结果或当前任务状态。
+
+不得为了让历史文件看起来与当前状态一致而改写历史结论。
+
+### 7.4 文档收尾验收
+
+文档任务结束前，至少执行：
+
+- `git diff --check`
+- `python tests/audit_c2_final_inspector.py --verify-docs`
+- 对本次明确指定的状态关键词进行仓库搜索。
+- 核对所有新增链接均为有效仓库相对路径或有效 URL。
+- 核对权威状态文件之间没有冲突。
+- 确认历史证据没有被删除或覆盖。

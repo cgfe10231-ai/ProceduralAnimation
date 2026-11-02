@@ -1,6 +1,8 @@
 # ProceduralAnimation — 生产接口审计 (R1–R4) 集中修复分组方案
 ## Remediation Grouping & Regression Testing Roadmap (集中修复维护包与回归测试规划)
 
+> **历史审计快照（非当前状态源）**：本文件仅描述其 Baseline Commit 和原审计日期对应的历史代码、接口签名、物理行号、Finding 状态及任务规划。上述事实可能已随之后的提交变化。本文件仅用于追溯历史问题与历史审计证据，不得直接作为当前实现说明或当前任务状态依据。使用其中的函数签名、行号、参数或结论进行开发前，必须重新读取当前生产源码及当前状态权威文件。历史正文与历史结论不得改写。
+
 > **当前阶段**：Production Interface Audit — Total Reconciliation & Closure (R1–R4 CLOSE)  
 > **基准 Commit**：`94222ddcba3fabbc3a01b4f9d6e1eca6776b4b5d`  
 > **门禁约束**：本方案仅作修复方案规划与依赖拓扑设计，**严禁在未获用户书面授权前修改任何生产代码**。Phase 7B 仍然严格禁止。

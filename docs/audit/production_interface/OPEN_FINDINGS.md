@@ -1,33 +1,35 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前修复节点**：PKG-5 / 09-B-4（Lower-Limb World Rotation）
-> **代码审计基准 HEAD**：`2904857433af01c2a7991e2da085b3c0f53a145f`
-> **本次文档同步基准 HEAD**：`76e5907eef5514801c8b17856787566c9e530a7a`
-> **文档更新时间**：2026-11-01
-> **当前修复状态**：`09-B-3 IN PROGRESS — NOT ACCEPTED`（修复尚未完成，仍存在未解决问题）
-> **历史验收说明**：DEC-064 与旧 09-B 验收记录保留其当时的历史有效性，但不得据此宣称最新 09-B-3 已通过独立验收。
-> **当前登记基线**：保留原有 16 项 Finding ID，不创建新的 Finding ID。
-> **当前未关闭历史 Finding**：FIND-R3-03、FIND-R3-04，归属 PKG-5 / 11 FootLock。
-> **当前 09-B-3 说明**：09-B-3 仍处于修复过程中，存在未解决问题。测试源码包含 TEST-01 至 TEST-21，但现有执行记录只证明此前 17 项测试通过；TEST-18 至 TEST-21 尚无当前实际执行证据。不得把补齐测试执行等同于修复完成。
-> **门禁**：Phase 7B 仍然 `NOT AUTHORIZED`。必须完成 PKG-5 / 09-B-3、10、11、12，并通过全仓联合验收及负责人明确批准。
+> **最近完成修复节点**：PKG-5 / 09-B-4（Lower-Limb World Rotation）
+> **09-B-4 验收证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
+> **生产修复提交**：`52d66dfd529627a9fbc8bae6ffcf6f4fee6c64d8`
+> **TEST-24 断言补充提交**：`3881aaadd58f76ffce18faf5d9e880bc49b82f97`
+> **文档更新时间**：2026-11-02
+> **09-B 当前状态**：`ACCEPTED — VERIFIED`
+> **下一执行节点**：Task 10 — Upper-Limb IK/FK（等待正式任务卡，尚未开始）
+> **当前登记基线**：16 项 Finding ID，不创建新的 Finding ID。
+> **当前未关闭 Finding**：FIND-R3-03、FIND-R3-04，归属 Task 11 FootLock。
+> **历史关闭状态**：FIND-R3-01 已完成并验证；FIND-R3-02 及其他历史修复状态继续有效。
+> **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10、11、12 联合验收，并取得负责人明确批准。
 
 ---
 
 ## 1. 审计缺陷与问题汇总看板 (Dashboard)
 
-> 本表中的 16 项是现有 Finding 登记基线。历史修复状态、当前未关闭 Finding、当前进行中的修复节点以及未验证项目必须分开统计。09-B-3 尚未修复完成，不得用历史验收记录替代当前修复状态。
+> 当前 Finding 状态与历史修复状态分开统计。09-B-4 已经完成，不得继续登记为进行中问题。Task 10、11、12 尚未完成，不得提前开启 Phase 7B。
 
 | 统计指标 | 数量 | 说明 |
 | :--- | :---: | :--- |
 | **已确认缺陷 (CONFIRMED_DEFECT)** | **0 项当前未关闭 + 3 项历史已修复** | FIND-R2-01、FIND-R2-02、FIND-R2-07 |
-| **接口合同缺口 (CONTRACT_GAP)** | **2 项当前未关闭 + 11 项历史已修复** | 当前未关闭：FIND-R3-03、FIND-R3-04；其余保留历史修复状态 |
+| **接口合同缺口 (CONTRACT_GAP)** | **2 项当前未关闭 + 11 项历史已修复** | 当前未关闭：FIND-R3-03、FIND-R3-04 |
 | **历史登记 Finding 总数** | **16** | 保留原有编号，不增删、不合并、不重新编号 |
-| **历史关闭数量** | **14** | 依据原有 Finding 记录；不代表当前 09-B-3 已通过 |
+| **历史关闭数量** | **14** | 14 项已关闭 |
 | **历史未关闭数量** | **2** | FIND-R3-03、FIND-R3-04 |
-| **09-B-3 当前节点** | **1 项进行中、尚未修复完成** | FIND-R3-01 的历史修复记录保留；当前 09-B-3 仍存在未解决问题，状态为 `IN PROGRESS — NOT ACCEPTED` |
-| **已知设计限制** | **3** | LIMIT-01、LIMIT-02、LIMIT-03，不能自动转化为代码缺陷 |
+| **PKG-5 / 09-B-4** | **已完成并验收** | 27/27 专项测试通过，分层回归全部零失败 |
+| **下一节点 Task 10** | **1 项待启动** | Upper-Limb IK/FK，等待正式任务卡 |
+| **已知设计限制** | **3** | LIMIT-01、LIMIT-02、LIMIT-03 |
 | **未验证项** | **2** | UNVERIFIED-01、UNVERIFIED-02；均不得宣称通过 |
-| **Phase 7B** | **NOT AUTHORIZED** | PKG-5 / 09-B-3、10、11、12 尚未完成联合验收与负责人批准 |
+| **Phase 7B** | **NOT AUTHORIZED** | Task 10、11、12 尚未完成联合验收与负责人批准 |
 
 ---
 
@@ -45,10 +47,10 @@
 | **FIND-T01-06** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.estimate_duration_frames()` | Lines 654–681 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-07** | - | `src/motion/terrain_walk.py` | `plan_terrain_footsteps()` | Lines 450–512 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 920–930 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
-| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `set_foot_ik_target()` | Lines 149–192 / 637–675 | CONTRACT_GAP (RESOLVED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `foot_contact.py` / `ik.py` (历史 FIND-R3-01 已按原 09-B 修复并验收；当前 09-B-3 是后续独立修复节点，仍在进行中，存在未解决问题，状态为 `IN PROGRESS — NOT ACCEPTED`；TEST-18 至 TEST-21 没有当前实际运行证据，不得宣称 21/21 PASS) |
+| **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `set_foot_ik_target()` | `foot_contact.py:151–238`; `ik.py:116–262, 333–600, 601–984` | CONTRACT_GAP (RESOLVED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `foot_contact.py` / `ik.py`（原 09-B 修复与 09-B-4 状态完整性、解锁事务和数学边界补强均已完成；27/27 专项测试通过；证据见 `docs/evidence/PKG5_09B4/`） |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `ik.py` |
-| **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | Lines 168–170 / 219 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
-| **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | Lines 207–235 | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
+| **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | `foot_contact.py:208`; `ik.py:244` | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
+| **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | `foot_contact.py:239–354` | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
 | **FIND-R4-01** | - | `src/scene/playground_terrain_traversal.py` | `generate_dynamics_playground_environment_gate01_u3_blend()` | Lines 633–640, 689, 704 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `playground_terrain_traversal.py` |
 | **FIND-R4-02** | - | `src/scene/environment_query.py` / `src/scene/blender_mesh_query_adapter.py` | `ground_height_at()` / `surface_normal_at()` / `query_ground_support_at()` | `eq:402, 588–593, 610–615` / `bmqa:885–892` | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `environment_query.py` / `blender_mesh_query_adapter.py` |
 
@@ -340,7 +342,7 @@
 ---
 
 ### FIND-R3-01: 控制器生命周期动态父级违规循环，且父级非空时 `set_foot_ik_target` 姿态未反解产生旋转偏差
-> **状态边界与历史记录适用范围：** 本节以下的 `CONTRACT_GAP (RESOLVED)`、`NO (RESOLVED)`、`FIXED / VERIFIED` 及修复与测试记录，均描述历史 FIND-R3-01 对应的原 09-B 修复与历史验收事实。上述历史记录继续有效，不得删除或改写为历史未修复。当前 09-B-3 是在历史修复基础上的后续独立修复节点，仍处于进行中，存在未解决问题，状态为 `IN PROGRESS — NOT ACCEPTED`。本节历史修复记录不构成当前 09-B-3 的验收证据。当前节点状态以文件顶部状态摘要及第 8 节 PKG-5 修复节点表为准。
+> **状态边界与历史记录适用范围：** 本节原有 `CONTRACT_GAP (RESOLVED)`、`NO (RESOLVED)`、`FIXED / VERIFIED` 及修复与测试记录，描述原 09-B 修复与历史验收事实。该历史记录继续有效，不得删除或改写为历史未修复。后续 PKG-5 / 09-B-4 在原修复基础上进一步补强完整状态快照、Phase B 事务回滚、FootIK / KneePole 独立剪切拒绝以及数学边界测试，现已通过独立专项测试与分层回归。FIND-R3-01 当前最终状态为 `FIXED / VERIFIED`。本节当前状态以文件顶部摘要和第 8 节节点表为准。
 * **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
 * **Class / Function**: `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `set_foot_ik_target()`
 * **Exact Line Range**: `foot_contact.py:149–192`; `ik.py:127–160, 232–260, 637–675`
@@ -386,6 +388,19 @@
      - 历史测试 `test_leg_ik_worldspace_init_reset.py` (6/6 PASS), `test_leg_ik_ground_height_contract.py` (20/20 PASS), `legacy_leg_ik` (1/1 PASS), `legacy_foot_contact` (1/1 PASS) 全部通过；
      - 全量分层回归：Quick (19/19 PASS), Physics (25/25 PASS), Motion (12/12 PASS), Full (40/40 PASS) 全部通过；
      - 文档与符号门禁 `tests/audit_c2_final_inspector.py --verify-docs` 0 报错通过。
+  5. **09-B-4 完整状态回滚、解锁事务与有效父级数学域补强（2026-11-02）**：
+     - `_snapshot_leg_rig_state()` 捕获 4 个控制器与 6 根下肢骨骼，其中控制器快照 15 个字段、骨骼快照 8 个字段；
+     - `_rollback_leg_rig_state()` 恢复并核验全部已保存状态字段；
+     - `unlock_foot_contact()` 将 `is_locked` 写入、控制器解绑、TRS 恢复、视图层更新、后验验证与最终状态查询纳入 Phase B 事务保护；
+     - TEST-22、TEST-23 分别验证 FootIK 与 KneePole 独立剪切拒绝；
+     - TEST-24 注入提交后异常，验证控制器、6 根骨骼、锁定状态与 7 项锁定元数据完整恢复；
+     - TEST-25 至 TEST-27 验证非有限矩阵、非仿射矩阵和退化尺度拒绝；
+     - TEST-15 修正奇异矩阵断言语义，使用 `det == 0`，不修改生产阈值；
+     - 09-B 专项测试 27/27 PASS；
+     - 09-A Ground × Reach 20/20 PASS；
+     - 08 Worldspace Init/Reset 6/6 PASS；
+     - Quick 19/19、Physics 25/25、Motion 12/12、Full 40/40，均退出码 0，FAIL 0、SKIPPED 0、NOT_RUN 0；
+     - 完整执行日志与报告归档在 `docs/evidence/PKG5_09B4/`。
 * **Suggested Repair Boundary**: `src/rig/ik.py` (Lines 637–675), `src/rig/foot_contact.py` (Lines 149–210), `tests/test_leg_ik_world_rotation_contract.py`。
 
 ---
@@ -420,7 +435,7 @@
 ### FIND-R3-03: `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留
 * **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
 * **Class / Function**: `unlock_foot_contact()` / `reset_leg_ik()`
-* **Exact Line Range**: `foot_contact.py:168–170`, `ik.py:219`
+* **Exact Line Range**: `foot_contact.py:208`; `ik.py:244`
 * **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 足部由锁定支撑（Stance）切换为摆动（Swing），或动作完成调用系统重置。
 * **Actual Behavior**:
@@ -442,15 +457,15 @@
 ### FIND-R3-04: `evaluate_foot_support` 充当隐式约束维持器，具有未声明的控制器强写入与骨骼修改副作用
 * **Source File**: `src/rig/foot_contact.py`
 * **Class / Function**: `evaluate_foot_support()`
-* **Exact Line Range**: Lines 207–235
+* **Exact Line Range**: Lines 239–354
 * **Evidence Grade**: `STATIC_CONFIRMED`
 * **Trigger Condition**: 任何调用 `evaluate_foot_support()` 或包装函数 `get_foot_support_state()` 的时机。
 * **Actual Behavior**:
   该函数在名称和文档上声明为“状态与漂移评估”（只读查询），但实际上在执行时具有极其强烈的副作用与写入行为：
-  1. 行 207 调用 `_apply_ik_prebend_hint(arm)`，直接改写了双侧小腿骨骼 `shin.L/R` 的局部欧拉角；
-  2. 行 208 和行 235 两次触发全场景依赖图强制更新 `bpy.context.view_layer.update()`；
-  3. 只要 `is_locked` 为 True，行 219–224 强制解绑 `ik_obj.parent = None` 并将 `ik_obj.location` 和 `rotation_euler` 覆写回锁定点；
-  4. 行 227–234 强制解绑 `pole_obj.parent = None` 并基于当前髋关节重新计算并写入 `pole_obj.location`。
+  1. 第 252 行调用 `_apply_ik_prebend_hint(arm)`，直接改写双侧小腿骨骼姿态；
+  2. 第 253 行和第 280 行触发依赖图更新；
+  3. 第 264–269 行在锁定状态下可能解绑 FootIK 并覆写位置、旋转；
+  4. 第 273–275 行可能解绑 KneePole 并覆写其位置。
 * **严重性与稳定性权衡 (R3-CLOSE-03)**：
   - 调用者在仅想查询遥测时（如 `ContactConstraintAdapter` 或测试代码），在未知情情况下触发了骨骼与控制器写操作；
   - 但在现有执行链中，`WholeBodyController` (L405) 在脚部持续锁定时，**正是依赖调用 `evaluate_foot_support` 来完成每帧对膝盖极向目标的动态更新和对 FootIK 的绝对世界钉死**；
@@ -546,9 +561,9 @@
 
 ## 7. 集中修复建议与维护包划分 (Remediation Roadmap)
 
-> **历史路线图快照（非当前状态）**：本节完整保留旧版 PKG-5 维护包划分与阶段记录，用于追溯历史规划。原文中“待处理 09-B（FIND-R3-01 姿态反解）”等表述，仅代表该历史快照形成时的任务状态，不代表当前任务状态。当前状态以文件顶部状态摘要及第 8 节 PKG-5 节点表为准：09-B-3 仍在进行中，修复尚未完成，仍存在未解决问题，状态为 `IN PROGRESS — NOT ACCEPTED`。本节历史内容不得用于宣称 09-B-3 已完成或仅待验收。
+> **历史路线图快照（非当前任务状态）**：本节保留原 R1–R4 审计后形成的维护包划分、依赖拓扑和早期任务建议，用于追溯历史规划。正文中的“待处理 09-B”仅代表该规划形成时的状态，不代表当前任务仍未完成。当前 PKG-5 状态以文件顶部摘要及第 8 节节点表为准：09-B-4 已验收，下一节点为 Task 10，FIND-R3-03 与 FIND-R3-04 仍归属 Task 11。不得使用本节历史规划文字覆盖当前验收状态。
 
-> **权威修复方案与详细回归规划**：详见独立维护包文档 [`docs/audit/production_interface/REPAIR_GROUPING.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/audit/production_interface/REPAIR_GROUPING.md)。
+> **权威修复方案与详细回归规划**：详见独立维护包文档 [`docs/audit/production_interface/REPAIR_GROUPING.md`](REPAIR_GROUPING.md)。
 
 根据门禁规则与依赖拓扑，将全生命周期 R1–R4 全部去重问题（共 15 项：3 项缺陷，12 项合同缺口）划分为 5 个原子维护包：
 
@@ -574,28 +589,31 @@ flowchart TD
    - 消除接缝探测坐标偏置，统一步态规划未命中策略、负向行进支持与 2.5D 高程/法线支撑有效性对齐。
 5. **维护包 5: Rig 与 IK 空间坐标不变量、支撑锁定与副作用解耦 (Rig & IK Spatial Invariance & Side Effects)**:
    - 修复目标：`FIND-R3-01`, `FIND-R3-02`, `FIND-R3-03`, `FIND-R3-04`。
-   - **当前进展**：
-     - `WS-01`：已关闭初始化与重置控制器世界空间无父级子问题 (`ik.py:81–87, 127–160, 232–260`)；
-     - `08 Rig`：已完成 `verify_task6fb_rigid_link.py` Test 8B 刚体平移测试语义隔离；
-     - `09-A`：已完成 `set_foot_ik_target()` 地面高程解耦、三维极值解析求解器与代码文档门禁收口 (FIND-R3-02 闭环)；
-     - **待处理**：`09-B`（FIND-R3-01 姿态反解）、`10 Upper IK/FK`、`11 FootLock`（FIND-R3-03, FIND-R3-04）、`12 联合验收`。
+   - **当前进展（以本文件顶部与 Section 8 为准）**：
+     - `WS-01`：初始化与重置控制器世界空间无父级合同已完成；
+     - `08 Rig`：刚体平移与世界空间隔离回归已完成；
+     - `09-A`：Ground × Reach 三维约束求解器已完成并验证；
+     - `09-B`：世界旋转、有效父级变换、状态完整性及解锁事务补强已完成，最近节点 09-B-4 为 `ACCEPTED — VERIFIED`；
+     - `10 Upper-Limb IK/FK`：下一执行节点，等待正式任务卡；
+     - `11 FootLock`：仍需处理 FIND-R3-03 与 FIND-R3-04；
+     - `12 联合验收`：等待 Task 10、11 完成。
 
 ---
 
 ## 8. PKG-5 修复节点与 Finding 映射
 
-本节将现有 Finding 与已经确认的修复节点建立对应关系。
+本节是当前 PKG-5 节点与 Finding 状态的权威映射。
 
 不得凭模块名称自行创造任务编号。
 
 | 修复节点 | 对应 Finding / 范围 | 具体内容 | 当前状态 |
 |---|---|---|---|
-| 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | 历史已完成 |
-| 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | 历史已验证 |
-| 09-B-3 | FIND-R3-01 的后续世界旋转与父级变换复核 | 有效父级矩阵支持域、旋转映射、边界条件、控制器状态完整性与失败原子性 | 修复尚未完成，仍存在未解决问题；`IN PROGRESS — NOT ACCEPTED` |
-| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 待准入 |
-| 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | 待修复 |
-| 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | 待执行 |
+| 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | `COMPLETED / VERIFIED` |
+| 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | `COMPLETED / VERIFIED` |
+| 09-B | FIND-R3-01 | 世界旋转、有效父级矩阵、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
+| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | `READY FOR TASK CARD — NOT STARTED` |
+| 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | `OPEN / PENDING REPAIR` |
+| 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | `PENDING` |
 
 ### 8.1 既有 Finding 的修复归属
 
@@ -611,10 +629,10 @@ flowchart TD
 | FIND-T01-06 | 历史环境所有权修复 | 动作与环境实例绑定不一致 | 历史已修复 |
 | FIND-T01-07 | 历史 TerrainWalk 修复 | 负向方向步态循环错误 | 历史已修复 |
 | FIND-T01-08 | 历史 TerrainWalk 修复 | 根轨迹与摆动脚时间归一化不一致 | 历史已修复 |
-| FIND-R3-01 | 08 Rig / 09-B / 当前 09-B-3 复核 | 控制器父级生命周期与世界旋转合同 | 历史修复记录保留；当前 09-B-3 修复尚未完成，仍存在未解决问题；未验收 |
-| FIND-R3-02 | 09-A | 下肢 Ground × Reach 数学约束 | 历史已验证 |
-| FIND-R3-03 | 11 FootLock | 锁定元数据残留与生命周期状态语义 | 待修复 |
-| FIND-R3-04 | 11 FootLock | `evaluate_foot_support()` 未声明的控制器和骨骼写入副作用 | 待修复 |
+| FIND-R3-01 | 08 Rig / 09-B | 控制器父级生命周期与世界旋转合同 | `FIXED / VERIFIED`，09-B-4 补强与测试证据已完成 |
+| FIND-R3-02 | 09-A | 下肢 Ground × Reach 数学约束 | `FIXED / VERIFIED` |
+| FIND-R3-03 | 11 FootLock | 锁定元数据残留与生命周期状态语义 | `OPEN / PENDING REPAIR` |
+| FIND-R3-04 | 11 FootLock | `evaluate_foot_support()` 未声明的控制器和骨骼写入副作用 | `OPEN / PENDING REPAIR` |
 | FIND-R4-01 | 历史场景执行门禁修复 | 失败场景仍可能落盘或伪报成功 | 历史已修复 |
 | FIND-R4-02 | 历史 Environment Query 修复 | 无有效支撑面的错误回退 | 历史已修复 |
 
@@ -626,7 +644,7 @@ flowchart TD
 
 | 模块 | 源码文件 | 必须检查的内容 | 对应节点 | 当前状态 |
 |---|---|---|---|---|
-| Lower-Limb IK | `src/rig/ik.py` | 有效父级变换、空间合同、可达域、有限性、事务与回滚 | 09-A、09-B-3 | 当前复核中 |
+| Lower-Limb IK | `src/rig/ik.py` | 有效父级变换、空间合同、可达域、有限性、事务与回滚 | 09-A、09-B | `COMPLETED / VERIFIED` |
 | Upper-Limb IK | `src/rig/arm_ik.py` | 双臂目标、世界空间变换、旋转映射、pole、非有限输入、回滚和左右独立性 | 10 | 待独立审计 |
 | FootLock | `src/rig/foot_contact.py` | 锁定、解锁、元数据、状态读取、副作用与漂移保持 | 11 | 两项既有 Finding 待修 |
 | FK / Pose | `src/rig/pose.py`、`src/motion/whole_body_controller.py` | FK 目标、骨骼本地姿态、约束权重、IK/FK 切换和姿态所有权 | 10 / 12 | 待独立审计 |
@@ -749,14 +767,18 @@ flowchart TD
 
 ## 12. 任务编号恢复纪律
 
-当前可确认：
+当前 PKG-5 正式节点：
 
-- 09-A：Lower-Limb Ground × Reach。
-- 09-B：Lower-Limb World Rotation 与控制器生命周期合同。
-- 当前第三次修复节点：`09-B-3`。
-- 10：Upper-Limb IK/FK。
-- 11：FootLock。
+- 08 Rig：已完成。
+- 09-A：Lower-Limb Ground × Reach，已完成。
+- 09-B：Lower-Limb World Rotation 与控制器生命周期合同，已完成；最近补强节点为 `09-B-4`。
+- 10：Upper-Limb IK/FK，下一节点。
+- 11：FootLock，处理 FIND-R3-03、FIND-R3-04。
 - 12：PKG-5 综合闭环与联合验收。
+
+09-B-4 是当前已接受的最新补强节点，不得自动衍生 09-B-5。
+
+不得因为模块数量多而自动创造新的任务号。
 
 在目前已核验的路线图、决策记录和仓库搜索结果中，没有找到能够证明 13、14、15 正式定义的权威资料。
 
@@ -765,7 +787,7 @@ flowchart TD
 - 13、14、15 当前标记为 `UNRECOVERED / PENDING EVIDENCE`。
 - 不得把它们擅自分配给 WBC、CoM、IK 或 FK。
 - 不得因为模块数量多而自动创造新的任务号。
-- 后续只有找到真实决策记录、历史任务卡、提交记录或明确聊天证据，才可以恢复正式定义。
+- 后续只有找到真实决策记录、历史任务卡、提交记录或明确授权证据，才可以恢复正式定义。
 
 ## 13. 验收与证据规则
 

@@ -4,14 +4,21 @@
 >
 > **总架构保护**：`ARCHITECTURE.md` 是全项目总架构蓝图，本文件不得替代、复制、重构或擅自修改总架构。
 >
-> **最近一次生产源码核验基准 HEAD**：`2904857433af01c2a7991e2da085b3c0f53a145f`
-> **本轮文档审查起点 HEAD**：`7547c91a31f0b97a19de335ad5c61cc617b017a2`（本轮起点，不代表本轮文档提交后的 HEAD）
+> **09-B-4 生产修复基准**：`52d66dfd529627a9fbc8bae6ffcf6f4fee6c64d8`
 >
-> **当前修复节点**：PKG-5 / 09-B-4。
+> **TEST-24 断言补充基准**：`3881aaadd58f76ffce18faf5d9e880bc49b82f97`
 >
-> **当前验收状态**：`IN PROGRESS — NOT ACCEPTED`。不得将历史 09-B 验收结果直接视为当前 09-B-3 已验收。
+> **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **当前工程核心事实**：19 骨骼角色运动学执行管线与 6-DOF 数值质心动力学管线保持独立；二者未来的合流属于 Phase 7C，不是当前 09-B 或 PKG-5 的待修缺陷。
+> **最近完成节点**：PKG-5 / 09-B-4。
+>
+> **最近完成状态**：`ACCEPTED — VERIFIED`。
+>
+> **下一执行节点**：PKG-5 / Task 10 — Upper-Limb IK/FK。
+>
+> **下一节点状态**：`READY FOR TASK CARD — NOT STARTED`。
+>
+> **当前工程核心事实**：19 骨骼角色运动学执行管线与 6-DOF 数值质心动力学管线保持独立；二者未来的合流属于 Phase 7C，不是当前 PKG-5 的待修缺陷。
 
 ---
 
@@ -296,59 +303,121 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 
 | 节点 | 工作内容 | 当前状态 |
 |---|---|---|
-| 08 Rig | 刚体平移与世界空间隔离回归 | 历史完成记录 |
-| 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | 已有历史专项验收记录 |
-| 09-B-4 | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性第三次修复 | 当前活动节点，等待重新核验，不得标记通过 |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | 待准入 |
+| 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
+| 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | `COMPLETED / VERIFIED` |
+| 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | 下一任务，等待正式任务卡 |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | 待修复 |
-| 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 09-B-3、10、11 完成后执行 |
+| 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 10、11 完成后执行 |
 
-### 4.1 09-B-3 当前准确状态
+### 4.1 09-B：Lower-Limb World Rotation 当前准确状态
 
-当前源代码文件：
+**当前状态：`ACCEPTED — VERIFIED`。**
+
+最近补强与独立复核节点：PKG-5 / 09-B-4。
+
+当前源码：
 
 - `src/rig/ik.py`
+- `src/rig/foot_contact.py`
+
+专项测试：
+
 - `tests/test_leg_ik_world_rotation_contract.py`
 
-最新代码使用的有效父级矩阵：
+证据：
+
+- 生产修复：`52d66dfd529627a9fbc8bae6ffcf6f4fee6c64d8`
+- TEST-24 补充：`3881aaadd58f76ffce18faf5d9e880bc49b82f97`
+- 证据归档：`docs/evidence/PKG5_09B4/`
+
+#### 数学支持域
+
+有效父级矩阵：
 
 \[
-M_{\mathrm{eff}}=M_{\mathrm{parent}}\cdot M_{\mathrm{parent\_inverse}}
+M_{\mathrm{eff}} =
+M_{\mathrm{parent}}
+M_{\mathrm{parent\_inverse}}
 \]
 
-当前实现的数学支持域：
+当前支持域：
 
-- 拒绝非有限矩阵元素。
-- 拒绝非仿射矩阵。
-- 拒绝负行列式的镜像反射。
-- 拒绝零行列式的奇异矩阵。
-- 拒绝 \(s^2\leq 10^{-12}\) 的退化尺度。
-- 拒绝 Gram 矩阵相对偏差大于 \(10^{-6}\) 的非共形变换。
-- 支持纯旋转以及正均匀缩放和旋转组合。
+- 16 个矩阵元素必须有限。
+- 仿射矩阵最后一行误差不得超过 `1e-6`。
+- `det(A) < 0`：拒绝镜像反射。
+- `det(A) == 0`：拒绝奇异矩阵。
+- `s_sq <= 1e-12`：拒绝退化尺度。
+- Gram 矩阵相对偏差 `> 1e-6`：拒绝非共形变换。
+- 支持纯旋转与正均匀缩放和旋转的组合。
 
-当前测试文件已有 TEST-01 至 TEST-21。
+不得将 `det(A) == 0` 替换成 `det(A) <= 1e-7`。
+不得将 Gram 矩阵相对偏差阈值放宽至 `1e-4`。
 
-TEST-17 当前还存在测试断言覆盖缺口：
+#### 状态完整性与失败原子性
 
-- `_capture_rig_state()` 保存了控制器旋转通道、`matrix_parent_inverse`、骨骼 `matrix_basis` 等字段。
-- `_assert_rig_state_identical()` 没有逐项比较全部已保存字段。
-- 当前主要比较控制器 `matrix_world`、`location`、`scale`、`parent`、`is_locked`，以及骨骼 `matrix`、`location`、`scale`。
-- 因此 TEST-17 不能证明所有已保存状态通道均已完整恢复。
-- 这是测试证据不足，不代表已经证明生产回滚实现必然错误。
+`_snapshot_leg_rig_state()`：
 
-但现存 `AI_SYNC.md` 中的最新实际执行记录为此前的 17/17，并且该记录早于 TEST-18 至 TEST-21 的增加。
+- 捕获 4 个腿部控制器。
+- 每个控制器快照覆盖 15 个状态字段。
+- 捕获 6 根腿部姿态骨骼。
+- 每根骨骼快照覆盖 8 个状态字段。
 
-测试文件顶部 TEST-15 的说明仍写着 `det <= 1e-7`，与当前实现使用 `det == 0` 的奇异矩阵判断不一致。
+`_rollback_leg_rig_state()`：
 
-本次文档必须明确记录：
+- 恢复控制器父级、父级逆矩阵、TRS、delta TRS、锁定属性等状态。
+- 恢复骨骼旋转模式、位置、旋转、尺度、matrix_basis。
+- 更新依赖图。
+- 对已保存状态逐字段检查恢复结果。
 
-1. TEST-18 至 TEST-21 已经出现在测试源文件。
-2. 当前仓库文档没有提供这四项新增测试的最新实际执行记录。
-3. 不得声明 21/21 已通过。
-4. 09-B-3 当前状态必须保持 `IN PROGRESS — NOT ACCEPTED`。
-5. 只有后续实际运行、检查输出和独立审查后才能改变状态。
+`unlock_foot_contact()`：
+
+- Phase B 提交前捕获共享腿部状态快照。
+- 修改 `is_locked`、解除父级、恢复 TRS、更新视图层及返回最终支撑状态的过程位于事务保护范围内。
+- 任一提交后异常均调用共享 `_rollback_leg_rig_state()`。
+- 不得另建第二套快照或回滚实现。
+
+#### 专项测试
+
+`tests/test_leg_ik_world_rotation_contract.py`：
+
+- TEST-01 至 TEST-27。
+- 27/27 PASS。
+
+重要边界：
+
+- TEST-17：Phase B 全状态事务回滚。
+- TEST-22：FootIK 解锁剪切拒绝。
+- TEST-23：KneePole 独立解锁剪切拒绝。
+- TEST-24：解锁提交后故障注入及七项元数据逐项相等性核验。
+- TEST-25：NaN / Inf 拒绝。
+- TEST-26：非仿射矩阵拒绝。
+- TEST-27：正行列式退化尺度拒绝。
+
+#### 回归证据
+
+| 测试 | 结果 |
+|---|---:|
+| 09-B World Rotation | 27/27 PASS |
+| 09-A Ground Height | 20/20 PASS |
+| 08 Worldspace Init/Reset | 6/6 PASS |
+| Quick | 19/19 |
+| Physics | 25/25 |
+| Motion | 12/12 |
+| Full | 40/40 |
+| C2 Final Inspector | PASS |
+
+四级回归退出码均为 0，FAIL 0、SKIPPED 0、NOT_RUN 0。
+
+其中 `AUTOMATED_PASS` 不等于视觉验收通过。相关场景视觉审查状态应单独记录。
+
+09-B-4 已经完成，不得继续标记为 `IN PROGRESS — NOT ACCEPTED`。
 
 ### 4.2 节点 10：Upper-Limb IK/FK
+
+状态：
+
+`READY FOR TASK CARD — NOT STARTED`
 
 目标：
 
@@ -360,30 +429,39 @@ TEST-17 当前还存在测试断言覆盖缺口：
 - 审核 `matrix_parent_inverse`、有效父级矩阵、世界空间输入输出。
 - 审核非有限输入和异常处理。
 - 审核写入前后失败原子性。
-- 复用现有 `src/rig/arm_ik.py` 和 WBC，不建第二套 IK/FK。
+- 复用现有 `src/rig/arm_ik.py` 和 WBC，不得创建第二套 IK/FK。
+
+Task 10 尚未开始实现，必须等待正式任务卡。
 
 ### 4.3 节点 11：FootLock
 
+归属：
+
+- `FIND-R3-03`
+- `FIND-R3-04`
+
 必须处理：
 
-- `FIND-R3-03`：`unlock_foot_contact()`、`reset_leg_ik()` 的元数据残留与生命周期语义。
-- `FIND-R3-04`：`evaluate_foot_support()` 的未声明状态维持副作用。
+- `unlock_foot_contact()`、`reset_leg_ik()` 的元数据残留与生命周期语义。
+- `evaluate_foot_support()` 的未声明状态维持副作用。
 
 必须明确：
 
 - 哪些函数只查询。
 - 哪些函数会修改。
 - 修改哪些控制器和骨骼。
-- 哪些数据属于锁定状态，哪些属于历史快照。
+- 哪些数据属于当前锁定状态。
+- 哪些数据属于历史快照。
 - 解锁与重新锁定如何保持世界位置和姿态不跳变。
-- 不允许简单清除全部元数据。
-- 不允许简单删除现有支撑维持写入。
 
-### 4.4 节点 12：综合闭环
+禁止简单清除全部元数据。
+禁止简单删除现有支撑维持写入。
 
-12 不等于把三个专项测试通过数量相加。
+### 4.4 节点 12：PKG-5 综合闭环
 
-必须分别审计模块自身，再审计模块之间的接口关系。
+12 不等于把专项测试通过数量相加。
+
+必须分别完成模块内部审计，再审计跨模块接口关系。
 
 需要覆盖：
 
@@ -397,7 +475,7 @@ TEST-17 当前还存在测试断言覆盖缺口：
 - 历史动作和 7A 地形动作是否保留。
 - 连续帧、失败帧、重置、左右肢体独立和动作切换。
 
-必须进行跨模块场景和联合回归，不得仅凭单模块通过判定整体通过。
+必须进行跨模块联合回归，不得仅凭单模块通过判定整体通过。
 
 ## 5. 后续 Phase 阶段门禁
 
@@ -415,7 +493,7 @@ TEST-17 当前还存在测试断言覆盖缺口：
 
 前置条件：
 
-1. PKG-5 / 09-B-3 完成独立核验。
+1. PKG-5 / 09-B 完成独立核验（09-B-4 已验收）。
 2. PKG-5 / 10 Upper-Limb IK/FK 完成。
 3. PKG-5 / 11 FootLock 完成。
 4. PKG-5 / 12 全仓联合验收通过。
@@ -492,8 +570,11 @@ TEST-17 当前还存在测试断言覆盖缺口：
 
 ## 8. 当前架构同步状态规则
 
-- 09-B-3 不得标记为已验收。
-- 10、11、12 尚未完成，不得开启 7B。
+- PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
+- 当前下一任务为 Task 10，尚未开始实施。
+- Task 11 负责 FIND-R3-03、FIND-R3-04。
+- Task 12 负责 PKG-5 跨模块联合审计与验收。
+- 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。
 - Pipeline A 与 Pipeline B 的独立性目前是设计事实，不是故障。
 - 7C 才负责未来的系统级动力学合流。
 - CoM、BodyKinematics、BodyInertia 不得被描述为已经驱动姿态补偿。
