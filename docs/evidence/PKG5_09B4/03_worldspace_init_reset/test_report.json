@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "generated_at": "2026-11-02 15:35:53",
+    "tier": "single:leg_ik_worldspace_init_reset",
+    "total_planned": 1,
+    "total_executed": 1,
+    "passed_count": 1,
+    "automated_pass_count": 0,
+    "failed_count": 0,
+    "skipped_count": 0,
+    "required_skipped_count": 0,
+    "optional_skipped_count": 0,
+    "not_run_count": 0,
+    "total_duration_sec": 2.13,
+    "all_success": true
+  },
+  "results": [
+    {
+      "test_id": "leg_ik_worldspace_init_reset",
+      "name": "Leg IK Controller World-Space Initialization & Reset Invariant (PKG-5/WS-01)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 2.13,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "acterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\character\\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0\n  mat.use_nodes = True\n......\n----------------------------------------------------------------------\nRan 6 tests in 0.551s\n\nOK\n"
+    }
+  ]
+}

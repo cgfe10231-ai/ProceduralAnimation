@@ -1,0 +1,5 @@
+[SELF-TEST] PASS: All 6 validator test cases (Positive, Negative, Proposed, Prose, Dynamic, Clause Exemption) verified successfully.
+[VERIFY-DOCS] PASS: All referenced src/tests paths exist on disk and zero phantom symbols found.
+
+EXIT_CODE=0
+PYTHON_EXECUTABLE=C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe

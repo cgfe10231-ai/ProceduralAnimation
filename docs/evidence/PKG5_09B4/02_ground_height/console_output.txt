@@ -1,0 +1,26 @@
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: QUICK | Fail-Fast: False
+================================================================================
+
+Resolved 1 test suite(s) to execute:
+  01. [leg_ik_ground_height_contract] Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A) (blender_headless, timeout=45.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[leg_ik_ground_height_contract] Starting: Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_ground_height_contract.py
+  [PASS] Test completed successfully (3.69s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 3.69s
+Planned: 1 | Executed: 1 | Passed: 1 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs\evidence\PKG5_09B4\02_ground_height\test_report.json
+  - Markdown: docs\evidence\PKG5_09B4\02_ground_height\test_report.md
+================================================================================
+
+EXIT_CODE=0
+BLENDER_VERSION=Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)

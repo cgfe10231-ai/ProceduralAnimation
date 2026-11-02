@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "generated_at": "2026-11-02 15:34:50",
+    "tier": "single:leg_ik_world_rotation_contract",
+    "total_planned": 1,
+    "total_executed": 1,
+    "passed_count": 1,
+    "automated_pass_count": 0,
+    "failed_count": 0,
+    "skipped_count": 0,
+    "required_skipped_count": 0,
+    "optional_skipped_count": 0,
+    "not_run_count": 0,
+    "total_duration_sec": 3.65,
+    "all_success": true
+  },
+  "results": [
+    {
+      "test_id": "leg_ik_world_rotation_contract",
+      "name": "Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 3.65,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "d CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "ar_rejection (__main__.TestLegIKWorldRotationContract.test_22_unlock_foot_contact_ik_shear_rejection)\nTEST-22: unlock_foot_contact rejects FootIK non-TRS shear and preserves pristine locked state. ... ok\ntest_23_unlock_foot_contact_pole_shear_rejection (__main__.TestLegIKWorldRotationContract.test_23_unlock_foot_contact_pole_shear_rejection)\nTEST-23: unlock_foot_contact rejects KneePole non-TRS shear independently while FootIK is valid. ... ok\ntest_24_unlock_foot_contact_post_commit_fault_injection (__main__.TestLegIKWorldRotationContract.test_24_unlock_foot_contact_post_commit_fault_injection)\nTEST-24: unlock_foot_contact rolls back all state atomically upon post-commit fault injection. ... ok\ntest_25_effective_parent_non_finite_rejection (__main__.TestLegIKWorldRotationContract.test_25_effective_parent_non_finite_rejection)\nTEST-25: _validate_effective_parent_transform rejects non-finite elements (NaN and Inf). ... ok\ntest_26_effective_parent_non_affine_rejection (__main__.TestLegIKWorldRotationContract.test_26_effective_parent_non_affine_rejection)\nTEST-26: _validate_effective_parent_transform rejects non-affine last row. ... ok\ntest_27_effective_parent_degenerate_scale_rejection (__main__.TestLegIKWorldRotationContract.test_27_effective_parent_degenerate_scale_rejection)\nTEST-27: _validate_effective_parent_transform rejects degenerate scale s^2 <= 1e-12 with det > 0. ... ok\n\n----------------------------------------------------------------------\nRan 27 tests in 1.858s\n\nOK\n"
+    }
+  ]
+}

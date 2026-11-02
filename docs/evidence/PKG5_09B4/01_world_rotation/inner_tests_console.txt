@@ -1,0 +1,197 @@
+test_01_parentless_world_rotation (__main__.TestLegIKWorldRotationContract.test_01_parentless_world_rotation)
+TEST-01: When controller parent is None, foot_rotation_deg directly sets world rotation. ... C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\character\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+ok
+test_02_nonzero_parent_yaw (__main__.TestLegIKWorldRotationContract.test_02_nonzero_parent_yaw)
+TEST-02: When parent has non-zero yaw, set_foot_ik_target achieves the requested world rotation. ... ok
+test_03_composite_rotation (__main__.TestLegIKWorldRotationContract.test_03_composite_rotation)
+TEST-03: Combined non-zero yaw, pitch, roll on parent and target simultaneously. ... ok
+test_04_world_rotation_composition_order_and_none_default (__main__.TestLegIKWorldRotationContract.test_04_world_rotation_composition_order_and_none_default)
+TEST-04: Verify proper 3D rotation matrix inversion (not Euler subtraction) and foot_rotation_deg=None level neutral. ... ok
+test_05_unlock_world_matrix_preservation (__main__.TestLegIKWorldRotationContract.test_05_unlock_world_matrix_preservation)
+TEST-05: Unlock preserves world position, orientation, scale, and full 4x4 matrix without jump. ... ok
+test_06_bilateral_lifecycle_parentless_invariant (__main__.TestLegIKWorldRotationContract.test_06_bilateral_lifecycle_parentless_invariant)
+TEST-06: Full lifecycle: setup -> lock -> unlock -> normal IK target -> reset preserves parent is None. ... ok
+test_07_legacy_compatibility_default_call (__main__.TestLegIKWorldRotationContract.test_07_legacy_compatibility_default_call)
+TEST-07: unlock_foot_contact(arm, side) without reparent_to_root maintains parentless invariant. ... ok
+test_08_explicit_illegal_request (__main__.TestLegIKWorldRotationContract.test_08_explicit_illegal_request)
+TEST-08: Explicitly passing reparent_to_root=True must raise ValueError, preserve transforms, and not reparent. ... ok
+test_09_failure_atomicity (__main__.TestLegIKWorldRotationContract.test_09_failure_atomicity)
+TEST-09: Phase A failure preserves FootIK, KneePole, and armature pose pristine across all 16 matrix elements. ... ok
+test_10_bilateral_symmetry_and_independence (__main__.TestLegIKWorldRotationContract.test_10_bilateral_symmetry_and_independence)
+TEST-10: Left and Right controllers operate independently without mutual cross-talk. ... ok
+test_11_nonzero_parent_inverse_combination (__main__.TestLegIKWorldRotationContract.test_11_nonzero_parent_inverse_combination)
+TEST-11: Combination of non-zero parent rotation and non-identity matrix_parent_inverse. ... ok
+test_12_parent_scale_and_shear_boundary (__main__.TestLegIKWorldRotationContract.test_12_parent_scale_and_shear_boundary)
+TEST-12: Parent uniform scale achieves requested rotation, and non-uniform scale shear boundary is detected. ... ok
+test_13_legacy_parented_controller_unlock_preservation (__main__.TestLegIKWorldRotationContract.test_13_legacy_parented_controller_unlock_preservation)
+TEST-13: Unlock handles legacy parented controllers with non-unit scale and non-zero rotation faithfully. ... ok
+test_14_shear_parent_transform_rejection (__main__.TestLegIKWorldRotationContract.test_14_shear_parent_transform_rejection)
+TEST-14: Effective parent transform with shear is rejected in Phase A with failure atomicity. ... ok
+test_15_singular_parent_transform_rejection (__main__.TestLegIKWorldRotationContract.test_15_singular_parent_transform_rejection)
+TEST-15: Singular effective parent transform (det == 0) is rejected in Phase A with failure atomicity. ... ok
+test_16_reflection_parent_transform_rejection (__main__.TestLegIKWorldRotationContract.test_16_reflection_parent_transform_rejection)
+TEST-16: Reflection effective parent transform (det < 0) is rejected in Phase A with failure atomicity. ... ok
+test_17_phase_b_transaction_rollback_fault_injection (__main__.TestLegIKWorldRotationContract.test_17_phase_b_transaction_rollback_fault_injection)
+TEST-17: Phase B transaction rollback catches fault, restores controllers & bones atomically, and re-raises. ... ok
+test_18_small_scale_positive_uniform_scale (__main__.TestLegIKWorldRotationContract.test_18_small_scale_positive_uniform_scale)
+TEST-18: Small-scale positive uniform scale (A = 0.001*R, det=1e-9) is accepted and achieves world rotation. ... ok
+test_19_near_threshold_non_conformal_rejection (__main__.TestLegIKWorldRotationContract.test_19_near_threshold_non_conformal_rejection)
+TEST-19: Effective parent matrix with 1e-6 < epsilon < 1e-4 is rejected by new tolerance (proved vs old 1e-4). ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bonesok
+test_20_conformal_boundary_tolerance_acceptance (__main__.TestLegIKWorldRotationContract.test_20_conformal_boundary_tolerance_acceptance)
+TEST-20: Effective parent matrix within legal numerical boundary (epsilon <= 1e-6) is accepted. ... ok
+test_21_kneepole_independent_shear_rejection (__main__.TestLegIKWorldRotationContract.test_21_kneepole_independent_shear_rejection)
+TEST-21: KneePole independent shear rejection while FootIK remains pristine and valid. ... ok
+test_22_unlock_foot_contact_ik_shear_rejection (__main__.TestLegIKWorldRotationContract.test_22_unlock_foot_contact_ik_shear_rejection)
+TEST-22: unlock_foot_contact rejects FootIK non-TRS shear and preserves pristine locked state. ... ok
+test_23_unlock_foot_contact_pole_shear_rejection (__main__.TestLegIKWorldRotationContract.test_23_unlock_foot_contact_pole_shear_rejection)
+TEST-23: unlock_foot_contact rejects KneePole non-TRS shear independently while FootIK is valid. ... ok
+test_24_unlock_foot_contact_post_commit_fault_injection (__main__.TestLegIKWorldRotationContract.test_24_unlock_foot_contact_post_commit_fault_injection)
+TEST-24: unlock_foot_contact rolls back all state atomically upon post-commit fault injection. ... ok
+test_25_effective_parent_non_finite_rejection (__main__.TestLegIKWorldRotationContract.test_25_effective_parent_non_finite_rejection)
+TEST-25: _validate_effective_parent_transform rejects non-finite elements (NaN and Inf). ... ok
+test_26_effective_parent_non_affine_rejection (__main__.TestLegIKWorldRotationContract.test_26_effective_parent_non_affine_rejection)
+TEST-26: _validate_effective_parent_transform rejects non-affine last row. ... ok
+test_27_effective_parent_degenerate_scale_rejection (__main__.TestLegIKWorldRotationContract.test_27_effective_parent_degenerate_scale_rejection)
+TEST-27: _validate_effective_parent_transform rejects degenerate scale s^2 <= 1e-12 with det > 0. ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 1.926s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R

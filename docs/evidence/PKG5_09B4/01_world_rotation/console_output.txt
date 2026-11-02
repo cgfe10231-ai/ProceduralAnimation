@@ -1,0 +1,23 @@
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: QUICK | Fail-Fast: False
+================================================================================
+
+Resolved 1 test suite(s) to execute:
+  01. [leg_ik_world_rotation_contract] Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B) (blender_headless, timeout=45.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[leg_ik_world_rotation_contract] Starting: Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_world_rotation_contract.py
+  [PASS] Test completed successfully (3.65s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 3.65s
+Planned: 1 | Executed: 1 | Passed: 1 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs\evidence\PKG5_09B4\01_world_rotation\test_report.json
+  - Markdown: docs\evidence\PKG5_09B4\01_world_rotation\test_report.md
+================================================================================
