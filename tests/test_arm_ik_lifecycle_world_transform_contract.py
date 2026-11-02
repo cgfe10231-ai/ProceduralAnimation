@@ -1,4 +1,4 @@
-"""Contract verification suite for Arm IK Initialization Idempotency and Effective Parent Transform (Task 10-A / 10-a-1).
+"""Contract verification suite for Arm IK Initialization Idempotency and Effective Parent Transform (Task 10-A / 10-a-1 & 10-a-2).
 
 Tests:
 - TEST-01: First-time initialization creates all 4 Empty controls and 4 constraints with correct initial influence.
@@ -13,6 +13,9 @@ Tests:
 - TEST-10: Unsupported effective parent domain rejects NaN, Inf, non-affine, reflection, singular, degenerate scale, and shear.
 - TEST-11: Phase A validation rejection leaves all controllers, pose bones, and constraint influences completely unpolluted.
 - TEST-12: Zero regression against existing 09-B Leg IK world rotation contract (all 27 tests pass).
+- TEST-13: Parent transform mutations without manual view_layer.update() are refreshed internally before validation.
+- TEST-14: Preserves controller active rotation_mode across XYZ, non-XYZ Euler, QUATERNION, and AXIS_ANGLE.
+- TEST-15: reset_arm_ik under non-identity distinct parents returns to CharacterRoot neutral world transform.
 """
 
 import io
@@ -36,6 +39,9 @@ from src.rig.arm_ik import (
     ARM_IK_CONSTRAINT_NAMES,
     ARM_IK_TARGET_NAMES,
     ARM_POLE_TARGET_NAMES,
+    DEFAULT_POLE_BACKWARD_OFFSET,
+    DEFAULT_POLE_OUTWARD_OFFSET,
+    ELBOW_REST_Z,
     HAND_ROT_CONSTRAINT_NAMES,
     MAX_ARM_REACH,
     MIN_ARM_REACH,
@@ -115,14 +121,14 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
         setup_arm_ik(self.armature, initial_influence=0.0)
 
         # Set active positions and rotations on left and right arms
-        pos_l = (-0.35, 0.20, 1.30)
+        pos_l = (-0.35, self.root.location.y + 0.20, 1.30)
         rot_l = (15.0, 30.0, -10.0)
-        pole_l = (-0.50, -0.30, 1.20)
+        pole_l = (-0.50, self.root.location.y - 0.30, 1.20)
         set_hand_ik_target(self.armature, "L", pos_l, hand_rotation_deg=rot_l, pole_world_xyz=pole_l, influence=1.0)
 
-        pos_r = (0.28, -0.15, 1.10)
+        pos_r = (0.28, self.root.location.y - 0.15, 1.10)
         rot_r = (-20.0, 10.0, 45.0)
-        pole_r = (0.45, -0.40, 1.15)
+        pole_r = (0.45, self.root.location.y - 0.40, 1.15)
         set_hand_ik_target(self.armature, "R", pos_r, hand_rotation_deg=rot_r, pole_world_xyz=pole_r, influence=1.0)
         bpy.context.view_layer.update()
 
@@ -205,8 +211,8 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
     def test_04_wbc_reconstruction_does_not_reset_arm_ik(self) -> None:
         """TEST-04: Constructing a new WholeBodyController instance must not reset active arm IK targets or influence."""
         setup_arm_ik(self.armature, initial_influence=0.0)
-        set_hand_ik_target(self.armature, "L", (-0.30, 0.15, 1.25), hand_rotation_deg=(10.0, 0.0, 0.0), influence=0.9)
-        set_hand_ik_target(self.armature, "R", (0.30, -0.10, 1.15), hand_rotation_deg=(-15.0, 0.0, 0.0), influence=0.7)
+        set_hand_ik_target(self.armature, "L", (-0.30, self.root.location.y + 0.15, 1.25), hand_rotation_deg=(10.0, 0.0, 0.0), influence=0.9)
+        set_hand_ik_target(self.armature, "R", (0.30, self.root.location.y - 0.10, 1.15), hand_rotation_deg=(-15.0, 0.0, 0.0), influence=0.7)
         bpy.context.view_layer.update()
 
         st_l_before = get_arm_ik_state(self.armature, "L")
@@ -229,8 +235,8 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
     def test_05_explicit_reset_contract(self) -> None:
         """TEST-05: reset_arm_ik explicitly restores neutral targets, bone rest pose, and influence=0.0."""
         setup_arm_ik(self.armature, initial_influence=0.0)
-        set_hand_ik_target(self.armature, "L", (-0.32, 0.20, 1.20), influence=1.0)
-        set_hand_ik_target(self.armature, "R", (0.32, 0.20, 1.20), influence=1.0)
+        set_hand_ik_target(self.armature, "L", (-0.32, self.root.location.y + 0.20, 1.20), influence=1.0)
+        set_hand_ik_target(self.armature, "R", (0.32, self.root.location.y + 0.20, 1.20), influence=1.0)
         bpy.context.view_layer.update()
 
         # Explicit reset
@@ -303,7 +309,7 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
         # Create custom parent object with rotation and scale = 1.5
         parent_empty = bpy.data.objects.new("CustomArmParent", None)
         bpy.context.scene.collection.objects.link(parent_empty)
-        parent_empty.location = Vector((1.0, 2.0, 0.5))
+        parent_empty.location = Vector((1.0, self.root.location.y + 2.0, 0.5))
         parent_empty.rotation_euler = Euler((math.radians(30.0), math.radians(-15.0), math.radians(45.0)), "XYZ")
         parent_empty.scale = Vector((1.5, 1.5, 1.5))
 
@@ -325,7 +331,7 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
 
         # Verification of world position and orientation
         self.assertAlmostEqual((ik_obj.matrix_world.translation - Vector(target_l)).length, 0.0, places=5)
-        actual_rot = ik_obj.matrix_world.to_3x3().to_quaternion()
+        actual_rot = ik_obj.matrix_world.to_quaternion()
         req_rot = Euler((math.radians(v) for v in rot_deg), "XYZ").to_matrix().to_quaternion()
         self.assertLessEqual(req_rot.rotation_difference(actual_rot).angle, 1e-4)
 
@@ -344,11 +350,11 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
         bpy.context.scene.collection.objects.link(p_hand_custom)
         bpy.context.scene.collection.objects.link(p_pole_custom)
 
-        p_hand_custom.location = Vector((0.5, 0.2, 1.0))
+        p_hand_custom.location = Vector((0.5, self.root.location.y + 0.2, 1.0))
         p_hand_custom.rotation_euler = Euler((math.radians(15.0), 0.0, 0.0), "XYZ")
         p_hand_custom.scale = Vector((1.2, 1.2, 1.2))
 
-        p_pole_custom.location = Vector((-0.4, -0.6, 0.8))
+        p_pole_custom.location = Vector((-0.4, self.root.location.y - 0.6, 0.8))
         p_pole_custom.rotation_euler = Euler((0.0, math.radians(-30.0), math.radians(20.0)), "XYZ")
         p_pole_custom.scale = Vector((0.8, 0.8, 0.8))
 
@@ -455,37 +461,152 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
         ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES["L"]]
         pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES["L"]]
 
-        # Capture baseline state before failed attempt
-        loc_before = ik_obj.location.copy()
-        rot_before = ik_obj.rotation_euler.copy()
-        p_fore = self.armature.pose.bones["forearm.L"]
-        fore_rot_before = p_fore.rotation_euler.copy()
-        ik_con = p_fore.constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
-        inf_before = ik_con.influence
-
-        # Create parent with non-conformal shear
-        shear_parent = bpy.data.objects.new("ShearParent", None)
-        bpy.context.scene.collection.objects.link(shear_parent)
-        ik_obj.parent = shear_parent
-        # Set matrix_parent_inverse with shear
-        shear_mat = Matrix.Identity(4)
-        shear_mat[0][1] = 0.8
-        ik_obj.matrix_parent_inverse = shear_mat
+        # Set up an initial active pose and target so state is non-neutral
+        set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=(-0.30, self.root.location.y + 0.15, 1.25),
+            hand_rotation_deg=(10.0, -15.0, 20.0),
+            influence=0.8,
+        )
         bpy.context.view_layer.update()
 
-        # Target call must fail during Phase A validation
-        with self.assertRaises(ValueError):
+        # Create illegal shear parent
+        shear_parent = bpy.data.objects.new("ShearParent", None)
+        bpy.context.scene.collection.objects.link(shear_parent)
+        shear_parent.location = Vector((1.0, self.root.location.y + 2.0, 3.0))
+        ik_obj.parent = shear_parent
+
+        # Set non-identity matrix_parent_inverse with shear
+        shear_mat = Matrix.Identity(4)
+        shear_mat[0][1] = 0.8
+        shear_mat[0][3] = 0.5
+        ik_obj.matrix_parent_inverse = shear_mat
+
+        # Also give ElbowPole a valid parent with non-identity transform
+        valid_pole_parent = bpy.data.objects.new("PoleParent", None)
+        bpy.context.scene.collection.objects.link(valid_pole_parent)
+        valid_pole_parent.location = Vector((-0.5, self.root.location.y - 0.5, 1.0))
+        pole_obj.parent = valid_pole_parent
+        pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+
+        # Synchronize dependency graph so illegal parent is established in Blender
+        bpy.context.view_layer.update()
+
+        # FULL SNAPSHOT OF STATE AFTER SETUP, BEFORE CALLING set_hand_ik_target
+        ik_snap = {
+            "parent": ik_obj.parent,
+            "matrix_parent_inverse": ik_obj.matrix_parent_inverse.copy(),
+            "matrix_world": ik_obj.matrix_world.copy(),
+            "location": ik_obj.location.copy(),
+            "rotation_mode": ik_obj.rotation_mode,
+            "rotation_euler": ik_obj.rotation_euler.copy(),
+            "rotation_quaternion": ik_obj.rotation_quaternion.copy(),
+            "rotation_axis_angle": tuple(ik_obj.rotation_axis_angle),
+            "scale": ik_obj.scale.copy(),
+        }
+        pole_snap = {
+            "parent": pole_obj.parent,
+            "matrix_parent_inverse": pole_obj.matrix_parent_inverse.copy(),
+            "matrix_world": pole_obj.matrix_world.copy(),
+            "location": pole_obj.location.copy(),
+            "rotation_mode": pole_obj.rotation_mode,
+            "rotation_euler": pole_obj.rotation_euler.copy(),
+            "rotation_quaternion": pole_obj.rotation_quaternion.copy(),
+            "rotation_axis_angle": tuple(pole_obj.rotation_axis_angle),
+            "scale": pole_obj.scale.copy(),
+        }
+
+        bone_snap = {}
+        for bname in ("upper_arm.L", "forearm.L", "hand.L"):
+            pb = self.armature.pose.bones[bname]
+            bone_snap[bname] = {
+                "rotation_mode": pb.rotation_mode,
+                "location": pb.location.copy(),
+                "rotation_euler": pb.rotation_euler.copy(),
+                "rotation_quaternion": pb.rotation_quaternion.copy(),
+                "rotation_axis_angle": tuple(pb.rotation_axis_angle),
+                "scale": pb.scale.copy(),
+                "matrix_basis": pb.matrix_basis.copy(),
+                "matrix": pb.matrix.copy(),
+            }
+
+        p_fore = self.armature.pose.bones["forearm.L"]
+        p_hand = self.armature.pose.bones["hand.L"]
+        ik_con = p_fore.constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
+        rot_con = p_hand.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]]
+
+        con_snap = {
+            "ik_ptr": ik_con.as_pointer(),
+            "ik_target": ik_con.target,
+            "ik_pole_target": ik_con.pole_target,
+            "ik_influence": ik_con.influence,
+            "rot_ptr": rot_con.as_pointer(),
+            "rot_target": rot_con.target,
+            "rot_influence": rot_con.influence,
+        }
+
+        # Target call MUST raise ValueError during Phase A validation
+        with self.assertRaises(ValueError) as ctx:
             set_hand_ik_target(
                 self.armature,
                 "L",
-                world_xyz=(-0.30, 0.20, 1.25),
+                world_xyz=(-0.25, self.root.location.y + 0.20, 1.30),
+                hand_rotation_deg=(20.0, 0.0, -10.0),
                 influence=1.0,
             )
+        self.assertIn("non-conformal transform", str(ctx.exception))
 
-        # Controllers and bones must NOT have been mutated by the failed set_hand_ik_target
-        self.assertEqual(ik_con.influence, inf_before)
-        fore_rot_diff = p_fore.rotation_euler.to_matrix().to_quaternion().rotation_difference(fore_rot_before.to_matrix().to_quaternion()).angle
-        self.assertAlmostEqual(fore_rot_diff, 0.0, places=6)
+        # Check HandIK state completely unpolluted
+        self.assertEqual(ik_obj.parent, ik_snap["parent"])
+        for r in range(4):
+            for c in range(4):
+                self.assertEqual(ik_obj.matrix_parent_inverse[r][c], ik_snap["matrix_parent_inverse"][r][c])
+                self.assertEqual(ik_obj.matrix_world[r][c], ik_snap["matrix_world"][r][c])
+        self.assertEqual(ik_obj.location, ik_snap["location"])
+        self.assertEqual(ik_obj.rotation_mode, ik_snap["rotation_mode"])
+        self.assertEqual(ik_obj.rotation_euler, ik_snap["rotation_euler"])
+        self.assertEqual(ik_obj.rotation_quaternion, ik_snap["rotation_quaternion"])
+        self.assertEqual(tuple(ik_obj.rotation_axis_angle), ik_snap["rotation_axis_angle"])
+        self.assertEqual(ik_obj.scale, ik_snap["scale"])
+
+        # Check ElbowPole state completely unpolluted
+        self.assertEqual(pole_obj.parent, pole_snap["parent"])
+        for r in range(4):
+            for c in range(4):
+                self.assertEqual(pole_obj.matrix_parent_inverse[r][c], pole_snap["matrix_parent_inverse"][r][c])
+                self.assertEqual(pole_obj.matrix_world[r][c], pole_snap["matrix_world"][r][c])
+        self.assertEqual(pole_obj.location, pole_snap["location"])
+        self.assertEqual(pole_obj.rotation_mode, pole_snap["rotation_mode"])
+        self.assertEqual(pole_obj.rotation_euler, pole_snap["rotation_euler"])
+        self.assertEqual(pole_obj.rotation_quaternion, pole_snap["rotation_quaternion"])
+        self.assertEqual(tuple(pole_obj.rotation_axis_angle), pole_snap["rotation_axis_angle"])
+        self.assertEqual(pole_obj.scale, pole_snap["scale"])
+
+        # Check PoseBones
+        for bname in ("upper_arm.L", "forearm.L", "hand.L"):
+            pb = self.armature.pose.bones[bname]
+            snap_b = bone_snap[bname]
+            self.assertEqual(pb.rotation_mode, snap_b["rotation_mode"])
+            self.assertEqual(pb.location, snap_b["location"])
+            self.assertEqual(pb.rotation_euler, snap_b["rotation_euler"])
+            self.assertEqual(pb.rotation_quaternion, snap_b["rotation_quaternion"])
+            self.assertEqual(tuple(pb.rotation_axis_angle), snap_b["rotation_axis_angle"])
+            self.assertEqual(pb.scale, snap_b["scale"])
+            for r in range(4):
+                for c in range(4):
+                    self.assertEqual(pb.matrix_basis[r][c], snap_b["matrix_basis"][r][c])
+                    self.assertEqual(pb.matrix[r][c], snap_b["matrix"][r][c])
+
+        # Check Constraints
+        self.assertEqual(ik_con.as_pointer(), con_snap["ik_ptr"])
+        self.assertEqual(ik_con.target, con_snap["ik_target"])
+        self.assertEqual(ik_con.pole_target, con_snap["ik_pole_target"])
+        self.assertEqual(ik_con.influence, con_snap["ik_influence"])
+
+        self.assertEqual(rot_con.as_pointer(), con_snap["rot_ptr"])
+        self.assertEqual(rot_con.target, con_snap["rot_target"])
+        self.assertEqual(rot_con.influence, con_snap["rot_influence"])
 
     def test_12_regression_compatibility_leg_ik(self) -> None:
         """TEST-12: Zero regression against existing 09-B Leg IK contract (all 27 tests pass)."""
@@ -499,6 +620,164 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
         self.assertEqual(result.testsRun, 27, "All 27 leg IK world rotation tests must run")
         self.assertEqual(len(result.failures), 0, f"Leg IK failures: {result.failures}")
         self.assertEqual(len(result.errors), 0, f"Leg IK errors: {result.errors}")
+
+    def test_13_effective_parent_stale_depgraph_update(self) -> None:
+        """TEST-13: Parent transform mutations without manual view_layer.update() are refreshed internally before validation."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES["L"]]
+        pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES["L"]]
+
+        parent = bpy.data.objects.new("StaleDepgraphParent", None)
+        bpy.context.scene.collection.objects.link(parent)
+        parent.location = Vector((1.0, self.root.location.y - 1.0, 2.0))
+        parent.rotation_euler = Euler((math.radians(10.0), 0.0, 0.0), "XYZ")
+        parent.scale = Vector((1.2, 1.2, 1.2))
+        ik_obj.parent = parent
+        pole_obj.parent = parent
+        bpy.context.view_layer.update()
+
+        # Mutate parent object transforms WITHOUT calling view_layer.update()
+        parent.location = Vector((3.5, self.root.location.y + 2.0, -1.0))
+        parent.rotation_euler = Euler((math.radians(25.0), math.radians(-35.0), math.radians(50.0)), "XYZ")
+        parent.scale = Vector((1.5, 1.5, 1.5))
+        # Note: view_layer.update() is intentionally NOT called here!
+
+        target_l = (-0.30, self.root.location.y + 0.18, 1.25)
+        pole_l = (-0.48, self.root.location.y - 0.35, 1.20)
+        rot_deg = (15.0, -20.0, 35.0)
+
+        set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=target_l,
+            hand_rotation_deg=rot_deg,
+            pole_world_xyz=pole_l,
+            influence=1.0,
+        )
+
+        # Final world positions must match requested targets
+        self.assertAlmostEqual((ik_obj.matrix_world.translation - Vector(target_l)).length, 0.0, places=5)
+        self.assertAlmostEqual((pole_obj.matrix_world.translation - Vector(pole_l)).length, 0.0, places=5)
+
+        # Hand world orientation error <= 1e-4 rad
+        req_rot = Euler((math.radians(v) for v in rot_deg), "XYZ").to_matrix().to_quaternion()
+        actual_rot = ik_obj.matrix_world.to_quaternion()
+        self.assertLessEqual(req_rot.rotation_difference(actual_rot).angle, 1e-4)
+
+    def test_14_rotation_mode_compatibility(self) -> None:
+        """TEST-14: Preserves controller active rotation_mode across XYZ, non-XYZ Euler, QUATERNION, and AXIS_ANGLE."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES["L"]]
+
+        # Parent with rotation, translation, and positive uniform scale
+        parent = bpy.data.objects.new("RotModeParent", None)
+        bpy.context.scene.collection.objects.link(parent)
+        parent.location = Vector((0.8, self.root.location.y + 0.5, 1.2))
+        parent.rotation_euler = Euler((math.radians(20.0), math.radians(-30.0), math.radians(45.0)), "XYZ")
+        parent.scale = Vector((1.4, 1.4, 1.4))
+
+        ik_obj.parent = parent
+        inv_euler = Euler((math.radians(10.0), math.radians(-15.0), math.radians(25.0)), "XYZ")
+        ik_obj.matrix_parent_inverse = Matrix.LocRotScale(Vector((0.1, -0.2, 0.15)), inv_euler, Vector((1.0, 1.0, 1.0)))
+        bpy.context.view_layer.update()
+
+        target_l = (-0.28, self.root.location.y + 0.20, 1.26)
+        rot_deg = (30.0, -40.0, 20.0)
+        expected_rot_quat = Euler((math.radians(v) for v in rot_deg), "XYZ").to_matrix().to_quaternion()
+
+        test_modes = ("XYZ", "ZYX", "QUATERNION", "AXIS_ANGLE")
+        for mode in test_modes:
+            ik_obj.rotation_mode = mode
+            bpy.context.view_layer.update()
+
+            set_hand_ik_target(
+                self.armature,
+                "L",
+                world_xyz=target_l,
+                hand_rotation_deg=rot_deg,
+                influence=1.0,
+            )
+
+            # rotation_mode must NOT be changed or forced to XYZ
+            self.assertEqual(ik_obj.rotation_mode, mode, f"rotation_mode must remain {mode}")
+
+            # Verify actual matrix_world orientation
+            actual_rot_quat = ik_obj.matrix_world.to_quaternion()
+            err_rad = expected_rot_quat.rotation_difference(actual_rot_quat).angle
+            self.assertLessEqual(err_rad, 1e-4, f"Mode {mode} world rotation error {err_rad:.6e} > 1e-4 rad")
+            self.assertAlmostEqual((ik_obj.matrix_world.translation - Vector(target_l)).length, 0.0, places=5)
+
+    def test_15_reset_non_identity_effective_parent(self) -> None:
+        """TEST-15: reset_arm_ik under non-identity distinct parents returns to CharacterRoot neutral world transform."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES["L"]]
+        pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES["L"]]
+
+        # Distinct parents with rotation, translation, and positive uniform scale
+        p_hand = bpy.data.objects.new("ResetParentHand", None)
+        p_pole = bpy.data.objects.new("ResetParentPole", None)
+        bpy.context.scene.collection.objects.link(p_hand)
+        bpy.context.scene.collection.objects.link(p_pole)
+
+        p_hand.location = Vector((0.6, self.root.location.y + 0.3, 1.1))
+        p_hand.rotation_euler = Euler((math.radians(15.0), math.radians(-25.0), math.radians(35.0)), "XYZ")
+        p_hand.scale = Vector((1.3, 1.3, 1.3))
+
+        p_pole.location = Vector((-0.5, self.root.location.y - 0.7, 0.9))
+        p_pole.rotation_euler = Euler((math.radians(-20.0), math.radians(15.0), math.radians(-10.0)), "XYZ")
+        p_pole.scale = Vector((0.7, 0.7, 0.7))
+
+        ik_obj.parent = p_hand
+        inv_euler = Euler((math.radians(-12.0), math.radians(18.0), math.radians(5.0)), "XYZ")
+        expected_inv_mat = Matrix.LocRotScale(Vector((0.15, -0.25, 0.1)), inv_euler, Vector((1.0, 1.0, 1.0)))
+        ik_obj.matrix_parent_inverse = expected_inv_mat
+
+        pole_obj.parent = p_pole
+        pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.view_layer.update()
+
+        # Set active non-neutral targets
+        set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=(-0.35, self.root.location.y + 0.25, 1.35),
+            hand_rotation_deg=(25.0, 10.0, -15.0),
+            influence=1.0,
+        )
+        bpy.context.view_layer.update()
+
+        # Call explicit reset
+        reset_arm_ik(self.armature)
+        bpy.context.view_layer.update()
+
+        # Verify parent and matrix_parent_inverse preserved
+        self.assertEqual(ik_obj.parent, p_hand)
+        for r in range(4):
+            for c in range(4):
+                self.assertAlmostEqual(ik_obj.matrix_parent_inverse[r][c], expected_inv_mat[r][c], places=6)
+        self.assertEqual(pole_obj.parent, p_pole)
+
+        # Expected neutral world positions and orientations relative to CharacterRoot
+        root_mat = self.root.matrix_world
+        expected_hand_world = root_mat @ Vector((-SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
+        expected_pole_world = root_mat @ Vector((
+            -(SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
+            -DEFAULT_POLE_BACKWARD_OFFSET,
+            ELBOW_REST_Z,
+        ))
+        expected_hand_rot_quat = root_mat.to_quaternion()
+
+        # Check actual world translations and rotation
+        self.assertAlmostEqual((ik_obj.matrix_world.translation - expected_hand_world).length, 0.0, places=5)
+        self.assertAlmostEqual((pole_obj.matrix_world.translation - expected_pole_world).length, 0.0, places=5)
+        hand_rot_err = ik_obj.matrix_world.to_quaternion().rotation_difference(expected_hand_rot_quat).angle
+        self.assertLessEqual(hand_rot_err, 1e-4)
+
+        # Verify constraint influences return to 0.0
+        p_fore = self.armature.pose.bones["forearm.L"]
+        p_hand_bone = self.armature.pose.bones["hand.L"]
+        self.assertAlmostEqual(p_fore.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.0, places=6)
+        self.assertAlmostEqual(p_hand_bone.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, 0.0, places=6)
 
 
 if __name__ == "__main__":

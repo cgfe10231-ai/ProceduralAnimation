@@ -7,6 +7,7 @@ Consolidates the effective parent transform contract established in Task 09-B:
 - Rejects non-finite elements, non-affine matrices, reflections (det < 0), singular matrices
   (det == 0), degenerate scales (s^2 <= 1e-12), non-uniform scales, and shears.
 - Provides unified world-to-local and local-to-world position and rotation mapping.
+- Preserves existing rotation_mode across 6 Euler orders, QUATERNION, and AXIS_ANGLE.
 """
 
 import math
@@ -106,14 +107,44 @@ def world_to_local_position(world_pos: Vector, eff_parent_mat: Matrix) -> Vector
     return eff_parent_mat.inverted() @ world_pos
 
 
-def world_to_local_rotation(world_rot_euler: Euler, eff_parent_mat: Matrix) -> Euler:
-    """Convert a world-space Euler rotation ('XYZ') to controller local Euler rotation ('XYZ').
+def world_to_local_rotation_quaternion(world_rot_quat: Quaternion, eff_parent_mat: Matrix) -> Quaternion:
+    """Convert a world-space rotation quaternion to controller local rotation quaternion.
 
     Extracts pure rotation from conformal effective parent matrix:
-    R_eff = eff_parent_mat.to_quaternion().to_matrix()
-    R_local = R_eff.inverted() @ R_world
+    Q_parent = eff_parent_mat.to_quaternion()
+    Q_local = Q_parent.inverted() @ Q_world
     """
-    world_rot_mat = world_rot_euler.to_matrix()
-    parent_rot_mat = eff_parent_mat.to_quaternion().to_matrix()
-    local_rot_mat = parent_rot_mat.inverted() @ world_rot_mat
-    return local_rot_mat.to_euler("XYZ")
+    q_parent = eff_parent_mat.to_quaternion()
+    return (q_parent.inverted() @ world_rot_quat).normalized()
+
+
+def apply_target_rotation(
+    obj: bpy.types.Object,
+    target_world_rot_quat: Quaternion,
+    eff_parent_mat: Matrix,
+) -> None:
+    """Compute and apply local rotation to obj preserving its active rotation_mode.
+
+    Supports:
+    - 6 Euler orders ('XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX'): writes to rotation_euler
+    - 'QUATERNION': writes to rotation_quaternion
+    - 'AXIS_ANGLE': writes (angle, axis.x, axis.y, axis.z) to rotation_axis_angle
+    """
+    q_local = world_to_local_rotation_quaternion(target_world_rot_quat, eff_parent_mat)
+    mode = obj.rotation_mode
+    if mode == "QUATERNION":
+        obj.rotation_quaternion = q_local
+    elif mode == "AXIS_ANGLE":
+        axis, angle = q_local.to_axis_angle()
+        obj.rotation_axis_angle = (angle, axis.x, axis.y, axis.z)
+    elif mode in ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"):
+        obj.rotation_euler = q_local.to_euler(mode)
+    else:
+        obj.rotation_euler = q_local.to_euler("XYZ")
+
+
+def world_to_local_rotation(world_rot_euler: Euler, eff_parent_mat: Matrix) -> Euler:
+    """Convert a world-space Euler rotation ('XYZ') to controller local Euler rotation ('XYZ')."""
+    q_world = world_rot_euler.to_quaternion()
+    q_local = world_to_local_rotation_quaternion(q_world, eff_parent_mat)
+    return q_local.to_euler(world_rot_euler.order)

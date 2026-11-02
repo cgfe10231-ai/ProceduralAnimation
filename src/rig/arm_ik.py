@@ -24,9 +24,12 @@ Task 10-A Contracts:
 - Setup Idempotency: setup_arm_ik() ensures controls and constraints exist with correct configuration,
   without resetting active positions, orientations, or influences.
 - Explicit Reset: reset_arm_ik() actively restores neutral rest positions and influence=0.0 while
-  respecting existing effective parent transforms.
+  respecting existing effective parent transforms and rotation modes.
 - Effective Parent Matrix: M_eff = M_parent @ matrix_parent_inverse handles world translation and
   rotation inversion across arbitrary valid conformal parent hierarchies.
+- Rotation Mode Fidelity: preserves controller active rotation_mode across 6 Euler modes, QUATERNION,
+  and AXIS_ANGLE without forced conversion to XYZ.
+- Dependency Graph Freshness: synchronizes view layer before computing effective parent matrices.
 """
 
 import math
@@ -36,6 +39,7 @@ import bpy
 from mathutils import Euler, Matrix, Quaternion, Vector
 
 from src.rig.transform_utils import (
+    apply_target_rotation,
     compute_effective_parent_matrix,
     validate_effective_parent_transform,
     world_to_local_position,
@@ -152,7 +156,7 @@ def setup_arm_ik(
     """Configure native Blender two-bone arm IK chains, elbow pole targets, and hand orientation controls.
 
     This function is strictly idempotent:
-    - Preserves existing controller objects, parents, matrices, positions, and orientations.
+    - Preserves existing controller objects, parents, matrices, positions, orientations, and rotation modes.
     - Preserves existing constraint instances, configurations, and active influences.
     - Only initializes neutral rest positions when creating brand new controllers.
     - Only sets initial_influence when creating brand new constraints.
@@ -313,8 +317,8 @@ def set_arm_ik_influence(
 def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
     """Reset both arms, empties, and constraint influences back to neutral rest (FK mode).
 
-    Preserves existing controller parent relationships and matrix_parent_inverse,
-    transforming neutral world positions into the controller's effective parent space.
+    Preserves existing controller parent relationships, rotation_mode, and matrix_parent_inverse,
+    transforming neutral world positions and orientations into the controller's effective parent space.
     """
     arm = _resolve_armature(armature_obj)
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
@@ -335,23 +339,23 @@ def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
         if root_obj is not None:
             ik_neutral_world = root_obj.matrix_world @ ik_neutral_local
             pole_neutral_world = root_obj.matrix_world @ pole_neutral_local
-            neutral_world_rot_euler = root_obj.matrix_world.to_quaternion().to_euler("XYZ")
+            neutral_world_rot_quat = root_obj.matrix_world.to_quaternion()
         else:
             ik_neutral_world = ik_neutral_local
             pole_neutral_world = pole_neutral_local
-            neutral_world_rot_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+            neutral_world_rot_quat = Quaternion()
 
         if ik_obj is not None:
             eff_ik_mat = compute_effective_parent_matrix(ik_obj)
             validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
             ik_obj.location = world_to_local_position(ik_neutral_world, eff_ik_mat)
-            ik_obj.rotation_euler = world_to_local_rotation(neutral_world_rot_euler, eff_ik_mat)
+            apply_target_rotation(ik_obj, neutral_world_rot_quat, eff_ik_mat)
 
         if pole_obj is not None:
             eff_pole_mat = compute_effective_parent_matrix(pole_obj)
             validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
             pole_obj.location = world_to_local_position(pole_neutral_world, eff_pole_mat)
-            pole_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+            apply_target_rotation(pole_obj, Quaternion(), eff_pole_mat)
 
         p_up = arm.pose.bones.get(f"upper_arm.{side}")
         p_fore = arm.pose.bones.get(f"forearm.{side}")
@@ -461,8 +465,10 @@ def set_hand_ik_target(
     """Set the left ('L') or right ('R') hand IK target in world coordinates.
 
     Follows the 10-A Contract:
-    - Phase A: Validates effective parent matrices before any scene mutation occurs.
+    - Phase A1: Synchronizes dependency graph (view_layer.update()) before reading parent transforms.
+    - Phase A2: Validates effective parent matrices before any scene mutation occurs.
     - HandIK and ElbowPole transforms are resolved independently using their respective M_eff.
+    - Preserves controller active rotation_mode (Euler modes, QUATERNION, AXIS_ANGLE).
     - Rejects non-conformal transforms (shears, non-uniform scaling, reflections, singularities).
     - Preserves default neutral orientation matching CharacterRoot when hand_rotation_deg is None.
 
@@ -493,14 +499,16 @@ def set_hand_ik_target(
         ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES[side]]
         pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES[side]]
 
-    # Phase A: Validate effective parent transform domains before any scene mutation
+    # Phase A1: Synchronize dependency graph FIRST before reading parent matrices
+    bpy.context.view_layer.update()
+
+    # Phase A2: Compute and validate effective parent transform domains before any scene mutation
     eff_ik_mat = compute_effective_parent_matrix(ik_obj)
     eff_pole_mat = compute_effective_parent_matrix(pole_obj)
     validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
     validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
 
-    # Synchronize scene graph to evaluate CharacterRoot and armature pose bone transforms
-    bpy.context.view_layer.update()
+    # Note: No mutation of controllers, pose bones, constraints, or pre-bend hint occurs before this point!
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
 
     p_up = arm.pose.bones[f"upper_arm.{side}"]
@@ -545,20 +553,20 @@ def set_hand_ik_target(
 
     # Hand 3D orientation target in world coordinates
     if hand_rotation_deg is not None:
-        target_world_rot_euler = Euler((math.radians(v) for v in hand_rotation_deg), "XYZ")
+        target_world_rot_quat = Euler((math.radians(v) for v in hand_rotation_deg), "XYZ").to_quaternion()
     else:
         # Neutral level orientation matching CharacterRoot
         if root_obj is not None:
-            target_world_rot_euler = root_obj.matrix_world.to_quaternion().to_euler("XYZ")
+            target_world_rot_quat = root_obj.matrix_world.to_quaternion()
         else:
-            target_world_rot_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+            target_world_rot_quat = Quaternion()
 
     # Phase B: Commit transforms and constraints
     _apply_arm_ik_prebend_hint_side(arm, side)
 
-    # Convert applied world targets to controller local spaces
+    # Convert applied world targets to controller local spaces preserving rotation_mode
     ik_obj.location = world_to_local_position(applied, eff_ik_mat)
-    ik_obj.rotation_euler = world_to_local_rotation(target_world_rot_euler, eff_ik_mat)
+    apply_target_rotation(ik_obj, target_world_rot_quat, eff_ik_mat)
     pole_obj.location = world_to_local_position(pole_world, eff_pole_mat)
 
     # Update constraint influence
