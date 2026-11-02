@@ -1,8 +1,8 @@
-"""Procedural two-bone arm IK and independent hand orientation control (Task 6F-A).
+"""Procedural two-bone arm IK and independent hand orientation control (Task 6F-A / Task 10-A).
 
 Builds on the existing 19-bone CharacterArmature from Task 4B and complements leg IK (Task 4C):
 - Creates dedicated Empty control objects for left/right hand IK targets (`HandIK.L`, `HandIK.R`)
-  and elbow pole targets (`ElbowPole.L`, `ElbowPole.R`) parented to `CharacterRoot`.
+  and elbow pole targets (`ElbowPole.L`, `ElbowPole.R`).
 - Configures Blender native `IK` constraints (`chain_count = 2`) on `forearm.L` and `forearm.R`
   so `upper_arm` + `forearm` form a deterministic two-bone IK chain per arm.
 - Configures elbow flexion constraints and pre-bend solver hints with matched `pole_angle = -90.0 deg`
@@ -20,11 +20,13 @@ Builds on the existing 19-bone CharacterArmature from Task 4B and complements le
   - `reset_arm_ik(...)`: resets arm IK targets and sets influence back to 0.0.
   - `get_arm_ik_state(...)`: inspects actual bone lengths, target error, orientation error, and reachability.
 
-Note on Biomechanics and Physiology:
-- The elbow flexion constraint (`use_ik_limit_x` on the forearm hinge) is strictly an IK solver hint
-  to ensure correct single-axis hinge direction during IK inversion and prevent hyperextension.
-  Comprehensive multi-body physiological Range of Motion (ROM) limits, Dempster mass distributions,
-  and whole-body Center of Mass (CoM) are part of Task 6F-B.
+Task 10-A Contracts:
+- Setup Idempotency: setup_arm_ik() ensures controls and constraints exist with correct configuration,
+  without resetting active positions, orientations, or influences.
+- Explicit Reset: reset_arm_ik() actively restores neutral rest positions and influence=0.0 while
+  respecting existing effective parent transforms.
+- Effective Parent Matrix: M_eff = M_parent @ matrix_parent_inverse handles world translation and
+  rotation inversion across arbitrary valid conformal parent hierarchies.
 """
 
 import math
@@ -32,6 +34,13 @@ from typing import Dict, Optional, Tuple, Union
 
 import bpy
 from mathutils import Euler, Matrix, Quaternion, Vector
+
+from src.rig.transform_utils import (
+    compute_effective_parent_matrix,
+    validate_effective_parent_transform,
+    world_to_local_position,
+    world_to_local_rotation,
+)
 
 ARM_IK_TARGET_NAMES: Dict[str, str] = {"L": "HandIK.L", "R": "HandIK.R"}
 ARM_POLE_TARGET_NAMES: Dict[str, str] = {"L": "ElbowPole.L", "R": "ElbowPole.R"}
@@ -81,8 +90,12 @@ def _get_or_create_empty(
     display_size: float,
     parent: Optional[bpy.types.Object],
     collection: bpy.types.Collection,
-) -> bpy.types.Object:
-    """Retrieve or construct an Empty control object with unified parent transform."""
+) -> Tuple[bpy.types.Object, bool]:
+    """Retrieve or construct an Empty control object preserving existing parent and transform.
+
+    Returns:
+        Tuple (obj, is_new): obj is the Empty object, is_new indicates whether it was created fresh.
+    """
     obj = bpy.data.objects.get(name)
     if obj is not None and obj.type != "EMPTY":
         bpy.data.objects.remove(obj, do_unlink=True)
@@ -91,44 +104,45 @@ def _get_or_create_empty(
     if obj is None:
         obj = bpy.data.objects.new(name, None)
         collection.objects.link(obj)
-    elif obj.name not in collection.objects:
-        collection.objects.link(obj)
+        obj.empty_display_type = display_type
+        obj.empty_display_size = display_size
+        obj.rotation_mode = "XYZ"
+        if parent is not None:
+            obj.parent = parent
+            obj.matrix_parent_inverse = Matrix.Identity(4)
+        return obj, True
 
+    # Existing valid Empty: ensure linked to collection and update display properties
+    if obj.name not in collection.objects:
+        collection.objects.link(obj)
     obj.empty_display_type = display_type
     obj.empty_display_size = display_size
-    obj.rotation_mode = "XYZ"
+    return obj, False
 
-    if parent is not None:
-        obj.parent = parent
-        obj.matrix_parent_inverse = Matrix.Identity(4)
 
-    return obj
+def _apply_arm_ik_prebend_hint_side(arm: bpy.types.Object, side: str) -> None:
+    """Apply a small sagittal pre-bend hint to a single arm side if currently unbent."""
+    p_up = arm.pose.bones[f"upper_arm.{side}"]
+    p_fore = arm.pose.bones[f"forearm.{side}"]
+    p_hand = arm.pose.bones[f"hand.{side}"]
+
+    p_up.rotation_mode = "XYZ"
+    p_fore.rotation_mode = "XYZ"
+    p_hand.rotation_mode = "XYZ"
+
+    # Apply slight pre-bend only if currently zero
+    euler_mag = p_up.rotation_euler.to_matrix().to_quaternion().angle
+    if euler_mag < 1e-4:
+        p_up.rotation_euler = Euler((math.radians(2.0), 0.0, 0.0), "XYZ")
+    euler_mag_fore = p_fore.rotation_euler.to_matrix().to_quaternion().angle
+    if euler_mag_fore < 1e-4:
+        p_fore.rotation_euler = Euler((math.radians(4.0), 0.0, 0.0), "XYZ")
 
 
 def _apply_arm_ik_prebend_hint(arm: bpy.types.Object) -> None:
-    """Apply a small sagittal pre-bend hint to upper arm and forearm.
-
-    In the rest pose, upper_arm and forearm are collinear along the vertical axis (180 deg).
-    Blender's iterative IK solver uses the PoseBone basis transform as the initial configuration.
-    A small forward (+X Euler) basis angle guarantees deterministic anatomical forward elbow
-    flexion without solver ambiguity or flip.
-    """
+    """Apply a small sagittal pre-bend hint to upper arm and forearm across both sides."""
     for side in ("L", "R"):
-        p_up = arm.pose.bones[f"upper_arm.{side}"]
-        p_fore = arm.pose.bones[f"forearm.{side}"]
-        p_hand = arm.pose.bones[f"hand.{side}"]
-
-        p_up.rotation_mode = "XYZ"
-        p_fore.rotation_mode = "XYZ"
-        p_hand.rotation_mode = "XYZ"
-
-        # Apply slight pre-bend only if currently zero
-        euler_mag = p_up.rotation_euler.to_matrix().to_quaternion().angle
-        if euler_mag < 1e-4:
-            p_up.rotation_euler = Euler((math.radians(2.0), 0.0, 0.0), "XYZ")
-        euler_mag_fore = p_fore.rotation_euler.to_matrix().to_quaternion().angle
-        if euler_mag_fore < 1e-4:
-            p_fore.rotation_euler = Euler((math.radians(4.0), 0.0, 0.0), "XYZ")
+        _apply_arm_ik_prebend_hint_side(arm, side)
 
 
 def setup_arm_ik(
@@ -136,6 +150,13 @@ def setup_arm_ik(
     initial_influence: float = 0.0,
 ) -> Dict[str, bpy.types.Object]:
     """Configure native Blender two-bone arm IK chains, elbow pole targets, and hand orientation controls.
+
+    This function is strictly idempotent:
+    - Preserves existing controller objects, parents, matrices, positions, and orientations.
+    - Preserves existing constraint instances, configurations, and active influences.
+    - Only initializes neutral rest positions when creating brand new controllers.
+    - Only sets initial_influence when creating brand new constraints.
+    - Only applies pre-bend hints when initializing a previously unconstrained arm.
 
     Args:
         armature_obj: Optional CharacterArmature object.
@@ -155,14 +176,14 @@ def setup_arm_ik(
         ik_name = ARM_IK_TARGET_NAMES[side]
         pole_name = ARM_POLE_TARGET_NAMES[side]
 
-        ik_obj = _get_or_create_empty(
+        ik_obj, ik_is_new = _get_or_create_empty(
             name=ik_name,
             display_type="CUBE",
             display_size=0.04,
             parent=root_obj,
             collection=collection,
         )
-        pole_obj = _get_or_create_empty(
+        pole_obj, pole_is_new = _get_or_create_empty(
             name=pole_name,
             display_type="SPHERE",
             display_size=0.035,
@@ -170,16 +191,18 @@ def setup_arm_ik(
             collection=collection,
         )
 
-        # Set neutral rest positions in CharacterRoot local space
-        ik_obj.location = Vector((sign * SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
-        ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+        # Set neutral rest positions only for newly created controllers
+        if ik_is_new:
+            ik_obj.location = Vector((sign * SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
+            ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
 
-        pole_obj.location = Vector((
-            sign * (SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
-            -DEFAULT_POLE_BACKWARD_OFFSET,
-            ELBOW_REST_Z,
-        ))
-        pole_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+        if pole_is_new:
+            pole_obj.location = Vector((
+                sign * (SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
+                -DEFAULT_POLE_BACKWARD_OFFSET,
+                ELBOW_REST_Z,
+            ))
+            pole_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
 
         controls[ik_name] = ik_obj
         controls[pole_name] = pole_obj
@@ -202,40 +225,58 @@ def setup_arm_ik(
         p_fore.ik_min_x = math.radians(0.0)      # Fully extended (straight)
         p_fore.ik_max_x = math.radians(150.0)    # Maximum anatomical elbow flexion
 
-        # Remove existing IK constraint if any
+        # Resolve or configure existing ArmIK constraint
+        ik_con = None
+        con_name_ik = ARM_IK_CONSTRAINT_NAMES[side]
         for con in list(p_fore.constraints):
-            if con.name == ARM_IK_CONSTRAINT_NAMES[side] or (con.type == "IK" and con.name.startswith("ArmIK")):
+            if con.name == con_name_ik:
+                if con.type == "IK":
+                    ik_con = con
+                else:
+                    p_fore.constraints.remove(con)
+            elif con.type == "IK" and con.name.startswith("ArmIK"):
                 p_fore.constraints.remove(con)
 
-        ik_con = p_fore.constraints.new(type="IK")
-        ik_con.name = ARM_IK_CONSTRAINT_NAMES[side]
+        newly_created_ik_con = False
+        if ik_con is None:
+            ik_con = p_fore.constraints.new(type="IK")
+            ik_con.name = con_name_ik
+            ik_con.influence = max(0.0, min(1.0, float(initial_influence)))
+            newly_created_ik_con = True
+
         ik_con.target = ik_obj
         ik_con.pole_target = pole_obj
         ik_con.chain_count = 2
         ik_con.use_tail = True
         ik_con.use_stretch = False
-        # In this rig, Bone +X is World +X, Bone +Y points down (-Z), Bone +Z points forward (+Y).
-        # When pole target is located backward (-Y), pole_angle = -90.0 deg aligns bone local X
-        # with World +X, ensuring zero lateral twist and correct sagittal flexion.
         ik_con.pole_angle = math.radians(-90.0)
-        ik_con.influence = max(0.0, min(1.0, initial_influence))
 
-        # Hand independent 3D orientation control via COPY_ROTATION constraint
-        # Leave arm.data.bones[hand].use_inherit_rotation = True so when influence=0,
-        # hand follows forearm naturally in FK mode.
+        # Resolve or configure existing HandRotation constraint
+        rot_con = None
+        con_name_rot = HAND_ROT_CONSTRAINT_NAMES[side]
         for con in list(p_hand.constraints):
-            if con.name == HAND_ROT_CONSTRAINT_NAMES[side] or (con.type == "COPY_ROTATION" and con.name.startswith("HandRotation")):
+            if con.name == con_name_rot:
+                if con.type == "COPY_ROTATION":
+                    rot_con = con
+                else:
+                    p_hand.constraints.remove(con)
+            elif con.type == "COPY_ROTATION" and con.name.startswith("HandRotation"):
                 p_hand.constraints.remove(con)
 
-        rot_con = p_hand.constraints.new(type="COPY_ROTATION")
-        rot_con.name = HAND_ROT_CONSTRAINT_NAMES[side]
+        if rot_con is None:
+            rot_con = p_hand.constraints.new(type="COPY_ROTATION")
+            rot_con.name = con_name_rot
+            rot_con.influence = max(0.0, min(1.0, float(initial_influence)))
+
         rot_con.target = ik_obj
         rot_con.target_space = "WORLD"
         rot_con.owner_space = "WORLD"
         rot_con.mix_mode = "REPLACE"
-        rot_con.influence = max(0.0, min(1.0, initial_influence))
 
-    _apply_arm_ik_prebend_hint(arm)
+        # Apply pre-bend hint only when establishing an IK chain for the first time
+        if newly_created_ik_con:
+            _apply_arm_ik_prebend_hint_side(arm, side)
+
     bpy.context.view_layer.update()
     return controls
 
@@ -270,28 +311,46 @@ def set_arm_ik_influence(
 
 
 def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
-    """Reset both arms, empties, and constraint influences back to neutral rest (FK mode)."""
+    """Reset both arms, empties, and constraint influences back to neutral rest (FK mode).
+
+    Preserves existing controller parent relationships and matrix_parent_inverse,
+    transforming neutral world positions into the controller's effective parent space.
+    """
     arm = _resolve_armature(armature_obj)
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
+    bpy.context.view_layer.update()
 
     for side, sign in (("L", -1.0), ("R", 1.0)):
         ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[side])
         pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[side])
+
+        # Compute neutral targets in root/world coordinates
+        ik_neutral_local = Vector((sign * SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
+        pole_neutral_local = Vector((
+            sign * (SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
+            -DEFAULT_POLE_BACKWARD_OFFSET,
+            ELBOW_REST_Z,
+        ))
+
+        if root_obj is not None:
+            ik_neutral_world = root_obj.matrix_world @ ik_neutral_local
+            pole_neutral_world = root_obj.matrix_world @ pole_neutral_local
+            neutral_world_rot_euler = root_obj.matrix_world.to_quaternion().to_euler("XYZ")
+        else:
+            ik_neutral_world = ik_neutral_local
+            pole_neutral_world = pole_neutral_local
+            neutral_world_rot_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+
         if ik_obj is not None:
-            if root_obj is not None:
-                ik_obj.parent = root_obj
-                ik_obj.matrix_parent_inverse = Matrix.Identity(4)
-            ik_obj.location = Vector((sign * SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
-            ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+            eff_ik_mat = compute_effective_parent_matrix(ik_obj)
+            validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
+            ik_obj.location = world_to_local_position(ik_neutral_world, eff_ik_mat)
+            ik_obj.rotation_euler = world_to_local_rotation(neutral_world_rot_euler, eff_ik_mat)
+
         if pole_obj is not None:
-            if root_obj is not None:
-                pole_obj.parent = root_obj
-                pole_obj.matrix_parent_inverse = Matrix.Identity(4)
-            pole_obj.location = Vector((
-                sign * (SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
-                -DEFAULT_POLE_BACKWARD_OFFSET,
-                ELBOW_REST_Z,
-            ))
+            eff_pole_mat = compute_effective_parent_matrix(pole_obj)
+            validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
+            pole_obj.location = world_to_local_position(pole_neutral_world, eff_pole_mat)
             pole_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
 
         p_up = arm.pose.bones.get(f"upper_arm.{side}")
@@ -308,7 +367,8 @@ def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
             if HAND_ROT_CONSTRAINT_NAMES[side] in p_hand.constraints:
                 p_hand.constraints[HAND_ROT_CONSTRAINT_NAMES[side]].influence = 0.0
 
-    _apply_arm_ik_prebend_hint(arm)
+        _apply_arm_ik_prebend_hint_side(arm, side)
+
     bpy.context.view_layer.update()
 
 
@@ -354,9 +414,9 @@ def get_arm_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dic
     hand_world_euler = tuple(round(math.degrees(a), 4) for a in hand_w_mat.to_euler("XYZ"))
 
     if ik_obj:
-        target_w_mat = ik_obj.matrix_world.to_3x3()
-        target_world_euler = tuple(round(math.degrees(a), 4) for a in target_w_mat.to_euler("XYZ"))
-        rot_diff = target_w_mat.to_quaternion().rotation_difference(hand_w_mat.to_quaternion()).angle
+        target_quat = ik_obj.matrix_world.to_quaternion()
+        target_world_euler = tuple(round(math.degrees(a), 4) for a in target_quat.to_euler("XYZ"))
+        rot_diff = target_quat.rotation_difference(hand_w_mat.to_quaternion()).angle
         rotation_error_deg = round(math.degrees(rot_diff), 4)
     else:
         target_world_euler = hand_world_euler
@@ -400,6 +460,12 @@ def set_hand_ik_target(
 ) -> dict:
     """Set the left ('L') or right ('R') hand IK target in world coordinates.
 
+    Follows the 10-A Contract:
+    - Phase A: Validates effective parent matrices before any scene mutation occurs.
+    - HandIK and ElbowPole transforms are resolved independently using their respective M_eff.
+    - Rejects non-conformal transforms (shears, non-uniform scaling, reflections, singularities).
+    - Preserves default neutral orientation matching CharacterRoot when hand_rotation_deg is None.
+
     Args:
         armature_obj: Optional CharacterArmature object.
         side: Arm side, 'L' or 'R'.
@@ -427,8 +493,15 @@ def set_hand_ik_target(
         ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES[side]]
         pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES[side]]
 
-    _apply_arm_ik_prebend_hint(arm)
+    # Phase A: Validate effective parent transform domains before any scene mutation
+    eff_ik_mat = compute_effective_parent_matrix(ik_obj)
+    eff_pole_mat = compute_effective_parent_matrix(pole_obj)
+    validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
+    validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
+
+    # Synchronize scene graph to evaluate CharacterRoot and armature pose bone transforms
     bpy.context.view_layer.update()
+    root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
 
     p_up = arm.pose.bones[f"upper_arm.{side}"]
     p_fore = arm.pose.bones[f"forearm.{side}"]
@@ -450,30 +523,14 @@ def set_hand_ik_target(
             clamped_reach = True
             if dist > 1e-6:
                 applied = shoulder_world + vec_from_shoulder.normalized() * MAX_ARM_REACH
+            else:
+                applied = shoulder_world + Vector((0.0, 0.0, -1.0)) * MAX_ARM_REACH
         elif dist < MIN_ARM_REACH:
             clamped_reach = True
             direction = vec_from_shoulder.normalized() if dist > 1e-6 else Vector((0.0, 0.0, -1.0))
             applied = shoulder_world + direction * MIN_ARM_REACH
 
-    # Convert applied world position to ik_obj parent coordinate space
-    if ik_obj.parent is not None:
-        ik_obj.location = ik_obj.parent.matrix_world.inverted() @ applied
-    else:
-        ik_obj.location = applied
-
-    # Hand 3D orientation control
-    if hand_rotation_deg is not None:
-        world_rot_mat = Euler((math.radians(v) for v in hand_rotation_deg), "XYZ").to_matrix()
-        if ik_obj.parent is not None:
-            local_rot_mat = ik_obj.parent.matrix_world.to_3x3().inverted() @ world_rot_mat
-            ik_obj.rotation_euler = local_rot_mat.to_euler("XYZ")
-        else:
-            ik_obj.rotation_euler = Euler((math.radians(v) for v in hand_rotation_deg), "XYZ")
-    else:
-        # Default level neutral orientation matching root
-        ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
-
-    # Elbow pole target positioning
+    # Elbow pole target positioning in world space
     sign = -1.0 if side == "L" else 1.0
     if pole_world_xyz is not None:
         pole_world = Vector(pole_world_xyz)
@@ -486,10 +543,23 @@ def set_hand_ik_target(
             mid_pt.z,
         ))
 
-    if pole_obj.parent is not None:
-        pole_obj.location = pole_obj.parent.matrix_world.inverted() @ pole_world
+    # Hand 3D orientation target in world coordinates
+    if hand_rotation_deg is not None:
+        target_world_rot_euler = Euler((math.radians(v) for v in hand_rotation_deg), "XYZ")
     else:
-        pole_obj.location = pole_world
+        # Neutral level orientation matching CharacterRoot
+        if root_obj is not None:
+            target_world_rot_euler = root_obj.matrix_world.to_quaternion().to_euler("XYZ")
+        else:
+            target_world_rot_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+
+    # Phase B: Commit transforms and constraints
+    _apply_arm_ik_prebend_hint_side(arm, side)
+
+    # Convert applied world targets to controller local spaces
+    ik_obj.location = world_to_local_position(applied, eff_ik_mat)
+    ik_obj.rotation_euler = world_to_local_rotation(target_world_rot_euler, eff_ik_mat)
+    pole_obj.location = world_to_local_position(pole_world, eff_pole_mat)
 
     # Update constraint influence
     influence_clamped = max(0.0, min(1.0, float(influence)))

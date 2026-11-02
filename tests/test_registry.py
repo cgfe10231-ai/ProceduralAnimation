@@ -246,6 +246,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=45.0,
         description="Validates that set_foot_ik_target correctly sets world-space 3D orientation under arbitrary parent rotation, level neutral default on None, and unlock_foot_contact preserves parentless world transform.",
     ),
+    "arm_ik_lifecycle_world_transform_contract": TestDefinition(
+        test_id="arm_ik_lifecycle_world_transform_contract",
+        name="Arm IK Lifecycle & Effective Parent Transform Contract (Task 10-A)",
+        script_path="tests/test_arm_ik_lifecycle_world_transform_contract.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=60.0,
+        description="Validates that setup_arm_ik is strictly idempotent, preserves existing controller transforms and constraint instances, respects effective parent transform domain, and maintains world-space translation and rotation accuracy.",
+    ),
     "physics_bridge_contract": TestDefinition(
         test_id="physics_bridge_contract",
         name="Kinematic Bridge 14-Point Architectural Contract",
