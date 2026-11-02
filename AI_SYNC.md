@@ -12,7 +12,7 @@
 >
 > **下一执行节点**：PKG-5 / Task 10 — Upper-Limb IK/FK
 >
-> **下一节点状态**：`READY FOR TASK CARD — NOT STARTED`
+> **下一节点状态**：`ROUTE FROZEN — IMPLEMENTATION NOT STARTED`
 
 ---
 
@@ -116,14 +116,34 @@ Finding 总数维持 16 项：14 项关闭，2 项未关闭。
 
 ## 5. PKG-5 后续顺序
 
-1. 09-B：已完成，最近补强节点 09-B-4 已验收。
-2. 10：Upper-Limb IK/FK，下一任务。
-3. 11：FootLock，处理 FIND-R3-03、FIND-R3-04。
-4. 12：PKG-5 全模块接口闭环与全仓联合验收。
+1. 09-B：已完成，09-B-4 已验收。
+2. 10：Upper-Limb IK/FK，架构路线已冻结，下一具体子任务为 `10-a-1`。
+3. 11：FootLock，处理 FIND-R3-03 / FIND-R3-04。
+4. 12：PKG-5 跨模块接口闭环与联合验收。
 
-Task 10 尚未开始实施，必须先取得正式任务卡。
+Task 10 模块：
+- 10-A：Rig 初始化、生命周期与世界空间矩阵。
+- 10-B：输入验证、事务回滚与 Influence 合同。
+- 10-C：Bridge / WBC 手部目标无损接口、FK/IK 仲裁与 ROM。
+- 10-D：独立上肢轨迹、TerrainWalk 摆臂解耦、历史动作兼容。
 
-不得提前修改 Task 10、11 或 12 的生产代码。
+Task 11 模块：
+- 11-A：锁定元数据生命周期。
+- 11-B：只读查询与支撑维持副作用分离。
+
+Task 12 模块：
+- 12-A：WBC 单帧合同。
+- 12-B：Bridge 帧提交合同。
+- 12-C：跨模块状态所有权。
+- 12-D：系统级连续动作与联合回归。
+
+技术细节与问题清单：
+- `ARCHITECTURE_SYNC.md` Section 4.2—4.5
+- `docs/audit/production_interface/OPEN_FINDINGS.md` Section 10.3
+
+下一步只允许启动 `10-a-1`。
+
+Phase 7B 继续保持 `NOT AUTHORIZED`。
 
 ## 6. Phase 7 准入
 

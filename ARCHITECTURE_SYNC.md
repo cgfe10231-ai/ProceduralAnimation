@@ -16,7 +16,7 @@
 >
 > **下一执行节点**：PKG-5 / Task 10 — Upper-Limb IK/FK。
 >
-> **下一节点状态**：`READY FOR TASK CARD — NOT STARTED`。
+> **下一节点状态**：`ROUTE FROZEN — IMPLEMENTATION NOT STARTED`。
 >
 > **当前工程核心事实**：19 骨骼角色运动学执行管线与 6-DOF 数值质心动力学管线保持独立；二者未来的合流属于 Phase 7C，不是当前 PKG-5 的待修缺陷。
 
@@ -306,7 +306,7 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 | 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | 下一任务，等待正式任务卡 |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `ROUTE FROZEN — IMPLEMENTATION NOT STARTED` |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | 待修复 |
 | 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 10、11 完成后执行 |
 
@@ -417,65 +417,591 @@ M_{\mathrm{parent\_inverse}}
 
 状态：
 
-`READY FOR TASK CARD — NOT STARTED`
+`ROUTE FROZEN — IMPLEMENTATION NOT STARTED`
 
-目标：
+正式范围：
 
-- 双臂独立三维目标。
-- 手部末端世界空间目标和 3D 姿态。
-- 正确区分 FK 摆臂与独立 IK 目标。
-- 解耦 TerrainWalk 中经验性正弦摆臂。
-- 审核左右臂独立性、手肘 pole、手腕旋转、可达性与 ROM。
-- 审核 `matrix_parent_inverse`、有效父级矩阵、世界空间输入输出。
-- 审核非有限输入和异常处理。
-- 审核写入前后失败原子性。
-- 复用现有 `src/rig/arm_ik.py` 和 WBC，不得创建第二套 IK/FK。
+Upper-Limb IK/FK — 双臂接口合同、独立控制与轨迹解耦
 
-Task 10 尚未开始实现，必须等待正式任务卡。
+#### 4.2.1 节点目标
+
+现有项目已经具备：
+
+- 双臂原生 Blender 两骨骼 IK。
+- 左右独立 HandIK 控制器。
+- 左右独立 ElbowPole 控制器。
+- 手部世界空间旋转约束。
+- FK / IK influence 控制。
+- 双臂世界空间位置目标。
+- 手腕位置与姿态反馈。
+- WBC 中的手部目标分发。
+- Bridge 中的 PlannedHandTarget 数据结构。
+- JointModel 上肢 ROM 校验。
+
+Task 10 不重新实现以上基础能力。
+
+Task 10 的目标是对现有 Rig、WBC、Bridge 和 MotionAction 路径进行合同收敛，使双臂具有可靠、可独立调用、可连续执行、可真实验证的生产控制能力。
+
+禁止另建第二套 Arm IK、FK、WBC 或动作规划框架。
+
+#### 4.2.2 10-A：Rig 初始化、控制器生命周期与世界空间矩阵合同
+
+负责范围：
+
+- `src/rig/arm_ik.py`
+- 与有效父级变换合同有关的既有数学实现。
+
+主要接口：
+
+- `setup_arm_ik()`
+- `reset_arm_ik()`
+- `get_arm_ik_state()`
+- `set_hand_ik_target()`
+- `HandIK.L` / `HandIK.R`
+- `ElbowPole.L` / `ElbowPole.R`
+
+必须核验和收敛的问题：
+
+- `setup_arm_ik()` 的幂等性声明与真实行为是否一致。
+- 重复调用 `setup_arm_ik()` 是否会重置正在使用的 HandIK / ElbowPole 目标。
+- `WholeBodyController.__init__()` 每次构造都会调用 `setup_arm_ik()`，该初始化调用是否会意外覆盖运行状态。
+- IK 约束和 COPY_ROTATION 约束是否需要每次删除重建，还是只需检查并修复配置。
+- `reset_arm_ik()` 是否具有明确且独立的重置语义。
+- `matrix_world` 与 `matrix_parent_inverse` 是否共同参与位置、旋转和 Pole 的世界空间反解。
+- 父级旋转、正均匀缩放、非均匀缩放、剪切、反射、奇异矩阵的行为是否具有明确支持边界。
+
+世界空间矩阵合同：
+
+- 控制器世界矩阵：不得在父级逆矩阵非单位矩阵时，仅用 `parent.matrix_world` 的逆矩阵反解控制器局部坐标。
+- 位置与旋转必须使用同一个有效父级变换语义。
+- Task 10 必须复用 09-B 已经确立的有效父级变换支持域，不能复制出第二套阈值不同的校验器。
+
+既有支持域为：
+
+- 所有矩阵元素必须有限。
+- 必须为仿射矩阵，最后一行容差 `1e-6`。
+- `det(A) < 0` 拒绝反射。
+- `det(A) == 0` 拒绝奇异矩阵。
+- `s_sq <= 1e-12` 拒绝退化尺度。
+- Gram 矩阵相对偏差大于 `1e-6` 拒绝非共形变换。
+- 支持纯旋转及正均匀缩放和旋转组合。
+
+允许在真实架构需要时整理共享实现位置，但不得未经审计直接复制、改写或改变 09-B 的数学阈值。
+
+#### 4.2.3 10-B：Rig 输入验证、写入事务与 Influence 合同
+
+负责范围：
+
+- `src/rig/arm_ik.py`
+- 与手臂目标输入和状态写入直接相关的调用边界。
+
+重点接口：
+
+- `set_hand_ik_target()`
+- `set_arm_ik_influence()`
+- `setup_arm_ik()`
+
+必须建立统一的输入验证合同。
+
+`set_hand_ik_target()` 的输入至少需要覆盖：
+
+| 输入 | 验证要求 |
+|---|---|
+| `side` | 只能为 `L` 或 `R` |
+| `world_xyz` | 恰好 3 个有限数值 |
+| `hand_rotation_deg` | `None` 或恰好 3 个有限数值 |
+| `pole_world_xyz` | `None` 或恰好 3 个有限数值 |
+| `influence` | 必须为有限数值，且位于 `[0, 1]` |
+| `clamp_reach` | 必须有明确布尔语义 |
+
+要求：
+
+- 所有输入必须在第一次场景状态写入之前完成验证。
+- 非有限输入不得传入 Blender 控制器。
+- 不允许一部分控制器写入成功、另一部分写入失败后留下半提交状态。
+- 应建立手臂专用的状态快照与回滚边界。
+- 快照应覆盖相关控制器、父级与父级逆矩阵、TRS、必要的骨骼姿态及约束 Influence。
+- 任一提交阶段发生异常，必须恢复并核验修改前状态。
+- 快照与回滚机制必须有单一实现归属，不得让 Rig 和 WBC 分别建立互相独立的回滚系统。
+
+Influence 合同：
+
+统一要求：
+
+- NaN / Inf 拒绝。
+- 小于 0 或大于 1 的输入拒绝。
+- 不允许某个函数自动截断而另一个函数直接接受。
+- 实际约束 Influence 与反馈中的有效权重必须保持语义一致。
+- 非法输入拒绝必须发生在任何场景写入之前。
+
+以上属于 Task 10 的目标合同，不代表当前源码已经完成。
+
+#### 4.2.4 10-C：PlannedHandTarget、Bridge 与 WBC 无损接口合同
+
+负责范围：
+
+- `src/motion/kinematic_bridge.py`
+- `src/motion/whole_body_controller.py`
+
+主要数据结构：
+
+- `PlannedHandTarget`
+- `KinematicPlannedPose`
+- `EndEffectorTarget`
+- `WholeBodyControlTargets`
+
+必须收敛以下接口问题。
+
+##### A. Bridge 字段无损传递
+
+当前：
+
+`PlannedHandTarget` 已经具备：
+
+- `world_xyz`
+- `rotation_deg`
+- `enabled`
+- `weight`
+- `contact_intent`
+- `is_locked`
+- `surface_id`
+- `contact_type`
+- `normal_world`
+
+但尚未提供与 WBC / Rig 对应的：
+
+- `pole_hint_world_xyz`
+- `clamp_reach`
+
+WBC 已有对应的 Pole Hint 和 Reach Clamp 能力。
+
+Task 10 必须核验并补全规划数据结构与转换接口，避免：
+
+```
+MotionAction
+    |
+PlannedHandTarget
+    |
+KinematicBridge
+    |
+WholeBodyControlTargets
+    |
+WholeBodyController
+    |
+Arm IK
+```
+
+过程中丢失规划端可以表达的控制信息。
+
+新增数据字段必须放在兼容位置，保持既有构造方式的语义和历史调用兼容。
+
+##### B. FK / IK 仲裁
+
+必须明确：
+
+- `enabled=False`：IK 关闭，由 FK 关节姿态控制。
+- `enabled=True`：IK 目标生效。
+- 左右手分别仲裁。
+- 禁用一侧不得关闭另一侧。
+- 目标权重为 0 时不得错误保留上一帧的有效 IK 权重。
+- FK 与 IK 不得同时成为同一侧的冲突写入源。
+
+##### C. 目标位置与姿态语义
+
+现有系统中的手部目标位置语义必须冻结为：
+
+`Wrist World Position`（即手腕关节的世界坐标）。
+
+姿态语义：
+
+`Hand Bone World Orientation`（即手部骨骼的世界朝向）。
+
+当前目标不是手指尖位置，也不是掌心表面接触点。
+
+WBC 的位置误差反馈必须与该定义保持一致。
+
+未来若需要指尖目标，必须另行定义掌部局部锚点和指尖几何偏移，不得把该能力提前描述为 Task 10 已具备。
+
+##### D. ROM 与可达性反馈
+
+必须保证：
+
+- 实际手腕位置误差可追踪。
+- 3D 手部旋转误差可追踪。
+- 左右臂可达性独立报告。
+- ROM 违反明确进入失败反馈。
+- ROM 截断后重新计算实际末端误差。
+- 不允许 IK 目标已到达、ROM 截断后仍伪报成功。
+
+#### 4.2.5 10-D：独立上肢运动轨迹与历史动作兼容
+
+负责范围：
+
+- `src/motion/terrain_walk.py`
+- `src/motion/kinematic_bridge.py`
+- 必要时涉及现有 MotionAction 的目标生成逻辑。
+
+当前实际情况：
+
+- `TerrainWalkAction` 中的左右上臂、前臂和手部 FK 旋转仍然由步态相位与经验性正弦函数直接驱动。
+- 其他历史动作也保留各自的 FK 摆臂计算。
+
+Task 10 必须解决：
+
+- 上肢运动不再被强制绑定为下肢 `gait_phase` 的直接函数。
+- 左右手应能够独立指定目标。
+- 上肢轨迹应拥有独立的时间或进度参数。
+- 上肢轨迹可以明确选择 FK 或 IK 模式。
+- IK 模式下目标通过 `PlannedHandTarget` 进入现有 Bridge / WBC。
+- FK 模式仍使用现有 FK 控制路径。
+- 不建立第二套 MotionAction 或动作调度系统。
+- 不允许直接绕过 Bridge / WBC 操作生产骨骼。
+- 可以与下肢步态同步，但不能在架构上强制依附于下肢相位。
+
+历史动作保护：
+
+- Walk / StartStopWalk。
+- Run。
+- SprintStart。
+- SprintBrake。
+- TerrainWalk。
+
+上述动作必须保留原有下肢运动、根运动、接触和时间连续性。
+
+不得为了完成上肢 IK 而整体推翻历史动作。
+
+本次重点是解耦独立上肢运动能力和 TerrainWalk 的经验性正弦摆臂。其他历史动作的迁移必须依据明确的兼容测试和任务范围，不得擅自批量改写。
+
+#### 4.2.6 Task 10 验收范围
+
+Task 10 必须分别通过：
+
+- Rig 初始化与重复调用合同。
+- 世界空间矩阵合同。
+- 左右臂独立性。
+- HandIK / ElbowPole 独立控制。
+- 输入有限性与边界拒绝。
+- 写入事务与完整状态回滚。
+- Influence 合同。
+- Bridge 字段无损传递。
+- FK / IK 明确仲裁。
+- 手腕位置与手部姿态反馈。
+- ROM 边界和截断后误差。
+- 独立上肢轨迹。
+- 历史动作回归。
+- Blender 场景真实姿态检查。
+
+自动化测试通过不代表视觉验收完成。
+
+Task 10 必须整体验收，不得只凭 `verify_task6fa_arm_ik.py` 已经存在就宣称 Task 10 完成。
 
 ### 4.3 节点 11：FootLock
 
-归属：
+状态：
+
+`PLANNED — NOT STARTED`
+
+正式范围：
+
+FootLock — 锁定元数据生命周期、状态查询与支撑维持副作用合同
+
+Task 11 负责关闭：
 
 - `FIND-R3-03`
 - `FIND-R3-04`
 
-必须处理：
+不得创建重复 Finding ID。
 
-- `unlock_foot_contact()`、`reset_leg_ik()` 的元数据残留与生命周期语义。
-- `evaluate_foot_support()` 的未声明状态维持副作用。
+#### 4.3.1 11-A：锁定元数据与生命周期
 
-必须明确：
+负责文件：
 
-- 哪些函数只查询。
-- 哪些函数会修改。
-- 修改哪些控制器和骨骼。
-- 哪些数据属于当前锁定状态。
-- 哪些数据属于历史快照。
-- 解锁与重新锁定如何保持世界位置和姿态不跳变。
+- `src/rig/foot_contact.py`
+- `src/rig/ik.py`
 
-禁止简单清除全部元数据。
-禁止简单删除现有支撑维持写入。
+主要接口：
 
-### 4.4 节点 12：PKG-5 综合闭环
+- `lock_foot_contact()`
+- `unlock_foot_contact()`
+- `reset_leg_ik()`
 
-12 不等于把专项测试通过数量相加。
+当前 FootIK 控制器上的锁定状态包括：
 
-必须分别完成模块内部审计，再审计跨模块接口关系。
+| 字段 | 语义 |
+|---|---|
+| `is_locked` | 当前锁定状态 |
+| `contact_world_xyz` | 锁定接触点 |
+| `locked_ankle_world_xyz` | 锁定踝部世界坐标 |
+| `target_rotation_deg` | 锁定姿态 |
+| `locked_foot_head_xyz` | 锁定时足部骨骼头位置 |
+| `locked_foot_tail_xyz` | 锁定时足部骨骼尾位置 |
+| `locked_foot_center_xyz` | 锁定时足部网格中心 |
+| `locked_foot_min_z` | 锁定时足部最低点 |
 
-需要覆盖：
+必须严格区分：
 
-- MotionPlanner / MotionAction 与 Bridge。
-- Bridge 与 WBC 的目标、结果、失败传播。
-- WBC 与 FK、Leg IK、Arm IK、FootLock。
-- IK/FK 与 ROM。
-- FootLock 与 ContactModel。
-- CoM、BodyKinematics、BodyInertia 的输入、输出、状态更新与只读边界。
-- ContactModel 与 MotionState。
-- 历史动作和 7A 地形动作是否保留。
-- 连续帧、失败帧、重置、左右肢体独立和动作切换。
+- 当前有效锁定状态。
+- 锁定期间需要使用的参考快照。
+- 已解锁或已重置后不再有效的历史元数据。
 
-必须进行跨模块联合回归，不得仅凭单模块通过判定整体通过。
+必须解决：
+
+- `unlock_foot_contact()` 设置 `is_locked=False` 后仍保留旧快照字段的问题。
+- `reset_leg_ik()` 设置 `is_locked=False` 后仍保留旧快照字段的问题。
+- 后续重新锁定是否会完整覆盖所有旧值。
+- 消费者是否可能读取到过期快照并将其误认为当前锁定状态。
+- 解锁、重置、重新锁定与场景重开后的生命周期一致性。
+
+成功解锁或重置后，必须统一使旧锁定快照失效，不得让失效数据继续被解释为当前锁定状态。
+
+具体采取删除、显式失效标记还是独立状态容器，必须在读取全部消费者后确定，不能只清理写入端。
+
+必须保留 09-B-4 已经建立的事务回滚合同。
+
+失败回滚时，七项锁定元数据必须完整恢复，不允许为了清理旧状态破坏回滚能力。
+
+#### 4.3.2 11-B：状态查询与支撑维持副作用边界
+
+负责文件：
+
+- `src/rig/foot_contact.py`
+
+主要接口：
+
+- `evaluate_foot_support()`
+- `get_foot_support_state()`
+- `move_character_root_with_support()`
+
+当前问题：
+
+`get_foot_support_state()` 直接调用 `evaluate_foot_support()`。
+
+而 `evaluate_foot_support()` 不只是计算和读取，它还可能：
+
+- 调用 `_apply_ik_prebend_hint()`。
+- 修改 PoseBone 姿态。
+- 解除 FootIK 父级。
+- 修改 FootIK 的世界位置和旋转。
+- 解除 KneePole 父级。
+- 修改 KneePole 的世界位置。
+- 调用 View Layer Update。
+
+因此现有函数名称与实际副作用之间存在接口语义缺口。
+
+必须把以下两类职责分离：
+
+只读查询：
+
+- 读取当前真实锁定状态。
+- 读取实际控制器及骨骼世界位置。
+- 计算漂移、可达性与支撑指标。
+- 不修改骨骼。
+- 不修改控制器。
+- 不改变父级。
+- 不修改锁定元数据。
+- 不通过隐藏的场景刷新产生状态写入。
+
+显式支撑维持：
+
+- 需要时维持锁定 FootIK 的世界位置。
+- 需要时更新 KneePole 支撑位置。
+- 必要时执行姿态预弯。
+- 明确执行场景更新。
+- 返回维持后的真实状态。
+
+必须对所有调用者做审计，尤其是 WBC 的锁定脚执行分支。
+
+不能为了让查询变成只读而删除现有必要的支撑维持逻辑。
+
+必须通过独立函数或清晰接口职责分离两类行为，函数命名与副作用必须一致，并保留合理的历史调用兼容性。
+
+#### 4.3.3 Task 11 验收范围
+
+- 锁定状态与元数据一致性。
+- 锁定快照失效和重建。
+- Unlock / Reset / Relock 生命周期。
+- 09-B-4 回滚回归。
+- 只读查询零副作用。
+- 支撑维持功能完整保留。
+- WBC 调用路径正确。
+- 连续动作中的脚部世界位置保持。
+- Blender 场景重开后状态一致。
+
+Task 11 必须关闭 `FIND-R3-03` 和 `FIND-R3-04`。
+
+### 4.4 节点 12：PKG-5 跨模块联合闭环
+
+状态：
+
+`PLANNED — BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE`
+
+正式范围：
+
+PKG-5 Cross-Module Integration, Failure Atomicity & Joint Acceptance
+
+Task 12 不新增独立运动功能，不重新实现已有模块。
+
+Task 12 的作用是核对各模块组合以后是否仍满足真实的数据流、状态所有权、失败传播和连续动作合同。
+
+#### 4.4.1 12-A：WBC 单帧写入与失败原子性
+
+负责文件：
+
+- `src/motion/whole_body_controller.py`
+
+审查执行顺序：
+
+1. Root / Pelvis。
+2. Spine / Neck / Head。
+3. FK Joint Rotations。
+4. Leg IK / FootLock。
+5. Arm IK / FK。
+6. 场景更新。
+7. 末端位置及姿态反馈。
+8. ROM 校验与可选截断。
+9. CoM 计算。
+10. 结果状态返回。
+
+必须验证：
+
+- 任一阶段异常时，前序写入是否留下残留。
+- 左右臂、左右腿是否可能出现一侧成功、一侧失败。
+- FootLock 状态与 WBC 目标是否一致。
+- ROM 截断后的末端误差是否真实。
+- 失败结果是否反映最终实际骨架状态。
+- 是否存在需要事务恢复的部分提交。
+
+#### 4.4.2 12-B：Bridge 帧提交和失败传播
+
+负责文件：
+
+- `src/motion/kinematic_bridge.py`
+- `src/motion/framework.py`
+
+必须核验：
+
+- WBC 失败后是否仍插入关键帧。
+- ContactModel 几何失败后是否仍提交无效帧。
+- 失败帧是否更新 `_last_time_sec` 和 `_last_frame`。
+- 失败帧是否更新跨帧接触状态。
+- Bridge 的 `overall_success` 与 WBC 结果是否一致。
+- MotionPlanner 是否阻止失败状态继续流转。
+- 失败帧是否污染后续动画轨迹。
+
+#### 4.4.3 12-C：跨模块状态所有权与接口一致性
+
+至少覆盖：
+
+| 模块关系 | 核验重点 |
+|---|---|
+| Bridge ↔ WBC | 目标、反馈、异常与帧状态 |
+| WBC ↔ FK / IK | 唯一骨骼写入所有权 |
+| Arm IK ↔ Joint ROM | 实际姿态、约束和反馈一致性 |
+| FootLock ↔ ContactModel | 接触生命周期与有效支撑 |
+| ContactModel ↔ MotionState | 状态提交与跨帧更新 |
+| CoM ↔ BodyKinematics | 输入姿态快照和时间戳 |
+| BodyKinematics ↔ BodyInertia | 速度、角速度和惯性状态 |
+| MotionAction ↔ Bridge | 规划目标与生产写入路径 |
+| WBC ↔ Rig | 所有控制器和 PoseBone 写入职责 |
+
+必须识别重复状态、隐式状态、双写状态和过期快照。
+
+不得为了统一接口而破坏现有向后兼容能力。
+
+#### 4.4.4 12-D：全系统连续动作与联合回归
+
+必须覆盖：
+
+- Task 09 下肢世界空间合同。
+- Task 10 双臂独立 IK/FK。
+- Task 11 FootLock 生命周期。
+- Walk / StartStopWalk。
+- Run。
+- SprintStart。
+- SprintBrake。
+- TerrainWalk。
+- 双手和双脚同时控制。
+- 左右肢体独立目标。
+- 连续帧切换。
+- IK / FK 模式切换。
+- 锁定 / 解锁。
+- 动作中断。
+- 异常恢复。
+- Reset 后重新执行。
+- Blender 场景保存与重开。
+
+必须运行适当的 Quick、Physics、Motion、Full 回归。
+
+不得仅把专项测试数量相加来判定系统通过。
+
+必须分别记录：
+
+- 普通 PASS。
+- AUTOMATED_PASS。
+- SKIPPED。
+- NOT_RUN。
+- 视觉待检查项。
+- 已完成视觉检查的项目。
+
+Task 12 必须建立独立的联合验收证据包。
+
+#### 4.4.5 Task 12 通过条件
+
+以下条件必须同时满足：
+
+1. Task 10 独立验收通过。
+2. Task 11 独立验收通过。
+3. 所有开放 Finding 已关闭并具有证据。
+4. WBC / Bridge 失败传播合同通过。
+5. 跨模块状态所有权无冲突。
+6. 历史动作回归无退化。
+7. 联合回归通过。
+8. 视觉验收单独完成并明确记录。
+9. 完整交付证据归档。
+
+Task 12 未通过，不得宣布 PKG-5 全部完成。
+
+### 4.5 PKG-5 子任务编号规则
+
+正式使用：
+
+`节点编号 - 模块字母 - 修复轮次`
+
+例如：
+
+- `10-a-1`
+- `10-a-2`
+- `10-b-1`
+- `10-c-1`
+- `10-d-1`
+- `11-a-1`
+- `11-b-1`
+- `12-a-1`
+- `12-d-1`
+
+编号含义：
+
+- 第一段：PKG-5 主节点。
+- 第二段：固定模块字母。
+- 第三段：该模块的修复轮次。
+
+规则：
+
+1. 每个节点的模块字母职责固定，不得随意变化。
+2. 同一模块第一次执行为 `-1`。
+3. 同一模块第一次修复未通过，第二轮为 `-2`。
+4. 不得把修复轮次误当成提交次数。
+5. 不得为了编号整齐创造没有实际工作内容的模块。
+6. 不得擅自创建 `09-B-5`。
+7. 每个具体子任务必须对应独立任务卡、独立验证结果和 Git 提交证据。
+
+只有项目负责人明确确认后，才允许改变上述模块划分。
+
+当前下一任务：
+
+`10-a-1`
+
+但本次文档同步任务完成前，不得开始代码修改。
 
 ## 5. 后续 Phase 阶段门禁
 

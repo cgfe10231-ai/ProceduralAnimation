@@ -611,7 +611,7 @@ flowchart TD
 | 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | `COMPLETED / VERIFIED` |
 | 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | FIND-R3-01 | 世界旋转、有效父级矩阵、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | `READY FOR TASK CARD — NOT STARTED` |
+| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | `ROUTE FROZEN — IMPLEMENTATION NOT STARTED` |
 | 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | `OPEN / PENDING REPAIR` |
 | 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | `PENDING` |
 
@@ -707,21 +707,203 @@ flowchart TD
 
 目前仅登记为跨模块审计候选，不得直接认定存在缺陷。
 
-### 10.3 上肢 IK 世界空间与失败原子性
+### 10.3 Task 10：上肢 IK/FK 接口与独立运动审计候选
 
-源码：`src/rig/arm_ik.py`
+本节记录 PKG-5 / Task 10 的第一轮静态代码审计结果。
 
-需逐项核验：
+重要证据边界：
 
-- `matrix_world` 与 `matrix_parent_inverse` 的组合语义。
-- 世界空间位置转换与世界空间旋转转换是否一致。
-- 父级存在旋转、缩放、非均匀缩放或剪切时的行为。
-- 左右臂控制器是否严格独立。
-- 非有限位置和旋转输入是否在写入前拒绝。
-- Phase A / Phase B 是否具备可靠的失败保护。
-- 异常后 IK、pole、骨骼和约束权重是否保持原状态。
+- 以下内容是基于当前源码检查得出的具体审计候选。
+- 它们尚未全部经过独立 Blender 故障注入或动态复现。
+- 它们不是新的已确认 Finding。
+- 不计入原有 16 项 Finding。
+- 不得提前创建新的 Finding ID。
+- 每一项必须在实际修复前先通过有针对性的测试确认真实行为。
+- 如果动态测试证明某项不构成缺陷，必须保留测试证据并明确记录，不得为了实现预定修复而强行制造问题。
 
-当前不得将这些审计问题直接登记为新 Finding。
+当前对应源码基准：`696b03200ade479b4db02c0ed9f451259fac8a29`
+
+#### 10.3.1 10-A：Arm IK 初始化幂等性与活动状态保持
+
+* **模块归属**：10-A
+* **状态**：`AUDIT_PENDING — NOT CONFIRMED`
+* **源码**：`src/rig/arm_ik.py` (`setup_arm_ik()`, `reset_arm_ik()`)
+* **关联调用**：`src/motion/whole_body_controller.py` (`WholeBodyController.__init__()`)
+* **静态观察**：
+  - `setup_arm_ik()` 的文档描述为幂等配置。
+  - 其当前实现会重设 HandIK / ElbowPole 控制器的中立位置。
+  - 其当前实现会移除并重新创建 IK / COPY_ROTATION 约束。
+  - `WholeBodyController.__init__()` 每次构造都会调用 `setup_arm_ik(..., initial_influence=0.0)`。
+* **需要真实验证**：
+  - 对已经配置的 Armature 重复调用 `setup_arm_ik()`，是否会重置活动中的 HandIK 目标。
+  - 是否会重置 ElbowPole 目标。
+  - 是否会破坏当前 Influence。
+  - 是否会改变活动约束的实际求值状态。
+  - 是否会影响正在执行的 FK / IK 过渡。
+  - 重建 WBC 是否会意外重置活动中的手部目标。
+  - 约束对象被重新创建后，其他引用者是否会受到影响。
+* **预期合同**：
+  - 配置初始化与显式重置必须是两个不同操作。
+  - 重复初始化不得悄悄覆盖有效运行状态。
+  - 只有显式 Reset 才允许重置目标和 Influence。
+  - 初始化、重复调用和重置均必须具备可测试的状态不变量。
+  - 不得仅凭函数名或注释判定幂等性成立。
+
+#### 10.3.2 10-A：有效父级矩阵与世界空间反解
+
+* **模块归属**：10-A
+* **状态**：`AUDIT_PENDING — STATIC CONTRACT MISMATCH OBSERVED`
+* **源码**：`src/rig/arm_ik.py` (`set_hand_ik_target()`)
+* **静态观察**：
+  - 当前控制器位置转换使用：`ik_obj.parent.matrix_world.inverted() @ applied`。
+  - Pole 位置转换也使用父级世界矩阵的逆矩阵。
+  - 手部旋转转换同样基于：`ik_obj.parent.matrix_world.to_3x3().inverted()`。
+  - 这些路径没有显式把 `matrix_parent_inverse` 纳入有效父级变换。
+* **正确的矩阵合同与真实验证**：
+  - 单位父级逆矩阵。
+  - 非单位父级逆矩阵。
+  - 父级旋转。
+  - 正均匀缩放。
+  - 非均匀缩放。
+  - 剪切。
+  - 镜像反射。
+  - 奇异变换。
+  - 世界位置、世界旋转和 Pole 三条路径的一致性。
+* **预期合同**：
+  - 位置、旋转、Pole 必须统一使用有效父级矩阵。
+  - 必须复用 09-B 已经明确的矩阵数学支持域和拒绝策略。
+  - 禁止自行复制出另一套不一致的数学阈值。
+
+#### 10.3.3 10-B：手部 IK 输入预验证与失败原子性
+
+* **模块归属**：10-B
+* **状态**：`AUDIT_PENDING — STATIC VALIDATION GAP OBSERVED`
+* **源码**：`src/rig/arm_ik.py` (`set_hand_ik_target()`, `set_arm_ik_influence()`, `setup_arm_ik()`)
+* **静态观察**：
+  - 当前 `set_hand_ik_target()` 在完整输入验证之前会调用预弯逻辑并更新场景。
+  - 后续依次修改：HandIK 位置、HandIK 旋转、ElbowPole 位置、IK Influence、Hand Rotation Influence。
+  - 当前函数没有与 09-B 解锁事务等价的完整手臂状态恢复合同。
+* **必须验证**：
+  - XYZ 缺少分量。
+  - XYZ 含 NaN / Inf。
+  - Rotation 含 NaN / Inf。
+  - Pole 含 NaN / Inf。
+  - Influence 含 NaN / Inf。
+  - Influence 小于 0 或大于 1。
+  - 目标转换中途注入异常。
+  - 控制器写入后注入异常。
+  - 场景更新后注入异常。
+  - 状态读取失败。
+* **预期合同**：
+  - 输入必须先完整验证，再允许任何场景写入。
+  - 非有限值必须拒绝。
+  - Influence 必须严格位于 `[0, 1]`。
+  - 非法输入不得通过截断、默认值或静默回退掩盖。
+  - 写入失败必须恢复原控制器、必要的骨骼姿态和约束 Influence。
+  - 回滚后必须逐项验证状态恢复。
+  - 手臂快照与回滚必须具有唯一实现归属，不得让 Rig 与 WBC 分别复制一套事务机制。
+
+#### 10.3.4 10-B / 10-C：Influence 与 WBC 权重语义一致性
+
+* **模块归属**：10-B、10-C
+* **状态**：`AUDIT_PENDING — STATIC CONTRACT MISMATCH TO VERIFY`
+* **源码**：`src/rig/arm_ik.py`、`src/motion/whole_body_controller.py`
+* **静态观察**：
+  - Rig API 当前使用：`max(0.0, min(1.0, float(influence)))`。
+  - WBC 通过 `EndEffectorTarget.weight` 管理手部目标权重。
+* **必须验证**：
+  - NaN / Inf 在不同入口中的行为是否一致。
+  - 超出 `[0, 1]` 的值是否会产生不同结果。
+  - 反馈中的权重是否和真实约束 Influence 一致。
+  - 权重为 0 时是否正确关闭 IK。
+  - 左右权重是否完全独立。
+  - 不同目标调用顺序是否会遗留上一帧 Influence。
+* **预期合同**：
+  - 所有输入入口使用相同的 `[0, 1]` 语义。
+  - 非有限和越界值拒绝。
+  - 实际应用权重必须被真实反馈。
+  - 不允许反馈报告值与实际约束状态不一致。
+
+#### 10.3.5 10-C：PlannedHandTarget 到 WBC 的数据丢失
+
+* **模块归属**：10-C
+* **状态**：`AUDIT_PENDING — STATIC FIELD GAP CONFIRMED, RUNTIME IMPACT TO VERIFY`
+* **源码**：
+  - `src/motion/kinematic_bridge.py` (`PlannedHandTarget`, `KinematicPlannedPose`, `convert_planned_pose_to_wbc_targets()`)
+  - `src/motion/whole_body_controller.py` (`EndEffectorTarget`, `WholeBodyControlTargets`)
+* **静态观察**：
+  - WBC 已有手部 Pole Hint 和 Reach Clamp 相关字段及接口。
+  - 但 `PlannedHandTarget` 当前没有完整对应字段。
+  - 当前 Bridge 转换过程没有无损传递手部 Pole Hint 和独立 Reach Clamp 参数的完整路径。
+* **必须验证**：
+  - 规划层能否表达左右肘 Pole Hint。
+  - 规划层能否表达左右手各自的 Reach Clamp 策略。
+  - Bridge 是否完整传递这些值。
+  - WBC 是否确实消费对应字段。
+  - 缺失字段时是否会出现默认值覆盖或信息损失。
+* **预期合同**：
+  - 规划层、Bridge、WBC、Rig 的目标数据必须无损传递。
+  - 新增字段应采用向后兼容的字段追加方式，不得破坏已有位置参数和历史构造调用。
+
+#### 10.3.6 10-D：生产动作上肢轨迹仍依附于下肢步态
+
+* **模块归属**：10-D
+* **状态**：`DESIGN_LIMITATION — ROUTE ACCEPTED, IMPLEMENTATION PENDING`
+* **源码重点**：`src/motion/terrain_walk.py`（其他历史 MotionAction 保持独立回归检查）
+* **静态观察**：
+  - `TerrainWalkAction` 当前左右上臂、前臂的 FK 姿态仍由步态相位和经验性正弦函数驱动。
+  - 当前动作层大部分手部规划目标处于 `enabled=False` 的 FK 模式。
+  - 这表明现有 Arm IK API 已经存在，但不能仅凭 API 存在就宣称生产动作具备完整独立上肢运动能力。
+  - Task 10 必须建立独立的上肢运动目标路径。
+* **必须验证**：
+  - 上肢目标是否可以独立于下肢 gait phase。
+  - 左右手是否可以独立设置运动进度。
+  - FK / IK 是否可以独立切换。
+  - 是否通过现有 Bridge / WBC 完成实际写入。
+  - TerrainWalk 的经验性正弦摆臂是否已经被独立轨迹职责取代。
+  - 原有根运动、落脚点、脚部接触和地形连续性是否保持。
+* **保护要求**：
+  - 不得整体破坏 Walk、Run、SprintStart、SprintBrake、TerrainWalk 的历史能力。
+  - 不得新建第二套 MotionAction 调度系统。
+
+#### 10.3.7 10-C：手部目标位置和姿态语义
+
+* **模块归属**：10-C
+* **状态**：`INTERFACE SEMANTICS — MUST BE FROZEN`
+* **现有代码实际使用的目标定义**：
+  - 位置：`Wrist World Position`。
+  - 姿态：`Hand Bone World Orientation`。
+* **依据包括**：
+  - `set_hand_ik_target()` 的 Wrist Position 输入定义。
+  - `get_arm_ik_state()` 的 `wrist_world`。
+  - WBC 手部位置反馈使用的腕部实际位置。
+  - Bridge ContactModel 对应的手部骨骼头部位置。
+* **锁定要求**：
+  - Task 10 必须继续使用统一语义。
+  - 不得把当前手部 IK 描述为指尖世界空间控制。
+  - 未来若需要指尖定位，必须另行定义局部锚点及几何偏移，不属于当前已实现能力。
+
+#### 10.3.8 10-C / 10-D：原生 IK 限制与 Joint ROM 边界差异
+
+* **模块归属**：10-C、10-D
+* **状态**：`AUDIT_PENDING — BOUNDARY MISMATCH OBSERVED`
+* **源码**：
+  - `src/rig/arm_ik.py`
+  - `src/motion/joint_limits.py`
+  - `src/motion/whole_body_controller.py`
+* **静态观察**：
+  - 原生 Blender Arm IK 肘部 X 轴约束与 JointModel 肘部 ROM 两者边界不完全相同。
+* **必须测试**：
+  - 145° 附近。
+  - 145° 至 150°。
+  - 150° 边界。
+  - 超过 150° 的请求。
+  - IK 可以求解但 ROM 不接受的姿态。
+  - ROM 截断后的真实手腕目标误差。
+* **预期保证**：
+  - IK 的目标到达状态不能覆盖 ROM 的不合规结果。
+  - ROM 截断后的实际目标误差必须真实反馈。
+  - 不得在未验证前擅自修改 09-B 或当前 JointModel 的其他边界。
 
 ### 10.4 CoM 历史回归 Test 8
 

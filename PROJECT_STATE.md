@@ -10,7 +10,7 @@
 >
 > **下一执行节点**：PKG-5 / Task 10 — Upper-Limb IK/FK。
 >
-> **下一节点准入状态**：`READY FOR TASK CARD — NOT STARTED`。
+> **下一节点状态**：`ROUTE FROZEN — IMPLEMENTATION NOT STARTED`。
 >
 > **历史状态边界**：
 > - DEC-064 与原 09-B 历史验收记录继续有效。
@@ -60,6 +60,13 @@
 > - 10：下一任务，尚未开始。
 > - 11：FootLock，待修复。
 > - 12：全仓跨模块联合验收，待执行。
+>
+> **PKG-5 后续路线状态**：
+> - Task 10 / Upper-Limb IK/FK：架构职责已冻结，尚未实施。
+> - Task 11 / FootLock：FIND-R3-03、FIND-R3-04，尚未实施。
+> - Task 12 / Joint Integration：等待 10 与 11 独立验收。
+> - 下一具体子任务：`10-a-1`。
+> - 子任务必须依据 `ARCHITECTURE_SYNC.md` 和 `OPEN_FINDINGS.md` 执行。
 >
 > **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10、11、12 的独立验收与联合验收，并取得项目负责人明确批准后方可开启。
 >
@@ -1120,18 +1127,18 @@
 * `.agents/rules/project_rules.md` 独立加载及外部新会话自动恢复状态保持为未完整验证。
 
 ### [未实现]
-* **Phase 7A**：真实 19 骨骼角色（`src/character/builder.py` + `src/rig/builder.py`）进入 `DynamicsPlayground`（`output/dynamics_playground.blend`），完成基础下肢连续通行（落脚点规划作为 7A 下肢移动的内部能力）。
-* **Phase 7B**：上肢独立运动与末端目标验证。
-* **Phase 7C**：既有 `KinematicBridge`（`src/motion/kinematic_bridge.py`）、`WholeBodyController`（`src/motion/whole_body_controller.py`）、`CoM`（`src/motion/rigid_link.py`）与整体动力学状态（`src/motion/closed_loop_dynamics.py` / `src/motion/forward_dynamics.py`）汇流。
+
+* **Phase 7B**：上肢独立运动与末端目标验证。必须等待 PKG-5 / Task 10、11、12 完成联合验收及负责人授权。
+* **Phase 7C**：既有 `KinematicBridge`、`WholeBodyController`、CoM 与整体动力学状态汇流。
 * **Phase 7D**：多关节动态协同。
 * **Phase 7E**：既有 IK/FK 求解器的动态协同与接触切换。
 * **Phase 7F**：全身移动、抓握、支撑、释放与连续训练场通行。
 * **Phase 6H**：动态平衡与主动补偿。
 
 ### [已知缺陷与遗留说明]
-1. **双管线尚未汇流（计划于 Phase 7A / 7C 解决）**：当前 `output/dynamics_playground.blend` 仅包含 14 区环境网格与 6G-D 刚体代理可视化（`Playground_Dynamics_Visualization`，0 骨骼），尚未放入 19 骨骼 `CharacterArmature`（定位于 **Phase 7A**），且 6G-D 质心动力学尚未与 `KinematicBridgeExecutor` + `WholeBodyController` 闭环汇流（定位于 **Phase 7C**）。
+1. **Pipeline A / Pipeline B 尚未系统级汇流（Phase 7C）**：生产运动学管线已经具备真实 19 骨骼角色、动作桥接、WBC 和 TerrainWalk 等生产能力；独立 6-DOF 数值动力学管线仍保持独立。两者尚未完成系统级闭环汇流，该工作属于未来 Phase 7C，不是当前 PKG-5 的待修缺陷。
 2. **Station 2 / 3 / 4 模型边界**：Station 2 为空中自由落体弹道（不含触地回弹碰撞）；Station 3 与 4 在训练场代理阶段采用连续移动接触点（待 7A/7C 替换为真实 19 骨骼双足交替落脚）。
-3. **`src/motion/kinematic_bridge.py:507` 存在休眠引用 `ContactLifecycle.TOUCHDOWN`**：**[已修复 / FIXED in PKG-1]**：已在 `kinematic_bridge.py:512` 替换为 `ContactLifecycle.CANDIDATE`，并通过 4 项单元测试及四级全量回归检验，该历史缺陷已不复存在。
+3. **历史修复记录：`ContactLifecycle.TOUCHDOWN`**：该问题已在 PKG-1 修复为 `ContactLifecycle.CANDIDATE`，当前不属于开放缺陷。原始记录只用于追溯历史修复。
 
 ### [理论可行但尚未测试]
 * 外部第三方 AI 助手粘贴 `AI_SYNC.md` 恢复完整上下文的人工交互效果。
@@ -1140,32 +1147,50 @@
 
 ## 2. 下一步计划
 
-当前任务顺序如下：
-
 | 节点 | 范围 | 状态 |
 |---|---|---|
-| 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
+| 08 Rig | 世界空间与刚体平移回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach | `COMPLETED / VERIFIED` |
-| 09-B | Lower-Limb World Rotation；最近补强节点 09-B-4 | `ACCEPTED — VERIFIED` |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `READY FOR TASK CARD — NOT STARTED` |
-| 11 | FootLock：元数据生命周期与查询/维持副作用合同 | `PENDING`，负责 FIND-R3-03、FIND-R3-04 |
-| 12 | PKG-5 跨模块接口闭环与全仓联合验收 | `PENDING` |
+| 09-B | Lower-Limb World Rotation；09-B-4 已完成 | `ACCEPTED — VERIFIED` |
+| 10 | Upper-Limb IK/FK | `ROUTE FROZEN — IMPLEMENTATION NOT STARTED` |
+| 11 | FootLock：FIND-R3-03、FIND-R3-04 | `PLANNED — NOT STARTED` |
+| 12 | PKG-5 跨模块联合审计与验收 | `BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE` |
 
-### 2.1 下一任务：PKG-5 / Task 10
+### 2.1 下一具体任务：PKG-5 / 10-A-1
 
-目标为现有双臂 IK/FK 系统的接口合同与独立轨迹控制。
+下一具体执行单元：
 
-必须复用 `src/rig/arm_ik.py` 和现有 WBC。
+`10-a-1`
 
-尚未发出正式 Task 10 任务卡，因此不得擅自开始实现。
+负责范围：
 
-### 2.2 Phase 7B 准入条件
+- `setup_arm_ik()` 重复初始化和活动状态保持。
+- `WholeBodyController.__init__()` 中的 Arm IK 初始化调用。
+- HandIK / ElbowPole 控制器状态。
+- 有效父级矩阵和世界空间变换测试。
 
-Phase 7B 继续保持 `NOT AUTHORIZED`。
+开始代码修改前，必须先提供独立任务卡、复现条件和验收断言。
 
-只有 Task 10、Task 11、Task 12 全部完成并通过联合验收，且获得项目负责人明确批准后，才允许进入 Phase 7B。
+当前尚未实施，不得提前标记为 PASS。
 
-Phase 7B 的正式定义：
+### 2.2 Task 10 / 11 / 12 路线
+
+完整模块职责、问题映射和验收边界：
+
+- `ARCHITECTURE_SYNC.md` Section 4.2—4.5
+- `docs/audit/production_interface/OPEN_FINDINGS.md` Section 10.3
+
+本文件只维护当前状态，不复制完整技术方案。
+
+### 2.3 Phase 7B 准入条件
+
+Phase 7B 继续保持：
+
+`NOT AUTHORIZED`
+
+只有 Task 10、Task 11、Task 12 全部完成独立验收与联合验收，并取得项目负责人明确批准后，才允许进入 Phase 7B。
+
+Phase 7B：
 
 `Upper-Limb Independent Motion & End-Effector Target Verification`
 
