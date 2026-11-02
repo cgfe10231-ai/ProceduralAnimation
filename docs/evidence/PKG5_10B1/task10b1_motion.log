@@ -1,0 +1,78 @@
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: MOTION | Fail-Fast: False
+================================================================================
+
+Resolved 12 test suite(s) to execute:
+  01. [motion_walk_r3b2] StartStopWalkAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  02. [motion_run_r3b2] RunAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  03. [motion_sprint_start_r3b2] SprintStartAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  04. [motion_sprint_brake_r3b2] SprintBrakeAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  05. [integration_unified_motion] Unified 462-Frame Motion Pipeline Artifact Verification (blender_headless, timeout=60.0s)
+  06. [task7a1_character_playground] Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop (blender_headless, timeout=90.0s)
+  07. [task7a2_p0_teleport_regression] Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect (blender_headless, timeout=30.0s)
+  08. [task7a2_terrain_traversal] Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground (blender_headless, timeout=120.0s)
+  09. [environment_gate01_unit3] Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification (blender_headless, timeout=60.0s)
+  10. [environment_gate01_u3_s1] Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps (blender_headless, timeout=60.0s)
+  11. [environment_gate01_u3_s2] Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair (blender_headless, timeout=60.0s)
+  12. [terrain_planning_contract] Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts (blender_headless, timeout=120.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[motion_walk_r3b2] Starting: StartStopWalkAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_walk_action.py
+  [PASS] Test completed successfully (4.39s)
+
+[motion_run_r3b2] Starting: RunAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_run_action.py
+  [PASS] Test completed successfully (3.08s)
+
+[motion_sprint_start_r3b2] Starting: SprintStartAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_sprint_start.py
+  [PASS] Test completed successfully (3.59s)
+
+[motion_sprint_brake_r3b2] Starting: SprintBrakeAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_sprint_brake.py
+  [PASS] Test completed successfully (2.32s)
+
+[integration_unified_motion] Starting: Unified 462-Frame Motion Pipeline Artifact Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_unified_motion_integration.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (1.61s)
+
+[task7a1_character_playground] Starting: Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task7a1_character_playground.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (2.82s)
+
+[task7a2_p0_teleport_regression] Starting: Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_p0_frame226_teleport_regression.py
+  [PASS] Test completed successfully (2.27s)
+
+[task7a2_terrain_traversal] Starting: Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task7a2_terrain_traversal.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (2.62s)
+
+[environment_gate01_unit3] Starting: Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit3.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (14.23s)
+
+[environment_gate01_u3_s1] Starting: Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s1.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (4.68s)
+
+[environment_gate01_u3_s2] Starting: Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s2.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (4.63s)
+
+[terrain_planning_contract] Starting: Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_planning_contract.py
+  [PASS] Test completed successfully (2.21s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 48.45s
+Planned: 12 | Executed: 12 | Passed: 12 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\output\test_report.json
+  - Markdown: C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\output\test_report.md
+================================================================================

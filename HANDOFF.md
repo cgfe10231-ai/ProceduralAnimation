@@ -10,48 +10,38 @@
 
 - 项目：ProceduralAnimation。
 - 分支：`master`。
-- 最近完成节点：PKG-5 / 09-B-4。
-- 验收状态：`ACCEPTED — VERIFIED`。
-- 下一节点：PKG-5 / Task 10 — Upper-Limb IK/FK。
-- Task 10 状态：`ROUTE FROZEN — IMPLEMENTATION NOT STARTED`。
+- 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）。
+- 当前实现节点：PKG-5 / Task 10-B / 10-B-1（Arm IK 输入预验证与零副作用合同）。
+- 状态：`10-B-1 IMPLEMENTED — TESTED — ARCHIVED — PENDING INDEPENDENT AUDIT`。
+- 下一执行节点：PKG-5 / Task 10-B-2（Arm IK 事务快照、故障注入与完整回滚）。
+- 下一节点状态：`READY TO IMPLEMENT`。
 
-09-B-4 已经完成生产代码修复、测试扩充、专项测试、分层回归及证据归档。
+10-B-1 已经完成生产代码输入校验加固、24 项独立专项测试、10-A 回归测试、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42）及证据归档。
 
-不得继续将 09-B-4 描述为未完成。
-
-不得创建 09-B-5。
-
-## 2. 09-B-4 交付证据
-
-接受依据：
-
-- 生产修复：`52d66dfd529627a9fbc8bae6ffcf6f4fee6c64d8`
-- TEST-24 断言补充：`3881aaadd58f76ffce18faf5d9e880bc49b82f97`
-- 测试证据归档：`0b42cb1d7dc685d1be7210bc1280519658f85809`
+## 2. 10-B-1 交付证据
 
 证据目录：
 
-`docs/evidence/PKG5_09B4/`
+`docs/evidence/PKG5_10B1/`
 
 专项测试：
 
 | 测试 | 结果 |
 |---|---:|
-| 09-B World Rotation | 27/27 PASS |
-| 09-A Ground Height | 20/20 PASS |
-| 08 Worldspace Init/Reset | 6/6 PASS |
+| 10-B-1 Input Validation (`test_task10b_input_validation.py`) | 24/24 PASS (1.997s) |
+| 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`) | 30/30 PASS (4.439s) |
 | C2 Final Inspector | 6 项自测试 PASS，文档符号检查 PASS |
 
 分层测试：
 
 | Tier | 套件数 | 状态 |
 |---|---:|---|
-| Quick | 19/19 | 退出码 0 |
-| Physics | 25/25 | 退出码 0 |
-| Motion | 12/12 | 退出码 0 |
-| Full | 40/40 | 退出码 0 |
+| Quick | 19/19 | 退出码 0 (48.13s) |
+| Physics | 27/27 | 退出码 0 (107.51s) |
+| Motion | 12/12 | 退出码 0 (48.45s) |
+| Full | 42/42 | 退出码 0 (158.96s) |
 
-所有分层测试均为 FAIL 0、SKIPPED 0、NOT_RUN 0。
+所有分层测试均为 FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
 
 必须保留 `AUTOMATED_PASS` 与普通 `PASS` 的区别。9 项视觉检查状态不得误写为视觉验收完成。
 
@@ -72,13 +62,13 @@ Finding 总数维持 16 项，14 项关闭，2 项开放。
 | 顺序 | 任务 | 状态 |
 |---|---|---|
 | 09-B | Lower-Limb World Rotation | `ACCEPTED — VERIFIED` |
-| 10 | Upper-Limb IK/FK | `ROUTE FROZEN — IMPLEMENTATION NOT STARTED` |
+| 10 | Upper-Limb IK/FK | `IN PROGRESS (10-A Done, 10-B-1 Implemented/Tested)` |
 | 11 | FootLock | `PLANNED — NOT STARTED` |
 | 12 | PKG-5 综合接口闭环 | `BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE` |
 
 下一具体子任务：
 
-`10-a-1`
+`10-b-2`
 
 Task 10 / 11 / 12 的权威分工以 `ARCHITECTURE_SYNC.md` Section 4.2—4.5 为准。
 

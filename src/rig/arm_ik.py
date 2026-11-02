@@ -33,7 +33,7 @@ Task 10-A Contracts:
 """
 
 import math
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import bpy
 from mathutils import Euler, Matrix, Quaternion, Vector
@@ -44,6 +44,7 @@ from src.rig.transform_utils import (
     validate_effective_parent_transform,
     world_to_local_position,
     world_to_local_rotation,
+    world_to_local_rotation_quaternion,
 )
 
 ARM_IK_TARGET_NAMES: Dict[str, str] = {"L": "HandIK.L", "R": "HandIK.R"}
@@ -67,6 +68,58 @@ MIN_ARM_REACH: float = 0.08  # Minimum distance avoiding degenerate zero-length 
 
 DEFAULT_POLE_BACKWARD_OFFSET: float = 0.40  # Meters backward (-Y) from arm plane
 DEFAULT_POLE_OUTWARD_OFFSET: float = 0.08   # Meters outward (X) from arm plane
+
+
+def _validate_influence(val: Any, param_name: str = "influence") -> float:
+    """Validate that influence is a finite real number in [0.0, 1.0]."""
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise TypeError(f"'{param_name}' must be a real number, got {type(val).__name__}: {val!r}")
+    f_val = float(val)
+    if not math.isfinite(f_val):
+        raise ValueError(f"'{param_name}' must be finite, got: {val!r}")
+    if f_val < 0.0 or f_val > 1.0:
+        raise ValueError(f"'{param_name}' must be in [0.0, 1.0], got: {val!r}")
+    return f_val
+
+
+def _validate_side(side: Any, allow_both: bool = False, param_name: str = "side") -> str:
+    """Validate arm side identifier ('L', 'R', or optionally 'BOTH')."""
+    if not isinstance(side, str):
+        raise TypeError(f"'{param_name}' must be a string, got {type(side).__name__}: {side!r}")
+    s_up = side.strip().upper()
+    valid_sides = ("L", "R", "BOTH") if allow_both else ("L", "R")
+    if s_up not in valid_sides:
+        expected = "'L', 'R', or 'BOTH'" if allow_both else "'L' or 'R'"
+        raise ValueError(f"Invalid {param_name} '{side}', expected {expected}")
+    return s_up
+
+
+def _validate_vec3(vec: Any, param_name: str, allow_none: bool = False) -> Optional[Tuple[float, float, float]]:
+    """Validate 3-element finite coordinate sequence."""
+    if vec is None:
+        if allow_none:
+            return None
+        raise TypeError(f"'{param_name}' cannot be None; expected 3-element sequence of finite numbers")
+    if isinstance(vec, (str, bytes, dict)) or not hasattr(vec, "__len__") or not hasattr(vec, "__getitem__"):
+        raise TypeError(f"'{param_name}' must be a sequence of 3 finite numbers, got {type(vec).__name__}")
+    if len(vec) != 3:
+        raise ValueError(f"'{param_name}' must have exactly 3 components, got {len(vec)}: {vec!r}")
+    out = []
+    for i, comp in enumerate(vec):
+        if isinstance(comp, bool) or not isinstance(comp, (int, float)):
+            raise TypeError(f"'{param_name}[{i}]' must be a real number, got {type(comp).__name__}: {comp!r}")
+        f_comp = float(comp)
+        if not math.isfinite(f_comp):
+            raise ValueError(f"'{param_name}[{i}]' must be finite, got: {comp!r}")
+        out.append(f_comp)
+    return (out[0], out[1], out[2])
+
+
+def _validate_bool(val: Any, param_name: str = "clamp_reach") -> bool:
+    """Validate that value is strictly a boolean."""
+    if not isinstance(val, bool):
+        raise TypeError(f"'{param_name}' must be a boolean (True or False), got {type(val).__name__}: {val!r}")
+    return val
 
 
 def _resolve_armature(armature_obj: Optional[bpy.types.Object] = None) -> bpy.types.Object:
@@ -170,6 +223,7 @@ def setup_arm_ik(
         Dict mapping controller names ('HandIK.L', 'HandIK.R', 'ElbowPole.L', 'ElbowPole.R')
         to their Empty objects.
     """
+    valid_influence = _validate_influence(initial_influence, param_name="initial_influence")
     arm = _resolve_armature(armature_obj)
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
     collection = _ensure_character_collection()
@@ -245,7 +299,7 @@ def setup_arm_ik(
         if ik_con is None:
             ik_con = p_fore.constraints.new(type="IK")
             ik_con.name = con_name_ik
-            ik_con.influence = max(0.0, min(1.0, float(initial_influence)))
+            ik_con.influence = valid_influence
             newly_created_ik_con = True
 
         ik_con.target = ik_obj
@@ -270,7 +324,7 @@ def setup_arm_ik(
         if rot_con is None:
             rot_con = p_hand.constraints.new(type="COPY_ROTATION")
             rot_con.name = con_name_rot
-            rot_con.influence = max(0.0, min(1.0, float(initial_influence)))
+            rot_con.influence = valid_influence
 
         rot_con.target = ik_obj
         rot_con.target_space = "WORLD"
@@ -297,19 +351,18 @@ def set_arm_ik_influence(
         side: 'L', 'R', or 'BOTH'.
         influence: Influence value in [0.0, 1.0].
     """
+    valid_side = _validate_side(side, allow_both=True, param_name="side")
+    valid_influence = _validate_influence(influence, param_name="influence")
     arm = _resolve_armature(armature_obj)
-    influence_clamped = max(0.0, min(1.0, float(influence)))
-    sides = ("L", "R") if side.upper() == "BOTH" else (side.upper(),)
+    sides = ("L", "R") if valid_side == "BOTH" else (valid_side,)
 
     for s in sides:
-        if s not in ("L", "R"):
-            raise ValueError(f"Invalid side '{s}', expected 'L', 'R', or 'BOTH'")
         p_fore = arm.pose.bones.get(f"forearm.{s}")
         p_hand = arm.pose.bones.get(f"hand.{s}")
         if p_fore and ARM_IK_CONSTRAINT_NAMES[s] in p_fore.constraints:
-            p_fore.constraints[ARM_IK_CONSTRAINT_NAMES[s]].influence = influence_clamped
+            p_fore.constraints[ARM_IK_CONSTRAINT_NAMES[s]].influence = valid_influence
         if p_hand and HAND_ROT_CONSTRAINT_NAMES[s] in p_hand.constraints:
-            p_hand.constraints[HAND_ROT_CONSTRAINT_NAMES[s]].influence = influence_clamped
+            p_hand.constraints[HAND_ROT_CONSTRAINT_NAMES[s]].influence = valid_influence
 
     bpy.context.view_layer.update()
 
@@ -378,19 +431,16 @@ def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
 
 def get_arm_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
     """Inspect current world-space arm bone positions, target errors, bone lengths, and flexion."""
-    side = side.upper()
-    if side not in ("L", "R"):
-        raise ValueError(f"Invalid side '{side}', expected 'L' or 'R'")
-
+    valid_side = _validate_side(side, allow_both=False, param_name="side")
     arm = _resolve_armature(armature_obj)
     bpy.context.view_layer.update()
 
-    p_up = arm.pose.bones[f"upper_arm.{side}"]
-    p_fore = arm.pose.bones[f"forearm.{side}"]
-    p_hand = arm.pose.bones[f"hand.{side}"]
+    p_up = arm.pose.bones[f"upper_arm.{valid_side}"]
+    p_fore = arm.pose.bones[f"forearm.{valid_side}"]
+    p_hand = arm.pose.bones[f"hand.{valid_side}"]
 
-    ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[side])
-    pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[side])
+    ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[valid_side])
+    pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[valid_side])
 
     shoulder_world = arm.matrix_world @ p_up.head
     elbow_world = arm.matrix_world @ p_fore.head
@@ -426,13 +476,13 @@ def get_arm_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dic
         target_world_euler = hand_world_euler
         rotation_error_deg = 0.0
 
-    ik_con = p_fore.constraints.get(ARM_IK_CONSTRAINT_NAMES[side])
-    rot_con = p_hand.constraints.get(HAND_ROT_CONSTRAINT_NAMES[side])
+    ik_con = p_fore.constraints.get(ARM_IK_CONSTRAINT_NAMES[valid_side])
+    rot_con = p_hand.constraints.get(HAND_ROT_CONSTRAINT_NAMES[valid_side])
     ik_influence = ik_con.influence if ik_con else 0.0
     rot_influence = rot_con.influence if rot_con else 0.0
 
     return {
-        "side": side,
+        "side": valid_side,
         "shoulder_world": shoulder_world,
         "elbow_world": elbow_world,
         "wrist_world": wrist_world,
@@ -464,9 +514,12 @@ def set_hand_ik_target(
 ) -> dict:
     """Set the left ('L') or right ('R') hand IK target in world coordinates.
 
-    Follows the 10-A Contract:
+    Follows the 10-A and 10-B-1 Pre-validation Contracts:
+    - Pre-validation: Validates all user inputs strictly before any scene mutation or auto-initialization.
     - Phase A1: Synchronizes dependency graph (view_layer.update()) before reading parent transforms.
     - Phase A2: Validates effective parent matrices before any scene mutation occurs.
+    - Phase A3: Verifies reachability, pole, and derived local targets are strictly finite.
+    - Phase B: Commits transforms and constraints atomically.
     - HandIK and ElbowPole transforms are resolved independently using their respective M_eff.
     - Preserves controller active rotation_mode (Euler modes, QUATERNION, AXIS_ANGLE).
     - Rejects non-conformal transforms (shears, non-uniform scaling, reflections, singularities).
@@ -487,17 +540,21 @@ def set_hand_ik_target(
         dict containing state information including requested/applied positions, target error,
         rotation error, reachability flag, and clamping status.
     """
-    side = side.upper()
-    if side not in ("L", "R"):
-        raise ValueError(f"Invalid arm side '{side}', expected 'L' or 'R'")
+    # Pre-validation: ALL user inputs validated before any scene mutation or auto-initialization
+    valid_side = _validate_side(side, allow_both=False, param_name="side")
+    valid_world_xyz = _validate_vec3(world_xyz, param_name="world_xyz", allow_none=False)
+    valid_hand_rot = _validate_vec3(hand_rotation_deg, param_name="hand_rotation_deg", allow_none=True)
+    valid_pole_world = _validate_vec3(pole_world_xyz, param_name="pole_world_xyz", allow_none=True)
+    valid_clamp_reach = _validate_bool(clamp_reach, param_name="clamp_reach")
+    valid_influence = _validate_influence(influence, param_name="influence")
 
     arm = _resolve_armature(armature_obj)
-    ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[side])
-    pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[side])
+    ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[valid_side])
+    pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[valid_side])
     if ik_obj is None or pole_obj is None:
-        setup_arm_ik(arm, initial_influence=influence)
-        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES[side]]
-        pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES[side]]
+        setup_arm_ik(arm, initial_influence=valid_influence)
+        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES[valid_side]]
+        pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES[valid_side]]
 
     # Phase A1: Synchronize dependency graph FIRST before reading parent matrices
     bpy.context.view_layer.update()
@@ -511,13 +568,13 @@ def set_hand_ik_target(
     # Note: No mutation of controllers, pose bones, constraints, or pre-bend hint occurs before this point!
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
 
-    p_up = arm.pose.bones[f"upper_arm.{side}"]
-    p_fore = arm.pose.bones[f"forearm.{side}"]
-    p_hand = arm.pose.bones[f"hand.{side}"]
+    p_up = arm.pose.bones[f"upper_arm.{valid_side}"]
+    p_fore = arm.pose.bones[f"forearm.{valid_side}"]
+    p_hand = arm.pose.bones[f"hand.{valid_side}"]
 
     shoulder_world = arm.matrix_world @ p_up.head
 
-    requested = Vector(world_xyz)
+    requested = Vector(valid_world_xyz)
     applied = requested.copy()
     clamped_reach = False
 
@@ -526,7 +583,7 @@ def set_hand_ik_target(
     is_reachable = (MIN_ARM_REACH <= dist <= MAX_ARM_REACH)
 
     # Reach clamping relative to shoulder joint
-    if clamp_reach:
+    if valid_clamp_reach:
         if dist > MAX_ARM_REACH:
             clamped_reach = True
             if dist > 1e-6:
@@ -539,9 +596,9 @@ def set_hand_ik_target(
             applied = shoulder_world + direction * MIN_ARM_REACH
 
     # Elbow pole target positioning in world space
-    sign = -1.0 if side == "L" else 1.0
-    if pole_world_xyz is not None:
-        pole_world = Vector(pole_world_xyz)
+    sign = -1.0 if valid_side == "L" else 1.0
+    if valid_pole_world is not None:
+        pole_world = Vector(valid_pole_world)
     else:
         # Default pole placement: behind (-Y) and slightly outward (X)
         mid_pt = 0.5 * (shoulder_world + applied)
@@ -552,8 +609,8 @@ def set_hand_ik_target(
         ))
 
     # Hand 3D orientation target in world coordinates
-    if hand_rotation_deg is not None:
-        target_world_rot_quat = Euler((math.radians(v) for v in hand_rotation_deg), "XYZ").to_quaternion()
+    if valid_hand_rot is not None:
+        target_world_rot_quat = Euler((math.radians(v) for v in valid_hand_rot), "XYZ").to_quaternion()
     else:
         # Neutral level orientation matching CharacterRoot
         if root_obj is not None:
@@ -561,26 +618,41 @@ def set_hand_ik_target(
         else:
             target_world_rot_quat = Quaternion()
 
+    ik_local_pos = world_to_local_position(applied, eff_ik_mat)
+    pole_local_pos = world_to_local_position(pole_world, eff_pole_mat)
+    ik_local_rot_quat = world_to_local_rotation_quaternion(target_world_rot_quat, eff_ik_mat)
+
+    # Phase A3: Verify all derived spatial coordinates and orientations are strictly finite
+    for v in (applied, pole_world, ik_local_pos, pole_local_pos):
+        for coord in v:
+            if not math.isfinite(coord):
+                raise ValueError(f"Derived coordinate {coord!r} in target computation is not finite")
+    for q_comp in target_world_rot_quat:
+        if not math.isfinite(q_comp):
+            raise ValueError(f"Derived orientation component {q_comp!r} is not finite")
+    for q_comp in ik_local_rot_quat:
+        if not math.isfinite(q_comp):
+            raise ValueError(f"Derived local orientation component {q_comp!r} is not finite")
+
     # Phase B: Commit transforms and constraints
-    _apply_arm_ik_prebend_hint_side(arm, side)
+    _apply_arm_ik_prebend_hint_side(arm, valid_side)
 
     # Convert applied world targets to controller local spaces preserving rotation_mode
-    ik_obj.location = world_to_local_position(applied, eff_ik_mat)
+    ik_obj.location = ik_local_pos
     apply_target_rotation(ik_obj, target_world_rot_quat, eff_ik_mat)
-    pole_obj.location = world_to_local_position(pole_world, eff_pole_mat)
+    pole_obj.location = pole_local_pos
 
     # Update constraint influence
-    influence_clamped = max(0.0, min(1.0, float(influence)))
-    ik_con = p_fore.constraints.get(ARM_IK_CONSTRAINT_NAMES[side])
+    ik_con = p_fore.constraints.get(ARM_IK_CONSTRAINT_NAMES[valid_side])
     if ik_con:
-        ik_con.influence = influence_clamped
-    rot_con = p_hand.constraints.get(HAND_ROT_CONSTRAINT_NAMES[side])
+        ik_con.influence = valid_influence
+    rot_con = p_hand.constraints.get(HAND_ROT_CONSTRAINT_NAMES[valid_side])
     if rot_con:
-        rot_con.influence = influence_clamped
+        rot_con.influence = valid_influence
 
     bpy.context.view_layer.update()
 
-    state = get_arm_ik_state(arm, side)
+    state = get_arm_ik_state(arm, valid_side)
     state["requested_world"] = requested
     state["applied_world"] = applied
     state["is_reachable"] = is_reachable

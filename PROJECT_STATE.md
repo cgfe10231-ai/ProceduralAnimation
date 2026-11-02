@@ -4,13 +4,13 @@
 >
 > **09-B-4 验收证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / 09-B / 09-B-4 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
+> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；当前实现节点：PKG-5 / Task 10-B / 10-B-1 (Arm IK 输入预验证与零副作用合同)。
 >
-> **当前完成状态**：`ACCEPTED — VERIFIED`。
+> **当前完成状态**：`10-B-1 IMPLEMENTED — TESTED — ARCHIVED — PENDING INDEPENDENT AUDIT`。
 >
-> **下一执行节点**：PKG-5 / Task 10 — Upper-Limb IK/FK。
+> **下一执行节点**：PKG-5 / Task 10-B-2 (Arm IK 事务快照、故障注入与完整回滚)。
 >
-> **下一节点状态**：`ROUTE FROZEN — IMPLEMENTATION NOT STARTED`。
+> **下一节点状态**：`READY TO IMPLEMENT`。
 >
 > **历史状态边界**：
 > - DEC-064 与原 09-B 历史验收记录继续有效。
@@ -36,6 +36,8 @@
 > - TEST-24 对 7 项锁定元数据执行逐项相等性核验。
 >
 > **当前专项测试状态**：
+> - `test_task10b_input_validation.py`：24/24 PASS。
+> - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS。
 > - `test_leg_ik_world_rotation_contract.py`：27/27 PASS。
 > - `test_leg_ik_ground_height_contract.py`：20/20 PASS。
 > - `test_leg_ik_worldspace_init_reset.py`：6/6 PASS。
@@ -43,9 +45,9 @@
 >
 > **当前分层回归状态**：
 > - Quick：19/19，退出码 0。
-> - Physics：25/25，退出码 0。
+> - Physics：27/27，退出码 0。
 > - Motion：12/12，退出码 0。
-> - Full：40/40，退出码 0。
+> - Full：42/42，退出码 0。
 > - 四级测试均为 FAIL 0、SKIPPED 0、NOT_RUN 0。
 > - `AUTOMATED_PASS` 仍要求相应的视觉检查，不得误写为视觉验收已完成。
 >
@@ -57,15 +59,15 @@
 >
 > **当前 PKG-5 准入顺序**：
 > - 09-B：已完成，09-B-4 已验收。
-> - 10：下一任务，尚未开始。
+> - 10：Task 10-A 已完成，Task 10-B-1 已实现并测试，下一子任务 10-B-2。
 > - 11：FootLock，待修复。
 > - 12：全仓跨模块联合验收，待执行。
 >
 > **PKG-5 后续路线状态**：
-> - Task 10 / Upper-Limb IK/FK：架构职责已冻结，尚未实施。
+> - Task 10 / Upper-Limb IK/FK：10-A 已完成，10-B 进行中（10-B-1 完成，10-B-2 待实施）。
 > - Task 11 / FootLock：FIND-R3-03、FIND-R3-04，尚未实施。
 > - Task 12 / Joint Integration：等待 10 与 11 独立验收。
-> - 下一具体子任务：`10-a-1`。
+> - 下一具体子任务：`10-b-2`。
 > - 子任务必须依据 `ARCHITECTURE_SYNC.md` 和 `OPEN_FINDINGS.md` 执行。
 >
 > **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10、11、12 的独立验收与联合验收，并取得项目负责人明确批准后方可开启。
@@ -1152,26 +1154,22 @@
 | 08 Rig | 世界空间与刚体平移回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation；09-B-4 已完成 | `ACCEPTED — VERIFIED` |
-| 10 | Upper-Limb IK/FK | `ROUTE FROZEN — IMPLEMENTATION NOT STARTED` |
+| 10 | Upper-Limb IK/FK | `IN PROGRESS (10-A Done, 10-B-1 Implemented/Tested)` |
 | 11 | FootLock：FIND-R3-03、FIND-R3-04 | `PLANNED — NOT STARTED` |
 | 12 | PKG-5 跨模块联合审计与验收 | `BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE` |
 
-### 2.1 下一具体任务：PKG-5 / 10-A-1
+### 2.1 下一具体任务：PKG-5 / 10-B-2
 
 下一具体执行单元：
 
-`10-a-1`
+`10-b-2`
 
 负责范围：
 
-- `setup_arm_ik()` 重复初始化和活动状态保持。
-- `WholeBodyController.__init__()` 中的 Arm IK 初始化调用。
-- HandIK / ElbowPole 控制器状态。
-- 有效父级矩阵和世界空间变换测试。
-
-开始代码修改前，必须先提供独立任务卡、复现条件和验收断言。
-
-当前尚未实施，不得提前标记为 PASS。
+- Arm IK 完整状态快照（`_snapshot_arm_rig_state()`）。
+- Arm IK 逐字段回滚与状态核验（`_rollback_arm_rig_state()`）。
+- 故障注入与异常安全事务回滚（`set_hand_ik_target()` Phase B 回滚）。
+- 异常安全测试与回归。
 
 ### 2.2 Task 10 / 11 / 12 路线
 

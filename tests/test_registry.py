@@ -255,6 +255,15 @@ TEST_REGISTRY: Dict[str, TestDefinition] = {
         timeout_sec=60.0,
         description="Validates that setup_arm_ik is strictly idempotent, preserves existing controller transforms and constraint instances, respects effective parent transform domain, and maintains world-space translation and rotation accuracy.",
     ),
+    "arm_ik_input_validation_contract": TestDefinition(
+        test_id="arm_ik_input_validation_contract",
+        name="Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B-1)",
+        script_path="tests/test_task10b_input_validation.py",
+        runner_type=RunnerType.BLENDER_HEADLESS,
+        tiers=[TestTier.PHYSICS, TestTier.FULL],
+        timeout_sec=45.0,
+        description="Validates strict pre-mutation input validation and zero side effects for setup_arm_ik, set_hand_ik_target, and set_arm_ik_influence.",
+    ),
     "physics_bridge_contract": TestDefinition(
         test_id="physics_bridge_contract",
         name="Kinematic Bridge 14-Point Architectural Contract",

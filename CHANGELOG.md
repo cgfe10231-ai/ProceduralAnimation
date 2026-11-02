@@ -2,6 +2,31 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-02] PKG-5 / Task 10-B-1：Arm IK 输入预验证与零副作用合同
+
+* **任务性质**：为现有 Arm IK API（`setup_arm_ik`, `set_hand_ik_target`, `set_arm_ik_influence`, `get_arm_ik_state`）建立统一、严格的输入预验证与零副作用保障合同。
+* **状态**：`IMPLEMENTED — TESTED — ARCHIVED — PENDING INDEPENDENT AUDIT`。
+* **修改范围**：
+  - `src/rig/arm_ik.py`：新增私有预验证函数（`_validate_influence`, `_validate_side`, `_validate_vec3`, `_validate_bool`）；所有输入在首次场景状态写入前完成验证；`set_hand_ik_target` 在 Phase A 校验失败时绝对不触发自动初始化（不创建 Empty、不创建约束）；Phase A3 派生世界与局部坐标/四元数有限性严格校验；修复对称 Influence 权重一致性更新。
+  - `tests/test_task10b_input_validation.py`：新增 24 项独立专项测试（TEST-01 至 TEST-24），覆盖边界值、非有限数、非法类型、零副作用、未初始化防护、快照比对、L/R 独立性及权重对称性。
+  - `tests/test_registry.py`：注册 `arm_ik_input_validation_contract`（Tiers: PHYSICS, FULL）。
+  - `docs/evidence/PKG5_10B1/`：归档完整测试证据报告与 4 级分层测试日志。
+* **专项测试**：
+  - `test_task10b_input_validation.py`：24/24 PASS（1.997s）。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS（4.439s）。
+* **分层回归**：
+  - Quick：19/19 PASS（退出码 0，48.13s）。
+  - Physics：27/27 PASS（退出码 0，107.51s）。
+  - Motion：12/12 PASS（退出码 0，48.45s）。
+  - Full：42/42 PASS（退出码 0，158.96s）。
+  - 四级测试均为 FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **文档与符号审计**：
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，符号存在性 PASS。
+* **实施边界与保护**：
+  - 纯局部输入验证加固，不改动 WBC、Bridge、TerrainWalk 或任何下肢模块。
+  - 事务快照与回滚严格留待 10-B-2，未提前混入本任务。
+  - 未生成或覆盖任何 `.blend` 文件，未进行 GUI 视觉验收。
+
 ### [2026-11-02] PKG-5：Task 10 / 11 / 12 架构职责冻结与执行路线同步
 
 * **任务性质**：同步 PKG-5 后续任务的模块职责、审计候选、任务依赖和阶段准入边界。
