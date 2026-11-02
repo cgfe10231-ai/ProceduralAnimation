@@ -1,6 +1,6 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **当前修复节点**：PKG-5 / 09-B-3（Lower-Limb World Rotation）
+> **当前修复节点**：PKG-5 / 09-B-4（Lower-Limb World Rotation）
 > **代码审计基准 HEAD**：`2904857433af01c2a7991e2da085b3c0f53a145f`
 > **本次文档同步基准 HEAD**：`76e5907eef5514801c8b17856787566c9e530a7a`
 > **文档更新时间**：2026-11-01

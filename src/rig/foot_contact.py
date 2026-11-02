@@ -32,6 +32,8 @@ from src.rig.ik import (
     POLE_TARGET_NAMES,
     _apply_ik_prebend_hint,
     _resolve_armature,
+    _rollback_leg_rig_state,
+    _snapshot_leg_rig_state,
     get_leg_ik_state,
     setup_leg_ik,
 )
@@ -199,33 +201,39 @@ def unlock_foot_contact(
             f"pole_obj world matrix contains non-TRS shear (diff={max_pole_shear:.6f}) which cannot be faithfully represented by a parentless Blender object"
         )
 
-    ik_obj["is_locked"] = False
+    # Phase B transaction: capture pre-commit state of controllers and bones for failure rollback
+    ctrl_snap, bone_snap = _snapshot_leg_rig_state(arm)
 
-    # Ensure parentless in world space with identity parent inverse and full TRS restoration
-    ik_obj.parent = None
-    ik_obj.matrix_parent_inverse = Matrix.Identity(4)
-    ik_obj.location = ik_loc
-    ik_obj.rotation_euler = ik_rot_quat.to_euler("XYZ")
-    ik_obj.scale = ik_scale
+    try:
+        ik_obj["is_locked"] = False
 
-    pole_obj.parent = None
-    pole_obj.matrix_parent_inverse = Matrix.Identity(4)
-    pole_obj.location = pole_loc
-    pole_obj.rotation_euler = pole_rot_quat.to_euler("XYZ")
-    pole_obj.scale = pole_scale
+        # Ensure parentless in world space with identity parent inverse and full TRS restoration
+        ik_obj.parent = None
+        ik_obj.matrix_parent_inverse = Matrix.Identity(4)
+        ik_obj.location = ik_loc
+        ik_obj.rotation_euler = ik_rot_quat.to_euler("XYZ")
+        ik_obj.scale = ik_scale
 
-    bpy.context.view_layer.update()
+        pole_obj.parent = None
+        pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+        pole_obj.location = pole_loc
+        pole_obj.rotation_euler = pole_rot_quat.to_euler("XYZ")
+        pole_obj.scale = pole_scale
 
-    # Post-validation: ensure restored matrix_world matches original within 1e-4
-    post_ik_diff = max(abs(ik_obj.matrix_world[r][c] - current_ik_world_mat[r][c]) for r in range(4) for c in range(4))
-    if post_ik_diff > 1e-4:
-        raise RuntimeError(f"unlock_foot_contact failed post-validation: ik_obj matrix_world drifted by {post_ik_diff:.6f}")
+        bpy.context.view_layer.update()
 
-    post_pole_diff = max(abs(pole_obj.matrix_world[r][c] - current_pole_world_mat[r][c]) for r in range(4) for c in range(4))
-    if post_pole_diff > 1e-4:
-        raise RuntimeError(f"unlock_foot_contact failed post-validation: pole_obj matrix_world drifted by {post_pole_diff:.6f}")
+        # Post-validation: ensure restored matrix_world matches original within 1e-4
+        post_ik_diff = max(abs(ik_obj.matrix_world[r][c] - current_ik_world_mat[r][c]) for r in range(4) for c in range(4))
+        if post_ik_diff > 1e-4:
+            raise RuntimeError(f"unlock_foot_contact failed post-validation: ik_obj matrix_world drifted by {post_ik_diff:.6f}")
 
-    return get_foot_support_state(arm, side)
+        post_pole_diff = max(abs(pole_obj.matrix_world[r][c] - current_pole_world_mat[r][c]) for r in range(4) for c in range(4))
+        if post_pole_diff > 1e-4:
+            raise RuntimeError(f"unlock_foot_contact failed post-validation: pole_obj matrix_world drifted by {post_pole_diff:.6f}")
+
+        return get_foot_support_state(arm, side)
+    except Exception as exc:
+        _rollback_leg_rig_state(arm, ctrl_snap, bone_snap, exc)
 
 
 def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -> dict:

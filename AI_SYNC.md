@@ -4,7 +4,7 @@
 * **文档审查起点 HEAD**：`7547c91a31f0b97a19de335ad5c61cc617b017a2`
 * **最近一次生产源码核验基准**：`2904857433af01c2a7991e2da085b3c0f53a145f`
 * **当前分支**：`master`
-* **当前任务**：PKG-5 / 09-B-3 — Lower-Limb World Rotation & Effective Parent Transform Re-verification
+* **当前任务**：PKG-5 / 09-B-4 — Lower-Limb World Rotation & Effective Parent Transform Re-verification
 * **当前状态**：`IN PROGRESS — NOT ACCEPTED`
 * **当前结论**：修复尚未完成，仍存在未解决问题。不得把历史 09-B 的验收记录当作 09-B-3 的验收结果。
 
@@ -12,11 +12,11 @@
 
 ## 1. 当前阶段与准入边界
 
-当前正在处理 PKG-5 / 09-B-3。
+当前正在处理 PKG-5 / 09-B-4。
 
 后续节点顺序：
 
-1. 09-B-3：Lower-Limb World Rotation / 有效父级变换域 / 控制器状态完整性与失败原子性。
+1. 09-B-4：Lower-Limb World Rotation / 有效父级变换域 / 控制器状态完整性与失败原子性。
 2. 10：Upper-Limb IK/FK。
 3. 11：FootLock。
 4. 12：PKG-5 综合接口闭环与全仓联合验收。

@@ -2,7 +2,7 @@
 
 > **更新时间**：2026-11-01
 >
-> **当前任务**：PKG-5 / 09-B-3 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
+> **当前任务**：PKG-5 / 09-B-4 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
 >
 > **当前状态**：`IN PROGRESS — NOT ACCEPTED`。修复尚未完成，仍存在未解决问题。
 >

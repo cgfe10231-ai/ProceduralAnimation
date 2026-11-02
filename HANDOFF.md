@@ -7,7 +7,7 @@
 ## 1. 当前目标与当前状态
 
 * **文档审查基准 HEAD**：`7547c91a31f0b97a19de335ad5c61cc617b017a2`。
-* **当前任务**：PKG-5 / 09-B-3 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
+* **当前任务**：PKG-5 / 09-B-4 — Lower-Limb World Rotation & Effective Parent Transform Re-verification。
 * **当前状态**：`IN PROGRESS — NOT ACCEPTED`。修复尚未完成，仍存在未解决问题。
 * **历史状态边界**：原 09-B 的历史修复与 DEC-064 验收记录继续有效，但不得将其当作当前 09-B-3 的验收结果。
 * **当前 Finding 状态**：
@@ -25,7 +25,7 @@
   - `det(A) == 0`：拒绝奇异矩阵。
   - `s_sq <= 1e-12`：拒绝退化尺度。
   - Gram 矩阵相对偏差 `> 1e-6`：拒绝非共形变换。
-* **下一步**：继续完成 09-B-3 修复和独立核验。
+* **下一步**：继续完成 09-B-4 修复和独立核验。
 * **Phase 7B**：`NOT AUTHORIZED`。必须完成 09-B-3、10、11、12 联合验收并获得负责人明确批准。
 * **保护范围**：本次任务不修改生产源码、测试源码、Blend 资产、`ARCHITECTURE.md` 或 `DECISIONS.md`。
 

@@ -490,20 +490,104 @@ def _rollback_leg_rig_state(
 
         bpy.context.view_layer.update()
 
-        # Verify restored state
+        # Verify restored state for all controllers (all fields from snapshot)
         for name, snap in ctrl_snap.items():
             obj = bpy.data.objects.get(name)
-            if obj is not None:
-                diff = max(abs(obj.matrix_world[r][c] - snap["matrix_world"][r][c]) for r in range(4) for c in range(4))
-                if diff > 1e-4:
-                    raise RuntimeError(f"Controller '{name}' rollback verification failed with matrix diff {diff:.6e} > 1e-4")
+            if obj is None:
+                raise RuntimeError(f"Controller '{name}' missing after rollback")
 
+            diff = max(abs(obj.matrix_world[r][c] - snap["matrix_world"][r][c]) for r in range(4) for c in range(4))
+            if diff > 1e-4:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed with matrix_world diff {diff:.6e} > 1e-4")
+
+            loc_diff = (obj.location - snap["location"]).length
+            if loc_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: location modified (diff={loc_diff:.6e})")
+
+            if obj.rotation_mode != snap["rotation_mode"]:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: rotation_mode modified")
+
+            euler_diff = max(abs(obj.rotation_euler[i] - snap["rotation_euler"][i]) for i in range(3))
+            if euler_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: rotation_euler modified (diff={euler_diff:.6e})")
+
+            quat_diff = max(abs(obj.rotation_quaternion[i] - snap["rotation_quaternion"][i]) for i in range(4))
+            if quat_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: rotation_quaternion modified (diff={quat_diff:.6e})")
+
+            axis_angle_diff = max(abs(obj.rotation_axis_angle[i] - snap["rotation_axis_angle"][i]) for i in range(4))
+            if axis_angle_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: rotation_axis_angle modified (diff={axis_angle_diff:.6e})")
+
+            scale_diff = (obj.scale - snap["scale"]).length
+            if scale_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: scale modified (diff={scale_diff:.6e})")
+
+            if obj.parent is not snap["parent"]:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: parent modified")
+
+            mpi_diff = max(abs(obj.matrix_parent_inverse[r][c] - snap["matrix_parent_inverse"][r][c]) for r in range(4) for c in range(4))
+            if mpi_diff > 1e-4:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed with matrix_parent_inverse diff {mpi_diff:.6e} > 1e-4")
+
+            if ("is_locked" in obj) != snap["has_is_locked"]:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: has_is_locked modified")
+
+            if obj.get("is_locked") != snap["is_locked"]:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: is_locked value modified")
+
+            dloc_diff = (obj.delta_location - snap["delta_location"]).length
+            if dloc_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: delta_location modified (diff={dloc_diff:.6e})")
+
+            deuler_diff = max(abs(obj.delta_rotation_euler[i] - snap["delta_rotation_euler"][i]) for i in range(3))
+            if deuler_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: delta_rotation_euler modified (diff={deuler_diff:.6e})")
+
+            dquat_diff = max(abs(obj.delta_rotation_quaternion[i] - snap["delta_rotation_quaternion"][i]) for i in range(4))
+            if dquat_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: delta_rotation_quaternion modified (diff={dquat_diff:.6e})")
+
+            dscale_diff = (obj.delta_scale - snap["delta_scale"]).length
+            if dscale_diff > 1e-6:
+                raise RuntimeError(f"Controller '{name}' rollback verification failed: delta_scale modified (diff={dscale_diff:.6e})")
+
+        # Verify restored state for all pose bones (all fields from snapshot)
         for name, snap in bone_snap.items():
             p_bone = arm.pose.bones.get(name)
-            if p_bone is not None:
-                diff = max(abs(p_bone.matrix[r][c] - snap["matrix"][r][c]) for r in range(4) for c in range(4))
-                if diff > 1e-4:
-                    raise RuntimeError(f"Pose bone '{name}' rollback verification failed with matrix diff {diff:.6e} > 1e-4")
+            if p_bone is None:
+                raise RuntimeError(f"Pose bone '{name}' missing after rollback")
+
+            diff = max(abs(p_bone.matrix[r][c] - snap["matrix"][r][c]) for r in range(4) for c in range(4))
+            if diff > 1e-4:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed with matrix diff {diff:.6e} > 1e-4")
+
+            basis_diff = max(abs(p_bone.matrix_basis[r][c] - snap["matrix_basis"][r][c]) for r in range(4) for c in range(4))
+            if basis_diff > 1e-4:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed with matrix_basis diff {basis_diff:.6e} > 1e-4")
+
+            loc_diff = (p_bone.location - snap["location"]).length
+            if loc_diff > 1e-6:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed: location modified (diff={loc_diff:.6e})")
+
+            if p_bone.rotation_mode != snap["rotation_mode"]:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed: rotation_mode modified")
+
+            euler_diff = max(abs(p_bone.rotation_euler[i] - snap["rotation_euler"][i]) for i in range(3))
+            if euler_diff > 1e-6:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed: rotation_euler modified (diff={euler_diff:.6e})")
+
+            quat_diff = max(abs(p_bone.rotation_quaternion[i] - snap["rotation_quaternion"][i]) for i in range(4))
+            if quat_diff > 1e-6:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed: rotation_quaternion modified (diff={quat_diff:.6e})")
+
+            axis_angle_diff = max(abs(p_bone.rotation_axis_angle[i] - snap["rotation_axis_angle"][i]) for i in range(4))
+            if axis_angle_diff > 1e-6:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed: rotation_axis_angle modified (diff={axis_angle_diff:.6e})")
+
+            scale_diff = (p_bone.scale - snap["scale"]).length
+            if scale_diff > 1e-6:
+                raise RuntimeError(f"Pose bone '{name}' rollback verification failed: scale modified (diff={scale_diff:.6e})")
 
     except Exception as rollback_exc:
         raise RuntimeError(
