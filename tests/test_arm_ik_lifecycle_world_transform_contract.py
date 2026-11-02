@@ -1,4 +1,4 @@
-"""Contract verification suite for Arm IK Initialization Idempotency and Effective Parent Transform (Task 10-A / 10-a-1 & 10-a-2).
+"""Contract verification suite for Arm IK Initialization Idempotency and Effective Parent Transform (Task 10-A / 10-a-1, 10-a-2 & 10-a-3).
 
 Tests:
 - TEST-01: First-time initialization creates all 4 Empty controls and 4 constraints with correct initial influence.
@@ -14,8 +14,23 @@ Tests:
 - TEST-11: Phase A validation rejection leaves all controllers, pose bones, and constraint influences completely unpolluted.
 - TEST-12: Zero regression against existing 09-B Leg IK world rotation contract (all 27 tests pass).
 - TEST-13: Parent transform mutations without manual view_layer.update() are refreshed internally before validation.
-- TEST-14: Preserves controller active rotation_mode across XYZ, non-XYZ Euler, QUATERNION, and AXIS_ANGLE.
-- TEST-15: reset_arm_ik under non-identity distinct parents returns to CharacterRoot neutral world transform.
+- TEST-14: HandIK target preserves XYZ rotation mode with world transform contract.
+- TEST-15: HandIK target preserves XZY rotation mode with world transform contract.
+- TEST-16: HandIK target preserves YXZ rotation mode with world transform contract.
+- TEST-17: HandIK target preserves YZX rotation mode with world transform contract.
+- TEST-18: HandIK target preserves ZXY rotation mode with world transform contract.
+- TEST-19: HandIK target preserves ZYX rotation mode with world transform contract.
+- TEST-20: HandIK target preserves QUATERNION rotation mode with world transform contract.
+- TEST-21: HandIK target preserves AXIS_ANGLE rotation mode with world transform contract.
+- TEST-22: reset_arm_ik under distinct non-identity parents and inverses restores neutral world transforms.
+- TEST-23: reset_arm_ik preserves XYZ rotation mode on HandIK and ElbowPole with neutral transforms.
+- TEST-24: reset_arm_ik preserves XZY rotation mode on HandIK and ElbowPole with neutral transforms.
+- TEST-25: reset_arm_ik preserves YXZ rotation mode on HandIK and ElbowPole with neutral transforms.
+- TEST-26: reset_arm_ik preserves YZX rotation mode on HandIK and ElbowPole with neutral transforms.
+- TEST-27: reset_arm_ik preserves ZXY rotation mode on HandIK and ElbowPole with neutral transforms.
+- TEST-28: reset_arm_ik preserves ZYX rotation mode on HandIK and ElbowPole with neutral transforms.
+- TEST-29: reset_arm_ik preserves QUATERNION rotation mode on HandIK and ElbowPole with neutral transforms.
+- TEST-30: reset_arm_ik preserves AXIS_ANGLE rotation mode on HandIK and ElbowPole with neutral transforms.
 """
 
 import io
@@ -664,58 +679,114 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
         actual_rot = ik_obj.matrix_world.to_quaternion()
         self.assertLessEqual(req_rot.rotation_difference(actual_rot).angle, 1e-4)
 
-    def test_14_rotation_mode_compatibility(self) -> None:
-        """TEST-14: Preserves controller active rotation_mode across XYZ, non-XYZ Euler, QUATERNION, and AXIS_ANGLE."""
+    def _verify_rotation_mode_set_target(self, mode: str) -> None:
+        """Helper to verify that set_hand_ik_target preserves the specified rotation_mode."""
         setup_arm_ik(self.armature, initial_influence=0.0)
         ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES["L"]]
 
-        # Parent with rotation, translation, and positive uniform scale
-        parent = bpy.data.objects.new("RotModeParent", None)
+        # Custom parent with non-zero translation, non-zero rotation, and positive uniform scale
+        parent = bpy.data.objects.new(f"RotModeParent_{mode}", None)
         bpy.context.scene.collection.objects.link(parent)
         parent.location = Vector((0.8, self.root.location.y + 0.5, 1.2))
         parent.rotation_euler = Euler((math.radians(20.0), math.radians(-30.0), math.radians(45.0)), "XYZ")
         parent.scale = Vector((1.4, 1.4, 1.4))
 
+        # Set non-identity matrix_parent_inverse containing rotation and translation
         ik_obj.parent = parent
         inv_euler = Euler((math.radians(10.0), math.radians(-15.0), math.radians(25.0)), "XYZ")
-        ik_obj.matrix_parent_inverse = Matrix.LocRotScale(Vector((0.1, -0.2, 0.15)), inv_euler, Vector((1.0, 1.0, 1.0)))
+        expected_inv = Matrix.LocRotScale(Vector((0.1, -0.2, 0.15)), inv_euler, Vector((1.0, 1.0, 1.0)))
+        ik_obj.matrix_parent_inverse = expected_inv.copy()
+
+        # Set rotation_mode to the specified mode under test
+        ik_obj.rotation_mode = mode
         bpy.context.view_layer.update()
 
         target_l = (-0.28, self.root.location.y + 0.20, 1.26)
         rot_deg = (30.0, -40.0, 20.0)
         expected_rot_quat = Euler((math.radians(v) for v in rot_deg), "XYZ").to_matrix().to_quaternion()
 
-        test_modes = ("XYZ", "ZYX", "QUATERNION", "AXIS_ANGLE")
-        for mode in test_modes:
-            ik_obj.rotation_mode = mode
-            bpy.context.view_layer.update()
+        set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=target_l,
+            hand_rotation_deg=rot_deg,
+            influence=1.0,
+        )
 
-            set_hand_ik_target(
-                self.armature,
-                "L",
-                world_xyz=target_l,
-                hand_rotation_deg=rot_deg,
-                influence=1.0,
-            )
+        # 1. Assert rotation_mode is completely preserved
+        self.assertEqual(ik_obj.rotation_mode, mode, f"rotation_mode must remain {mode}")
 
-            # rotation_mode must NOT be changed or forced to XYZ
-            self.assertEqual(ik_obj.rotation_mode, mode, f"rotation_mode must remain {mode}")
+        # 2. Assert parent reference and matrix_parent_inverse are not mutated by interface
+        self.assertEqual(ik_obj.parent, parent, "Parent reference must not be changed")
+        for r in range(4):
+            for c in range(4):
+                self.assertAlmostEqual(
+                    ik_obj.matrix_parent_inverse[r][c],
+                    expected_inv[r][c],
+                    places=6,
+                    msg=f"matrix_parent_inverse element ({r}, {c}) mutated",
+                )
 
-            # Verify actual matrix_world orientation
-            actual_rot_quat = ik_obj.matrix_world.to_quaternion()
-            err_rad = expected_rot_quat.rotation_difference(actual_rot_quat).angle
-            self.assertLessEqual(err_rad, 1e-4, f"Mode {mode} world rotation error {err_rad:.6e} > 1e-4 rad")
-            self.assertAlmostEqual((ik_obj.matrix_world.translation - Vector(target_l)).length, 0.0, places=5)
+        # 3. Assert final world position matches requested target <= 1e-5 m
+        pos_err = (ik_obj.matrix_world.translation - Vector(target_l)).length
+        self.assertAlmostEqual(pos_err, 0.0, places=5, msg=f"World position error {pos_err:.6e} > 1e-5 m")
 
-    def test_15_reset_non_identity_effective_parent(self) -> None:
-        """TEST-15: reset_arm_ik under non-identity distinct parents returns to CharacterRoot neutral world transform."""
+        # 4. Assert final world rotation matches requested rotation <= 1e-4 rad
+        actual_rot_quat = ik_obj.matrix_world.to_quaternion()
+        ang_err = expected_rot_quat.rotation_difference(actual_rot_quat).angle
+        self.assertLessEqual(ang_err, 1e-4, f"Mode {mode} world rotation error {ang_err:.6e} > 1e-4 rad")
+
+    def test_14_rotation_mode_xyz(self) -> None:
+        """TEST-14: HandIK target preserves XYZ rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("XYZ")
+
+    def test_15_rotation_mode_xzy(self) -> None:
+        """TEST-15: HandIK target preserves XZY rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("XZY")
+
+    def test_16_rotation_mode_yxz(self) -> None:
+        """TEST-16: HandIK target preserves YXZ rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("YXZ")
+
+    def test_17_rotation_mode_yzx(self) -> None:
+        """TEST-17: HandIK target preserves YZX rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("YZX")
+
+    def test_18_rotation_mode_zxy(self) -> None:
+        """TEST-18: HandIK target preserves ZXY rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("ZXY")
+
+    def test_19_rotation_mode_zyx(self) -> None:
+        """TEST-19: HandIK target preserves ZYX rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("ZYX")
+
+    def test_20_rotation_mode_quaternion(self) -> None:
+        """TEST-20: HandIK target preserves QUATERNION rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("QUATERNION")
+
+    def test_21_rotation_mode_axis_angle(self) -> None:
+        """TEST-21: HandIK target preserves AXIS_ANGLE rotation mode with world transform contract."""
+        self._verify_rotation_mode_set_target("AXIS_ANGLE")
+
+    def test_22_reset_distinct_non_identity_parent_inverses(self) -> None:
+        """TEST-22: reset_arm_ik under distinct non-identity parents and inverses restores neutral world transforms."""
         setup_arm_ik(self.armature, initial_influence=0.0)
         ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES["L"]]
         pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES["L"]]
 
-        # Distinct parents with rotation, translation, and positive uniform scale
-        p_hand = bpy.data.objects.new("ResetParentHand", None)
-        p_pole = bpy.data.objects.new("ResetParentPole", None)
+        p_fore = self.armature.pose.bones["forearm.L"]
+        p_hand_bone = self.armature.pose.bones["hand.L"]
+        ik_con = p_fore.constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
+        rot_con = p_hand_bone.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]]
+
+        ik_obj_ptr = ik_obj.as_pointer()
+        pole_obj_ptr = pole_obj.as_pointer()
+        ik_con_ptr = ik_con.as_pointer()
+        rot_con_ptr = rot_con.as_pointer()
+
+        # Two distinct parent objects with non-zero translation, rotation, and positive uniform scale
+        p_hand = bpy.data.objects.new("ResetParentHand_A", None)
+        p_pole = bpy.data.objects.new("ResetParentPole_B", None)
         bpy.context.scene.collection.objects.link(p_hand)
         bpy.context.scene.collection.objects.link(p_pole)
 
@@ -727,13 +798,17 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
         p_pole.rotation_euler = Euler((math.radians(-20.0), math.radians(15.0), math.radians(-10.0)), "XYZ")
         p_pole.scale = Vector((0.7, 0.7, 0.7))
 
+        # Independent non-identity matrix_parent_inverse matrices with non-zero translation, rotation, and uniform scale
         ik_obj.parent = p_hand
-        inv_euler = Euler((math.radians(-12.0), math.radians(18.0), math.radians(5.0)), "XYZ")
-        expected_inv_mat = Matrix.LocRotScale(Vector((0.15, -0.25, 0.1)), inv_euler, Vector((1.0, 1.0, 1.0)))
-        ik_obj.matrix_parent_inverse = expected_inv_mat
+        inv_euler_hand = Euler((math.radians(-12.0), math.radians(18.0), math.radians(5.0)), "XYZ")
+        hand_inv_mat = Matrix.LocRotScale(Vector((0.15, -0.25, 0.1)), inv_euler_hand, Vector((1.1, 1.1, 1.1)))
+        ik_obj.matrix_parent_inverse = hand_inv_mat.copy()
 
         pole_obj.parent = p_pole
-        pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+        inv_euler_pole = Euler((math.radians(14.0), math.radians(-10.0), math.radians(22.0)), "XYZ")
+        pole_inv_mat = Matrix.LocRotScale(Vector((-0.2, 0.18, -0.12)), inv_euler_pole, Vector((0.9, 0.9, 0.9)))
+        pole_obj.matrix_parent_inverse = pole_inv_mat.copy()
+
         bpy.context.view_layer.update()
 
         # Set active non-neutral targets
@@ -742,22 +817,104 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
             "L",
             world_xyz=(-0.35, self.root.location.y + 0.25, 1.35),
             hand_rotation_deg=(25.0, 10.0, -15.0),
+            pole_world_xyz=(-0.55, self.root.location.y - 0.40, 1.15),
             influence=1.0,
         )
         bpy.context.view_layer.update()
 
-        # Call explicit reset
+        # Save controllers' parent, matrix_parent_inverse, and rotation_mode
+        saved_ik_parent = ik_obj.parent
+        saved_ik_inv = ik_obj.matrix_parent_inverse.copy()
+        saved_ik_rot_mode = ik_obj.rotation_mode
+
+        saved_pole_parent = pole_obj.parent
+        saved_pole_inv = pole_obj.matrix_parent_inverse.copy()
+        saved_pole_rot_mode = pole_obj.rotation_mode
+
+        # Execute reset_arm_ik and synchronize dependency graph
         reset_arm_ik(self.armature)
         bpy.context.view_layer.update()
 
-        # Verify parent and matrix_parent_inverse preserved
-        self.assertEqual(ik_obj.parent, p_hand)
+        # HandIK assertions:
+        self.assertEqual(ik_obj.parent, saved_ik_parent)
         for r in range(4):
             for c in range(4):
-                self.assertAlmostEqual(ik_obj.matrix_parent_inverse[r][c], expected_inv_mat[r][c], places=6)
-        self.assertEqual(pole_obj.parent, p_pole)
+                self.assertEqual(ik_obj.matrix_parent_inverse[r][c], saved_ik_inv[r][c])
+        self.assertEqual(ik_obj.rotation_mode, saved_ik_rot_mode)
 
-        # Expected neutral world positions and orientations relative to CharacterRoot
+        root_mat = self.root.matrix_world
+        expected_hand_world = root_mat @ Vector((-SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
+        self.assertAlmostEqual((ik_obj.matrix_world.translation - expected_hand_world).length, 0.0, places=5)
+
+        expected_hand_rot_quat = root_mat.to_quaternion()
+        hand_rot_err = ik_obj.matrix_world.to_quaternion().rotation_difference(expected_hand_rot_quat).angle
+        self.assertLessEqual(hand_rot_err, 1e-4)
+
+        # ElbowPole assertions:
+        self.assertEqual(pole_obj.parent, saved_pole_parent)
+        for r in range(4):
+            for c in range(4):
+                self.assertEqual(pole_obj.matrix_parent_inverse[r][c], saved_pole_inv[r][c])
+        self.assertEqual(pole_obj.rotation_mode, saved_pole_rot_mode)
+
+        expected_pole_world = root_mat @ Vector((
+            -(SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
+            -DEFAULT_POLE_BACKWARD_OFFSET,
+            ELBOW_REST_Z,
+        ))
+        self.assertAlmostEqual((pole_obj.matrix_world.translation - expected_pole_world).length, 0.0, places=5)
+
+        expected_pole_rot_quat = Quaternion()
+        pole_rot_err = pole_obj.matrix_world.to_quaternion().rotation_difference(expected_pole_rot_quat).angle
+        self.assertLessEqual(pole_rot_err, 1e-4)
+
+        # Constraints and object pointers assertions:
+        self.assertAlmostEqual(ik_con.influence, 0.0, places=6)
+        self.assertAlmostEqual(rot_con.influence, 0.0, places=6)
+        self.assertEqual(ik_obj.as_pointer(), ik_obj_ptr, "HandIK Empty must not be recreated")
+        self.assertEqual(pole_obj.as_pointer(), pole_obj_ptr, "ElbowPole Empty must not be recreated")
+        self.assertEqual(ik_con.as_pointer(), ik_con_ptr, "ArmIK constraint must not be recreated")
+        self.assertEqual(rot_con.as_pointer(), rot_con_ptr, "HandRotation constraint must not be recreated")
+
+    def _verify_reset_rotation_mode(self, mode: str) -> None:
+        """Helper to verify that reset_arm_ik preserves the specified rotation_mode on HandIK and ElbowPole."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+
+        # Rotate CharacterRoot so neutral world orientation is non-identity
+        self.root.rotation_euler = Euler((math.radians(18.0), math.radians(-12.0), math.radians(25.0)), "XYZ")
+        bpy.context.view_layer.update()
+
+        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES["L"]]
+        pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES["L"]]
+        ik_obj.rotation_mode = mode
+        pole_obj.rotation_mode = mode
+        bpy.context.view_layer.update()
+
+        # Set active non-neutral targets
+        p_up = self.armature.pose.bones["upper_arm.L"]
+        shoulder_world = self.armature.matrix_world @ p_up.head
+        target_world = shoulder_world + self.root.matrix_world.to_3x3() @ Vector((0.0, 0.25, -0.20))
+        pole_target_world = shoulder_world + self.root.matrix_world.to_3x3() @ Vector((-0.20, -0.30, -0.15))
+
+        set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=tuple(target_world),
+            hand_rotation_deg=(35.0, -15.0, 45.0),
+            pole_world_xyz=tuple(pole_target_world),
+            influence=1.0,
+        )
+        bpy.context.view_layer.update()
+
+        # Reset arm IK
+        reset_arm_ik(self.armature)
+        bpy.context.view_layer.update()
+
+        # 1. Assert rotation_mode is preserved on both controllers
+        self.assertEqual(ik_obj.rotation_mode, mode, f"HandIK rotation_mode must remain {mode}")
+        self.assertEqual(pole_obj.rotation_mode, mode, f"ElbowPole rotation_mode must remain {mode}")
+
+        # 2. Expected neutral targets
         root_mat = self.root.matrix_world
         expected_hand_world = root_mat @ Vector((-SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
         expected_pole_world = root_mat @ Vector((
@@ -766,18 +923,56 @@ class TestArmIKLifecycleWorldTransformContract(unittest.TestCase):
             ELBOW_REST_Z,
         ))
         expected_hand_rot_quat = root_mat.to_quaternion()
+        expected_pole_rot_quat = Quaternion()
 
-        # Check actual world translations and rotation
+        # 3. Assert world translations recovered to neutral
         self.assertAlmostEqual((ik_obj.matrix_world.translation - expected_hand_world).length, 0.0, places=5)
         self.assertAlmostEqual((pole_obj.matrix_world.translation - expected_pole_world).length, 0.0, places=5)
-        hand_rot_err = ik_obj.matrix_world.to_quaternion().rotation_difference(expected_hand_rot_quat).angle
-        self.assertLessEqual(hand_rot_err, 1e-4)
 
-        # Verify constraint influences return to 0.0
+        # 4. Assert world orientations
+        hand_rot_err = ik_obj.matrix_world.to_quaternion().rotation_difference(expected_hand_rot_quat).angle
+        self.assertLessEqual(hand_rot_err, 1e-4, f"HandIK mode {mode} reset rotation error {hand_rot_err:.6e} > 1e-4 rad")
+
+        pole_rot_err = pole_obj.matrix_world.to_quaternion().rotation_difference(expected_pole_rot_quat).angle
+        self.assertLessEqual(pole_rot_err, 1e-4, f"ElbowPole mode {mode} reset rotation error {pole_rot_err:.6e} > 1e-4 rad")
+
+        # 5. Assert constraint influences returned to 0.0
         p_fore = self.armature.pose.bones["forearm.L"]
         p_hand_bone = self.armature.pose.bones["hand.L"]
         self.assertAlmostEqual(p_fore.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.0, places=6)
         self.assertAlmostEqual(p_hand_bone.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, 0.0, places=6)
+
+    def test_23_reset_rotation_mode_xyz(self) -> None:
+        """TEST-23: reset_arm_ik preserves XYZ rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("XYZ")
+
+    def test_24_reset_rotation_mode_xzy(self) -> None:
+        """TEST-24: reset_arm_ik preserves XZY rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("XZY")
+
+    def test_25_reset_rotation_mode_yxz(self) -> None:
+        """TEST-25: reset_arm_ik preserves YXZ rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("YXZ")
+
+    def test_26_reset_rotation_mode_yzx(self) -> None:
+        """TEST-26: reset_arm_ik preserves YZX rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("YZX")
+
+    def test_27_reset_rotation_mode_zxy(self) -> None:
+        """TEST-27: reset_arm_ik preserves ZXY rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("ZXY")
+
+    def test_28_reset_rotation_mode_zyx(self) -> None:
+        """TEST-28: reset_arm_ik preserves ZYX rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("ZYX")
+
+    def test_29_reset_rotation_mode_quaternion(self) -> None:
+        """TEST-29: reset_arm_ik preserves QUATERNION rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("QUATERNION")
+
+    def test_30_reset_rotation_mode_axis_angle(self) -> None:
+        """TEST-30: reset_arm_ik preserves AXIS_ANGLE rotation mode on HandIK and ElbowPole with neutral transforms."""
+        self._verify_reset_rotation_mode("AXIS_ANGLE")
 
 
 if __name__ == "__main__":
