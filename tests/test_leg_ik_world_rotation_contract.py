@@ -1362,8 +1362,30 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         lock_foot_contact(self.armature, "L", target_rotation_deg=(12.0, -15.0, 25.0))
         ik_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
         self.assertTrue(ik_obj.get("is_locked"), "FootIK.L must be locked initially")
-        self.assertIn("locked_ankle_world_xyz", ik_obj, "Lock metadata must be present")
-        self.assertIn("contact_world_xyz", ik_obj, "Lock metadata must be present")
+
+        meta_keys = (
+            "contact_world_xyz",
+            "locked_ankle_world_xyz",
+            "target_rotation_deg",
+            "locked_foot_head_xyz",
+            "locked_foot_tail_xyz",
+            "locked_foot_center_xyz",
+            "locked_foot_min_z",
+        )
+
+        def _read_meta(obj, key):
+            val = obj[key]
+            if hasattr(val, "to_list"):
+                return tuple(val.to_list())
+            try:
+                return tuple(val)
+            except TypeError:
+                return val
+
+        saved_metadata = {}
+        for k in meta_keys:
+            self.assertIn(k, ik_obj, f"Lock metadata '{k}' must exist before unlock")
+            saved_metadata[k] = _read_meta(ik_obj, k)
 
         saved_state = _capture_rig_state(self.armature)
 
@@ -1375,7 +1397,16 @@ class TestLegIKWorldRotationContract(unittest.TestCase):
         bpy.context.view_layer.update()
         _assert_rig_state_identical(self, saved_state, tol=1e-6)
         self.assertTrue(ik_obj.get("is_locked"), "is_locked must be restored to True")
-        self.assertIn("locked_ankle_world_xyz", ik_obj, "Lock metadata must be preserved after rollback")
+
+        # Explicit item-by-item metadata equality assertions
+        for k in meta_keys:
+            self.assertIn(k, ik_obj, f"Lock metadata '{k}' must exist after rollback")
+            curr_val = _read_meta(ik_obj, k)
+            self.assertEqual(
+                curr_val,
+                saved_metadata[k],
+                f"Lock metadata '{k}' must be identical after rollback: {curr_val} != {saved_metadata[k]}",
+            )
 
     def test_25_effective_parent_non_finite_rejection(self) -> None:
         """TEST-25: _validate_effective_parent_transform rejects non-finite elements (NaN and Inf)."""
