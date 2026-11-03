@@ -8,13 +8,13 @@
 >
 > **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）
 >
-> **当前实现节点**：PKG-5 / Task 10-B / 10-B-1 (Arm IK 输入预验证与零副作用合同)
+> **当前实现与修复节点**：PKG-5 / Task 10-B / 10-B-1-FIX-01 (Arm IK 自动初始化前置变换预检与零副作用修复)
 >
-> **当前节点状态**：`10-B-1 IMPLEMENTED — TESTED — ARCHIVED — PENDING INDEPENDENT AUDIT`
+> **当前节点状态**：`10-B-1-FIX-01 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）
 >
-> **下一执行节点**：PKG-5 / Task 10-B-2 (Arm IK 事务快照、故障注入与完整回滚)
+> **下一执行节点**：等待 10-B-1 独立审计验收；待批准后准入 PKG-5 / Task 10-B-2 (Arm IK 事务快照、故障注入与完整回滚)
 >
-> **下一节点状态**：`READY TO IMPLEMENT`
+> **下一节点状态**：`WAITING INDEPENDENT AUDIT / NOT STARTED`
 
 ---
 
@@ -22,11 +22,13 @@
 
 PKG-5 / Task 10-A（Arm IK 初始化幂等、控制器生命周期与有效父级变换合同）已通过 10-A-1 至 10-A-4 完整验收归档。
 
-PKG-5 / Task 10-B-1（Arm IK 输入预验证与零副作用保障合同）已完成代码实现、24 项独立测试覆盖、10-A 回归测试、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42）以及完整测试证据归档。
+PKG-5 / Task 10-B-1-FIX-01 修复了 `set_hand_ik_target` 在自动初始化时有效父级变换预检缺失导致的零副作用合同破坏。建立了严格的 Phase A（输入参数预验证）$\to$ Phase B（零突变控制器与环境预检）$\to$ Phase C（自动初始化）$\to$ Phase D（目标计算与提交）执行顺序。
 
-下一项子任务为 `10-b-2`（事务快照、故障注入与完整回滚），不得提前进入 10-C。
+在 `tests/test_task10b_input_validation.py` 中新增 TEST-25 至 TEST-27 深度场景快照比对测试，全套件 27 项专项测试、10-A 回归测试、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42）均已验证通过并归档报告。
 
-## 2. 10-B-1 已验证交付
+整体 10-B-1 保持 `PENDING INDEPENDENT AUDIT`，下一阶段在获得独立审计批准后准入 `10-b-2`。
+
+## 2. 10-B-1 及 10-B-1-FIX-01 已验证交付
 
 ### 生产代码
 
@@ -44,8 +46,9 @@ PKG-5 / Task 10-B-1（Arm IK 输入预验证与零副作用保障合同）已完
 3. `_validate_vec3()`：严格校验 3 元素实数序列，分量必须有限，拒绝错误维度、字典、字符串与布尔值。
 4. `_validate_bool()`：严格校验布尔类型，拒绝整数（0, 1）、字符串等伪布尔值。
 5. `setup_arm_ik()`：在获取骨架、集合或创建 Empty/Constraint 之前预先校验 `initial_influence`，非法输入保证场景零突变。
-6. `set_hand_ik_target()`：在 Phase A1 依赖图更新、未初始化检测与任何写入前，完成全部用户参数校验；非法输入绝不触发自动初始化，现有场景状态 100% 保持；Phase A3 对派生目标坐标及局部四元数进行严格有限性核验。
+6. `set_hand_ik_target()`：在 Phase A 校验失败时绝不触发自动初始化，现有场景状态 100% 保持；Phase A3 对派生目标坐标及局部四元数进行严格有限性核验。
 7. `set_arm_ik_influence()`：在任何写入前校验参数，并同时对称更新 ArmIK 和 HandRotation 约束权重，保持 L/R 独立性。
+8. `_preflight_arm_ik_parent_transforms()`（10-B-1-FIX-01）：在触发自动初始化前，预先校验已存在及待创建控制器的有效父级矩阵（$M_{\text{eff}} = M_{\text{parent}} \cdot I_4$），非法时在零场景写入前直接抛出 `ValueError`，杜绝部分场景污染。
 
 ### 测试证据
 
@@ -53,18 +56,22 @@ PKG-5 / Task 10-B-1（Arm IK 输入预验证与零副作用保障合同）已完
 
 `docs/evidence/PKG5_10B1/`
 
+新增修复报告：
+
+[`task10b1_autoinit_preflight_fix_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B1/task10b1_autoinit_preflight_fix_report.md)
+
 专项测试：
 
-- 10-B-1 Input Validation (`test_task10b_input_validation.py`)：24/24 PASS (1.997s)。
-- 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`)：30/30 PASS (4.439s)。
+- 10-B-1 Input Validation & Preflight (`test_task10b_input_validation.py`)：27/27 PASS (2.305s)。
+- 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`)：30/30 PASS (5.66s)。
 - C2 Final Inspector：6 项验证器自测试通过，文档与符号检查通过。
 
 分层回归：
 
-- Quick：19/19 (48.13s)。
-- Physics：27/27 (107.51s)。
-- Motion：12/12 (48.45s)。
-- Full：42/42 (158.96s)。
+- Quick：19/19 (50.44s)。
+- Physics：27/27 (109.13s)。
+- Motion：12/12 (48.60s)。
+- Full：42/42 (156.51s)。
 
 四级运行均为退出码 0，FAIL 0，ERROR 0，SKIPPED 0，NOT_RUN 0。
 

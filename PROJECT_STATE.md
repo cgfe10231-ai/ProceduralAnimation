@@ -4,13 +4,13 @@
 >
 > **09-B-4 验收证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；当前实现节点：PKG-5 / Task 10-B / 10-B-1 (Arm IK 输入预验证与零副作用合同)。
+> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；当前实现修复节点：PKG-5 / Task 10-B / 10-B-1-FIX-01 (Arm IK 自动初始化前置变换预检与零副作用修复)。
 >
-> **当前完成状态**：`10-B-1 IMPLEMENTED — TESTED — ARCHIVED — PENDING INDEPENDENT AUDIT`。
+> **当前完成状态**：`10-B-1-FIX-01 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
 >
-> **下一执行节点**：PKG-5 / Task 10-B-2 (Arm IK 事务快照、故障注入与完整回滚)。
+> **下一执行节点**：等待 10-B-1 独立审计验收；待批准后准入 PKG-5 / Task 10-B-2 (Arm IK 事务快照、故障注入与完整回滚)。
 >
-> **下一节点状态**：`READY TO IMPLEMENT`。
+> **下一节点状态**：`WAITING INDEPENDENT AUDIT / NOT STARTED`。
 >
 > **历史状态边界**：
 > - DEC-064 与原 09-B 历史验收记录继续有效。
@@ -36,7 +36,7 @@
 > - TEST-24 对 7 项锁定元数据执行逐项相等性核验。
 >
 > **当前专项测试状态**：
-> - `test_task10b_input_validation.py`：24/24 PASS。
+> - `test_task10b_input_validation.py`：27/27 PASS（含 TEST-25 至 TEST-27 自动初始化前置预检与零突变快照比对）。
 > - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS。
 > - `test_leg_ik_world_rotation_contract.py`：27/27 PASS。
 > - `test_leg_ik_ground_height_contract.py`：20/20 PASS。

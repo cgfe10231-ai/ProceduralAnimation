@@ -503,6 +503,72 @@ def get_arm_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dic
     }
 
 
+def _preflight_arm_ik_parent_transforms(
+    arm: bpy.types.Object,
+    valid_side: str,
+    root_obj: Optional[bpy.types.Object],
+) -> Tuple[bool, Matrix, Matrix]:
+    """Preflight check effective parent transform domains before any scene mutation (Task 10-B-2).
+
+    Inspects existing and anticipated arm IK controllers without writing to the scene.
+    If controllers are missing and setup_arm_ik() would be required, anticipates the
+    effective parent matrix for any newly created controller based on setup_arm_ik's
+    parenting contract:
+        M_eff = M_parent @ Matrix.Identity(4)
+    Validates all existing and anticipated controllers via validate_effective_parent_transform.
+    Raises ValueError before setup_arm_ik() can cause any scene mutation or partial initialization.
+
+    Returns:
+        (needs_auto_init, eff_ik_mat, eff_pole_mat)
+    """
+    ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[valid_side])
+    pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[valid_side])
+    needs_auto_init = (ik_obj is None or pole_obj is None)
+
+    expected_new_eff_mat = (
+        root_obj.matrix_world @ Matrix.Identity(4)
+        if root_obj is not None
+        else Matrix.Identity(4)
+    )
+
+    if needs_auto_init:
+        # setup_arm_ik() processes all four controllers (L and R);
+        # validate effective parent transforms for existing controls and anticipated new controls.
+        other_side = "R" if valid_side == "L" else "L"
+        all_ctrl_names = (
+            ARM_IK_TARGET_NAMES[valid_side],
+            ARM_POLE_TARGET_NAMES[valid_side],
+            ARM_IK_TARGET_NAMES[other_side],
+            ARM_POLE_TARGET_NAMES[other_side],
+        )
+        for ctrl_name in all_ctrl_names:
+            existing_obj = bpy.data.objects.get(ctrl_name)
+            if existing_obj is not None:
+                ctrl_eff_mat = compute_effective_parent_matrix(existing_obj)
+            else:
+                ctrl_eff_mat = expected_new_eff_mat
+            validate_effective_parent_transform(ctrl_eff_mat, ctrl_name)
+
+        eff_ik_mat = (
+            compute_effective_parent_matrix(ik_obj)
+            if ik_obj is not None
+            else expected_new_eff_mat
+        )
+        eff_pole_mat = (
+            compute_effective_parent_matrix(pole_obj)
+            if pole_obj is not None
+            else expected_new_eff_mat
+        )
+    else:
+        # Both target controllers exist; validate their effective parent transforms directly
+        eff_ik_mat = compute_effective_parent_matrix(ik_obj)
+        eff_pole_mat = compute_effective_parent_matrix(pole_obj)
+        validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
+        validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
+
+    return needs_auto_init, eff_ik_mat, eff_pole_mat
+
+
 def set_hand_ik_target(
     armature_obj: Optional[bpy.types.Object],
     side: str,
@@ -514,12 +580,12 @@ def set_hand_ik_target(
 ) -> dict:
     """Set the left ('L') or right ('R') hand IK target in world coordinates.
 
-    Follows the 10-A and 10-B-1 Pre-validation Contracts:
-    - Pre-validation: Validates all user inputs strictly before any scene mutation or auto-initialization.
-    - Phase A1: Synchronizes dependency graph (view_layer.update()) before reading parent transforms.
-    - Phase A2: Validates effective parent matrices before any scene mutation occurs.
-    - Phase A3: Verifies reachability, pole, and derived local targets are strictly finite.
-    - Phase B: Commits transforms and constraints atomically.
+    Follows the 10-A, 10-B-1, and 10-B-2 Pre-validation and Zero-Side-Effect Contracts:
+    - Phase A: Validates all user inputs strictly before any scene access or mutation.
+    - Phase B: Preflights dependency graph (view_layer.update()) and validates effective
+      parent transforms of existing and anticipated controllers before auto-initialization.
+    - Phase C: Invokes setup_arm_ik() only after Phase B validation succeeds with zero mutation.
+    - Phase D: Computes targets, checks finite derived coordinates, and commits transforms/influences.
     - HandIK and ElbowPole transforms are resolved independently using their respective M_eff.
     - Preserves controller active rotation_mode (Euler modes, QUATERNION, AXIS_ANGLE).
     - Rejects non-conformal transforms (shears, non-uniform scaling, reflections, singularities).
@@ -540,7 +606,7 @@ def set_hand_ik_target(
         dict containing state information including requested/applied positions, target error,
         rotation error, reachability flag, and clamping status.
     """
-    # Pre-validation: ALL user inputs validated before any scene mutation or auto-initialization
+    # Phase A: User input pre-validation (all inputs validated before scene mutation or auto-init)
     valid_side = _validate_side(side, allow_both=False, param_name="side")
     valid_world_xyz = _validate_vec3(world_xyz, param_name="world_xyz", allow_none=False)
     valid_hand_rot = _validate_vec3(hand_rotation_deg, param_name="hand_rotation_deg", allow_none=True)
@@ -548,26 +614,25 @@ def set_hand_ik_target(
     valid_clamp_reach = _validate_bool(clamp_reach, param_name="clamp_reach")
     valid_influence = _validate_influence(influence, param_name="influence")
 
+    # Phase B: Zero-mutation controller and environment preflight
     arm = _resolve_armature(armature_obj)
-    ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[valid_side])
-    pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[valid_side])
-    if ik_obj is None or pole_obj is None:
+    bpy.context.view_layer.update()
+    root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
+
+    needs_auto_init, eff_ik_mat, eff_pole_mat = _preflight_arm_ik_parent_transforms(
+        arm, valid_side, root_obj
+    )
+
+    # Phase C: Auto-initialization (only executed if Phase B validations all pass)
+    if needs_auto_init:
         setup_arm_ik(arm, initial_influence=valid_influence)
         ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES[valid_side]]
         pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES[valid_side]]
+    else:
+        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES[valid_side]]
+        pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES[valid_side]]
 
-    # Phase A1: Synchronize dependency graph FIRST before reading parent matrices
-    bpy.context.view_layer.update()
-
-    # Phase A2: Compute and validate effective parent transform domains before any scene mutation
-    eff_ik_mat = compute_effective_parent_matrix(ik_obj)
-    eff_pole_mat = compute_effective_parent_matrix(pole_obj)
-    validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
-    validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
-
-    # Note: No mutation of controllers, pose bones, constraints, or pre-bend hint occurs before this point!
-    root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
-
+    # Phase D: Target computation and commit
     p_up = arm.pose.bones[f"upper_arm.{valid_side}"]
     p_fore = arm.pose.bones[f"forearm.{valid_side}"]
     p_hand = arm.pose.bones[f"hand.{valid_side}"]

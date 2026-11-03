@@ -2,6 +2,30 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-03] PKG-5 / Task 10-B-1-FIX-01：Arm IK 自动初始化前置变换预检与零副作用修复
+
+* **任务性质**：已有接口合同缺陷修复（修复 `set_hand_ik_target` 在自动初始化时有效父级变换预检缺失导致的零副作用合同破坏）。
+* **状态**：`10-B-1-FIX-01 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
+* **修改范围**：
+  - `src/rig/arm_ik.py`：新增私有预检函数 `_preflight_arm_ik_parent_transforms()`；调整 `set_hand_ik_target()` 执行时序为 Phase A（参数校验）$\to$ Phase B（零突变控制器与环境预检）$\to$ Phase C（自动初始化）$\to$ Phase D（目标计算与提交），在任何场景写入发生前拦截非法有效父级变换。
+  - `tests/test_task10b_input_validation.py`：新增深层场景快照对比辅助机制，新增 TEST-25（未初始化状态非共形父级零突变）、TEST-26（部分初始化状态反射父级零突变）、TEST-27（合法父级首次自动初始化成功），套件扩充至 27 项测试。
+  - `docs/evidence/PKG5_10B1/task10b1_autoinit_preflight_fix_report.md`：归档完整缺陷修复与测试报告。
+* **专项测试**：
+  - `test_task10b_input_validation.py`：27/27 PASS（2.305s）。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS（5.66s）。
+* **分层回归**：
+  - Quick：19/19 PASS（退出码 0，50.44s）。
+  - Physics：27/27 PASS（退出码 0，109.13s）。
+  - Motion：12/12 PASS（退出码 0，48.60s）。
+  - Full：42/42 PASS（退出码 0，156.51s）。
+  - 四级测试均为 FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **文档与符号审计**：
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，符号存在性 PASS。
+* **实施边界与保护**：
+  - 纯局部执行顺序加固，未改动任何下肢模块、Bridge、WBC 或 TerrainWalk。
+  - 整体 10-B-1 仍等待独立验收；通用事务快照回滚系统归属 10-B-2，未提前混入本任务。
+
+
 ### [2026-11-02] PKG-5 / Task 10-B-1：Arm IK 输入预验证与零副作用合同
 
 * **任务性质**：为现有 Arm IK API（`setup_arm_ik`, `set_hand_ik_target`, `set_arm_ik_influence`, `get_arm_ik_state`）建立统一、严格的输入预验证与零副作用保障合同。

@@ -1,4 +1,4 @@
-"""Contract verification suite for Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B / 10-b-1).
+"""Contract verification suite for Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B / 10-b-1 & 10-b-2).
 
 Tests:
 - TEST-01: setup_arm_ik accepts valid influence boundaries (0.0, 0.5, 1.0).
@@ -25,6 +25,9 @@ Tests:
 - TEST-22: set_arm_ik_influence preserves independent L/R state updates and accepts BOTH.
 - TEST-23: set_hand_ik_target accepts valid boolean clamp_reach modes (True and False).
 - TEST-24: set_hand_ik_target preserves symmetric influence weight consistency across constraints.
+- TEST-25: set_hand_ik_target with invalid auto-init parent transform causes zero scene mutation.
+- TEST-26: set_hand_ik_target with partially initialized state and invalid new parent causes zero mutation.
+- TEST-27: set_hand_ik_target first-time auto-initialization succeeds under valid conformal parent transforms.
 """
 
 import math
@@ -461,6 +464,280 @@ class TestArmIKInputValidationContract(unittest.TestCase):
 
         self.assertAlmostEqual(ik_inf, target_inf, places=5)
         self.assertAlmostEqual(rot_inf, target_inf, places=5)
+        self.assertAlmostEqual(state["ik_influence"], target_inf, places=5)
+        self.assertAlmostEqual(state["rot_influence"], target_inf, places=5)
+
+    # -------------------------------------------------------------------------
+    # Auto-init Preflight and Zero-Mutation Tests (TEST-25 to TEST-27, Task 10-B-2)
+    # -------------------------------------------------------------------------
+
+    def _capture_scene_snapshot(self) -> dict:
+        """Capture comprehensive snapshot of scene objects, collections, and arm pose bones.
+
+        Covers all elements specified in Task 10-B-2 Section 5:
+        - Scene objects: name, type, parent, location, rotation_mode, euler, quat, axis_angle,
+          scale, matrix_parent_inverse, matrix_world.
+        - Collections: name, member objects.
+        - PoseBones (upper_arm, forearm, hand L/R): location, rotation_mode, euler, quat,
+          axis_angle, scale, matrix_basis, IK lock/limit properties, constraints configuration.
+        """
+        objs_snap = {}
+        for obj in bpy.data.objects:
+            objs_snap[obj.name] = {
+                "type": obj.type,
+                "parent": obj.parent.name if obj.parent else None,
+                "location": tuple(round(v, 7) for v in obj.location),
+                "rotation_mode": obj.rotation_mode,
+                "rotation_euler": tuple(round(v, 7) for v in obj.rotation_euler),
+                "rotation_quaternion": tuple(round(v, 7) for v in obj.rotation_quaternion),
+                "rotation_axis_angle": tuple(round(v, 7) for v in obj.rotation_axis_angle),
+                "scale": tuple(round(v, 7) for v in obj.scale),
+                "matrix_parent_inverse": tuple(tuple(round(v, 7) for v in row) for row in obj.matrix_parent_inverse),
+                "matrix_world": tuple(tuple(round(v, 7) for v in row) for row in obj.matrix_world),
+            }
+
+        cols_snap = {}
+        for col in bpy.data.collections:
+            cols_snap[col.name] = sorted([o.name for o in col.objects])
+
+        bones_snap = {}
+        arm = self.armature
+        bone_names = ("upper_arm.L", "upper_arm.R", "forearm.L", "forearm.R", "hand.L", "hand.R")
+        for b_name in bone_names:
+            pb = arm.pose.bones.get(b_name)
+            if pb:
+                con_list = []
+                for con in pb.constraints:
+                    target_name = con.target.name if hasattr(con, "target") and con.target else None
+                    pole_name = con.pole_target.name if hasattr(con, "pole_target") and con.pole_target else None
+                    inf = round(con.influence, 7) if hasattr(con, "influence") else None
+                    con_list.append({
+                        "name": con.name,
+                        "type": con.type,
+                        "target": target_name,
+                        "pole_target": pole_name,
+                        "influence": inf,
+                    })
+                bones_snap[b_name] = {
+                    "location": tuple(round(v, 7) for v in pb.location),
+                    "rotation_mode": pb.rotation_mode,
+                    "rotation_euler": tuple(round(v, 7) for v in pb.rotation_euler),
+                    "rotation_quaternion": tuple(round(v, 7) for v in pb.rotation_quaternion),
+                    "rotation_axis_angle": tuple(round(v, 7) for v in pb.rotation_axis_angle),
+                    "scale": tuple(round(v, 7) for v in pb.scale),
+                    "matrix_basis": tuple(tuple(round(v, 7) for v in row) for row in pb.matrix_basis),
+                    "lock_ik_x": getattr(pb, "lock_ik_x", None),
+                    "lock_ik_y": getattr(pb, "lock_ik_y", None),
+                    "lock_ik_z": getattr(pb, "lock_ik_z", None),
+                    "use_ik_limit_x": getattr(pb, "use_ik_limit_x", None),
+                    "use_ik_limit_y": getattr(pb, "use_ik_limit_y", None),
+                    "use_ik_limit_z": getattr(pb, "use_ik_limit_z", None),
+                    "ik_min_x": getattr(pb, "ik_min_x", None),
+                    "ik_max_x": getattr(pb, "ik_max_x", None),
+                    "ik_min_y": getattr(pb, "ik_min_y", None),
+                    "ik_max_y": getattr(pb, "ik_max_y", None),
+                    "ik_min_z": getattr(pb, "ik_min_z", None),
+                    "ik_max_z": getattr(pb, "ik_max_z", None),
+                    "constraints": con_list,
+                }
+
+        return {
+            "objects": objs_snap,
+            "collections": cols_snap,
+            "pose_bones": bones_snap,
+        }
+
+    def _assert_scene_snapshot_unchanged(self, snap_before: dict, snap_after: dict) -> None:
+        """Assert that scene objects, collections, and pose bones are bit-for-bit unchanged."""
+        self.assertEqual(
+            set(snap_before["objects"].keys()),
+            set(snap_after["objects"].keys()),
+            "Scene object set changed!"
+        )
+        for obj_name, b_info in snap_before["objects"].items():
+            a_info = snap_after["objects"][obj_name]
+            self.assertEqual(b_info, a_info, f"Object '{obj_name}' transform or state mutated!")
+
+        self.assertEqual(
+            snap_before["collections"],
+            snap_after["collections"],
+            "Collections mutated!"
+        )
+        self.assertEqual(
+            snap_before["pose_bones"],
+            snap_after["pose_bones"],
+            "PoseBone transforms, IK limits, or constraints mutated!"
+        )
+
+    def test_25_auto_init_invalid_parent_has_zero_scene_mutation(self) -> None:
+        """TEST-25: Uninitialized arm IK with invalid parent transform causes zero scene mutation.
+
+        Preconditions:
+        - Character and Armature built, leg IK setup, arm IK uninitialized.
+        - Confirm HandIK.L, HandIK.R, ElbowPole.L, ElbowPole.R all do not exist.
+        Setup:
+        - Set initialization parent (root_obj) scale to non-conformal (1.0, 2.0, 1.0).
+        - Update dependency graph.
+        - Capture full scene snapshot.
+        Action:
+        - Call set_hand_ik_target with valid target coordinates.
+        Assertions:
+        - Raises ValueError from effective parent transform validation (non-conformal transform).
+        - Post-call snapshot equals pre-call snapshot exactly.
+        - No HandIK or ElbowPole empties exist.
+        - No IK or HandRotation constraints exist on pose bones.
+        """
+        for ctrl_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertNotIn(ctrl_name, bpy.data.objects)
+
+        root_obj = self.armature.parent or bpy.data.objects.get("CharacterRoot")
+        self.assertIsNotNone(root_obj)
+        root_obj.scale = (1.0, 2.0, 1.0)
+        bpy.context.view_layer.update()
+
+        snap_before = self._capture_scene_snapshot()
+
+        with self.assertRaises(ValueError) as cm:
+            set_hand_ik_target(
+                self.armature,
+                "L",
+                world_xyz=(0.35, -0.1, 1.1),
+                hand_rotation_deg=(0.0, 0.0, 0.0),
+                influence=1.0,
+            )
+
+        self.assertIn("non-conformal transform", str(cm.exception))
+
+        snap_after = self._capture_scene_snapshot()
+        self._assert_scene_snapshot_unchanged(snap_before, snap_after)
+
+        for ctrl_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertNotIn(ctrl_name, bpy.data.objects)
+
+        for side in ("L", "R"):
+            p_fore = self.armature.pose.bones[f"forearm.{side}"]
+            p_hand = self.armature.pose.bones[f"hand.{side}"]
+            self.assertNotIn(ARM_IK_CONSTRAINT_NAMES[side], p_fore.constraints)
+            self.assertNotIn(HAND_ROT_CONSTRAINT_NAMES[side], p_hand.constraints)
+
+    def test_26_partial_init_invalid_new_parent_has_zero_scene_mutation(self) -> None:
+        """TEST-26: Partially initialized arm IK with invalid new parent transform causes zero mutation.
+
+        Preconditions:
+        - Character and Armature built, leg IK setup.
+        - Manually create a valid HandIK.L empty.
+        - Confirm ElbowPole.L, HandIK.R, ElbowPole.R are missing.
+        Setup:
+        - Set initialization parent (root_obj) scale to reflection (-1.0, 1.0, 1.0).
+        - Update dependency graph.
+        - Capture full scene snapshot.
+        Action:
+        - Call set_hand_ik_target for L side with valid target coordinates.
+        Assertions:
+        - Raises ValueError from reflection rejection (det(A) < 0).
+        - Post-call snapshot equals pre-call snapshot exactly.
+        - ElbowPole.L is NOT created.
+        - HandIK.R and ElbowPole.R are NOT created.
+        - No constraints created on any pose bones.
+        - Existing HandIK.L remains 100% unchanged.
+        """
+        hand_l = bpy.data.objects.new("HandIK.L", None)
+        hand_l.empty_display_size = 0.08
+        hand_l.empty_display_type = "SPHERE"
+        hand_l.location = (0.35, -0.1, 1.1)
+        bpy.context.scene.collection.objects.link(hand_l)
+
+        for ctrl_name in ("HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertNotIn(ctrl_name, bpy.data.objects)
+
+        root_obj = self.armature.parent or bpy.data.objects.get("CharacterRoot")
+        self.assertIsNotNone(root_obj)
+        root_obj.scale = (-1.0, 1.0, 1.0)
+        bpy.context.view_layer.update()
+
+        snap_before = self._capture_scene_snapshot()
+
+        with self.assertRaises(ValueError) as cm:
+            set_hand_ik_target(
+                self.armature,
+                "L",
+                world_xyz=(0.35, -0.1, 1.1),
+                hand_rotation_deg=(0.0, 0.0, 0.0),
+                influence=1.0,
+            )
+
+        self.assertIn("reflection", str(cm.exception).lower())
+
+        snap_after = self._capture_scene_snapshot()
+        self._assert_scene_snapshot_unchanged(snap_before, snap_after)
+
+        self.assertIn("HandIK.L", bpy.data.objects)
+        for ctrl_name in ("HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertNotIn(ctrl_name, bpy.data.objects)
+
+        for side in ("L", "R"):
+            p_fore = self.armature.pose.bones[f"forearm.{side}"]
+            p_hand = self.armature.pose.bones[f"hand.{side}"]
+            self.assertNotIn(ARM_IK_CONSTRAINT_NAMES[side], p_fore.constraints)
+            self.assertNotIn(HAND_ROT_CONSTRAINT_NAMES[side], p_hand.constraints)
+
+    def test_27_valid_parent_first_time_auto_init_succeeds(self) -> None:
+        """TEST-27: First-time auto-initialization succeeds under valid conformal parent transforms.
+
+        Preconditions:
+        - Character and Armature built, leg IK setup, arm IK uninitialized.
+        - Confirm 4 arm IK controllers do not exist.
+        Action:
+        - Call set_hand_ik_target with valid target and default valid parent.
+        Assertions:
+        - API returns valid state dict.
+        - All 4 controllers exist in bpy.data.objects.
+        - IK and Copy Rotation constraints created on both L and R bones.
+        - HandIK.L world translation matches applied_world.
+        - ElbowPole.L coordinates are finite.
+        - ArmIK and HandRotation constraint influences match requested influence.
+        - Returned state matches scene data.
+        """
+        for ctrl_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertNotIn(ctrl_name, bpy.data.objects)
+
+        target_xyz = (0.35, -0.1, 1.1)
+        target_rot = (10.0, 20.0, 30.0)
+        target_inf = 0.85
+
+        state = set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=target_xyz,
+            hand_rotation_deg=target_rot,
+            influence=target_inf,
+            clamp_reach=True,
+        )
+
+        self.assertIsInstance(state, dict)
+        for ctrl_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertIn(ctrl_name, bpy.data.objects)
+
+        for side in ("L", "R"):
+            p_fore = self.armature.pose.bones[f"forearm.{side}"]
+            p_hand = self.armature.pose.bones[f"hand.{side}"]
+            self.assertIn(ARM_IK_CONSTRAINT_NAMES[side], p_fore.constraints)
+            self.assertIn(HAND_ROT_CONSTRAINT_NAMES[side], p_hand.constraints)
+
+        ik_l = bpy.data.objects["HandIK.L"]
+        pole_l = bpy.data.objects["ElbowPole.L"]
+
+        self.assertAlmostEqual(ik_l.matrix_world.translation.x, state["applied_world"].x, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.y, state["applied_world"].y, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.z, state["applied_world"].z, places=5)
+
+        for c in pole_l.matrix_world.translation:
+            self.assertTrue(math.isfinite(c))
+
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_hand_l = self.armature.pose.bones["hand.L"]
+        self.assertAlmostEqual(p_fore_l.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, target_inf, places=5)
+        self.assertAlmostEqual(p_hand_l.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, target_inf, places=5)
         self.assertAlmostEqual(state["ik_influence"], target_inf, places=5)
         self.assertAlmostEqual(state["rot_influence"], target_inf, places=5)
 
