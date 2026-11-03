@@ -2,6 +2,17 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-03] PKG-5 / Task 10-B 当前状态与路线编号一致性同步说明
+
+* **任务性质**：根据真实代码、测试和提交历史同步 Task 10-B 当前工程状态与后续计划编号（纯文档状态同步，不涉及生产代码和测试修改）。
+* **状态与职责澄清**：
+  - **10-B-1**（`d56f66c759845a2e1e65ad5ee40358ae839faa87`）：已实现输入预验证、Influence 边界与基础零副作用合同 (`IMPLEMENTED — TESTED — ARCHIVED`)。
+  - **10-B-2**（`c634252240b231f1d3ff1e7425ec9761c21ff83f`）：实际交付内容为自动初始化前的有效父级矩阵预检与执行时序调整 (`IMPLEMENTED — TESTED — ARCHIVED`)。
+  - **10-B-3**（`71104d67d5416b9f39380ab2352b19ca3d896430`）：实际交付内容为控制器类型有效性校验（仅 EMPTY 有效）、Case C 预期矩阵一致性、场景快照扩充与测试证据归档 (`IMPLEMENTED — TESTED — ARCHIVED`)。
+  - **历史计划澄清**：原 10-B-1 历史记录中关于“事务快照留待 10-B-2”的描述属于当时的规划，不代表当前剩余工作的实际编号。
+  - **生产级事务缺口与后续计划**：生产级 Arm IK 状态快照（`_snapshot_arm_rig_state()`）、逐字段回滚（`_rollback_arm_rig_state()`）与异常安全回滚尚未实现（测试套件中的 `_capture_scene_snapshot()` 属于测试辅助函数，不代替生产事务系统）。因此整体 Task 10-B 当前状态为 `IN PROGRESS — NOT ACCEPTED`；生产级事务快照与失败回滚安排在后续计划 **10-B-4** 中实施（本次不执行）。
+  - **准入边界**：Task 10-C / 10-D 保持 `BLOCKED — NOT STARTED`；Task 11 为 `PLANNED — NOT STARTED`；Task 12 为 `BLOCKED`；Phase 7B 为 `NOT AUTHORIZED`。
+
 ### [2026-11-03] PKG-5 / Task 10-B-3：Arm IK 控制器类型识别、预检矩阵一致性与证据归档修复
 
 * **任务性质**：Task 10-B-2 后续缺陷修复（修复控制器类型未校验导致错误对象被视作有效、替换非 Empty 时预检矩阵不一致、以及测试日志与归档修复）。

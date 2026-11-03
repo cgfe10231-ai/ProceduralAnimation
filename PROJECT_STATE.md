@@ -4,13 +4,13 @@
 >
 > **09-B-4 验收证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；当前实现与修复节点：PKG-5 / Task 10-B / Task 10-B-2 与 Task 10-B-3 (Arm IK 控制器类型识别、预检矩阵一致性与证据归档修复)。
+> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；当前已实现节点：PKG-5 / Task 10-B (10-B-1、10-B-2、10-B-3 已实现测试归档)。
 >
-> **当前完成状态**：`10-B-3 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
+> **当前完成状态**：10-A 为 `COMPLETED — ARCHIVED`；10-B-1 至 10-B-3 为 `IMPLEMENTED — TESTED — ARCHIVED`；生产级事务快照与回滚系统为 `NOT IMPLEMENTED`（测试辅助 `_capture_scene_snapshot()` 不代替生产事务系统）；整体 Task 10-B 状态为 `IN PROGRESS — NOT ACCEPTED`。
 >
-> **下一执行节点**：等待 10-B 独立审计验收；待批准后准入后续任务（PKG-5 / Task 10-C 或待定路线）。
+> **下一执行节点**：后续计划 `10-B-4`（生产级事务快照、故障注入与完整回滚，仅作为后续计划记录，本次不执行）；Task 10-C 保持 `BLOCKED — NOT STARTED`。
 >
-> **下一节点状态**：`WAITING INDEPENDENT AUDIT / NOT STARTED`。
+> **下一节点状态**：`PLANNED / NOT STARTED`。
 >
 > **历史状态边界**：
 > - DEC-064 与原 09-B 历史验收记录继续有效。
@@ -59,15 +59,15 @@
 >
 > **当前 PKG-5 准入顺序**：
 > - 09-B：已完成，09-B-4 已验收。
-> - 10：Task 10-A 已完成，Task 10-B 进行中（10-B-1 实现待审计，10-B-2 / 10-B-3 缺陷修复已完成）。
+> - 10：Task 10-A 已完成归档；Task 10-B-1 至 10-B-3 已实现测试归档；生产级事务快照与回滚尚未实现；整体 10-B 状态为 `IN PROGRESS — NOT ACCEPTED`；下一轮计划为 `10-B-4`。
 > - 11：FootLock，待修复。
 > - 12：全仓跨模块联合验收，待执行。
 >
 > **PKG-5 后续路线状态**：
-> - Task 10 / Upper-Limb IK/FK：10-A 已完成，10-B 修复已归档，等待审计。
+> - Task 10 / Upper-Limb IK/FK：10-A 已完成，10-B 整体 `IN PROGRESS — NOT ACCEPTED`（10-B-1..3 已归档，10-B-4 待实施，10-C 尚未准入）。
 > - Task 11 / FootLock：FIND-R3-03、FIND-R3-04，尚未实施。
 > - Task 12 / Joint Integration：等待 10 与 11 独立验收。
-> - 下一具体子任务：等待 10-B 独立审计验收指令。
+> - 下一具体子任务：后续计划 `10-B-4`（本次不执行）。
 > - 子任务必须依据 `ARCHITECTURE_SYNC.md` 和 `OPEN_FINDINGS.md` 执行。
 >
 > **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10、11、12 的独立验收与联合验收，并取得项目负责人明确批准后方可开启。
@@ -1154,19 +1154,21 @@
 | 08 Rig | 世界空间与刚体平移回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation；09-B-4 已完成 | `ACCEPTED — VERIFIED` |
-| 10 | Upper-Limb IK/FK | `IN PROGRESS (10-A Done, 10-B-1 Implemented/Tested)` |
+| 10 | Upper-Limb IK/FK | `IN PROGRESS (10-A Done, 10-B-1..3 Implemented/Tested, 10-B-4 Planned)` |
 | 11 | FootLock：FIND-R3-03、FIND-R3-04 | `PLANNED — NOT STARTED` |
 | 12 | PKG-5 跨模块联合审计与验收 | `BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE` |
 
-### 2.1 下一具体任务：PKG-5 / 10-B-2
+### 2.1 下一具体任务计划：PKG-5 / 10-B-4
 
 下一具体执行单元：
 
-`10-b-2`
+`10-b-4`
+
+（仅作为后续计划记录，本次不执行；待批准后准入）
 
 负责范围：
 
-- Arm IK 完整状态快照（`_snapshot_arm_rig_state()`）。
+- Arm IK 生产级完整状态快照（`_snapshot_arm_rig_state()`）。
 - Arm IK 逐字段回滚与状态核验（`_rollback_arm_rig_state()`）。
 - 故障注入与异常安全事务回滚（`set_hand_ik_target()` Phase B 回滚）。
 - 异常安全测试与回归。

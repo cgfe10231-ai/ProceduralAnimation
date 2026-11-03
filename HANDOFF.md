@@ -11,13 +11,20 @@
 - 项目：ProceduralAnimation。
 - 分支：`master`。
 - 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）。
-- 当前实现与修复节点：PKG-5 / Task 10-B / Task 10-B-2 与 Task 10-B-3（Arm IK 控制器类型识别、预检矩阵一致性与证据归档修复）。
-- 状态：`10-B-3 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
-- 下一执行节点：等待 10-B 独立审计验收；待批准后准入后续任务。
-- 下一节点状态：`WAITING INDEPENDENT AUDIT / NOT STARTED`。
+- 当前已实现节点：PKG-5 / Task 10-B（10-B-1、10-B-2、10-B-3）。
+- 当前状态判定：
+  - 10-A：`COMPLETED — ARCHIVED`。
+  - 10-B-1 至 10-B-3：`IMPLEMENTED — TESTED — ARCHIVED`。
+  - 生产级事务快照与回滚系统：`NOT IMPLEMENTED`（测试辅助函数 `_capture_scene_snapshot()` 不代替生产事务系统）。
+  - 整体 Task 10-B：`IN PROGRESS — NOT ACCEPTED`。
+- 下一执行节点：后续计划 `10-B-4`（生产级事务快照、故障注入与完整回滚，仅作为计划记录，本次不执行）。
+- 下一节点状态：`PLANNED / NOT STARTED`。
+- Task 10-C：`BLOCKED — NOT STARTED`（尚未准入）。
 
-Task 10-B-2 修复了自动初始化前有效父级变换校验缺失导致的零副作用合同破坏，引入 Phase B 零突变预检与 TEST-25 至 TEST-27 快照比对测试。
-Task 10-B-3 进一步闭环了控制器类型校验（仅 `EMPTY` 视为有效控制器）、替换错误类型对象时的预检预期矩阵一致性（Case C），扩充场景快照至完整字段，新增 TEST-28 至 TEST-30（全 30 项专项测试 PASS）、10-A 回归测试（30/30 PASS）、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42 全部 0 退出码）及修复证据报告归档。
+### 10-B 已有具体交付：
+1. **10-B-1**：输入预验证、Influence 边界与基础零副作用合同。
+2. **10-B-2**：自动初始化前有效父级矩阵预检（Phase B 零突变预检与 TEST-25 至 TEST-27 快照比对测试）。
+3. **10-B-3**：控制器类型校验（仅 `EMPTY` 视为有效控制器）、替换错误类型对象时的预检预期矩阵一致性（Case C），场景快照扩充，新增 TEST-28 至 TEST-30（全 30 项专项测试 PASS）、10-A 回归测试（30/30 PASS）、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42 全部 0 退出码）及修复证据报告归档。
 
 ## 2. 10-B-1 / 10-B-2 / 10-B-3 交付证据
 
@@ -68,13 +75,13 @@ Finding 总数维持 16 项，14 项关闭，2 项开放。
 | 顺序 | 任务 | 状态 |
 |---|---|---|
 | 09-B | Lower-Limb World Rotation | `ACCEPTED — VERIFIED` |
-| 10 | Upper-Limb IK/FK | `IN PROGRESS (10-A Done, 10-B-1-FIX-01 Done, 10-B-1 Pending Audit)` |
+| 10 | Upper-Limb IK/FK | `IN PROGRESS (10-A Done, 10-B-1..3 Implemented/Tested, 10-B-4 Planned)` |
 | 11 | FootLock | `PLANNED — NOT STARTED` |
 | 12 | PKG-5 综合接口闭环 | `BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE` |
 
 下一具体子任务：
 
-等待 10-B-1 独立审计验收；待批准后准入 `10-b-2`。
+后续计划 `10-B-4`（生产级 Arm IK 事务快照、故障注入与回滚核验，仅作为后续计划记录，本次不执行；待批准后准入）。Task 10-C 保持 `BLOCKED — NOT STARTED`。
 
 Task 10 / 11 / 12 的权威分工以 `ARCHITECTURE_SYNC.md` Section 4.2—4.5 为准。
 

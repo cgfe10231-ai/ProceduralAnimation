@@ -10,13 +10,13 @@
 >
 > **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；当前修复节点：PKG-5 / Task 10-B / Task 10-B-2 与 Task 10-B-3。
+> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；当前已实现节点：PKG-5 / Task 10-B（10-B-1、10-B-2、10-B-3 已实现测试归档）。
 >
-> **最近完成状态**：`10-B-3 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 待独立审计）。
+> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；10-B-1 至 10-B-3 为 `IMPLEMENTED — TESTED — ARCHIVED`；生产级事务快照与回滚为 `NOT IMPLEMENTED`；整体 Task 10-B 为 `IN PROGRESS — NOT ACCEPTED`。
 >
-> **下一执行节点**：等待 10-B 独立审计验收，随后准入后续任务。
+> **下一执行节点**：后续计划 `10-B-4`（生产级事务快照与故障回滚，仅作为后续计划记录，本次不执行）；Task 10-C 保持 `BLOCKED — NOT STARTED`。
 >
-> **下一节点状态**：`WAITING INDEPENDENT AUDIT / NOT STARTED`。
+> **下一节点状态**：`PLANNED / NOT STARTED`。
 >
 > **当前工程核心事实**：19 骨骼角色运动学执行管线与 6-DOF 数值质心动力学管线保持独立；二者未来的合流属于 Phase 7C，不是当前 PKG-5 的待修缺陷。
 
@@ -1097,7 +1097,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 8. 当前架构同步状态规则
 
 - PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- 当前 Task 10 进行中（10-A 已归档验收，10-B-1-FIX-01 缺陷修复完成，10-B-1 待独立审计验收）。
+- 当前 Task 10 进行中（10-A 已归档验收，10-B-1 至 10-B-3 已实现测试归档，生产级事务快照与回滚尚未实现，整体 10-B 保持 IN PROGRESS — NOT ACCEPTED，后续计划 10-B-4，Task 10-C 尚未准入）。
 - Task 11 负责 FIND-R3-03、FIND-R3-04。
 - Task 12 负责 PKG-5 跨模块联合审计与验收。
 - 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。
