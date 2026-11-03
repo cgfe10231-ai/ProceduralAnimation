@@ -2,6 +2,43 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-03] PKG-5 / Task 10-B / Revision 4 独立审计修正：Arm IK 生产级事务完整性与异常安全加固
+
+* **任务性质**：PKG-5 / Task 10-B / Revision 4 独立审计修正，全面修复代码审查发现的验证器盲区、无损约束暂存、初始化异常安全与跨 Armature 独占性等阻塞项。
+* **状态**：`TASK 10-B — ACCEPTED`（64/64 专项测试通过，全四级分层回归 0 缺陷通过）。
+* **生产代码修改**（`src/rig/arm_ik.py`）：
+  - **修复项 A（逐字段恢复验证器）**：扩充 `_verify_arm_rig_state_restored()`，逐元素核验 4 个控制器的 16 局部矩阵元素、3 欧拉角、4 四元数（四元数旋转等价性判定）、4 轴角、16 世界矩阵元素；逐字段核验 6 根姿态骨骼全通道与全部 IK 锁定/限位属性；使用严格公差 `TOL = 1e-5`，禁止截断吞错，格式化输出详细通道与精确差值。
+  - **修复项 B（无损约束恢复）**：快照阶段完整捕获骨骼全部约束链及其通用可写 RNA 属性与 `con_ref` 身份；在 `setup_arm_ik()` 中通过重命名与 mute 暂存错误类型约束而非直接删除；在回滚时仅删除事务新增约束，安全恢复暂存约束，并调用 `pbone.constraints.move()` 恢复约束原始精确顺序。
+  - **修复项 C（事务初始化异常安全与跨 Armature 独占）**：在 `_arm_rig_transaction` 中将快照生成放入 `try ... finally`，防止快照失败污染全局事务栈；增加严格 Armature 归属核查，同骨架嵌套复用外层事务，跨骨架嵌套调用直接抛出 `RuntimeError` 拒绝。
+  - **修复项 D（Collection 层级完整恢复）**：完整快照 Character 集合引用、场景根集合链接、父集合列表、子集合列表及成员对象；回滚时安全恢复树状结构，彻底删除事务新建集合。
+  - **修复项 E（故障注入钩子私有化）**：将测试钩子重命名为私有函数 `_set_test_fault_injection_hook` 与 `_clear_test_fault_injection_hook`，不导出至公开 API，且在测试 `tearDown()` 中自动清理。
+  - **修复项 F（Commit 清理与 Data Block 周期）**：保证全部写入与核验无误后才执行提交清理；仅当 Data Block `users == 0` 时调用删除，对存在共享引用的 Data Block 予以保护；清理失败抛出 `RuntimeError`。
+* **专项测试扩充**（`tests/test_task10b_transaction_atomicity.py`）：
+  - 修正 TEST-49～TEST-52 的映射描述，新增 TEST-53 至 TEST-64 全部 12 项独立审计修正测试：
+    - TEST-53：逐字段核验器捕获矩阵、四元数等价性、欧拉角与骨骼限位微小差异验证。
+    - TEST-54：核验器严格遵守 `1e-5` 公差及格式化错误信息验证。
+    - TEST-55：无损约束恢复保留骨骼上无关约束验证。
+    - TEST-56：`setup_arm_ik` 暂存错误类型约束在回滚中完整恢复验证。
+    - TEST-57：约束全量通用 RNA 属性序列化与恢复保真度验证。
+    - TEST-58：快照初始化异常安全与全局事务栈零污染验证。
+    - TEST-59：跨 Armature 嵌套事务严格拒绝防卫验证。
+    - TEST-60：集合层级结构及成员从属完整恢复验证。
+    - TEST-61：Character 集合父子/场景根链接完整恢复验证。
+    - TEST-62：可达极限截断投影与手部准确触达（IK 误差 < 0.05m）验证。
+    - TEST-63：故障注入函数私有化及测试零泄漏验证。
+    - TEST-64：提交清理生命周期、孤儿清理与共享 Data Block 保护验证。
+* **专项与分层测试验证**：
+  - `test_task10b_input_validation.py`：30/30 PASS (2.40s)。
+  - `test_task10b_transaction_atomicity.py`：34/34 PASS (3.12s)。
+  - Task 10-B 专项总计：64/64 PASS (100%)。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS (4.16s)。
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，文档符号存在性 PASS。
+  - 分层回归：Quick 19/19 (50.19s)、Physics 27/27 (108.30s)、Motion 12/12 (51.71s)、Full 42/42 (171.12s)，全部退出码 0，FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **证据归档**：
+  - `docs/evidence/PKG5_10B_REVISION_4_AUDIT_CORRECTION/`：包含执行报告 `task10b_revision4_audit_correction_report.md` 及 8 份 UTF-8 格式测试日志。
+* **后续任务与边界**：
+  - Task 10-B 验收通过，下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`，尚未准入）。
+
 ### [2026-11-03] PKG-5 / Task 10-B / Revision 4：Arm IK 生产级事务快照、失败回滚与异常安全验收
 
 * **任务性质**：PKG-5 / Task 10-B 第四轮修订，建立 Arm IK 生产级事务状态快照、失败回滚与异常安全机制（关闭历史计划记法 `10-B-4`）。
@@ -17,9 +54,22 @@
     - TEST-31～33：状态快照完整性、字段覆盖率与独立隔离性。
     - TEST-34～38：直接回滚保真度（含非 Empty 对象还原与集合拓扑恢复）。
     - TEST-39～48：在 10 个执行阶段的确定性故障注入与自动回滚零突变核验。
-    - TEST-49～50：8 种旋转模式成功路径事务提交验证。
-    - TEST-51：`set_arm_ik_influence()` 成功提交与异常回滚验证。
+    - TEST-49：`set_arm_ik_influence(side="L")` 成对约束写入中途故障回滚验证。
+    - TEST-50：`set_arm_ik_influence(side="BOTH")` 左右两侧约束写入中途故障回滚验证。
+    - TEST-51：8 种旋转模式在事务成功路径下的正常提交与位姿验证。
     - TEST-52：回滚核验失败时不吞没原始异常与核验异常的双重报错验证。
+* **专项与分层测试验证**：
+  - `test_task10b_input_validation.py`：30/30 PASS (2.44s)。
+  - `test_task10b_transaction_atomicity.py`：22/22 PASS (2.06s)。
+  - Task 10-B 专项总计：52/52 PASS。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS (4.19s)。
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，符号存在性 PASS。
+  - 分层回归：Quick 19/19 (48.36s)、Physics 27/27 (105.65s)、Motion 12/12 (48.12s)、Full 42/42 (157.44s)，全部退出码 0，FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **证据归档**：
+  - `docs/evidence/PKG5_10B_REVISION_4/`：完整执行报告 `task10b_revision4_execution_report.md` 及 8 份 UTF-8 格式测试日志。
+* **后续任务与边界**：
+  - Task 10-A 与 Task 10-B 全部验收通过。下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`，尚未准入）。
+  - 历史规划编号 `10-B-4` 作为第四轮修订的历史记法已完成并关闭，不作为未完成子任务存在。
 * **专项与分层测试验证**：
   - `test_task10b_input_validation.py`：30/30 PASS (2.44s)。
   - `test_task10b_transaction_atomicity.py`：22/22 PASS (2.06s)。

@@ -10,9 +10,9 @@
 >
 > **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B（Task 10-B / Revision 4，生产级事务快照、失败回滚与异常安全已完成验收归档）。
+> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B（Task 10-B / Revision 4 独立审计修正，生产级事务快照、失败回滚与异常安全已完成验收归档）。
 >
-> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B 为 `ACCEPTED — VERIFIED`（52/52 专项测试通过，四级回归全部 0 缺陷通过）；生产级事务快照与回滚已在 `src/rig/arm_ik.py` 完整实现并验收。
+> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B 为 `ACCEPTED — VERIFIED`（64/64 专项测试通过，四级回归全部 0 缺陷通过）；生产级事务快照、失败回滚与逐字段核验已在 `src/rig/arm_ik.py` 完整实现并经验收。
 >
 > **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 >
