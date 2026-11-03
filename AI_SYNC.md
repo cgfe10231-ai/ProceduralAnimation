@@ -2,7 +2,9 @@
 
 > **项目**：ProceduralAnimation | **分支**：`master`
 > **最新完成节点**：Task 10-B / Revision 4 独立审计修正（生产级事务快照、失败回滚与异常安全验收）
-> **工作区**：保留未跟踪受保护文件 `P2_R1_recovery.patch`
+> **前序实现提交 SHA**：`fa21009d60d4d4e0870068fff7c67127b102094b`
+> **远程同步状态**：已同步至 `origin/master`（HEAD 一致）
+> **工作区现场**：保留未跟踪受保护文件 `P2_R1_recovery.patch`（除保护文件外工作区干净）
 > **证据归档**：`docs/evidence/PKG5_10B_REVISION_4_AUDIT_CORRECTION/`
 
 ---
