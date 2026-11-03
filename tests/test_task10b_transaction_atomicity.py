@@ -1,0 +1,694 @@
+"""Contract verification suite for Arm IK Production Transaction Snapshot & Atomicity (Task 10-B / Revision 4).
+
+Tests:
+- TEST-31: Snapshot fidelity: covers 4 controllers (existence, type, Data Block, Parent,
+           matrix_parent_inverse, TRS, rotation_mode, collections) with zero scene mutation.
+- TEST-32: Snapshot fidelity: covers 6 upper-limb pose bones (all transform properties,
+           IK locks, and IK limits).
+- TEST-33: Snapshot fidelity: covers constraint configuration, ordering, targets, and
+           Character collection hierarchy.
+- TEST-34: Direct rollback on uninitialized scene: removes 4 controllers, constraints,
+           and created Character collection.
+- TEST-35: Direct rollback with wrong-type controller: restores original object type,
+           data block, name, parent, and collection memberships.
+- TEST-36: Direct rollback on initialized scene: restores controller parent,
+           matrix_parent_inverse, TRS, and rotation mode.
+- TEST-37: Direct rollback on 6 pose bones: restores rotation mode, channels,
+           location, scale, IK locks, and limits.
+- TEST-38: Direct rollback on constraints: restores count, order, types, names,
+           targets, pole targets, and influences.
+- TEST-39: Fault injection in setup_arm_ik() after first controller created -> rolls back.
+- TEST-40: Fault injection in setup_arm_ik() after wrong-type controller replaced -> restores original object.
+- TEST-41: Fault injection in setup_arm_ik() after constraints/pre-bend modified -> restores clean state.
+- TEST-42: Fault injection in set_hand_ik_target() during auto-init -> rolls back to uninitialized state.
+- TEST-43: Fault injection in set_hand_ik_target() after HandIK location written -> restores location.
+- TEST-44: Fault injection in set_hand_ik_target() after HandIK rotation written -> restores rotation.
+- TEST-45: Fault injection in set_hand_ik_target() after ElbowPole location written -> restores pole location.
+- TEST-46: Fault injection in set_hand_ik_target() between ArmIK and HandRotation influences -> influences restored in sync.
+- TEST-47: Fault injection in set_hand_ik_target() after HandRotation influence modified -> rolls back all state.
+- TEST-48: Fault injection in set_hand_ik_target() during view_layer.update / get_arm_ik_state() -> revokes all writes.
+- TEST-49: Fault injection in set_arm_ik_influence(side="L") mid-write -> L influences restored, R unaffected.
+- TEST-50: Fault injection in set_arm_ik_influence(side="BOTH") mid-write -> all 4 constraint influences restored.
+- TEST-51: Success path fresh & re-entrant calls across all 8 rotation modes (6 Eulers, QUATERNION, AXIS_ANGLE).
+- TEST-52: Success after failure recovery; explicit failure report if rollback verification fails.
+"""
+
+import math
+import os
+import sys
+import unittest
+
+import bpy
+from mathutils import Euler, Matrix, Quaternion, Vector
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from src.character.builder import build_character
+from src.config import PipelineConfig
+from src.rig.arm_ik import (
+    ARM_IK_CONSTRAINT_NAMES,
+    ARM_IK_TARGET_NAMES,
+    ARM_POLE_TARGET_NAMES,
+    HAND_ROT_CONSTRAINT_NAMES,
+    _arm_rig_transaction,
+    _rollback_arm_rig_state,
+    _snapshot_arm_rig_state,
+    _verify_arm_rig_state_restored,
+    clear_fault_injection_hook,
+    get_arm_ik_state,
+    reset_arm_ik,
+    set_arm_ik_influence,
+    set_fault_injection_hook,
+    set_hand_ik_target,
+    setup_arm_ik,
+)
+from src.rig.builder import bind_character_to_rig, build_rig
+from src.rig.ik import reset_leg_ik, setup_leg_ik
+from src.rig.pose import reset_pose
+
+
+class TestArmIKTransactionAtomicity(unittest.TestCase):
+    """Test suite verifying Arm IK transaction snapshot, atomic rollback, and fault resilience."""
+
+    def setUp(self) -> None:
+        """Reset Blender state, clear hooks, and build fresh character rig."""
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        clear_fault_injection_hook()
+        self.config = PipelineConfig()
+        self.char_data = build_character(self.config)
+        self.root = self.char_data["root"]
+        self.parts = self.char_data["parts"]
+        self.armature = build_rig(self.config)
+        bind_character_to_rig(self.armature, self.parts)
+        setup_leg_ik(self.armature)
+        reset_leg_ik(self.armature)
+        reset_pose(self.armature)
+        bpy.context.view_layer.update()
+
+    def tearDown(self) -> None:
+        """Ensure fault injection hooks are cleared."""
+        clear_fault_injection_hook()
+
+    # -------------------------------------------------------------------------
+    # Snapshot Fidelity Tests (TEST-31 to TEST-33)
+    # -------------------------------------------------------------------------
+
+    def test_31_snapshot_fidelity_controllers(self) -> None:
+        """TEST-31: Snapshot covers 4 controllers, data blocks, parent, TRS, mode, collections with zero mutation."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        bpy.context.view_layer.update()
+
+        objs_before = set(bpy.data.objects.keys())
+        bones_rot_before = {
+            b.name: (b.rotation_mode, tuple(b.rotation_euler))
+            for b in self.armature.pose.bones
+        }
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        # Verify zero mutation occurred during snapshot
+        self.assertEqual(set(bpy.data.objects.keys()), objs_before)
+        for b in self.armature.pose.bones:
+            self.assertEqual(
+                (b.rotation_mode, tuple(b.rotation_euler)),
+                bones_rot_before[b.name],
+            )
+
+        ctrls = snap["controllers"]
+        for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertIn(c_name, ctrls)
+            cs = ctrls[c_name]
+            self.assertTrue(cs["exists"])
+            self.assertEqual(cs["type"], "EMPTY")
+            self.assertIsNotNone(cs["obj_ref"])
+            self.assertEqual(cs["obj_name"], c_name)
+            self.assertEqual(cs["parent"], self.root)
+            self.assertIsInstance(cs["matrix_parent_inverse"], Matrix)
+            self.assertIsInstance(cs["location"], Vector)
+            self.assertIn(cs["rotation_mode"], ("XYZ", "QUATERNION", "AXIS_ANGLE"))
+            self.assertIsInstance(cs["scale"], Vector)
+            self.assertIsInstance(cs["matrix_world"], Matrix)
+            self.assertIn("Character", cs["collections"])
+
+    def test_32_snapshot_fidelity_pose_bones(self) -> None:
+        """TEST-32: Snapshot covers 6 upper-limb pose bones with transform properties, IK locks, and limits."""
+        setup_arm_ik(self.armature)
+        snap = _snapshot_arm_rig_state(self.armature)
+        bones = snap["pose_bones"]
+
+        for b_name in ("upper_arm.L", "upper_arm.R", "forearm.L", "forearm.R", "hand.L", "hand.R"):
+            self.assertIn(b_name, bones)
+            bs = bones[b_name]
+            self.assertIsInstance(bs["location"], Vector)
+            self.assertEqual(bs["rotation_mode"], "XYZ")
+            self.assertIsInstance(bs["rotation_euler"], Euler)
+            self.assertIsInstance(bs["scale"], Vector)
+            self.assertIsInstance(bs["matrix_basis"], Matrix)
+            self.assertIn("lock_ik_x", bs)
+            self.assertIn("use_ik_limit_x", bs)
+            self.assertIn("ik_min_x", bs)
+            self.assertIn("ik_max_x", bs)
+
+        # Check elbow anatomical limit fidelity
+        self.assertTrue(bones["forearm.L"]["use_ik_limit_x"])
+        self.assertAlmostEqual(bones["forearm.L"]["ik_min_x"], 0.0, places=4)
+        self.assertAlmostEqual(bones["forearm.L"]["ik_max_x"], math.radians(150.0), places=4)
+        self.assertTrue(bones["forearm.L"]["lock_ik_y"])
+        self.assertTrue(bones["forearm.L"]["lock_ik_z"])
+
+    def test_33_snapshot_fidelity_constraints_and_collection(self) -> None:
+        """TEST-33: Snapshot covers constraint configurations, ordering, targets, and Character collection."""
+        setup_arm_ik(self.armature, initial_influence=0.75)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        char_col = snap["character_collection"]
+        self.assertTrue(char_col["existed"])
+        self.assertTrue(char_col["children_of_scene"])
+        self.assertIn("HandIK.L", char_col["object_names"])
+        self.assertIn("ElbowPole.R", char_col["object_names"])
+
+        forearm_l_cons = snap["pose_bones"]["forearm.L"]["constraints"]
+        self.assertEqual(len(forearm_l_cons), 1)
+        ik_con = forearm_l_cons[0]
+        self.assertEqual(ik_con["name"], "ArmIK.L")
+        self.assertEqual(ik_con["type"], "IK")
+        self.assertAlmostEqual(ik_con["influence"], 0.75, places=5)
+        self.assertEqual(ik_con["chain_count"], 2)
+        self.assertAlmostEqual(ik_con["pole_angle"], math.radians(-90.0), places=4)
+
+        hand_l_cons = snap["pose_bones"]["hand.L"]["constraints"]
+        self.assertEqual(len(hand_l_cons), 1)
+        rot_con = hand_l_cons[0]
+        self.assertEqual(rot_con["name"], "HandRotation.L")
+        self.assertEqual(rot_con["type"], "COPY_ROTATION")
+        self.assertAlmostEqual(rot_con["influence"], 0.75, places=5)
+
+    # -------------------------------------------------------------------------
+    # Direct Rollback Fidelity Tests (TEST-34 to TEST-38)
+    # -------------------------------------------------------------------------
+
+    def test_34_direct_rollback_uninitialized_scene(self) -> None:
+        """TEST-34: Rollback on uninitialized scene removes 4 controllers, constraints, and created Character col."""
+        # Unlink Character collection to test uninitialized collection cleanup
+        col = bpy.data.collections.get("Character")
+        if col is not None:
+            if col.name in bpy.context.scene.collection.children:
+                bpy.context.scene.collection.children.unlink(col)
+            bpy.data.collections.remove(col)
+        bpy.context.view_layer.update()
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        self.assertFalse(snap_initial["character_collection"]["existed"])
+
+        # Create controllers and constraints
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertIn(c_name, bpy.data.objects)
+
+        # Rollback directly
+        _rollback_arm_rig_state(self.armature, snap_initial)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+        # Verify controllers and constraints removed, Character collection removed
+        for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertNotIn(c_name, bpy.data.objects)
+        self.assertNotIn("Character", bpy.data.collections)
+        self.assertEqual(len(self.armature.pose.bones["forearm.L"].constraints), 0)
+
+    def test_35_direct_rollback_wrong_type_controller(self) -> None:
+        """TEST-35: Rollback on wrong-type controller restores original object type, data block, and collections."""
+        mesh_data = bpy.data.meshes.new("OriginalHandIKMesh")
+        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+        wrong_obj.location = Vector((1.0, 2.0, 3.0))
+
+        snap = _snapshot_arm_rig_state(self.armature)
+        self.assertTrue(snap["controllers"]["HandIK.L"]["exists"])
+        self.assertEqual(snap["controllers"]["HandIK.L"]["type"], "MESH")
+
+        # Execute setup under transaction which replaces wrong-type object
+        with self.assertRaises(RuntimeError):
+            with _arm_rig_transaction(self.armature):
+                setup_arm_ik(self.armature)
+                # Verify that inside the transaction, HandIK.L is now an Empty
+                curr_empty = bpy.data.objects.get("HandIK.L")
+                self.assertIsNotNone(curr_empty)
+                self.assertEqual(curr_empty.type, "EMPTY")
+                raise RuntimeError("Fault injected to trigger rollback")
+
+        # After rollback, verify original object reference, datablock, and type are restored
+        restored_obj = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(restored_obj)
+        self.assertEqual(restored_obj.type, "MESH")
+        self.assertIs(restored_obj, wrong_obj)
+        self.assertIs(restored_obj.data, mesh_data)
+        self.assertIn(restored_obj.name, bpy.context.scene.collection.objects)
+        self.assertAlmostEqual((restored_obj.location - Vector((1.0, 2.0, 3.0))).length, 0.0, places=5)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_36_direct_rollback_initialized_scene_controllers(self) -> None:
+        """TEST-36: Rollback on initialized scene restores controller transforms, parents, and rotation modes."""
+        setup_arm_ik(self.armature, initial_influence=0.2)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        # Mutate controller properties
+        ik_l = bpy.data.objects["HandIK.L"]
+        ik_l.location = Vector((9.9, 8.8, 7.7))
+        ik_l.rotation_mode = "ZYX"
+        ik_l.rotation_euler = Euler((0.5, 0.5, 0.5), "ZYX")
+        ik_l.parent = None
+        ik_l.matrix_parent_inverse = Matrix.Scale(2.0, 4)
+        bpy.context.view_layer.update()
+
+        _rollback_arm_rig_state(self.armature, snap)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        self.assertEqual(ik_l.parent, self.root)
+        self.assertEqual(ik_l.rotation_mode, "XYZ")
+        self.assertAlmostEqual((ik_l.location - snap["controllers"]["HandIK.L"]["location"]).length, 0.0, places=5)
+
+    def test_37_direct_rollback_pose_bones(self) -> None:
+        """TEST-37: Rollback on pose bones restores rotation mode, limits, locks, and transforms."""
+        setup_arm_ik(self.armature)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        p_fore = self.armature.pose.bones["forearm.L"]
+        p_fore.rotation_mode = "QUATERNION"
+        p_fore.rotation_quaternion = Quaternion((0.5, 0.5, 0.5, 0.5))
+        p_fore.lock_ik_x = True
+        p_fore.use_ik_limit_x = False
+        p_fore.ik_max_x = math.radians(45.0)
+        bpy.context.view_layer.update()
+
+        _rollback_arm_rig_state(self.armature, snap)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        self.assertEqual(p_fore.rotation_mode, "XYZ")
+        self.assertFalse(p_fore.lock_ik_x)
+        self.assertTrue(p_fore.use_ik_limit_x)
+        self.assertAlmostEqual(p_fore.ik_max_x, math.radians(150.0), places=4)
+
+    def test_38_direct_rollback_constraints(self) -> None:
+        """TEST-38: Rollback on constraints restores constraint counts, order, types, and influences."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        p_fore = self.armature.pose.bones["forearm.L"]
+        # Delete existing IK constraint
+        for con in list(p_fore.constraints):
+            p_fore.constraints.remove(con)
+        # Add extraneous constraint
+        p_fore.constraints.new(type="TRACK_TO")
+        bpy.context.view_layer.update()
+
+        _rollback_arm_rig_state(self.armature, snap)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        self.assertEqual(len(p_fore.constraints), 1)
+        self.assertEqual(p_fore.constraints[0].name, "ArmIK.L")
+        self.assertEqual(p_fore.constraints[0].type, "IK")
+        self.assertAlmostEqual(p_fore.constraints[0].influence, 0.4, places=5)
+
+    # -------------------------------------------------------------------------
+    # Fault Injection Tests (TEST-39 to TEST-50)
+    # -------------------------------------------------------------------------
+
+    def test_39_fault_injection_setup_arm_ik_after_first_controller(self) -> None:
+        """TEST-39: Fault injection in setup_arm_ik() after first controller created rolls back completely."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                # Verify that the write actually happened before raising
+                self.assertIn("HandIK.L", bpy.data.objects)
+                raise RuntimeError("Fault injected after HandIK.L creation")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Fault injected after HandIK.L creation", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertNotIn("HandIK.L", bpy.data.objects)
+        self.assertNotIn("ElbowPole.L", bpy.data.objects)
+
+    def test_40_fault_injection_setup_arm_ik_after_controller_replaced(self) -> None:
+        """TEST-40: Fault injection in setup_arm_ik() after wrong-type controller replaced restores original object."""
+        mesh_data = bpy.data.meshes.new("WrongTypeMesh")
+        mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.context.scene.collection.objects.link(mesh_obj)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_controller_replaced":
+                raise RuntimeError("Fault injected after wrong controller replaced")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Fault injected after wrong controller replaced", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        restored = bpy.data.objects.get("HandIK.L")
+        self.assertIs(restored, mesh_obj)
+        self.assertIs(restored.data, mesh_data)
+
+    def test_41_fault_injection_setup_arm_ik_after_constraints_or_prebend(self) -> None:
+        """TEST-41: Fault injection in setup_arm_ik() after constraints/pre-bend modified restores state."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend":
+                # Verify constraints and pre-bend were actually written
+                self.assertIn("ArmIK.L", self.armature.pose.bones["forearm.L"].constraints)
+                raise RuntimeError("Fault injected after constraints created")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Fault injected after constraints created", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(self.armature.pose.bones["forearm.L"].constraints), 0)
+
+    def test_42_fault_injection_set_hand_ik_target_during_auto_init(self) -> None:
+        """TEST-42: Fault injection in set_hand_ik_target() during auto-init rolls back to uninitialized state."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_during_auto_init":
+                # Triggered when auto-init creates first controller
+                self.assertIn("HandIK.L", bpy.data.objects)
+                raise RuntimeError("Fault injected during auto-init")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(0.3, -0.1, 1.1))
+        self.assertIn("Fault injected during auto-init", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertNotIn("HandIK.L", bpy.data.objects)
+
+    def test_43_fault_injection_set_hand_ik_target_after_hand_location(self) -> None:
+        """TEST-43: Fault injection in set_hand_ik_target() after HandIK Location written restores location."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        orig_loc = bpy.data.objects["HandIK.L"].location.copy()
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                # Verify location has actually changed before raising
+                curr_loc = bpy.data.objects["HandIK.L"].location
+                self.assertNotEqual(curr_loc, orig_loc)
+                raise RuntimeError("Fault injected after HandIK location written")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(0.4, -0.3, 1.2))
+        self.assertIn("Fault injected after HandIK location written", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertAlmostEqual((bpy.data.objects["HandIK.L"].location - orig_loc).length, 0.0, places=5)
+
+    def test_44_fault_injection_set_hand_ik_target_after_hand_rotation(self) -> None:
+        """TEST-44: Fault injection in set_hand_ik_target() after HandIK Rotation written restores rotation."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        orig_rot = tuple(bpy.data.objects["HandIK.L"].rotation_euler)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_rotation":
+                curr_rot = tuple(bpy.data.objects["HandIK.L"].rotation_euler)
+                self.assertNotEqual(curr_rot, orig_rot)
+                raise RuntimeError("Fault injected after HandIK rotation written")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(
+                self.armature,
+                side="L",
+                world_xyz=(0.4, -0.3, 1.2),
+                hand_rotation_deg=(45.0, 30.0, 60.0),
+            )
+        self.assertIn("Fault injected after HandIK rotation written", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(tuple(bpy.data.objects["HandIK.L"].rotation_euler), orig_rot)
+
+    def test_45_fault_injection_set_hand_ik_target_after_pole_location(self) -> None:
+        """TEST-45: Fault injection in set_hand_ik_target() after ElbowPole Location written restores pole."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        orig_pole_loc = bpy.data.objects["ElbowPole.L"].location.copy()
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_pole_location":
+                curr_loc = bpy.data.objects["ElbowPole.L"].location
+                self.assertNotEqual(curr_loc, orig_pole_loc)
+                raise RuntimeError("Fault injected after ElbowPole location written")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(
+                self.armature,
+                side="L",
+                world_xyz=(0.4, -0.3, 1.2),
+                pole_world_xyz=(0.6, -0.8, 1.3),
+            )
+        self.assertIn("Fault injected after ElbowPole location written", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertAlmostEqual(
+            (bpy.data.objects["ElbowPole.L"].location - orig_pole_loc).length, 0.0, places=5
+        )
+
+    def test_46_fault_injection_set_hand_ik_target_between_influences(self) -> None:
+        """TEST-46: Fault injection between ArmIK and HandRotation influence writes keeps influences in sync."""
+        setup_arm_ik(self.armature, initial_influence=0.1)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_between_influences":
+                # ArmIK influence was set to 0.9, but HandRotation not yet set
+                self.assertAlmostEqual(
+                    self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"].influence,
+                    0.9,
+                    places=4,
+                )
+                raise RuntimeError("Fault injected between influence updates")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(0.35, -0.1, 1.2), influence=0.9)
+        self.assertIn("Fault injected between influence updates", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        # Verify influences remain in sync at original 0.1
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"].influence,
+            0.1,
+            places=4,
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["hand.L"].constraints["HandRotation.L"].influence,
+            0.1,
+            places=4,
+        )
+
+    def test_47_fault_injection_set_hand_ik_target_after_rot_influence(self) -> None:
+        """TEST-47: Fault injection after HandRotation influence modified rolls back all writes."""
+        setup_arm_ik(self.armature, initial_influence=0.2)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_rot_influence":
+                raise RuntimeError("Fault injected after rot influence update")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(0.35, -0.1, 1.2), influence=0.85)
+        self.assertIn("Fault injected after rot influence update", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_48_fault_injection_set_hand_ik_target_during_state_read(self) -> None:
+        """TEST-48: Fault injection during view_layer.update / get_arm_ik_state revokes all prior writes."""
+        setup_arm_ik(self.armature, initial_influence=0.0)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_during_state_read":
+                raise RuntimeError("Fault injected during state read")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(0.35, -0.2, 1.1), influence=0.9)
+        self.assertIn("Fault injected during state read", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_49_fault_injection_set_arm_ik_influence_side_l(self) -> None:
+        """TEST-49: Fault injection in set_arm_ik_influence(side='L') mid-write restores L and leaves R intact."""
+        setup_arm_ik(self.armature, initial_influence=0.3)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences" and ctx.get("side") == "L":
+                raise RuntimeError("Fault injected mid-write on side L")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_arm_ik_influence(self.armature, side="L", influence=0.8)
+        self.assertIn("Fault injected mid-write on side L", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"].influence,
+            0.3,
+            places=4,
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.R"].constraints["ArmIK.R"].influence,
+            0.3,
+            places=4,
+        )
+
+    def test_50_fault_injection_set_arm_ik_influence_side_both(self) -> None:
+        """TEST-50: Fault injection in set_arm_ik_influence(side='BOTH') restores all 4 constraints without half-update."""
+        setup_arm_ik(self.armature, initial_influence=0.25)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_sides":
+                # L was updated, R not yet updated
+                self.assertAlmostEqual(
+                    self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"].influence,
+                    0.95,
+                    places=4,
+                )
+                raise RuntimeError("Fault injected between side L and side R")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_arm_ik_influence(self.armature, side="BOTH", influence=0.95)
+        self.assertIn("Fault injected between side L and side R", str(cm.exception))
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        for s in ("L", "R"):
+            self.assertAlmostEqual(
+                self.armature.pose.bones[f"forearm.{s}"].constraints[f"ArmIK.{s}"].influence,
+                0.25,
+                places=4,
+            )
+            self.assertAlmostEqual(
+                self.armature.pose.bones[f"hand.{s}"].constraints[f"HandRotation.{s}"].influence,
+                0.25,
+                places=4,
+            )
+
+    # -------------------------------------------------------------------------
+    # Lifecycle & Edge Condition Tests (TEST-51 to TEST-52)
+    # -------------------------------------------------------------------------
+
+    def test_51_success_path_fresh_and_reentrant_across_8_rotation_modes(self) -> None:
+        """TEST-51: Success path fresh & re-entrant calls across all 8 rotation modes (6 Eulers, QUAT, AXIS_ANGLE)."""
+        modes = ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX", "QUATERNION", "AXIS_ANGLE")
+
+        for mode in modes:
+            with self.subTest(rotation_mode=mode):
+                # Fresh auto-init call
+                bpy.ops.wm.read_factory_settings(use_empty=True)
+                char_data = build_character(self.config)
+                arm = build_rig(self.config)
+                bind_character_to_rig(arm, char_data["parts"])
+                setup_leg_ik(arm)
+
+                # Set desired rotation mode on target controller before call
+                setup_arm_ik(arm)
+                bpy.data.objects["HandIK.L"].rotation_mode = mode
+                bpy.data.objects["HandIK.R"].rotation_mode = mode
+
+                # Call for Left side
+                y_pos = char_data["root"].location.y + 0.15
+                state_l = set_hand_ik_target(
+                    arm,
+                    side="L",
+                    world_xyz=(-0.32, y_pos, 1.20),
+                    hand_rotation_deg=(20.0, 30.0, -10.0),
+                    influence=1.0,
+                )
+                self.assertTrue(state_l["is_reachable"])
+                self.assertLess(state_l["target_error"], 0.05)
+                self.assertEqual(bpy.data.objects["HandIK.L"].rotation_mode, mode)
+
+                # Re-entrant call for Right side
+                state_r = set_hand_ik_target(
+                    arm,
+                    side="R",
+                    world_xyz=(0.32, y_pos, 1.20),
+                    hand_rotation_deg=(-20.0, -30.0, 10.0),
+                    influence=1.0,
+                )
+                self.assertTrue(state_r["is_reachable"])
+                self.assertLess(state_r["target_error"], 0.05)
+                self.assertEqual(bpy.data.objects["HandIK.R"].rotation_mode, mode)
+
+    def test_52_success_after_failure_recovery_and_explicit_verification_error(self) -> None:
+        """TEST-52: Success after recovery; explicit failure report if rollback verification fails."""
+        y_pos = self.root.location.y + 0.15
+        target_pos = (-0.32, y_pos, 1.20)
+
+        # 1. Trigger a transaction failure and rollback
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Transient injected fault")
+
+        set_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError):
+            set_hand_ik_target(self.armature, side="L", world_xyz=target_pos)
+
+        # Clear fault hook and verify subsequent call succeeds completely
+        clear_fault_injection_hook()
+        state = set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=1.0)
+        self.assertIsNotNone(state)
+        self.assertTrue(state["is_reachable"])
+        self.assertLess(state["target_error"], 0.05)
+
+        # 2. Simulate rollback verification failure by tampering with restored state during rollback
+        def corrupting_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary transaction failure")
+            elif stage == "during_rollback_verification":
+                # Tamper with restored controller location to trigger verification mismatch
+                if "HandIK.L" in bpy.data.objects:
+                    bpy.data.objects["HandIK.L"].location += Vector((1.0, 1.0, 1.0))
+
+        set_fault_injection_hook(corrupting_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=target_pos)
+
+        err_msg = str(cm.exception)
+        # Must explicitly report both primary failure and verification failure
+        self.assertIn("Primary transaction failure", err_msg)
+        self.assertIn("rollback verification failed", err_msg)
+        self.assertIn("Arm rig transaction failed with RuntimeError", err_msg)
+
+
+if __name__ == "__main__":
+    unittest.main(argv=[sys.argv[0], "-v"])

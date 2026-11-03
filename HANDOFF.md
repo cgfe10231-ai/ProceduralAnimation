@@ -10,30 +10,32 @@
 
 - 项目：ProceduralAnimation。
 - 分支：`master`。
-- 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）。
-- 当前已实现节点：PKG-5 / Task 10-B（10-B-1、10-B-2、10-B-3）。
+- 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B（Task 10-B / Revision 4，生产级事务快照、失败回滚与异常安全已完成验收归档）。
+- 当前已实现节点：PKG-5 / Task 10-B（第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订生产级事务快照与回滚）。
 - 当前状态判定：
   - 10-A：`COMPLETED — ARCHIVED`。
-  - 10-B-1 至 10-B-3：`IMPLEMENTED — TESTED — ARCHIVED`。
-  - 生产级事务快照与回滚系统：`NOT IMPLEMENTED`（测试辅助函数 `_capture_scene_snapshot()` 不代替生产事务系统）。
-  - 整体 Task 10-B：`IN PROGRESS — NOT ACCEPTED`。
-- 下一执行节点：后续计划 `10-B-4`（生产级事务快照、故障注入与完整回滚，仅作为计划记录，本次不执行）。
-- 下一节点状态：`PLANNED / NOT STARTED`。
-- Task 10-C：`BLOCKED — NOT STARTED`（尚未准入）。
+  - 10-B：`ACCEPTED — VERIFIED`（52 项专项测试 52/52 PASS，四级回归全部 0 缺陷通过）。
+  - 生产级事务快照与回滚系统：`ACCEPTED — VERIFIED`（`src/rig/arm_ik.py` 中完整实现并通过 22 项生产事务测试）。
+  - 整体 Task 10-B：`TASK 10-B — ACCEPTED`。
+- 下一执行节点：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
+- 下一节点状态：`BLOCKED — NOT STARTED`。
+- 历史记法说明：旧规划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产事务快照与回滚）已于 Task 10-B / Revision 4 验收合入并关闭，不作为独立未完成子任务存在。
 
 ### 10-B 已有具体交付：
 1. **10-B-1**：输入预验证、Influence 边界与基础零副作用合同。
 2. **10-B-2**：自动初始化前有效父级矩阵预检（Phase B 零突变预检与 TEST-25 至 TEST-27 快照比对测试）。
-3. **10-B-3**：控制器类型校验（仅 `EMPTY` 视为有效控制器）、替换错误类型对象时的预检预期矩阵一致性（Case C），场景快照扩充，新增 TEST-28 至 TEST-30（全 30 项专项测试 PASS）、10-A 回归测试（30/30 PASS）、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42 全部 0 退出码）及修复证据报告归档。
+3. **10-B-3**：控制器类型校验（仅 `EMPTY` 视为有效控制器）、替换错误类型对象时的预检预期矩阵一致性（Case C），场景快照扩充，新增 TEST-28 至 TEST-30。
+4. **10-B-4（Task 10-B / Revision 4）**：生产级手臂 Rig 状态快照（`_snapshot_arm_rig_state()`）、逐字段精确回滚与状态核验（`_rollback_arm_rig_state()`、`_verify_arm_rig_state_restored()`）、生产事务上下文管理器（`_arm_rig_transaction()`）、非 Empty 控制器暂存与提交/还原、可控故障注入挂钩（`set_fault_injection_hook()`、`clear_fault_injection_hook()`），新增 TEST-31 至 TEST-52（全 22 项专项事务测试 PASS，Task 10-B 总计 52/52 PASS），10-A 回归（30/30 PASS），全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42 全部 0 退出码）及完备证据归档。
 
-## 2. 10-B-1 / 10-B-2 / 10-B-3 交付证据
+## 2. 10-B-1 / 10-B-2 / 10-B-3 / Revision 4 交付证据
 
 证据目录：
 
-`docs/evidence/PKG5_10B1/`
+`docs/evidence/PKG5_10B_REVISION_4/` (Revision 4 综合证据目录) 与 `docs/evidence/PKG5_10B1/` (前三轮历史证据目录)
 
-新增修复报告：
+执行报告：
 
+- [`task10b_revision4_execution_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_4/task10b_revision4_execution_report.md)（Task 10-B 第四轮修订生产级事务与异常安全执行报告）
 - [`task10b1_autoinit_preflight_fix_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B1/task10b1_autoinit_preflight_fix_report.md)（Task 10-B-2 自动初始化预检修复报告）
 - [`task10b3_test_execution_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B1/task10b3_test_execution_report.md)（Task 10-B-3 控制器类型识别与预检矩阵一致性执行报告）
 
@@ -41,18 +43,20 @@
 
 | 测试 | 结果 |
 |---|---:|
-| 10-B-3 Input Validation & Preflight (`test_task10b_input_validation.py`) | 30/30 PASS (2.524s) |
-| 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`) | 30/30 PASS (3.971s) |
+| 10-B 专项：Input Validation & Preflight (`test_task10b_input_validation.py`) | 30/30 PASS (2.44s) |
+| 10-B 专项：Transaction Atomicity (`test_task10b_transaction_atomicity.py`) | 22/22 PASS (2.06s) |
+| 10-B 专项总计 | 52/52 PASS |
+| 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`) | 30/30 PASS (4.19s) |
 | C2 Final Inspector | 6 项自测试 PASS，文档符号检查 PASS |
 
 分层测试：
 
 | Tier | 套件数 | 状态 |
 |---|---:|---|
-| Quick | 19/19 | 退出码 0 (47.37s) |
-| Physics | 27/27 | 退出码 0 (102.20s) |
-| Motion | 12/12 | 退出码 0 (47.93s) |
-| Full | 42/42 | 退出码 0 (154.49s) |
+| Quick | 19/19 | 退出码 0 (48.36s) |
+| Physics | 27/27 | 退出码 0 (105.65s) |
+| Motion | 12/12 | 退出码 0 (48.12s) |
+| Full | 42/42 | 退出码 0 (157.44s) |
 
 所有分层测试均为 FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
 
@@ -75,13 +79,15 @@ Finding 总数维持 16 项，14 项关闭，2 项开放。
 | 顺序 | 任务 | 状态 |
 |---|---|---|
 | 09-B | Lower-Limb World Rotation | `ACCEPTED — VERIFIED` |
-| 10 | Upper-Limb IK/FK | `IN PROGRESS (10-A Done, 10-B-1..3 Implemented/Tested, 10-B-4 Planned)` |
+| 10 | Upper-Limb IK/FK | `ACCEPTED — VERIFIED (10-A Done, 10-B Accepted; 10-C Blocked/Not Started)` |
 | 11 | FootLock | `PLANNED — NOT STARTED` |
 | 12 | PKG-5 综合接口闭环 | `BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE` |
 
 下一具体子任务：
 
-后续计划 `10-B-4`（生产级 Arm IK 事务快照、故障注入与回滚核验，仅作为后续计划记录，本次不执行；待批准后准入）。Task 10-C 保持 `BLOCKED — NOT STARTED`。
+Task 10-C（PlannedHandTarget、Bridge 与 WBC 无损接口合同，`BLOCKED — NOT STARTED`；等待批准后准入）。
+
+*历史记法说明*：旧计划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产级事务快照、故障注入与回滚核验）已于 Task 10-B / Revision 4 验收合入并关闭。不作为独立未完成子任务存在。
 
 Task 10 / 11 / 12 的权威分工以 `ARCHITECTURE_SYNC.md` Section 4.2—4.5 为准。
 

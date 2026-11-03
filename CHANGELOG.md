@@ -2,6 +2,38 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-03] PKG-5 / Task 10-B / Revision 4：Arm IK 生产级事务快照、失败回滚与异常安全验收
+
+* **任务性质**：PKG-5 / Task 10-B 第四轮修订，建立 Arm IK 生产级事务状态快照、失败回滚与异常安全机制（关闭历史计划记法 `10-B-4`）。
+* **状态**：`TASK 10-B — ACCEPTED`（52/52 专项测试通过，全四级分层回归 0 缺陷通过）。
+* **生产代码修改**（`src/rig/arm_ik.py`）：
+  - **生产级快照与回滚**：实现 `_snapshot_arm_rig_state()`、`_rollback_arm_rig_state()` 与 `_verify_arm_rig_state_restored()`。完整捕获 4 个手臂控制器（存在性、引用、类型、TRS、有效父级与逆矩阵、旋转模式、显示属性与集合归属）、6 根姿态骨骼（位移、旋转模式、各旋转通道、缩放、基矩阵、IK 锁定与限位）、约束完整链（顺序、类型、Target、Pole Target、Chain Count、Pole Angle、Mix Mode、Influence 等）及 Character Collection 层次结构。
+  - **事务原子性保护**：实现生产级上下文管理器 `_arm_rig_transaction(arm)`，统一包装 `setup_arm_ik()`、`set_hand_ik_target()` 与 `set_arm_ik_influence()`。在异常发生时自动回滚并核验状态；若核验异常与原始异常并存，报告双重异常详情，绝不静默吞没异常。
+  - **控制器暂存机制**：在 `_get_or_create_empty()` 中，若需替换非 Empty 错误类型对象，先安全暂存至当前事务上下文，仅在事务提交时执行彻底删除；若事务回滚，无损还原原对象的集合关联、名称及数据块。
+  - **集合解析健壮性**：实现 `_find_collection_by_name()` 统一解析场景根集合（`bpy.context.scene.collection`）与普通集合。
+  - **故障注入钩子**：实现 `set_fault_injection_hook()` 与 `clear_fault_injection_hook()`，支持在 10 个执行阶段确定性触发异常用于异常安全回归验证。
+* **新增事务专项测试**（`tests/test_task10b_transaction_atomicity.py`）：
+  - 新增 TEST-31 至 TEST-52 全部 22 项测试，覆盖：
+    - TEST-31～33：状态快照完整性、字段覆盖率与独立隔离性。
+    - TEST-34～38：直接回滚保真度（含非 Empty 对象还原与集合拓扑恢复）。
+    - TEST-39～48：在 10 个执行阶段的确定性故障注入与自动回滚零突变核验。
+    - TEST-49～50：8 种旋转模式成功路径事务提交验证。
+    - TEST-51：`set_arm_ik_influence()` 成功提交与异常回滚验证。
+    - TEST-52：回滚核验失败时不吞没原始异常与核验异常的双重报错验证。
+* **专项与分层测试验证**：
+  - `test_task10b_input_validation.py`：30/30 PASS (2.44s)。
+  - `test_task10b_transaction_atomicity.py`：22/22 PASS (2.06s)。
+  - Task 10-B 专项总计：52/52 PASS。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS (4.19s)。
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，符号存在性 PASS。
+  - 分层回归：Quick 19/19 (48.36s)、Physics 27/27 (105.65s)、Motion 12/12 (48.12s)、Full 42/42 (157.44s)，全部退出码 0，FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **证据归档**：
+  - `docs/evidence/PKG5_10B_REVISION_4/`：完整执行报告 `task10b_revision4_execution_report.md` 及 8 份 UTF-8 格式测试日志。
+* **后续任务与边界**：
+  - Task 10-A 与 Task 10-B 全部验收通过。下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`，尚未准入）。
+  - 历史规划编号 `10-B-4` 作为第四轮修订的历史记法已完成并关闭，不作为未完成子任务存在。
+
+
 ### [2026-11-03] PKG-5 / Task 10-B 当前状态与路线编号一致性同步说明
 
 * **任务性质**：根据真实代码、测试和提交历史同步 Task 10-B 当前工程状态与后续计划编号（纯文档状态同步，不涉及生产代码和测试修改）。
