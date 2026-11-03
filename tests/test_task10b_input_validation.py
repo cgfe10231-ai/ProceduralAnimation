@@ -1,4 +1,4 @@
-"""Contract verification suite for Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B / 10-b-1 & 10-b-2).
+"""Contract verification suite for Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B / 10-b-1, 10-b-2, 10-b-3).
 
 Tests:
 - TEST-01: setup_arm_ik accepts valid influence boundaries (0.0, 0.5, 1.0).
@@ -28,6 +28,9 @@ Tests:
 - TEST-25: set_hand_ik_target with invalid auto-init parent transform causes zero scene mutation.
 - TEST-26: set_hand_ik_target with partially initialized state and invalid new parent causes zero mutation.
 - TEST-27: set_hand_ik_target first-time auto-initialization succeeds under valid conformal parent transforms.
+- TEST-28: set_hand_ik_target replaces existing non-Empty controller with valid Empty and sets target accurately.
+- TEST-29: set_hand_ik_target preflight ignores doomed non-Empty controller with bad parent on opposite side.
+- TEST-30: set_hand_ik_target replaces existing non-Empty elbow pole controller with valid Empty and sets target accurately.
 """
 
 import math
@@ -36,7 +39,7 @@ import sys
 import unittest
 
 import bpy
-from mathutils import Vector
+from mathutils import Euler, Matrix, Quaternion, Vector
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -474,17 +477,21 @@ class TestArmIKInputValidationContract(unittest.TestCase):
     def _capture_scene_snapshot(self) -> dict:
         """Capture comprehensive snapshot of scene objects, collections, and arm pose bones.
 
-        Covers all elements specified in Task 10-B-2 Section 5:
-        - Scene objects: name, type, parent, location, rotation_mode, euler, quat, axis_angle,
-          scale, matrix_parent_inverse, matrix_world.
-        - Collections: name, member objects.
+        Covers all elements specified in Task 10-B-2 and 10-B-3:
+        - Scene objects: name, type, data_name, users_collection, parent, location, rotation_mode,
+          euler, quat, axis_angle, scale, matrix_parent_inverse, matrix_world.
+        - Collections: hierarchy (children) and member objects, including scene root collection.
         - PoseBones (upper_arm, forearm, hand L/R): location, rotation_mode, euler, quat,
-          axis_angle, scale, matrix_basis, IK lock/limit properties, constraints configuration.
+          axis_angle, scale, matrix_basis, IK lock/limit properties, detailed constraints configuration
+          (IK chain_count, use_tail, use_stretch, pole_angle, iterations, mute; COPY_ROTATION spaces,
+          axes, mix_mode, invert flags, use_offset, mute).
         """
         objs_snap = {}
         for obj in bpy.data.objects:
             objs_snap[obj.name] = {
                 "type": obj.type,
+                "data_name": obj.data.name if getattr(obj, "data", None) else None,
+                "users_collection": sorted([c.name for c in obj.users_collection]),
                 "parent": obj.parent.name if obj.parent else None,
                 "location": tuple(round(v, 7) for v in obj.location),
                 "rotation_mode": obj.rotation_mode,
@@ -498,7 +505,15 @@ class TestArmIKInputValidationContract(unittest.TestCase):
 
         cols_snap = {}
         for col in bpy.data.collections:
-            cols_snap[col.name] = sorted([o.name for o in col.objects])
+            cols_snap[col.name] = {
+                "children": sorted([c.name for c in col.children]),
+                "objects": sorted([o.name for o in col.objects]),
+            }
+        scene_col = bpy.context.scene.collection
+        cols_snap["__scene_root__"] = {
+            "children": sorted([c.name for c in scene_col.children]),
+            "objects": sorted([o.name for o in scene_col.objects]),
+        }
 
         bones_snap = {}
         arm = self.armature
@@ -508,16 +523,41 @@ class TestArmIKInputValidationContract(unittest.TestCase):
             if pb:
                 con_list = []
                 for con in pb.constraints:
-                    target_name = con.target.name if hasattr(con, "target") and con.target else None
-                    pole_name = con.pole_target.name if hasattr(con, "pole_target") and con.pole_target else None
+                    target_name = con.target.name if getattr(con, "target", None) else None
                     inf = round(con.influence, 7) if hasattr(con, "influence") else None
-                    con_list.append({
+                    c_dict = {
                         "name": con.name,
                         "type": con.type,
                         "target": target_name,
-                        "pole_target": pole_name,
                         "influence": inf,
-                    })
+                        "mute": getattr(con, "mute", None),
+                    }
+                    if con.type == "IK":
+                        pole_name = con.pole_target.name if getattr(con, "pole_target", None) else None
+                        pole_ang = round(con.pole_angle, 7) if getattr(con, "pole_angle", None) is not None else None
+                        c_dict.update({
+                            "pole_target": pole_name,
+                            "chain_count": getattr(con, "chain_count", None),
+                            "use_tail": getattr(con, "use_tail", None),
+                            "use_stretch": getattr(con, "use_stretch", None),
+                            "pole_angle": pole_ang,
+                            "iterations": getattr(con, "iterations", None),
+                        })
+                    elif con.type == "COPY_ROTATION":
+                        c_dict.update({
+                            "subtarget": getattr(con, "subtarget", None),
+                            "target_space": getattr(con, "target_space", None),
+                            "owner_space": getattr(con, "owner_space", None),
+                            "mix_mode": getattr(con, "mix_mode", None),
+                            "use_x": getattr(con, "use_x", None),
+                            "use_y": getattr(con, "use_y", None),
+                            "use_z": getattr(con, "use_z", None),
+                            "invert_x": getattr(con, "invert_x", None),
+                            "invert_y": getattr(con, "invert_y", None),
+                            "invert_z": getattr(con, "invert_z", None),
+                            "use_offset": getattr(con, "use_offset", None),
+                        })
+                    con_list.append(c_dict)
                 bones_snap[b_name] = {
                     "location": tuple(round(v, 7) for v in pb.location),
                     "rotation_mode": pb.rotation_mode,
@@ -740,6 +780,208 @@ class TestArmIKInputValidationContract(unittest.TestCase):
         self.assertAlmostEqual(p_hand_l.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, target_inf, places=5)
         self.assertAlmostEqual(state["ik_influence"], target_inf, places=5)
         self.assertAlmostEqual(state["rot_influence"], target_inf, places=5)
+
+    def test_28_requested_wrong_type_controller_auto_replaced(self) -> None:
+        """TEST-28: Requested side non-EMPTY controller is replaced with EMPTY and set accurately.
+
+        Preconditions:
+        - Character and Armature built, leg IK setup.
+        - root_obj has non-identity conformal transform (translation, rotation, uniform scale).
+        - HandIK.L exists as a MESH object (wrong type).
+        - ElbowPole.L exists as a valid EMPTY object parented to root_obj.
+        Action:
+        - Call set_hand_ik_target for 'L' side with world_xyz, hand_rotation_deg, influence.
+        Assertions:
+        - HandIK.L is replaced by an EMPTY object.
+        - ElbowPole.L remains the existing valid EMPTY object.
+        - HandIK.L world translation matches state['applied_world'] accurately.
+        - HandIK.L world orientation matches target orientation.
+        - Constraint influences on L match requested influence.
+        - All 4 controllers exist and are EMPTY objects.
+        """
+        root_obj = self.armature.parent or bpy.data.objects.get("CharacterRoot")
+        self.assertIsNotNone(root_obj)
+        root_obj.location = (0.2, 0.3, 0.4)
+        root_obj.rotation_euler = (0.0, 0.0, math.radians(30.0))
+        root_obj.scale = (1.5, 1.5, 1.5)
+
+        # HandIK.L exists as a MESH object
+        wrong_mesh = bpy.data.meshes.new("WrongTypeMeshL")
+        wrong_hand_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+        bpy.context.scene.collection.objects.link(wrong_hand_obj)
+
+        # ElbowPole.L exists as a valid EMPTY object parented to root_obj
+        valid_pole_obj = bpy.data.objects.new("ElbowPole.L", None)
+        valid_pole_obj.empty_display_type = "SPHERE"
+        valid_pole_obj.parent = root_obj
+        valid_pole_obj.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.scene.collection.objects.link(valid_pole_obj)
+
+        bpy.context.view_layer.update()
+
+        target_xyz = (0.35, -0.1, 1.1)
+        target_rot = (15.0, 25.0, 35.0)
+        target_inf = 0.85
+
+        state = set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=target_xyz,
+            hand_rotation_deg=target_rot,
+            influence=target_inf,
+        )
+
+        ik_l = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(ik_l)
+        self.assertEqual(ik_l.type, "EMPTY")
+        self.assertNotEqual(ik_l, wrong_hand_obj)
+
+        pole_l = bpy.data.objects.get("ElbowPole.L")
+        self.assertIsNotNone(pole_l)
+        self.assertEqual(pole_l.type, "EMPTY")
+        self.assertEqual(pole_l, valid_pole_obj)
+
+        self.assertAlmostEqual(ik_l.matrix_world.translation.x, state["applied_world"].x, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.y, state["applied_world"].y, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.z, state["applied_world"].z, places=5)
+
+        expected_quat = Euler((math.radians(15.0), math.radians(25.0), math.radians(35.0)), "XYZ").to_quaternion()
+        actual_quat = ik_l.matrix_world.to_quaternion()
+        self.assertAlmostEqual(abs(expected_quat.dot(actual_quat)), 1.0, places=4)
+
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_hand_l = self.armature.pose.bones["hand.L"]
+        self.assertAlmostEqual(p_fore_l.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, target_inf, places=5)
+        self.assertAlmostEqual(p_hand_l.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, target_inf, places=5)
+
+    def test_29_wrong_type_other_side_controller_preflight(self) -> None:
+        """TEST-29: Preflight ignores doomed non-EMPTY controller with bad parent on opposite side.
+
+        Preconditions:
+        - Character and Armature built, leg IK setup.
+        - HandIK.L is a valid EMPTY object.
+        - ElbowPole.L is missing -> triggers needs_auto_init=True.
+        - HandIK.R exists as a MESH under a bad parent with non-conformal scale (1.0, 2.5, 1.0).
+        Action:
+        - Call set_hand_ik_target for 'L' side with world_xyz and influence.
+        Assertions:
+        - Does NOT raise ValueError (preflight recognizes HandIK.R is non-EMPTY, anticipating root_obj transform).
+        - HandIK.R is replaced with an EMPTY object parented to root_obj.
+        - Left arm target is accurately applied.
+        - All 4 controllers exist and are EMPTY objects.
+        """
+        root_obj = self.armature.parent or bpy.data.objects.get("CharacterRoot")
+        self.assertIsNotNone(root_obj)
+
+        hand_l = bpy.data.objects.new("HandIK.L", None)
+        hand_l.empty_display_type = "SPHERE"
+        hand_l.parent = root_obj
+        hand_l.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.scene.collection.objects.link(hand_l)
+
+        self.assertNotIn("ElbowPole.L", bpy.data.objects)
+
+        bad_parent = bpy.data.objects.new("BadParentObj", None)
+        bad_parent.scale = (1.0, 2.5, 1.0)
+        bpy.context.scene.collection.objects.link(bad_parent)
+
+        wrong_mesh_r = bpy.data.meshes.new("WrongTypeMeshR")
+        wrong_hand_r = bpy.data.objects.new("HandIK.R", wrong_mesh_r)
+        wrong_hand_r.parent = bad_parent
+        bpy.context.scene.collection.objects.link(wrong_hand_r)
+
+        bpy.context.view_layer.update()
+
+        target_xyz = (0.35, -0.1, 1.1)
+        state = set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=target_xyz,
+            influence=0.9,
+        )
+
+        self.assertIsInstance(state, dict)
+        ik_r = bpy.data.objects.get("HandIK.R")
+        self.assertIsNotNone(ik_r)
+        self.assertEqual(ik_r.type, "EMPTY")
+        self.assertEqual(ik_r.parent, root_obj)
+
+        for ctrl_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            obj = bpy.data.objects.get(ctrl_name)
+            self.assertIsNotNone(obj)
+            self.assertEqual(obj.type, "EMPTY")
+
+        ik_l = bpy.data.objects["HandIK.L"]
+        self.assertAlmostEqual(ik_l.matrix_world.translation.x, state["applied_world"].x, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.y, state["applied_world"].y, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.z, state["applied_world"].z, places=5)
+
+    def test_30_wrong_type_pole_controller_auto_replaced(self) -> None:
+        """TEST-30: Requested side non-EMPTY elbow pole controller is replaced with EMPTY and set accurately.
+
+        Preconditions:
+        - Character and Armature built, leg IK setup.
+        - root_obj has non-identity conformal transform.
+        - HandIK.L is a valid EMPTY object.
+        - ElbowPole.L exists as a MESH object (wrong type).
+        Action:
+        - Call set_hand_ik_target for 'L' side with world_xyz, pole_world_xyz, influence.
+        Assertions:
+        - ElbowPole.L is replaced by an EMPTY object.
+        - ElbowPole.L world translation matches pole_world_xyz.
+        - HandIK.L world translation matches applied target.
+        - Constraint influences match requested influence.
+        - All 4 controllers exist and are EMPTY objects.
+        """
+        root_obj = self.armature.parent or bpy.data.objects.get("CharacterRoot")
+        self.assertIsNotNone(root_obj)
+        root_obj.location = (0.1, -0.2, 0.3)
+        root_obj.scale = (1.2, 1.2, 1.2)
+
+        hand_l = bpy.data.objects.new("HandIK.L", None)
+        hand_l.empty_display_type = "SPHERE"
+        hand_l.parent = root_obj
+        hand_l.matrix_parent_inverse = Matrix.Identity(4)
+        bpy.context.scene.collection.objects.link(hand_l)
+
+        wrong_pole_mesh = bpy.data.meshes.new("WrongTypePoleMesh")
+        wrong_pole_obj = bpy.data.objects.new("ElbowPole.L", wrong_pole_mesh)
+        bpy.context.scene.collection.objects.link(wrong_pole_obj)
+
+        bpy.context.view_layer.update()
+
+        target_xyz = (0.35, -0.1, 1.1)
+        pole_target = (0.45, -0.3, 1.15)
+        target_inf = 0.75
+
+        state = set_hand_ik_target(
+            self.armature,
+            "L",
+            world_xyz=target_xyz,
+            pole_world_xyz=pole_target,
+            influence=target_inf,
+        )
+
+        pole_l = bpy.data.objects.get("ElbowPole.L")
+        self.assertIsNotNone(pole_l)
+        self.assertEqual(pole_l.type, "EMPTY")
+        self.assertNotEqual(pole_l, wrong_pole_obj)
+
+        self.assertAlmostEqual(pole_l.matrix_world.translation.x, pole_target[0], places=5)
+        self.assertAlmostEqual(pole_l.matrix_world.translation.y, pole_target[1], places=5)
+        self.assertAlmostEqual(pole_l.matrix_world.translation.z, pole_target[2], places=5)
+
+        ik_l = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(ik_l)
+        self.assertEqual(ik_l.type, "EMPTY")
+        self.assertAlmostEqual(ik_l.matrix_world.translation.x, state["applied_world"].x, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.y, state["applied_world"].y, places=5)
+        self.assertAlmostEqual(ik_l.matrix_world.translation.z, state["applied_world"].z, places=5)
+
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_hand_l = self.armature.pose.bones["hand.L"]
+        self.assertAlmostEqual(p_fore_l.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, target_inf, places=5)
+        self.assertAlmostEqual(p_hand_l.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, target_inf, places=5)
 
 
 if __name__ == "__main__":

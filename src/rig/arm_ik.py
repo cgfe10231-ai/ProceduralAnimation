@@ -508,22 +508,26 @@ def _preflight_arm_ik_parent_transforms(
     valid_side: str,
     root_obj: Optional[bpy.types.Object],
 ) -> Tuple[bool, Matrix, Matrix]:
-    """Preflight check effective parent transform domains before any scene mutation (Task 10-B-2).
+    """Preflight check effective parent transform domains before any scene mutation (Task 10-B-2 & 10-B-3).
 
     Inspects existing and anticipated arm IK controllers without writing to the scene.
-    If controllers are missing and setup_arm_ik() would be required, anticipates the
-    effective parent matrix for any newly created controller based on setup_arm_ik's
-    parenting contract:
-        M_eff = M_parent @ Matrix.Identity(4)
-    Validates all existing and anticipated controllers via validate_effective_parent_transform.
-    Raises ValueError before setup_arm_ik() can cause any scene mutation or partial initialization.
+    A controller is valid if and only if the object exists and its type is 'EMPTY'.
+    If any controller on valid_side is missing or not an EMPTY, setup_arm_ik() will be required.
+
+    Preflight rules:
+    - Case A: Existing object is an EMPTY -> compute actual effective parent matrix.
+    - Case B: Object does not exist -> compute expected effective parent matrix (root_obj @ Identity).
+    - Case C: Object exists but type != 'EMPTY' -> it will be unlinked and recreated by _get_or_create_empty();
+      anticipate the expected effective parent matrix for the new EMPTY, NOT the doomed object's matrix.
 
     Returns:
         (needs_auto_init, eff_ik_mat, eff_pole_mat)
     """
     ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[valid_side])
     pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[valid_side])
-    needs_auto_init = (ik_obj is None or pole_obj is None)
+    ik_valid = (ik_obj is not None and ik_obj.type == "EMPTY")
+    pole_valid = (pole_obj is not None and pole_obj.type == "EMPTY")
+    needs_auto_init = not (ik_valid and pole_valid)
 
     expected_new_eff_mat = (
         root_obj.matrix_world @ Matrix.Identity(4)
@@ -533,7 +537,7 @@ def _preflight_arm_ik_parent_transforms(
 
     if needs_auto_init:
         # setup_arm_ik() processes all four controllers (L and R);
-        # validate effective parent transforms for existing controls and anticipated new controls.
+        # validate effective parent transforms for existing valid controls and anticipated new controls.
         other_side = "R" if valid_side == "L" else "L"
         all_ctrl_names = (
             ARM_IK_TARGET_NAMES[valid_side],
@@ -543,24 +547,27 @@ def _preflight_arm_ik_parent_transforms(
         )
         for ctrl_name in all_ctrl_names:
             existing_obj = bpy.data.objects.get(ctrl_name)
-            if existing_obj is not None:
+            if existing_obj is not None and existing_obj.type == "EMPTY":
+                # Case A: Existing valid EMPTY controller
                 ctrl_eff_mat = compute_effective_parent_matrix(existing_obj)
             else:
+                # Case B (missing) & Case C (wrong type, will be unlinked/recreated):
+                # Use expected effective parent matrix for the new Empty
                 ctrl_eff_mat = expected_new_eff_mat
             validate_effective_parent_transform(ctrl_eff_mat, ctrl_name)
 
         eff_ik_mat = (
             compute_effective_parent_matrix(ik_obj)
-            if ik_obj is not None
+            if ik_valid
             else expected_new_eff_mat
         )
         eff_pole_mat = (
             compute_effective_parent_matrix(pole_obj)
-            if pole_obj is not None
+            if pole_valid
             else expected_new_eff_mat
         )
     else:
-        # Both target controllers exist; validate their effective parent transforms directly
+        # Both target controllers exist and are valid EMPTY objects; validate their transforms directly
         eff_ik_mat = compute_effective_parent_matrix(ik_obj)
         eff_pole_mat = compute_effective_parent_matrix(pole_obj)
         validate_effective_parent_transform(eff_ik_mat, ik_obj.name)

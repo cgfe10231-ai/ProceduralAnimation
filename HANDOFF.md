@@ -11,14 +11,15 @@
 - 项目：ProceduralAnimation。
 - 分支：`master`。
 - 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）。
-- 当前实现与修复节点：PKG-5 / Task 10-B / 10-B-1-FIX-01（Arm IK 自动初始化前置变换预检与零副作用修复）。
-- 状态：`10-B-1-FIX-01 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
-- 下一执行节点：等待 10-B-1 独立审计验收；待批准后准入 PKG-5 / Task 10-B-2（Arm IK 事务快照、故障注入与完整回滚）。
+- 当前实现与修复节点：PKG-5 / Task 10-B / Task 10-B-2 与 Task 10-B-3（Arm IK 控制器类型识别、预检矩阵一致性与证据归档修复）。
+- 状态：`10-B-3 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
+- 下一执行节点：等待 10-B 独立审计验收；待批准后准入后续任务。
 - 下一节点状态：`WAITING INDEPENDENT AUDIT / NOT STARTED`。
 
-10-B-1-FIX-01 已修复自动初始化前有效父级变换校验缺失导致的零副作用合同破坏，扩充 TEST-25 至 TEST-27 深度场景快照比对测试，全 27 项专项测试、10-A 回归测试、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42）及修复证据报告归档均已完成。
+Task 10-B-2 修复了自动初始化前有效父级变换校验缺失导致的零副作用合同破坏，引入 Phase B 零突变预检与 TEST-25 至 TEST-27 快照比对测试。
+Task 10-B-3 进一步闭环了控制器类型校验（仅 `EMPTY` 视为有效控制器）、替换错误类型对象时的预检预期矩阵一致性（Case C），扩充场景快照至完整字段，新增 TEST-28 至 TEST-30（全 30 项专项测试 PASS）、10-A 回归测试（30/30 PASS）、全四级分层回归（Quick 19, Physics 27, Motion 12, Full 42 全部 0 退出码）及修复证据报告归档。
 
-## 2. 10-B-1 及 10-B-1-FIX-01 交付证据
+## 2. 10-B-1 / 10-B-2 / 10-B-3 交付证据
 
 证据目录：
 
@@ -26,24 +27,25 @@
 
 新增修复报告：
 
-[`task10b1_autoinit_preflight_fix_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B1/task10b1_autoinit_preflight_fix_report.md)
+- [`task10b1_autoinit_preflight_fix_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B1/task10b1_autoinit_preflight_fix_report.md)（Task 10-B-2 自动初始化预检修复报告）
+- [`task10b3_test_execution_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B1/task10b3_test_execution_report.md)（Task 10-B-3 控制器类型识别与预检矩阵一致性执行报告）
 
 专项测试：
 
 | 测试 | 结果 |
 |---|---:|
-| 10-B-1 Input Validation & Preflight (`test_task10b_input_validation.py`) | 27/27 PASS (2.305s) |
-| 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`) | 30/30 PASS (5.66s) |
+| 10-B-3 Input Validation & Preflight (`test_task10b_input_validation.py`) | 30/30 PASS (2.524s) |
+| 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`) | 30/30 PASS (3.971s) |
 | C2 Final Inspector | 6 项自测试 PASS，文档符号检查 PASS |
 
 分层测试：
 
 | Tier | 套件数 | 状态 |
 |---|---:|---|
-| Quick | 19/19 | 退出码 0 (50.44s) |
-| Physics | 27/27 | 退出码 0 (109.13s) |
-| Motion | 12/12 | 退出码 0 (48.60s) |
-| Full | 42/42 | 退出码 0 (156.51s) |
+| Quick | 19/19 | 退出码 0 (47.37s) |
+| Physics | 27/27 | 退出码 0 (102.20s) |
+| Motion | 12/12 | 退出码 0 (47.93s) |
+| Full | 42/42 | 退出码 0 (154.49s) |
 
 所有分层测试均为 FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
 

@@ -10,11 +10,11 @@
 >
 > **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；当前修复节点：PKG-5 / Task 10-B / 10-B-1-FIX-01。
+> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；当前修复节点：PKG-5 / Task 10-B / Task 10-B-2 与 Task 10-B-3。
 >
-> **最近完成状态**：`10-B-1-FIX-01 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 待独立审计）。
+> **最近完成状态**：`10-B-3 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 待独立审计）。
 >
-> **下一执行节点**：等待 10-B-1 独立审计验收，随后准入 PKG-5 / Task 10-B-2。
+> **下一执行节点**：等待 10-B 独立审计验收，随后准入后续任务。
 >
 > **下一节点状态**：`WAITING INDEPENDENT AUDIT / NOT STARTED`。
 >

@@ -2,10 +2,37 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
-### [2026-11-03] PKG-5 / Task 10-B-1-FIX-01：Arm IK 自动初始化前置变换预检与零副作用修复
+### [2026-11-03] PKG-5 / Task 10-B-3：Arm IK 控制器类型识别、预检矩阵一致性与证据归档修复
+
+* **任务性质**：Task 10-B-2 后续缺陷修复（修复控制器类型未校验导致错误对象被视作有效、替换非 Empty 时预检矩阵不一致、以及测试日志与归档修复）。
+* **状态**：`10-B-3 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
+* **修改范围**：
+  - `src/rig/arm_ik.py`：
+    - `_preflight_arm_ik_parent_transforms()`：控制器有效性判定增加类型校验，控制器有效当且仅当 `obj is not None and obj.type == "EMPTY"`；任一目标缺失或非 Empty 时触发自动初始化并预检全部 4 控制器；针对类型错误即将被清除替换的对象（Case C），预先计算新 Empty 的预期有效父级矩阵（`root_obj.matrix_world @ Matrix.Identity(4)`），绝不调用即将销毁对象的非共形父级矩阵；保证返回的 `(needs_auto_init, eff_ik_mat, eff_pole_mat)` 与最终生成的有效控制器物理矩阵完全一致。
+  - `tests/test_task10b_input_validation.py`：
+    - 扩充 `_capture_scene_snapshot()` 覆盖对象的 `data_name`、`users_collection`、集合层级结构（包含场景根集合 `__scene_root__`），以及 IK 和 COPY_ROTATION 约束的完整字段配置（`chain_count`, `use_tail`, `use_stretch`, `pole_angle`, `iterations`, `mute`, `target_space`, `owner_space`, `mix_mode`, `use_x/y/z`, `invert_x/y/z`, `use_offset`）。
+    - 新增 TEST-28（请求侧非 Empty 控制器被替换为合法 Empty 并精准设置目标）、TEST-29（预检忽略对侧带有非法父级的非 Empty 控制器并成功初始化）、TEST-30（请求侧非 Empty 肘部极向控制器被替换为合法 Empty 并精准设置目标），测试套件扩充至 30 项测试。
+  - `docs/evidence/PKG5_10B1/`：归档完整测试证据报告 `task10b3_test_execution_report.md` 以及 6 份独立测试日志（专项 30/30、10-A 30/30、Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42）。
+* **专项测试**：
+  - `test_task10b_input_validation.py`：30/30 PASS（2.524s）。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS（3.971s）。
+* **分层回归**：
+  - Quick：19/19 PASS（退出码 0，47.37s）。
+  - Physics：27/27 PASS（退出码 0，102.20s）。
+  - Motion：12/12 PASS（退出码 0，47.93s）。
+  - Full：42/42 PASS（退出码 0，154.49s）。
+  - 四级测试均为 FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **文档与符号审计**：
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，符号存在性 PASS。
+* **实施边界与保护**：
+  - 纯局部修复，未改动任何其他动作、环境、接触、WBC、Bridge 模块。
+  - 整体 10-B-1 仍等待独立验收；暂不开启 10-C。
+
+### [2026-11-03] PKG-5 / Task 10-B-2：Arm IK 自动初始化前置变换预检与零副作用修复
 
 * **任务性质**：已有接口合同缺陷修复（修复 `set_hand_ik_target` 在自动初始化时有效父级变换预检缺失导致的零副作用合同破坏）。
-* **状态**：`10-B-1-FIX-01 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
+* **提交基准**：`c634252240b231f1d3ff1e7425ec9761c21ff83f`。
+* **状态**：`10-B-2 IMPLEMENTED — TESTED — ARCHIVED`（整体 10-B-1 仍保持 `PENDING INDEPENDENT AUDIT`）。
 * **修改范围**：
   - `src/rig/arm_ik.py`：新增私有预检函数 `_preflight_arm_ik_parent_transforms()`；调整 `set_hand_ik_target()` 执行时序为 Phase A（参数校验）$\to$ Phase B（零突变控制器与环境预检）$\to$ Phase C（自动初始化）$\to$ Phase D（目标计算与提交），在任何场景写入发生前拦截非法有效父级变换。
   - `tests/test_task10b_input_validation.py`：新增深层场景快照对比辅助机制，新增 TEST-25（未初始化状态非共形父级零突变）、TEST-26（部分初始化状态反射父级零突变）、TEST-27（合法父级首次自动初始化成功），套件扩充至 27 项测试。
@@ -23,7 +50,7 @@
   - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，符号存在性 PASS。
 * **实施边界与保护**：
   - 纯局部执行顺序加固，未改动任何下肢模块、Bridge、WBC 或 TerrainWalk。
-  - 整体 10-B-1 仍等待独立验收；通用事务快照回滚系统归属 10-B-2，未提前混入本任务。
+  - 整体 10-B-1 仍等待独立验收。
 
 
 ### [2026-11-02] PKG-5 / Task 10-B-1：Arm IK 输入预验证与零副作用合同
