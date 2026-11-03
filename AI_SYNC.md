@@ -2,7 +2,7 @@
 
 > **项目**：ProceduralAnimation
 >
-> **最新已验证工程证据基准**：`c634252240b231f1d3ff1e7425ec9761c21ff83f` (`docs/evidence/PKG5_10B1/`)
+> **最新已验证工程证据基准**：`71104d67d5416b9f39380ab2352b19ca3d896430` (`docs/evidence/PKG5_10B1/`)
 >
 > **当前分支**：`master`
 >
@@ -174,3 +174,10 @@ Phase 7C：
 `ARCHITECTURE.md` 与 `DECISIONS.md` 保持保护状态。
 
 本卡片只表示当前已核验的工程事实。每次新任务启动时，仍须重新检查真实 Git HEAD 与工作区。
+
+## 8. Git 同步状态
+
+- 本地 HEAD SHA：`71104d67d5416b9f39380ab2352b19ca3d896430`
+- 远程 master SHA：`71104d67d5416b9f39380ab2352b19ca3d896430`
+- 同步状态：已安全推送至 `origin/master`，本地与远程完全一致
+- 未跟踪受保护文件现场：`P2_R1_recovery.patch`（严格保留，未做任何修改）
