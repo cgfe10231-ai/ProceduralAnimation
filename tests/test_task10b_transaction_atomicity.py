@@ -31,6 +31,30 @@ Tests:
 - TEST-50: Fault injection in set_arm_ik_influence(side="BOTH") mid-write -> all 4 constraint influences restored.
 - TEST-51: Success path fresh & re-entrant calls across all 8 rotation modes (6 Eulers, QUATERNION, AXIS_ANGLE).
 - TEST-52: Success after failure recovery; explicit failure report if rollback verification fails.
+- TEST-53: Comprehensive 4-controller transform fidelity test.
+- TEST-54: Controller empty_display_type and empty_display_size fidelity test.
+- TEST-55: 6 pose bones comprehensive transform & limits fidelity test.
+- TEST-56: 4 constraints full properties fidelity test.
+- TEST-57: Character collection hierarchy & parent-child linkages recovery.
+- TEST-58: Fault injection during during_snapshot_controllers.
+- TEST-59: Fault injection during during_snapshot_pose_bones.
+- TEST-60: Fault injection during during_snapshot_constraints.
+- TEST-61: Fault injection during set_hand_ik_target_during_depsgraph_update (pre-update hook).
+- TEST-62: Direct set_hand_ik_target() on uninitialized scene succeeds; subsequent failure rolls back.
+- TEST-63: Fault injection interface privacy & cleanliness test.
+- TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, reports errors.
+- TEST-65: Phase 1 (Reversible Commit Preparation) failure triggers full atomic rollback.
+- TEST-66: Phase 3 (Irreversible Resource Cleanup) failure leaves rig COMMITTED with retry capability.
+- TEST-67: Partial cleanup failure prevents duplicate deletions, protects shared resources, and converges on retry.
+- TEST-68: Exception at _DEPSGRAPH_UPDATER call boundary propagates and triggers complete atomic rollback.
+- TEST-69: Snapshot arrays are immutable tuples, immune to in-place RNA mutations, and restored properly.
+- TEST-70: Failure during constraint property restoration aggregates dual exceptions with exact context.
+- TEST-71: Rollback protects collections created externally during transaction while removing transaction collections.
+- TEST-72: Character collection with multiple parents, renamed or reparented in transaction, is restored 100%.
+- TEST-73: Stashed wrong-type constraints and unrelated custom constraints preserve identities and order on rollback.
+- TEST-74: Sequential snapshot failure -> write failure -> clean rollback -> normal setup -> idempotent re-run.
+- TEST-75: Failure on L side set_hand_ik_target isolates R side completely and protects shared datablock.
+- TEST-76: Verifier captures 6 distinct corruption dimensions with exact field names without mutating scene.
 """
 
 import math
@@ -52,9 +76,14 @@ from src.rig.arm_ik import (
     ARM_IK_TARGET_NAMES,
     ARM_POLE_TARGET_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
+    _ACTIVE_TRANSACTION_STACK,
+    _ArmRigTransactionState,
     _arm_rig_transaction,
+    _clear_test_depsgraph_updater,
     _clear_test_fault_injection_hook,
+    _depsgraph_update,
     _rollback_arm_rig_state,
+    _set_test_depsgraph_updater,
     _set_test_fault_injection_hook,
     _snapshot_arm_rig_state,
     _verify_arm_rig_state_restored,
@@ -76,6 +105,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """Reset Blender state, clear hooks, and build fresh character rig."""
         bpy.ops.wm.read_factory_settings(use_empty=True)
         _clear_test_fault_injection_hook()
+        _clear_test_depsgraph_updater()
         self.config = PipelineConfig()
         self.char_data = build_character(self.config)
         self.root = self.char_data["root"]
@@ -88,8 +118,9 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.context.view_layer.update()
 
     def tearDown(self) -> None:
-        """Ensure fault injection hooks are cleared."""
+        """Ensure fault injection hooks and depsgraph updaters are cleared."""
         _clear_test_fault_injection_hook()
+        _clear_test_depsgraph_updater()
 
     # -------------------------------------------------------------------------
     # Snapshot Fidelity Tests (TEST-31 to TEST-33)
@@ -961,9 +992,10 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # Inside transaction: create a new collection, reparent Character, and inject error
         with self.assertRaises(RuntimeError):
-            with _arm_rig_transaction(self.armature):
+            with _arm_rig_transaction(self.armature) as tx:
                 rogue_col = bpy.data.collections.new("RogueCol")
                 bpy.context.scene.collection.children.link(rogue_col)
+                tx.register_created_collection(rogue_col, initial_parent=bpy.context.scene.collection)
                 setup_arm_ik(self.armature)
                 raise RuntimeError("Fault inside transaction with modified collections")
 
@@ -1081,7 +1113,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _verify_arm_rig_state_restored(self.armature, snap_initial)
 
     def test_61_depsgraph_update_exception_triggers_rollback(self) -> None:
-        """TEST-61: Exception during dependency graph update stage rolls back all writes."""
+        """TEST-61: Exception during dependency graph update stage rolls back all writes.
+
+        Note: This test verifies the fault injection hook positioned immediately before
+        the dependency graph update call. In contrast, TEST-68 tests the actual
+        _DEPSGRAPH_UPDATER call boundary adapter exception handling. The two tests
+        complement each other.
+        """
         setup_arm_ik(self.armature, initial_influence=0.1)
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
@@ -1164,7 +1202,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(called, ["test_stage_dummy"])
 
     def test_64_commit_cleanup_failure_and_datablock_lifecycle(self) -> None:
-        """TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, and reports cleanup errors."""
+        """TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, and reports cleanup errors.
+
+        Note: TEST-64 focuses specifically on data block reference counting and cleanup
+        error reporting. Complementary test TEST-66 verifies transaction state transitions
+        (COMMITTED / CLEANUP_PENDING) and retry_cleanup() idempotency.
+        """
         # 1. Create wrong-type HandIK.L with MESH data block
         mesh_data = bpy.data.meshes.new("DoomedMesh")
         wrong_mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
@@ -1207,6 +1250,557 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             setup_arm_ik(self.armature)
         self.assertIn("Simulated commit cleanup failure", str(cm.exception))
+
+    def test_65_reversible_commit_preparation_failure_rolls_back(self) -> None:
+        """TEST-65: Reversible commit preparation failure (Phase 1) rolls back without destroying stashed resources."""
+        # 1. Setup initial state with a wrong-type controller to verify it's stashed and restored intact
+        mesh_data = bpy.data.meshes.new("TestMesh65")
+        mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.context.scene.collection.objects.link(mesh_obj)
+        orig_obj_ptr = mesh_obj.as_pointer()
+        orig_data_ptr = mesh_data.as_pointer()
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        # 2. Inject failure at Phase 1 before_commit_prepare
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "before_commit_prepare":
+                raise RuntimeError("Simulated Phase 1 preparation failure")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Simulated Phase 1 preparation failure", str(cm.exception))
+
+        # 3. Assertions
+        # Stashed wrong-type object and mesh data block identities must NOT be destroyed
+        self.assertIn("HandIK.L", bpy.data.objects)
+        restored_obj = bpy.data.objects["HandIK.L"]
+        self.assertEqual(restored_obj.as_pointer(), orig_obj_ptr)
+        self.assertEqual(restored_obj.type, "MESH")
+        self.assertIn("TestMesh65", bpy.data.meshes)
+        self.assertEqual(restored_obj.data.as_pointer(), orig_data_ptr)
+
+        # Active transaction stack restored to empty
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Full rig restoration verification passes
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_66_irreversible_cleanup_failure_semantics_and_retry(self) -> None:
+        """TEST-66: Irreversible cleanup failure (Phase 3) leaves rig COMMITTED, tracks uncleaned resources, and retries cleanly."""
+        # 1. Add a wrong-type object that requires cleanup
+        mesh_data = bpy.data.meshes.new("DoomedMesh66")
+        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Simulated Phase 3 irreversible cleanup failure")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        # 2. Call setup_arm_ik() -> must raise RuntimeError because cleanup failed
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Simulated Phase 3 irreversible cleanup failure", str(cm.exception))
+
+        # 3. Verify transaction state and semantics
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertTrue(tx.committed)
+        self.assertIsNotNone(tx.cleanup_error)
+        self.assertIn("Simulated Phase 3 irreversible cleanup failure", tx.cleanup_error)
+
+        # Business rig is committed: HandIK.L is now the active EMPTY controller!
+        active_controller = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(active_controller)
+        self.assertEqual(active_controller.type, "EMPTY")
+        self.assertNotEqual(active_controller, wrong_obj)
+
+        # Original doomed object is tracked in uncleaned resources
+        self.assertGreater(len(tx.uncleaned_stashed_objects), 0)
+        stashed_names = [s["original_name"] for s in tx.uncleaned_stashed_objects]
+        self.assertIn("HandIK.L", stashed_names)
+
+        # 4. Clear the fault hook and execute idempotent retry
+        _clear_test_fault_injection_hook()
+        tx.retry_cleanup()
+
+        # After retry, transaction converges to COMMITTED with no cleanup error
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertNotIn("DoomedMesh66", bpy.data.meshes)
+
+        # Second retry is idempotent and harmless
+        tx.retry_cleanup()
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+    def test_67_partial_cleanup_failure_and_convergence(self) -> None:
+        """TEST-67: Partial cleanup failure prevents duplicate deletions, protects shared resources, and converges on retry."""
+        # Setup 2 wrong-type controllers:
+        # 1) HandIK.L with exclusive mesh
+        mesh_excl = bpy.data.meshes.new("ExclMesh67")
+        wrong_l = bpy.data.objects.new("HandIK.L", mesh_excl)
+        bpy.context.scene.collection.objects.link(wrong_l)
+
+        # 2) HandIK.R with shared curve
+        curve_shared = bpy.data.curves.new("SharedCurve67", type="CURVE")
+        wrong_r = bpy.data.objects.new("HandIK.R", curve_shared)
+        bpy.context.scene.collection.objects.link(wrong_r)
+
+        other_obj = bpy.data.objects.new("OtherObj67", curve_shared)
+        bpy.context.scene.collection.objects.link(other_obj)
+        self.assertGreaterEqual(curve_shared.users, 2)
+
+        # Setup 2 wrong-type constraints on forearm.L
+        pbone_l = self.armature.pose.bones["forearm.L"]
+        stashed_con1 = pbone_l.constraints.new(type="LIMIT_ROTATION")
+        stashed_con1.name = "ArmIK.L"
+        stashed_con2 = pbone_l.constraints.new(type="TRACK_TO")
+        stashed_con2.name = "ArmIK.L_Extra"
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                tx = ctx["tx"]
+                captured_tx.append(tx)
+                # Simulate partial cleanup: remove wrong_l and mesh_excl manually, then pop from uncleaned_stashed_objects
+                for st in list(tx.uncleaned_stashed_objects):
+                    if st.get("original_name") == "HandIK.L":
+                        obj = st.get("stashed_obj")
+                        if obj and obj.name in bpy.data.objects:
+                            bpy.data.objects.remove(obj, do_unlink=True)
+                        mesh = st.get("stashed_data")
+                        if mesh and mesh.name in bpy.data.meshes:
+                            bpy.data.meshes.remove(mesh, do_unlink=True)
+                        tx.uncleaned_stashed_objects.remove(st)
+                        break
+                raise RuntimeError("Simulated partial commit cleanup failure")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Simulated partial commit cleanup failure", str(cm.exception))
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+
+        # Verify partial cleanup results:
+        # wrong_l (exclusive mesh) was cleaned up, wrong_r still pending
+        self.assertNotIn("ExclMesh67", bpy.data.meshes)
+        self.assertIn("SharedCurve67", bpy.data.curves)
+        self.assertIs(other_obj.data, curve_shared)
+
+        # Retry cleanup converges cleanly
+        _clear_test_fault_injection_hook()
+        tx.retry_cleanup()
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+        self.assertIn("SharedCurve67", bpy.data.curves)
+        self.assertEqual(other_obj.data, curve_shared)
+
+    def test_68_depsgraph_update_call_boundary_exception_rollback(self) -> None:
+        """TEST-68: Exception at _DEPSGRAPH_UPDATER call boundary propagates and triggers complete atomic rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.2)
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        # Call boundary failure injection: fail on first call during forward transaction, then succeed during rollback
+        call_count = [0]
+        def failing_updater():
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("Depsgraph call boundary crash")
+            bpy.context.view_layer.update()
+
+        _set_test_depsgraph_updater(failing_updater)
+        try:
+            y_pos = self.root.location.y + 0.15
+            target_pos = (-0.32, y_pos, 1.20)
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.88)
+            self.assertIn("Depsgraph call boundary crash", str(cm.exception))
+        finally:
+            _clear_test_depsgraph_updater()
+
+        # All writes prior to depsgraph update rolled back atomically
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_69_snapshot_array_immutability_and_independence(self) -> None:
+        """TEST-69: Snapshot arrays are immutable tuples, immune to in-place RNA mutations, and restored properly."""
+        from src.rig.arm_ik import _clone_snapshot_property_value
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        # Assert snapshot stored immutable tuples for array properties (rotation_axis_angle, etc.)
+        pbone = self.armature.pose.bones["forearm.L"]
+        stored_axis_angle = snap["pose_bones"]["forearm.L"]["rotation_axis_angle"]
+        self.assertIsInstance(stored_axis_angle, tuple)
+
+        # Verify _clone_snapshot_property_value creates independent immutable tuple
+        raw_list = [10.0, 20.0, 30.0]
+        cloned_tuple = _clone_snapshot_property_value(raw_list)
+        self.assertIsInstance(cloned_tuple, tuple)
+        self.assertEqual(cloned_tuple, (10.0, 20.0, 30.0))
+        raw_list[0] = 999.0
+        self.assertEqual(cloned_tuple[0], 10.0)
+
+        # In-place mutate pbone rotation_axis_angle RNA array
+        orig_angle = pbone.rotation_axis_angle[0]
+        pbone.rotation_axis_angle[0] = orig_angle + 1.57
+        # Snapshot tuple must remain strictly unaffected
+        self.assertEqual(snap["pose_bones"]["forearm.L"]["rotation_axis_angle"][0], stored_axis_angle[0])
+
+        # In-place mutate pbone location Vector and matrix_basis Matrix
+        orig_snap_loc = snap["pose_bones"]["forearm.L"]["location"].copy()
+        pbone.location.x += 10.0
+        self.assertEqual(snap["pose_bones"]["forearm.L"]["location"].x, orig_snap_loc.x)
+
+        # Rollback recovers original values
+        _rollback_arm_rig_state(self.armature, snap)
+        self.assertAlmostEqual(pbone.rotation_axis_angle[0], orig_angle, places=5)
+        self.assertAlmostEqual(pbone.location.x, orig_snap_loc.x, places=5)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_70_rna_property_restoration_failure_error_aggregation(self) -> None:
+        """TEST-70: Failure during constraint property restoration aggregates dual exceptions with exact context."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Inject failure on restoration of generic property
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary forward transaction error")
+            elif stage == "during_constraint_property_restore":
+                if ctx.get("bone") == "forearm.L" and ctx.get("con") == "ArmIK.L":
+                    raise ValueError("Simulated RNA property write rejection")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        y_pos = self.root.location.y + 0.15
+        target_pos = (-0.32, y_pos, 1.20)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.9)
+
+        err_msg = str(cm.exception)
+        # Dual exception aggregation: both primary and restoration errors present
+        self.assertIn("Primary forward transaction error", err_msg)
+        self.assertIn("Simulated RNA property write rejection", err_msg)
+        # Detailed context reported: bone, constraint, property
+        self.assertIn("forearm.L", err_msg)
+        self.assertIn("ArmIK.L", err_msg)
+
+        # Active transaction stack cleaned up
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_71_external_collection_protection_during_rollback(self) -> None:
+        """TEST-71: Rollback protects collections created externally during transaction while removing transaction collections."""
+        setup_arm_ik(self.armature)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        ext_col_name = "ExternalThirdPartyCol71"
+        ext_obj_name = "ExternalObj71"
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                # Simulate external code creating a collection and object concurrently
+                ext_col = bpy.data.collections.new(ext_col_name)
+                bpy.context.scene.collection.children.link(ext_col)
+                ext_obj = bpy.data.objects.new(ext_obj_name, None)
+                ext_col.objects.link(ext_obj)
+                raise RuntimeError("Crash inside transaction write")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        y_pos = self.root.location.y + 0.15
+        target_pos = (-0.32, y_pos, 1.20)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.8)
+        self.assertIn("Crash inside transaction write", str(cm.exception))
+
+        # External collection and its object must be strictly protected!
+        self.assertIn(ext_col_name, bpy.data.collections)
+        self.assertIn(ext_col_name, bpy.context.scene.collection.children)
+        ext_col = bpy.data.collections[ext_col_name]
+        self.assertIn(ext_obj_name, ext_col.objects)
+
+        # Rig state restored
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        # Clean up external test artifacts
+        bpy.data.objects.remove(bpy.data.objects[ext_obj_name], do_unlink=True)
+        bpy.context.scene.collection.children.unlink(ext_col)
+        bpy.data.collections.remove(ext_col)
+
+    def test_72_collection_rename_and_multi_parent_restoration(self) -> None:
+        """TEST-72: Character collection with multiple parents, renamed or reparented in transaction, is restored 100%."""
+        char_col = bpy.data.collections["Character"]
+
+        parent_col2 = bpy.data.collections.new("ParentCol2_72")
+        bpy.context.scene.collection.children.link(parent_col2)
+        parent_col2.children.link(char_col)
+
+        parent_col3 = bpy.data.collections.new("ParentCol3_72")
+        bpy.context.scene.collection.children.link(parent_col3)
+
+        char_col_ptr = char_col.as_pointer()
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                # Alter parents and rename Character collection
+                c = bpy.data.collections.get("Character")
+                if c is not None:
+                    if c.name in parent_col2.children:
+                        parent_col2.children.unlink(c)
+                    parent_col3.children.link(c)
+                    c.name = "Character_Mutated72"
+                raise RuntimeError("Fault during transaction")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Fault during transaction", str(cm.exception))
+
+        # Verify restoration:
+        # 1. Collection name is Character and pointer unchanged
+        self.assertIn("Character", bpy.data.collections)
+        restored_char = bpy.data.collections["Character"]
+        self.assertEqual(restored_char.as_pointer(), char_col_ptr)
+
+        # 2. Both original parents restored: scene.collection and parent_col2
+        self.assertIn("Character", bpy.context.scene.collection.children)
+        self.assertIn("Character", parent_col2.children)
+        self.assertNotIn("Character", parent_col3.children)
+
+        # Clean up additional collections
+        bpy.context.scene.collection.children.unlink(parent_col2)
+        bpy.data.collections.remove(parent_col2)
+        bpy.context.scene.collection.children.unlink(parent_col3)
+        bpy.data.collections.remove(parent_col3)
+
+    def test_73_stashed_constraint_identity_and_ordering(self) -> None:
+        """TEST-73: Stashed wrong-type constraints and unrelated custom constraints preserve identities and order on rollback."""
+        pbone = self.armature.pose.bones["forearm.L"]
+
+        con1 = pbone.constraints.new(type="COPY_LOCATION")
+        con1.name = "MyCustomLoc73"
+        con1.influence = 0.72
+        con1.mute = False
+        con1_ptr = con1.as_pointer()
+
+        con2 = pbone.constraints.new(type="LIMIT_ROTATION")
+        con2.name = "ArmIK.L"  # Wrong-type constraint with target name
+        con2.influence = 0.55
+        con2.mute = True
+        con2_ptr = con2.as_pointer()
+
+        con3 = pbone.constraints.new(type="TRACK_TO")
+        con3.name = "MyCustomTrack73"
+        con3.influence = 0.41
+        con3.mute = True
+        con3_ptr = con3.as_pointer()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend":
+                raise RuntimeError("Fault after constraints setup")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Fault after constraints setup", str(cm.exception))
+
+        # Check constraint count, names, identities, ordering, and properties
+        self.assertEqual(len(pbone.constraints), 3)
+        names = [c.name for c in pbone.constraints]
+        self.assertEqual(names, ["MyCustomLoc73", "ArmIK.L", "MyCustomTrack73"])
+
+        self.assertEqual(pbone.constraints[0].as_pointer(), con1_ptr)
+        self.assertEqual(pbone.constraints[1].as_pointer(), con2_ptr)
+        self.assertEqual(pbone.constraints[2].as_pointer(), con3_ptr)
+
+        self.assertEqual(pbone.constraints[1].type, "LIMIT_ROTATION")
+        self.assertTrue(pbone.constraints[1].mute)
+        self.assertAlmostEqual(pbone.constraints[1].influence, 0.55, places=5)
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_74_sequential_failures_and_subsequent_success_avalanche_protection(self) -> None:
+        """TEST-74: Sequential snapshot failure -> write failure -> clean rollback -> normal setup -> idempotent re-run."""
+        # 1. Snapshot failure
+        def fault_snapshot(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                raise RuntimeError("Fault in snapshot stage")
+
+        _set_test_fault_injection_hook(fault_snapshot)
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Fault in snapshot stage", str(cm.exception))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # 2. Write failure
+        def fault_write(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                raise RuntimeError("Fault in write stage")
+
+        _set_test_fault_injection_hook(fault_write)
+        with self.assertRaises(RuntimeError) as cm:
+            setup_arm_ik(self.armature)
+        self.assertIn("Fault in write stage", str(cm.exception))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # 3. Clear hook and run normal setup_arm_ik()
+        _clear_test_fault_injection_hook()
+        setup_arm_ik(self.armature, initial_influence=0.7)
+
+        # Verify rig is properly setup
+        for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            self.assertIn(c_name, bpy.data.objects)
+            self.assertEqual(bpy.data.objects[c_name].type, "EMPTY")
+
+        snap_valid = _snapshot_arm_rig_state(self.armature)
+
+        # 4. Idempotent re-run
+        setup_arm_ik(self.armature, initial_influence=0.7)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        _verify_arm_rig_state_restored(self.armature, snap_valid)
+
+    def test_75_side_isolation_and_shared_resource_protection(self) -> None:
+        """TEST-75: Failure on L side set_hand_ik_target isolates R side completely and protects shared datablock."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Create shared curve datablock referenced by R side custom object
+        shared_curve = bpy.data.curves.new("SharedCurve75", type="CURVE")
+        user1 = bpy.data.objects.new("CurveUser1_75", shared_curve)
+        user2 = bpy.data.objects.new("CurveUser2_75", shared_curve)
+        bpy.context.scene.collection.objects.link(user1)
+        bpy.context.scene.collection.objects.link(user2)
+        initial_users = shared_curve.users
+        self.assertGreaterEqual(initial_users, 2)
+
+        # Assign custom property to R controller
+        bpy.data.objects["HandIK.R"]["r_tag"] = "SideR_Value"
+        r_loc_before = bpy.data.objects["HandIK.R"].location.copy()
+        r_con_influence = self.armature.pose.bones["forearm.R"].constraints["ArmIK.R"].influence
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Fault during L hand target write")
+
+        _set_test_fault_injection_hook(fault_hook)
+
+        y_pos = self.root.location.y + 0.15
+        target_pos = (-0.32, y_pos, 1.20)
+
+        with self.assertRaises(RuntimeError) as cm:
+            set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.95)
+        self.assertIn("Fault during L hand target write", str(cm.exception))
+
+        # 1. R side is 100% untouched
+        self.assertEqual(bpy.data.objects["HandIK.R"]["r_tag"], "SideR_Value")
+        self.assertEqual(bpy.data.objects["HandIK.R"].location, r_loc_before)
+        self.assertEqual(self.armature.pose.bones["forearm.R"].constraints["ArmIK.R"].influence, r_con_influence)
+
+        # 2. Shared curve datablock is intact with users count preserved
+        self.assertIn("SharedCurve75", bpy.data.curves)
+        self.assertEqual(shared_curve.users, initial_users)
+
+        # 3. Overall rig restored to snapshot
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+        # Clean up test objects
+        bpy.data.objects.remove(user1, do_unlink=True)
+        bpy.data.objects.remove(user2, do_unlink=True)
+        bpy.data.curves.remove(shared_curve, do_unlink=True)
+
+    def test_76_validator_corruption_detection(self) -> None:
+        """TEST-76: Verifier captures 6 distinct corruption dimensions with exact field names without mutating scene."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        # Baseline: verifier must pass initially
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        # Dimension 1: Controller object identity pointer mismatch
+        old_c = bpy.data.objects["HandIK.L"]
+        old_c.name = "HandIK.L_temp_76"
+        new_c = bpy.data.objects.new("HandIK.L", None)
+        bpy.context.scene.collection.objects.link(new_c)
+        with self.assertRaises((RuntimeError, AssertionError)) as cm1:
+            _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertIn("identity mismatch", str(cm1.exception))
+        # Restore old object for next checks
+        bpy.data.objects.remove(new_c, do_unlink=True)
+        old_c.name = "HandIK.L"
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        # Dimension 2: Constraint property difference
+        snap_corrupt = _snapshot_arm_rig_state(self.armature)
+        snap_corrupt["pose_bones"]["forearm.L"]["constraints"][0]["pole_angle"] += 0.005  # diff > 1e-5
+        with self.assertRaises((RuntimeError, AssertionError)) as cm2:
+            _verify_arm_rig_state_restored(self.armature, snap_corrupt)
+        self.assertIn("pole_angle", str(cm2.exception))
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        # Dimension 3: Constraint ordering reversed
+        pbone = self.armature.pose.bones["forearm.L"]
+        extra_con = pbone.constraints.new(type="COPY_ROTATION")
+        extra_con.name = "ExtraCon76"
+        snap_order = _snapshot_arm_rig_state(self.armature)
+        pbone.constraints.move(1, 0)  # swap order
+        with self.assertRaises((RuntimeError, AssertionError)) as cm3:
+            _verify_arm_rig_state_restored(self.armature, snap_order)
+        self.assertIn("constraint", str(cm3.exception))
+        pbone.constraints.remove(extra_con)
+        _rollback_arm_rig_state(self.armature, snap)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        # Dimension 4: Character collection link unlinked
+        char_col = bpy.data.collections["Character"]
+        bpy.context.scene.collection.children.unlink(char_col)
+        with self.assertRaises((RuntimeError, AssertionError)) as cm4:
+            _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertIn("Character collection", str(cm4.exception))
+        bpy.context.scene.collection.children.link(char_col)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        # Dimension 5: DataBlock identity change
+        # Corrupt data_ref expectation in snapshot
+        snap_data_corrupt = _snapshot_arm_rig_state(self.armature)
+        snap_data_corrupt["controllers"]["HandIK.L"]["data_ref"] = 999999999
+        with self.assertRaises((RuntimeError, AssertionError)) as cm5:
+            _verify_arm_rig_state_restored(self.armature, snap_data_corrupt)
+        self.assertIn("data_ref identity mismatch", str(cm5.exception))
+
+        # Dimension 6: Active transaction stack violation
+        _ACTIVE_TRANSACTION_STACK.append("dummy_tx")
+        try:
+            with self.assertRaises((RuntimeError, AssertionError)) as cm6:
+                _verify_arm_rig_state_restored(self.armature, snap)
+            self.assertIn("Active transaction stack", str(cm6.exception))
+        finally:
+            _ACTIVE_TRANSACTION_STACK.pop()
+
+        # Final check: verifier leaves rig 100% clean and passing
+        _verify_arm_rig_state_restored(self.armature, snap)
 
 
 if __name__ == "__main__":

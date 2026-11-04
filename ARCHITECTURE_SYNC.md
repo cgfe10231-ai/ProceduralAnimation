@@ -10,9 +10,9 @@
 >
 > **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B（Task 10-B / Revision 4 独立审计修正，生产级事务快照、失败回滚与异常安全已完成验收归档）。
+> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-5（Production Snapshot Integrity & Transaction Atomicity Repair，生产级快照完整性、三阶段提交与事务原子性修复已全部实现并通过验证）。
 >
-> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B 为 `ACCEPTED — VERIFIED`（64/64 专项测试通过，四级回归全部 0 缺陷通过）；生产级事务快照、失败回滚与逐字段核验已在 `src/rig/arm_ik.py` 完整实现并经验收。
+> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B-5 为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`（76/76 专项测试通过，四级回归全部 0 缺陷通过）；显式 9 状态生命周期状态机、三阶段提交协议、快照不可变深拷贝、集合所有权隔离、调用边界适配及全字段核验已在 `src/rig/arm_ik.py` 完整实现。
 >
 > **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 >
@@ -1097,7 +1097,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 8. 当前架构同步状态规则
 
 - PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- Task 10-A 与 Task 10-B 均已通过验收（Task 10-A 归档验收；Task 10-B / Revision 4 生产级事务快照与回滚系统已闭环验收归档，52/52 PASS）。下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`，尚未准入）。
+- Task 10-A 已归档验收；Task 10-B-5 生产级快照完整性与事务原子性已实现并待独立评审（76/76 PASS）。下一执行节点仍严格为 Task 10-C（`BLOCKED — NOT STARTED`，尚未准入）。
 - Task 11 负责 FIND-R3-03、FIND-R3-04。
 - Task 12 负责 PKG-5 跨模块联合审计与验收。
 - 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。

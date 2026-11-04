@@ -2,6 +2,45 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-04] PKG-5 / Task 10-B-5：Arm IK 生产级快照完整性与事务原子性修复
+
+* **任务性质**：既有功能缺陷修复（TASK 10-B-5），修复 Task 10-B / Revision 4 遗留的状态机隐式转换、快照数组引用联动、不可逆清理异常悬挂、集合所有权污染、更新调用边界异常及验证器盲区。
+* **状态**：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`（76/76 专项测试通过，全四级分层回归 0 缺陷通过）。
+* **生产代码修改**（`src/rig/arm_ik.py`）：
+  - **单元 A（状态机与三阶段提交协议）**：引入 9 状态显式生命周期状态机 `_ArmRigTransactionState`（`CREATED`, `SNAPSHOTTING`, `ACTIVE`, `ROLLING_BACK`, `ROLLED_BACK`, `COMMITTING`, `COMMITTED`, `CLEANUP_PENDING`, `FAILED`）。实现三阶段提交：阶段 1 可逆提交准备（`COMMITTING`，故障时完整回滚）、阶段 2 逻辑提交确认（`COMMITTED`，业务 Rig 正式生效）、阶段 3 不可逆资源清理（清理失败置为 `CLEANUP_PENDING`，记录未清理资源与错误，提供幂等 `tx.retry_cleanup()` 保证最终一致性）。
+  - **单元 B（快照深拷贝与数据不可变性）**：实现 `_clone_snapshot_property_value()`，严格将 RNA 序列属性深层克隆为独立不可变 `tuple`，解除 RNA 内存就地修改与快照联动的安全隐患；mathutils 向量矩阵采用 `.copy()`；对关键属性读取失败显式抛错，杜绝盲目静默吞错。
+  - **单元 C（约束恢复与双异常聚合）**：重构 `_rollback_arm_rig_state()` 中的约束属性还原，消除静默 `except: pass`；若回滚恢复失败，聚合向外报告原始异常与回滚恢复异常上下文。
+  - **单元 D（集合所有权严格隔离）**：引入 `tx.register_created_collection()` 显式所有权注册；回滚仅删除当前事务所创建的集合，严格保护并发外部创建的集合及对象；无损恢复多父级链接与被重命名的 Character 集合。
+  - **单元 E（依赖图更新调用边界适配）**：将直接的 `view_layer.update()` 调用统一封装在 `_depsgraph_update()` 适配层，并提供私有测试适配接口 `_set_test_depsgraph_updater` / `_clear_test_depsgraph_updater`，实现对真实调用边界异常的注入与原子回滚验证。
+  - **单元 F（全字段恢复核验器加固）**：全面升级 `_verify_arm_rig_state_restored()`，逐项核验 4 控制器（存在、身份、数据块、变换、显示）、6 姿态骨骼（变换、锁定、限位）、约束（数量、顺序、身份、通用属性数组元素逐项比对公差 `TOL = 1e-5`）与全局事务栈干净度（深度 0）。
+* **专项测试扩充**（`tests/test_task10b_transaction_atomicity.py`）：
+  - 新增 TEST-65 至 TEST-76 全部 12 项专项事务修复测试：
+    - TEST-65：验证三阶段提交第一阶段（`before_commit_prepare`）异常时的完整回滚与暂存资源保全。
+    - TEST-66：验证第三阶段不可逆清理异常时的 `CLEANUP_PENDING` 语义、资源记录及 `retry_cleanup()` 幂等收敛。
+    - TEST-67：多资源部分清理失败验证，杜绝二次重复删除，保护共享 DataBlock 并在重试后收敛。
+    - TEST-68：验证 `_DEPSGRAPH_UPDATER` 调用边界异常向外抛出与写入属性的原子回滚。
+    - TEST-69：验证快照数组不可变性，RNA 就地修改不联动快照且回滚准确恢复。
+    - TEST-70：验证约束属性恢复失败时的双异常聚合与骨骼/约束/属性上下文报告。
+    - TEST-71：验证回滚期间外部独立创建集合的严格保护与事务集合清理。
+    - TEST-72：验证多父级链接 Character 集合在重命名/重置层级后的 100% 恢复。
+    - TEST-73：验证暂存错误约束与无关自定义约束在回滚中的身份指针与相对顺序保全。
+    - TEST-74：同一骨架连续“快照失败 -> 写入失败 -> 正常回滚 -> 正常 setup -> 幂等再次调用”雪崩防护验证。
+    - TEST-75：左侧目标写入失败对右侧控制器及共享 DataBlock 的隔离保护验证。
+    - TEST-76：验证器对 6 种不同维度损坏（控制器身份、约束参数、约束顺序、集合链接、数据块身份、事务栈）的精确捕获。
+  - 澄清 TEST-61（预更新钩子注入）与 TEST-64（数据块引用生命周期感知）的注记定位。
+* **专项与分层测试验证**：
+  - `test_task10b_input_validation.py`：30/30 PASS (2.36s)。
+  - `test_task10b_transaction_atomicity.py`：46/46 PASS (6.28s)。
+  - Task 10-B 专项总计：76/76 PASS (100%)。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS (6.53s)。
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，文档符号存在性 PASS。
+  - 分层回归：Quick 19/19 (65.48s)、Physics 27/27 (135.78s)、Motion 12/12 (77.25s)、Full 42/42 (215.00s)，全部退出码 0，FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **证据归档**：
+  - `docs/evidence/PKG5_10B_REVISION_5/`：包含 8 份分析报告（`baseline.md`、`transaction_state_machine.md`、`snapshot_schema.md`、`resource_ownership.md`、`fault_injection_matrix.md`、`test_traceability.md`、`regression_summary.md`、`final_audit_report.md`）及 8 份 UTF-8 格式测试日志。
+* **后续任务与边界**：
+  - 当前状态为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`。
+  - 下一执行节点仍严格为 `Task 10-C (BLOCKED — NOT STARTED)`。
+
 ### [2026-11-03] PKG-5 / Task 10-B / Revision 4 独立审计修正：Arm IK 生产级事务完整性与异常安全加固
 
 * **任务性质**：PKG-5 / Task 10-B / Revision 4 独立审计修正，全面修复代码审查发现的验证器盲区、无损约束暂存、初始化异常安全与跨 Armature 独占性等阻塞项。

@@ -1,12 +1,12 @@
 # PROJECT_STATE：项目当前真实状态
 
-> **更新时间**：2026-11-03
+> **更新时间**：2026-11-04
 >
 > **09-B-4 验收证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；PKG-5 / Task 10-B (Task 10-B / Revision 4 独立审计修正，生产级事务快照、失败回滚与异常安全已完成验收归档)。
+> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；PKG-5 / Task 10-B-5 (Production Snapshot Integrity & Transaction Atomicity Repair，生产级快照完整性、三阶段提交与事务原子性修复已全部实现并通过验证)。
 >
-> **当前完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B (含第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订及独立审计修正生产级事务快照与回滚) 为 `ACCEPTED — VERIFIED`；64 项专项测试 (30 输入验证 + 34 事务) 64/64 PASS；四级回归全部 0 缺陷通过。
+> **当前完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B (含第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订及第 5 轮生产级快照完整性与事务原子性修复) 为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`；76 项专项测试 (30 输入验证 + 46 事务原子性) 76/76 PASS；四级回归全部 0 缺陷通过。
 >
 > **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 >
@@ -17,7 +17,7 @@
 > - 09-B-4 是在既有 09-B 修复基础上的完整状态回滚、解锁事务与数学边界补强及独立复核。
 > - 不得把已完成的 09-B-4 重新描述为 `IN PROGRESS — NOT ACCEPTED`。
 > - 不得创建未经授权的 09-B-5。
-> - 历史计划记法说明：旧文档中曾记录的计划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产事务快照与回滚）已于 Task 10-B / Revision 4 及独立审计修正验收合入并关闭。
+> - 历史计划记法说明：旧文档中曾记录的计划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产事务快照与回滚）已于 Task 10-B / Revision 4 验收合入并关闭；本轮 Task 10-B-5 针对独立审计提出的状态机、不可变深拷贝、三阶段提交、集合所有权隔离与调用边界进行闭环修复。
 >
 > **当前生产源码数学支持域**（`src/rig/ik.py`）：
 > - 有效父级矩阵：`M_eff = M_parent @ matrix_parent_inverse`。
@@ -31,12 +31,19 @@
 >
 > **当前完整状态与事务合同**：
 > - 腿部 IK：`_snapshot_leg_rig_state()` 捕获 4 个腿部控制器的 15 个状态字段，以及 6 根腿部姿态骨骼的 8 个状态字段；`_rollback_leg_rig_state()` 恢复并核验所有快照字段；`unlock_foot_contact()` 的 Phase B 修改过程具备失败回滚。
-> - 手臂 IK（Task 10-B / Revision 4 独立审计修正）：`_snapshot_arm_rig_state()` 完整覆盖 4 个手臂控制器（存在性、对象/Data Block 引用、名称、类型、Parent、matrix_parent_inverse、TRS、rotation_mode、显示属性、集合归属）、6 根姿态骨骼（位移、旋转模式、各旋转通道、缩放、基矩阵、IK 锁定与限位）、约束完整链（顺序、类型、Target、Pole Target、Chain Count、Pole Angle、Mix Mode、Influence 及全量通用可写 RNA 属性）及 Character Collection 层次结构；`_rollback_arm_rig_state()` 精准逐字段恢复并还原被替换的错误类型对象与暂存约束，利用 `pbone.constraints.move()` 恢复精准约束顺序；`_verify_arm_rig_state_restored()` 逐项核验（TOL=1e-5，四元数旋转等价性）；统一通过 `_arm_rig_transaction` 保护 `setup_arm_ik`、`set_hand_ik_target` 和 `set_arm_ik_influence`，具备初始化异常安全与跨 Armature 独占保护；提交清理安全清理孤儿 Data Block 并保护共享 Data Block。
+> - 手臂 IK（Task 10-B-5 修订）：
+>   - 显式 9 状态生命周期状态机 `_ArmRigTransactionState`（`CREATED`, `SNAPSHOTTING`, `ACTIVE`, `ROLLING_BACK`, `ROLLED_BACK`, `COMMITTING`, `COMMITTED`, `CLEANUP_PENDING`, `FAILED`）。
+>   - 三阶段安全提交协议（Phase 1 可逆准备故障回滚；Phase 2 逻辑提交确认；Phase 3 不可逆资源清理挂起与 `tx.retry_cleanup()` 幂等收敛）。
+>   - 快照不可变深拷贝契约：`_clone_snapshot_property_value()` 将 RNA 数组完全解耦为独立不可变 tuple，mathutils 对象采用 `.copy()`，禁止静默吞错。
+>   - 集合所有权严格隔离：`tx.register_created_collection()` 显式所有权跟踪，回滚仅删除事务集合，100% 保护并发外部集合；多父级 Character 集合无损恢复。
+>   - 依赖图更新调用边界解耦：`_DEPSGRAPH_UPDATER` 适配层与私有测试适配接口支持真实调用边界异常注入与原子回滚。
+>   - 全字段恢复验证器：`_verify_arm_rig_state_restored()` 逐字段核验 4 控制器（存在、身份、数据块、TRS、显示、集合）、6 骨骼（TRS、basis、锁定、限位）、约束（数量、相对顺序、身份、通用 RNA 属性数组公差 `TOL=1e-5`）与全局事务栈干净度（深度 0）。
+>   - 统一通过 `_arm_rig_transaction` 保护 `setup_arm_ik`、`set_hand_ik_target` 和 `set_arm_ik_influence`，具备初始化异常安全与跨 Armature 独占保护。
 >
 > **当前专项测试状态**：
 > - `test_task10b_input_validation.py`：30/30 PASS（TEST-01 至 TEST-30 输入预验证、Influence 范围、零突变与控制器类型预检）。
-> - `test_task10b_transaction_atomicity.py`：34/34 PASS（TEST-31 至 TEST-52 快照保真度、直接回滚保真度、10 个阶段故障注入回滚、8 种旋转模式成功路径与核验失败双重异常报告；TEST-53 至 TEST-64 逐字段核验器精度、无损约束暂存与恢复、初始化异常安全、跨 Armature 隔离、集合层级恢复、极限投影触达、测试钩子私有化与 Data Block 周期）。
-> - Task 10-B 专项测试总计：64/64 PASS (100%)。
+> - `test_task10b_transaction_atomicity.py`：46/46 PASS（TEST-31 至 TEST-64 快照保真度、直接回滚保真度、故障注入回滚、8 种旋转模式成功路径、逐字段核验器精度、无损约束暂存与恢复、初始化异常安全、跨 Armature 隔离、集合层级恢复；TEST-65 至 TEST-76 三阶段提交、不可逆清理异常与重试、部分清理收敛、调用边界异常、快照不可变性、双异常聚合、外部集合保护、多父级集合恢复、暂存约束保真、雪崩防护、侧向隔离与 6 维损坏捕获）。
+> - Task 10-B 专项测试总计：76/76 PASS (100%)。
 > - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS。
 > - `test_leg_ik_world_rotation_contract.py`：27/27 PASS。
 > - `test_leg_ik_ground_height_contract.py`：20/20 PASS。
@@ -44,10 +51,10 @@
 > - 文档符号审计及 6 项审计器自测试通过。
 >
 > **当前分层回归状态**：
-> - Quick：19/19，退出码 0 (50.19s)。
-> - Physics：27/27，退出码 0 (108.30s)。
-> - Motion：12/12，退出码 0 (51.71s)。
-> - Full：42/42，退出码 0 (171.12s)。
+> - Quick：19/19，退出码 0 (65.48s)。
+> - Physics：27/27，退出码 0 (135.78s)。
+> - Motion：12/12，退出码 0 (77.25s)。
+> - Full：42/42，退出码 0 (215.00s)。
 > - 四级测试均为 FAIL 0、SKIPPED 0、NOT_RUN 0。
 > - `AUTOMATED_PASS` 仍要求相应的视觉检查，不得误写为视觉验收已完成。
 >
@@ -59,12 +66,12 @@
 >
 > **当前 PKG-5 准入顺序**：
 > - 09-B：已完成，09-B-4 已验收。
-> - 10：Task 10-A 已完成归档；Task 10-B 已验收（`TASK 10-B — ACCEPTED`，Revision 4 生产事务闭环）；下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
+> - 10：Task 10-A 已完成归档；Task 10-B-5 已实现并待独立评审（`IMPLEMENTED — PENDING INDEPENDENT REVIEW`）；下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
 > - 11：FootLock，待修复。
 > - 12：全仓跨模块联合验收，待执行。
 >
 > **PKG-5 后续路线状态**：
-> - Task 10 / Upper-Limb IK/FK：10-A 已完成，10-B 已验收（`ACCEPTED — VERIFIED`，Revision 4 生产事务快照与回滚已闭环）；下一节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
+> - Task 10 / Upper-Limb IK/FK：10-A 已完成，10-B-5 已实现并待独立评审（`IMPLEMENTED — PENDING INDEPENDENT REVIEW`，76/76 PASS）；下一节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
 > - Task 11 / FootLock：FIND-R3-03、FIND-R3-04，尚未实施。
 > - Task 12 / Joint Integration：等待 10 与 11 独立验收。
 > - 下一具体子任务：Task 10-C（尚未准入，待明确批准后准入）。
@@ -72,7 +79,7 @@
 >
 > **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10、11、12 的独立验收与联合验收，并取得项目负责人明确批准后方可开启。
 >
-> **保护范围**：`ARCHITECTURE.md` 与 `DECISIONS.md` 受保护；本次文档同步不修改生产代码、测试源码或 Blend 资产。
+> **保护范围**：`ARCHITECTURE.md` 与 `DECISIONS.md` 受保护；本次任务不修改外部动作模块、WBC、Bridge 或 Blend 资产。
 ---
 
 ## 1. 状态分类一览
@@ -1154,7 +1161,7 @@
 | 08 Rig | 世界空间与刚体平移回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation；09-B-4 已完成 | `ACCEPTED — VERIFIED` |
-| 10 | Upper-Limb IK/FK | `ACCEPTED — VERIFIED (10-A Done, 10-B Accepted; 10-C Blocked/Not Started)` |
+| 10 | Upper-Limb IK/FK | `IMPLEMENTED — PENDING INDEPENDENT REVIEW (10-A Done, 10-B-5 Implemented; 10-C Blocked/Not Started)` |
 | 11 | FootLock：FIND-R3-03、FIND-R3-04 | `PLANNED — NOT STARTED` |
 | 12 | PKG-5 跨模块联合审计与验收 | `BLOCKED BY TASK 10 / TASK 11 ACCEPTANCE` |
 

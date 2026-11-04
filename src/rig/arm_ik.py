@@ -35,6 +35,7 @@ Task 10-A Contracts:
 import math
 import uuid
 from contextlib import contextmanager
+from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import bpy
@@ -140,6 +141,8 @@ def _ensure_character_collection() -> bpy.types.Collection:
     if col is None:
         col = bpy.data.collections.new("Character")
         scene.collection.children.link(col)
+        if _ACTIVE_TRANSACTION_STACK:
+            _ACTIVE_TRANSACTION_STACK[-1].register_created_collection(col, initial_parent=scene.collection)
     return col
 
 
@@ -156,6 +159,19 @@ def _find_collection_by_name(col_name: str) -> Optional[bpy.types.Collection]:
 # =============================================================================
 # Production Transaction Snapshot, Rollback, and Verification Infrastructure
 # =============================================================================
+
+class _ArmRigTransactionState(str, Enum):
+    """Explicit lifecycle state machine for Arm IK rig transactions."""
+    CREATED = "CREATED"
+    SNAPSHOTTING = "SNAPSHOTTING"
+    ACTIVE = "ACTIVE"
+    ROLLING_BACK = "ROLLING_BACK"
+    ROLLED_BACK = "ROLLED_BACK"
+    COMMITTING = "COMMITTING"
+    COMMITTED = "COMMITTED"
+    CLEANUP_PENDING = "CLEANUP_PENDING"
+    FAILED = "FAILED"
+
 
 _FAULT_INJECTION_HOOK: Optional[Callable[[str, Dict[str, Any]], None]] = None
 
@@ -179,10 +195,50 @@ def _trigger_fault_injection(stage: str, context: Optional[Dict[str, Any]] = Non
         _FAULT_INJECTION_HOOK(stage, context or {})
 
 
+_DEPSGRAPH_UPDATER: Callable[[], None] = lambda: bpy.context.view_layer.update() if (bpy.context and bpy.context.view_layer) else None
+
+
+def _set_test_depsgraph_updater(updater: Optional[Callable[[], None]]) -> None:
+    """Private test hook to replace or wrap depsgraph update execution at the boundary."""
+    global _DEPSGRAPH_UPDATER
+    if updater is None:
+        _DEPSGRAPH_UPDATER = lambda: bpy.context.view_layer.update() if (bpy.context and bpy.context.view_layer) else None
+    else:
+        _DEPSGRAPH_UPDATER = updater
+
+
+def _clear_test_depsgraph_updater() -> None:
+    """Clear private test depsgraph updater hook."""
+    global _DEPSGRAPH_UPDATER
+    _DEPSGRAPH_UPDATER = lambda: bpy.context.view_layer.update() if (bpy.context and bpy.context.view_layer) else None
+
+
+def _depsgraph_update() -> None:
+    """Internal unified dependency graph update boundary."""
+    _DEPSGRAPH_UPDATER()
+
+
 def _update_arm_ik_depsgraph() -> None:
-    """Synchronize the dependency graph for Arm IK calculations within transactions."""
+    """Synchronize the dependency graph for Arm IK calculations within mutations."""
     _trigger_fault_injection("set_hand_ik_target_during_depsgraph_update")
-    bpy.context.view_layer.update()
+    _depsgraph_update()
+
+
+def _clone_snapshot_property_value(val: Any) -> Any:
+    """Safely clone an RNA property value into an immutable/independent snapshot representation."""
+    if val is None:
+        return None
+    if isinstance(val, (bool, int, float, str)):
+        return val
+    if isinstance(val, (Vector, Euler, Matrix, Quaternion)):
+        return val.copy()
+    if hasattr(val, "__len__") and hasattr(val, "__getitem__") and not isinstance(val, (str, bytes, dict)):
+        # Convert RNA arrays and sequences into independent immutable tuples of cloned values
+        return tuple(_clone_snapshot_property_value(elem) for elem in val)
+    if isinstance(val, (bpy.types.Object, bpy.types.ID, bpy.types.bpy_struct)):
+        # ID / StructRNA reference: keep reference, do not deepcopy Blender C data
+        return val
+    return val
 
 
 def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
@@ -191,16 +247,16 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
     Zero-mutation guarantee: Strictly inspects and copies properties without modifying Blender state.
     """
     _trigger_fault_injection("during_snapshot_creation", {"arm": arm})
-    if bpy.context and bpy.context.view_layer:
-        bpy.context.view_layer.update()
+    _depsgraph_update()
 
     # 1. Collections snapshot
-    collections_before = {c.name for c in bpy.data.collections}
     char_col = bpy.data.collections.get("Character")
     scene_children = bpy.context.scene.collection.children if bpy.context.scene else []
     char_col_data = {
         "existed": char_col is not None,
         "col_ref": char_col,
+        "col_ptr": char_col.as_pointer() if (char_col is not None and hasattr(char_col, "as_pointer")) else None,
+        "name": char_col.name if char_col is not None else None,
         "children_of_scene": (char_col is not None and char_col.name in scene_children),
         "parent_collections": [c.name for c in bpy.data.collections if char_col is not None and char_col.name in c.children],
         "child_collections": [c.name for c in char_col.children] if char_col is not None else [],
@@ -223,7 +279,9 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
             controllers_data[c_name] = {
                 "exists": True,
                 "obj_ref": c_obj,
+                "obj_ptr": c_obj.as_pointer() if hasattr(c_obj, "as_pointer") else None,
                 "data_ref": getattr(c_obj, "data", None),
+                "data_ptr": c_obj.data.as_pointer() if getattr(c_obj, "data", None) and hasattr(c_obj.data, "as_pointer") else None,
                 "obj_name": c_obj.name,
                 "type": c_obj.type,
                 "parent": c_obj.parent,
@@ -232,7 +290,7 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
                 "rotation_mode": c_obj.rotation_mode,
                 "rotation_euler": c_obj.rotation_euler.copy(),
                 "rotation_quaternion": c_obj.rotation_quaternion.copy(),
-                "rotation_axis_angle": list(c_obj.rotation_axis_angle),
+                "rotation_axis_angle": tuple(c_obj.rotation_axis_angle),
                 "scale": c_obj.scale.copy(),
                 "matrix_world": c_obj.matrix_world.copy(),
                 "empty_display_type": getattr(c_obj, "empty_display_type", None) if c_obj.type == "EMPTY" else None,
@@ -258,6 +316,7 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
                 "name": con.name,
                 "type": con.type,
                 "con_ref": con,
+                "con_ptr": con.as_pointer() if hasattr(con, "as_pointer") else None,
                 "influence": float(con.influence),
                 "mute": bool(con.mute),
                 "target": getattr(con, "target", None),
@@ -289,15 +348,16 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
 
             generic_props: Dict[str, Any] = {}
             for p in con.rna_type.properties:
-                if not p.is_readonly and p.identifier not in ("name", "mute", "influence"):
+                if not p.is_readonly and p.identifier not in ("rna_type", "name", "mute", "influence"):
                     try:
-                        val = getattr(con, p.identifier, None)
-                        if isinstance(val, (Vector, Euler, Matrix, Quaternion)):
-                            generic_props[p.identifier] = val.copy()
-                        else:
-                            generic_props[p.identifier] = val
-                    except Exception:
-                        pass
+                        val = getattr(con, p.identifier)
+                    except Exception as pe:
+                        raise RuntimeError(
+                            f"Snapshot failed: cannot read property '{p.identifier}' (type {p.type}) "
+                            f"on constraint '{con.name}' ({con.type}) on bone '{pbone.name}': {pe}"
+                        ) from pe
+                    generic_props[p.identifier] = _clone_snapshot_property_value(val)
+
             c_dict["generic_props"] = generic_props
             con_list.append(c_dict)
 
@@ -307,7 +367,7 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
             "rotation_mode": pbone.rotation_mode,
             "rotation_euler": pbone.rotation_euler.copy(),
             "rotation_quaternion": pbone.rotation_quaternion.copy(),
-            "rotation_axis_angle": list(pbone.rotation_axis_angle),
+            "rotation_axis_angle": tuple(pbone.rotation_axis_angle),
             "scale": pbone.scale.copy(),
             "matrix_basis": pbone.matrix_basis.copy(),
             "lock_ik_x": bool(pbone.lock_ik_x),
@@ -326,7 +386,6 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
         }
 
     return {
-        "collections_before": collections_before,
         "character_collection": char_col_data,
         "controllers": controllers_data,
         "pose_bones": pose_bones_data,
@@ -353,31 +412,38 @@ def _rollback_arm_rig_state(
                 bpy.data.objects.remove(curr_obj, do_unlink=True)
 
             if orig_ref is not None:
-                if orig_ref.name != c_snap["obj_name"]:
-                    orig_ref.name = c_snap["obj_name"]
+                try:
+                    _ = orig_ref.name
+                    orig_alive = True
+                except ReferenceError:
+                    orig_alive = False
 
-                for col_name in c_snap.get("collections", []):
-                    col = _find_collection_by_name(col_name)
-                    if col is not None and orig_ref.name not in col.objects:
-                        col.objects.link(orig_ref)
+                if orig_alive:
+                    if orig_ref.name != c_snap["obj_name"]:
+                        orig_ref.name = c_snap["obj_name"]
 
-                for col in list(orig_ref.users_collection):
-                    if col.name not in c_snap.get("collections", []):
-                        col.objects.unlink(orig_ref)
+                    for col_name in c_snap.get("collections", []):
+                        col = _find_collection_by_name(col_name)
+                        if col is not None and orig_ref.name not in col.objects:
+                            col.objects.link(orig_ref)
 
-                orig_ref.parent = c_snap["parent"]
-                orig_ref.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
-                orig_ref.rotation_mode = c_snap["rotation_mode"]
-                orig_ref.location = c_snap["location"].copy()
-                orig_ref.rotation_euler = c_snap["rotation_euler"].copy()
-                orig_ref.rotation_quaternion = c_snap["rotation_quaternion"].copy()
-                orig_ref.rotation_axis_angle = tuple(c_snap["rotation_axis_angle"])
-                orig_ref.scale = c_snap["scale"].copy()
-                if orig_ref.type == "EMPTY":
-                    if c_snap.get("empty_display_type") is not None:
-                        orig_ref.empty_display_type = c_snap["empty_display_type"]
-                    if c_snap.get("empty_display_size") is not None:
-                        orig_ref.empty_display_size = c_snap["empty_display_size"]
+                    for col in list(orig_ref.users_collection):
+                        if col.name not in c_snap.get("collections", []):
+                            col.objects.unlink(orig_ref)
+
+                    orig_ref.parent = c_snap["parent"]
+                    orig_ref.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
+                    orig_ref.rotation_mode = c_snap["rotation_mode"]
+                    orig_ref.location = c_snap["location"].copy()
+                    orig_ref.rotation_euler = c_snap["rotation_euler"].copy()
+                    orig_ref.rotation_quaternion = c_snap["rotation_quaternion"].copy()
+                    orig_ref.rotation_axis_angle = tuple(c_snap["rotation_axis_angle"])
+                    orig_ref.scale = c_snap["scale"].copy()
+                    if orig_ref.type == "EMPTY":
+                        if c_snap.get("empty_display_type") is not None:
+                            orig_ref.empty_display_type = c_snap["empty_display_type"]
+                        if c_snap.get("empty_display_size") is not None:
+                            orig_ref.empty_display_size = c_snap["empty_display_size"]
 
     # Also ensure any other stashed objects from active_tx are restored
     if active_tx is not None:
@@ -392,8 +458,10 @@ def _rollback_arm_rig_state(
                     if col is not None and obj.name not in col.objects:
                         col.objects.link(obj)
 
-    # Step 2: Pose bones restoration
+    # Step 2: Pose bones and constraints restoration
     pose_bones_snap = snapshot.get("pose_bones", {})
+    restoration_errors: List[str] = []
+
     for b_name, b_snap in pose_bones_snap.items():
         pbone = arm.pose.bones.get(b_name)
         if pbone is None:
@@ -420,16 +488,16 @@ def _rollback_arm_rig_state(
         pbone.ik_min_z = b_snap["ik_min_z"]
         pbone.ik_max_z = b_snap["ik_max_z"]
 
-        # Step 3: Constraints non-destructive restoration
+        # Constraints non-destructive restoration
         saved_cons = b_snap.get("constraints", [])
         saved_con_refs = {sc["con_ref"] for sc in saved_cons if "con_ref" in sc}
 
-        # 3.1: Remove constraints added during transaction (identity check)
+        # 2.1: Remove constraints added during transaction (identity check)
         for con in list(pbone.constraints):
             if con not in saved_con_refs:
                 pbone.constraints.remove(con)
 
-        # 3.2: Restore names and mutes for any stashed constraints on this bone
+        # 2.2: Restore names and mutes for any stashed constraints on this bone
         if active_tx is not None:
             for item in getattr(active_tx, "stashed_constraints", []):
                 if item["pbone"] == pbone:
@@ -438,7 +506,7 @@ def _rollback_arm_rig_state(
                         c.name = item["orig_name"]
                         c.mute = item["orig_mute"]
 
-        # 3.3: Reconcile and restore all saved constraints
+        # 2.3: Reconcile and restore all saved constraints
         for sc in saved_cons:
             con = pbone.constraints.get(sc["name"])
             if con is None or con.type != sc["type"]:
@@ -452,13 +520,26 @@ def _rollback_arm_rig_state(
 
             for prop, val in sc.get("generic_props", {}).items():
                 try:
+                    _trigger_fault_injection("during_constraint_property_restore", {
+                        "bone": b_name, "con": sc["name"], "prop": prop, "val": val
+                    })
                     if hasattr(con, prop):
                         if isinstance(val, (Vector, Euler, Quaternion, Matrix)):
                             setattr(con, prop, val.copy())
+                        elif isinstance(val, tuple):
+                            curr_val = getattr(con, prop)
+                            if hasattr(curr_val, "__len__"):
+                                for arr_i, el in enumerate(val):
+                                    curr_val[arr_i] = el
+                            else:
+                                setattr(con, prop, val)
                         else:
                             setattr(con, prop, val)
-                except Exception:
-                    pass
+                except Exception as ce:
+                    restoration_errors.append(
+                        f"Failed to restore property '{prop}' on constraint '{sc['name']}' "
+                        f"on bone '{b_name}' with value {val!r}: {ce}"
+                    )
 
             if hasattr(con, "target"):
                 con.target = sc.get("target")
@@ -487,7 +568,7 @@ def _rollback_arm_rig_state(
                 con.invert_z = sc.get("invert_z", False)
                 con.use_offset = sc.get("use_offset", False)
 
-        # 3.3: Restore constraint ordering
+        # 2.4: Restore constraint ordering
         for target_idx, sc in enumerate(saved_cons):
             curr_names = [c.name for c in pbone.constraints]
             if sc["name"] in curr_names:
@@ -495,17 +576,34 @@ def _rollback_arm_rig_state(
                 if curr_idx != target_idx:
                     pbone.constraints.move(curr_idx, target_idx)
 
-    # Step 4: Collection hierarchy restoration
-    saved_coll_names = snapshot.get("collections_before", set())
-    for c in list(bpy.data.collections):
-        if c.name not in saved_coll_names:
-            for parent_c in list(bpy.data.collections):
-                if c.name in parent_c.children:
-                    parent_c.children.unlink(c)
-            for scene in bpy.data.scenes:
-                if c.name in scene.collection.children:
-                    scene.collection.children.unlink(c)
-            bpy.data.collections.remove(c)
+    # Step 3: Collection hierarchy restoration with strict ownership isolation
+    # Only delete collections explicitly registered as created by this transaction!
+    if active_tx is not None:
+        for reg in list(getattr(active_tx, "created_collections", [])):
+            col_ref = reg.get("col_ref")
+            col_ptr = reg.get("col_ptr")
+            created_name = reg.get("created_name")
+
+            target_col = None
+            if col_ref is not None:
+                try:
+                    if col_ref.name in bpy.data.collections and bpy.data.collections[col_ref.name] == col_ref:
+                        target_col = col_ref
+                except ReferenceError:
+                    target_col = None
+            if target_col is None and created_name in bpy.data.collections:
+                c_candidate = bpy.data.collections[created_name]
+                if col_ptr is None or c_candidate.as_pointer() == col_ptr:
+                    target_col = c_candidate
+
+            if target_col is not None:
+                for p_col in list(bpy.data.collections):
+                    if target_col.name in p_col.children:
+                        p_col.children.unlink(target_col)
+                for scene in list(bpy.data.scenes):
+                    if target_col.name in scene.collection.children:
+                        scene.collection.children.unlink(target_col)
+                bpy.data.collections.remove(target_col)
 
     char_col_snap = snapshot.get("character_collection", {})
     if not char_col_snap.get("existed", False):
@@ -519,49 +617,60 @@ def _rollback_arm_rig_state(
                     parent_c.children.unlink(col)
             bpy.data.collections.remove(col)
     else:
-        col = bpy.data.collections.get("Character")
-        if col is None:
-            col = bpy.data.collections.new("Character")
+        orig_name = char_col_snap.get("name", "Character")
+        col = char_col_snap.get("col_ref")
+        if col is None or col.name not in bpy.data.collections:
+            col = bpy.data.collections.get(orig_name)
+        if col is not None:
+            if col.name != orig_name:
+                col.name = orig_name
 
-        should_be_in_scene = char_col_snap.get("children_of_scene", False)
-        is_in_scene = col.name in bpy.context.scene.collection.children
-        if should_be_in_scene and not is_in_scene:
-            bpy.context.scene.collection.children.link(col)
-        elif not should_be_in_scene and is_in_scene:
-            bpy.context.scene.collection.children.unlink(col)
+            should_be_in_scene = char_col_snap.get("children_of_scene", False)
+            is_in_scene = col.name in bpy.context.scene.collection.children
+            if should_be_in_scene and not is_in_scene:
+                bpy.context.scene.collection.children.link(col)
+            elif not should_be_in_scene and is_in_scene:
+                bpy.context.scene.collection.children.unlink(col)
 
-        expected_parents = set(char_col_snap.get("parent_collections", []))
-        for p_col in bpy.data.collections:
-            if p_col == col:
-                continue
-            has_child = col.name in p_col.children
-            if p_col.name in expected_parents and not has_child:
-                p_col.children.link(col)
-            elif p_col.name not in expected_parents and has_child:
-                p_col.children.unlink(col)
+            expected_parents = set(char_col_snap.get("parent_collections", []))
+            for p_col in bpy.data.collections:
+                if p_col == col:
+                    continue
+                has_child = col.name in p_col.children
+                if p_col.name in expected_parents and not has_child:
+                    p_col.children.link(col)
+                elif p_col.name not in expected_parents and has_child:
+                    p_col.children.unlink(col)
 
-        expected_children = set(char_col_snap.get("child_collections", []))
-        for child in list(col.children):
-            if child.name not in expected_children:
-                col.children.unlink(child)
-        for c_name in expected_children:
-            child = bpy.data.collections.get(c_name)
-            if child is not None and child.name not in col.children:
-                col.children.link(child)
+            expected_children = set(char_col_snap.get("child_collections", []))
+            for child in list(col.children):
+                if child.name not in expected_children:
+                    col.children.unlink(child)
+            for c_name in expected_children:
+                child = bpy.data.collections.get(c_name)
+                if child is not None and child.name not in col.children:
+                    col.children.link(child)
 
-        expected_objs = char_col_snap.get("object_names", set())
-        for o in list(col.objects):
-            if o.name not in expected_objs:
-                col.objects.unlink(o)
-        for o_name in expected_objs:
-            o = bpy.data.objects.get(o_name)
-            if o is not None and o.name not in col.objects:
-                col.objects.link(o)
+            expected_objs = char_col_snap.get("object_names", set())
+            for o in list(col.objects):
+                if o.name not in expected_objs:
+                    col.objects.unlink(o)
+            for o_name in expected_objs:
+                o = bpy.data.objects.get(o_name)
+                if o is not None and o.name not in col.objects:
+                    col.objects.link(o)
 
-    bpy.context.view_layer.update()
+    _depsgraph_update()
+
+    if restoration_errors:
+        raise RuntimeError("Rollback constraint restoration failed: " + "; ".join(restoration_errors))
 
 
-def _verify_arm_rig_state_restored(arm: bpy.types.Object, snapshot: Dict[str, Any]) -> None:
+def _verify_arm_rig_state_restored(
+    arm: bpy.types.Object,
+    snapshot: Dict[str, Any],
+    active_tx: Optional[Any] = None,
+) -> None:
     """Verify that current Arm IK rig state precisely matches the snapshot.
 
     Raises:
@@ -591,12 +700,6 @@ def _verify_arm_rig_state_restored(arm: bpy.types.Object, snapshot: Dict[str, An
         return max_d, max_r, max_c
 
     # 1. Collection check
-    s_col_before = snapshot.get("collections_before", set())
-    c_col_curr = {c.name for c in bpy.data.collections}
-    unexpected_cols = c_col_curr - s_col_before
-    if unexpected_cols:
-        diffs.append(f"Unexpected new collections remained in scene: {unexpected_cols}")
-
     s_col = snapshot.get("character_collection", {})
     c_col = current.get("character_collection", {})
     if s_col.get("existed") != c_col.get("existed"):
@@ -611,6 +714,13 @@ def _verify_arm_rig_state_restored(arm: bpy.types.Object, snapshot: Dict[str, An
         if s_col.get("object_names") != c_col.get("object_names"):
             diffs.append(f"Character collection members {c_col.get('object_names')} != {s_col.get('object_names')}")
 
+    # Check that transaction-created collections do not linger
+    if active_tx is not None:
+        for reg in getattr(active_tx, "created_collections", []):
+            c_name = reg.get("created_name")
+            if c_name in bpy.data.collections:
+                diffs.append(f"Transaction-created collection '{c_name}' still exists in scene")
+
     # 2. Controllers check
     s_ctrls = snapshot.get("controllers", {})
     c_ctrls = current.get("controllers", {})
@@ -622,10 +732,22 @@ def _verify_arm_rig_state_restored(arm: bpy.types.Object, snapshot: Dict[str, An
         if not sc["exists"]:
             continue
 
-        if sc["obj_ref"] != cc["obj_ref"]:
+        try:
+            obj_mismatch = (sc["obj_ref"] != cc["obj_ref"])
+        except ReferenceError:
+            obj_mismatch = True
+        if obj_mismatch:
             diffs.append(f"Controller {c_name} obj_ref identity mismatch")
-        if sc["data_ref"] != cc["data_ref"]:
+        if sc.get("obj_ptr") and cc.get("obj_ptr") and sc["obj_ptr"] != cc["obj_ptr"]:
+            diffs.append(f"Controller {c_name} obj_ptr mismatch: {cc['obj_ptr']} != {sc['obj_ptr']}")
+        try:
+            data_mismatch = (sc["data_ref"] != cc["data_ref"])
+        except ReferenceError:
+            data_mismatch = True
+        if data_mismatch:
             diffs.append(f"Controller {c_name} data_ref identity mismatch")
+        if sc.get("data_ptr") and cc.get("data_ptr") and sc["data_ptr"] != cc["data_ptr"]:
+            diffs.append(f"Controller {c_name} data_ptr mismatch: {cc['data_ptr']} != {sc['data_ptr']}")
         if sc["obj_name"] != cc["obj_name"]:
             diffs.append(f"Controller {c_name} obj_name {cc['obj_name']} != {sc['obj_name']}")
         if sc["type"] != cc["type"]:
@@ -734,6 +856,19 @@ def _verify_arm_rig_state_restored(arm: bpy.types.Object, snapshot: Dict[str, An
                     diffs.append(f"Bone {b_name} constraint {idx} name {cc['name']} != {sc['name']}")
                 if sc["type"] != cc["type"]:
                     diffs.append(f"Bone {b_name} constraint {idx} type {cc['type']} != {sc['type']}")
+                orig_con = sc.get("con_ref")
+                con_alive = False
+                if orig_con is not None:
+                    try:
+                        _ = orig_con.name
+                        con_alive = True
+                    except ReferenceError:
+                        con_alive = False
+                if con_alive:
+                    if orig_con != cc.get("con_ref"):
+                        diffs.append(f"Bone {b_name} constraint {idx} identity mismatch")
+                    elif sc.get("con_ptr") and cc.get("con_ptr") and sc["con_ptr"] != cc["con_ptr"]:
+                        diffs.append(f"Bone {b_name} constraint {idx} identity pointer mismatch: {cc['con_ptr']} != {sc['con_ptr']}")
                 if abs(sc["influence"] - cc["influence"]) > TOL:
                     diffs.append(f"Bone {b_name} constraint {idx} influence {cc['influence']} != {sc['influence']}")
                 if sc["mute"] != cc["mute"]:
@@ -784,12 +919,30 @@ def _verify_arm_rig_state_restored(arm: bpy.types.Object, snapshot: Dict[str, An
                     elif isinstance(s_val, Quaternion):
                         if c_val is None or _quat_diff(s_val, c_val) > TOL:
                             diffs.append(f"Bone {b_name} constraint {idx} {g_prop} {c_val} != {s_val}")
+                    elif isinstance(s_val, tuple):
+                        if c_val is None or not hasattr(c_val, "__len__") or len(c_val) != len(s_val):
+                            diffs.append(f"Bone {b_name} constraint {idx} {g_prop} length mismatch: {c_val} != {s_val}")
+                        else:
+                            for arr_i, (sv, cv) in enumerate(zip(s_val, c_val)):
+                                if isinstance(sv, float):
+                                    if abs(sv - cv) > TOL:
+                                        diffs.append(f"Bone {b_name} constraint {idx} {g_prop}[{arr_i}] {cv} != {sv} (diff {abs(sv - cv):.6e} > {TOL})")
+                                elif sv != cv:
+                                    diffs.append(f"Bone {b_name} constraint {idx} {g_prop}[{arr_i}] {cv} != {sv}")
                     elif isinstance(s_val, float):
                         if c_val is None or abs(s_val - c_val) > TOL:
                             diffs.append(f"Bone {b_name} constraint {idx} {g_prop} {c_val} != {s_val}")
                     else:
                         if s_val != c_val:
                             diffs.append(f"Bone {b_name} constraint {idx} {g_prop} {c_val} != {s_val}")
+
+    # 4. Active transaction stack check
+    if active_tx is None:
+        if len(_ACTIVE_TRANSACTION_STACK) != 0:
+            diffs.append(f"Active transaction stack is not empty (contains {len(_ACTIVE_TRANSACTION_STACK)} transactions)")
+    else:
+        if _ACTIVE_TRANSACTION_STACK != [active_tx]:
+            diffs.append(f"Active transaction stack contains unexpected transactions: {_ACTIVE_TRANSACTION_STACK}")
 
     if diffs:
         raise RuntimeError("Arm rig rollback verification failed: " + "; ".join(diffs))
@@ -800,10 +953,90 @@ class _ArmRigTransactionContext:
 
     def __init__(self, arm: bpy.types.Object):
         self.arm = arm
+        self.state: _ArmRigTransactionState = _ArmRigTransactionState.CREATED
         self.snapshot: Optional[Dict[str, Any]] = None
         self.stashed_objects: List[Dict[str, Any]] = []
         self.stashed_constraints: List[Dict[str, Any]] = []
-        self.committed: bool = False
+        self.created_collections: List[Dict[str, Any]] = []
+        self.uncleaned_stashed_objects: List[Dict[str, Any]] = []
+        self.uncleaned_stashed_constraints: List[Dict[str, Any]] = []
+        self.cleanup_error: Optional[str] = None
+        self.tx_id: str = uuid.uuid4().hex[:8]
+
+    @property
+    def committed(self) -> bool:
+        """Backward-compatibility property reflecting logical commit status."""
+        return self.state in (_ArmRigTransactionState.COMMITTED, _ArmRigTransactionState.CLEANUP_PENDING)
+
+    def register_created_collection(
+        self,
+        col: bpy.types.Collection,
+        initial_parent: Optional[bpy.types.Collection] = None,
+    ) -> None:
+        """Register a collection created within this transaction for ownership tracking."""
+        rec = {
+            "col_ref": col,
+            "col_ptr": col.as_pointer() if hasattr(col, "as_pointer") else None,
+            "created_name": col.name,
+            "initial_parent": initial_parent,
+        }
+        self.created_collections.append(rec)
+
+    def retry_cleanup(self) -> None:
+        """Idempotently retry irreversible cleanup of pending stashed resources."""
+        cleanup_failures: List[str] = []
+
+        # 1. Clean up stashed constraints
+        for stashed_con in list(self.uncleaned_stashed_constraints):
+            try:
+                pbone = stashed_con.get("pbone")
+                con = stashed_con.get("con")
+                if pbone is not None and con is not None:
+                    if con in pbone.constraints.values() or con.name in pbone.constraints:
+                        pbone.constraints.remove(con)
+                if stashed_con in self.uncleaned_stashed_constraints:
+                    self.uncleaned_stashed_constraints.remove(stashed_con)
+            except Exception as ce:
+                cleanup_failures.append(f"Failed to remove stashed constraint {stashed_con.get('orig_name')}: {ce}")
+
+        # 2. Clean up stashed doomed objects and unreferenced datablocks
+        for stashed in list(self.uncleaned_stashed_objects):
+            try:
+                obj = stashed.get("stashed_obj")
+                data_ref = stashed.get("stashed_data")
+
+                if obj is not None:
+                    try:
+                        if obj.name in bpy.data.objects and bpy.data.objects.get(obj.name) == obj:
+                            bpy.data.objects.remove(obj, do_unlink=True)
+                    except ReferenceError:
+                        pass
+
+                if data_ref is not None:
+                    try:
+                        user_count = getattr(data_ref, "users", 0)
+                        if user_count == 0:
+                            for coll_name in ("meshes", "curves", "lights", "cameras", "armatures", "lattices", "metaballs", "volumes"):
+                                coll = getattr(bpy.data, coll_name, None)
+                                if coll is not None and data_ref.name in coll and coll.get(data_ref.name) == data_ref:
+                                    coll.remove(data_ref, do_unlink=True)
+                                    break
+                    except ReferenceError:
+                        pass
+
+                if stashed in self.uncleaned_stashed_objects:
+                    self.uncleaned_stashed_objects.remove(stashed)
+            except Exception as oe:
+                cleanup_failures.append(f"Failed to clean up stashed object {stashed.get('original_name')}: {oe}")
+
+        if cleanup_failures:
+            self.cleanup_error = "; ".join(cleanup_failures)
+            self.state = _ArmRigTransactionState.CLEANUP_PENDING
+            raise RuntimeError("Arm rig transaction commit cleanup failed: " + self.cleanup_error)
+        else:
+            self.cleanup_error = None
+            if self.state == _ArmRigTransactionState.CLEANUP_PENDING:
+                self.state = _ArmRigTransactionState.COMMITTED
 
 
 _ACTIVE_TRANSACTION_STACK: List[_ArmRigTransactionContext] = []
@@ -828,69 +1061,74 @@ def _arm_rig_transaction(arm: bpy.types.Object):
     _ACTIVE_TRANSACTION_STACK.append(tx)
 
     try:
+        tx.state = _ArmRigTransactionState.SNAPSHOTTING
         tx.snapshot = _snapshot_arm_rig_state(arm)
+        tx.state = _ArmRigTransactionState.ACTIVE
+
         yield tx
 
-        # Commit Phase: permanently remove stashed constraints and unreferenced doomed objects
-        tx.committed = True
-        cleanup_failures: List[str] = []
+        # -------------------------------------------------------------
+        # Phase 1: Reversible Commit Preparation
+        # -------------------------------------------------------------
+        tx.state = _ArmRigTransactionState.COMMITTING
+        _trigger_fault_injection("before_commit_prepare", {"tx": tx})
 
-        # 1. Permanently remove stashed constraints
-        for stashed_con in tx.stashed_constraints:
-            try:
-                pbone = stashed_con["pbone"]
-                con = stashed_con["con"]
-                if con.name in pbone.constraints:
-                    pbone.constraints.remove(con)
-            except Exception as ce:
-                cleanup_failures.append(f"Failed to remove stashed constraint {stashed_con.get('orig_name')}: {ce}")
+        _depsgraph_update()
+        _trigger_fault_injection("during_commit_prepare", {"tx": tx})
 
-        # 2. Permanently remove stashed doomed objects and unreferenced datablocks
-        for stashed in tx.stashed_objects:
-            obj = stashed.get("stashed_obj")
-            data_ref = stashed.get("stashed_data")
-            try:
-                if obj is not None and obj.name in bpy.data.objects:
-                    bpy.data.objects.remove(obj, do_unlink=True)
-                if data_ref is not None and hasattr(data_ref, "users") and data_ref.users == 0:
-                    for coll_name in ("meshes", "curves", "lights", "cameras", "armatures", "lattices", "metaballs", "volumes"):
-                        coll = getattr(bpy.data, coll_name, None)
-                        if coll is not None and data_ref.name in coll and coll.get(data_ref.name) == data_ref:
-                            coll.remove(data_ref, do_unlink=True)
-                            break
-            except Exception as oe:
-                cleanup_failures.append(f"Failed to clean up stashed object {stashed.get('original_name')}: {oe}")
-
-        _trigger_fault_injection("during_commit_cleanup", {"tx": tx})
-
-        if cleanup_failures:
-            raise RuntimeError("Arm rig transaction commit cleanup failed: " + "; ".join(cleanup_failures))
+        # -------------------------------------------------------------
+        # Phase 2: Logical Commit Confirmation
+        # -------------------------------------------------------------
+        tx.state = _ArmRigTransactionState.COMMITTED
+        _trigger_fault_injection("after_logical_commit", {"tx": tx})
 
     except BaseException as orig_exc:
-        # Phase E: Failure Rollback & Verification
-        if tx.snapshot is not None:
+        # If failure occurred before Phase 2 (Logical Commit), execute full rollback!
+        if tx.state != _ArmRigTransactionState.COMMITTED:
+            tx.state = _ArmRigTransactionState.ROLLING_BACK
             rollback_err = None
-            try:
-                _rollback_arm_rig_state(arm, tx.snapshot, tx)
-                bpy.context.view_layer.update()
-                _trigger_fault_injection("during_rollback_verification", {"arm": arm})
-                _verify_arm_rig_state_restored(arm, tx.snapshot)
-            except BaseException as rb_exc:
-                rollback_err = rb_exc
+            if tx.snapshot is not None:
+                try:
+                    _rollback_arm_rig_state(arm, tx.snapshot, tx)
+                    _depsgraph_update()
+                    _trigger_fault_injection("during_rollback_verification", {"arm": arm})
+                    _verify_arm_rig_state_restored(arm, tx.snapshot, active_tx=tx)
+                    tx.state = _ArmRigTransactionState.ROLLED_BACK
+                except BaseException as rb_exc:
+                    tx.state = _ArmRigTransactionState.FAILED
+                    rollback_err = rb_exc
 
-            if rollback_err is not None:
-                raise RuntimeError(
-                    f"Arm rig transaction failed with {type(orig_exc).__name__}: {orig_exc}, "
-                    f"AND rollback verification failed with {type(rollback_err).__name__}: {rollback_err}"
-                ) from orig_exc
+                if rollback_err is not None:
+                    raise RuntimeError(
+                        f"Arm rig transaction failed with {type(orig_exc).__name__}: {orig_exc}, "
+                        f"AND rollback verification failed with {type(rollback_err).__name__}: {rollback_err}"
+                    ) from orig_exc
+                else:
+                    raise
             else:
+                tx.state = _ArmRigTransactionState.FAILED
                 raise
         else:
-            # Snapshot construction itself failed before entering transaction body
             raise
     finally:
         if tx in _ACTIVE_TRANSACTION_STACK:
             _ACTIVE_TRANSACTION_STACK.remove(tx)
+
+    # -----------------------------------------------------------------
+    # Phase 3: Irreversible Resource Cleanup (runs only after logical commit)
+    # -----------------------------------------------------------------
+    if tx.state == _ArmRigTransactionState.COMMITTED:
+        tx.uncleaned_stashed_constraints = list(tx.stashed_constraints)
+        tx.uncleaned_stashed_objects = list(tx.stashed_objects)
+        try:
+            _trigger_fault_injection("during_commit_cleanup", {"tx": tx})
+            tx.retry_cleanup()
+        except BaseException as ce:
+            tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+            tx.cleanup_error = str(ce)
+            raise RuntimeError(
+                f"Arm rig transaction committed, but irreversible cleanup failed: {ce}"
+            ) from ce
 
 
 def _get_or_create_empty(
@@ -1181,7 +1419,7 @@ def setup_arm_ik(
 
             _trigger_fault_injection("setup_arm_ik_after_constraints_or_prebend", {"side": side, "arm": arm})
 
-        bpy.context.view_layer.update()
+        _depsgraph_update()
         return controls
 
 
@@ -1214,7 +1452,7 @@ def set_arm_ik_influence(
             if valid_side == "BOTH" and s == "L":
                 _trigger_fault_injection("set_arm_ik_influence_between_sides", {"side": s})
 
-        bpy.context.view_layer.update()
+        _depsgraph_update()
 
 
 def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
@@ -1225,7 +1463,7 @@ def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
     """
     arm = _resolve_armature(armature_obj)
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
-    bpy.context.view_layer.update()
+    _depsgraph_update()
 
     for side, sign in (("L", -1.0), ("R", 1.0)):
         ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[side])
@@ -1276,14 +1514,14 @@ def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
 
         _apply_arm_ik_prebend_hint_side(arm, side)
 
-    bpy.context.view_layer.update()
+    _depsgraph_update()
 
 
 def get_arm_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
     """Inspect current world-space arm bone positions, target errors, bone lengths, and flexion."""
     valid_side = _validate_side(side, allow_both=False, param_name="side")
     arm = _resolve_armature(armature_obj)
-    bpy.context.view_layer.update()
+    _depsgraph_update()
 
     p_up = arm.pose.bones[f"upper_arm.{valid_side}"]
     p_fore = arm.pose.bones[f"forearm.{valid_side}"]
@@ -1473,7 +1711,7 @@ def set_hand_ik_target(
 
     # Phase B: Zero-mutation controller and environment preflight
     arm = _resolve_armature(armature_obj)
-    bpy.context.view_layer.update()
+    _depsgraph_update()
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
 
     needs_auto_init, eff_ik_mat, eff_pole_mat = _preflight_arm_ik_parent_transforms(
