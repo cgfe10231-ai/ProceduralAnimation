@@ -9,13 +9,13 @@
 ## 1. 当前状态
 
 - 项目：ProceduralAnimation。
-- 分支：`audit/task-10-b-8`。
-- 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-8（Full Transaction Lifecycle & Ownership Integrity Repair，统一事务控制器所有权登记、活体指针身份严格解析、剔除按名删除控制器逻辑、命名冲突保护、暂存约束双重身份校验、逻辑提交后异常清理挂起重试已全部实现并通过验证）。
-- 当前已实现节点：PKG-5 / Task 10-B（第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订、第 5 轮生产级快照完整性、第 6 轮受控修正、第 7 轮最终所有权生命周期修正与第 8 轮全生命周期及所有权完整性修复）。
+- 分支：`audit/task-10-b-9`。
+- 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-8（生产级事务完整生命周期与所有权修正实现并待独立审查）；PKG-5 / Task 10-B-9（Architecture-First Transaction Consolidation，建立统一事务架构模型、六大职责边界、资源所有权合同、9 状态生命周期模型、架构驱动影响矩阵、受控迁移方案与现有 102 项测试追溯审计，生产代码保持 0 修改）。
+- 当前已实现节点：PKG-5 / Task 10-B（第 1 轮至第 8 轮实施已闭环，第 9 轮架构提案待审）。
 - 当前状态判定：
   - 10-A：`COMPLETED — ARCHIVED`。
-  - 10-B：`READY FOR INDEPENDENT REVIEW`（102 项专项测试 102/102 PASS，四级回归全部 0 缺陷通过）。
-  - 生产级事务快照与回滚系统：`READY FOR INDEPENDENT REVIEW`（`src/rig/arm_ik.py` 中完整实现并通过 72 项生产事务测试）。
+  - 10-B-8：`READY FOR INDEPENDENT REVIEW`（102 项专项测试 102/102 PASS，四级回归全部 0 缺陷通过）。
+  - 10-B-9：`ARCHITECTURE PROPOSAL — PENDING REVIEW`（架构提案就绪，待独立审查批准；严格禁止未经审核直接重构生产代码）。
   - 整体 Task 10-B：`READY FOR INDEPENDENT REVIEW`。
 - 下一执行节点：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 - 下一节点状态：`BLOCKED — NOT STARTED`。

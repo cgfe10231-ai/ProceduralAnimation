@@ -10,9 +10,9 @@
 >
 > **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-8（Full Transaction Lifecycle & Ownership Integrity Repair，统一事务控制器所有权登记、活体指针身份严格解析、剔除按名删除控制器逻辑、命名冲突保护、暂存约束双重身份校验、逻辑提交后异常清理挂起重试已全部实现并通过验证）。
+> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-8（生产级事务完整生命周期与所有权修正实现并待独立审查）；PKG-5 / Task 10-B-9（Architecture-First Transaction Consolidation，完成真实架构提取、六大架构职责解耦映射、资源所有权合同、9 状态生命周期模型、架构驱动影响矩阵、受控迁移方案与现有 102 项测试追溯审计，生产代码保持 0 修改）。
 >
-> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B-8 为 `READY FOR INDEPENDENT REVIEW`（102/102 专项测试通过，四级回归全部 0 缺陷通过，测试套件共 238 测试用例 100% PASS）；显式 9 状态生命周期状态机、三阶段提交协议、快照不可变深拷贝、同 Armature 清理挂起准入门禁、控制器与集合所有权隔离、暂存约束双重身份匹配、逻辑提交后异常统一清理挂起已在 `src/rig/arm_ik.py` 完整实现。
+> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B-8 为 `READY FOR INDEPENDENT REVIEW`；Task 10-B-9 为 `ARCHITECTURE PROPOSAL — PENDING REVIEW`（架构提案待独立审查，严格禁止未经审核直接修改生产代码）。
 >
 > **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 >
@@ -1109,3 +1109,64 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 - 所有历史成熟步态必须保留。
 
 本文件随真实工程演进，但每次修改必须能追溯至实际代码、测试、批准决策或项目负责人明确要求。
+
+## 9. Task 10-B-9：架构驱动事务统一模型（Architecture-First Transaction Consolidation）
+
+> **归档位置**：`docs/evidence/PKG5_10B_REVISION_9/`
+> **架构状态标记**：
+> - `[CURRENT]`：当前代码已实际存在并运行
+> - `[VERIFIED]`：已通过真实源码与自动化测试逐项核对
+> - `[PROPOSED]`：架构提案，尚未实施，需独立审查批准
+> - `[UNKNOWN]`：缺乏客观证据，严禁虚构
+
+### 9.1 真实架构与六大职责解耦 `[CURRENT / VERIFIED]`
+
+经过对 `src/rig/arm_ik.py`（2414 行）及其调用者（`whole_body_controller.py`、`playground_character_assembly.py`、`run_arm_ik_prototype.py`）只读扫描，当前逻辑划分为六大职责：
+
+1. **Transaction Coordinator（事务协调器）** `[CURRENT / VERIFIED]`：
+   - 核心入口：`_arm_rig_transaction` (L1605-L1705)、`_assert_arm_rig_cleanup_gate` (L1571-L1603)、`_ACTIVE_TRANSACTION_STACK` (L1510)。
+   - 职责：驱动 9 状态生命周期、维护单一 Armature 事务独占性、提供重入复用与跨 Armature 隔离。
+2. **State & Ownership Registry（状态与所有权注册表）** `[CURRENT / VERIFIED]`：
+   - 核心结构：`_ArmRigTransactionContext` (L1259-L1509)、`_ArmRigTransactionState` 枚举、`_PENDING_ARM_RIG_CLEANUPS` 全局字典。
+   - 职责：严格记录本事务自建资源、暂存资源指针与待清理队列。
+3. **Resource Operations（底层资源操作引擎）** `[CURRENT / VERIFIED]`：
+   - 核心函数：`_get_or_create_empty` (L1707-L1772)、`_ensure_character_collection` (L137-L147)、`_find_live_object_by_identity` (L411-L438)。
+   - 职责：执行 Blender C 实体创建、指针比对、集合成员链接/解绑、约束绑定与安全删除。
+4. **Arm IK Business Operations（领域业务操作）** `[CURRENT / VERIFIED]`：
+   - 核心 API：`setup_arm_ik`、`set_hand_ik_target`、`set_arm_ik_influence`、`reset_arm_ik`、`get_arm_ik_state`。
+   - 职责：Phase A 严格参数校验、Phase B 零副作用父级共形预检、Phase C/D 空间目标求解与姿态赋值。
+5. **Snapshot & Verification（快照捕获与全字段核验）** `[CURRENT / VERIFIED]`：
+   - 核心函数：`_snapshot_arm_rig_state` (L244-L409)、`_verify_arm_rig_state_restored` (L858-L1257)。
+   - 职责：不可变深拷贝（Collections, Controllers, PoseBones, Constraints）；回滚后 $10^{-5}$ 容差全字段与物理指针身份比对。
+6. **Commit & Cleanup（提交确认与不可逆资源清理）** `[CURRENT / VERIFIED]`：
+   - 核心函数：`tx.retry_cleanup()` (L1316-L1509)、`retry_pending_arm_rig_cleanup` (L1543-L1570)。
+   - 职责：Phase 2 达成 `COMMITTED` 后启动 Phase 3 不可逆垃圾回收；失败转入 `CLEANUP_PENDING` 并登记注册表，杜绝重入死锁。
+
+### 9.2 资源物理身份与 5 类所有权分类合同 `[CURRENT / VERIFIED]`
+
+- **非推断铁律 (Non-Inference Principle)**：禁止以名称、快照差集或孤立指针整数推断所有权。
+- **物理身份判定**：
+  - `Object`：`(obj_ref, obj_ptr == obj_ref.as_pointer(), obj_ref in bpy.data.objects)`
+  - `Constraint`：`(con_ref, con_ptr == con_ref.as_pointer(), con_ref in pbone.constraints)`
+  - `Collection`：`(col_ref, col_ptr == col_ref.as_pointer(), col_ref.name in bpy.data.collections)`
+  - `DataBlock`：`(data_ref, data_ptr == data_ref.as_pointer(), users == 0)`
+- **5 类所有权分类**：
+  1. **原始已存在资源 (Pre-existing)**：快照完整记录，受回滚引擎保护，严禁物理删除；
+  2. **本事务自建资源 (Created)**：先登记所有权后链接集合，回滚负有 100% 指针级删除责任；
+  3. **本事务暂存资源 (Stashed)**：隔离脱绑与重命名，回滚时恢复原状，提交后由 Phase 3 物理删除；
+  4. **外部登记资源 (External)**：持有只读引用，严禁更改生命周期或删除；
+  5. **所有权不可证明资源 (Unprovable)**：命名冲突但不匹配任何历史指针，一律报错保护现场，严禁擅自覆盖。
+
+### 9.3 事务 9 状态生命周期模型 `[CURRENT / VERIFIED]`
+
+- **状态集合**：`CREATED` $\to$ `SNAPSHOTTING` $\to$ `ACTIVE` $\to$ `COMMITTING` $\to$ `COMMITTED` $\to$ `CLEANUP_PENDING` / `ROLLING_BACK` $\to$ `ROLLED_BACK` / `FAILED`。
+- **不可逆提交红线**：跨越 Phase 2 达成 `COMMITTED` 之后，严禁执行普通回滚；任何后续异常统一转入 `CLEANUP_PENDING` 并锁入 `_PENDING_ARM_RIG_CLEANUPS`。
+- **准入门禁**：同 Armature 存在未清理事务时，`_assert_arm_rig_cleanup_gate` 阻断新事务开启。
+
+### 9.4 架构迁移方案与演进建议 `[PROPOSED]`
+
+- **建议 1（reset_arm_ik 事务化）** `[PROPOSED]`：将裸写执行的 `reset_arm_ik` 纳入 `with _arm_rig_transaction(arm):` 保护，消除场景半重置隐患。
+- **建议 2（单文件分节重整首选）** `[PROPOSED]`：保持单一 `src/rig/arm_ik.py`，但在内部划分为 6 个显式职责 Section，避免多文件拆分引入循环依赖或打断 Git 追溯历史。
+- **建议 3（清理非事务历史死代码）** `[PROPOSED]`：安全移除 `_get_or_create_empty` 和 `setup_arm_ik` 中 `else: bpy.data.objects.remove` 等已不可达分支。
+- **建议 4（资源记录结构归一化）** `[PROPOSED]`：将分散的 `created_controller_objects`、`created_collections` 统一映射为 `created_resources`，保留原有属性作为 `@property` 兼容层。
+

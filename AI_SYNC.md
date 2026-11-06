@@ -1,18 +1,20 @@
 # AI_SYNC：当前工程状态与跨 AI 交接卡片
 
-> **项目**：ProceduralAnimation | **分支**：`audit/task-10-b-8`
-> **最新完成节点**：TASK 10-B-8（Arm IK 全生命周期与所有权完整性修复）
-> **前序基线 SHA**：`445f0e0ebc6459a69527bab329548a6ad182493d`（来自 `origin/audit/task-10-b-7`）
-> **工作区分支状态**：当前开发分支 `audit/task-10-b-8`（待安全推送至远程对应审计分支，严禁合入 master）
+> **项目**：ProceduralAnimation | **分支**：`audit/task-10-b-9`
+> **最新完成节点**：TASK 10-B-9（架构驱动事务统一模型与全系统审计）
+> **前序基线 SHA**：`6d9fd089c4a42600c397889e4e5449f9034975d9`（来自 `origin/audit/task-10-b-8`）
+> **工作区分支状态**：当前开发分支 `audit/task-10-b-9`（待安全推送至远程对应审计分支，严禁合入 master）
 > **工作区现场**：保留未跟踪受保护文件 `P2_R1_recovery.patch`（除保护文件外工作区干净）
-> **证据归档**：`docs/evidence/PKG5_10B_REVISION_8/`
+> **证据归档**：`docs/evidence/PKG5_10B_REVISION_9/`
 
 ---
 
 ## 1. Task 10 当前状态与交付
 
 - **Task 10-A**：`COMPLETED — ARCHIVED`。10-A-1 至 10-A-4 归档验收，30/30 回归通过。
-- **Task 10-B 当前状态**：`READY FOR INDEPENDENT REVIEW`（102 项专项测试全部通过，等待独立审查，不得虚报 ACCEPTED）。
+- **Task 10-B 当前状态**：
+  - **Task 10-B-8 生产实现**：`READY FOR INDEPENDENT REVIEW`（102 项专项测试全部通过，四级回归全部通过）。
+  - **Task 10-B-9 架构模型**：`ARCHITECTURE PROPOSAL — PENDING REVIEW`（架构提案就绪，待独立审查批准；生产代码保持 0 行修改；严禁未经审核直接重构）。
   - **10-B-1**：输入预验证、Influence 边界与基础零副作用合同 (`IMPLEMENTED — TESTED — ARCHIVED`)。
   - **10-B-2**：自动初始化有效父级矩阵预检 (`IMPLEMENTED — TESTED — ARCHIVED`)。
   - **10-B-3**：控制器类型校验（仅 EMPTY 有效）、Case C 预期矩阵一致性与证据归档 (`IMPLEMENTED — TESTED — ARCHIVED`)。
@@ -20,12 +22,15 @@
   - **Task 10-B-5**：三阶段安全提交协议、快照不可变深拷贝契约、集合所有权隔离、调用边界解耦与全字段恢复验证器（TEST-65 至 TEST-76）。
   - **TASK 10-B-6**：约束指针严格身份比对、禁止生成补丁替代物、集合所有权与成员保护隔离、运行时注册表 `_PENDING_ARM_RIG_CLEANUPS` 与幂等重试（TEST-77 至 TEST-84）。
   - **TASK 10-B-7**：同 Armature 待清理事务准入门禁、暂存约束指针清理、Character 集合身份级恢复、验证器子集匹配（TEST-85 至 TEST-92）。
-  - **TASK 10-B-8（Full Transaction Lifecycle & Ownership Integrity Repair）**：
-    - **Section 3 & 4（统一事务控制器所有权）**：在 `_ArmRigTransactionContext` 增加 `created_controller_objects` 与 `register_created_controller`；在 `_get_or_create_empty` 中创建 Empty 成功后立即登记所有权（先登记后链接集合），发生初始化或链接故障可安全识别清理。
-    - **Section 5 & 6（活体身份解析与控制器回滚边界重写）**：实现 `_find_live_object_by_identity`，回滚时优先遍历 `created_controller_objects` 按物理指针删除事务对象；彻底剔除按名删除控制器旧逻辑；原控制器存在时校验身份存活与外部命名占用，发生冲突绝不误删外部对象或强行覆盖，完整记录聚合错误。
-    - **Section 7（暂存约束双重身份核验）**：在 `retry_cleanup` 中联合核验 `con` 引用与 `con_ptr` 指针，对原始引用失效或指针不符的暂存记录安全报错并保留在待清理列表，严禁误删同名替代约束。
-    - **Section 8（逻辑提交后异常统一清理挂起）**：将 `after_logical_commit` 移入 Phase 3 保护块，与 `during_commit_cleanup` 统一受异常捕获；逻辑提交后任何异常均进入 `CLEANUP_PENDING` 并登记注册表，严禁绕过清理或执行普通回滚。
-    - **新增 10 项专属测试**：TEST-93 至 TEST-102，专项总计 102/102 PASS (100%)。
+  - **TASK 10-B-8**：统一事务控制器所有权登记、活体指针身份严格解析、剔除按名删除控制器逻辑、命名冲突保护、暂存约束双重身份校验、逻辑提交后异常清理挂起重试（TEST-93 至 TEST-102）。
+  - **TASK 10-B-9（Architecture-First Transaction Consolidation）**：
+    - **真实架构提取**：完成对 `src/rig/arm_ik.py`（2414 行）及其调用者的逐行只读扫描，全面确认所有公开 API、内部事务入口、Blender 资源 CRUD/Link/Unlink/Rename 定位、快照与验证点、异常出口及 Cleanup 挂起路径。
+    - **六大职责解耦**：Transaction Coordinator、State & Ownership Registry、Resource Operations、Arm IK Business Operations、Snapshot & Verification、Commit & Cleanup。
+    - **资源所有权合同**：建立 Resource Identity 与 Relationship Mutation 物理模型；确立所有权非推断原则；划分 5 类资源所有权模型。
+    - **事务生命周期合同**：建模 9 个显式状态的进入条件、下一迁移、操作权限与不可逆提交红线；深度审计 10 项重点边缘与故障场景。
+    - **架构驱动影响矩阵**：建立全系统真实依赖拓扑；细化直接、间接、共享状态、生命周期 4 类依赖；明确每一依赖路径的合同、失败传播、恢复责任方及测试证据。
+    - **受控架构迁移方案**：确立接口冻结与数学行为零退化原则；对比单文件分节重排（首选）与多模块拆分方案；制定 4 阶段平滑迁移顺序、独立回退门禁与对应测试覆盖。
+    - **测试映射与验证设计**：将现有 TEST-01 至 TEST-102 完整映射至架构职责；深度审计重复测试、未触发路径、无测试删除、孤儿状态修改等 7 大重点问题。
   - **历史记法说明**：旧规划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果已在后续修订与受控修正中吸收覆盖。
 - **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`，尚未准入）。
 - **Task 10-D**：`BLOCKED — NOT STARTED`。
@@ -49,7 +54,7 @@
 ## 3. PKG-5 后续边界与准入
 
 - **Finding**：FIND-R3-01 已修复；FIND-R3-03、FIND-R3-04 保持 OPEN（归属 Task 11）。全仓 14 项关闭，2 项开放。
-- **PKG-5 顺序**：09-B-4 (已验收) $\to$ 10-A (已验收) $\to$ 10-B-8 (READY FOR INDEPENDENT REVIEW) $\to$ 10-C (BLOCKED) $\to$ 10-D $\to$ 11 $\to$ 12。
+- **PKG-5 顺序**：09-B-4 (已验收) $\to$ 10-A (已验收) $\to$ 10-B-8 (READY FOR INDEPENDENT REVIEW) $\to$ 10-B-9 (ARCHITECTURE PROPOSAL — PENDING REVIEW) $\to$ 10-C (BLOCKED) $\to$ 10-D $\to$ 11 $\to$ 12。
 - **Task 11 / Task 12**：Task 11 `PLANNED — NOT STARTED`；Task 12 `BLOCKED`。
 - **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10/11/12 联合验收并获批后方可准入。
 - **保护文件**：`ARCHITECTURE.md` 与 `DECISIONS.md` 严格受保护。

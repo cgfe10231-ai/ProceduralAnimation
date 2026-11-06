@@ -2,6 +2,23 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-06] PKG-5 / Task 10-B-9：架构驱动事务统一模型与全系统审计 (Architecture-First Transaction Consolidation)
+
+* **任务性质**：架构审计与方案设计（TASK 10-B-9），停止针对单一故障点的局部打补丁，基于真实代码与全调用拓扑建立统一架构模型、资源所有权模型、影响关系和可验证迁移方案。
+* **执行约束**：本轮严格限制为架构阶段，禁止未经审核直接修改生产代码。生产代码 `src/rig/arm_ik.py` 严格保持 0 行修改。
+* **状态**：`ARCHITECTURE PROPOSAL — PENDING REVIEW`（架构提案就绪，待独立审查批准；下一执行节点保持 `Task 10-C (BLOCKED — NOT STARTED)`）。
+* **架构成果交付归档**（`docs/evidence/PKG5_10B_REVISION_9/`）：
+  - **真实架构提取**（`01_real_architecture_extraction.md`）：完成对 `src/rig/arm_ik.py`（2414 行）及其调用者（`whole_body_controller.py`、`playground_character_assembly.py`、`run_arm_ik_prototype.py`）的逐行只读扫描，全面核实所有公开 API、内部事务入口、Blender 资源 CRUD/Link/Unlink/Rename 定位、快照与验证点、异常出口及 Cleanup 挂起路径。
+  - **六大职责边界映射**（`02_architectural_responsibility_boundaries.md`）：将现有逻辑映射为 Transaction Coordinator、State & Ownership Registry、Resource Operations、Arm IK Business Operations、Snapshot & Verification、Commit & Cleanup 六大清晰正交边界，逐项定义输入、输出、状态所有权、操作权限及异常职责。
+  - **资源所有权合同规范**（`03_resource_ownership_contract.md`）：建立 Resource Identity 与 Relationship Mutation 物理模型；确立所有权非推断原则（严禁以名称、快照差集或孤立指针推断所有权）；系统性划分原始已存在、本事务自建、本事务暂存、外部已登记、所有权不可证明 5 类资源模型。
+  - **事务生命周期合同规范**（`04_transaction_lifecycle_contract.md`）：严谨建模 9 个显式状态的进入条件、下一迁移、操作权限与不可逆提交红线；深度审计 10 项重点边缘与故障注入场景（从快照失败到提交后清理挂起与门禁阻断）。
+  - **架构驱动影响矩阵**（`05_architecture_driven_impact_matrix.md`）：建立全系统真实依赖拓扑；细化直接、间接、共享状态、生命周期 4 类依赖；明确每一依赖路径的合同、失败传播、恢复责任方及测试证据；发现 `reset_arm_ik` 缺乏事务保护与非事务历史遗留死代码两大关键架构隐患。
+  - **受控架构迁移方案**（`06_architecture_migration_plan.md`）：确立接口冻结与数学行为零退化原则；对比单文件分节重排（首选）与多模块拆分方案；制定 4 阶段平滑迁移顺序、独立回退门禁与对应测试覆盖。
+  - **测试映射与验证设计**（`07_test_mapping_and_verification_design.md`）：将现有 TEST-01 至 TEST-102 完整映射至架构职责；深度审计重复测试、未触发路径、无测试删除、孤儿状态修改等 7 大重点问题。
+* **架构同步更新**（`ARCHITECTURE_SYNC.md`）：
+  - 新增 Section 9《Task 10-B-9：架构驱动事务统一模型》，以 `[CURRENT]`、`[VERIFIED]`、`[PROPOSED]`、`[UNKNOWN]` 明确区分事实与提案；
+  - 核心 Section 4.2.3 严格保持原样未作改动。
+
 ### [2026-11-06] PKG-5 / Task 10-B-8：Arm IK 全生命周期与所有权完整性修复 (Full Transaction Lifecycle & Ownership Integrity Repair)
 
 * **任务性质**：生产缺陷修复（TASK 10-B-8），针对 Task 10-B-7 遗留的控制器按名误删风险、创建后未登记即链接失败清理盲区、暂存约束仅依指针缺少原引用核验、逻辑提交后异常绕过 Phase 3 清理挂起注册表等问题进行闭环修正。
