@@ -1,0 +1,2700 @@
+{
+  "metadata": {
+    "task": "TASK 10-B-9",
+    "base_sha": "feb7a4b0fbdc0ed49dfb3aaa101c3174a0f42a93",
+    "branch": "audit/task-10-b-9",
+    "total_tests": 112,
+    "test_range": "TEST-01 to TEST-112",
+    "verification_status": "PASS (112/112)",
+    "markdown_generation_allowed": false
+  },
+  "test_coverage": [
+    {
+      "test_id": "TEST-01",
+      "test_number": 1,
+      "test_function": "test_01_setup_accepts_influence_boundaries",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-01: setup_arm_ik accepts valid influence boundaries (0.0, 0.5, 1.0).",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual"
+      ],
+      "architecture_responsibility": "setup_arm_ik Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments (influence boundaries, non-finite, out of range)",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-02",
+      "test_number": 2,
+      "test_function": "test_02_setup_rejects_non_finite_influence",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-02: setup_arm_ik rejects non-finite influence values (NaN, +Inf, -Inf).",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "setup_arm_ik Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments (influence boundaries, non-finite, out of range)",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-03",
+      "test_number": 3,
+      "test_function": "test_03_setup_rejects_influence_below_zero",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-03: setup_arm_ik rejects negative influence values (< 0.0).",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "setup_arm_ik Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments (influence boundaries, non-finite, out of range)",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-04",
+      "test_number": 4,
+      "test_function": "test_04_setup_rejects_influence_above_one",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-04: setup_arm_ik rejects excessive influence values (> 1.0).",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "setup_arm_ik Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments (influence boundaries, non-finite, out of range)",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-05",
+      "test_number": 5,
+      "test_function": "test_05_setup_invalid_input_has_zero_scene_mutation",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-05: setup_arm_ik invalid inputs cause zero scene mutation (no Empties, no constraints).",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "setup_arm_ik Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments (influence boundaries, non-finite, out of range)",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-06",
+      "test_number": 6,
+      "test_function": "test_06_hand_target_rejects_invalid_side",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-06: set_hand_ik_target rejects invalid side identifiers.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-07",
+      "test_number": 7,
+      "test_function": "test_07_hand_target_rejects_world_xyz_wrong_arity",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-07: set_hand_ik_target rejects world_xyz with wrong arity or type.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-08",
+      "test_number": 8,
+      "test_function": "test_08_hand_target_rejects_world_xyz_non_finite",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-08: set_hand_ik_target rejects non-finite world_xyz coordinates.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-09",
+      "test_number": 9,
+      "test_function": "test_09_hand_target_rejects_rotation_wrong_arity",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-09: set_hand_ik_target rejects hand_rotation_deg with wrong arity or type.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-10",
+      "test_number": 10,
+      "test_function": "test_10_hand_target_rejects_rotation_non_finite",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-10: set_hand_ik_target rejects non-finite hand_rotation_deg values.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-11",
+      "test_number": 11,
+      "test_function": "test_11_hand_target_rejects_pole_wrong_arity",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-11: set_hand_ik_target rejects pole_world_xyz with wrong arity or type.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-12",
+      "test_number": 12,
+      "test_function": "test_12_hand_target_rejects_pole_non_finite",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-12: set_hand_ik_target rejects non-finite pole_world_xyz coordinates.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-13",
+      "test_number": 13,
+      "test_function": "test_13_hand_target_rejects_non_finite_influence",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-13: set_hand_ik_target rejects non-finite influence values.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-14",
+      "test_number": 14,
+      "test_function": "test_14_hand_target_rejects_out_of_range_influence",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-14: set_hand_ik_target rejects out-of-range influence values.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-15",
+      "test_number": 15,
+      "test_function": "test_15_hand_target_rejects_non_boolean_clamp_reach",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-15: set_hand_ik_target rejects non-boolean clamp_reach values.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-16",
+      "test_number": 16,
+      "test_function": "test_16_invalid_hand_target_does_not_auto_initialize",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-16: set_hand_ik_target with invalid inputs does NOT auto-initialize arm IK.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-17",
+      "test_number": 17,
+      "test_function": "test_17_invalid_hand_target_leaves_existing_state_unchanged",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-17: set_hand_ik_target with invalid inputs leaves existing scene and IK state completely unchanged.",
+      "production_api": [
+        "get_arm_ik_state",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_hand_ik_target Input Pre-Validation & Zero-Side-Effect Contract",
+      "global_invariant": "Zero scene mutation on invalid arguments; auto-init prevented on preflight rejection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-18",
+      "test_number": 18,
+      "test_function": "test_18_influence_setter_rejects_invalid_side",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-18: set_arm_ik_influence rejects invalid side identifiers.",
+      "production_api": [
+        "set_arm_ik_influence",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_arm_ik_influence Input Pre-Validation & Bilateral State Isolation",
+      "global_invariant": "Zero mutation on invalid inputs; independent L/R state updates preserved",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-19",
+      "test_number": 19,
+      "test_function": "test_19_influence_setter_rejects_non_finite_values",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-19: set_arm_ik_influence rejects non-finite influence values.",
+      "production_api": [
+        "set_arm_ik_influence",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_arm_ik_influence Input Pre-Validation & Bilateral State Isolation",
+      "global_invariant": "Zero mutation on invalid inputs; independent L/R state updates preserved",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-20",
+      "test_number": 20,
+      "test_function": "test_20_influence_setter_rejects_out_of_range_values",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-20: set_arm_ik_influence rejects out-of-range influence values.",
+      "production_api": [
+        "set_arm_ik_influence",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_arm_ik_influence Input Pre-Validation & Bilateral State Isolation",
+      "global_invariant": "Zero mutation on invalid inputs; independent L/R state updates preserved",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-21",
+      "test_number": 21,
+      "test_function": "test_21_influence_setter_invalid_input_has_zero_mutation",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-21: set_arm_ik_influence invalid inputs cause zero mutation on existing influences.",
+      "production_api": [
+        "set_arm_ik_influence",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "set_arm_ik_influence Input Pre-Validation & Bilateral State Isolation",
+      "global_invariant": "Zero mutation on invalid inputs; independent L/R state updates preserved",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-22",
+      "test_number": 22,
+      "test_function": "test_22_valid_influence_setter_preserves_left_right_independence",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-22: set_arm_ik_influence preserves independent L/R state updates and accepts BOTH.",
+      "production_api": [
+        "set_arm_ik_influence",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual"
+      ],
+      "architecture_responsibility": "set_arm_ik_influence Input Pre-Validation & Bilateral State Isolation",
+      "global_invariant": "Zero mutation on invalid inputs; independent L/R state updates preserved",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-23",
+      "test_number": 23,
+      "test_function": "test_23_valid_hand_target_accepts_boolean_clamp_modes",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-23: set_hand_ik_target accepts valid boolean clamp_reach modes (True and False).",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertFalse",
+        "assertIsInstance"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-24",
+      "test_number": 24,
+      "test_function": "test_24_valid_hand_target_preserves_weight_consistency",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-24: set_hand_ik_target preserves symmetric influence weight consistency across constraints.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-25",
+      "test_number": 25,
+      "test_function": "test_25_auto_init_invalid_parent_has_zero_scene_mutation",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-25: Uninitialized arm IK with invalid parent transform causes zero scene mutation.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertIsNotNone",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-26",
+      "test_number": 26,
+      "test_function": "test_26_partial_init_invalid_new_parent_has_zero_scene_mutation",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-26: Partially initialized arm IK with invalid new parent transform causes zero mutation.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertIsNotNone",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-27",
+      "test_number": 27,
+      "test_function": "test_27_valid_parent_first_time_auto_init_succeeds",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-27: First-time auto-initialization succeeds under valid conformal parent transforms.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertIn",
+        "assertIsInstance",
+        "assertNotIn",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-28",
+      "test_number": 28,
+      "test_function": "test_28_requested_wrong_type_controller_auto_replaced",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-28: Requested side non-EMPTY controller is replaced with EMPTY and set accurately.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIsNotNone",
+        "assertNotEqual"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-29",
+      "test_number": 29,
+      "test_function": "test_29_wrong_type_other_side_controller_preflight",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-29: Preflight ignores doomed non-EMPTY controller with bad parent on opposite side.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIsInstance",
+        "assertIsNotNone",
+        "assertNotIn"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-30",
+      "test_number": 30,
+      "test_function": "test_30_wrong_type_pole_controller_auto_replaced",
+      "test_file": "tests/test_task10b_input_validation.py",
+      "summary": "TEST-30: Requested side non-EMPTY elbow pole controller is replaced with EMPTY and set accurately.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIsNotNone",
+        "assertNotEqual"
+      ],
+      "architecture_responsibility": "Gate A Controller Preflight & Conformal Transform Admission Contract",
+      "global_invariant": "Conformal parent transform requirement; replacement of invalid controllers with valid Empties",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-31",
+      "test_number": 31,
+      "test_function": "test_31_snapshot_fidelity_controllers",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-31: Snapshot covers 4 controllers, data blocks, parent, TRS, mode, collections with zero mutation.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsInstance",
+        "assertIsNotNone",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate B Snapshot Fidelity & Rig Immutability Contract",
+      "global_invariant": "Snapshot covers all 4 controllers, 6 pose bones, constraints, and collections with zero mutation",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-32",
+      "test_number": 32,
+      "test_function": "test_32_snapshot_fidelity_pose_bones",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-32: Snapshot covers 6 upper-limb pose bones with transform properties, IK locks, and limits.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertIsInstance",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate B Snapshot Fidelity & Rig Immutability Contract",
+      "global_invariant": "Snapshot covers all 4 controllers, 6 pose bones, constraints, and collections with zero mutation",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-33",
+      "test_number": 33,
+      "test_function": "test_33_snapshot_fidelity_constraints_and_collection",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-33: Snapshot covers constraint configurations, ordering, targets, and Character collection.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate B Snapshot Fidelity & Rig Immutability Contract",
+      "global_invariant": "Snapshot covers all 4 controllers, 6 pose bones, constraints, and collections with zero mutation",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-34",
+      "test_number": 34,
+      "test_function": "test_34_direct_rollback_uninitialized_scene",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-34: Rollback on uninitialized scene removes 4 controllers, constraints, and created Character col.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertFalse",
+        "assertIn",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate C Direct Rollback & Identity Restoration Contract",
+      "global_invariant": "Complete rig state restoration to snapshot identities, properties, and ordering",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-35",
+      "test_number": 35,
+      "test_function": "test_35_direct_rollback_wrong_type_controller",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-35: Rollback on wrong-type controller restores original object type, data block, and collections.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertIs",
+        "assertIsNotNone",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate C Direct Rollback & Identity Restoration Contract",
+      "global_invariant": "Complete rig state restoration to snapshot identities, properties, and ordering",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-36",
+      "test_number": 36,
+      "test_function": "test_36_direct_rollback_initialized_scene_controllers",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-36: Rollback on initialized scene restores controller transforms, parents, and rotation modes.",
+      "production_api": [
+        "_rollback_arm_rig_state",
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual"
+      ],
+      "architecture_responsibility": "Gate C Direct Rollback & Identity Restoration Contract",
+      "global_invariant": "Complete rig state restoration to snapshot identities, properties, and ordering",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-37",
+      "test_number": 37,
+      "test_function": "test_37_direct_rollback_pose_bones",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-37: Rollback on pose bones restores rotation mode, limits, locks, and transforms.",
+      "production_api": [
+        "_rollback_arm_rig_state",
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertFalse",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate C Direct Rollback & Identity Restoration Contract",
+      "global_invariant": "Complete rig state restoration to snapshot identities, properties, and ordering",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-38",
+      "test_number": 38,
+      "test_function": "test_38_direct_rollback_constraints",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-38:",
+      "production_api": [
+        "_rollback_arm_rig_state",
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertNotIn"
+      ],
+      "architecture_responsibility": "Gate C Direct Rollback & Identity Restoration Contract",
+      "global_invariant": "Complete rig state restoration to snapshot identities, properties, and ordering",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-39",
+      "test_number": 39,
+      "test_function": "test_39_fault_injection_setup_arm_ik_after_first_controller",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-39: Fault injection in setup_arm_ik() after first controller created rolls back completely.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-40",
+      "test_number": 40,
+      "test_function": "test_40_fault_injection_setup_arm_ik_after_controller_replaced",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-40: Fault injection in setup_arm_ik() after wrong-type controller replaced restores original object.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_controller_replaced"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertIs",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-41",
+      "test_number": 41,
+      "test_function": "test_41_fault_injection_setup_arm_ik_after_constraints_or_prebend",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-41: Fault injection in setup_arm_ik() after constraints/pre-bend modified restores state.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_constraints_or_prebend"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-42",
+      "test_number": 42,
+      "test_function": "test_42_fault_injection_set_hand_ik_target_during_auto_init",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-42: Fault injection in set_hand_ik_target() during auto-init rolls back to uninitialized state.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_during_auto_init"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-43",
+      "test_number": 43,
+      "test_function": "test_43_fault_injection_set_hand_ik_target_after_hand_location",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-43: Fault injection in set_hand_ik_target() after HandIK Location written restores location.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertIn",
+        "assertNotEqual",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-44",
+      "test_number": 44,
+      "test_function": "test_44_fault_injection_set_hand_ik_target_after_hand_rotation",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-44: Fault injection in set_hand_ik_target() after HandIK Rotation written restores rotation.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_rotation"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertNotEqual",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-45",
+      "test_number": 45,
+      "test_function": "test_45_fault_injection_set_hand_ik_target_after_pole_location",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-45: Fault injection in set_hand_ik_target() after ElbowPole Location written restores pole.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_pole_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertIn",
+        "assertNotEqual",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-46",
+      "test_number": 46,
+      "test_function": "test_46_fault_injection_set_hand_ik_target_between_influences",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-46: Fault injection between ArmIK and HandRotation influence writes keeps influences in sync.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_between_influences"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-47",
+      "test_number": 47,
+      "test_function": "test_47_fault_injection_set_hand_ik_target_after_rot_influence",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-47: Fault injection after HandRotation influence modified rolls back all writes.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_rot_influence"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-48",
+      "test_number": 48,
+      "test_function": "test_48_fault_injection_set_hand_ik_target_during_state_read",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-48: Fault injection during view_layer.update / get_arm_ik_state revokes all prior writes.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_during_state_read"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-49",
+      "test_number": 49,
+      "test_function": "test_49_fault_injection_set_arm_ik_influence_side_l",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-49: Fault injection in set_arm_ik_influence(side='L') mid-write restores L and leaves R intact.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_arm_ik_influence",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_arm_ik_influence_between_influences"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-50",
+      "test_number": 50,
+      "test_function": "test_50_fault_injection_set_arm_ik_influence_side_both",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-50: Fault injection in set_arm_ik_influence(side='BOTH') restores all 4 constraints without half-update.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_arm_ik_influence",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_arm_ik_influence_between_sides"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate D Transaction Atomicity & Observable Fault Boundary Contract",
+      "global_invariant": "Atomic rollback upon mid-mutation failure across all public write APIs",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-51",
+      "test_number": 51,
+      "test_function": "test_51_success_path_fresh_and_reentrant_across_8_rotation_modes",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-51: Success path fresh & re-entrant calls across all 8 rotation modes (6 Eulers, QUAT, AXIS_ANGLE).",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertLess",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Production Rig Rotation Mode & Verification Integrity Contract",
+      "global_invariant": "Full support across all 8 rotation modes; explicit failure reporting on verification mismatch",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-52",
+      "test_number": 52,
+      "test_function": "test_52_success_after_failure_recovery_and_explicit_verification_error",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-52: Success after recovery; explicit failure report if rollback verification fails.",
+      "production_api": [
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": [
+        "during_rollback_verification",
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertIsNotNone",
+        "assertLess",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Production Rig Rotation Mode & Verification Integrity Contract",
+      "global_invariant": "Full support across all 8 rotation modes; explicit failure reporting on verification mismatch",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-53",
+      "test_number": 53,
+      "test_function": "test_53_controller_full_fields_verification",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-53: _verify_arm_rig_state_restored() detects tampering on controller matrix_parent_inverse, Eulers, Quat, AxisAngle, matrix_world.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-54",
+      "test_number": 54,
+      "test_function": "test_54_bone_full_fields_verification",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-54: _verify_arm_rig_state_restored() detects tampering on all 6 bones (Eulers, Quat, AxisAngle, matrix_basis).",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-55",
+      "test_number": 55,
+      "test_function": "test_55_constraints_full_fields_verification",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-55: _verify_arm_rig_state_restored() detects tampering on IK and COPY_ROTATION specific parameters.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-56",
+      "test_number": 56,
+      "test_function": "test_56_wrong_type_and_unrelated_constraints_lossless_recovery",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-56: Lossless recovery of preexisting unrelated and wrong-type constraints after transaction rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_constraints_or_prebend"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertIs",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-57",
+      "test_number": 57,
+      "test_function": "test_57_collection_hierarchy_full_recovery",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-57: Full recovery of multi-level nested collection hierarchy and scene linkages after transaction rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-58",
+      "test_number": 58,
+      "test_function": "test_58_snapshot_failure_clears_active_transaction_stack",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-58: Fault during _snapshot_arm_rig_state() completely cleans up transaction stack allowing subsequent calls.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_snapshot_creation",
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-59",
+      "test_number": 59,
+      "test_function": "test_59_cross_armature_nested_transaction_rejection",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-59: Cross-armature nested transaction call is rejected without mutating either armature.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-60",
+      "test_number": 60,
+      "test_function": "test_60_get_arm_ik_state_internal_exception_triggers_rollback",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-60: Genuine exception inside get_arm_ik_state() after full writes triggers complete rollback and bubbles up.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-61",
+      "test_number": 61,
+      "test_function": "test_61_depsgraph_update_exception_triggers_rollback",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-61: Exception during dependency graph update stage rolls back all writes.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_during_depsgraph_update"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-62",
+      "test_number": 62,
+      "test_function": "test_62_first_time_autoinit_success_path_and_failure_resilience",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-62: Direct set_hand_ik_target() on uninitialized scene succeeds; subsequent failure call rolls back.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertLess",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-63",
+      "test_number": 63,
+      "test_function": "test_63_fault_injection_public_interface_boundary",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-63: Fault injection functions are strictly private; hooks do not leak across exceptions and tests.",
+      "production_api": [
+        "arm_ik_internal"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertFalse",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate E Transaction Stack, Depsgraph Boundary & Fault Interface Privacy",
+      "global_invariant": "Single transaction per armature; active stack empty after exit; depsgraph call boundary protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-64",
+      "test_number": 64,
+      "test_function": "test_64_commit_cleanup_failure_and_datablock_lifecycle",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, and reports cleanup errors.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertGreater",
+        "assertIn",
+        "assertIs",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-65",
+      "test_number": 65,
+      "test_function": "test_65_reversible_commit_preparation_failure_rolls_back",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-65: Reversible commit preparation failure (Phase 1) rolls back without destroying stashed resources.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "before_commit_prepare"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-66",
+      "test_number": 66,
+      "test_function": "test_66_irreversible_cleanup_failure_semantics_and_retry",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-66: Irreversible cleanup failure (Phase 3) leaves rig COMMITTED, tracks uncleaned resources, and retries cleanly.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertGreater",
+        "assertIn",
+        "assertIsNone",
+        "assertIsNotNone",
+        "assertNotEqual",
+        "assertNotIn",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-67",
+      "test_number": 67,
+      "test_function": "test_67_partial_cleanup_failure_and_convergence",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-67: Partial cleanup failure prevents duplicate deletions, protects shared resources, and converges on retry.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertGreaterEqual",
+        "assertIn",
+        "assertIs",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-68",
+      "test_number": 68,
+      "test_function": "test_68_depsgraph_update_call_boundary_exception_rollback",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-68: Exception at _DEPSGRAPH_UPDATER call boundary propagates and triggers complete atomic rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertGreaterEqual",
+        "assertIn",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-69",
+      "test_number": 69,
+      "test_function": "test_69_snapshot_array_immutability_and_independence",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-69: Snapshot arrays are immutable tuples, immune to in-place RNA mutations, and restored properly.",
+      "production_api": [
+        "_rollback_arm_rig_state",
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIsInstance"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-70",
+      "test_number": 70,
+      "test_function": "test_70_rna_property_restoration_failure_error_aggregation",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-70: Failure during constraint property restoration aggregates dual exceptions with exact context.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_constraint_property_restore",
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-71",
+      "test_number": 71,
+      "test_function": "test_71_external_collection_protection_during_rollback",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-71: Rollback protects collections created externally during transaction while removing transaction collections.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-72",
+      "test_number": 72,
+      "test_function": "test_72_collection_rename_and_multi_parent_restoration",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-72: Character collection with multiple parents, renamed or reparented in transaction, is restored 100%.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-73",
+      "test_number": 73,
+      "test_function": "test_73_stashed_constraint_identity_and_ordering",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-73: Stashed wrong-type constraints and unrelated custom constraints preserve identities and order on rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_constraints_or_prebend"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-74",
+      "test_number": 74,
+      "test_function": "test_74_sequential_failures_and_subsequent_success_avalanche_protection",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-74: Sequential snapshot failure -> write failure -> clean rollback -> normal setup -> idempotent re-run.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_snapshot_creation",
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-75",
+      "test_number": 75,
+      "test_function": "test_75_side_isolation_and_shared_resource_protection",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-75: Failure on L side set_hand_ik_target isolates R side completely and protects shared datablock.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertGreaterEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Three-Phase Transaction Lifecycle (Reversible Commit vs Irreversible Cleanup)",
+      "global_invariant": "Reversible commit failure triggers rollback; post-commit cleanup failure enters CLEANUP_PENDING; DataBlock shared protection",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-76",
+      "test_number": 76,
+      "test_function": "test_76_validator_corruption_detection",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-76: Verifier captures 6 distinct corruption dimensions with exact field names without mutating scene.",
+      "production_api": [
+        "_rollback_arm_rig_state",
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-77",
+      "test_number": 77,
+      "test_function": "test_77_destroyed_constraint_identity_is_rejected",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-77: Verifier explicitly rejects substitute constraint after original constraint destruction.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertNotEqual",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-78",
+      "test_number": 78,
+      "test_function": "test_78_destroyed_constraint_causes_rollback_failure",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-78: Destruction of original constraint during transaction causes rollback to report identity failure.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-79",
+      "test_number": 79,
+      "test_function": "test_79_external_character_collection_creation_preserved",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-79: External Character collection created during transaction is preserved on rollback.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertFalse",
+        "assertIn",
+        "assertIsNotNone",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-80",
+      "test_number": 80,
+      "test_function": "test_80_external_character_collection_members_preserved",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-80: External object members added to Character collection during transaction are preserved on rollback.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-81",
+      "test_number": 81,
+      "test_function": "test_81_cleanup_pending_registry_and_retry",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-81: Phase 3 cleanup failure registers pending cleanup; queryable and retriable without test callbacks.",
+      "production_api": [
+        "get_pending_arm_rig_cleanup_ids",
+        "retry_pending_arm_rig_cleanup",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertGreaterEqual",
+        "assertIn",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-82",
+      "test_number": 82,
+      "test_function": "test_82_partial_cleanup_object_removed_datablock_failure_and_retry",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-82: Object removed but datablock removal fails; pending state retained and retried without RNA error.",
+      "production_api": [
+        "get_pending_arm_rig_cleanup_ids",
+        "retry_pending_arm_rig_cleanup",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_cleanup_datablock_removal"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertFalse",
+        "assertGreaterEqual",
+        "assertNotIn",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-83",
+      "test_number": 83,
+      "test_function": "test_83_datablock_shared_users_and_same_name_replacement_preserved",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-83: Shared datablock with users > 0 and same-name different-identity resources are preserved.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertGreater",
+        "assertIn",
+        "assertIsNotNone",
+        "assertNotEqual",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-84",
+      "test_number": 84,
+      "test_function": "test_84_sequential_transactions_failure_recovery_isolation",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-84: Sequential transaction failure and recovery proves snapshot isolation, no leaks, and clean re-entry.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "get_pending_arm_rig_cleanup_ids",
+        "set_hand_ik_target"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIsNotNone",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Identity-Based Corruption Detection & Resource Lifecycle Protection",
+      "global_invariant": "Verifier rejects substitute entities; destroyed constraints report failure; shared resources protected",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-85",
+      "test_number": 85,
+      "test_function": "test_85_same_armature_cleanup_pending_blocks_new_transaction",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-85: Reject new independent writes while same Armature owns an unresolved committed cleanup.",
+      "production_api": [
+        "get_pending_arm_rig_cleanup_ids",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertGreater",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-86",
+      "test_number": 86,
+      "test_function": "test_86_unrelated_armature_not_blocked_by_pending_cleanup",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-86: Unresolved cleanup on Armature A does not block independent writes on Armature B.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertIsNotNone"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-87",
+      "test_number": 87,
+      "test_function": "test_87_pending_cleanup_retry_success_restores_write_admission",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-87: Retrying pending cleanup to completion clears registry and allows new write transactions.",
+      "production_api": [
+        "get_pending_arm_rig_cleanup_ids",
+        "retry_pending_arm_rig_cleanup",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-88",
+      "test_number": 88,
+      "test_function": "test_88_stashed_constraint_same_name_replacement_not_erroneously_deleted",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-88: Stashed constraint cleanup matches by pointer identity and does not remove same-name substitute.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertIn"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-89",
+      "test_number": 89,
+      "test_function": "test_89_original_character_collection_rename_restores_identity_and_name",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-89: Character collection renamed during transaction is restored by identity and name without phantom.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-90",
+      "test_number": 90,
+      "test_function": "test_90_original_parent_collection_rename_restored_by_identity",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-90: Parent collection renamed during transaction is restored by identity reference without relying on name.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-91",
+      "test_number": 91,
+      "test_function": "test_91_external_child_collection_preserved_on_rollback",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-91: External child collection added to Character collection during transaction is preserved on rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-92",
+      "test_number": 92,
+      "test_function": "test_92_full_lifecycle_and_continuous_transaction_integration",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-92: Comprehensive sequence of snapshot, rollback, commit, cleanup failure, admission gate, retry, and re-entry.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "get_pending_arm_rig_cleanup_ids",
+        "retry_pending_arm_rig_cleanup",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup",
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Cleanup Pending Write Admission Gate & Collection Identity Restoration",
+      "global_invariant": "Unresolved committed cleanup blocks new writes on same armature; collection identities restored by pointer",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-93",
+      "test_number": 93,
+      "test_function": "test_93_transaction_created_controller_renamed_cleaned_by_identity",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-93: Transaction creates HandIK.L, then renames it; failure deletes by identity without residual.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNone",
+        "assertIsNotNone",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-94",
+      "test_number": 94,
+      "test_function": "test_94_external_same_name_controller_preserved_when_transaction_controller_renamed",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-94: Transaction controller renamed, external creates same-name HandIK.L; rollback cleans tx object and preserves external.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNone",
+        "assertIsNotNone",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-95",
+      "test_number": 95,
+      "test_function": "test_95_original_controller_physically_destroyed_fails_restoration",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-95: Original controller physically destroyed during transaction fails identity restoration without substitutes.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNone",
+        "assertIsNotNone",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-96",
+      "test_number": 96,
+      "test_function": "test_96_original_controller_name_occupied_by_external_object_fails_restoration",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-96: Original controller renamed and original name occupied by external object fails restoration without overwriting.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-97",
+      "test_number": 97,
+      "test_function": "test_97_stashed_constraint_reference_invalid_with_same_name_replacement",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-97: Stashed constraint original reference becomes invalid with live same-name replacement; cleanup fails without deleting replacement.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-98",
+      "test_number": 98,
+      "test_function": "test_98_controller_registered_before_collection_link_failure",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-98: Controller registration occurs immediately after creation; collection link failure rolls back cleanly.",
+      "production_api": [
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNone",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-99",
+      "test_number": 99,
+      "test_function": "test_99_exception_after_logical_commit_enters_cleanup_pending",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-99: Exception at after_logical_commit enters CLEANUP_PENDING without ordinary rollback; retry succeeds.",
+      "production_api": [
+        "get_pending_arm_rig_cleanup_ids",
+        "retry_pending_arm_rig_cleanup",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "after_logical_commit"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-100",
+      "test_number": 100,
+      "test_function": "test_100_reversible_vs_post_commit_failure_boundaries",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-100: Reversible stages rollback state; post-commit stages enter CLEANUP_PENDING without duplicate rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "get_pending_arm_rig_cleanup_ids",
+        "retry_pending_arm_rig_cleanup",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "after_logical_commit",
+        "before_commit_prepare",
+        "during_commit_cleanup",
+        "during_commit_prepare"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-101",
+      "test_number": 101,
+      "test_function": "test_101_joint_multi_resource_identity_and_ownership_verification",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-101: Joint simulation of controller rename, constraint stash, collection addition, and datablock sharing.",
+      "production_api": [
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNone",
+        "assertIsNotNone",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-102",
+      "test_number": 102,
+      "test_function": "test_102_continuous_full_lifecycle_and_reentry",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-102: End-to-end full continuous lifecycle covering all 9 states, admission gates, and resource classes.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "get_pending_arm_rig_cleanup_ids",
+        "retry_pending_arm_rig_cleanup",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "during_commit_cleanup",
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Final Ownership, Entity Renaming & Full Lifecycle State Machine",
+      "global_invariant": "CanDestroy(r,t) => Owned(r,t) and IdentityVerified(r); external resources untouched on rollback",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-103",
+      "test_number": 103,
+      "test_function": "test_103_transaction_created_constraint_cleaned_up_by_identity",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-103: Transaction-created constraints are identified and removed by pointer identity upon rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_constraints_or_prebend"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A-1 / Gate A-2 Identity-Based Constraint Ownership & Relative Order Contract",
+      "global_invariant": "Constraint deletion strictly by registered identity; external constraints preserved; relative ordering maintained",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-104",
+      "test_number": 104,
+      "test_function": "test_104_external_constraint_preserved_on_transaction_failure",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-104: External constraints on rig bones are strictly preserved when an arm transaction aborts.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A-1 / Gate A-2 Identity-Based Constraint Ownership & Relative Order Contract",
+      "global_invariant": "Constraint deletion strictly by registered identity; external constraints preserved; relative ordering maintained",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-105",
+      "test_number": 105,
+      "test_function": "test_105_same_name_different_identity_constraint_not_erroneously_deleted",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-105: Same-name constraint with different identity pointer is never deleted by rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate A-1 / Gate A-2 Identity-Based Constraint Ownership & Relative Order Contract",
+      "global_invariant": "Constraint deletion strictly by registered identity; external constraints preserved; relative ordering maintained",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-106",
+      "test_number": 106,
+      "test_function": "test_106_external_constraint_insertion_preserves_original_constraint_order",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-106: Inserting external constraints before/between original constraints maintains relative ordering.",
+      "production_api": [
+        "_rollback_arm_rig_state",
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertLess"
+      ],
+      "architecture_responsibility": "Gate A-1 / Gate A-2 Identity-Based Constraint Ownership & Relative Order Contract",
+      "global_invariant": "Constraint deletion strictly by registered identity; external constraints preserved; relative ordering maintained",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-107",
+      "test_number": 107,
+      "test_function": "test_107_transaction_created_collection_link_undone_on_failure",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-107: Controller collection links created within a transaction are unlinked on rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "setup_arm_ik_after_first_controller"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertIsNotNone",
+        "assertNotIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A-1 / Gate A-2 Relationship Ownership & Collection Linkage Contract",
+      "global_invariant": "Only transaction-created collection links are undone; external collection members preserved",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-108",
+      "test_number": 108,
+      "test_function": "test_108_external_collection_member_link_preserved_on_rollback",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-108: External collection members linked before transaction are not unlinked during rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "set_hand_ik_target_after_hand_location"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A-1 / Gate A-2 Relationship Ownership & Collection Linkage Contract",
+      "global_invariant": "Only transaction-created collection links are undone; external collection members preserved",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-109",
+      "test_number": 109,
+      "test_function": "test_109_reset_arm_ik_left_write_failure_restores_bilateral_state",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-109: reset_arm_ik left-side write failure triggers bilateral rollback preserving pre-reset pose.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "reset_arm_ik",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "reset_arm_ik_after_influence_l"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A-3 reset_arm_ik Transaction Atomicity & Preflight Invariant Contract",
+      "global_invariant": "Bilateral atomic rollback on reset failure; parent preflight failure guarantees zero business writes",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-110",
+      "test_number": 110,
+      "test_function": "test_110_reset_arm_ik_right_write_failure_restores_bilateral_state",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-110: reset_arm_ik right-side write failure restores both left and right sides via atomic rollback.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "reset_arm_ik",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "reset_arm_ik_after_influence_r"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Gate A-3 reset_arm_ik Transaction Atomicity & Preflight Invariant Contract",
+      "global_invariant": "Bilateral atomic rollback on reset failure; parent preflight failure guarantees zero business writes",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-111",
+      "test_number": 111,
+      "test_function": "test_111_reset_arm_ik_parent_preflight_failure_zero_business_writes",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-111: reset_arm_ik aborts on parent transform preflight failure before performing any scene writes.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "reset_arm_ik",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": null,
+      "fault_hit": false,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertRaises",
+        "assertTrue"
+      ],
+      "architecture_responsibility": "Gate A-3 reset_arm_ik Transaction Atomicity & Preflight Invariant Contract",
+      "global_invariant": "Bilateral atomic rollback on reset failure; parent preflight failure guarantees zero business writes",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    },
+    {
+      "test_id": "TEST-112",
+      "test_number": 112,
+      "test_function": "test_112_joint_regression_reset_constraint_collection_cleanup_pending",
+      "test_file": "tests/test_task10b_transaction_atomicity.py",
+      "summary": "TEST-112: Joint regression verifying reset atomicity, constraint rollback, and cleanup pending gate.",
+      "production_api": [
+        "_snapshot_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "reset_arm_ik",
+        "set_hand_ik_target",
+        "setup_arm_ik"
+      ],
+      "fault_injection_point": [
+        "reset_arm_ik_after_influence_l"
+      ],
+      "fault_hit": true,
+      "assertions": [
+        "assertAlmostEqual",
+        "assertEqual",
+        "assertIn",
+        "assertRaises"
+      ],
+      "architecture_responsibility": "Joint System-Wide Regression & Invariant Harmonization",
+      "global_invariant": "All 4 repair vectors (F1, F2, F3, F4) harmonized and verified simultaneously across full lifecycle",
+      "covers_target": true,
+      "coverage_gaps": "None"
+    }
+  ]
+}

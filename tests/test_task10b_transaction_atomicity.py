@@ -382,16 +382,27 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             places=5,
         )
 
-        # Execute rollback.
-        _rollback_arm_rig_state(
-            self.armature,
-            snap,
-        )
+        # Register extra constraint as transaction-created on mock transaction context
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.snapshot = snap
+        tx.register_created_constraint(p_fore, extra)
 
-        _verify_arm_rig_state_restored(
-            self.armature,
-            snap,
-        )
+        _ACTIVE_TRANSACTION_STACK.append(tx)
+        try:
+            # Execute rollback.
+            _rollback_arm_rig_state(
+                self.armature,
+                snap,
+                active_tx=tx,
+            )
+
+            _verify_arm_rig_state_restored(
+                self.armature,
+                snap,
+                active_tx=tx,
+            )
+        finally:
+            _ACTIVE_TRANSACTION_STACK.pop()
 
         # Original assertions: count, name, type, influence.
         self.assertEqual(
@@ -3022,6 +3033,369 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         snap_final = _snapshot_arm_rig_state(self.armature)
         _verify_arm_rig_state_restored(self.armature, snap_final)
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-9 Extended Tests (TEST-103 to TEST-112)
+    # -------------------------------------------------------------------------
+
+    def test_103_transaction_created_constraint_cleaned_up_by_identity(self) -> None:
+        """TEST-103: Transaction-created constraints are identified and removed by pointer identity upon rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                raise RuntimeError("Fault after R constraint creation in TEST-103")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.6)
+            self.assertIn("Fault after R constraint creation in TEST-103", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both L and R created constraints must be completely unlinked and removed
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertNotIn("ArmIK.L", p_fore_l.constraints)
+        self.assertNotIn("ArmIK.R", p_fore_r.constraints)
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_104_external_constraint_preserved_on_transaction_failure(self) -> None:
+        """TEST-104: External constraints on rig bones are strictly preserved when an arm transaction aborts."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Add external constraint on forearm.L
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ext_con = p_fore.constraints.new(type="COPY_ROTATION")
+        ext_con.name = "ExternalCopyRot104"
+        ext_con.influence = 0.73
+        ext_ptr = ext_con.as_pointer()
+        bpy.context.view_layer.update()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Fault during hand location in TEST-104")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.9)
+            self.assertIn("Fault during hand location in TEST-104", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # External constraint must still exist with unchanged identity and properties
+        self.assertIn("ExternalCopyRot104", p_fore.constraints)
+        live_ext = p_fore.constraints["ExternalCopyRot104"]
+        self.assertEqual(live_ext.as_pointer(), ext_ptr)
+        self.assertAlmostEqual(live_ext.influence, 0.73, places=5)
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_105_same_name_different_identity_constraint_not_erroneously_deleted(self) -> None:
+        """TEST-105: Same-name constraint with different identity pointer is never deleted by rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Add a constraint named 'ArmIK.L' on another bone (upper_arm.L)
+        p_up = self.armature.pose.bones["upper_arm.L"]
+        alien_con = p_up.constraints.new(type="LIMIT_ROTATION")
+        alien_con.name = "ArmIK.L"
+        alien_con.use_limit_x = True
+        alien_ptr = alien_con.as_pointer()
+        bpy.context.view_layer.update()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Fault in TEST-105")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+            self.assertIn("Fault in TEST-105", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # The alien constraint on upper_arm.L must be 100% untouched
+        self.assertIn("ArmIK.L", p_up.constraints)
+        live_alien = p_up.constraints["ArmIK.L"]
+        self.assertEqual(live_alien.as_pointer(), alien_ptr)
+        self.assertTrue(live_alien.use_limit_x)
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_106_external_constraint_insertion_preserves_original_constraint_order(self) -> None:
+        """TEST-106: Inserting external constraints before/between original constraints maintains relative ordering."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        p_fore = self.armature.pose.bones["forearm.L"]
+        # Add a second constraint so we have multiple original constraints
+        orig_limit = p_fore.constraints.new(type="LIMIT_ROTATION")
+        orig_limit.name = "OrigLimit106"
+        bpy.context.view_layer.update()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        # Invert original constraint order: move OrigLimit106 before ArmIK.L
+        p_fore.constraints.move(1, 0)
+        # Add an external constraint at index 0
+        ext_first = p_fore.constraints.new(type="TRACK_TO")
+        ext_first.name = "ExtFirst106"
+        p_fore.constraints.move(len(p_fore.constraints) - 1, 0)
+        bpy.context.view_layer.update()
+
+        # Execute mock transaction rollback
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.snapshot = snap
+        _ACTIVE_TRANSACTION_STACK.append(tx)
+        try:
+            _rollback_arm_rig_state(self.armature, snap, active_tx=tx)
+            _verify_arm_rig_state_restored(self.armature, snap, active_tx=tx)
+        finally:
+            _ACTIVE_TRANSACTION_STACK.pop()
+
+        # ArmIK.L must come before OrigLimit106 again
+        c_names = [c.name for c in p_fore.constraints]
+        self.assertIn("ArmIK.L", c_names)
+        self.assertIn("OrigLimit106", c_names)
+        self.assertLess(c_names.index("ArmIK.L"), c_names.index("OrigLimit106"))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_107_transaction_created_collection_link_undone_on_failure(self) -> None:
+        """TEST-107: Controller collection links created within a transaction are unlinked on rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        char_col = bpy.data.collections.get("Character")
+        self.assertIsNotNone(char_col)
+        initial_member_count = len(char_col.objects)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                raise RuntimeError("Fault after first controller in TEST-107")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after first controller in TEST-107", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Character collection must not retain any leaked objects or links
+        self.assertEqual(len(char_col.objects), initial_member_count)
+        self.assertNotIn("HandIK.L", char_col.objects)
+        self.assertNotIn("HandIK.L", bpy.data.objects)
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_108_external_collection_member_link_preserved_on_rollback(self) -> None:
+        """TEST-108: External collection members linked before transaction are not unlinked during rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        char_col = bpy.data.collections.get("Character")
+        ext_mesh = bpy.data.meshes.new("ExternalMesh108")
+        ext_obj = bpy.data.objects.new("ExternalMember108", ext_mesh)
+        char_col.objects.link(ext_obj)
+        ext_ptr = ext_obj.as_pointer()
+        bpy.context.view_layer.update()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Fault in TEST-108")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+            self.assertIn("Fault in TEST-108", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # ext_obj must remain securely linked inside Character collection
+        self.assertIn("ExternalMember108", char_col.objects)
+        self.assertEqual(char_col.objects["ExternalMember108"].as_pointer(), ext_ptr)
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Clean up external test object
+        bpy.data.objects.remove(ext_obj, do_unlink=True)
+        bpy.data.meshes.remove(ext_mesh, do_unlink=True)
+
+    def test_109_reset_arm_ik_left_write_failure_restores_bilateral_state(self) -> None:
+        """TEST-109: reset_arm_ik left-side write failure triggers bilateral rollback preserving pre-reset pose."""
+        setup_arm_ik(self.armature, initial_influence=0.8)
+        y_pos = self.root.location.y + 0.15
+        set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.85)
+        set_hand_ik_target(self.armature, side="R", world_xyz=(0.32, y_pos, 1.20), influence=0.85)
+
+        snap_before_reset = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "reset_arm_ik_after_influence_l":
+                raise RuntimeError("Fault after Left reset write in TEST-109")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("Fault after Left reset write in TEST-109", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both Left and Right influences and positions must be completely restored
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.85, places=4)
+        self.assertAlmostEqual(p_fore_r.constraints["ArmIK.R"].influence, 0.85, places=4)
+
+        _verify_arm_rig_state_restored(self.armature, snap_before_reset)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_110_reset_arm_ik_right_write_failure_restores_bilateral_state(self) -> None:
+        """TEST-110: reset_arm_ik right-side write failure restores both left and right sides via atomic rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.7)
+        y_pos = self.root.location.y + 0.15
+        set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.75)
+        set_hand_ik_target(self.armature, side="R", world_xyz=(0.30, y_pos, 1.15), influence=0.75)
+
+        snap_before_reset = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "reset_arm_ik_after_influence_r":
+                raise RuntimeError("Fault after Right reset write in TEST-110")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("Fault after Right reset write in TEST-110", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Left side was mutated first, but atomic rollback must revert Left side as well as Right side
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.75, places=4)
+        self.assertAlmostEqual(p_fore_r.constraints["ArmIK.R"].influence, 0.75, places=4)
+
+        _verify_arm_rig_state_restored(self.armature, snap_before_reset)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_111_reset_arm_ik_parent_preflight_failure_zero_business_writes(self) -> None:
+        """TEST-111: reset_arm_ik aborts on parent transform preflight failure before performing any scene writes."""
+        setup_arm_ik(self.armature, initial_influence=0.88)
+        snap_before = _snapshot_arm_rig_state(self.armature)
+
+        # Corrupt parent transform by setting root scale to 0 (non-invertible matrix)
+        self.root.scale = Vector((0.0, 0.0, 0.0))
+        bpy.context.view_layer.update()
+
+        try:
+            with self.assertRaises(ValueError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertTrue("singular matrix" in str(cm.exception).lower() or "zero determinant" in str(cm.exception).lower())
+        finally:
+            self.root.scale = Vector((1.0, 1.0, 1.0))
+            bpy.context.view_layer.update()
+
+        # Zero business writes: bone influences and controllers remain unchanged
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.88, places=4)
+        self.assertAlmostEqual(p_fore_r.constraints["ArmIK.R"].influence, 0.88, places=4)
+
+        _verify_arm_rig_state_restored(self.armature, snap_before)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_112_joint_regression_reset_constraint_collection_cleanup_pending(self) -> None:
+        """TEST-112: Joint regression verifying reset atomicity, constraint rollback, and cleanup pending gate."""
+        setup_arm_ik(self.armature, initial_influence=0.6)
+        y_pos = self.root.location.y + 0.15
+
+        # 1. External object in Character collection
+        char_col = bpy.data.collections.get("Character")
+        ext_mesh = bpy.data.meshes.new("Mesh112")
+        ext_obj = bpy.data.objects.new("ExternalProp112", ext_mesh)
+        char_col.objects.link(ext_obj)
+        ext_ptr = ext_obj.as_pointer()
+
+        # 2. External constraint on forearm.L
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        ext_con = p_fore_l.constraints.new(type="LIMIT_ROTATION")
+        ext_con.name = "ExtLimit112"
+        ext_con_ptr = ext_con.as_pointer()
+        bpy.context.view_layer.update()
+
+        # 3. Successful pose mutation
+        set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.8)
+        set_hand_ik_target(self.armature, side="R", world_xyz=(0.30, y_pos, 1.15), influence=0.8)
+
+        snap_active = _snapshot_arm_rig_state(self.armature)
+
+        # 4. Injected reset failure -> bilateral rollback
+        def fault_hook_reset(stage: str, ctx: dict) -> None:
+            if stage == "reset_arm_ik_after_influence_l":
+                raise RuntimeError("Injected fault during reset in TEST-112")
+
+        _set_test_fault_injection_hook(fault_hook_reset)
+        try:
+            with self.assertRaises(RuntimeError):
+                reset_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Verify full state preserved after failed reset
+        _verify_arm_rig_state_restored(self.armature, snap_active)
+        self.assertEqual(char_col.objects["ExternalProp112"].as_pointer(), ext_ptr)
+        self.assertEqual(p_fore_l.constraints["ExtLimit112"].as_pointer(), ext_con_ptr)
+
+        # 5. Clean reset succeeds
+        reset_arm_ik(self.armature)
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.0, places=4)
+        self.assertAlmostEqual(self.armature.pose.bones["forearm.R"].constraints["ArmIK.R"].influence, 0.0, places=4)
+        # External objects and constraints still intact
+        self.assertEqual(char_col.objects["ExternalProp112"].as_pointer(), ext_ptr)
+        self.assertEqual(p_fore_l.constraints["ExtLimit112"].as_pointer(), ext_con_ptr)
+
+        # 6. Verify CLEANUP_PENDING gate blocks reset_arm_ik and mutations
+        snap_after_reset = _snapshot_arm_rig_state(self.armature)
+        fake_tx = _ArmRigTransactionContext(self.armature)
+        fake_tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        fake_tx.uncleaned_stashed_objects.append({"original_name": "Ghost112", "obj_cleaned": False, "data_cleaned": False})
+        from src.rig.arm_ik import _register_pending_arm_rig_cleanup
+        _register_pending_arm_rig_cleanup(fake_tx)
+
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            reset_arm_ik(self.armature)
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_blocked.exception))
+
+        with self.assertRaises(RuntimeError) as cm_blocked2:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_blocked2.exception))
+
+        # Clear gate and clean up test fixtures
+        _PENDING_ARM_RIG_CLEANUPS.clear()
+        _verify_arm_rig_state_restored(self.armature, snap_after_reset)
+
+        p_fore_l.constraints.remove(ext_con)
+        bpy.data.objects.remove(ext_obj, do_unlink=True)
+        bpy.data.meshes.remove(ext_mesh, do_unlink=True)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
 
 if __name__ == "__main__":

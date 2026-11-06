@@ -516,9 +516,25 @@ def _rollback_arm_rig_state(
             if col is not None and live_original.name not in col.objects:
                 col.objects.link(live_original)
 
-        for col in list(live_original.users_collection):
-            if col.name not in c_snap.get("collections", []):
-                col.objects.unlink(live_original)
+        if active_tx is not None:
+            for link_rec in list(getattr(active_tx, "created_collection_links", [])):
+                if link_rec.get("obj_ptr") == original_ptr or link_rec.get("obj_ref") == live_original:
+                    col_ref = link_rec.get("col_ref")
+                    col_ptr = link_rec.get("col_ptr")
+                    col_name = link_rec.get("col_name")
+                    for col in list(live_original.users_collection):
+                        try:
+                            matches = False
+                            if col_ptr and col.as_pointer() == col_ptr:
+                                matches = True
+                            elif col_ref is not None and col == col_ref:
+                                matches = True
+                            elif col.name == col_name:
+                                matches = True
+                            if matches and col.name not in c_snap.get("collections", []):
+                                col.objects.unlink(live_original)
+                        except ReferenceError:
+                            continue
 
         live_original.parent = c_snap["parent"]
         live_original.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
@@ -584,10 +600,33 @@ def _rollback_arm_rig_state(
         saved_cons = b_snap.get("constraints", [])
         saved_con_refs = {sc["con_ref"] for sc in saved_cons if "con_ref" in sc}
 
-        # 2.1: Remove constraints added during transaction (identity check)
-        for con in list(pbone.constraints):
-            if con not in saved_con_refs:
-                pbone.constraints.remove(con)
+        # 2.1: Remove ONLY constraints explicitly registered as created by this transaction
+        if active_tx is not None:
+            for reg_con in list(getattr(active_tx, "created_constraints", [])):
+                if reg_con.get("bone_name") == b_name or reg_con.get("pbone") == pbone:
+                    expected_ptr = reg_con.get("con_ptr")
+                    con_ref = reg_con.get("con_ref")
+                    target = None
+                    for candidate in list(pbone.constraints):
+                        try:
+                            if expected_ptr and candidate.as_pointer() == expected_ptr:
+                                target = candidate
+                                break
+                            elif con_ref is not None and candidate == con_ref:
+                                target = candidate
+                                break
+                        except ReferenceError:
+                            continue
+                    if target is not None:
+                        pbone.constraints.remove(target)
+                        still_present = any(
+                            (expected_ptr and c.as_pointer() == expected_ptr)
+                            for c in pbone.constraints
+                        )
+                        if still_present:
+                            restoration_errors.append(
+                                f"Failed to remove transaction-created constraint: {reg_con.get('created_name')}"
+                            )
 
         # 2.2: Restore names and mutes for any stashed constraints on this bone
         if active_tx is not None:
@@ -705,13 +744,19 @@ def _rollback_arm_rig_state(
                 con.invert_z = sc.get("invert_z", False)
                 con.use_offset = sc.get("use_offset", False)
 
-        # 2.4: Restore constraint ordering
-        for target_idx, sc in enumerate(saved_cons):
-            curr_names = [c.name for c in pbone.constraints]
-            if sc["name"] in curr_names:
-                curr_idx = curr_names.index(sc["name"])
-                if curr_idx != target_idx:
-                    pbone.constraints.move(curr_idx, target_idx)
+        # 2.4: Restore relative ordering of original constraints by identity
+        saved_ptrs = [sc["con_ptr"] for sc in saved_cons if sc.get("con_ptr")]
+        live_ptr_to_idx = {c.as_pointer(): idx for idx, c in enumerate(pbone.constraints)}
+        for i in range(len(saved_ptrs)):
+            for j in range(i + 1, len(saved_ptrs)):
+                ptr_i = saved_ptrs[i]
+                ptr_j = saved_ptrs[j]
+                if ptr_i in live_ptr_to_idx and ptr_j in live_ptr_to_idx:
+                    idx_i = live_ptr_to_idx[ptr_i]
+                    idx_j = live_ptr_to_idx[ptr_j]
+                    if idx_i > idx_j:
+                        pbone.constraints.move(idx_i, idx_j)
+                        live_ptr_to_idx = {c.as_pointer(): idx for idx, c in enumerate(pbone.constraints)}
 
     # Step 3: Collection hierarchy restoration with strict ownership isolation
     # Only delete collections explicitly registered as created by this transaction!
@@ -1126,123 +1171,149 @@ def _verify_arm_rig_state_restored(
         # Constraints
         sc_list = sb["constraints"]
         cc_list = cb["constraints"]
-        if len(sc_list) != len(cc_list):
-            diffs.append(f"Bone {b_name} constraint count {len(cc_list)} != {len(sc_list)}")
-        else:
-            for idx, (sc, cc) in enumerate(zip(sc_list, cc_list)):
-                if sc["name"] != cc["name"]:
-                    diffs.append(f"Bone {b_name} constraint {idx} name {cc['name']} != {sc['name']}")
-                if sc["type"] != cc["type"]:
-                    diffs.append(f"Bone {b_name} constraint {idx} type {cc['type']} != {sc['type']}")
-                # Task 10-B-6
-                # Original constraint identity verification
 
-                orig_con = sc.get("con_ref")
-                orig_ptr = sc.get("con_ptr")
+        # Check that transaction-created constraints do not linger
+        if active_tx is not None:
+            for reg_con in getattr(active_tx, "created_constraints", []):
+                if reg_con.get("bone_name") == b_name:
+                    expected_ptr = reg_con.get("con_ptr")
+                    for c in cc_list:
+                        if c.get("con_ptr") == expected_ptr:
+                            diffs.append(
+                                f"Bone {b_name} transaction-created constraint "
+                                f"'{reg_con.get('created_name')}' still present after rollback"
+                            )
 
-                curr_con = cc.get("con_ref")
-                curr_ptr = cc.get("con_ptr")
+        # Map current live constraints by pointer
+        cc_by_ptr = {c.get("con_ptr"): c for c in cc_list if c.get("con_ptr")}
+        orig_ptrs = [sc["con_ptr"] for sc in sc_list if sc.get("con_ptr")]
 
-                label = (
-                    f"Bone {b_name} "
-                    f"constraint[{idx}] '{sc['name']}'"
+        # Verify each original constraint is restored
+        for idx, sc in enumerate(sc_list):
+            orig_con = sc.get("con_ref")
+            orig_ptr = sc.get("con_ptr")
+            label = f"Bone {b_name} constraint[{idx}] '{sc['name']}'"
+
+            if orig_con is None or orig_ptr is None:
+                diffs.append(f"{label}: snapshot identity missing")
+                continue
+
+            try:
+                live_orig_ptr = orig_con.as_pointer()
+            except ReferenceError:
+                diffs.append(f"{label}: original constraint destroyed")
+                continue
+
+            if live_orig_ptr != orig_ptr:
+                diffs.append(f"{label}: original pointer changed")
+                continue
+
+            cc = cc_by_ptr.get(orig_ptr)
+            if cc is None:
+                diffs.append(f"{label}: identity mismatch: original constraint destroyed or absent from live chain")
+                continue
+
+            curr_con = cc.get("con_ref")
+            curr_ptr = cc.get("con_ptr")
+            if curr_con is None or curr_ptr is None:
+                diffs.append(f"{label}: current identity missing")
+                continue
+
+            if curr_ptr != orig_ptr:
+                diffs.append(
+                    f"{label}: identity mismatch; "
+                    f"expected={orig_ptr}, "
+                    f"actual={curr_ptr}"
                 )
 
-                if orig_con is None or orig_ptr is None:
-                    diffs.append(
-                        f"{label}: snapshot identity missing"
-                    )
+            if sc["name"] != cc["name"]:
+                diffs.append(f"{label} name {cc['name']} != {sc['name']}")
+            if sc["type"] != cc["type"]:
+                diffs.append(f"{label} type {cc['type']} != {sc['type']}")
+            if abs(sc["influence"] - cc["influence"]) > TOL:
+                diffs.append(f"{label} influence {cc['influence']} != {sc['influence']}")
+            if sc["mute"] != cc["mute"]:
+                diffs.append(f"{label} mute {cc['mute']} != {sc['mute']}")
+            if sc.get("target") != cc.get("target"):
+                diffs.append(f"{label} target {cc.get('target')} != {sc.get('target')}")
+            if sc.get("subtarget") != cc.get("subtarget"):
+                diffs.append(f"{label} subtarget {cc.get('subtarget')} != {sc.get('subtarget')}")
+            if sc.get("pole_target") != cc.get("pole_target"):
+                diffs.append(f"{label} pole_target {cc.get('pole_target')} != {sc.get('pole_target')}")
+            if sc.get("pole_subtarget") != cc.get("pole_subtarget"):
+                diffs.append(f"{label} pole_subtarget {cc.get('pole_subtarget')} != {sc.get('pole_subtarget')}")
 
+            if sc["type"] == "IK":
+                if sc.get("chain_count") != cc.get("chain_count"):
+                    diffs.append(f"{label} chain_count {cc.get('chain_count')} != {sc.get('chain_count')}")
+                if sc.get("use_tail") != cc.get("use_tail"):
+                    diffs.append(f"{label} use_tail {cc.get('use_tail')} != {sc.get('use_tail')}")
+                if sc.get("use_stretch") != cc.get("use_stretch"):
+                    diffs.append(f"{label} use_stretch {cc.get('use_stretch')} != {sc.get('use_stretch')}")
+                if abs(sc.get("pole_angle", 0.0) - cc.get("pole_angle", 0.0)) > TOL:
+                    diffs.append(f"{label} pole_angle {cc.get('pole_angle')} != {sc.get('pole_angle')}")
+                if sc.get("iterations") != cc.get("iterations"):
+                    diffs.append(f"{label} iterations {cc.get('iterations')} != {sc.get('iterations')}")
+            elif sc["type"] == "COPY_ROTATION":
+                if sc.get("target_space") != cc.get("target_space"):
+                    diffs.append(f"{label} target_space {cc.get('target_space')} != {sc.get('target_space')}")
+                if sc.get("owner_space") != cc.get("owner_space"):
+                    diffs.append(f"{label} owner_space {cc.get('owner_space')} != {sc.get('owner_space')}")
+                if sc.get("mix_mode") != cc.get("mix_mode"):
+                    diffs.append(f"{label} mix_mode {cc.get('mix_mode')} != {sc.get('mix_mode')}")
+                for axis in ("x", "y", "z"):
+                    if sc.get(f"use_{axis}") != cc.get(f"use_{axis}"):
+                        diffs.append(f"{label} use_{axis} {cc.get(f'use_{axis}')} != {sc.get(f'use_{axis}')}")
+                    if sc.get(f"invert_{axis}") != cc.get(f"invert_{axis}"):
+                        diffs.append(f"{label} invert_{axis} {cc.get(f'invert_{axis}')} != {sc.get(f'invert_{axis}')}")
+                if sc.get("use_offset") != cc.get("use_offset"):
+                    diffs.append(f"{label} use_offset {cc.get('use_offset')} != {sc.get('use_offset')}")
+
+            # Check generic properties
+            s_gen = sc.get("generic_props", {})
+            c_gen = cc.get("generic_props", {})
+            for g_prop, s_val in s_gen.items():
+                c_val = c_gen.get(g_prop)
+                if isinstance(s_val, (Vector, Euler)):
+                    if c_val is None or _vec_diff(s_val, c_val) > TOL:
+                        diffs.append(f"{label} {g_prop} {c_val} != {s_val}")
+                elif isinstance(s_val, Quaternion):
+                    if c_val is None or _quat_diff(s_val, c_val) > TOL:
+                        diffs.append(f"{label} {g_prop} {c_val} != {s_val}")
+                elif isinstance(s_val, tuple):
+                    if c_val is None or not hasattr(c_val, "__len__") or len(c_val) != len(s_val):
+                        diffs.append(f"{label} {g_prop} length mismatch: {c_val} != {s_val}")
+                    else:
+                        for arr_i, (sv, cv) in enumerate(zip(s_val, c_val)):
+                            if isinstance(sv, float):
+                                if abs(sv - cv) > TOL:
+                                    diffs.append(f"{label} {g_prop}[{arr_i}] {cv} != {sv} (diff {abs(sv - cv):.6e} > {TOL})")
+                            elif sv != cv:
+                                diffs.append(f"{label} {g_prop}[{arr_i}] {cv} != {sv}")
+                elif isinstance(s_val, float):
+                    if c_val is None or abs(s_val - c_val) > TOL:
+                        diffs.append(f"{label} {g_prop} {c_val} != {s_val}")
                 else:
-                    try:
-                        live_orig_ptr = orig_con.as_pointer()
-                    except ReferenceError:
-                        diffs.append(
-                            f"{label}: original constraint destroyed"
-                        )
-                    else:
-                        if live_orig_ptr != orig_ptr:
-                            diffs.append(
-                                f"{label}: original pointer changed"
-                            )
+                    if s_val != c_val:
+                        diffs.append(f"{label} {g_prop} {c_val} != {s_val}")
 
-                        elif curr_con is None or curr_ptr is None:
-                            diffs.append(
-                                f"{label}: current identity missing"
-                            )
+        # Check relative ordering of original constraints
+        orig_live_indices = []
+        for sc in sc_list:
+            sc_ptr = sc.get("con_ptr")
+            for c_idx, cc in enumerate(cc_list):
+                if cc.get("con_ptr") == sc_ptr:
+                    orig_live_indices.append(c_idx)
+                    break
+        if orig_live_indices != sorted(orig_live_indices):
+            diffs.append(
+                f"Bone {b_name} original constraints relative order violated: "
+                f"indices={orig_live_indices}"
+            )
 
-                        elif curr_ptr != orig_ptr:
-                            diffs.append(
-                                f"{label}: identity mismatch; "
-                                f"expected={orig_ptr}, "
-                                f"actual={curr_ptr}"
-                            )
-                if abs(sc["influence"] - cc["influence"]) > TOL:
-                    diffs.append(f"Bone {b_name} constraint {idx} influence {cc['influence']} != {sc['influence']}")
-                if sc["mute"] != cc["mute"]:
-                    diffs.append(f"Bone {b_name} constraint {idx} mute {cc['mute']} != {sc['mute']}")
-                if sc.get("target") != cc.get("target"):
-                    diffs.append(f"Bone {b_name} constraint {idx} target {cc.get('target')} != {sc.get('target')}")
-                if sc.get("subtarget") != cc.get("subtarget"):
-                    diffs.append(f"Bone {b_name} constraint {idx} subtarget {cc.get('subtarget')} != {sc.get('subtarget')}")
-                if sc.get("pole_target") != cc.get("pole_target"):
-                    diffs.append(f"Bone {b_name} constraint {idx} pole_target {cc.get('pole_target')} != {sc.get('pole_target')}")
-                if sc.get("pole_subtarget") != cc.get("pole_subtarget"):
-                    diffs.append(f"Bone {b_name} constraint {idx} pole_subtarget {cc.get('pole_subtarget')} != {sc.get('pole_subtarget')}")
-
-                if sc["type"] == "IK":
-                    if sc.get("chain_count") != cc.get("chain_count"):
-                        diffs.append(f"Bone {b_name} constraint {idx} chain_count {cc.get('chain_count')} != {sc.get('chain_count')}")
-                    if sc.get("use_tail") != cc.get("use_tail"):
-                        diffs.append(f"Bone {b_name} constraint {idx} use_tail {cc.get('use_tail')} != {sc.get('use_tail')}")
-                    if sc.get("use_stretch") != cc.get("use_stretch"):
-                        diffs.append(f"Bone {b_name} constraint {idx} use_stretch {cc.get('use_stretch')} != {sc.get('use_stretch')}")
-                    if abs(sc.get("pole_angle", 0.0) - cc.get("pole_angle", 0.0)) > TOL:
-                        diffs.append(f"Bone {b_name} constraint {idx} pole_angle {cc.get('pole_angle')} != {sc.get('pole_angle')}")
-                    if sc.get("iterations") != cc.get("iterations"):
-                        diffs.append(f"Bone {b_name} constraint {idx} iterations {cc.get('iterations')} != {sc.get('iterations')}")
-                elif sc["type"] == "COPY_ROTATION":
-                    if sc.get("target_space") != cc.get("target_space"):
-                        diffs.append(f"Bone {b_name} constraint {idx} target_space {cc.get('target_space')} != {sc.get('target_space')}")
-                    if sc.get("owner_space") != cc.get("owner_space"):
-                        diffs.append(f"Bone {b_name} constraint {idx} owner_space {cc.get('owner_space')} != {sc.get('owner_space')}")
-                    if sc.get("mix_mode") != cc.get("mix_mode"):
-                        diffs.append(f"Bone {b_name} constraint {idx} mix_mode {cc.get('mix_mode')} != {sc.get('mix_mode')}")
-                    for axis in ("x", "y", "z"):
-                        if sc.get(f"use_{axis}") != cc.get(f"use_{axis}"):
-                            diffs.append(f"Bone {b_name} constraint {idx} use_{axis} {cc.get(f'use_{axis}')} != {sc.get(f'use_{axis}')}")
-                        if sc.get(f"invert_{axis}") != cc.get(f"invert_{axis}"):
-                            diffs.append(f"Bone {b_name} constraint {idx} invert_{axis} {cc.get(f'invert_{axis}')} != {sc.get(f'invert_{axis}')}")
-                    if sc.get("use_offset") != cc.get("use_offset"):
-                        diffs.append(f"Bone {b_name} constraint {idx} use_offset {cc.get('use_offset')} != {sc.get('use_offset')}")
-
-                # Check generic properties
-                s_gen = sc.get("generic_props", {})
-                c_gen = cc.get("generic_props", {})
-                for g_prop, s_val in s_gen.items():
-                    c_val = c_gen.get(g_prop)
-                    if isinstance(s_val, (Vector, Euler)):
-                        if c_val is None or _vec_diff(s_val, c_val) > TOL:
-                            diffs.append(f"Bone {b_name} constraint {idx} {g_prop} {c_val} != {s_val}")
-                    elif isinstance(s_val, Quaternion):
-                        if c_val is None or _quat_diff(s_val, c_val) > TOL:
-                            diffs.append(f"Bone {b_name} constraint {idx} {g_prop} {c_val} != {s_val}")
-                    elif isinstance(s_val, tuple):
-                        if c_val is None or not hasattr(c_val, "__len__") or len(c_val) != len(s_val):
-                            diffs.append(f"Bone {b_name} constraint {idx} {g_prop} length mismatch: {c_val} != {s_val}")
-                        else:
-                            for arr_i, (sv, cv) in enumerate(zip(s_val, c_val)):
-                                if isinstance(sv, float):
-                                    if abs(sv - cv) > TOL:
-                                        diffs.append(f"Bone {b_name} constraint {idx} {g_prop}[{arr_i}] {cv} != {sv} (diff {abs(sv - cv):.6e} > {TOL})")
-                                elif sv != cv:
-                                    diffs.append(f"Bone {b_name} constraint {idx} {g_prop}[{arr_i}] {cv} != {sv}")
-                    elif isinstance(s_val, float):
-                        if c_val is None or abs(s_val - c_val) > TOL:
-                            diffs.append(f"Bone {b_name} constraint {idx} {g_prop} {c_val} != {s_val}")
-                    else:
-                        if s_val != c_val:
-                            diffs.append(f"Bone {b_name} constraint {idx} {g_prop} {c_val} != {s_val}")
+        # In standalone check without transaction context, constraint count must match exactly
+        if active_tx is None and len(sc_list) != len(cc_list):
+            diffs.append(f"Bone {b_name} constraint count {len(cc_list)} != {len(sc_list)}")
 
     # 4. Active transaction stack check
     if active_tx is None:
@@ -1265,6 +1336,12 @@ class _ArmRigTransactionContext:
         self.state: _ArmRigTransactionState = _ArmRigTransactionState.CREATED
         self.snapshot: Optional[Dict[str, Any]] = None
         self.created_controller_objects: List[
+            Dict[str, Any]
+        ] = []
+        self.created_constraints: List[
+            Dict[str, Any]
+        ] = []
+        self.created_collection_links: List[
             Dict[str, Any]
         ] = []
         self.stashed_objects: List[Dict[str, Any]] = []
@@ -1297,6 +1374,50 @@ class _ArmRigTransactionContext:
             "obj_ref": obj,
             "obj_ptr": obj_ptr,
             "created_name": obj.name,
+        })
+
+    def register_created_constraint(
+        self,
+        pbone: bpy.types.PoseBone,
+        con: bpy.types.Constraint,
+    ) -> None:
+        """Register a constraint created by this transaction for identity-based ownership."""
+        con_ptr = con.as_pointer()
+
+        for record in self.created_constraints:
+            if record["con_ptr"] == con_ptr:
+                raise RuntimeError(
+                    "Duplicate transaction constraint registration"
+                )
+
+        self.created_constraints.append({
+            "pbone": pbone,
+            "con_ref": con,
+            "con_ptr": con_ptr,
+            "created_name": con.name,
+            "bone_name": pbone.name,
+        })
+
+    def register_created_collection_link(
+        self,
+        col: bpy.types.Collection,
+        obj: bpy.types.Object,
+    ) -> None:
+        """Register an object-to-collection link mutation created by this transaction."""
+        col_ptr = col.as_pointer() if hasattr(col, "as_pointer") else None
+        obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
+
+        for record in self.created_collection_links:
+            if record["col_ptr"] == col_ptr and record["obj_ptr"] == obj_ptr:
+                return
+
+        self.created_collection_links.append({
+            "col_ref": col,
+            "col_ptr": col_ptr,
+            "col_name": col.name,
+            "obj_ref": obj,
+            "obj_ptr": obj_ptr,
+            "obj_name": obj.name,
         })
 
     def register_created_collection(
@@ -1753,6 +1874,8 @@ def _get_or_create_empty(
             active_tx.register_created_controller(obj)
         _trigger_fault_injection("get_or_create_empty_after_register", {"obj": obj, "name": name})
         collection.objects.link(obj)
+        if _ACTIVE_TRANSACTION_STACK:
+            active_tx.register_created_collection_link(collection, obj)
         obj.empty_display_type = display_type
         obj.empty_display_size = display_size
         obj.rotation_mode = "XYZ"
@@ -1766,6 +1889,8 @@ def _get_or_create_empty(
     # Existing valid Empty: ensure linked to collection and update display properties
     if obj.name not in collection.objects:
         collection.objects.link(obj)
+        if _ACTIVE_TRANSACTION_STACK:
+            _ACTIVE_TRANSACTION_STACK[-1].register_created_collection_link(collection, obj)
     obj.empty_display_type = display_type
     obj.empty_display_size = display_size
     return obj, False
@@ -1934,6 +2059,8 @@ def setup_arm_ik(
                 ik_con = p_fore.constraints.new(type="IK")
                 ik_con.name = con_name_ik
                 ik_con.influence = valid_influence
+                if _ACTIVE_TRANSACTION_STACK:
+                    _ACTIVE_TRANSACTION_STACK[-1].register_created_constraint(p_fore, ik_con)
                 newly_created_ik_con = True
 
             ik_con.target = ik_obj
@@ -1993,6 +2120,8 @@ def setup_arm_ik(
                 rot_con = p_hand.constraints.new(type="COPY_ROTATION")
                 rot_con.name = con_name_rot
                 rot_con.influence = valid_influence
+                if _ACTIVE_TRANSACTION_STACK:
+                    _ACTIVE_TRANSACTION_STACK[-1].register_created_constraint(p_hand, rot_con)
 
             rot_con.target = ik_obj
             rot_con.target_space = "WORLD"
@@ -2044,63 +2173,87 @@ def set_arm_ik_influence(
 def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
     """Reset both arms, empties, and constraint influences back to neutral rest (FK mode).
 
-    Preserves existing controller parent relationships, rotation_mode, and matrix_parent_inverse,
-    transforming neutral world positions and orientations into the controller's effective parent space.
+    Follows the Gate A-3 Transaction Atomicity Contract:
+    - Phase 1: Resolves Armature and CharacterRoot, updates view layer.
+    - Phase 2: Preflights effective parent transforms for all existing controllers on both sides (L and R)
+      using compute_effective_parent_matrix() and validate_effective_parent_transform().
+      If any preflight check fails, aborts immediately with ZERO scene writes on either side.
+    - Phase 3: Enters unified _arm_rig_transaction(arm) context.
+    - Phase 4: Executes bilateral reset with observable fault injection boundaries.
+    - Phase 5: Synchronizes dependency graph and commits. Any write exception triggers atomic rollback.
     """
     arm = _resolve_armature(armature_obj)
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
     _depsgraph_update()
 
-    for side, sign in (("L", -1.0), ("R", 1.0)):
-        ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[side])
-        pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[side])
+    # Preflight parent transform domains for all existing controllers on both sides BEFORE any writes
+    eff_mats: Dict[str, Tuple[Optional[Matrix], Optional[Matrix]]] = {}
+    for s in ("L", "R"):
+        ik_c = bpy.data.objects.get(ARM_IK_TARGET_NAMES[s])
+        pole_c = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[s])
+        eff_ik = None
+        eff_pole = None
+        if ik_c is not None:
+            eff_ik = compute_effective_parent_matrix(ik_c)
+            validate_effective_parent_transform(eff_ik, ik_c.name)
+        if pole_c is not None:
+            eff_pole = compute_effective_parent_matrix(pole_c)
+            validate_effective_parent_transform(eff_pole, pole_c.name)
+        eff_mats[s] = (eff_ik, eff_pole)
 
-        # Compute neutral targets in root/world coordinates
-        ik_neutral_local = Vector((sign * SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
-        pole_neutral_local = Vector((
-            sign * (SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
-            -DEFAULT_POLE_BACKWARD_OFFSET,
-            ELBOW_REST_Z,
-        ))
+    # All preflight checks passed; execute reset under unified transaction protection
+    with _arm_rig_transaction(arm):
+        for side, sign in (("L", -1.0), ("R", 1.0)):
+            ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[side])
+            pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[side])
+            eff_ik_mat, eff_pole_mat = eff_mats[side]
 
-        if root_obj is not None:
-            ik_neutral_world = root_obj.matrix_world @ ik_neutral_local
-            pole_neutral_world = root_obj.matrix_world @ pole_neutral_local
-            neutral_world_rot_quat = root_obj.matrix_world.to_quaternion()
-        else:
-            ik_neutral_world = ik_neutral_local
-            pole_neutral_world = pole_neutral_local
-            neutral_world_rot_quat = Quaternion()
+            # Compute neutral targets in root/world coordinates
+            ik_neutral_local = Vector((sign * SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
+            pole_neutral_local = Vector((
+                sign * (SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
+                -DEFAULT_POLE_BACKWARD_OFFSET,
+                ELBOW_REST_Z,
+            ))
 
-        if ik_obj is not None:
-            eff_ik_mat = compute_effective_parent_matrix(ik_obj)
-            validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
-            ik_obj.location = world_to_local_position(ik_neutral_world, eff_ik_mat)
-            apply_target_rotation(ik_obj, neutral_world_rot_quat, eff_ik_mat)
+            if root_obj is not None:
+                ik_neutral_world = root_obj.matrix_world @ ik_neutral_local
+                pole_neutral_world = root_obj.matrix_world @ pole_neutral_local
+                neutral_world_rot_quat = root_obj.matrix_world.to_quaternion()
+            else:
+                ik_neutral_world = ik_neutral_local
+                pole_neutral_world = pole_neutral_local
+                neutral_world_rot_quat = Quaternion()
 
-        if pole_obj is not None:
-            eff_pole_mat = compute_effective_parent_matrix(pole_obj)
-            validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
-            pole_obj.location = world_to_local_position(pole_neutral_world, eff_pole_mat)
-            apply_target_rotation(pole_obj, Quaternion(), eff_pole_mat)
+            if ik_obj is not None and eff_ik_mat is not None:
+                ik_obj.location = world_to_local_position(ik_neutral_world, eff_ik_mat)
+                apply_target_rotation(ik_obj, neutral_world_rot_quat, eff_ik_mat)
+                _trigger_fault_injection(f"reset_arm_ik_after_hand_controller_{side.lower()}", {"side": side, "ik_obj": ik_obj})
 
-        p_up = arm.pose.bones.get(f"upper_arm.{side}")
-        p_fore = arm.pose.bones.get(f"forearm.{side}")
-        p_hand = arm.pose.bones.get(f"hand.{side}")
-        if p_up:
-            p_up.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
-        if p_fore:
-            p_fore.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
-            if ARM_IK_CONSTRAINT_NAMES[side] in p_fore.constraints:
-                p_fore.constraints[ARM_IK_CONSTRAINT_NAMES[side]].influence = 0.0
-        if p_hand:
-            p_hand.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
-            if HAND_ROT_CONSTRAINT_NAMES[side] in p_hand.constraints:
-                p_hand.constraints[HAND_ROT_CONSTRAINT_NAMES[side]].influence = 0.0
+            if pole_obj is not None and eff_pole_mat is not None:
+                pole_obj.location = world_to_local_position(pole_neutral_world, eff_pole_mat)
+                apply_target_rotation(pole_obj, Quaternion(), eff_pole_mat)
+                _trigger_fault_injection(f"reset_arm_ik_after_pole_{side.lower()}", {"side": side, "pole_obj": pole_obj})
 
-        _apply_arm_ik_prebend_hint_side(arm, side)
+            p_up = arm.pose.bones.get(f"upper_arm.{side}")
+            p_fore = arm.pose.bones.get(f"forearm.{side}")
+            p_hand = arm.pose.bones.get(f"hand.{side}")
+            if p_up:
+                p_up.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+            if p_fore:
+                p_fore.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+                if ARM_IK_CONSTRAINT_NAMES[side] in p_fore.constraints:
+                    p_fore.constraints[ARM_IK_CONSTRAINT_NAMES[side]].influence = 0.0
+            if p_hand:
+                p_hand.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+                if HAND_ROT_CONSTRAINT_NAMES[side] in p_hand.constraints:
+                    p_hand.constraints[HAND_ROT_CONSTRAINT_NAMES[side]].influence = 0.0
+            _trigger_fault_injection(f"reset_arm_ik_after_influence_{side.lower()}", {"side": side})
 
-    _depsgraph_update()
+            _apply_arm_ik_prebend_hint_side(arm, side)
+
+        _trigger_fault_injection("reset_arm_ik_during_depsgraph_update", {"arm": arm})
+        _depsgraph_update()
 
 
 def get_arm_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
