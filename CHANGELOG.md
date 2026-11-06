@@ -2,6 +2,41 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-06] PKG-5 / Task 10-B-6：Arm IK 生产级事务完整性与受控修正 (Controlled Correction)
+
+* **任务性质**：既有功能缺陷修复（TASK 10-B-6），针对 Task 10-B 遗留的约束身份核验盲区、回滚静默创建替代约束、集合所有权隔离避免解绑外部成员、不可逆清理异常挂起注册与幂等重试机制进行闭环修正。
+* **状态**：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`（84/84 专项测试通过，全四级分层回归 0 缺陷通过）。
+* **生产代码修改**（`src/rig/arm_ik.py`）：
+  - **Section 3（约束身份严格核验）**：在 `_verify_arm_rig_state_restored()` 中使用约束物理内存指针 `as_pointer()` 进行严格身份一致性比对，准确侦测约束被销毁、内存指针变更或由替代物冒充等破坏原子性的情况，拒绝替代物通过。
+  - **Section 4（约束回滚严格化）**：在 `_rollback_arm_rig_state()` 中彻底剔除 `pbone.constraints.new()` 补丁式替代约束创建分支；仅通过原始快照指针 `orig_ptr` 匹配存活约束，对被删除或指针不符的原始约束显式记录恢复失败，禁止向场景中注入同名替代物。
+  - **Section 5（集合所有权与成员保护隔离）**：快照扩充记录 Character 集合的 `parent_refs`、`child_refs` 与 `object_refs`；`_rollback_arm_rig_state()` 移除按名字盲目删除 `"Character"` 集合的分支，严格限定仅删除当前事务在 `tx.created_collections` 中显式登记的集合；恢复集合成员时不解绑事务期间外部独立挂载的成员。
+  - **Section 6（清理挂起注册表与幂等重试）**：引入模块级运行时注册表 `_PENDING_ARM_RIG_CLEANUPS`，提供 `get_pending_arm_rig_cleanup_ids()` 与 `retry_pending_arm_rig_cleanup(tx_id)`；在 Phase 3 不可逆资源清理失败时，将事务状态置为 `CLEANUP_PENDING` 并安全登记；在 `retry_cleanup()` 中实施两步删除（步骤 2.1 对象删除，步骤 2.2 数据块删除），通过 RNA 安全标记 `obj_cleaned` 与 `data_cleaned` 避免重试时触发 RNA 访问异常，并严格保护存在存活引用的共享数据块（`users > 0`）。
+* **专项测试修改与扩充**（`tests/test_task10b_transaction_atomicity.py`）：
+  - **TEST-38（约束回滚重构）**：按方案 A 重构，就地修改已有约束属性并注入无关多余约束，核验回滚后数量、名称、类型、影响度完全恢复，且原始约束内存指针严格保持不变。
+  - **TEST-68（调用边界异常适配）**：按方案 A 重构，适配真实单帧执行序列，在第 3 次调用（即写入后的 `_update_arm_ik_depsgraph()`）注入异常，并在抛出前严格断言 HandIK 控制器世界位置已被物理修改，验证异常后的完整原子回滚。
+  - **TEST-34（未初始化场景事务隔离）**：包裹在 `_arm_rig_transaction` 上下文中执行，验证事务集合跟踪与自动清理。
+  - **新增 TEST-77 至 TEST-84 全部 8 项专项测试**：
+    - TEST-77：验证约束销毁后即使分配同名替代物，核验器基于指针也能准确认定失败。
+    - TEST-78：验证约束销毁后回滚显式失败，杜绝静默创建替代约束。
+    - TEST-79：验证事务期间外部独立创建的 Character 集合在回滚时得到完整保护。
+    - TEST-80：验证事务期间向 Character 集合中追加的外部对象在回滚时不被意外解绑。
+    - TEST-81：验证 Phase 3 清理失败后事务登记在 `_PENDING_ARM_RIG_CLEANUPS` 中，可通过公开接口独立查询并幂等重试。
+    - TEST-82：验证两步清理机制：对象已删但数据块清理失败时，重试不会因 RNA 引用失效而报错。
+    - TEST-83：验证 `users > 0` 的共享数据块与同名异构资源在重试清理中严格不受破坏。
+    - TEST-84：验证连续事务失败与回滚的快照完全隔离，无挂起泄漏，再次调用完全干净。
+* **专项与分层测试验证**：
+  - `test_task10b_input_validation.py`：30/30 PASS (2.34s)。
+  - `test_task10b_transaction_atomicity.py`：54/54 PASS (4.24s)。
+  - Task 10-B 专项总计：84/84 PASS (100%)。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS (4.27s)。
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，文档符号存在性 PASS (1.80s)。
+  - 分层回归：Quick 19/19 (49.11s)、Physics 27/27 (104.50s)、Motion 12/12 (48.55s)、Full 42/42 (159.13s)，全部退出码 0，FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **证据归档**：
+  - `docs/evidence/PKG5_10B_REVISION_6/`：包含 4 份分析与核验报告（`baseline.md`、`test_traceability.md`、`regression_summary.md`、`final_audit_report.md`）及 8 份 raw 格式测试日志。
+* **后续任务与边界**：
+  - 当前状态为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`。
+  - 下一执行节点仍严格为 `Task 10-C (BLOCKED — NOT STARTED)`。
+
 ### [2026-11-04] PKG-5 / Task 10-B-5：Arm IK 生产级快照完整性与事务原子性修复
 
 * **任务性质**：既有功能缺陷修复（TASK 10-B-5），修复 Task 10-B / Revision 4 遗留的状态机隐式转换、快照数组引用联动、不可逆清理异常悬挂、集合所有权污染、更新调用边界异常及验证器盲区。

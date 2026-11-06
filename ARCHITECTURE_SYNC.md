@@ -10,9 +10,9 @@
 >
 > **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-5（Production Snapshot Integrity & Transaction Atomicity Repair，生产级快照完整性、三阶段提交与事务原子性修复已全部实现并通过验证）。
+> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-6（Production Transaction Integrity — Controlled Correction，生产级事务约束身份核验、严格回滚禁止替代物、集合所有权成员隔离、清理挂起注册表与幂等重试已全部实现并通过验证）。
 >
-> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B-5 为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`（76/76 专项测试通过，四级回归全部 0 缺陷通过）；显式 9 状态生命周期状态机、三阶段提交协议、快照不可变深拷贝、集合所有权隔离、调用边界适配及全字段核验已在 `src/rig/arm_ik.py` 完整实现。
+> **最近完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B-6 为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`（84/84 专项测试通过，四级回归全部 0 缺陷通过）；显式 9 状态生命周期状态机、三阶段提交协议、快照不可变深拷贝、集合所有权隔离、调用边界适配、约束指针身份严格核验、清理挂起注册表与幂等重试已在 `src/rig/arm_ik.py` 完整实现。
 >
 > **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 >

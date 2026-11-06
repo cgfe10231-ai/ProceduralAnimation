@@ -261,6 +261,22 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
         "parent_collections": [c.name for c in bpy.data.collections if char_col is not None and char_col.name in c.children],
         "child_collections": [c.name for c in char_col.children] if char_col is not None else [],
         "object_names": set(char_col.objects.keys()) if char_col is not None else set(),
+        "parent_refs": [
+            parent
+            for parent in bpy.data.collections
+            if char_col is not None
+            and char_col.name in parent.children
+        ],
+        "child_refs": (
+            list(char_col.children)
+            if char_col is not None
+            else []
+        ),
+        "object_refs": (
+            list(char_col.objects)
+            if char_col is not None
+            else []
+        ),
     }
 
     # 2. Controllers snapshot (HandIK.L/R, ElbowPole.L/R)
@@ -508,12 +524,57 @@ def _rollback_arm_rig_state(
 
         # 2.3: Reconcile and restore all saved constraints
         for sc in saved_cons:
-            con = pbone.constraints.get(sc["name"])
-            if con is None or con.type != sc["type"]:
-                if con is not None:
-                    pbone.constraints.remove(con)
-                con = pbone.constraints.new(type=sc["type"])
-                con.name = sc["name"]
+            # Task 10-B-6
+            # Resolve original constraint without substitution
+
+            original_con = sc.get("con_ref")
+            original_ptr = sc.get("con_ptr")
+
+            if original_con is None or original_ptr is None:
+                restoration_errors.append(
+                    f"Missing snapshot identity: "
+                    f"{b_name}/{sc['name']}"
+                )
+                continue
+
+            try:
+                live_ptr = original_con.as_pointer()
+            except ReferenceError:
+                restoration_errors.append(
+                    f"Original constraint destroyed: "
+                    f"{b_name}/{sc['name']}"
+                )
+                continue
+
+            if live_ptr != original_ptr:
+                restoration_errors.append(
+                    f"Original constraint pointer changed: "
+                    f"{b_name}/{sc['name']}"
+                )
+                continue
+
+            con = None
+
+            for candidate in pbone.constraints:
+                if candidate.as_pointer() == original_ptr:
+                    con = candidate
+                    break
+
+            if con is None:
+                restoration_errors.append(
+                    f"Original constraint absent from live chain: "
+                    f"{b_name}/{sc['name']}"
+                )
+                continue
+
+            if con.type != sc["type"]:
+                restoration_errors.append(
+                    f"Original constraint type mismatch: "
+                    f"{b_name}/{sc['name']}"
+                )
+                continue
+
+            con.name = sc["name"]
 
             con.influence = sc["influence"]
             con.mute = sc["mute"]
@@ -607,15 +668,12 @@ def _rollback_arm_rig_state(
 
     char_col_snap = snapshot.get("character_collection", {})
     if not char_col_snap.get("existed", False):
-        col = bpy.data.collections.get("Character")
-        if col is not None:
-            for child in list(bpy.context.scene.collection.children):
-                if child == col:
-                    bpy.context.scene.collection.children.unlink(col)
-            for parent_c in list(bpy.data.collections):
-                if col.name in parent_c.children:
-                    parent_c.children.unlink(col)
-            bpy.data.collections.remove(col)
+        # Transaction-owned collections are handled
+        # exclusively by active_tx.created_collections.
+        #
+        # Never delete a collection merely because
+        # its name is "Character".
+        pass
     else:
         orig_name = char_col_snap.get("name", "Character")
         col = char_col_snap.get("col_ref")
@@ -651,14 +709,49 @@ def _rollback_arm_rig_state(
                 if child is not None and child.name not in col.children:
                     col.children.link(child)
 
-            expected_objs = char_col_snap.get("object_names", set())
-            for o in list(col.objects):
-                if o.name not in expected_objs:
-                    col.objects.unlink(o)
-            for o_name in expected_objs:
-                o = bpy.data.objects.get(o_name)
-                if o is not None and o.name not in col.objects:
-                    col.objects.link(o)
+            expected_refs = char_col_snap.get(
+                "object_refs", []
+            )
+
+            expected_ptrs = {
+                obj.as_pointer()
+                for obj in expected_refs
+            }
+
+            # Restore missing original members.
+            for obj in expected_refs:
+                try:
+                    obj_ptr = obj.as_pointer()
+                except ReferenceError:
+                    restoration_errors.append(
+                        "Character collection original member "
+                        "was destroyed"
+                    )
+                    continue
+
+                found = any(
+                    current.as_pointer() == obj_ptr
+                    for current in col.objects
+                )
+
+                if not found:
+                    col.objects.link(obj)
+
+            # Only remove unexpected members when the
+            # transaction can prove ownership of the link.
+            #
+            # Do not remove external additions based solely
+            # on absence from the snapshot.
+            for obj in list(col.objects):
+                if obj.as_pointer() in expected_ptrs:
+                    continue
+
+                # Controller membership is restored through
+                # the controller snapshot and transaction
+                # object lifecycle.
+                #
+                # External members must be preserved.
+                continue
 
     _depsgraph_update()
 
@@ -702,23 +795,84 @@ def _verify_arm_rig_state_restored(
     # 1. Collection check
     s_col = snapshot.get("character_collection", {})
     c_col = current.get("character_collection", {})
-    if s_col.get("existed") != c_col.get("existed"):
-        diffs.append(f"Character collection existed={c_col.get('existed')}, expected {s_col.get('existed')}")
-    elif s_col.get("existed"):
-        if s_col.get("children_of_scene") != c_col.get("children_of_scene"):
-            diffs.append(f"Character collection children_of_scene={c_col.get('children_of_scene')}, expected {s_col.get('children_of_scene')}")
-        if set(s_col.get("parent_collections", [])) != set(c_col.get("parent_collections", [])):
-            diffs.append(f"Character collection parent_collections {c_col.get('parent_collections')} != {s_col.get('parent_collections')}")
-        if set(s_col.get("child_collections", [])) != set(c_col.get("child_collections", [])):
-            diffs.append(f"Character collection child_collections {c_col.get('child_collections')} != {s_col.get('child_collections')}")
-        if s_col.get("object_names") != c_col.get("object_names"):
-            diffs.append(f"Character collection members {c_col.get('object_names')} != {s_col.get('object_names')}")
+
+    if s_col.get("existed"):
+        if not c_col.get("existed"):
+            diffs.append("Character collection existed in snapshot but is missing in current state")
+        else:
+            # Check original collection object identity
+            orig_col_ref = s_col.get("col_ref")
+            orig_col_ptr = s_col.get("col_ptr")
+            curr_col_ref = c_col.get("col_ref")
+            curr_col_ptr = c_col.get("col_ptr")
+
+            if orig_col_ref is not None:
+                try:
+                    live_col_ptr = orig_col_ref.as_pointer()
+                    if orig_col_ptr and live_col_ptr != orig_col_ptr:
+                        diffs.append("Character collection original pointer changed")
+                except ReferenceError:
+                    diffs.append("Character collection original collection destroyed")
+
+            if orig_col_ptr and curr_col_ptr and curr_col_ptr != orig_col_ptr:
+                diffs.append(f"Character collection identity mismatch: expected={orig_col_ptr}, actual={curr_col_ptr}")
+
+            # Parent / Child hierarchy: all snapshot parents and children must still exist
+            if s_col.get("children_of_scene") and not c_col.get("children_of_scene"):
+                diffs.append("Character collection missing from scene collection children")
+
+            s_parents = set(s_col.get("parent_collections", []))
+            c_parents = set(c_col.get("parent_collections", []))
+            missing_parents = s_parents - c_parents
+            if missing_parents:
+                diffs.append(f"Character collection missing original parent collections: {missing_parents}")
+
+            s_children = set(s_col.get("child_collections", []))
+            c_children = set(c_col.get("child_collections", []))
+            missing_children = s_children - c_children
+            if missing_children:
+                diffs.append(f"Character collection missing original child collections: {missing_children}")
+
+            # Original members check: all snapshot members must be present
+            s_objs = s_col.get("object_names", set())
+            c_objs = c_col.get("object_names", set())
+            missing_objs = s_objs - c_objs
+            if missing_objs:
+                diffs.append(f"Character collection missing original members: {missing_objs}")
+
+            # Check individual original member identities
+            for orig_obj in s_col.get("object_refs", []):
+                try:
+                    optr = orig_obj.as_pointer()
+                    c_ptrs = {o.as_pointer() for o in c_col.get("object_refs", [])}
+                    if optr not in c_ptrs:
+                        diffs.append(f"Character collection original member '{orig_obj.name}' identity missing")
+                except ReferenceError:
+                    diffs.append("Character collection original member was destroyed")
+    else:
+        # Snapshot did NOT have Character collection.
+        # If active_tx created it, active_tx.created_collections will catch it below if not removed.
+        # If an external party created a Character collection, it must be preserved.
+        pass
 
     # Check that transaction-created collections do not linger
     if active_tx is not None:
         for reg in getattr(active_tx, "created_collections", []):
             c_name = reg.get("created_name")
-            if c_name in bpy.data.collections:
+            c_ptr = reg.get("col_ptr")
+            c_ref = reg.get("col_ref")
+            found_lingering = False
+            if c_ref is not None:
+                try:
+                    if c_ref.name in bpy.data.collections and bpy.data.collections[c_ref.name] == c_ref:
+                        found_lingering = True
+                except ReferenceError:
+                    found_lingering = False
+            if not found_lingering and c_name in bpy.data.collections:
+                col_obj = bpy.data.collections[c_name]
+                if c_ptr is None or col_obj.as_pointer() == c_ptr:
+                    found_lingering = True
+            if found_lingering:
                 diffs.append(f"Transaction-created collection '{c_name}' still exists in scene")
 
     # 2. Controllers check
@@ -856,19 +1010,49 @@ def _verify_arm_rig_state_restored(
                     diffs.append(f"Bone {b_name} constraint {idx} name {cc['name']} != {sc['name']}")
                 if sc["type"] != cc["type"]:
                     diffs.append(f"Bone {b_name} constraint {idx} type {cc['type']} != {sc['type']}")
+                # Task 10-B-6
+                # Original constraint identity verification
+
                 orig_con = sc.get("con_ref")
-                con_alive = False
-                if orig_con is not None:
+                orig_ptr = sc.get("con_ptr")
+
+                curr_con = cc.get("con_ref")
+                curr_ptr = cc.get("con_ptr")
+
+                label = (
+                    f"Bone {b_name} "
+                    f"constraint[{idx}] '{sc['name']}'"
+                )
+
+                if orig_con is None or orig_ptr is None:
+                    diffs.append(
+                        f"{label}: snapshot identity missing"
+                    )
+
+                else:
                     try:
-                        _ = orig_con.name
-                        con_alive = True
+                        live_orig_ptr = orig_con.as_pointer()
                     except ReferenceError:
-                        con_alive = False
-                if con_alive:
-                    if orig_con != cc.get("con_ref"):
-                        diffs.append(f"Bone {b_name} constraint {idx} identity mismatch")
-                    elif sc.get("con_ptr") and cc.get("con_ptr") and sc["con_ptr"] != cc["con_ptr"]:
-                        diffs.append(f"Bone {b_name} constraint {idx} identity pointer mismatch: {cc['con_ptr']} != {sc['con_ptr']}")
+                        diffs.append(
+                            f"{label}: original constraint destroyed"
+                        )
+                    else:
+                        if live_orig_ptr != orig_ptr:
+                            diffs.append(
+                                f"{label}: original pointer changed"
+                            )
+
+                        elif curr_con is None or curr_ptr is None:
+                            diffs.append(
+                                f"{label}: current identity missing"
+                            )
+
+                        elif curr_ptr != orig_ptr:
+                            diffs.append(
+                                f"{label}: identity mismatch; "
+                                f"expected={orig_ptr}, "
+                                f"actual={curr_ptr}"
+                            )
                 if abs(sc["influence"] - cc["influence"]) > TOL:
                     diffs.append(f"Bone {b_name} constraint {idx} influence {cc['influence']} != {sc['influence']}")
                 if sc["mute"] != cc["mute"]:
@@ -1001,33 +1185,101 @@ class _ArmRigTransactionContext:
 
         # 2. Clean up stashed doomed objects and unreferenced datablocks
         for stashed in list(self.uncleaned_stashed_objects):
-            try:
-                obj = stashed.get("stashed_obj")
-                data_ref = stashed.get("stashed_data")
+            # Step 2.1: Object cleanup
+            if not stashed.get("obj_cleaned", False):
+                try:
+                    _trigger_fault_injection("during_cleanup_object_removal", {"stashed": stashed})
+                    obj_ref = stashed.get("stashed_obj")
+                    obj_ptr = stashed.get("stashed_obj_ptr")
 
-                if obj is not None:
-                    try:
-                        if obj.name in bpy.data.objects and bpy.data.objects.get(obj.name) == obj:
-                            bpy.data.objects.remove(obj, do_unlink=True)
-                    except ReferenceError:
-                        pass
+                    target_obj = None
+                    for o in bpy.data.objects:
+                        try:
+                            if obj_ptr and o.as_pointer() == obj_ptr:
+                                target_obj = o
+                                break
+                            elif obj_ref is not None and o == obj_ref:
+                                target_obj = o
+                                break
+                        except ReferenceError:
+                            continue
 
-                if data_ref is not None:
-                    try:
-                        user_count = getattr(data_ref, "users", 0)
-                        if user_count == 0:
-                            for coll_name in ("meshes", "curves", "lights", "cameras", "armatures", "lattices", "metaballs", "volumes"):
-                                coll = getattr(bpy.data, coll_name, None)
-                                if coll is not None and data_ref.name in coll and coll.get(data_ref.name) == data_ref:
-                                    coll.remove(data_ref, do_unlink=True)
-                                    break
-                    except ReferenceError:
-                        pass
+                    if target_obj is not None:
+                        bpy.data.objects.remove(target_obj, do_unlink=True)
+                        still_exists = any(
+                            (obj_ptr and o.as_pointer() == obj_ptr)
+                            for o in bpy.data.objects
+                        )
+                        if still_exists:
+                            cleanup_failures.append(
+                                f"Failed to delete doomed object {stashed.get('original_name')}: still exists in bpy.data.objects"
+                            )
+                        else:
+                            stashed["obj_cleaned"] = True
+                    else:
+                        stashed["obj_cleaned"] = True
+                except Exception as oe:
+                    cleanup_failures.append(f"Failed to clean up stashed object {stashed.get('original_name')}: {oe}")
 
+            # Step 2.2: DataBlock cleanup (runs only if object cleanup has succeeded)
+            if stashed.get("obj_cleaned", False) and not stashed.get("data_cleaned", False):
+                try:
+                    _trigger_fault_injection("during_cleanup_datablock_removal", {"stashed": stashed})
+                    data_ref = stashed.get("stashed_data")
+                    data_ptr = stashed.get("stashed_data_ptr")
+                    data_name = stashed.get("stashed_data_name")
+
+                    if data_ptr is None and data_ref is None:
+                        stashed["data_cleaned"] = True
+                    else:
+                        target_data = None
+                        target_coll = None
+                        for coll_name in ("meshes", "curves", "lights", "cameras", "armatures", "lattices", "metaballs", "volumes"):
+                            coll = getattr(bpy.data, coll_name, None)
+                            if coll is not None:
+                                for item in coll:
+                                    try:
+                                        if data_ptr and item.as_pointer() == data_ptr:
+                                            target_data = item
+                                            target_coll = coll
+                                            break
+                                        elif data_ref is not None and item == data_ref:
+                                            target_data = item
+                                            target_coll = coll
+                                            break
+                                    except ReferenceError:
+                                        continue
+                            if target_data is not None:
+                                break
+
+                        if target_data is None:
+                            stashed["data_cleaned"] = True
+                        else:
+                            try:
+                                user_count = getattr(target_data, "users", 0)
+                            except ReferenceError:
+                                user_count = 0
+
+                            if user_count > 0:
+                                # Shared datablock with remaining users: preserve it per DataBlock rules
+                                stashed["data_cleaned"] = True
+                            else:
+                                target_coll.remove(target_data, do_unlink=True)
+                                still_present = any(
+                                    (data_ptr and item.as_pointer() == data_ptr)
+                                    for item in target_coll
+                                )
+                                if still_present:
+                                    cleanup_failures.append(f"Failed to delete datablock {data_name}: still exists in {target_coll}")
+                                else:
+                                    stashed["data_cleaned"] = True
+                except Exception as de:
+                    cleanup_failures.append(f"Failed to clean up datablock for {stashed.get('original_name')}: {de}")
+
+            # Only remove record from uncleaned_stashed_objects when BOTH object and datablock are cleaned
+            if stashed.get("obj_cleaned", False) and stashed.get("data_cleaned", False):
                 if stashed in self.uncleaned_stashed_objects:
                     self.uncleaned_stashed_objects.remove(stashed)
-            except Exception as oe:
-                cleanup_failures.append(f"Failed to clean up stashed object {stashed.get('original_name')}: {oe}")
 
         if cleanup_failures:
             self.cleanup_error = "; ".join(cleanup_failures)
@@ -1040,6 +1292,64 @@ class _ArmRigTransactionContext:
 
 
 _ACTIVE_TRANSACTION_STACK: List[_ArmRigTransactionContext] = []
+
+# Task 10-B-6
+# Runtime registry for committed transactions
+# with unfinished resource cleanup.
+
+_PENDING_ARM_RIG_CLEANUPS: Dict[
+    str,
+    "_ArmRigTransactionContext"
+] = {}
+
+
+def _register_pending_arm_rig_cleanup(
+    tx: "_ArmRigTransactionContext",
+) -> None:
+
+    if tx.state != _ArmRigTransactionState.CLEANUP_PENDING:
+        raise RuntimeError(
+            "Cannot register cleanup for "
+            "a non-pending transaction"
+        )
+
+    _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+
+
+def get_pending_arm_rig_cleanup_ids() -> Tuple[str, ...]:
+    """Return pending cleanup transaction IDs."""
+
+    return tuple(
+        sorted(_PENDING_ARM_RIG_CLEANUPS)
+    )
+
+
+def retry_pending_arm_rig_cleanup(tx_id: str) -> None:
+    """Retry cleanup of one pending transaction."""
+
+    tx = _PENDING_ARM_RIG_CLEANUPS.get(tx_id)
+
+    if tx is None:
+        raise KeyError(
+            f"Pending cleanup transaction not found: {tx_id}"
+        )
+
+    tx.retry_cleanup()
+
+    if tx.state == _ArmRigTransactionState.COMMITTED:
+        if (
+            tx.uncleaned_stashed_objects
+            or tx.uncleaned_stashed_constraints
+        ):
+            raise RuntimeError(
+                "Cleanup reported COMMITTED "
+                "while pending resources remain"
+            )
+
+        _PENDING_ARM_RIG_CLEANUPS.pop(
+            tx_id,
+            None
+        )
 
 
 @contextmanager
@@ -1126,6 +1436,7 @@ def _arm_rig_transaction(arm: bpy.types.Object):
         except BaseException as ce:
             tx.state = _ArmRigTransactionState.CLEANUP_PENDING
             tx.cleanup_error = str(ce)
+            _register_pending_arm_rig_cleanup(tx)
             raise RuntimeError(
                 f"Arm rig transaction committed, but irreversible cleanup failed: {ce}"
             ) from ce
@@ -1154,8 +1465,13 @@ def _get_or_create_empty(
             stashed_record = {
                 "original_name": name,
                 "stashed_obj": obj,
+                "stashed_obj_ptr": obj.as_pointer() if hasattr(obj, "as_pointer") else None,
                 "stashed_data": getattr(obj, "data", None),
+                "stashed_data_ptr": getattr(obj, "data", None).as_pointer() if (getattr(obj, "data", None) and hasattr(getattr(obj, "data", None), "as_pointer")) else None,
+                "stashed_data_name": getattr(obj, "data", None).name if getattr(obj, "data", None) else None,
                 "collections": [c.name for c in obj.users_collection],
+                "obj_cleaned": False,
+                "data_cleaned": False,
             }
             tx.stashed_objects.append(stashed_record)
             obj.name = f"__stashed_doomed_{name}__"
@@ -1320,6 +1636,7 @@ def setup_arm_ik(
                             tx.stashed_constraints.append({
                                 "pbone": p_fore,
                                 "con": con,
+                                "con_ptr": con.as_pointer(),
                                 "orig_name": orig_name,
                                 "orig_mute": orig_mute,
                                 "orig_idx": orig_idx,
@@ -1338,6 +1655,7 @@ def setup_arm_ik(
                         tx.stashed_constraints.append({
                             "pbone": p_fore,
                             "con": con,
+                            "con_ptr": con.as_pointer(),
                             "orig_name": orig_name,
                             "orig_mute": orig_mute,
                             "orig_idx": orig_idx,
@@ -1378,6 +1696,7 @@ def setup_arm_ik(
                             tx.stashed_constraints.append({
                                 "pbone": p_hand,
                                 "con": con,
+                                "con_ptr": con.as_pointer(),
                                 "orig_name": orig_name,
                                 "orig_mute": orig_mute,
                                 "orig_idx": orig_idx,
@@ -1396,6 +1715,7 @@ def setup_arm_ik(
                         tx.stashed_constraints.append({
                             "pbone": p_hand,
                             "con": con,
+                            "con_ptr": con.as_pointer(),
                             "orig_name": orig_name,
                             "orig_mute": orig_mute,
                             "orig_idx": orig_idx,

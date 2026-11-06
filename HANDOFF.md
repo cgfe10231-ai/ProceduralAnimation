@@ -10,64 +10,62 @@
 
 - 项目：ProceduralAnimation。
 - 分支：`master`。
-- 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-5（Production Snapshot Integrity & Transaction Atomicity Repair，生产级快照完整性、三阶段提交与事务原子性修复已全部实现并通过验证）。
-- 当前已实现节点：PKG-5 / Task 10-B（第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订及第 5 轮生产级快照完整性与事务原子性修复）。
+- 最近完成节点：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-6（Production Transaction Integrity — Controlled Correction，生产级事务约束身份核验、严格回滚禁止替代物、集合所有权成员隔离、清理挂起注册表与幂等重试已全部实现并通过验证）。
+- 当前已实现节点：PKG-5 / Task 10-B（第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订、第 5 轮生产级快照完整性与第 6 轮受控修正）。
 - 当前状态判定：
   - 10-A：`COMPLETED — ARCHIVED`。
-  - 10-B：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`（76 项专项测试 76/76 PASS，四级回归全部 0 缺陷通过）。
-  - 生产级事务快照与回滚系统：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`（`src/rig/arm_ik.py` 中完整实现并通过 46 项生产事务测试）。
+  - 10-B：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`（84 项专项测试 84/84 PASS，四级回归全部 0 缺陷通过）。
+  - 生产级事务快照与回滚系统：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`（`src/rig/arm_ik.py` 中完整实现并通过 54 项生产事务测试）。
   - 整体 Task 10-B：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`。
 - 下一执行节点：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 - 下一节点状态：`BLOCKED — NOT STARTED`。
-- 历史记法说明：旧规划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产事务快照与回滚）已于 Task 10-B / Revision 4 验收合入并关闭；本轮 Task 10-B-5 针对独立审计提出的状态机、不可变深拷贝、三阶段提交、集合所有权隔离与调用边界进行闭环修复。
+- 历史记法说明：旧规划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产事务快照与回滚）已于 Task 10-B / Revision 4 验收合入并关闭；Task 10-B-5 与 Task 10-B-6 针对独立审计提出的状态机、不可变深拷贝、三阶段提交、集合所有权隔离、调用边界、约束指针身份严格核验与不可逆清理挂起注册表进行闭环修复与受控修正。
 
 ### 10-B 已有具体交付：
 1. **10-B-1**：输入预验证、Influence 边界与基础零副作用合同。
 2. **10-B-2**：自动初始化前有效父级矩阵预检（Phase B 零突变预检与 TEST-25 至 TEST-27 快照比对测试）。
 3. **10-B-3**：控制器类型校验（仅 `EMPTY` 视为有效控制器）、替换错误类型对象时的预检预期矩阵一致性（Case C），场景快照扩充，新增 TEST-28 至 TEST-30。
 4. **10-B-4（Task 10-B / Revision 4 及独立审计修正）**：生产级手臂 Rig 状态快照、逐字段精确回滚与状态核验、非 Empty 控制器暂存与还原、无损约束暂存、初始化异常安全与跨 Armature 独占保护，包含 TEST-31 至 TEST-64。
-5. **10-B-5（Production Snapshot Integrity & Transaction Atomicity Repair）**：
-   - 显式 9 状态生命周期状态机 `_ArmRigTransactionState`。
-   - 三阶段安全提交协议（Phase 1 可逆准备故障回滚、Phase 2 逻辑提交确认、Phase 3 不可逆资源清理挂起与 `tx.retry_cleanup()` 幂等收敛）。
-   - 快照不可变深拷贝契约：`_clone_snapshot_property_value()` 将 RNA 数组解耦为独立不可变 tuple，mathutils 采用 `.copy()`，消除 RNA 内存就地修改联动风险。
-   - 集合所有权严格隔离：`tx.register_created_collection()` 显式跟踪，回滚仅删除事务集合，100% 保护并发外部集合；多父级 Character 集合无损恢复。
-   - 依赖图更新调用边界解耦：`_DEPSGRAPH_UPDATER` 适配层与私有测试适配接口支持真实调用边界异常注入与原子回滚。
-   - 全字段恢复验证器：`_verify_arm_rig_state_restored()` 逐字段核验 4 控制器、6 骨骼、约束（数量、相对顺序、身份、通用 RNA 属性数组公差 `TOL=1e-5`）与全局事务栈干净度（深度 0）。
-   - 新增 TEST-65 至 TEST-76 全部 12 项专项事务修复测试（专项测试总数升至 76/76 PASS）。
+5. **10-B-5（Production Snapshot Integrity & Transaction Atomicity Repair）**：显式 9 状态生命周期状态机、三阶段安全提交协议、快照不可变深拷贝契约、集合所有权隔离、调用边界解耦与全字段恢复验证器，包含 TEST-65 至 TEST-76。
+6. **10-B-6（Production Transaction Integrity — Controlled Correction）**：
+   - Section 3 约束内存指针 `as_pointer()` 严格身份核验，拒绝替代物冒充。
+   - Section 4 约束回滚剔除 `pbone.constraints.new()` 补丁逻辑，原约束缺失直接报错。
+   - Section 5 集合快照扩充 `object_refs`，回滚移除按名删除 Character 逻辑，保护外部集合与新增成员。
+   - Section 6 运行时注册表 `_PENDING_ARM_RIG_CLEANUPS`、公开查询与重试接口，两步清理保护 `users > 0` 共享数据块并防御 RNA 失效。
+   - TEST-38 重构（方案 A，属性修改与多余约束回滚）与 TEST-68 重构（方案 A，第 3 次调用注入与写后坐标突变断言）。
+   - 新增 TEST-77 至 TEST-84 全部 8 项专项测试（专项测试总数升至 84/84 PASS）。
 
-## 2. 10-B-5 交付证据
+## 2. 10-B-6 交付证据
 
 证据目录：
 
-`docs/evidence/PKG5_10B_REVISION_5/` (Revision 5 综合证据目录)、`docs/evidence/PKG5_10B_REVISION_4_AUDIT_CORRECTION/` (独立审计修正证据目录)、`docs/evidence/PKG5_10B_REVISION_4/` (Revision 4 证据目录) 与 `docs/evidence/PKG5_10B1/` (前三轮历史证据目录)
+`docs/evidence/PKG5_10B_REVISION_6/` (Revision 6 综合证据目录)
 
 执行报告：
 
-- [`final_audit_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_5/final_audit_report.md)（Task 10-B-5 独立审计闭环报告）
-- [`test_traceability.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_5/test_traceability.md)（TEST-01 至 TEST-76 全量测试追溯矩阵）
-- [`regression_summary.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_5/regression_summary.md)（四级分层回归与全量专项回归总结报告）
-- [`transaction_state_machine.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_5/transaction_state_machine.md)（显式 9 状态生命周期状态机与三阶段提交协议规范）
-- [`snapshot_schema.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_5/snapshot_schema.md)（快照模式与深拷贝不可变性契约规范）
-- [`resource_ownership.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_5/resource_ownership.md)（集合所有权隔离与资源生命周期规范）
-- [`fault_injection_matrix.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_5/fault_injection_matrix.md)（故障注入阶段映射与调用边界矩阵）
+- [`final_audit_report.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_6/final_audit_report.md)（Task 10-B-6 受控修正闭环报告）
+- [`test_traceability.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_6/test_traceability.md)（TEST-01 至 TEST-84 全量测试追溯矩阵）
+- [`regression_summary.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_6/regression_summary.md)（四级分层回归与全量专项回归总结报告）
+- [`baseline.md`](file:///c:/Users/64701/OneDrive/Desktop/ProceduralAnimation/docs/evidence/PKG5_10B_REVISION_6/baseline.md)（环境基线与修改范围不变量）
 
 专项测试：
 
 | 测试 | 结果 |
 |---|---:|
-| 10-B 专项：Input Validation & Preflight (`test_task10b_input_validation.py`) | 30/30 PASS (2.36s) |
-| 10-B 专项：Transaction Atomicity (`test_task10b_transaction_atomicity.py`) | 46/46 PASS (6.28s) |
-| 10-B 专项总计 | 76/76 PASS (100%) |
-| 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`) | 30/30 PASS (6.53s) |
-| C2 Final Inspector | 6 项自测试 PASS，文档符号检查 PASS |
+| 10-B 专项：Input Validation & Preflight (`test_task10b_input_validation.py`) | 30/30 PASS (2.34s) |
+| 10-B 专项：Transaction Atomicity (`test_task10b_transaction_atomicity.py`) | 54/54 PASS (4.24s) |
+| 10-B 专项总计 | 84/84 PASS (100%) |
+| 10-A World Transform & Lifecycle (`test_arm_ik_lifecycle_world_transform_contract.py`) | 30/30 PASS (4.27s) |
+| C2 Final Inspector | 6 项自测试 PASS，文档符号检查 PASS (1.80s) |
 
 分层测试：
 
 | Tier | 套件数 | 状态 |
 |---|---:|---|
-| Quick | 19/19 | 退出码 0 (65.48s) |
-| Physics | 27/27 | 退出码 0 (135.78s) |
-| Motion | 12/12 | 退出码 0 (77.25s) |
+| Quick | 19/19 | 退出码 0 (49.11s) |
+| Physics | 27/27 | 退出码 0 (104.50s) |
+| Motion | 12/12 | 退出码 0 (48.55s) |
+| Full | 42/42 | 退出码 0 (159.13s) |
 | Full | 42/42 | 退出码 0 (215.00s) |
 
 所有分层测试均为 FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。

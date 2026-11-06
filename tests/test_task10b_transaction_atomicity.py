@@ -88,7 +88,9 @@ from src.rig.arm_ik import (
     _snapshot_arm_rig_state,
     _verify_arm_rig_state_restored,
     get_arm_ik_state,
+    get_pending_arm_rig_cleanup_ids,
     reset_arm_ik,
+    retry_pending_arm_rig_cleanup,
     set_arm_ik_influence,
     set_hand_ik_target,
     setup_arm_ik,
@@ -106,6 +108,8 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.ops.wm.read_factory_settings(use_empty=True)
         _clear_test_fault_injection_hook()
         _clear_test_depsgraph_updater()
+        from src.rig.arm_ik import _PENDING_ARM_RIG_CLEANUPS
+        _PENDING_ARM_RIG_CLEANUPS.clear()
         self.config = PipelineConfig()
         self.char_data = build_character(self.config)
         self.root = self.char_data["root"]
@@ -233,13 +237,15 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         snap_initial = _snapshot_arm_rig_state(self.armature)
         self.assertFalse(snap_initial["character_collection"]["existed"])
 
-        # Create controllers and constraints
-        setup_arm_ik(self.armature, initial_influence=0.5)
-        for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
-            self.assertIn(c_name, bpy.data.objects)
+        # Create controllers and constraints under transaction
+        with self.assertRaises(RuntimeError):
+            with _arm_rig_transaction(self.armature):
+                setup_arm_ik(self.armature, initial_influence=0.5)
+                for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+                    self.assertIn(c_name, bpy.data.objects)
+                self.assertIn("Character", bpy.data.collections)
+                raise RuntimeError("Trigger rollback of uninitialized scene")
 
-        # Rollback directly
-        _rollback_arm_rig_state(self.armature, snap_initial)
         _verify_arm_rig_state_restored(self.armature, snap_initial)
 
         # Verify controllers and constraints removed, Character collection removed
@@ -322,25 +328,112 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertAlmostEqual(p_fore.ik_max_x, math.radians(150.0), places=4)
 
     def test_38_direct_rollback_constraints(self) -> None:
-        """TEST-38: Rollback on constraints restores constraint counts, order, types, and influences."""
-        setup_arm_ik(self.armature, initial_influence=0.4)
+        """
+        TEST-38:
+        Restore original constraint identity, order,
+        properties and remove transaction-added constraints.
+
+        Physical destruction of an original constraint
+        is covered separately by TEST-77 and TEST-78.
+        """
+
+        setup_arm_ik(
+            self.armature,
+            initial_influence=0.4,
+        )
+
         snap = _snapshot_arm_rig_state(self.armature)
 
         p_fore = self.armature.pose.bones["forearm.L"]
-        # Delete existing IK constraint
-        for con in list(p_fore.constraints):
-            p_fore.constraints.remove(con)
-        # Add extraneous constraint
-        p_fore.constraints.new(type="TRACK_TO")
+
+        original = p_fore.constraints["ArmIK.L"]
+        original_ptr = original.as_pointer()
+
+        original_mute = original.mute
+        original_influence = original.influence
+
+        # Mutate the original constraint without destroying it.
+        original.influence = 0.9
+        original.mute = not original_mute
+
+        # Add an extraneous constraint.
+        extra = p_fore.constraints.new(type="TRACK_TO")
+        extra.name = "ExtraTrack_TEST38"
+
+        # Move the extra constraint before the original.
+        extra_idx = list(p_fore.constraints).index(extra)
+        p_fore.constraints.move(extra_idx, 0)
+
         bpy.context.view_layer.update()
 
-        _rollback_arm_rig_state(self.armature, snap)
-        _verify_arm_rig_state_restored(self.armature, snap)
+        # Confirm the test actually changed the scene.
+        self.assertEqual(
+            p_fore.constraints[0].name,
+            "ExtraTrack_TEST38",
+        )
 
-        self.assertEqual(len(p_fore.constraints), 1)
-        self.assertEqual(p_fore.constraints[0].name, "ArmIK.L")
-        self.assertEqual(p_fore.constraints[0].type, "IK")
-        self.assertAlmostEqual(p_fore.constraints[0].influence, 0.4, places=5)
+        self.assertAlmostEqual(
+            original.influence,
+            0.9,
+            places=5,
+        )
+
+        # Execute rollback.
+        _rollback_arm_rig_state(
+            self.armature,
+            snap,
+        )
+
+        _verify_arm_rig_state_restored(
+            self.armature,
+            snap,
+        )
+
+        # Original assertions: count, name, type, influence.
+        self.assertEqual(
+            len(p_fore.constraints),
+            1,
+        )
+
+        restored = p_fore.constraints[0]
+
+        self.assertEqual(
+            restored.name,
+            "ArmIK.L",
+        )
+
+        self.assertEqual(
+            restored.type,
+            "IK",
+        )
+
+        self.assertAlmostEqual(
+            restored.influence,
+            0.4,
+            places=5,
+        )
+
+        # Additional strict identity assertions.
+        self.assertEqual(
+            restored.as_pointer(),
+            original_ptr,
+        )
+
+        self.assertAlmostEqual(
+            restored.influence,
+            original_influence,
+            places=5,
+        )
+
+        self.assertEqual(
+            restored.mute,
+            original_mute,
+        )
+
+        self.assertNotIn(
+            "ExtraTrack_TEST38",
+            [c.name for c in p_fore.constraints],
+        )
 
     # -------------------------------------------------------------------------
     # Fault Injection Tests (TEST-39 to TEST-50)
@@ -1414,13 +1507,49 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         setup_arm_ik(self.armature, initial_influence=0.2)
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
-        # Call boundary failure injection: fail on first call during forward transaction, then succeed during rollback
+        original_location = (
+            bpy.data.objects["HandIK.L"]
+            .location.copy()
+        )
+
+        original_update = bpy.context.view_layer.update
         call_count = [0]
+        write_observed = [False]
+
         def failing_updater():
             call_count[0] += 1
-            if call_count[0] == 1:
-                raise RuntimeError("Depsgraph call boundary crash")
-            bpy.context.view_layer.update()
+
+            # Call 1: Phase B preflight
+            # Call 2: Snapshot creation
+            # Call 3: After transaction has written state
+            if call_count[0] == 3:
+                ctrl = bpy.data.objects.get("HandIK.L")
+
+                if ctrl is None:
+                    raise AssertionError(
+                        "TEST-68: HandIK.L missing at post-write update"
+                    )
+
+                location_after_write = ctrl.location.copy()
+
+                location_difference = (
+                    location_after_write - original_location
+                ).length
+
+                if location_difference <= 1e-5:
+                    raise AssertionError(
+                        "TEST-68: post-write update reached "
+                        "without actual controller mutation; "
+                        f"location_difference={location_difference}"
+                    )
+
+                write_observed[0] = True
+
+                raise RuntimeError(
+                    "TEST-68 dependency graph post-write failure"
+                )
+
+            original_update()
 
         _set_test_depsgraph_updater(failing_updater)
         try:
@@ -1428,9 +1557,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             target_pos = (-0.32, y_pos, 1.20)
             with self.assertRaises(RuntimeError) as cm:
                 set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.88)
-            self.assertIn("Depsgraph call boundary crash", str(cm.exception))
+            self.assertIn("TEST-68 dependency graph post-write failure", str(cm.exception))
         finally:
             _clear_test_depsgraph_updater()
+
+        # Assert post-write failure occurred
+        self.assertTrue(write_observed[0])
+        self.assertGreaterEqual(call_count[0], 3)
 
         # All writes prior to depsgraph update rolled back atomically
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
@@ -1802,6 +1935,300 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # Final check: verifier leaves rig 100% clean and passing
         _verify_arm_rig_state_restored(self.armature, snap)
 
+    # -------------------------------------------------------------------------
+    # Task 10-B-6 Extended Tests (TEST-77 to TEST-84)
+    # -------------------------------------------------------------------------
+
+    def test_77_destroyed_constraint_identity_is_rejected(self) -> None:
+        """TEST-77: Verifier explicitly rejects substitute constraint after original constraint destruction."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        p_fore = self.armature.pose.bones["forearm.L"]
+        orig_con = p_fore.constraints["ArmIK.L"]
+        orig_ptr = orig_con.as_pointer()
+
+        # Destroy original constraint
+        p_fore.constraints.remove(orig_con)
+
+        # Allocate a temporary dummy to prevent allocator from reusing the same heap block
+        dummy = p_fore.constraints.new(type="LIMIT_ROTATION")
+        substitute = p_fore.constraints.new(type="IK")
+        p_fore.constraints.remove(dummy)
+        substitute.name = "ArmIK.L"
+        substitute.influence = 0.5
+        substitute.target = bpy.data.objects["HandIK.L"]
+        substitute.pole_target = bpy.data.objects["ElbowPole.L"]
+        substitute.chain_count = 2
+
+        bpy.context.view_layer.update()
+
+        # Substitute must have a different pointer
+        self.assertNotEqual(substitute.as_pointer(), orig_ptr)
+
+        # Verifier MUST reject the substitute constraint
+        with self.assertRaises(RuntimeError) as cm:
+            _verify_arm_rig_state_restored(self.armature, snap)
+
+        err_msg = str(cm.exception)
+        self.assertTrue(
+            "identity mismatch" in err_msg or "original constraint destroyed" in err_msg or "identity pointer mismatch" in err_msg,
+            f"Expected identity rejection in error message: {err_msg}",
+        )
+
+    def test_78_destroyed_constraint_causes_rollback_failure(self) -> None:
+        """TEST-78: Destruction of original constraint during transaction causes rollback to report identity failure."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        p_fore = self.armature.pose.bones["forearm.L"]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                if "ArmIK.L" in p_fore.constraints:
+                    p_fore.constraints.remove(p_fore.constraints["ArmIK.L"])
+                raise RuntimeError("Primary transaction business fault")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            y_pos = self.root.location.y + 0.15
+            target_pos = (-0.32, y_pos, 1.20)
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.8)
+
+            err_msg = str(cm.exception)
+            self.assertIn("Primary transaction business fault", err_msg)
+            self.assertTrue(
+                "Original constraint" in err_msg or "constraint" in err_msg or "rollback" in err_msg,
+                f"Expected constraint restoration failure in: {err_msg}",
+            )
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            _clear_test_fault_injection_hook()
+
+    def test_79_external_character_collection_creation_preserved(self) -> None:
+        """TEST-79: External Character collection created during transaction is preserved on rollback."""
+        char_col = bpy.data.collections.get("Character")
+        if char_col is not None:
+            for parent in list(bpy.data.collections):
+                if char_col.name in parent.children:
+                    parent.children.unlink(char_col)
+            for scene in list(bpy.data.scenes):
+                if char_col.name in scene.collection.children:
+                    scene.collection.children.unlink(char_col)
+            bpy.data.collections.remove(char_col)
+
+        self.assertNotIn("Character", bpy.data.collections)
+
+        external_col = [None]
+        external_ptr = [None]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                ext = bpy.data.collections.new("External_Character_Marker")
+                bpy.context.scene.collection.children.link(ext)
+                if "Character" not in bpy.data.collections:
+                    c = bpy.data.collections.new("Character")
+                    bpy.context.scene.collection.children.link(c)
+                    external_col[0] = c
+                    external_ptr[0] = c.as_pointer()
+                raise RuntimeError("Injected fault during setup_arm_ik")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+            self.assertIn("External_Character_Marker", bpy.data.collections)
+            if external_col[0] is not None:
+                self.assertIn("Character", bpy.data.collections)
+                self.assertEqual(bpy.data.collections["Character"].as_pointer(), external_ptr[0])
+        finally:
+            _clear_test_fault_injection_hook()
+            for c_name in ("External_Character_Marker", "Character"):
+                c = bpy.data.collections.get(c_name)
+                if c is not None:
+                    for parent in list(bpy.data.collections):
+                        if c.name in parent.children:
+                            parent.children.unlink(c)
+                    for scene in list(bpy.data.scenes):
+                        if c.name in scene.collection.children:
+                            scene.collection.children.unlink(c)
+                    bpy.data.collections.remove(c)
+
+    def test_80_external_character_collection_members_preserved(self) -> None:
+        """TEST-80: External object members added to Character collection during transaction are preserved on rollback."""
+        setup_arm_ik(self.armature)
+        char_col = bpy.data.collections["Character"]
+        original_member_ptrs = {o.as_pointer() for o in char_col.objects}
+
+        external_obj = [None]
+        external_ptr = [None]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                ext_mesh = bpy.data.meshes.new("ExternalPropMesh80")
+                ext_o = bpy.data.objects.new("ExternalProp80", ext_mesh)
+                char_col.objects.link(ext_o)
+                external_obj[0] = ext_o
+                external_ptr[0] = ext_o.as_pointer()
+                raise RuntimeError("Fault injected after external member linked")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            y_pos = self.root.location.y + 0.15
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+            current_member_ptrs = {o.as_pointer() for o in char_col.objects}
+            for optr in original_member_ptrs:
+                self.assertIn(optr, current_member_ptrs)
+
+            self.assertIn(external_ptr[0], current_member_ptrs)
+            self.assertIn("ExternalProp80", char_col.objects)
+        finally:
+            _clear_test_fault_injection_hook()
+
+    def test_81_cleanup_pending_registry_and_retry(self) -> None:
+        """TEST-81: Phase 3 cleanup failure registers pending cleanup; queryable and retriable without test callbacks."""
+        wrong_mesh = bpy.data.meshes.new("DoomedMesh81")
+        wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+        bpy.data.collections["Character"].objects.link(wrong_obj)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Simulated Phase 3 irreversible cleanup crash")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+
+            self.assertIn("irreversible cleanup failed", str(cm.exception))
+
+            pending_ids = get_pending_arm_rig_cleanup_ids()
+            self.assertGreaterEqual(len(pending_ids), 1)
+
+            target_tx_id = pending_ids[0]
+            _clear_test_fault_injection_hook()
+
+            retry_pending_arm_rig_cleanup(target_tx_id)
+            self.assertNotIn(target_tx_id, get_pending_arm_rig_cleanup_ids())
+        finally:
+            _clear_test_fault_injection_hook()
+
+    def test_82_partial_cleanup_object_removed_datablock_failure_and_retry(self) -> None:
+        """TEST-82: Object removed but datablock removal fails; pending state retained and retried without RNA error."""
+        exclusive_mesh = bpy.data.meshes.new("ExclusiveMesh82")
+        exclusive_mesh_ptr = exclusive_mesh.as_pointer()
+        wrong_obj = bpy.data.objects.new("HandIK.L", exclusive_mesh)
+        wrong_obj_ptr = wrong_obj.as_pointer()
+        bpy.data.collections["Character"].objects.link(wrong_obj)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_cleanup_datablock_removal":
+                raise RuntimeError("Injected datablock cleanup failure after object removal")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+
+            pending_ids = get_pending_arm_rig_cleanup_ids()
+            self.assertGreaterEqual(len(pending_ids), 1)
+            target_id = pending_ids[0]
+
+            obj_still_alive = any(o.as_pointer() == wrong_obj_ptr for o in bpy.data.objects)
+            self.assertFalse(obj_still_alive, "Object should have been removed before datablock stage")
+
+            mesh_still_alive = any(m.as_pointer() == exclusive_mesh_ptr for m in bpy.data.meshes)
+            self.assertTrue(mesh_still_alive, "Mesh datablock should remain pending cleanup")
+
+            _clear_test_fault_injection_hook()
+            retry_pending_arm_rig_cleanup(target_id)
+
+            mesh_alive_after_retry = any(m.as_pointer() == exclusive_mesh_ptr for m in bpy.data.meshes)
+            self.assertFalse(mesh_alive_after_retry, "Mesh datablock should be cleaned up on retry")
+
+            self.assertNotIn(target_id, get_pending_arm_rig_cleanup_ids())
+        finally:
+            _clear_test_fault_injection_hook()
+
+    def test_83_datablock_shared_users_and_same_name_replacement_preserved(self) -> None:
+        """TEST-83: Shared datablock with users > 0 and same-name different-identity resources are preserved."""
+        shared_mesh = bpy.data.meshes.new("SharedPropMesh83")
+        shared_mesh_ptr = shared_mesh.as_pointer()
+
+        wrong_obj = bpy.data.objects.new("HandIK.L", shared_mesh)
+        bpy.data.collections["Character"].objects.link(wrong_obj)
+
+        external_user = bpy.data.objects.new("ExternalBackgroundObj83", shared_mesh)
+        bpy.context.scene.collection.objects.link(external_user)
+
+        self.assertGreater(shared_mesh.users, 1)
+
+        setup_arm_ik(self.armature)
+
+        self.assertIn("SharedPropMesh83", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["SharedPropMesh83"].as_pointer(), shared_mesh_ptr)
+        self.assertEqual(bpy.data.meshes["SharedPropMesh83"].users, 1)
+
+        new_mesh = bpy.data.meshes.new("SharedPropMesh83")
+        self.assertNotEqual(new_mesh.as_pointer(), shared_mesh_ptr)
+
+        y_pos = self.root.location.y + 0.15
+        state = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIsNotNone(state)
+        self.assertTrue(any(m.as_pointer() == shared_mesh_ptr for m in bpy.data.meshes))
+        self.assertTrue(any(m.as_pointer() == new_mesh.as_pointer() for m in bpy.data.meshes))
+
+        bpy.data.objects.remove(external_user, do_unlink=True)
+        bpy.data.meshes.remove(shared_mesh, do_unlink=True)
+        bpy.data.meshes.remove(new_mesh, do_unlink=True)
+
+    def test_84_sequential_transactions_failure_recovery_isolation(self) -> None:
+        """TEST-84: Sequential transaction failure and recovery proves snapshot isolation, no leaks, and clean re-entry."""
+        snap1 = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Injected failure in TX 1")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        target1 = (-0.32, y_pos, 1.20)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=target1)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        _verify_arm_rig_state_restored(self.armature, snap1)
+
+        target2 = (0.32, y_pos, 1.20)
+        state2 = set_hand_ik_target(self.armature, side="R", world_xyz=target2, influence=0.95)
+        self.assertIsNotNone(state2)
+        self.assertTrue(state2["is_reachable"])
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        target3 = (-0.28, y_pos, 1.15)
+        state3 = set_hand_ik_target(self.armature, side="L", world_xyz=target3, influence=0.85)
+        self.assertIsNotNone(state3)
+        self.assertTrue(state3["is_reachable"])
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        snap_final = _snapshot_arm_rig_state(self.armature)
+        _verify_arm_rig_state_restored(self.armature, snap_final)
+
 
 if __name__ == "__main__":
-    unittest.main(argv=[sys.argv[0], "-v"])
+    args = [sys.argv[0]]
+    if "--" in sys.argv:
+        args.extend(sys.argv[sys.argv.index("--") + 1:])
+    else:
+        args.append("-v")
+    unittest.main(argv=args)
