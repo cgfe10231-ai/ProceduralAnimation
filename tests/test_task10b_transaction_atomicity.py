@@ -77,8 +77,11 @@ from src.rig.arm_ik import (
     ARM_POLE_TARGET_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
     _ACTIVE_TRANSACTION_STACK,
+    _ArmRigTransactionContext,
     _ArmRigTransactionState,
+    _PENDING_ARM_RIG_CLEANUPS,
     _arm_rig_transaction,
+    _assert_arm_rig_cleanup_gate,
     _clear_test_depsgraph_updater,
     _clear_test_fault_injection_hook,
     _depsgraph_update,
@@ -122,9 +125,10 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.context.view_layer.update()
 
     def tearDown(self) -> None:
-        """Ensure fault injection hooks and depsgraph updaters are cleared."""
+        """Ensure fault injection hooks, depsgraph updaters, and pending registries are cleared."""
         _clear_test_fault_injection_hook()
         _clear_test_depsgraph_updater()
+        _PENDING_ARM_RIG_CLEANUPS.clear()
 
     # -------------------------------------------------------------------------
     # Snapshot Fidelity Tests (TEST-31 to TEST-33)
@@ -1717,7 +1721,8 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # 2. Both original parents restored: scene.collection and parent_col2
         self.assertIn("Character", bpy.context.scene.collection.children)
         self.assertIn("Character", parent_col2.children)
-        self.assertNotIn("Character", parent_col3.children)
+        # 3. External addition parent_col3 link is preserved on rollback (Task 10-B-7 ownership isolation)
+        self.assertIn("Character", parent_col3.children)
 
         # Clean up additional collections
         bpy.context.scene.collection.children.unlink(parent_col2)
@@ -2006,6 +2011,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_79_external_character_collection_creation_preserved(self) -> None:
         """TEST-79: External Character collection created during transaction is preserved on rollback."""
+        # 1. Ensure initial scene does not have Character collection
         char_col = bpy.data.collections.get("Character")
         if char_col is not None:
             for parent in list(bpy.data.collections):
@@ -2020,31 +2026,79 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         external_col = [None]
         external_ptr = [None]
+        owned_col_ptr = [None]
 
         def fault_hook(stage: str, ctx: dict) -> None:
-            if stage == "setup_arm_ik_after_first_controller":
-                ext = bpy.data.collections.new("External_Character_Marker")
-                bpy.context.scene.collection.children.link(ext)
-                if "Character" not in bpy.data.collections:
-                    c = bpy.data.collections.new("Character")
-                    bpy.context.scene.collection.children.link(c)
-                    external_col[0] = c
-                    external_ptr[0] = c.as_pointer()
-                raise RuntimeError("Injected fault during setup_arm_ik")
+            if stage != "setup_arm_ik_after_first_controller":
+                return
+
+            owned = bpy.data.collections.get("Character")
+            if owned is None:
+                raise AssertionError(
+                    "TEST-79: transaction did not create Character"
+                )
+
+            owned_col_ptr[0] = owned.as_pointer()
+
+            # Release the original name without destroying
+            # the transaction-owned collection.
+            owned.name = "Character_TX_79"
+
+            # External code now creates a different Collection
+            # with the original name.
+            ext = bpy.data.collections.new("Character")
+            bpy.context.scene.collection.children.link(ext)
+
+            external_col[0] = ext
+            external_ptr[0] = ext.as_pointer()
+
+            if external_ptr[0] == owned_col_ptr[0]:
+                raise AssertionError(
+                    "TEST-79: external and transaction-owned "
+                    "collections unexpectedly share identity"
+                )
+
+            raise RuntimeError(
+                "TEST-79 injected rollback failure"
+            )
 
         _set_test_fault_injection_hook(fault_hook)
         try:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(RuntimeError) as cm:
                 setup_arm_ik(self.armature)
+            self.assertIn("TEST-79 injected rollback failure", str(cm.exception))
 
+            # Required assertions (Task 10-B-7 Section 6.2)
+            self.assertIsNotNone(external_col[0])
+            self.assertIn("Character", bpy.data.collections)
+            self.assertEqual(
+                bpy.data.collections["Character"].as_pointer(),
+                external_ptr[0],
+            )
+
+            # 1. Transaction-owned original collection is cleaned up
+            self.assertNotIn("Character_TX_79", bpy.data.collections)
+            self.assertFalse(
+                any(c.as_pointer() == owned_col_ptr[0] for c in bpy.data.collections)
+            )
+
+            # 2. External Collection's parent link is preserved
+            self.assertIn("Character", bpy.context.scene.collection.children)
+            self.assertEqual(
+                bpy.context.scene.collection.children["Character"].as_pointer(),
+                external_ptr[0],
+            )
+
+            # 3. Active transaction stack is empty
             self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
-            self.assertIn("External_Character_Marker", bpy.data.collections)
-            if external_col[0] is not None:
-                self.assertIn("Character", bpy.data.collections)
-                self.assertEqual(bpy.data.collections["Character"].as_pointer(), external_ptr[0])
+
+            # 4. No lingering transaction controllers
+            for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+                self.assertNotIn(c_name, bpy.data.objects)
+
         finally:
             _clear_test_fault_injection_hook()
-            for c_name in ("External_Character_Marker", "Character"):
+            for c_name in ("Character_TX_79", "Character"):
                 c = bpy.data.collections.get(c_name)
                 if c is not None:
                     for parent in list(bpy.data.collections):
@@ -2221,6 +2275,312 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
         self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
 
+        snap_final = _snapshot_arm_rig_state(self.armature)
+        _verify_arm_rig_state_restored(self.armature, snap_final)
+
+    def test_85_same_armature_cleanup_pending_blocks_new_transaction(self) -> None:
+        """TEST-85: Reject new independent writes while same Armature owns an unresolved committed cleanup."""
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Injected cleanup failure for TEST-85")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Injected cleanup failure for TEST-85", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Confirm that Cleanup Pending is registered on this armature
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertGreater(len(pending_ids), 0)
+
+        # Now attempt to initiate a new independent write on the SAME armature
+        with self.assertRaises(RuntimeError) as cm_block:
+            setup_arm_ik(self.armature)
+        self.assertIn("Arm IK write blocked: unresolved cleanup for the same Armature", str(cm_block.exception))
+
+        # Also verify set_hand_ik_target is blocked
+        y_pos = self.root.location.y + 0.15
+        with self.assertRaises(RuntimeError) as cm_block2:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIn("Arm IK write blocked: unresolved cleanup for the same Armature", str(cm_block2.exception))
+
+        # Prove blocking occurred before any transaction mutation (active stack depth 0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_86_unrelated_armature_not_blocked_by_pending_cleanup(self) -> None:
+        """TEST-86: Unresolved cleanup on Armature A does not block independent writes on Armature B."""
+        setup_arm_ik(self.armature)
+
+        # Manually register a mock Cleanup Pending transaction on Armature A
+        tx_a = _ArmRigTransactionContext(self.armature)
+        tx_a.state = _ArmRigTransactionState.CLEANUP_PENDING
+        tx_a.uncleaned_stashed_objects.append({"obj_cleaned": False, "original_name": "Mock86"})
+        _PENDING_ARM_RIG_CLEANUPS[tx_a.tx_id] = tx_a
+
+        # Create independent Armature B
+        arm_b_data = bpy.data.armatures.new("ArmBData_86")
+        arm_b = bpy.data.objects.new("ArmatureB_86", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        # Armature B should NOT be blocked
+        try:
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertIsNotNone(tx_b)
+                self.assertEqual(tx_b.arm, arm_b)
+                self.assertEqual(tx_b.state, _ArmRigTransactionState.ACTIVE)
+        finally:
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+            _PENDING_ARM_RIG_CLEANUPS.clear()
+
+    def test_87_pending_cleanup_retry_success_restores_write_admission(self) -> None:
+        """TEST-87: Retrying pending cleanup to completion clears registry and allows new write transactions."""
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Injected cleanup failure for TEST-87")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Injected cleanup failure for TEST-87", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids), 1)
+        tx_id = pending_ids[0]
+
+        # Verify admission is blocked
+        with self.assertRaises(RuntimeError) as cm_block:
+            setup_arm_ik(self.armature)
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_block.exception))
+
+        # Retry pending cleanup without fault injection -> should succeed and unregister
+        retry_pending_arm_rig_cleanup(tx_id)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        # Now public write API should succeed cleanly
+        y_pos = self.root.location.y + 0.15
+        state = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIsNotNone(state)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_88_stashed_constraint_same_name_replacement_not_erroneously_deleted(self) -> None:
+        """TEST-88: Stashed constraint cleanup matches by pointer identity and does not remove same-name substitute."""
+        setup_arm_ik(self.armature)
+        p_fore = self.armature.pose.bones["forearm.L"]
+        original_con = p_fore.constraints["ArmIK.L"]
+        original_ptr = original_con.as_pointer()
+
+        # Create a transaction context and register a stashed constraint with an obsolete pointer
+        tx = _ArmRigTransactionContext(self.armature)
+        obsolete_ptr = original_ptr + 999999  # distinct pointer
+        stashed_record = {
+            "pbone": p_fore,
+            "con_ptr": obsolete_ptr,
+            "orig_name": "ArmIK.L",
+        }
+        tx.uncleaned_stashed_constraints.append(stashed_record)
+
+        # Execute retry_cleanup()
+        tx.retry_cleanup()
+
+        # The live ArmIK.L constraint must NOT have been removed because pointers differ
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        self.assertEqual(p_fore.constraints["ArmIK.L"].as_pointer(), original_ptr)
+        # The uncleaned list should have removed the record since target was absent
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+
+    def test_89_original_character_collection_rename_restores_identity_and_name(self) -> None:
+        """TEST-89: Character collection renamed during transaction is restored by identity and name without phantom."""
+        char_col = bpy.data.collections.get("Character")
+        if char_col is None:
+            char_col = bpy.data.collections.new("Character")
+            bpy.context.scene.collection.children.link(char_col)
+
+        orig_ptr = char_col.as_pointer()
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                c = bpy.data.collections.get("Character")
+                if c is not None:
+                    c.name = "Character_Renamed_89"
+                raise RuntimeError("Inject fault for TEST-89")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Inject fault for TEST-89", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Assertions
+        self.assertIn("Character", bpy.data.collections)
+        self.assertNotIn("Character_Renamed_89", bpy.data.collections)
+        self.assertEqual(bpy.data.collections["Character"].as_pointer(), orig_ptr)
+        self.assertIn("Character", bpy.context.scene.collection.children)
+        self.assertEqual(
+            len([c for c in bpy.data.collections if c.name == "Character"]),
+            1,
+        )
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_90_original_parent_collection_rename_restored_by_identity(self) -> None:
+        """TEST-90: Parent collection renamed during transaction is restored by identity reference without relying on name."""
+        char_col = bpy.data.collections["Character"]
+        p_col = bpy.data.collections.new("ParentCol_90")
+        bpy.context.scene.collection.children.link(p_col)
+        p_col.children.link(char_col)
+
+        p_col_ptr = p_col.as_pointer()
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                p = bpy.data.collections.get("ParentCol_90")
+                if p is not None:
+                    p.name = "ParentCol_90_Renamed"
+                    c = bpy.data.collections.get("Character")
+                    if c is not None and any(child.as_pointer() == c.as_pointer() for child in p.children):
+                        p.children.unlink(c)
+                raise RuntimeError("Inject fault for TEST-90")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Inject fault for TEST-90", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Verification: link restored to p_col even though p_col is renamed!
+        self.assertTrue(
+            any(child.as_pointer() == char_col.as_pointer() for child in p_col.children)
+        )
+        self.assertEqual(p_col.as_pointer(), p_col_ptr)
+
+        # Cleanup
+        bpy.context.scene.collection.children.unlink(p_col)
+        bpy.data.collections.remove(p_col)
+
+    def test_91_external_child_collection_preserved_on_rollback(self) -> None:
+        """TEST-91: External child collection added to Character collection during transaction is preserved on rollback."""
+        setup_arm_ik(self.armature)
+        char_col = bpy.data.collections["Character"]
+        initial_child = bpy.data.collections.new("Initial_Child_91")
+        char_col.children.link(initial_child)
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        external_child = [None]
+        external_child_ptr = [None]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                ext_child = bpy.data.collections.new("External_Child_91")
+                c = bpy.data.collections["Character"]
+                c.children.link(ext_child)
+                external_child[0] = ext_child
+                external_child_ptr[0] = ext_child.as_pointer()
+                raise RuntimeError("Inject fault for TEST-91")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+            self.assertIn("Inject fault for TEST-91", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both original child and external child must be linked to Character
+        self.assertIn("Initial_Child_91", [c.name for c in char_col.children])
+        self.assertIn("External_Child_91", [c.name for c in char_col.children])
+        self.assertEqual(
+            bpy.data.collections["External_Child_91"].as_pointer(),
+            external_child_ptr[0],
+        )
+
+        # Cleanup
+        char_col.children.unlink(initial_child)
+        bpy.data.collections.remove(initial_child)
+        char_col.children.unlink(external_child[0])
+        bpy.data.collections.remove(external_child[0])
+
+    def test_92_full_lifecycle_and_continuous_transaction_integration(self) -> None:
+        """TEST-92: Comprehensive sequence of snapshot, rollback, commit, cleanup failure, admission gate, retry, and re-entry."""
+        # 1. Initial rig setup
+        setup_arm_ik(self.armature)
+        snap1 = _snapshot_arm_rig_state(self.armature)
+
+        # 2. Normal transaction
+        y_pos = self.root.location.y + 0.15
+        state1 = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIsNotNone(state1)
+        self.assertTrue(state1["is_reachable"])
+
+        # 3. Injected reversible fault and rollback
+        snap2 = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook_rb(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Injected reversible failure in TEST-92")
+
+        _set_test_fault_injection_hook(fault_hook_rb)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.25, y_pos, 1.10))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        _verify_arm_rig_state_restored(self.armature, snap2)
+
+        # 4. Replace controller, commit successfully but inject Phase 3 cleanup failure
+        old_hand = bpy.data.objects["HandIK.L"]
+        mesh_data = bpy.data.meshes.new("DoomedMesh92")
+        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.data.objects.remove(old_hand, do_unlink=True)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        def fault_hook_clean(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Injected Phase 3 cleanup failure in TEST-92")
+
+        _set_test_fault_injection_hook(fault_hook_clean)
+        try:
+            with self.assertRaises(RuntimeError) as cm_cf:
+                setup_arm_ik(self.armature)
+            self.assertIn("Injected Phase 3 cleanup failure in TEST-92", str(cm_cf.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # 5. Verify Cleanup Pending and write admission blocking
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids), 1)
+        tx_id = pending_ids[0]
+
+        with self.assertRaises(RuntimeError) as cm_gate:
+            set_hand_ik_target(self.armature, side="R", world_xyz=(0.32, y_pos, 1.20))
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_gate.exception))
+
+        # 6. Retry pending cleanup to completion
+        retry_pending_arm_rig_cleanup(tx_id)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        # 7. Resume normal writes
+        state_r = set_hand_ik_target(self.armature, side="R", world_xyz=(0.32, y_pos, 1.20))
+        self.assertIsNotNone(state_r)
+        self.assertTrue(state_r["is_reachable"])
+
+        # 8. Assert absolute state integrity
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
         snap_final = _snapshot_arm_rig_state(self.armature)
         _verify_arm_rig_state_restored(self.armature, snap_final)
 

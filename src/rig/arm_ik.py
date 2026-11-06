@@ -265,7 +265,7 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
             parent
             for parent in bpy.data.collections
             if char_col is not None
-            and char_col.name in parent.children
+            and any(child.as_pointer() == char_col.as_pointer() for child in parent.children)
         ],
         "child_refs": (
             list(char_col.children)
@@ -675,83 +675,103 @@ def _rollback_arm_rig_state(
         # its name is "Character".
         pass
     else:
-        orig_name = char_col_snap.get("name", "Character")
+        # ------------------------------------------------------
+        # Task 10-B-7
+        # Identity-safe restoration of Character collection
+        # ------------------------------------------------------
+        orig_name = char_col_snap.get("name")
         col = char_col_snap.get("col_ref")
-        if col is None or col.name not in bpy.data.collections:
-            col = bpy.data.collections.get(orig_name)
-        if col is not None:
-            if col.name != orig_name:
-                col.name = orig_name
+        original_ptr = char_col_snap.get("col_ptr")
 
-            should_be_in_scene = char_col_snap.get("children_of_scene", False)
-            is_in_scene = col.name in bpy.context.scene.collection.children
-            if should_be_in_scene and not is_in_scene:
-                bpy.context.scene.collection.children.link(col)
-            elif not should_be_in_scene and is_in_scene:
-                bpy.context.scene.collection.children.unlink(col)
-
-            expected_parents = set(char_col_snap.get("parent_collections", []))
-            for p_col in bpy.data.collections:
-                if p_col == col:
-                    continue
-                has_child = col.name in p_col.children
-                if p_col.name in expected_parents and not has_child:
-                    p_col.children.link(col)
-                elif p_col.name not in expected_parents and has_child:
-                    p_col.children.unlink(col)
-
-            expected_children = set(char_col_snap.get("child_collections", []))
-            for child in list(col.children):
-                if child.name not in expected_children:
-                    col.children.unlink(child)
-            for c_name in expected_children:
-                child = bpy.data.collections.get(c_name)
-                if child is not None and child.name not in col.children:
-                    col.children.link(child)
-
-            expected_refs = char_col_snap.get(
-                "object_refs", []
+        if col is None or original_ptr is None:
+            restoration_errors.append(
+                "Character collection snapshot identity missing"
             )
-
-            expected_ptrs = {
-                obj.as_pointer()
-                for obj in expected_refs
-            }
-
-            # Restore missing original members.
-            for obj in expected_refs:
-                try:
-                    obj_ptr = obj.as_pointer()
-                except ReferenceError:
-                    restoration_errors.append(
-                        "Character collection original member "
-                        "was destroyed"
-                    )
-                    continue
-
-                found = any(
-                    current.as_pointer() == obj_ptr
-                    for current in col.objects
+        else:
+            try:
+                live_ptr = col.as_pointer()
+            except ReferenceError:
+                restoration_errors.append(
+                    "Original Character collection destroyed"
                 )
+            else:
+                if live_ptr != original_ptr:
+                    restoration_errors.append(
+                        "Character collection identity changed"
+                    )
+                else:
+                    # Identity verified! Restore name, parents, children, and members.
+                    if orig_name is not None and col.name != orig_name:
+                        col.name = orig_name
 
-                if not found:
-                    col.objects.link(obj)
+                    should_be_in_scene = char_col_snap.get("children_of_scene", False)
+                    is_in_scene = any(
+                        c.as_pointer() == col.as_pointer()
+                        for c in (bpy.context.scene.collection.children if bpy.context.scene else [])
+                    )
+                    if should_be_in_scene and not is_in_scene:
+                        bpy.context.scene.collection.children.link(col)
 
-            # Only remove unexpected members when the
-            # transaction can prove ownership of the link.
-            #
-            # Do not remove external additions based solely
-            # on absence from the snapshot.
-            for obj in list(col.objects):
-                if obj.as_pointer() in expected_ptrs:
-                    continue
+                    # Parent Collection restoration by reference
+                    expected_parents = char_col_snap.get(
+                        "parent_refs", []
+                    )
+                    for parent in expected_parents:
+                        try:
+                            parent_ptr = parent.as_pointer()
+                        except ReferenceError:
+                            restoration_errors.append(
+                                "Original Character parent collection destroyed"
+                            )
+                            continue
 
-                # Controller membership is restored through
-                # the controller snapshot and transaction
-                # object lifecycle.
-                #
-                # External members must be preserved.
-                continue
+                        linked = any(
+                            child.as_pointer() == col.as_pointer()
+                            for child in parent.children
+                        )
+                        if not linked:
+                            parent.children.link(col)
+
+                    # Child Collection restoration by reference
+                    expected_children = char_col_snap.get(
+                        "child_refs", []
+                    )
+                    for child in expected_children:
+                        try:
+                            child_ptr = child.as_pointer()
+                        except ReferenceError:
+                            restoration_errors.append(
+                                "Original Character child collection destroyed"
+                            )
+                            continue
+
+                        linked = any(
+                            current.as_pointer() == child_ptr
+                            for current in col.children
+                        )
+                        if not linked:
+                            col.children.link(child)
+
+                    # Member Objects restoration by reference
+                    expected_refs = char_col_snap.get(
+                        "object_refs", []
+                    )
+
+                    for obj in expected_refs:
+                        try:
+                            obj_ptr = obj.as_pointer()
+                        except ReferenceError:
+                            restoration_errors.append(
+                                "Character collection original member was destroyed"
+                            )
+                            continue
+
+                        found = any(
+                            current.as_pointer() == obj_ptr
+                            for current in col.objects
+                        )
+                        if not found:
+                            col.objects.link(obj)
 
     _depsgraph_update()
 
@@ -817,38 +837,66 @@ def _verify_arm_rig_state_restored(
             if orig_col_ptr and curr_col_ptr and curr_col_ptr != orig_col_ptr:
                 diffs.append(f"Character collection identity mismatch: expected={orig_col_ptr}, actual={curr_col_ptr}")
 
-            # Parent / Child hierarchy: all snapshot parents and children must still exist
+            if orig_col_ref is not None and s_col.get("name") != c_col.get("name"):
+                diffs.append(f"Character collection name '{c_col.get('name')}' != expected '{s_col.get('name')}'")
+
+            # Parent / Child / Member identity hierarchy verification
             if s_col.get("children_of_scene") and not c_col.get("children_of_scene"):
                 diffs.append("Character collection missing from scene collection children")
 
-            s_parents = set(s_col.get("parent_collections", []))
-            c_parents = set(c_col.get("parent_collections", []))
-            missing_parents = s_parents - c_parents
-            if missing_parents:
-                diffs.append(f"Character collection missing original parent collections: {missing_parents}")
+            def _live_identity_set(items, desc: str = "item"):
+                result = set()
+                for item in items:
+                    try:
+                        result.add(item.as_pointer())
+                    except ReferenceError:
+                        diffs.append(f"Character collection original {desc} was destroyed")
+                return result
 
-            s_children = set(s_col.get("child_collections", []))
-            c_children = set(c_col.get("child_collections", []))
-            missing_children = s_children - c_children
-            if missing_children:
-                diffs.append(f"Character collection missing original child collections: {missing_children}")
+            original_parent_ptrs = _live_identity_set(
+                s_col.get("parent_refs", []), "parent collection"
+            )
+            current_parent_ptrs = _live_identity_set(
+                c_col.get("parent_refs", []), "current parent collection"
+            )
+            missing_parent_ptrs = (
+                original_parent_ptrs - current_parent_ptrs
+            )
+            if missing_parent_ptrs:
+                diffs.append(
+                    "Character collection original parent "
+                    f"identities missing: {missing_parent_ptrs}"
+                )
 
-            # Original members check: all snapshot members must be present
-            s_objs = s_col.get("object_names", set())
-            c_objs = c_col.get("object_names", set())
-            missing_objs = s_objs - c_objs
-            if missing_objs:
-                diffs.append(f"Character collection missing original members: {missing_objs}")
+            original_child_ptrs = _live_identity_set(
+                s_col.get("child_refs", []), "child collection"
+            )
+            current_child_ptrs = _live_identity_set(
+                c_col.get("child_refs", []), "current child collection"
+            )
+            missing_child_ptrs = (
+                original_child_ptrs - current_child_ptrs
+            )
+            if missing_child_ptrs:
+                diffs.append(
+                    "Character collection original child "
+                    f"identities missing: {missing_child_ptrs}"
+                )
 
-            # Check individual original member identities
-            for orig_obj in s_col.get("object_refs", []):
-                try:
-                    optr = orig_obj.as_pointer()
-                    c_ptrs = {o.as_pointer() for o in c_col.get("object_refs", [])}
-                    if optr not in c_ptrs:
-                        diffs.append(f"Character collection original member '{orig_obj.name}' identity missing")
-                except ReferenceError:
-                    diffs.append("Character collection original member was destroyed")
+            original_obj_ptrs = _live_identity_set(
+                s_col.get("object_refs", []), "member object"
+            )
+            current_obj_ptrs = _live_identity_set(
+                c_col.get("object_refs", []), "current member object"
+            )
+            missing_obj_ptrs = (
+                original_obj_ptrs - current_obj_ptrs
+            )
+            if missing_obj_ptrs:
+                diffs.append(
+                    "Character collection original member "
+                    f"identities missing: {missing_obj_ptrs}"
+                )
     else:
         # Snapshot did NOT have Character collection.
         # If active_tx created it, active_tx.created_collections will catch it below if not removed.
@@ -1137,6 +1185,7 @@ class _ArmRigTransactionContext:
 
     def __init__(self, arm: bpy.types.Object):
         self.arm = arm
+        self.arm_ptr = arm.as_pointer()
         self.state: _ArmRigTransactionState = _ArmRigTransactionState.CREATED
         self.snapshot: Optional[Dict[str, Any]] = None
         self.stashed_objects: List[Dict[str, Any]] = []
@@ -1170,18 +1219,64 @@ class _ArmRigTransactionContext:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
         cleanup_failures: List[str] = []
 
-        # 1. Clean up stashed constraints
-        for stashed_con in list(self.uncleaned_stashed_constraints):
+        # ------------------------------------------------------
+        # Task 10-B-7
+        # Identity-safe cleanup of stashed constraints
+        # ------------------------------------------------------
+
+        for stashed_con in list(
+            self.uncleaned_stashed_constraints
+        ):
             try:
-                pbone = stashed_con.get("pbone")
-                con = stashed_con.get("con")
-                if pbone is not None and con is not None:
-                    if con in pbone.constraints.values() or con.name in pbone.constraints:
-                        pbone.constraints.remove(con)
-                if stashed_con in self.uncleaned_stashed_constraints:
-                    self.uncleaned_stashed_constraints.remove(stashed_con)
-            except Exception as ce:
-                cleanup_failures.append(f"Failed to remove stashed constraint {stashed_con.get('orig_name')}: {ce}")
+                pbone = stashed_con["pbone"]
+
+                expected_ptr = stashed_con.get("con_ptr")
+
+                if expected_ptr is None:
+                    raise RuntimeError(
+                        "Stashed constraint has no recorded identity"
+                    )
+
+                live_matches = [
+                    candidate
+                    for candidate in pbone.constraints
+                    if candidate.as_pointer() == expected_ptr
+                ]
+
+                if len(live_matches) > 1:
+                    raise RuntimeError(
+                        "Multiple live constraints match "
+                        "the same recorded identity"
+                    )
+
+                if len(live_matches) == 1:
+                    target = live_matches[0]
+
+                    pbone.constraints.remove(target)
+
+                    still_present = any(
+                        candidate.as_pointer() == expected_ptr
+                        for candidate in pbone.constraints
+                    )
+
+                    if still_present:
+                        raise RuntimeError(
+                            "Stashed constraint removal did not "
+                            "remove the recorded identity"
+                        )
+
+                # No live match means the recorded resource
+                # is already absent. Never remove by name.
+
+                self.uncleaned_stashed_constraints.remove(
+                    stashed_con
+                )
+
+            except Exception as exc:
+                cleanup_failures.append(
+                    "Failed to clean up stashed constraint "
+                    f"{stashed_con.get('orig_name')}: {exc}"
+                )
 
         # 2. Clean up stashed doomed objects and unreferenced datablocks
         for stashed in list(self.uncleaned_stashed_objects):
@@ -1352,6 +1447,40 @@ def retry_pending_arm_rig_cleanup(tx_id: str) -> None:
         )
 
 
+def _assert_arm_rig_cleanup_gate(
+    arm: bpy.types.Object,
+) -> None:
+    """
+    Reject new independent writes while the same Armature
+    owns an unresolved committed cleanup transaction.
+    """
+
+    arm_ptr = arm.as_pointer()
+
+    blocking_transactions = []
+
+    for tx_id, tx in tuple(
+        _PENDING_ARM_RIG_CLEANUPS.items()
+    ):
+
+        if tx.state != _ArmRigTransactionState.CLEANUP_PENDING:
+            raise RuntimeError(
+                "Arm IK cleanup registry invariant violated: "
+                f"transaction {tx_id} is registered with "
+                f"state {tx.state}"
+            )
+
+        if tx.arm_ptr == arm_ptr:
+            blocking_transactions.append(tx_id)
+
+    if blocking_transactions:
+        raise RuntimeError(
+            "Arm IK write blocked: unresolved cleanup "
+            "for the same Armature; pending transactions="
+            + ",".join(sorted(blocking_transactions))
+        )
+
+
 @contextmanager
 def _arm_rig_transaction(arm: bpy.types.Object):
     """Context manager executing Arm IK mutations under atomic transaction protection."""
@@ -1366,6 +1495,10 @@ def _arm_rig_transaction(arm: bpy.types.Object):
         # Re-entrant invocation on same armature: outer transaction retains exclusive ownership
         yield outer_tx
         return
+
+    # Reject a new outermost transaction when previous
+    # committed cleanup is unresolved on this Armature.
+    _assert_arm_rig_cleanup_gate(arm)
 
     tx = _ArmRigTransactionContext(arm)
     _ACTIVE_TRANSACTION_STACK.append(tx)
