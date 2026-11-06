@@ -2,6 +2,28 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-06] PKG-5 / Task 10-B-8：Arm IK 全生命周期与所有权完整性修复 (Full Transaction Lifecycle & Ownership Integrity Repair)
+
+* **任务性质**：生产缺陷修复（TASK 10-B-8），针对 Task 10-B-7 遗留的控制器按名误删风险、创建后未登记即链接失败清理盲区、暂存约束仅依指针缺少原引用核验、逻辑提交后异常绕过 Phase 3 清理挂起注册表等问题进行闭环修正。
+* **状态**：`READY FOR INDEPENDENT REVIEW`（102/102 专项测试通过，全四级分层回归 0 缺陷通过，测试套件共 238 测试用例 100% PASS）。
+* **生产代码修改**（`src/rig/arm_ik.py`）：
+  - **Section 3 & 4（统一事务控制器所有权与即时登记）**：在 `_ArmRigTransactionContext` 新增 `created_controller_objects` 列表及 `register_created_controller()` 方法；在 `_get_or_create_empty()` 中在 `bpy.data.objects.new()` 创建对象后立即登记所有权（先登记后链接集合），保证创建成功但后续失败时能精准按身份追溯并删除，杜绝遗漏未登记对象。
+  - **Section 5 & 6（活体对象身份解析与控制器回滚边界重写）**：实现 `_find_live_object_by_identity()`；在 `_rollback_arm_rig_state()` 中优先遍历 `active_tx.created_controller_objects` 按物理指针删除事务控制器；彻底剔除按名删除控制器旧逻辑；原控制器存在时校验原引用与物理指针存活，并检查原始名称是否被外部对象占用，冲突时拒绝误删外部对象并聚合报告错误。
+  - **Section 7（暂存约束双重身份核验）**：在 `_ArmRigTransactionContext` 方法 `retry_cleanup()` 中联合核验 `con` 引用与 `con_ptr` 指针，对原始引用失效或指针不符的暂存记录安全报错并保留在待清理列表，严禁误删同名替代约束。
+  - **Section 8（逻辑提交后异常统一清理挂起）**：在 `_arm_rig_transaction()` 中将 `after_logical_commit` 移入 Phase 3 保护块，与 `during_commit_cleanup` 统一受异常捕获；逻辑提交后任何异常均进入 `CLEANUP_PENDING` 并登记注册表，严禁绕过清理或执行普通回滚。
+* **专项测试修改与扩充**（`tests/test_task10b_transaction_atomicity.py`）：
+  - **新增 TEST-93 至 TEST-102 全部 10 项专项测试**：
+    - TEST-93：事务创建控制器后重命名，失败回滚按身份精准删除，不残留重命名对象且不误删无关对象。
+    - TEST-94：事务控制器重命名后外部创建同名对象，回滚清理事务对象并完整保留外部同名对象及数据块。
+    - TEST-95：快照中原控制器在事务中被物理删除，回滚严格报告身份丢失错误，不创建替身。
+    - TEST-96：原控制器被重命名且原名称被外部对象占用，回滚报错且不误删外部对象、不强行覆盖。
+    - TEST-97：暂存约束原始引用失效且存在同名新约束，清理失败保留记录，不误删同名新约束。
+    - TEST-98：事务创建控制器后在集合链接阶段抛错，已登记对象被回滚精准清理，无对象与事务残留。
+    - TEST-99：逻辑提交后钩子抛出异常，进入 `CLEANUP_PENDING` 并在注册表登记，重试成功后恢复准入。
+    - TEST-100：系统性验证可逆阶段故障执行回滚、提交后阶段故障进入待清理，证明各阶段边界正交性。
+    - TEST-101：控制器重命名、约束暂存、集合外部新增成员与共享数据块联合故障模拟，全维度核验所有权与身份。
+    - TEST-102：13 步端到端连续生命周期验证，覆盖 9 状态流转、资源替换、故障挂起、准入阻断、重试收敛与重新写入。
+
 ### [2026-11-06] PKG-5 / Task 10-B-7：Arm IK 生产级事务完整性与所有权生命周期最终修正 (Final Ownership & Lifecycle Correction)
 
 * **任务性质**：生产缺陷修复（TASK 10-B-7），针对 Task 10-B-6 遗留的同一 Armature 存在待清理事务时的独立写入准入门禁、暂存约束清理的指针身份核验、Character 集合身份级恢复与验证器子集匹配、TEST-79 假阳性消除及外部新增父级保留等问题进行闭环修正。

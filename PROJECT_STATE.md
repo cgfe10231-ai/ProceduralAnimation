@@ -4,9 +4,9 @@
 >
 > **09-B-4 验收证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
 >
-> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；PKG-5 / Task 10-B-7 (Production Transaction Integrity — Final Ownership & Lifecycle Correction，生产级事务待清理门禁、暂存约束指针清理、Character 集合身份级恢复、验证器子集匹配已全部实现并通过验证)。
+> **最近完成节点**：PKG-5 / Task 10-A (10-A-1 至 10-A-4 归档验收)；PKG-5 / Task 10-B-8 (Full Transaction Lifecycle & Ownership Integrity Repair，统一事务控制器所有权登记、活体指针身份严格解析、剔除按名删除控制器逻辑、命名冲突保护、暂存约束双重身份校验、逻辑提交后异常清理挂起重试已全部实现并通过验证)。
 >
-> **当前完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B (含第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订、第 5 轮生产级快照完整性、第 6 轮受控修正与第 7 轮最终所有权生命周期修正) 为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`；92 项专项测试 (30 输入验证 + 62 事务原子性) 92/92 PASS；四级回归全部 0 缺陷通过。
+> **当前完成状态**：10-A 为 `COMPLETED — ARCHIVED`；Task 10-B (含第 1 轮输入验证、第 2 轮自动初始化预检、第 3 轮控制器类型识别与一致性、第 4 轮修订、第 5 轮生产级快照完整性、第 6 轮受控修正、第 7 轮最终所有权生命周期修正与第 8 轮全生命周期及所有权完整性修复) 为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`；102 项专项测试 (30 输入验证 + 72 事务原子性) 102/102 PASS；四级回归全部 0 缺陷通过。
 >
 > **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`）。
 >
@@ -17,7 +17,7 @@
 > - 09-B-4 是在既有 09-B 修复基础上的完整状态回滚、解锁事务与数学边界补强及独立复核。
 > - 不得把已完成的 09-B-4 重新描述为 `IN PROGRESS — NOT ACCEPTED`。
 > - 不得创建未经授权的 09-B-5。
-> - 历史计划记法说明：旧文档中曾记录的计划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产事务快照与回滚）已于 Task 10-B / Revision 4 验收合入并关闭；Task 10-B-5、Task 10-B-6 与 Task 10-B-7 针对独立审计提出的状态机、不可变深拷贝、三阶段提交、集合所有权隔离、调用边界、约束指针身份严格核验、待清理准入门禁及集合身份级恢复进行闭环修复与受控修正。
+> - 历史计划记法说明：旧文档中曾记录的计划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果（生产事务快照与回滚）已于 Task 10-B / Revision 4 验收合入并关闭；Task 10-B-5 至 Task 10-B-8 针对独立审计提出的状态机、不可变深拷贝、三阶段提交、集合与控制器所有权隔离、调用边界、约束指针身份严格核验、待清理准入门禁、暂存约束双重身份校验及逻辑提交后异常统一清理挂起进行闭环修复与最终修正。
 >
 > **当前生产源码数学支持域**（`src/rig/ik.py`）：
 > - 有效父级矩阵：`M_eff = M_parent @ matrix_parent_inverse`。
@@ -31,11 +31,13 @@
 >
 > **当前完整状态与事务合同**：
 > - 腿部 IK：`_snapshot_leg_rig_state()` 捕获 4 个腿部控制器的 15 个状态字段，以及 6 根腿部姿态骨骼的 8 个状态字段；`_rollback_leg_rig_state()` 恢复并核验所有快照字段；`unlock_foot_contact()` 的 Phase B 修改过程具备失败回滚。
-> - 手臂 IK（Task 10-B-7 修订）：
+> - 手臂 IK（Task 10-B-8 修订）：
 >   - 显式 9 状态生命周期状态机 `_ArmRigTransactionState`（`CREATED`, `SNAPSHOTTING`, `ACTIVE`, `ROLLING_BACK`, `ROLLED_BACK`, `COMMITTING`, `COMMITTED`, `CLEANUP_PENDING`, `FAILED`）。
 >   - 三阶段安全提交协议（Phase 1 可逆准备故障回滚；Phase 2 逻辑提交确认；Phase 3 不可逆资源清理挂起与 `tx.retry_cleanup()` 幂等收敛）。
+>   - 统一控制器所有权：`tx.register_created_controller(obj)` 在 Empty 创建后立即登记所有权；回滚时通过 `_find_live_object_by_identity()` 仅物理删除本事务创建的控制器；彻底剔除按名删除控制器逻辑，原控制器存在时严格核验指针与命名冲突。
+>   - 暂存约束双重身份校验：`retry_cleanup()` 同时核验 `con` 活体对象与 `con_ptr` 内存指针，原引用失效或指针不符时绝不误删同名替代约束，保留待清理记录。
+>   - 提交后故障统一重试：`_arm_rig_transaction` 中逻辑提交后任何异常（含 `after_logical_commit` 与 `during_commit_cleanup`）均受 Phase 3 保护进入 `CLEANUP_PENDING` 并登记注册表，严禁绕过或重复回滚。
 >   - 模块级运行时清理挂起注册表 `_PENDING_ARM_RIG_CLEANUPS` 与准入门禁 `_assert_arm_rig_cleanup_gate`：同一 Armature 存在未决待清理事务时严格阻断新独立写事务，隔离无关 Armature。
->   - 暂存约束清理身份核验：`retry_cleanup()` 基于原始指针 `as_pointer()` 严格匹配，杜绝根据名称误删同名替代物。
 >   - Character 集合身份级恢复与验证：`_rollback_arm_rig_state()` 在恢复前校验原集合身份指针，通过 `parent_refs` 与 `child_refs` 按指针恢复，保留外部新增链接；`_verify_arm_rig_state_restored()` 使用身份子集校验 `_live_identity_set`，杜绝名称伪造与假性失败。
 >   - 快照不可变深拷贝契约：`_clone_snapshot_property_value()` 将 RNA 数组完全解耦为独立不可变 tuple，mathutils 对象采用 `.copy()`，禁止静默吞错。
 >   - 集合所有权严格隔离：`tx.register_created_collection()` 显式所有权跟踪，回滚仅删除事务集合，100% 保护并发外部集合与新增成员；多父级 Character 集合无损恢复。
@@ -45,8 +47,8 @@
 >
 > **当前专项测试状态**：
 > - `test_task10b_input_validation.py`：30/30 PASS（TEST-01 至 TEST-30 输入预验证、Influence 范围、零突变与控制器类型预检）。
-> - `test_task10b_transaction_atomicity.py`：62/62 PASS（TEST-31 至 TEST-92 快照保真度、直接回滚保真度、故障注入回滚、8 种旋转模式成功路径、逐字段核验器精度、无损约束暂存与恢复、初始化异常安全、跨 Armature 隔离、集合层级恢复；三阶段提交、不可逆清理异常与重试、部分清理收敛、调用边界异常、快照不可变性、双异常聚合、外部集合保护、多父级集合恢复、暂存约束保真、雪崩防护、侧向隔离与 6 维损坏捕获；约束指针身份验证、禁止替代约束回滚、外部集合与成员保全、清理挂起注册表与重试、两步清理与数据块安全、连续事务隔离；待清理事务准入门禁、无关 Armature 隔离、重试恢复准入、暂存约束同名保护、集合重命名身份恢复、父级重命名引用恢复、外部子集合保全与端到端全流程联合验证）。
-> - Task 10-B 专项测试总计：92/92 PASS (100%)。
+> - `test_task10b_transaction_atomicity.py`：72/72 PASS（TEST-31 至 TEST-102 快照保真度、直接回滚保真度、故障注入回滚、8 种旋转模式成功路径、逐字段核验器精度、无损约束暂存与恢复、初始化异常安全、跨 Armature 隔离、集合层级恢复；三阶段提交、不可逆清理异常与重试、部分清理收敛、调用边界异常、快照不可变性、双异常聚合、外部集合保护、多父级集合恢复、暂存约束保真、雪崩防护、侧向隔离与 6 维损坏捕获；约束指针身份验证、禁止替代约束回滚、外部集合与成员保全、清理挂起注册表与重试、两步清理与数据块安全、连续事务隔离；待清理事务准入门禁、无关 Armature 隔离、重试恢复准入、暂存约束同名保护、集合重命名身份恢复、父级重命名引用恢复、外部子集合保全与端到端全流程联合验证；重命名控制器身份清理、外部同名控制器保全、原控制器销毁恢复失败、控制器命名冲突保护、暂存约束引用失效保护、创建即登记与链接失败回滚、提交后异常清理挂起、可逆与提交后故障边界、多资源联合身份核验与 13 步端到端连续生命周期验证）。
+> - Task 10-B 专项测试总计：102/102 PASS (100%)。
 > - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS。
 > - `test_leg_ik_world_rotation_contract.py`：27/27 PASS。
 > - `test_leg_ik_ground_height_contract.py`：20/20 PASS。
@@ -54,10 +56,10 @@
 > - 文档符号审计及 6 项审计器自测试通过。
 >
 > **当前分层回归状态**：
-> - Quick：19/19，退出码 0 (47.23s)。
-> - Physics：27/27，退出码 0 (105.34s)。
-> - Motion：12/12，退出码 0 (49.14s)。
-> - Full：42/42，退出码 0 (160.69s)。
+> - Quick：19/19，退出码 0 (51.32s)。
+> - Physics：27/27，退出码 0 (106.63s)。
+> - Motion：12/12，退出码 0 (51.01s)。
+> - Full：42/42，退出码 0 (163.61s)。
 > - 四级测试均为 FAIL 0、SKIPPED 0、NOT_RUN 0。
 > - `AUTOMATED_PASS` 仍要求相应的视觉检查，不得误写为视觉验收已完成。
 >
@@ -69,12 +71,12 @@
 >
 > **当前 PKG-5 准入顺序**：
 > - 09-B：已完成，09-B-4 已验收。
-> - 10：Task 10-A 已完成归档；Task 10-B-7 已实现并待独立评审（`IMPLEMENTED — PENDING INDEPENDENT REVIEW`）；下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
+> - 10：Task 10-A 已完成归档；Task 10-B-8 已实现并待独立评审（`IMPLEMENTED — PENDING INDEPENDENT REVIEW`）；下一执行节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
 > - 11：FootLock，待修复。
 > - 12：全仓跨模块联合验收，待执行。
 >
 > **PKG-5 后续路线状态**：
-> - Task 10 / Upper-Limb IK/FK：10-A 已完成，10-B-7 已实现并待独立评审（`IMPLEMENTED — PENDING INDEPENDENT REVIEW`，92/92 PASS）；下一节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
+> - Task 10 / Upper-Limb IK/FK：10-A 已完成，10-B-8 已实现并待独立评审（`IMPLEMENTED — PENDING INDEPENDENT REVIEW`，102/102 PASS）；下一节点为 Task 10-C（`BLOCKED — NOT STARTED`）。
 > - Task 11 / FootLock：FIND-R3-03、FIND-R3-04，尚未实施。
 > - Task 12 / Joint Integration：等待 10 与 11 独立验收。
 > - 下一具体子任务：Task 10-C（尚未准入，待明确批准后准入）。

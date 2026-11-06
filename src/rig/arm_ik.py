@@ -408,75 +408,151 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
     }
 
 
+def _find_live_object_by_identity(
+    obj_ref: bpy.types.Object,
+    expected_ptr: int,
+) -> Optional[bpy.types.Object]:
+    """Resolve the original live Blender object.
+
+    A matching name alone never proves identity.
+    """
+    try:
+        ref_ptr = obj_ref.as_pointer()
+    except ReferenceError:
+        return None
+
+    if ref_ptr != expected_ptr:
+        return None
+
+    for candidate in bpy.data.objects:
+        if candidate.as_pointer() != expected_ptr:
+            continue
+
+        try:
+            if candidate == obj_ref:
+                return candidate
+        except ReferenceError:
+            return None
+
+    return None
+
+
 def _rollback_arm_rig_state(
     arm: bpy.types.Object,
     snapshot: Dict[str, Any],
     active_tx: Optional[Any] = None,
 ) -> None:
     """Restore the Arm IK rig state precisely to the recorded snapshot."""
+    restoration_errors: List[str] = []
+
     # Step 1: Controller cleanup, stashed object restoration, and transform restoration
+    # 1.0: First clean up transaction-owned controller objects by identity
+    if active_tx is not None:
+        for record in getattr(active_tx, "created_controller_objects", []):
+            live_obj = _find_live_object_by_identity(
+                record["obj_ref"],
+                record["obj_ptr"],
+            )
+
+            if live_obj is None:
+                # Never delete a replacement by name.
+                continue
+
+            bpy.data.objects.remove(
+                live_obj,
+                do_unlink=True,
+            )
+
+            remaining = _find_live_object_by_identity(
+                record["obj_ref"],
+                record["obj_ptr"],
+            )
+
+            if remaining is not None:
+                restoration_errors.append(
+                    "Transaction-owned controller removal failed"
+                )
+
     controllers_snap = snapshot.get("controllers", {})
     for c_name, c_snap in controllers_snap.items():
-        curr_obj = bpy.data.objects.get(c_name)
-
         if not c_snap["exists"]:
-            if curr_obj is not None:
-                bpy.data.objects.remove(curr_obj, do_unlink=True)
-        else:
-            orig_ref = c_snap.get("obj_ref")
-            if curr_obj is not None and curr_obj != orig_ref:
-                bpy.data.objects.remove(curr_obj, do_unlink=True)
+            # If snapshot recorded controller did not exist, transaction-owned
+            # controllers have already been cleaned up by identity above.
+            # External same-name objects MUST NOT be deleted.
+            continue
 
-            if orig_ref is not None:
-                try:
-                    _ = orig_ref.name
-                    orig_alive = True
-                except ReferenceError:
-                    orig_alive = False
+        original_ref = c_snap["obj_ref"]
+        original_ptr = c_snap["obj_ptr"]
+        original_name = c_snap["obj_name"]
 
-                if orig_alive:
-                    if orig_ref.name != c_snap["obj_name"]:
-                        orig_ref.name = c_snap["obj_name"]
+        live_original = _find_live_object_by_identity(
+            original_ref,
+            original_ptr,
+        )
 
-                    for col_name in c_snap.get("collections", []):
-                        col = _find_collection_by_name(col_name)
-                        if col is not None and orig_ref.name not in col.objects:
-                            col.objects.link(orig_ref)
+        if live_original is None:
+            restoration_errors.append(
+                f"Original controller identity lost: {original_name}"
+            )
+            continue
 
-                    for col in list(orig_ref.users_collection):
-                        if col.name not in c_snap.get("collections", []):
-                            col.objects.unlink(orig_ref)
+        name_owner = bpy.data.objects.get(original_name)
 
-                    orig_ref.parent = c_snap["parent"]
-                    orig_ref.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
-                    orig_ref.rotation_mode = c_snap["rotation_mode"]
-                    orig_ref.location = c_snap["location"].copy()
-                    orig_ref.rotation_euler = c_snap["rotation_euler"].copy()
-                    orig_ref.rotation_quaternion = c_snap["rotation_quaternion"].copy()
-                    orig_ref.rotation_axis_angle = tuple(c_snap["rotation_axis_angle"])
-                    orig_ref.scale = c_snap["scale"].copy()
-                    if orig_ref.type == "EMPTY":
-                        if c_snap.get("empty_display_type") is not None:
-                            orig_ref.empty_display_type = c_snap["empty_display_type"]
-                        if c_snap.get("empty_display_size") is not None:
-                            orig_ref.empty_display_size = c_snap["empty_display_size"]
+        if (
+            name_owner is not None
+            and name_owner != live_original
+        ):
+            restoration_errors.append(
+                "Original controller name occupied by "
+                f"another object: {original_name}"
+            )
+            continue
+
+        if live_original.name != original_name:
+            live_original.name = original_name
+
+        for col_name in c_snap.get("collections", []):
+            col = _find_collection_by_name(col_name)
+            if col is not None and live_original.name not in col.objects:
+                col.objects.link(live_original)
+
+        for col in list(live_original.users_collection):
+            if col.name not in c_snap.get("collections", []):
+                col.objects.unlink(live_original)
+
+        live_original.parent = c_snap["parent"]
+        live_original.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
+        live_original.rotation_mode = c_snap["rotation_mode"]
+        live_original.location = c_snap["location"].copy()
+        live_original.rotation_euler = c_snap["rotation_euler"].copy()
+        live_original.rotation_quaternion = c_snap["rotation_quaternion"].copy()
+        live_original.rotation_axis_angle = tuple(c_snap["rotation_axis_angle"])
+        live_original.scale = c_snap["scale"].copy()
+        if live_original.type == "EMPTY":
+            if c_snap.get("empty_display_type") is not None:
+                live_original.empty_display_type = c_snap["empty_display_type"]
+            if c_snap.get("empty_display_size") is not None:
+                live_original.empty_display_size = c_snap["empty_display_size"]
 
     # Also ensure any other stashed objects from active_tx are restored
     if active_tx is not None:
         for stashed in getattr(active_tx, "stashed_objects", []):
             obj = stashed.get("stashed_obj")
+            obj_ptr = stashed.get("stashed_obj_ptr")
             orig_name = stashed.get("original_name")
-            if obj is not None and obj.name in bpy.data.objects:
-                if orig_name and obj.name != orig_name:
-                    obj.name = orig_name
+            live_stashed = _find_live_object_by_identity(obj, obj_ptr) if (obj and obj_ptr) else obj
+            if live_stashed is not None:
+                if orig_name and live_stashed.name != orig_name:
+                    name_owner = bpy.data.objects.get(orig_name)
+                    if name_owner is None or name_owner == live_stashed:
+                        live_stashed.name = orig_name
                 for col_name in stashed.get("collections", []):
                     col = _find_collection_by_name(col_name)
-                    if col is not None and obj.name not in col.objects:
-                        col.objects.link(obj)
+                    if col is not None and live_stashed.name not in col.objects:
+                        col.objects.link(live_stashed)
 
     # Step 2: Pose bones and constraints restoration
     pose_bones_snap = snapshot.get("pose_bones", {})
-    restoration_errors: List[str] = []
 
     for b_name, b_snap in pose_bones_snap.items():
         pbone = arm.pose.bones.get(b_name)
@@ -1188,6 +1264,9 @@ class _ArmRigTransactionContext:
         self.arm_ptr = arm.as_pointer()
         self.state: _ArmRigTransactionState = _ArmRigTransactionState.CREATED
         self.snapshot: Optional[Dict[str, Any]] = None
+        self.created_controller_objects: List[
+            Dict[str, Any]
+        ] = []
         self.stashed_objects: List[Dict[str, Any]] = []
         self.stashed_constraints: List[Dict[str, Any]] = []
         self.created_collections: List[Dict[str, Any]] = []
@@ -1200,6 +1279,25 @@ class _ArmRigTransactionContext:
     def committed(self) -> bool:
         """Backward-compatibility property reflecting logical commit status."""
         return self.state in (_ArmRigTransactionState.COMMITTED, _ArmRigTransactionState.CLEANUP_PENDING)
+
+    def register_created_controller(
+        self,
+        obj: bpy.types.Object,
+    ) -> None:
+        """Register a controller created by this transaction."""
+        obj_ptr = obj.as_pointer()
+
+        for record in self.created_controller_objects:
+            if record["obj_ptr"] == obj_ptr:
+                raise RuntimeError(
+                    "Duplicate transaction controller registration"
+                )
+
+        self.created_controller_objects.append({
+            "obj_ref": obj,
+            "obj_ptr": obj_ptr,
+            "created_name": obj.name,
+        })
 
     def register_created_collection(
         self,
@@ -1220,7 +1318,7 @@ class _ArmRigTransactionContext:
         cleanup_failures: List[str] = []
 
         # ------------------------------------------------------
-        # Task 10-B-7
+        # Task 10-B-8
         # Identity-safe cleanup of stashed constraints
         # ------------------------------------------------------
 
@@ -1230,27 +1328,50 @@ class _ArmRigTransactionContext:
             try:
                 pbone = stashed_con["pbone"]
 
+                original_ref = stashed_con.get("con")
                 expected_ptr = stashed_con.get("con_ptr")
 
-                if expected_ptr is None:
+                if expected_ptr is None and original_ref is None:
                     raise RuntimeError(
-                        "Stashed constraint has no recorded identity"
+                        "Stashed constraint identity record incomplete"
                     )
 
-                live_matches = [
-                    candidate
-                    for candidate in pbone.constraints
-                    if candidate.as_pointer() == expected_ptr
-                ]
+                if original_ref is not None:
+                    try:
+                        live_ptr = original_ref.as_pointer()
+                    except ReferenceError:
+                        raise RuntimeError(
+                            "Stashed constraint original reference invalid"
+                        )
 
-                if len(live_matches) > 1:
+                    if expected_ptr is not None and live_ptr != expected_ptr:
+                        raise RuntimeError(
+                            "Stashed constraint identity changed"
+                        )
+
+                    matches = [
+                        candidate
+                        for candidate in pbone.constraints
+                        if (
+                            (expected_ptr is None or candidate.as_pointer() == expected_ptr)
+                            and candidate == original_ref
+                        )
+                    ]
+                else:
+                    matches = [
+                        candidate
+                        for candidate in pbone.constraints
+                        if candidate.as_pointer() == expected_ptr
+                    ]
+
+                if len(matches) > 1:
                     raise RuntimeError(
                         "Multiple live constraints match "
                         "the same recorded identity"
                     )
 
-                if len(live_matches) == 1:
-                    target = live_matches[0]
+                if len(matches) == 1:
+                    target = matches[0]
 
                     pbone.constraints.remove(target)
 
@@ -1523,7 +1644,6 @@ def _arm_rig_transaction(arm: bpy.types.Object):
         # Phase 2: Logical Commit Confirmation
         # -------------------------------------------------------------
         tx.state = _ArmRigTransactionState.COMMITTED
-        _trigger_fault_injection("after_logical_commit", {"tx": tx})
 
     except BaseException as orig_exc:
         # If failure occurred before Phase 2 (Logical Commit), execute full rollback!
@@ -1564,15 +1684,24 @@ def _arm_rig_transaction(arm: bpy.types.Object):
         tx.uncleaned_stashed_constraints = list(tx.stashed_constraints)
         tx.uncleaned_stashed_objects = list(tx.stashed_objects)
         try:
-            _trigger_fault_injection("during_commit_cleanup", {"tx": tx})
+            _trigger_fault_injection(
+                "after_logical_commit",
+                {"tx": tx}
+            )
+            _trigger_fault_injection(
+                "during_commit_cleanup",
+                {"tx": tx}
+            )
             tx.retry_cleanup()
-        except BaseException as ce:
+        except BaseException as exc:
             tx.state = _ArmRigTransactionState.CLEANUP_PENDING
-            tx.cleanup_error = str(ce)
+            tx.cleanup_error = str(exc)
             _register_pending_arm_rig_cleanup(tx)
             raise RuntimeError(
-                f"Arm rig transaction committed, but irreversible cleanup failed: {ce}"
-            ) from ce
+                "Arm rig transaction committed, "
+                "but post-commit cleanup failed (irreversible cleanup failed): "
+                f"{exc}"
+            ) from exc
 
 
 def _get_or_create_empty(
@@ -1619,6 +1748,10 @@ def _get_or_create_empty(
 
     if obj is None:
         obj = bpy.data.objects.new(name, None)
+        if _ACTIVE_TRANSACTION_STACK:
+            active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+            active_tx.register_created_controller(obj)
+        _trigger_fault_injection("get_or_create_empty_after_register", {"obj": obj, "name": name})
         collection.objects.link(obj)
         obj.empty_display_type = display_type
         obj.empty_display_size = display_size
