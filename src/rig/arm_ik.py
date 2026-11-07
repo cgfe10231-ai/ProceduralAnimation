@@ -200,6 +200,601 @@ _LEGAL_RELATIONSHIP_LOG_TRANSITIONS: Dict[
 }
 
 
+class _ArmatureLivenessStatus(str, Enum):
+    """Explicit liveness status for managed Armature session identities (Task 10-B-13)."""
+    ALIVE_VERIFIED = "ALIVE_VERIFIED"
+    INVALIDATED_DEAD = "INVALIDATED_DEAD"
+
+
+class _ArmatureIsolationState(str, Enum):
+    """Explicit FAILED isolation state for managed Armature session identities (Task 10-B-13)."""
+    NONE = "NONE"
+    ISOLATED_FAILED_B = "ISOLATED_FAILED_B"
+    ISOLATED_FAILED_C = "ISOLATED_FAILED_C"
+    TOMBSTONED_FAILED_D = "TOMBSTONED_FAILED_D"
+    ARCHIVED_RETIRED = "ARCHIVED_RETIRED"
+
+
+class _FailedTransactionClass(str, Enum):
+    """Explicit four-class taxonomy for FAILED transactions (Task 10-B-13)."""
+    FAILED_A = "FAILED-A"
+    FAILED_B = "FAILED-B"
+    FAILED_C = "FAILED-C"
+    FAILED_D = "FAILED-D"
+
+
+class ArmatureSessionIdentityRecord:
+    """Layer 2 session identity record for a managed Armature (Task 10-B-13)."""
+
+    def __init__(
+        self,
+        registry_session_id: str,
+        original_blender_ref: Optional[bpy.types.Object],
+        registration_pointer: int,
+        original_data_pointer: int,
+        liveness_status: _ArmatureLivenessStatus = _ArmatureLivenessStatus.ALIVE_VERIFIED,
+        in_live_blender_collection: bool = True,
+        isolation_state: _ArmatureIsolationState = _ArmatureIsolationState.NONE,
+        tombstone_record: Optional[Dict[str, Any]] = None,
+        original_data_ref: Optional[Any] = None,
+        registered_name_snapshot: str = "",
+        lifecycle_stage: str = "REGISTERED_ALIVE",
+    ) -> None:
+        self.registry_session_id: str = str(registry_session_id)
+        self.original_blender_ref: Optional[bpy.types.Object] = original_blender_ref
+        self.registration_pointer: int = int(registration_pointer)
+        self.original_data_pointer: int = int(original_data_pointer)
+        self.liveness_status: _ArmatureLivenessStatus = (
+            liveness_status
+            if isinstance(liveness_status, _ArmatureLivenessStatus)
+            else _ArmatureLivenessStatus(liveness_status)
+        )
+        self.in_live_blender_collection: bool = bool(in_live_blender_collection)
+        self.isolation_state: _ArmatureIsolationState = (
+            isolation_state
+            if isinstance(isolation_state, _ArmatureIsolationState)
+            else _ArmatureIsolationState(isolation_state)
+        )
+        self.tombstone_record: Optional[Dict[str, Any]] = tombstone_record
+        self.original_data_ref: Optional[Any] = original_data_ref
+        self.registered_name_snapshot: str = str(registered_name_snapshot)
+        self.lifecycle_stage: str = str(lifecycle_stage)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "registry_session_id": self.registry_session_id,
+            "original_blender_ref": self.original_blender_ref,
+            "registration_pointer": self.registration_pointer,
+            "original_data_pointer": self.original_data_pointer,
+            "liveness_status": (
+                self.liveness_status.value
+                if isinstance(self.liveness_status, Enum)
+                else str(self.liveness_status)
+            ),
+            "in_live_blender_collection": self.in_live_blender_collection,
+            "isolation_state": (
+                self.isolation_state.value
+                if isinstance(self.isolation_state, Enum)
+                else str(self.isolation_state)
+            ),
+            "tombstone_record": self.tombstone_record,
+            "original_data_ref": self.original_data_ref,
+            "registered_name_snapshot": self.registered_name_snapshot,
+            "lifecycle_stage": self.lifecycle_stage,
+        }
+
+    def __getitem__(self, key: str) -> Any:
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def keys(self) -> Tuple[str, ...]:
+        return (
+            "registry_session_id",
+            "original_blender_ref",
+            "registration_pointer",
+            "original_data_pointer",
+            "liveness_status",
+            "in_live_blender_collection",
+            "isolation_state",
+            "tombstone_record",
+            "original_data_ref",
+            "registered_name_snapshot",
+            "lifecycle_stage",
+        )
+
+
+_MANAGED_ARMATURE_IDENTITIES: Dict[str, ArmatureSessionIdentityRecord] = {}
+_ISOLATED_FAILED_ARMATURES: Dict[str, Dict[str, Any]] = {}
+_ARCHIVED_FAILED_D_TOMBSTONES: Dict[str, Dict[str, Any]] = {}
+_FAILED_A_AUDIT_RECORDS: List[Dict[str, Any]] = []
+_DEISOLATION_AUDIT_LOG: List[Dict[str, Any]] = []
+
+
+def _safe_object_name(obj: Any, fallback: str = "<invalid_or_destroyed_object>") -> str:
+    """Safely read a Blender object's name without raising ReferenceError."""
+    if obj is None:
+        return fallback
+    try:
+        return str(obj.name)
+    except BaseException:
+        return fallback
+
+
+def _safe_object_pointer(obj: Any, fallback: int = 0) -> int:
+    """Safely read a Blender object's RNA pointer without raising ReferenceError."""
+    if obj is None:
+        return fallback
+    try:
+        return int(obj.as_pointer())
+    except BaseException:
+        return fallback
+
+
+def _verify_armature_session_identity_record(
+    record: ArmatureSessionIdentityRecord,
+    candidate_arm: Optional[bpy.types.Object] = None,
+) -> Dict[str, Any]:
+    """Simultaneously verify all 7 Armature session identity conditions (Task 10-B-13 Section 4.2)."""
+    if record is None:
+        return {
+            "is_valid": False,
+            "checks": {},
+            "reasons": ["ArmatureSessionIdentityRecord is None"],
+            "registry_session_id": None,
+        }
+
+    reasons: List[str] = []
+    ref = record.original_blender_ref
+
+    # Condition 1: original_blender_ref has not been invalidated
+    c1_not_invalidated = (
+        ref is not None
+        and record.liveness_status != _ArmatureLivenessStatus.INVALIDATED_DEAD
+        and record.isolation_state not in (
+            _ArmatureIsolationState.TOMBSTONED_FAILED_D,
+            _ArmatureIsolationState.ARCHIVED_RETIRED,
+        )
+    )
+    if not c1_not_invalidated:
+        reasons.append(
+            f"Condition 1 failed: record liveness_status={record.liveness_status}, "
+            f"isolation_state={record.isolation_state}"
+        )
+
+    # Condition 2: accessing ref does not raise ReferenceError
+    c2_no_ref_error = False
+    ref_ptr: Optional[int] = None
+    ref_type: Optional[str] = None
+    ref_data: Optional[Any] = None
+    if ref is not None:
+        try:
+            ref_ptr = int(ref.as_pointer())
+            ref_type = str(ref.type)
+            ref_data = ref.data
+            c2_no_ref_error = True
+        except ReferenceError as re_err:
+            reasons.append(f"Condition 2 failed: original_blender_ref raised ReferenceError ({re_err})")
+        except BaseException as exc:
+            reasons.append(f"Condition 2 failed: original_blender_ref access error ({exc})")
+    else:
+        reasons.append("Condition 2 failed: original_blender_ref is None")
+
+    # Condition 3: object is in live bpy.data.objects.values()
+    c3_in_live_collection = False
+    if c2_no_ref_error and ref_ptr is not None:
+        try:
+            for live_obj in bpy.data.objects.values():
+                try:
+                    if live_obj.as_pointer() == ref_ptr and live_obj == ref:
+                        c3_in_live_collection = True
+                        break
+                except ReferenceError:
+                    continue
+        except BaseException:
+            c3_in_live_collection = False
+    if not c3_in_live_collection:
+        reasons.append("Condition 3 failed: original_blender_ref is absent from live bpy.data.objects.values()")
+
+    # Condition 4: obj.type == 'ARMATURE'
+    c4_is_armature_type = bool(c2_no_ref_error and ref_type == "ARMATURE")
+    if not c4_is_armature_type:
+        reasons.append(f"Condition 4 failed: object type is {ref_type!r}, expected 'ARMATURE'")
+
+    # Condition 6 (on original_blender_ref): obj.as_pointer() == registration_pointer
+    c6_ref_ptr_matches = bool(
+        c2_no_ref_error
+        and ref_ptr is not None
+        and ref_ptr == record.registration_pointer
+    )
+    if not c6_ref_ptr_matches:
+        reasons.append(
+            f"Condition 6 failed: original_blender_ref pointer {ref_ptr} != "
+            f"registration_pointer {record.registration_pointer}"
+        )
+
+    # Condition 7: obj.data is valid and obj.data.as_pointer() == original_data_pointer
+    c7_data_valid_and_matches = False
+    if c2_no_ref_error and ref_data is not None:
+        try:
+            live_data_ptr = int(ref_data.as_pointer())
+            in_armatures = any(
+                a.as_pointer() == live_data_ptr and a == ref_data
+                for a in bpy.data.armatures.values()
+            )
+            orig_data_ok = True
+            if record.original_data_ref is not None:
+                try:
+                    orig_data_ok = (
+                        record.original_data_ref.as_pointer() == record.original_data_pointer
+                        and ref_data == record.original_data_ref
+                    )
+                except ReferenceError:
+                    orig_data_ok = False
+            if in_armatures and orig_data_ok and live_data_ptr == record.original_data_pointer:
+                c7_data_valid_and_matches = True
+        except ReferenceError:
+            c7_data_valid_and_matches = False
+        except BaseException:
+            c7_data_valid_and_matches = False
+    if not c7_data_valid_and_matches:
+        reasons.append(
+            "Condition 7 failed: Armature data block is invalid, removed, or pointer does not match original_data_pointer"
+        )
+
+    # Update record liveness based on the registered object's own liveness checks (1, 2, 3, 4, 6, 7)
+    registered_obj_alive = (
+        c1_not_invalidated
+        and c2_no_ref_error
+        and c3_in_live_collection
+        and c4_is_armature_type
+        and c6_ref_ptr_matches
+        and c7_data_valid_and_matches
+    )
+    if not registered_obj_alive:
+        record.in_live_blender_collection = False
+        record.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
+        if record.lifecycle_stage not in ("TOMBSTONED_FAILED_D", "ARCHIVED_RETIRED"):
+            record.lifecycle_stage = "INVALIDATED_DEAD"
+    else:
+        record.in_live_blender_collection = True
+        record.liveness_status = _ArmatureLivenessStatus.ALIVE_VERIFIED
+        try:
+            record.registered_name_snapshot = str(ref.name)
+        except BaseException:
+            pass
+
+    # Condition 5 & Condition 6 on candidate_arm (if provided)
+    c5_same_blender_ref = True
+    c6_pointer_matches = c6_ref_ptr_matches
+    if candidate_arm is not None:
+        try:
+            cand_ptr = int(candidate_arm.as_pointer())
+            c5_same_blender_ref = bool(
+                c2_no_ref_error
+                and ref is not None
+                and candidate_arm == ref
+            )
+            c6_pointer_matches = bool(
+                c6_ref_ptr_matches
+                and cand_ptr == record.registration_pointer
+            )
+        except ReferenceError as cand_re:
+            c5_same_blender_ref = False
+            c6_pointer_matches = False
+            reasons.append(f"Condition 5/6 failed: candidate_arm raised ReferenceError ({cand_re})")
+        except BaseException as cand_exc:
+            c5_same_blender_ref = False
+            c6_pointer_matches = False
+            reasons.append(f"Condition 5/6 failed: candidate_arm invalid ({cand_exc})")
+
+        if not c5_same_blender_ref:
+            reasons.append("Condition 5 failed: candidate_arm != record.original_blender_ref")
+        if not c6_pointer_matches:
+            reasons.append("Condition 6 failed: candidate_arm.as_pointer() != record.registration_pointer")
+
+    checks = {
+        "c1_not_invalidated": c1_not_invalidated,
+        "c2_no_reference_error": c2_no_ref_error,
+        "c3_in_live_blender_collection": c3_in_live_collection,
+        "c4_is_armature_type": c4_is_armature_type,
+        "c5_same_blender_ref": c5_same_blender_ref,
+        "c6_pointer_matches": c6_pointer_matches,
+        "c7_data_valid_and_pointer_matches": c7_data_valid_and_matches,
+    }
+    is_valid = all(checks.values())
+    return {
+        "is_valid": is_valid,
+        "checks": checks,
+        "reasons": reasons,
+        "registry_session_id": record.registry_session_id,
+    }
+
+
+def _sweep_dead_managed_armature_identities() -> None:
+    """Refresh liveness of all registered ArmatureSessionIdentityRecords and escalate dead isolated armatures."""
+    for session_id, rec in list(_MANAGED_ARMATURE_IDENTITIES.items()):
+        if rec.isolation_state == _ArmatureIsolationState.ARCHIVED_RETIRED:
+            continue
+        ver = _verify_armature_session_identity_record(rec, candidate_arm=None)
+        if not ver["is_valid"]:
+            # If this session was already in _ISOLATED_FAILED_ARMATURES as FAILED-B or FAILED-C,
+            # escalate it to TOMBSTONED_FAILED_D because the underlying Armature has died.
+            iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
+            if iso_rec is not None and rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D:
+                rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+                rec.lifecycle_stage = "TOMBSTONED_FAILED_D"
+                tombstone = {
+                    "registry_session_id": session_id,
+                    "registration_pointer": rec.registration_pointer,
+                    "original_data_pointer": rec.original_data_pointer,
+                    "registered_name_snapshot": rec.registered_name_snapshot,
+                    "failure_class": _FailedTransactionClass.FAILED_D.value,
+                    "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+                    "retirement_state": "ACTIVE_TOMBSTONE",
+                    "reasons": ver["reasons"],
+                }
+                rec.tombstone_record = tombstone
+                iso_rec["failure_class"] = _FailedTransactionClass.FAILED_D.value
+                iso_rec["isolation_state"] = _ArmatureIsolationState.TOMBSTONED_FAILED_D.value
+                iso_rec["tombstone_record"] = tombstone
+
+
+def ensure_armature_session_identity(arm: bpy.types.Object) -> ArmatureSessionIdentityRecord:
+    """Layer 2: Resolve existing verified ArmatureSessionIdentityRecord or register a new session identity."""
+    _sweep_dead_managed_armature_identities()
+
+    if arm is None:
+        raise RuntimeError("Cannot resolve ArmatureSessionIdentityRecord: armature object is None")
+
+    # 1. Check if arm matches an existing live verified record
+    for rec in _MANAGED_ARMATURE_IDENTITIES.values():
+        if rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED and rec.isolation_state not in (
+            _ArmatureIsolationState.TOMBSTONED_FAILED_D,
+            _ArmatureIsolationState.ARCHIVED_RETIRED,
+        ):
+            ver = _verify_armature_session_identity_record(rec, candidate_arm=arm)
+            if ver["is_valid"]:
+                return rec
+
+    # 2. Check if arm is the exact dead object wrapper of an existing invalidated/tombstoned record
+    for rec in _MANAGED_ARMATURE_IDENTITIES.values():
+        if rec.original_blender_ref is arm:
+            return rec
+
+    # 3. Validate that arm is a live ARMATURE object in bpy.data.objects before creating a new identity
+    try:
+        arm_ptr = int(arm.as_pointer())
+        arm_type = str(arm.type)
+        arm_data = arm.data
+        arm_name = str(arm.name)
+    except ReferenceError as re_err:
+        raise RuntimeError(
+            f"Armature session identity rejected: StructRNA object has been destroyed ({re_err})"
+        ) from re_err
+    except BaseException as exc:
+        raise RuntimeError(
+            f"Armature session identity rejected: invalid object ({exc})"
+        ) from exc
+
+    in_live_objects = any(
+        o.as_pointer() == arm_ptr and o == arm
+        for o in bpy.data.objects.values()
+    )
+    if not in_live_objects or arm_type != "ARMATURE" or arm_data is None:
+        raise RuntimeError(
+            f"Armature session identity rejected: object '{arm_name}' is not a live ARMATURE in bpy.data.objects"
+        )
+
+    try:
+        data_ptr = int(arm_data.as_pointer())
+    except BaseException as exc:
+        raise RuntimeError(
+            f"Armature session identity rejected: armature data block is invalid ({exc})"
+        ) from exc
+
+    session_id = str(uuid.uuid4())
+    while session_id in _MANAGED_ARMATURE_IDENTITIES:
+        session_id = str(uuid.uuid4())
+
+    new_rec = ArmatureSessionIdentityRecord(
+        registry_session_id=session_id,
+        original_blender_ref=arm,
+        registration_pointer=arm_ptr,
+        original_data_pointer=data_ptr,
+        liveness_status=_ArmatureLivenessStatus.ALIVE_VERIFIED,
+        in_live_blender_collection=True,
+        isolation_state=_ArmatureIsolationState.NONE,
+        tombstone_record=None,
+        original_data_ref=arm_data,
+        registered_name_snapshot=arm_name,
+        lifecycle_stage="REGISTERED_ALIVE",
+    )
+    _MANAGED_ARMATURE_IDENTITIES[session_id] = new_rec
+    return new_rec
+
+
+def _record_armature_failure_isolation_by_coordinator(
+    session_rec: ArmatureSessionIdentityRecord,
+    tx: "_ArmRigTransactionContext",
+    failure_class: _FailedTransactionClass,
+    primary_exception: Optional[BaseException],
+    secondary_exception: Optional[BaseException] = None,
+    evidence_status: str = "SNAPSHOT_AVAILABLE",
+    missing_evidence_reasons: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Layer 2: Record FAILED-B / FAILED-C / FAILED-D isolation or tombstone under Layer 1 Coordinator authority."""
+    f_class = (
+        failure_class
+        if isinstance(failure_class, _FailedTransactionClass)
+        else _FailedTransactionClass(failure_class)
+    )
+    tx.failure_class = f_class.value
+
+    if f_class == _FailedTransactionClass.FAILED_A:
+        session_rec.isolation_state = _ArmatureIsolationState.NONE
+        if session_rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED:
+            session_rec.lifecycle_stage = "NORMAL_TERMINAL"
+        audit_rec = {
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_rec.registry_session_id,
+            "failure_class": f_class.value,
+            "isolation_state": _ArmatureIsolationState.NONE.value,
+            "primary_exception": f"{type(primary_exception).__name__}: {primary_exception}" if primary_exception else None,
+            "evidence_status": "PRE_WRITE_ZERO_MUTATION_VERIFIED",
+        }
+        _FAILED_A_AUDIT_RECORDS.append(audit_rec)
+        return audit_rec
+
+    if f_class == _FailedTransactionClass.FAILED_B:
+        iso_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+    elif f_class == _FailedTransactionClass.FAILED_C:
+        iso_state = _ArmatureIsolationState.ISOLATED_FAILED_C
+    elif f_class == _FailedTransactionClass.FAILED_D:
+        iso_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+    else:
+        raise RuntimeError(f"Unsupported failure class for isolation: {f_class}")
+
+    session_rec.isolation_state = iso_state
+    if f_class == _FailedTransactionClass.FAILED_D:
+        session_rec.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
+        session_rec.in_live_blender_collection = False
+        session_rec.lifecycle_stage = "TOMBSTONED_FAILED_D"
+
+    snapshot_trusted = bool(
+        tx.snapshot is not None
+        and f_class in (_FailedTransactionClass.FAILED_B, _FailedTransactionClass.FAILED_C)
+        and evidence_status != "RECOVERY_EVIDENCE_INSUFFICIENT"
+    )
+
+    uncertain_ops = [
+        {
+            "operation_id": r.get("operation_id"),
+            "intended_mutation": r.get("intended_mutation"),
+            "operation_state": (
+                r.get("operation_state").value
+                if isinstance(r.get("operation_state"), Enum)
+                else str(r.get("operation_state"))
+            ),
+        }
+        for r in getattr(tx, "prepared_relationship_mutations", [])
+        if r.get("operation_state") == _RelationshipOperationState.RECOVERY_UNCERTAIN
+    ]
+
+    tombstone_rec: Optional[Dict[str, Any]] = None
+    if f_class == _FailedTransactionClass.FAILED_D:
+        tombstone_rec = {
+            "registry_session_id": session_rec.registry_session_id,
+            "transaction_id": tx.tx_id,
+            "registration_pointer": session_rec.registration_pointer,
+            "original_data_pointer": session_rec.original_data_pointer,
+            "registered_name_snapshot": session_rec.registered_name_snapshot,
+            "failure_class": f_class.value,
+            "isolation_state": iso_state.value,
+            "retirement_state": "ACTIVE_TOMBSTONE",
+            "created_controller_objects": list(getattr(tx, "created_controller_objects", [])),
+            "created_collections": list(getattr(tx, "created_collections", [])),
+            "primary_exception": f"{type(primary_exception).__name__}: {primary_exception}" if primary_exception else None,
+            "secondary_exception": f"{type(secondary_exception).__name__}: {secondary_exception}" if secondary_exception else None,
+        }
+        session_rec.tombstone_record = tombstone_rec
+
+    iso_record: Dict[str, Any] = {
+        "registry_session_id": session_rec.registry_session_id,
+        "transaction_id": tx.tx_id,
+        "failure_class": f_class.value,
+        "isolation_state": iso_state.value,
+        "liveness_status": session_rec.liveness_status.value,
+        "registration_pointer": session_rec.registration_pointer,
+        "original_data_pointer": session_rec.original_data_pointer,
+        "registered_name_snapshot": session_rec.registered_name_snapshot,
+        "primary_exception": (
+            f"{type(primary_exception).__name__}: {primary_exception}"
+            if primary_exception is not None
+            else None
+        ),
+        "secondary_exception": (
+            f"{type(secondary_exception).__name__}: {secondary_exception}"
+            if secondary_exception is not None
+            else None
+        ),
+        "snapshot_reference": tx.snapshot if snapshot_trusted else None,
+        "snapshot_trusted": snapshot_trusted,
+        "evidence_status": evidence_status,
+        "missing_evidence_reasons": list(missing_evidence_reasons or []),
+        "transaction_context": tx,
+        "created_controller_objects": list(getattr(tx, "created_controller_objects", [])),
+        "created_constraints": list(getattr(tx, "created_constraints", [])),
+        "created_collections": list(getattr(tx, "created_collections", [])),
+        "prepared_relationship_mutations": list(getattr(tx, "prepared_relationship_mutations", [])),
+        "recovery_uncertain_operations": uncertain_ops,
+        "tombstone_record": tombstone_rec,
+    }
+    _ISOLATED_FAILED_ARMATURES[session_rec.registry_session_id] = iso_record
+    tx.isolation_record = iso_record
+    return iso_record
+
+
+def _clear_or_retire_failure_isolation_by_coordinator(
+    session_id: str,
+    action: str,
+    reason: str,
+    verification_evidence: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Layer 2: Clear FAILED-B/C isolation or archive FAILED-D tombstone exclusively for Layer 1 Coordinator."""
+    session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
+    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
+    if session_rec is None or iso_rec is None:
+        raise RuntimeError(f"Cannot modify isolation state: session {session_id} not found in active isolation registry")
+
+    if action == "CLEAR_TO_NONE":
+        if not verification_evidence.get("can_deisolate", False):
+            raise RuntimeError("Layer 2 rejected de-isolation: Layer 5 verification_evidence did not pass")
+        if session_rec.isolation_state == _ArmatureIsolationState.TOMBSTONED_FAILED_D:
+            raise RuntimeError("Layer 2 rejected de-isolation: TOMBSTONED_FAILED_D cannot return to active status")
+        previous_state = session_rec.isolation_state.value
+        session_rec.isolation_state = _ArmatureIsolationState.NONE
+        session_rec.lifecycle_stage = "NORMAL_TERMINAL"
+        _ISOLATED_FAILED_ARMATURES.pop(session_id, None)
+        return {
+            "registry_session_id": session_id,
+            "previous_isolation_state": previous_state,
+            "new_isolation_state": _ArmatureIsolationState.NONE.value,
+            "action": "CLEAR_TO_NONE",
+            "reason": reason,
+        }
+    elif action == "ARCHIVE_TOMBSTONE":
+        if not verification_evidence.get("can_retire", False):
+            raise RuntimeError("Layer 2 rejected tombstone retirement: Layer 5 retirement evidence did not pass")
+        if session_rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D:
+            raise RuntimeError(
+                f"Layer 2 rejected tombstone retirement: session {session_id} is in {session_rec.isolation_state}, "
+                "expected TOMBSTONED_FAILED_D"
+            )
+        previous_state = session_rec.isolation_state.value
+        session_rec.isolation_state = _ArmatureIsolationState.ARCHIVED_RETIRED
+        session_rec.lifecycle_stage = "ARCHIVED_RETIRED"
+        iso_rec["isolation_state"] = _ArmatureIsolationState.ARCHIVED_RETIRED.value
+        if session_rec.tombstone_record is not None:
+            session_rec.tombstone_record["isolation_state"] = _ArmatureIsolationState.ARCHIVED_RETIRED.value
+            session_rec.tombstone_record["retirement_state"] = "ARCHIVED_RETIRED"
+            session_rec.tombstone_record["retirement_reason"] = reason
+        _ISOLATED_FAILED_ARMATURES.pop(session_id, None)
+        _ARCHIVED_FAILED_D_TOMBSTONES[session_id] = iso_rec
+        return {
+            "registry_session_id": session_id,
+            "previous_isolation_state": previous_state,
+            "new_isolation_state": _ArmatureIsolationState.ARCHIVED_RETIRED.value,
+            "action": "ARCHIVE_TOMBSTONE",
+            "reason": reason,
+        }
+    else:
+        raise RuntimeError(f"Unsupported Layer 2 isolation transition action: {action!r}")
+
+
 _FAULT_INJECTION_HOOK: Optional[Callable[[str, Dict[str, Any]], None]] = None
 
 
@@ -268,12 +863,184 @@ def _clone_snapshot_property_value(val: Any) -> Any:
     return val
 
 
+_REQUIRED_ARM_IK_BONE_NAMES: Tuple[str, ...] = (
+    "upper_arm.L",
+    "upper_arm.R",
+    "forearm.L",
+    "forearm.R",
+    "hand.L",
+    "hand.R",
+)
+
+
+def _capture_pre_snapshot_structural_fingerprint(arm: bpy.types.Object) -> Dict[str, Any]:
+    """Capture a lightweight read-only structural and value fingerprint before SNAPSHOTTING."""
+    char_col = bpy.data.collections.get("Character")
+    scene_children = bpy.context.scene.collection.children if (bpy.context and bpy.context.scene) else []
+    char_col_fp = None
+    if char_col is not None:
+        char_col_fp = (
+            int(char_col.as_pointer()),
+            str(char_col.name),
+            bool(char_col.name in scene_children),
+            tuple(sorted(p.as_pointer() for p in bpy.data.collections if any(ch.as_pointer() == char_col.as_pointer() for ch in p.children))),
+            tuple(sorted(ch.as_pointer() for ch in char_col.children)),
+            tuple(sorted(o.as_pointer() for o in char_col.objects)),
+        )
+
+    ctrl_names = (
+        ARM_IK_TARGET_NAMES["L"],
+        ARM_IK_TARGET_NAMES["R"],
+        ARM_POLE_TARGET_NAMES["L"],
+        ARM_POLE_TARGET_NAMES["R"],
+    )
+    ctrls_fp: Dict[str, Any] = {}
+    for c_name in ctrl_names:
+        c_obj = bpy.data.objects.get(c_name)
+        if c_obj is None:
+            ctrls_fp[c_name] = None
+        else:
+            ctrls_fp[c_name] = (
+                int(c_obj.as_pointer()),
+                int(c_obj.data.as_pointer()) if getattr(c_obj, "data", None) is not None else None,
+                str(c_obj.name),
+                str(c_obj.type),
+                int(c_obj.parent.as_pointer()) if c_obj.parent is not None else None,
+                tuple(round(float(v), 6) for v in c_obj.location),
+                str(c_obj.rotation_mode),
+                tuple(round(float(v), 6) for v in c_obj.rotation_euler),
+                tuple(round(float(v), 6) for v in c_obj.rotation_quaternion),
+                tuple(round(float(v), 6) for v in c_obj.rotation_axis_angle),
+                tuple(round(float(v), 6) for v in c_obj.scale),
+                tuple(sorted(c.as_pointer() for c in c_obj.users_collection)),
+            )
+
+    bones_fp: Dict[str, Any] = {}
+    present_arm_bones: List[str] = []
+    for b_name in _REQUIRED_ARM_IK_BONE_NAMES:
+        pbone = arm.pose.bones.get(b_name) if getattr(arm, "pose", None) else None
+        if pbone is None:
+            bones_fp[b_name] = None
+            continue
+        present_arm_bones.append(b_name)
+        cons_fp = tuple(
+            (
+                int(con.as_pointer()),
+                str(con.name),
+                str(con.type),
+                round(float(con.influence), 6),
+                bool(con.mute),
+                int(con.target.as_pointer()) if getattr(con, "target", None) is not None else None,
+                str(getattr(con, "subtarget", "")),
+                int(con.pole_target.as_pointer()) if getattr(con, "pole_target", None) is not None else None,
+                str(getattr(con, "pole_subtarget", "")),
+            )
+            for con in pbone.constraints
+        )
+        bones_fp[b_name] = (
+            tuple(round(float(v), 6) for v in pbone.location),
+            str(pbone.rotation_mode),
+            tuple(round(float(v), 6) for v in pbone.rotation_euler),
+            tuple(round(float(v), 6) for v in pbone.rotation_quaternion),
+            tuple(round(float(v), 6) for v in pbone.rotation_axis_angle),
+            tuple(round(float(v), 6) for v in pbone.scale),
+            bool(pbone.lock_ik_x),
+            bool(pbone.lock_ik_y),
+            bool(pbone.lock_ik_z),
+            bool(pbone.use_ik_limit_x),
+            bool(pbone.use_ik_limit_y),
+            bool(pbone.use_ik_limit_z),
+            cons_fp,
+        )
+
+    return {
+        "arm_ptr": int(arm.as_pointer()),
+        "arm_name": str(arm.name),
+        "data_ptr": int(arm.data.as_pointer()) if getattr(arm, "data", None) is not None else None,
+        "total_pose_bone_count": len(arm.pose.bones) if getattr(arm, "pose", None) else 0,
+        "present_arm_bones": tuple(present_arm_bones),
+        "character_collection": char_col_fp,
+        "controllers": ctrls_fp,
+        "pose_bones": bones_fp,
+        "all_object_ptrs": frozenset(int(o.as_pointer()) for o in bpy.data.objects),
+        "all_collection_ptrs": frozenset(int(c.as_pointer()) for c in bpy.data.collections),
+    }
+
+
+def _verify_pre_write_zero_mutation_and_integrity(
+    arm: bpy.types.Object,
+    pre_fp: Optional[Dict[str, Any]],
+    tx: "_ArmRigTransactionContext",
+) -> Dict[str, Any]:
+    """Layer 5: Verify zero mutations and structural integrity when a transaction aborts before ACTIVE."""
+    reasons: List[str] = []
+
+    if getattr(tx, "pre_write_integrity_compromised", False):
+        extra = getattr(tx, "pre_write_integrity_reasons", [])
+        reasons.extend(extra if extra else ["Transaction pre-write integrity explicitly marked compromised"])
+
+    if (
+        tx.created_controller_objects
+        or tx.created_constraints
+        or tx.created_collection_links
+        or tx.prepared_relationship_mutations
+        or tx.stashed_objects
+        or tx.stashed_constraints
+        or tx.created_collections
+    ):
+        reasons.append("Transaction recorded resource or relationship mutations before reaching ACTIVE")
+
+    if pre_fp is None:
+        reasons.append("Pre-snapshot structural fingerprint is missing")
+        return {"is_verified": False, "reasons": reasons}
+
+    try:
+        post_fp = _capture_pre_snapshot_structural_fingerprint(arm)
+    except BaseException as exc:
+        reasons.append(f"Failed to capture post-exception structural fingerprint: {exc}")
+        return {"is_verified": False, "reasons": reasons}
+
+    if post_fp["total_pose_bone_count"] > 0:
+        missing_bones = [
+            b for b in _REQUIRED_ARM_IK_BONE_NAMES
+            if b not in post_fp["present_arm_bones"]
+        ]
+        if missing_bones:
+            reasons.append(f"Required upper-limb pose bones missing: {missing_bones}")
+
+    for key in (
+        "arm_ptr",
+        "arm_name",
+        "data_ptr",
+        "total_pose_bone_count",
+        "present_arm_bones",
+        "character_collection",
+        "controllers",
+        "pose_bones",
+        "all_object_ptrs",
+        "all_collection_ptrs",
+    ):
+        if pre_fp.get(key) != post_fp.get(key):
+            reasons.append(f"Pre-write state mutated during SNAPSHOTTING in field '{key}'")
+
+    return {
+        "is_verified": len(reasons) == 0,
+        "reasons": reasons,
+    }
+
+
 def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
     """Capture full production state snapshot of Arm IK controllers, pose bones, constraints, and collections.
 
     Zero-mutation guarantee: Strictly inspects and copies properties without modifying Blender state.
     """
-    _trigger_fault_injection("during_snapshot_creation", {"arm": arm})
+    _trigger_fault_injection(
+        "during_snapshot_creation",
+        {
+            "arm": arm,
+            "tx": (_ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None),
+        },
+    )
     _depsgraph_update()
 
     # 1. Collections snapshot
@@ -832,9 +1599,6 @@ def _authorized_revert_relationship_record(
         return
 
     if state == _RelationshipOperationState.RECOVERY_UNCERTAIN:
-        restoration_errors.append(
-            f"Relationship operation '{op_id}' is in RECOVERY_UNCERTAIN state"
-        )
         return
 
     try:
@@ -842,7 +1606,7 @@ def _authorized_revert_relationship_record(
             "during_relationship_rollback_undo",
             {"op": op_record, "tx": active_tx},
         )
-    except BaseException as hook_exc:
+    except BaseException:
         if op_record.get("operation_state") in (
             _RelationshipOperationState.APPLYING,
             _RelationshipOperationState.APPLIED_VERIFIED,
@@ -852,9 +1616,6 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
-        restoration_errors.append(
-            f"Relationship operation '{op_id}' rollback failed due to fault: {hook_exc}"
-        )
         return
 
     src_id = op_record.get("source_identity", {})
@@ -876,9 +1637,6 @@ def _authorized_revert_relationship_record(
             active_tx.update_relationship_mutation_state(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-            restoration_errors.append(
-                f"Relationship operation '{op_id}' interrupted in APPLYING with invalid identity or unknown ownership"
             )
             return
 
@@ -912,9 +1670,6 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
-            restoration_errors.append(
-                f"Relationship operation '{op_id}' has unsupported mutation '{mutation}'"
-            )
             return
 
     if state not in (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED):
@@ -928,9 +1683,6 @@ def _authorized_revert_relationship_record(
             op_record,
             _RelationshipOperationState.RECOVERY_UNCERTAIN,
         )
-        restoration_errors.append(
-            f"Relationship operation '{op_id}' cannot be reverted: target/source identity invalid or ownership unknown (category={category})"
-        )
         return
 
     if mutation == "COLLECTION_OBJECT_LINK":
@@ -939,21 +1691,15 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
-            restoration_errors.append(
-                f"Relationship operation '{op_id}' has non-revocable category '{category}' in state '{state}'"
-            )
             return
         try:
             if _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
                 live_col.objects.unlink(live_obj)
             still_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
-        except BaseException as unlink_exc:
+        except BaseException:
             active_tx.update_relationship_mutation_state(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-            restoration_errors.append(
-                f"Failed to revert COLLECTION_OBJECT_LINK '{op_id}': {unlink_exc}"
             )
             return
 
@@ -961,9 +1707,6 @@ def _authorized_revert_relationship_record(
             active_tx.update_relationship_mutation_state(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-            restoration_errors.append(
-                f"Failed to revert COLLECTION_OBJECT_LINK '{op_id}': object still linked after unlink"
             )
             return
 
@@ -977,21 +1720,15 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
-            restoration_errors.append(
-                f"Relationship operation '{op_id}' has invalid unlink category '{category}' in state '{state}'"
-            )
             return
         try:
             if not _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
                 live_col.objects.link(live_obj)
             now_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
-        except BaseException as link_exc:
+        except BaseException:
             active_tx.update_relationship_mutation_state(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-            restoration_errors.append(
-                f"Failed to revert COLLECTION_OBJECT_UNLINK '{op_id}': {link_exc}"
             )
             return
 
@@ -999,9 +1736,6 @@ def _authorized_revert_relationship_record(
             active_tx.update_relationship_mutation_state(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-            restoration_errors.append(
-                f"Failed to revert COLLECTION_OBJECT_UNLINK '{op_id}': object not linked after link"
             )
             return
 
@@ -1013,9 +1747,6 @@ def _authorized_revert_relationship_record(
         active_tx.update_relationship_mutation_state(
             op_record,
             _RelationshipOperationState.RECOVERY_UNCERTAIN,
-        )
-        restoration_errors.append(
-            f"Relationship operation '{op_id}' has unsupported mutation '{mutation}'"
         )
 
 
@@ -1153,6 +1884,10 @@ def _rollback_arm_rig_state(
     active_tx: Optional[Any] = None,
 ) -> None:
     """Restore the Arm IK rig state precisely to the recorded snapshot."""
+    _trigger_fault_injection(
+        "during_rollback_execution",
+        {"arm": arm, "snapshot": snapshot, "tx": active_tx},
+    )
     restoration_errors: List[str] = []
 
     # Step 1: Controller cleanup, stashed object restoration, and transform restoration
@@ -2045,9 +2780,27 @@ def _verify_arm_rig_state_restored(
 class _ArmRigTransactionContext:
     """Active transaction execution state tracking."""
 
-    def __init__(self, arm: bpy.types.Object):
+    def __init__(
+        self,
+        arm: bpy.types.Object,
+        session_record: Optional[ArmatureSessionIdentityRecord] = None,
+    ):
         self.arm = arm
-        self.arm_ptr = arm.as_pointer()
+        if session_record is None and arm is not None:
+            try:
+                session_record = ensure_armature_session_identity(arm)
+            except BaseException:
+                session_record = None
+        self.session_record: Optional[ArmatureSessionIdentityRecord] = session_record
+        self.session_id: Optional[str] = (
+            session_record.registry_session_id
+            if session_record is not None
+            else None
+        )
+        self.arm_ptr = _safe_object_pointer(
+            arm,
+            fallback=(session_record.registration_pointer if session_record is not None else 0),
+        )
         self.state: _ArmRigTransactionState = _ArmRigTransactionState.CREATED
         self.snapshot: Optional[Dict[str, Any]] = None
         self.created_controller_objects: List[
@@ -2070,12 +2823,23 @@ class _ArmRigTransactionContext:
         self.cleanup_error: Optional[str] = None
         self.rollback_only: bool = False
         self.rollback_only_reason: Optional[str] = None
+        self.failure_class: Optional[str] = None
+        self.isolation_record: Optional[Dict[str, Any]] = None
+        self.pre_write_integrity_compromised: bool = False
+        self.pre_write_integrity_reasons: List[str] = []
         self.tx_id: str = uuid.uuid4().hex[:8]
 
     @property
     def committed(self) -> bool:
         """Backward-compatibility property reflecting logical commit status."""
         return self.state in (_ArmRigTransactionState.COMMITTED, _ArmRigTransactionState.CLEANUP_PENDING)
+
+    def mark_pre_write_evidence_insufficient(self, reason: str) -> None:
+        """Explicitly mark pre-write recovery evidence as insufficient before snapshot completion."""
+        self.pre_write_integrity_compromised = True
+        norm = str(reason).strip() if reason is not None else "Pre-write recovery evidence insufficient"
+        if norm not in self.pre_write_integrity_reasons:
+            self.pre_write_integrity_reasons.append(norm)
 
     def mark_rollback_only(self, reason: str) -> None:
         """Monotonically mark this transaction context as rollback-only preserving the first failure reason."""
@@ -2227,6 +2991,11 @@ class _ArmRigTransactionContext:
 
     def retry_cleanup(self) -> None:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
+        if self.state == _ArmRigTransactionState.FAILED:
+            raise RuntimeError(
+                f"Cannot execute retry_cleanup on FAILED transaction {self.tx_id}: "
+                "FAILED -> COMMITTED transition is strictly forbidden"
+            )
         cleanup_failures: List[str] = []
 
         # ------------------------------------------------------
@@ -2458,8 +3227,21 @@ def retry_pending_arm_rig_cleanup(tx_id: str) -> None:
     tx = _PENDING_ARM_RIG_CLEANUPS.get(tx_id)
 
     if tx is None:
+        for iso_rec in _ISOLATED_FAILED_ARMATURES.values():
+            if iso_rec.get("transaction_id") == tx_id:
+                raise RuntimeError(
+                    f"Cannot retry cleanup for FAILED transaction {tx_id}: "
+                    "FAILED transactions cannot be recovered via retry_pending_arm_rig_cleanup "
+                    "or transition FAILED -> COMMITTED"
+                )
         raise KeyError(
             f"Pending cleanup transaction not found: {tx_id}"
+        )
+
+    if tx.state == _ArmRigTransactionState.FAILED:
+        raise RuntimeError(
+            f"Transaction {tx_id} is in FAILED state; "
+            "FAILED -> COMMITTED transition is strictly forbidden"
         )
 
     tx.retry_cleanup()
@@ -2482,13 +3264,18 @@ def retry_pending_arm_rig_cleanup(tx_id: str) -> None:
 
 def _assert_arm_rig_cleanup_gate(
     arm: bpy.types.Object,
+    session_record: Optional[ArmatureSessionIdentityRecord] = None,
 ) -> None:
     """
     Reject new independent writes while the same Armature
     owns an unresolved committed cleanup transaction.
     """
 
-    arm_ptr = arm.as_pointer()
+    arm_ptr = _safe_object_pointer(
+        arm,
+        fallback=(session_record.registration_pointer if session_record is not None else 0),
+    )
+    session_id = session_record.registry_session_id if session_record is not None else None
 
     blocking_transactions = []
 
@@ -2503,7 +3290,9 @@ def _assert_arm_rig_cleanup_gate(
                 f"state {tx.state}"
             )
 
-        if tx.arm_ptr == arm_ptr:
+        if (arm_ptr and tx.arm_ptr == arm_ptr) or (
+            session_id is not None and getattr(tx, "session_id", None) == session_id
+        ):
             blocking_transactions.append(tx_id)
 
     if blocking_transactions:
@@ -2514,6 +3303,546 @@ def _assert_arm_rig_cleanup_gate(
         )
 
 
+def _assert_arm_rig_failed_isolation_gate(
+    arm: bpy.types.Object,
+    session_record: ArmatureSessionIdentityRecord,
+) -> None:
+    """
+    Reject new independent writes while the same Armature session identity
+    is isolated in _ISOLATED_FAILED_ARMATURES (FAILED-B / FAILED-C / FAILED-D).
+    """
+    session_id = session_record.registry_session_id
+    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
+    if iso_rec is not None or session_record.isolation_state != _ArmatureIsolationState.NONE:
+        failure_class = (
+            iso_rec.get("failure_class")
+            if iso_rec is not None
+            else (
+                _FailedTransactionClass.FAILED_D.value
+                if session_record.isolation_state in (
+                    _ArmatureIsolationState.TOMBSTONED_FAILED_D,
+                    _ArmatureIsolationState.ARCHIVED_RETIRED,
+                )
+                else session_record.isolation_state.value
+            )
+        )
+        tx_id = iso_rec.get("transaction_id", "<unknown>") if iso_rec is not None else "<unknown>"
+        iso_state = (
+            iso_rec.get("isolation_state")
+            if iso_rec is not None
+            else session_record.isolation_state.value
+        )
+        raise RuntimeError(
+            "Arm IK write blocked: Armature session is isolated due to prior FAILED transaction "
+            f"(failure_class={failure_class}, isolation_state={iso_state}, "
+            f"transaction_id={tx_id}, registry_session_id={session_id})"
+        )
+
+
+def query_admission_gate_status(
+    arm: Optional[bpy.types.Object] = None,
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Layer 2: Read-only query of unified admission gate status for an Armature or session_id."""
+    _sweep_dead_managed_armature_identities()
+
+    session_rec: Optional[ArmatureSessionIdentityRecord] = None
+    if session_id is not None:
+        session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
+    elif arm is not None:
+        for rec in _MANAGED_ARMATURE_IDENTITIES.values():
+            if rec.original_blender_ref is arm:
+                session_rec = rec
+                break
+            if rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED:
+                ver = _verify_armature_session_identity_record(rec, candidate_arm=arm)
+                if ver["is_valid"]:
+                    session_rec = rec
+                    break
+
+    resolved_session_id = session_rec.registry_session_id if session_rec is not None else session_id
+    arm_ptr = _safe_object_pointer(
+        arm,
+        fallback=(session_rec.registration_pointer if session_rec is not None else 0),
+    )
+
+    pending_cleanup_txs = [
+        tx_id
+        for tx_id, tx in _PENDING_ARM_RIG_CLEANUPS.items()
+        if (arm_ptr and tx.arm_ptr == arm_ptr)
+        or (resolved_session_id is not None and getattr(tx, "session_id", None) == resolved_session_id)
+    ]
+    iso_rec = _ISOLATED_FAILED_ARMATURES.get(resolved_session_id) if resolved_session_id else None
+    archived_rec = _ARCHIVED_FAILED_D_TOMBSTONES.get(resolved_session_id) if resolved_session_id else None
+
+    id_check = (
+        _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+        if session_rec is not None
+        else {"is_valid": False, "reasons": ["Session record not registered"]}
+    )
+
+    cleanup_blocked = len(pending_cleanup_txs) > 0
+    failed_isolated = bool(
+        iso_rec is not None
+        or (
+            session_rec is not None
+            and session_rec.isolation_state != _ArmatureIsolationState.NONE
+        )
+    )
+    identity_valid = bool(id_check["is_valid"])
+
+    return {
+        "registry_session_id": resolved_session_id,
+        "cleanup_pending_blocked": cleanup_blocked,
+        "pending_cleanup_transaction_ids": sorted(pending_cleanup_txs),
+        "failed_isolation_blocked": failed_isolated,
+        "failure_class": (
+            iso_rec.get("failure_class")
+            if iso_rec is not None
+            else (archived_rec.get("failure_class") if archived_rec is not None else None)
+        ),
+        "isolation_state": (
+            session_rec.isolation_state.value
+            if session_rec is not None
+            else None
+        ),
+        "liveness_status": (
+            session_rec.liveness_status.value
+            if session_rec is not None
+            else None
+        ),
+        "identity_valid": identity_valid,
+        "identity_reasons": id_check.get("reasons", []),
+        "can_admit": (not cleanup_blocked and not failed_isolated and identity_valid),
+    }
+
+
+def verify_armature_deisolation_evidence(
+    arm: Optional[bpy.types.Object] = None,
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Layer 5: Read-only verification of recovery evidence before de-isolating an Armature (Section 8.2)."""
+    _sweep_dead_managed_armature_identities()
+
+    session_rec: Optional[ArmatureSessionIdentityRecord] = None
+    if session_id is not None:
+        session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
+    elif arm is not None:
+        for rec in _MANAGED_ARMATURE_IDENTITIES.values():
+            if rec.original_blender_ref is arm:
+                session_rec = rec
+                break
+            if rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED:
+                ver = _verify_armature_session_identity_record(rec, candidate_arm=arm)
+                if ver["is_valid"]:
+                    session_rec = rec
+                    break
+
+    resolved_session_id = session_rec.registry_session_id if session_rec is not None else session_id
+    iso_rec = _ISOLATED_FAILED_ARMATURES.get(resolved_session_id) if resolved_session_id else None
+    archived_rec = _ARCHIVED_FAILED_D_TOMBSTONES.get(resolved_session_id) if resolved_session_id else None
+
+    if session_rec is None or (iso_rec is None and archived_rec is None):
+        return {
+            "can_deisolate": False,
+            "status": "NOT_ISOLATED",
+            "case": "NONE",
+            "registry_session_id": resolved_session_id,
+            "failure_class": None,
+            "isolation_state": (session_rec.isolation_state.value if session_rec is not None else None),
+            "reasons": ["Armature session is not present in _ISOLATED_FAILED_ARMATURES"],
+        }
+
+    if archived_rec is not None or session_rec.isolation_state == _ArmatureIsolationState.ARCHIVED_RETIRED:
+        return {
+            "can_deisolate": False,
+            "status": "REJECTED_ARCHIVED_TOMBSTONE",
+            "case": "CASE_3_DEAD_TOMBSTONE",
+            "registry_session_id": resolved_session_id,
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.ARCHIVED_RETIRED.value,
+            "reasons": ["FAILED-D tombstone is already ARCHIVED_RETIRED and cannot return to active status"],
+        }
+
+    failure_class = iso_rec.get("failure_class")
+    target_arm = arm if arm is not None else session_rec.original_blender_ref
+    id_ver = _verify_armature_session_identity_record(session_rec, candidate_arm=target_arm)
+
+    # Case 3: FAILED-D or dead Armature tombstone
+    if (
+        failure_class == _FailedTransactionClass.FAILED_D.value
+        or session_rec.isolation_state == _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        or session_rec.liveness_status == _ArmatureLivenessStatus.INVALIDATED_DEAD
+    ):
+        reasons = [
+            "FAILED-D dead Armature tombstone cannot be restored to active status; "
+            "use retire_dead_armature_tombstone after verifying residual resources"
+        ]
+        if not id_ver["is_valid"]:
+            reasons.extend(id_ver["reasons"])
+        return {
+            "can_deisolate": False,
+            "status": "REJECTED_DEAD_ARMATURE_TOMBSTONE",
+            "case": "CASE_3_DEAD_TOMBSTONE",
+            "registry_session_id": resolved_session_id,
+            "failure_class": failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "reasons": reasons,
+        }
+
+    # Case 2: No trusted pre-transaction snapshot available
+    snapshot = iso_rec.get("snapshot_reference")
+    snapshot_trusted = bool(iso_rec.get("snapshot_trusted", False) and snapshot is not None)
+    if not snapshot_trusted:
+        missing_reasons = list(
+            iso_rec.get("missing_evidence_reasons")
+            or ["Trusted pre-transaction snapshot is missing; recovery evidence is insufficient"]
+        )
+        return {
+            "can_deisolate": False,
+            "status": "RECOVERY_EVIDENCE_INSUFFICIENT",
+            "case": "CASE_2_NO_TRUSTED_SNAPSHOT",
+            "registry_session_id": resolved_session_id,
+            "failure_class": failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "reasons": missing_reasons,
+        }
+
+    # Case 1: Trusted snapshot exists -> verify all 8 mandatory conditions simultaneously
+    reasons: List[str] = []
+
+    # Condition 1: 7-condition ArmatureSessionIdentityRecord verification
+    if not id_ver["is_valid"]:
+        reasons.extend(id_ver["reasons"])
+
+    # Condition 7 (checked before snapshot restore call because _verify_arm_rig_state_restored also checks stack):
+    # _ACTIVE_TRANSACTION_STACK is empty
+    if len(_ACTIVE_TRANSACTION_STACK) != 0:
+        reasons.append(
+            f"Active transaction stack is not empty (contains {len(_ACTIVE_TRANSACTION_STACK)} active transaction(s))"
+        )
+
+    # Condition 2: Current Armature, Controllers, PoseBones, Constraints, and Collections match snapshot 100%
+    if id_ver["is_valid"] and target_arm is not None:
+        try:
+            _verify_arm_rig_state_restored(target_arm, snapshot, active_tx=None)
+        except BaseException as ver_exc:
+            reasons.append(f"Snapshot state verification failed: {ver_exc}")
+
+    # Condition 3: No transaction-created Controllers remain in bpy.data.objects by identity
+    for ctrl_rec in iso_rec.get("created_controller_objects", []):
+        c_ref = ctrl_rec.get("obj_ref")
+        c_ptr = ctrl_rec.get("obj_ptr")
+        c_name = ctrl_rec.get("created_name", "<unknown>")
+        if c_ptr is not None and _find_live_object_by_identity(c_ref, c_ptr) is not None:
+            reasons.append(f"Transaction-created controller '{c_name}' (ptr={c_ptr}) still exists in bpy.data.objects")
+
+    # Condition 4: No transaction-created Constraints remain on any PoseBone by identity
+    if id_ver["is_valid"] and target_arm is not None and getattr(target_arm, "pose", None) is not None:
+        for con_rec in iso_rec.get("created_constraints", []):
+            b_name = con_rec.get("bone_name")
+            con_ptr = con_rec.get("con_ptr")
+            con_name = con_rec.get("created_name", "<unknown>")
+            pbone = target_arm.pose.bones.get(b_name) if b_name else None
+            if pbone is not None and con_ptr is not None:
+                for live_con in pbone.constraints:
+                    try:
+                        if live_con.as_pointer() == con_ptr:
+                            reasons.append(
+                                f"Transaction-created constraint '{con_name}' (ptr={con_ptr}) still exists on bone '{b_name}'"
+                            )
+                            break
+                    except ReferenceError:
+                        continue
+
+    # Condition 5: No transaction-created Collections remain in bpy.data.collections by identity
+    for col_rec in iso_rec.get("created_collections", []):
+        col_ref = col_rec.get("col_ref")
+        col_ptr = col_rec.get("col_ptr")
+        col_name = col_rec.get("created_name", "<unknown>")
+        if _find_live_collection_by_identity(col_ref, col_ptr) is not None:
+            reasons.append(
+                f"Transaction-created collection '{col_name}' (ptr={col_ptr}) still exists in bpy.data.collections"
+            )
+
+    # Condition 6: Relationship operation log contains no unverified RECOVERY_UNCERTAIN residual relationships
+    for op_rec in iso_rec.get("prepared_relationship_mutations", []):
+        op_id = op_rec.get("operation_id", "<unknown>")
+        op_state = op_rec.get("operation_state")
+        if op_state == _RelationshipOperationState.RECOVERY_UNCERTAIN:
+            reasons.append(
+                f"Relationship operation '{op_id}' remains in unverified RECOVERY_UNCERTAIN state"
+            )
+        elif op_state not in (
+            _RelationshipOperationState.NO_EFFECT,
+            _RelationshipOperationState.REVERTED,
+        ):
+            reasons.append(
+                f"Relationship operation '{op_id}' is in non-terminal rollback state '{op_state}'"
+            )
+
+    # Condition 8: No unresolved CLEANUP_PENDING records for this Armature
+    pending_cleanups = [
+        c_tx_id
+        for c_tx_id, c_tx in _PENDING_ARM_RIG_CLEANUPS.items()
+        if c_tx.arm_ptr == session_rec.registration_pointer
+        or getattr(c_tx, "session_id", None) == resolved_session_id
+    ]
+    if pending_cleanups:
+        reasons.append(
+            f"Unresolved CLEANUP_PENDING transaction(s) exist for this Armature: {sorted(pending_cleanups)}"
+        )
+
+    can_deisolate = len(reasons) == 0
+    return {
+        "can_deisolate": can_deisolate,
+        "status": "RECOVERY_VERIFIED" if can_deisolate else "RECOVERY_VERIFICATION_FAILED",
+        "case": "CASE_1_SNAPSHOT_VERIFIED",
+        "registry_session_id": resolved_session_id,
+        "transaction_id": iso_rec.get("transaction_id"),
+        "failure_class": failure_class,
+        "isolation_state": session_rec.isolation_state.value,
+        "reasons": reasons,
+    }
+
+
+def _verify_dead_armature_tombstone_retirement_evidence(session_id: str) -> Dict[str, Any]:
+    """Layer 5: Read-only verification of dead Armature tombstone retirement conditions (Section 8.2 Case 3)."""
+    _sweep_dead_managed_armature_identities()
+
+    session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
+    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
+
+    if session_rec is None or iso_rec is None:
+        return {
+            "can_retire": False,
+            "status": "TOMBSTONE_NOT_FOUND",
+            "registry_session_id": session_id,
+            "reasons": [f"Active FAILED-D tombstone for session '{session_id}' not found"],
+        }
+
+    reasons: List[str] = []
+
+    if (
+        iso_rec.get("failure_class") != _FailedTransactionClass.FAILED_D.value
+        or session_rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D
+    ):
+        reasons.append(
+            f"Session '{session_id}' is not a FAILED-D tombstone "
+            f"(failure_class={iso_rec.get('failure_class')}, isolation_state={session_rec.isolation_state})"
+        )
+
+    # 1. Confirm original Armature is genuinely absent from live Blender objects
+    # (Never mistake a same-name replacement Armature for the original)
+    id_ver = _verify_armature_session_identity_record(session_rec, candidate_arm=None)
+    if id_ver["is_valid"] or session_rec.in_live_blender_collection:
+        reasons.append("Original Armature is still alive in bpy.data.objects; cannot retire as dead tombstone")
+
+    # 2. Confirm no transaction-created objects or collections from the failed transaction remain in bpy.data
+    for ctrl_rec in iso_rec.get("created_controller_objects", []):
+        c_ref = ctrl_rec.get("obj_ref")
+        c_ptr = ctrl_rec.get("obj_ptr")
+        c_name = ctrl_rec.get("created_name", "<unknown>")
+        if c_ptr is not None and _find_live_object_by_identity(c_ref, c_ptr) is not None:
+            reasons.append(
+                f"Residual transaction-created controller '{c_name}' (ptr={c_ptr}) still exists in bpy.data.objects"
+            )
+
+    for col_rec in iso_rec.get("created_collections", []):
+        col_ref = col_rec.get("col_ref")
+        col_ptr = col_rec.get("col_ptr")
+        col_name = col_rec.get("created_name", "<unknown>")
+        if _find_live_collection_by_identity(col_ref, col_ptr) is not None:
+            reasons.append(
+                f"Residual transaction-created collection '{col_name}' (ptr={col_ptr}) still exists in bpy.data.collections"
+            )
+
+    # 3. Confirm no unresolved CLEANUP_PENDING records remain for this session
+    pending_cleanups = [
+        c_tx_id
+        for c_tx_id, c_tx in _PENDING_ARM_RIG_CLEANUPS.items()
+        if getattr(c_tx, "session_id", None) == session_id
+        or c_tx.arm_ptr == session_rec.registration_pointer
+    ]
+    if pending_cleanups:
+        reasons.append(
+            f"Unresolved CLEANUP_PENDING transaction(s) remain for dead Armature session: {sorted(pending_cleanups)}"
+        )
+
+    # 4. Confirm _ACTIVE_TRANSACTION_STACK is empty
+    if len(_ACTIVE_TRANSACTION_STACK) != 0:
+        reasons.append("Active transaction stack is not empty")
+
+    can_retire = len(reasons) == 0
+    return {
+        "can_retire": can_retire,
+        "status": "TOMBSTONE_RETIREMENT_VERIFIED" if can_retire else "TOMBSTONE_RETIREMENT_REJECTED",
+        "registry_session_id": session_id,
+        "transaction_id": iso_rec.get("transaction_id"),
+        "failure_class": iso_rec.get("failure_class"),
+        "isolation_state": session_rec.isolation_state.value,
+        "reasons": reasons,
+    }
+
+
+def request_armature_deisolation(
+    arm: Optional[bpy.types.Object],
+    reason: str,
+    session_id: Optional[str] = None,
+    raise_on_reject: bool = False,
+) -> Dict[str, Any]:
+    """Layer 1 Coordinator: Evaluate Layer 5 evidence and authorize or reject de-isolation (Section 8.1/8.3)."""
+    evidence = verify_armature_deisolation_evidence(arm=arm, session_id=session_id)
+    resolved_session_id = evidence.get("registry_session_id") or session_id
+    iso_rec = _ISOLATED_FAILED_ARMATURES.get(resolved_session_id) if resolved_session_id else None
+    tx_id = (
+        evidence.get("transaction_id")
+        or (iso_rec.get("transaction_id") if iso_rec is not None else None)
+    )
+    failure_class = evidence.get("failure_class")
+    previous_state = evidence.get("isolation_state")
+
+    if evidence.get("can_deisolate", False) and resolved_session_id is not None:
+        transition = _clear_or_retire_failure_isolation_by_coordinator(
+            session_id=resolved_session_id,
+            action="CLEAR_TO_NONE",
+            reason=reason,
+            verification_evidence=evidence,
+        )
+        audit_entry = {
+            "audit_id": f"deiso_{uuid.uuid4().hex[:8]}",
+            "operation": "REQUEST_DEISOLATION",
+            "decision": "APPROVED",
+            "registry_session_id": resolved_session_id,
+            "transaction_id": tx_id,
+            "failure_class": failure_class,
+            "previous_isolation_state": previous_state,
+            "new_isolation_state": transition["new_isolation_state"],
+            "reason": reason,
+            "verification_status": evidence.get("status"),
+            "verification_reasons": list(evidence.get("reasons", [])),
+        }
+        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        return {
+            "approved": True,
+            "action": "DEISOLATED",
+            "registry_session_id": resolved_session_id,
+            "transaction_id": tx_id,
+            "failure_class": failure_class,
+            "isolation_state": transition["new_isolation_state"],
+            "evidence": evidence,
+            "audit_entry": audit_entry,
+        }
+
+    audit_entry = {
+        "audit_id": f"deiso_{uuid.uuid4().hex[:8]}",
+        "operation": "REQUEST_DEISOLATION",
+        "decision": "REJECTED",
+        "registry_session_id": resolved_session_id,
+        "transaction_id": tx_id,
+        "failure_class": failure_class,
+        "previous_isolation_state": previous_state,
+        "new_isolation_state": previous_state,
+        "reason": reason,
+        "verification_status": evidence.get("status"),
+        "verification_reasons": list(evidence.get("reasons", [])),
+    }
+    _DEISOLATION_AUDIT_LOG.append(audit_entry)
+
+    if raise_on_reject:
+        raise RuntimeError(
+            f"Armature de-isolation rejected for session {resolved_session_id} "
+            f"(status={evidence.get('status')}): {'; '.join(evidence.get('reasons', []))}"
+        )
+
+    return {
+        "approved": False,
+        "action": "REJECTED",
+        "registry_session_id": resolved_session_id,
+        "transaction_id": tx_id,
+        "failure_class": failure_class,
+        "isolation_state": previous_state,
+        "evidence": evidence,
+        "audit_entry": audit_entry,
+    }
+
+
+def retire_dead_armature_tombstone(
+    session_id: str,
+    reason: str,
+    raise_on_reject: bool = False,
+) -> Dict[str, Any]:
+    """Layer 1 Coordinator: Verify dead Armature tombstone retirement evidence and transition to ARCHIVED_RETIRED."""
+    evidence = _verify_dead_armature_tombstone_retirement_evidence(session_id)
+    previous_state = evidence.get("isolation_state")
+    tx_id = evidence.get("transaction_id")
+    failure_class = evidence.get("failure_class")
+
+    if evidence.get("can_retire", False):
+        transition = _clear_or_retire_failure_isolation_by_coordinator(
+            session_id=session_id,
+            action="ARCHIVE_TOMBSTONE",
+            reason=reason,
+            verification_evidence=evidence,
+        )
+        audit_entry = {
+            "audit_id": f"retire_{uuid.uuid4().hex[:8]}",
+            "operation": "RETIRE_DEAD_TOMBSTONE",
+            "decision": "APPROVED",
+            "registry_session_id": session_id,
+            "transaction_id": tx_id,
+            "failure_class": failure_class,
+            "previous_isolation_state": previous_state,
+            "new_isolation_state": transition["new_isolation_state"],
+            "reason": reason,
+            "verification_status": evidence.get("status"),
+            "verification_reasons": list(evidence.get("reasons", [])),
+        }
+        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        return {
+            "approved": True,
+            "action": "ARCHIVED_RETIRED",
+            "registry_session_id": session_id,
+            "transaction_id": tx_id,
+            "failure_class": failure_class,
+            "isolation_state": transition["new_isolation_state"],
+            "evidence": evidence,
+            "audit_entry": audit_entry,
+        }
+
+    audit_entry = {
+        "audit_id": f"retire_{uuid.uuid4().hex[:8]}",
+        "operation": "RETIRE_DEAD_TOMBSTONE",
+        "decision": "REJECTED",
+        "registry_session_id": session_id,
+        "transaction_id": tx_id,
+        "failure_class": failure_class,
+        "previous_isolation_state": previous_state,
+        "new_isolation_state": previous_state,
+        "reason": reason,
+        "verification_status": evidence.get("status"),
+        "verification_reasons": list(evidence.get("reasons", [])),
+    }
+    _DEISOLATION_AUDIT_LOG.append(audit_entry)
+
+    if raise_on_reject:
+        raise RuntimeError(
+            f"Dead Armature tombstone retirement rejected for session {session_id} "
+            f"(status={evidence.get('status')}): {'; '.join(evidence.get('reasons', []))}"
+        )
+
+    return {
+        "approved": False,
+        "action": "REJECTED",
+        "registry_session_id": session_id,
+        "transaction_id": tx_id,
+        "failure_class": failure_class,
+        "isolation_state": previous_state,
+        "evidence": evidence,
+        "audit_entry": audit_entry,
+    }
+
+
 @contextmanager
 def _arm_rig_transaction(arm: bpy.types.Object):
     """Context manager executing Arm IK mutations under atomic transaction protection."""
@@ -2521,9 +3850,11 @@ def _arm_rig_transaction(arm: bpy.types.Object):
     if _ACTIVE_TRANSACTION_STACK:
         outer_tx = _ACTIVE_TRANSACTION_STACK[-1]
         if outer_tx.arm != arm:
+            outer_name = _safe_object_name(outer_tx.arm)
+            req_name = _safe_object_name(arm)
             raise RuntimeError(
                 f"Cross-armature nested transaction rejected: active transaction owns armature "
-                f"'{outer_tx.arm.name}', but requested transaction is for armature '{arm.name}'."
+                f"'{outer_name}', but requested transaction is for armature '{req_name}'."
             )
         if outer_tx.state != _ArmRigTransactionState.ACTIVE:
             raise RuntimeError(
@@ -2543,11 +3874,41 @@ def _arm_rig_transaction(arm: bpy.types.Object):
             raise
         return
 
-    # Reject a new outermost transaction when previous
-    # committed cleanup is unresolved on this Armature.
-    _assert_arm_rig_cleanup_gate(arm)
+    # -----------------------------------------------------------------
+    # Unified Admission Gate (Section 7):
+    # 1. Cleanup Pending Gate -> 2. FAILED Isolation Gate -> 3. Armature Identity Check
+    # -----------------------------------------------------------------
+    session_rec = ensure_armature_session_identity(arm)
 
-    tx = _ArmRigTransactionContext(arm)
+    # Gate 1: Reject a new outermost transaction when previous committed cleanup is unresolved
+    _assert_arm_rig_cleanup_gate(arm, session_rec)
+
+    # Gate 2: Reject a new outermost transaction when Armature session is isolated due to FAILED
+    _assert_arm_rig_failed_isolation_gate(arm, session_rec)
+
+    # Gate 3: Verify 7-condition Armature Session Identity
+    admission_id_check = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+    if not admission_id_check["is_valid"]:
+        dead_tx = _ArmRigTransactionContext(arm, session_record=session_rec)
+        dead_tx.state = _ArmRigTransactionState.FAILED
+        _record_armature_failure_isolation_by_coordinator(
+            session_rec=session_rec,
+            tx=dead_tx,
+            failure_class=_FailedTransactionClass.FAILED_D,
+            primary_exception=RuntimeError("; ".join(admission_id_check["reasons"])),
+            evidence_status="ARMATURE_IDENTITY_INVALID_AT_ADMISSION",
+            missing_evidence_reasons=admission_id_check["reasons"],
+        )
+        raise RuntimeError(
+            "Arm IK write blocked: Armature session identity invalid at admission "
+            f"(failure_class=FAILED-D, transaction_id={dead_tx.tx_id}, "
+            f"registry_session_id={session_rec.registry_session_id}): "
+            + "; ".join(admission_id_check["reasons"])
+        )
+
+    pre_snap_fp = _capture_pre_snapshot_structural_fingerprint(arm)
+    tx = _ArmRigTransactionContext(arm, session_record=session_rec)
+    session_rec.lifecycle_stage = "ACTIVE_TRANSACTION"
     _ACTIVE_TRANSACTION_STACK.append(tx)
 
     try:
@@ -2572,26 +3933,81 @@ def _arm_rig_transaction(arm: bpy.types.Object):
         _depsgraph_update()
         _trigger_fault_injection("during_commit_prepare", {"tx": tx})
 
+        # Verify Armature identity remained valid before Logical Commit Confirmation
+        commit_id_check = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+        if not commit_id_check["is_valid"]:
+            raise RuntimeError(
+                "Armature session identity invalidated during COMMITTING: "
+                + "; ".join(commit_id_check["reasons"])
+            )
+
         # -------------------------------------------------------------
         # Phase 2: Logical Commit Confirmation
         # -------------------------------------------------------------
         tx.state = _ArmRigTransactionState.COMMITTED
+        session_rec.lifecycle_stage = "NORMAL_TERMINAL"
 
     except BaseException as orig_exc:
-        # If failure occurred before Phase 2 (Logical Commit), execute full rollback!
+        # If failure occurred before Phase 2 (Logical Commit), execute classification & rollback!
         if tx.state != _ArmRigTransactionState.COMMITTED:
-            tx.state = _ArmRigTransactionState.ROLLING_BACK
-            rollback_err = None
             if tx.snapshot is not None:
-                try:
-                    _rollback_arm_rig_state(arm, tx.snapshot, tx)
-                    _depsgraph_update()
-                    _trigger_fault_injection("during_rollback_verification", {"arm": arm})
-                    _verify_arm_rig_state_restored(arm, tx.snapshot, active_tx=tx)
-                    tx.state = _ArmRigTransactionState.ROLLED_BACK
-                except BaseException as rb_exc:
+                tx.state = _ArmRigTransactionState.ROLLING_BACK
+                rollback_err: Optional[BaseException] = None
+                pre_rb_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+
+                if not pre_rb_id["is_valid"]:
+                    # FAILED-D: Armature destroyed or identity invalidated during ACTIVE/COMMITTING.
+                    # Never execute rollback on a dead or substitute Armature!
                     tx.state = _ArmRigTransactionState.FAILED
-                    rollback_err = rb_exc
+                    rollback_err = RuntimeError(
+                        "Armature session identity invalidated before rollback "
+                        f"(registry_session_id={session_rec.registry_session_id}): "
+                        + "; ".join(pre_rb_id["reasons"])
+                    )
+                    _record_armature_failure_isolation_by_coordinator(
+                        session_rec=session_rec,
+                        tx=tx,
+                        failure_class=_FailedTransactionClass.FAILED_D,
+                        primary_exception=orig_exc,
+                        secondary_exception=rollback_err,
+                        evidence_status="ARMATURE_DESTROYED_DURING_TRANSACTION",
+                        missing_evidence_reasons=pre_rb_id["reasons"],
+                    )
+                else:
+                    rollback_execution_completed = False
+                    try:
+                        _rollback_arm_rig_state(arm, tx.snapshot, tx)
+                        _depsgraph_update()
+                        rollback_execution_completed = True
+                        _trigger_fault_injection("during_rollback_verification", {"arm": arm, "tx": tx})
+                        _verify_arm_rig_state_restored(arm, tx.snapshot, active_tx=tx)
+                        tx.state = _ArmRigTransactionState.ROLLED_BACK
+                        session_rec.lifecycle_stage = "NORMAL_TERMINAL"
+                    except BaseException as rb_exc:
+                        tx.state = _ArmRigTransactionState.FAILED
+                        rollback_err = rb_exc
+                        post_rb_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+                        if not post_rb_id["is_valid"]:
+                            f_class = _FailedTransactionClass.FAILED_D
+                            ev_status = "ARMATURE_DESTROYED_DURING_ROLLBACK"
+                            ev_reasons = post_rb_id["reasons"]
+                        elif not rollback_execution_completed:
+                            f_class = _FailedTransactionClass.FAILED_B
+                            ev_status = "SNAPSHOT_AVAILABLE"
+                            ev_reasons = []
+                        else:
+                            f_class = _FailedTransactionClass.FAILED_C
+                            ev_status = "SNAPSHOT_AVAILABLE"
+                            ev_reasons = []
+                        _record_armature_failure_isolation_by_coordinator(
+                            session_rec=session_rec,
+                            tx=tx,
+                            failure_class=f_class,
+                            primary_exception=orig_exc,
+                            secondary_exception=rb_exc,
+                            evidence_status=ev_status,
+                            missing_evidence_reasons=ev_reasons,
+                        )
 
                 if rollback_err is not None:
                     raise RuntimeError(
@@ -2601,8 +4017,57 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                 else:
                     raise
             else:
+                # Pre-ACTIVE failure (during CREATED or SNAPSHOTTING before snapshot completion)
                 tx.state = _ArmRigTransactionState.FAILED
-                raise
+                pre_active_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+                if not pre_active_id["is_valid"]:
+                    _record_armature_failure_isolation_by_coordinator(
+                        session_rec=session_rec,
+                        tx=tx,
+                        failure_class=_FailedTransactionClass.FAILED_D,
+                        primary_exception=orig_exc,
+                        evidence_status="ARMATURE_DESTROYED_DURING_SNAPSHOTTING",
+                        missing_evidence_reasons=pre_active_id["reasons"],
+                    )
+                    raise RuntimeError(
+                        f"Arm rig transaction failed during SNAPSHOTTING with {type(orig_exc).__name__}: {orig_exc}, "
+                        f"AND Armature session identity was invalidated (FAILED-D, "
+                        f"registry_session_id={session_rec.registry_session_id})"
+                    ) from orig_exc
+
+                integrity_check = _verify_pre_write_zero_mutation_and_integrity(
+                    arm=arm,
+                    pre_fp=pre_snap_fp,
+                    tx=tx,
+                )
+                if integrity_check["is_verified"]:
+                    # FAILED-A: Pre-write abort with 100% verified zero mutation and intact structure.
+                    # Do NOT isolate the healthy Armature!
+                    _record_armature_failure_isolation_by_coordinator(
+                        session_rec=session_rec,
+                        tx=tx,
+                        failure_class=_FailedTransactionClass.FAILED_A,
+                        primary_exception=orig_exc,
+                        evidence_status="PRE_WRITE_ZERO_MUTATION_VERIFIED",
+                    )
+                    raise
+                else:
+                    # Insufficient evidence to prove zero mutation without a trusted snapshot ->
+                    # escalate and isolate as FAILED-C (Section 5.1 & Section 8.2 Case 2).
+                    _record_armature_failure_isolation_by_coordinator(
+                        session_rec=session_rec,
+                        tx=tx,
+                        failure_class=_FailedTransactionClass.FAILED_C,
+                        primary_exception=orig_exc,
+                        evidence_status="RECOVERY_EVIDENCE_INSUFFICIENT",
+                        missing_evidence_reasons=integrity_check["reasons"],
+                    )
+                    raise RuntimeError(
+                        f"Arm rig transaction failed before ACTIVE with {type(orig_exc).__name__}: {orig_exc}, "
+                        "AND pre-write zero-mutation verification failed without a trusted snapshot "
+                        f"(classified as FAILED-C, registry_session_id={session_rec.registry_session_id}): "
+                        + "; ".join(integrity_check["reasons"])
+                    ) from orig_exc
         else:
             raise
     finally:

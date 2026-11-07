@@ -1,0 +1,347 @@
+{
+  "task_id": "10-b-13",
+  "baseline_sha": "9158741d164c8c8085ed0d600238ee485e1ec6d4",
+  "changed_functions": [
+    "src/rig/arm_ik.py::_ArmatureLivenessStatus",
+    "src/rig/arm_ik.py::_ArmatureIsolationState",
+    "src/rig/arm_ik.py::_FailedTransactionClass",
+    "src/rig/arm_ik.py::ArmatureSessionIdentityRecord",
+    "src/rig/arm_ik.py::_safe_object_name",
+    "src/rig/arm_ik.py::_safe_object_pointer",
+    "src/rig/arm_ik.py::_verify_armature_session_identity_record",
+    "src/rig/arm_ik.py::_sweep_dead_managed_armature_identities",
+    "src/rig/arm_ik.py::ensure_armature_session_identity",
+    "src/rig/arm_ik.py::_record_armature_failure_isolation_by_coordinator",
+    "src/rig/arm_ik.py::_clear_or_retire_failure_isolation_by_coordinator",
+    "src/rig/arm_ik.py::_capture_pre_snapshot_structural_fingerprint",
+    "src/rig/arm_ik.py::_verify_pre_write_zero_mutation_and_integrity",
+    "src/rig/arm_ik.py::_snapshot_arm_rig_state",
+    "src/rig/arm_ik.py::_authorized_revert_relationship_record",
+    "src/rig/arm_ik.py::_rollback_arm_rig_state",
+    "src/rig/arm_ik.py::_ArmRigTransactionContext.__init__",
+    "src/rig/arm_ik.py::_ArmRigTransactionContext.mark_pre_write_evidence_insufficient",
+    "src/rig/arm_ik.py::_ArmRigTransactionContext.retry_cleanup",
+    "src/rig/arm_ik.py::retry_pending_arm_rig_cleanup",
+    "src/rig/arm_ik.py::_assert_arm_rig_cleanup_gate",
+    "src/rig/arm_ik.py::_assert_arm_rig_failed_isolation_gate",
+    "src/rig/arm_ik.py::query_admission_gate_status",
+    "src/rig/arm_ik.py::verify_armature_deisolation_evidence",
+    "src/rig/arm_ik.py::_verify_dead_armature_tombstone_retirement_evidence",
+    "src/rig/arm_ik.py::request_armature_deisolation",
+    "src/rig/arm_ik.py::retire_dead_armature_tombstone",
+    "src/rig/arm_ik.py::_arm_rig_transaction"
+  ],
+  "approved_architecture_contracts": [
+    "ARCHITECTURE_SYNC.md::Section 10.2 (Six-Layer Architecture: Layer 1 Coordinator, Layer 2 Session Identity & Registries, Layer 5 State Snapshot/Rollback/Verification)",
+    "ARCHITECTURE_SYNC.md::Section 10.5 (Nine-State Transaction Machine & Seven-State Relationship Log Machine)",
+    "ARCHITECTURE_SYNC.md::Section 10.6.1 (FAILED Four-Class Taxonomy: FAILED-A, FAILED-B, FAILED-C, FAILED-D)",
+    "ARCHITECTURE_SYNC.md::Section 10.6.2 (ArmatureSessionIdentityRecord 8-Field Contract & 7-Condition Verification)",
+    "ARCHITECTURE_SYNC.md::Section 10.6.3 (Unified Admission Gate: Cleanup Pending Gate -> FAILED Isolation Gate -> Armature Identity -> Snapshot -> ACTIVE)",
+    "ARCHITECTURE_SYNC.md::Section 10.6.4 (Trusted De-Isolation Verification Cases 1/2/3, Tombstone Retirement & _DEISOLATION_AUDIT_LOG)",
+    "ARCHITECTURE_SYNC.md::Section 10.7 (CONTRACT-05 Unified Admission Gate & CONTRACT-06 FAILED Classification & Isolation)",
+    "ARCHITECTURE_SYNC.md::Section 10.8 (Verification Coverage TEST-124 through TEST-136)"
+  ],
+  "failed_classification_cases": {
+    "FAILED-A": {
+      "trigger_stage": "CREATED or SNAPSHOTTING before ACTIVE",
+      "verification_requirement": "_verify_pre_write_zero_mutation_and_integrity == True",
+      "isolation_state": "NONE",
+      "isolated_in_registry": false,
+      "subsequent_write_admitted": true,
+      "verified_by": ["TEST-58", "TEST-74", "TEST-124"]
+    },
+    "FAILED-B": {
+      "trigger_stage": "ROLLING_BACK execution failure (_rollback_arm_rig_state or _depsgraph_update)",
+      "verification_requirement": "Armature session identity remains valid",
+      "isolation_state": "ISOLATED_FAILED_B",
+      "isolated_in_registry": true,
+      "subsequent_write_admitted": false,
+      "verified_by": ["TEST-70", "TEST-95", "TEST-96", "TEST-126", "TEST-128", "TEST-129", "TEST-131", "TEST-132", "TEST-134", "TEST-136"]
+    },
+    "FAILED-C": {
+      "trigger_stage": "Post-rollback verification failure (_verify_arm_rig_state_restored), relationship log RECOVERY_UNCERTAIN, or pre-ACTIVE abort with unverified zero-mutation / missing snapshot",
+      "verification_requirement": "Armature session identity remains valid",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "isolated_in_registry": true,
+      "subsequent_write_admitted": false,
+      "verified_by": ["TEST-52", "TEST-117", "TEST-125", "TEST-127", "TEST-131", "TEST-133", "TEST-136"]
+    },
+    "FAILED-D": {
+      "trigger_stage": "Armature object or Armature DataBlock destroyed / identity invalidated before or during transaction or rollback",
+      "verification_requirement": "_verify_armature_session_identity_record == False (skips rollback on dead or substitute object)",
+      "isolation_state": "TOMBSTONED_FAILED_D",
+      "isolated_in_registry": true,
+      "subsequent_write_admitted": false,
+      "verified_by": ["TEST-130", "TEST-135"]
+    }
+  },
+  "session_identity_evidence": {
+    "model_class": "ArmatureSessionIdentityRecord",
+    "required_fields": [
+      "registry_session_id",
+      "original_blender_ref",
+      "registration_pointer",
+      "original_data_pointer",
+      "liveness_status",
+      "in_live_blender_collection",
+      "isolation_state",
+      "tombstone_record"
+    ],
+    "seven_condition_checks": [
+      "c1_not_invalidated",
+      "c2_no_reference_error",
+      "c3_in_live_blender_collection",
+      "c4_is_armature_type",
+      "c5_same_blender_ref",
+      "c6_pointer_matches",
+      "c7_data_valid_and_pointer_matches"
+    ],
+    "rename_invariance_verified": true,
+    "pointer_reuse_and_same_name_substitution_rejection_verified": true
+  },
+  "isolation_gate_evidence": {
+    "gate_order": [
+      "1. Cleanup Pending Gate (_assert_arm_rig_cleanup_gate)",
+      "2. FAILED Isolation Gate (_assert_arm_rig_failed_isolation_gate)",
+      "3. Armature Session Identity Check (_verify_armature_session_identity_record)",
+      "4. SNAPSHOTTING (_snapshot_arm_rig_state)",
+      "5. ACTIVE"
+    ],
+    "rejects_before_snapshotting": true,
+    "error_includes_failure_class_tx_id_session_id": true,
+    "isolated_to_single_armature_session": true
+  },
+  "deisolation_evidence": {
+    "coordinator_entrypoint": "request_armature_deisolation",
+    "verifier_entrypoint": "verify_armature_deisolation_evidence",
+    "layer2_executor": "_clear_or_retire_failure_isolation_by_coordinator",
+    "case_1_snapshot_verified_8_conditions": true,
+    "case_2_no_trusted_snapshot_returns": "RECOVERY_EVIDENCE_INSUFFICIENT",
+    "case_3_dead_tombstone_returns": "REJECTED_DEAD_ARMATURE_TOMBSTONE",
+    "audit_log_registry": "_DEISOLATION_AUDIT_LOG"
+  },
+  "tombstone_evidence": {
+    "coordinator_entrypoint": "retire_dead_armature_tombstone",
+    "verifier_entrypoint": "_verify_dead_armature_tombstone_retirement_evidence",
+    "active_tombstone_state": "TOMBSTONED_FAILED_D",
+    "retired_tombstone_state": "ARCHIVED_RETIRED",
+    "archived_registry": "_ARCHIVED_FAILED_D_TOMBSTONES",
+    "cannot_return_to_active_status": true,
+    "requires_residual_resource_absence": true
+  },
+  "cleanup_failed_separation": {
+    "cleanup_pending_registry": "_PENDING_ARM_RIG_CLEANUPS",
+    "failed_isolation_registry": "_ISOLATED_FAILED_ARMATURES",
+    "retry_cleanup_rejects_failed_transactions": true,
+    "failed_to_committed_transition_forbidden": true,
+    "deisolation_does_not_clear_cleanup_pending": true,
+    "coexistence_independent_gate_resolution_verified": true
+  },
+  "tests_124_to_136": {
+    "TEST-124": {
+      "test_method": "test_124_failed_a_pre_write_snapshot_abort_verified_zero_mutation_no_isolation",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-A",
+      "isolation_state": "NONE",
+      "admission_result": "ADMITTED_AND_COMMITTED",
+      "recovery_result": "NO_ISOLATION_REQUIRED_PRE_WRITE_ZERO_MUTATION_VERIFIED"
+    },
+    "TEST-125": {
+      "test_method": "test_125_pre_write_abort_without_zero_mutation_proof_isolated_as_failed_c",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "recovery_result": "ISOLATED_WITH_RECOVERY_EVIDENCE_INSUFFICIENT"
+    },
+    "TEST-126": {
+      "test_method": "test_126_failed_b_rollback_execution_failure_records_isolation",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-B",
+      "isolation_state": "ISOLATED_FAILED_B",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "recovery_result": "ISOLATED_WITH_TRUSTED_SNAPSHOT"
+    },
+    "TEST-127": {
+      "test_method": "test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id_part_a_and_b",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "recovery_result": "PART_A_DEISOLATED_PART_B_ISOLATED_RECOVERY_UNCERTAIN"
+    },
+    "TEST-128": {
+      "test_method": "test_128_isolated_armature_renamed_still_rejected_before_snapshotting",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id_unchanged_across_rename",
+      "failure_class": "FAILED-B",
+      "isolation_state": "ISOLATED_FAILED_B",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING_ZERO_SNAPSHOT_CALLS",
+      "recovery_result": "REMAINS_ISOLATED_AFTER_OBJECT_AND_DATABLOCK_RENAME"
+    },
+    "TEST-129": {
+      "test_method": "test_129_other_healthy_armature_unaffected_by_isolated_armature",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id_arm_a_and_arm_b",
+      "registry_session_id": "distinct_uuid4_sessions_for_arm_a_and_arm_b",
+      "failure_class": "FAILED-B",
+      "isolation_state": "ARM_A_ISOLATED_FAILED_B_ARM_B_NONE",
+      "admission_result": "ARM_B_ADMITTED_AND_COMMITTED_ARM_A_REJECTED",
+      "recovery_result": "CROSS_ARMATURE_ISOLATION_INDEPENDENCE_VERIFIED"
+    },
+    "TEST-130": {
+      "test_method": "test_130_failed_d_armature_destroyed_during_active_records_tombstone_without_rollback",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id_tombstoned",
+      "failure_class": "FAILED-D",
+      "isolation_state": "TOMBSTONED_FAILED_D",
+      "admission_result": "ZERO_ROLLBACK_ON_DEAD_ARMATURE_NEW_SAME_NAME_ARMATURE_GETS_NEW_SESSION",
+      "recovery_result": "ACTIVE_TOMBSTONE_PRESERVED"
+    },
+    "TEST-131": {
+      "test_method": "test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id_b_and_c",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-B_AND_FAILED-C",
+      "isolation_state": "NONE",
+      "admission_result": "ADMITTED_AND_COMMITTED_AFTER_DEISOLATION",
+      "recovery_result": "APPROVED_AND_AUDITED_IN_DEISOLATION_AUDIT_LOG"
+    },
+    "TEST-132": {
+      "test_method": "test_132_incomplete_recovery_deisolation_rejected_with_audit_log",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-B",
+      "isolation_state": "ISOLATED_FAILED_B",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "recovery_result": "REJECTED_RECOVERY_VERIFICATION_FAILED_AND_AUDITED"
+    },
+    "TEST-133": {
+      "test_method": "test_133_missing_snapshot_deisolation_rejected_as_recovery_evidence_insufficient",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "recovery_result": "REJECTED_RECOVERY_EVIDENCE_INSUFFICIENT_AND_AUDITED"
+    },
+    "TEST-134": {
+      "test_method": "test_134_direct_isolation_dict_tampering_without_coordinator_verification_rejected",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-B",
+      "isolation_state": "ISOLATED_FAILED_B",
+      "admission_result": "REJECTED_EVEN_IF_DICT_ENTRY_POPPED_DIRECTLY",
+      "recovery_result": "LAYER_2_DIRECT_CALL_WITHOUT_EVIDENCE_REJECTED"
+    },
+    "TEST-135": {
+      "test_method": "test_135_failed_d_tombstone_cannot_return_to_active_and_retires_to_archived",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_id",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-D",
+      "isolation_state": "ARCHIVED_RETIRED",
+      "admission_result": "DEAD_SESSION_NEVER_REVIVED_REPLACEMENT_ARMATURE_USES_NEW_SESSION",
+      "recovery_result": "REJECTED_DEISOLATION_THEN_APPROVED_TOMBSTONE_RETIREMENT_AFTER_RESIDUAL_CLEANUP"
+    },
+    "TEST-136": {
+      "test_method": "test_136_cleanup_pending_and_failed_isolation_strictly_separated",
+      "status": "PASS",
+      "transaction_id": "verified_dynamic_tx_ids",
+      "registry_session_id": "verified_uuid4_session_id",
+      "failure_class": "FAILED-B_AND_FAILED-C_WITH_CLEANUP_PENDING",
+      "isolation_state": "NONE",
+      "admission_result": "BLOCKED_BY_BOTH_GATES_UNTIL_BOTH_INDEPENDENTLY_RESOLVED",
+      "recovery_result": "RETRY_CLEANUP_RESOLVED_CLEANUP_PENDING_DEISOLATION_RESOLVED_FAILED_C"
+    }
+  },
+  "transaction_suite": {
+    "script": "tests/test_task10b_transaction_atomicity.py",
+    "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b -P tests/test_task10b_transaction_atomicity.py",
+    "total_tests": 106,
+    "passed": 106,
+    "failed": 0,
+    "exit_code": 0,
+    "duration_seconds": 7.928,
+    "status": "PASS"
+  },
+  "input_validation_suite": {
+    "script": "tests/test_task10b_input_validation.py",
+    "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b -P tests/test_task10b_input_validation.py",
+    "total_tests": 30,
+    "passed": 30,
+    "failed": 0,
+    "exit_code": 0,
+    "duration_seconds": 2.448,
+    "status": "PASS"
+  },
+  "task_10a_suite": {
+    "script": "tests/test_arm_ik_lifecycle_world_transform_contract.py",
+    "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b -P tests/test_arm_ik_lifecycle_world_transform_contract.py",
+    "total_tests": 30,
+    "passed": 30,
+    "failed": 0,
+    "exit_code": 0,
+    "duration_seconds": 4.259,
+    "status": "PASS"
+  },
+  "quick_regression": {
+    "tier": "quick",
+    "report_file": "docs/evidence/PKG5_10B_REVISION_13/test_report_quick.json",
+    "planned": 19,
+    "executed": 19,
+    "passed": 19,
+    "failed": 0,
+    "exit_code": 0,
+    "duration_seconds": 50.75,
+    "status": "PASS"
+  },
+  "physics_regression": {
+    "tier": "physics",
+    "report_file": "docs/evidence/PKG5_10B_REVISION_13/test_report_physics.json",
+    "planned": 27,
+    "executed": 27,
+    "passed": 27,
+    "failed": 0,
+    "exit_code": 0,
+    "duration_seconds": 107.57,
+    "status": "PASS"
+  },
+  "motion_regression": {
+    "tier": "motion",
+    "report_file": "docs/evidence/PKG5_10B_REVISION_13/test_report_motion.json",
+    "planned": 12,
+    "executed": 12,
+    "passed": 12,
+    "failed": 0,
+    "exit_code": 0,
+    "duration_seconds": 51.79,
+    "status": "PASS"
+  },
+  "full_regression": {
+    "tier": "full",
+    "report_file": "docs/evidence/PKG5_10B_REVISION_13/test_report_full.json",
+    "planned": 42,
+    "executed": 42,
+    "passed": 42,
+    "failed": 0,
+    "exit_code": 0,
+    "duration_seconds": 165.35,
+    "status": "PASS"
+  },
+  "unresolved_issues": []
+}

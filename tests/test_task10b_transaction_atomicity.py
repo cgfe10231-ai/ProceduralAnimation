@@ -76,14 +76,25 @@ from src.rig.arm_ik import (
     ARM_IK_TARGET_NAMES,
     ARM_POLE_TARGET_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
+    ArmatureSessionIdentityRecord,
     _ACTIVE_TRANSACTION_STACK,
+    _ARCHIVED_FAILED_D_TOMBSTONES,
+    _ArmatureIsolationState,
+    _ArmatureLivenessStatus,
     _ArmRigTransactionContext,
     _ArmRigTransactionState,
+    _DEISOLATION_AUDIT_LOG,
+    _FAILED_A_AUDIT_RECORDS,
+    _FailedTransactionClass,
+    _ISOLATED_FAILED_ARMATURES,
+    _MANAGED_ARMATURE_IDENTITIES,
     _PENDING_ARM_RIG_CLEANUPS,
     _RelationshipOperationState,
     _arm_rig_transaction,
     _assert_arm_rig_cleanup_gate,
+    _assert_arm_rig_failed_isolation_gate,
     _authorized_link_object_to_collection,
+    _clear_or_retire_failure_isolation_by_coordinator,
     _clear_test_depsgraph_updater,
     _clear_test_fault_injection_hook,
     _depsgraph_update,
@@ -92,13 +103,19 @@ from src.rig.arm_ik import (
     _set_test_fault_injection_hook,
     _snapshot_arm_rig_state,
     _verify_arm_rig_state_restored,
+    _verify_armature_session_identity_record,
+    ensure_armature_session_identity,
     get_arm_ik_state,
     get_pending_arm_rig_cleanup_ids,
+    query_admission_gate_status,
+    request_armature_deisolation,
     reset_arm_ik,
+    retire_dead_armature_tombstone,
     retry_pending_arm_rig_cleanup,
     set_arm_ik_influence,
     set_hand_ik_target,
     setup_arm_ik,
+    verify_armature_deisolation_evidence,
 )
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
@@ -113,8 +130,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.ops.wm.read_factory_settings(use_empty=True)
         _clear_test_fault_injection_hook()
         _clear_test_depsgraph_updater()
-        from src.rig.arm_ik import _PENDING_ARM_RIG_CLEANUPS
+        # Test fixture isolation only across read_factory_settings resets (not a production recovery mechanism)
         _PENDING_ARM_RIG_CLEANUPS.clear()
+        _ISOLATED_FAILED_ARMATURES.clear()
+        _MANAGED_ARMATURE_IDENTITIES.clear()
+        _ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        _FAILED_A_AUDIT_RECORDS.clear()
+        _DEISOLATION_AUDIT_LOG.clear()
         self.config = PipelineConfig()
         self.char_data = build_character(self.config)
         self.root = self.char_data["root"]
@@ -127,10 +149,15 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.context.view_layer.update()
 
     def tearDown(self) -> None:
-        """Ensure fault injection hooks, depsgraph updaters, and pending registries are cleared."""
+        """Ensure fault injection hooks, depsgraph updaters, and test fixture registries are cleared."""
         _clear_test_fault_injection_hook()
         _clear_test_depsgraph_updater()
         _PENDING_ARM_RIG_CLEANUPS.clear()
+        _ISOLATED_FAILED_ARMATURES.clear()
+        _MANAGED_ARMATURE_IDENTITIES.clear()
+        _ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        _FAILED_A_AUDIT_RECORDS.clear()
+        _DEISOLATION_AUDIT_LOG.clear()
 
     # -------------------------------------------------------------------------
     # Snapshot Fidelity Tests (TEST-31 to TEST-33)
@@ -3963,6 +3990,796 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(rollback_calls[0], 1)
         _verify_arm_rig_state_restored(self.armature, initial_snapshot)
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-13 FAILED Classification, Session Identity & Recovery Admission Tests (TEST-124 to TEST-136)
+    # -------------------------------------------------------------------------
+
+    def test_124_failed_a_pre_write_snapshot_abort_verified_zero_mutation_no_isolation(self) -> None:
+        """TEST-124: FAILED-A pre-write snapshot abort with verified zero mutation does not isolate healthy Armature."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        snap_before = _snapshot_arm_rig_state(self.armature)
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected pre-write snapshot fault in TEST-124")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("Injected pre-write snapshot fault in TEST-124", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_A.value)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # FAILED-A must NOT isolate the healthy Armature
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertEqual(session_rec.liveness_status, _ArmatureLivenessStatus.ALIVE_VERIFIED)
+        self.assertGreaterEqual(len(_FAILED_A_AUDIT_RECORDS), 1)
+        self.assertEqual(_FAILED_A_AUDIT_RECORDS[-1]["transaction_id"], tx.tx_id)
+        self.assertEqual(_FAILED_A_AUDIT_RECORDS[-1]["registry_session_id"], session_id)
+        self.assertEqual(_FAILED_A_AUDIT_RECORDS[-1]["failure_class"], "FAILED-A")
+        _verify_arm_rig_state_restored(self.armature, snap_before)
+
+        # Subsequent write transaction on the same Armature must be admitted and commit normally
+        controls = setup_arm_ik(self.armature, initial_influence=0.6)
+        self.assertIsNotNone(controls)
+        gate_status = query_admission_gate_status(arm=self.armature)
+        self.assertTrue(gate_status["can_admit"])
+        self.assertFalse(gate_status["failed_isolation_blocked"])
+
+    def test_125_pre_write_abort_without_zero_mutation_proof_isolated_as_failed_c(self) -> None:
+        """TEST-125: Pre-ACTIVE abort without zero-mutation proof or trusted snapshot is isolated as FAILED-C."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                # Mutate pose bone before snapshot completes so pre-write zero-mutation proof fails while tx.snapshot is None
+                self.armature.pose.bones["forearm.L"].location.x += 0.25
+                raise RuntimeError("Pre-write fault with unverified mutation in TEST-125")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            err_msg = str(cm.exception)
+            self.assertIn("Pre-write fault with unverified mutation in TEST-125", err_msg)
+            self.assertIn("FAILED-C", err_msg)
+            self.assertIn(session_id, err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertIsNone(tx.snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Must be isolated as FAILED-C with snapshot_trusted=False and RECOVERY_EVIDENCE_INSUFFICIENT
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_rec["failure_class"], "FAILED-C")
+        self.assertEqual(iso_rec["isolation_state"], "ISOLATED_FAILED_C")
+        self.assertIsNone(iso_rec["snapshot_reference"])
+        self.assertFalse(iso_rec["snapshot_trusted"])
+        self.assertEqual(iso_rec["evidence_status"], "RECOVERY_EVIDENCE_INSUFFICIENT")
+
+        # Subsequent write transaction must be rejected by FAILED Isolation Gate before SNAPSHOTTING
+        with self.assertRaises(RuntimeError) as cm_gate:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_gate.exception))
+        self.assertIn(tx.tx_id, str(cm_gate.exception))
+        self.assertIn(session_id, str(cm_gate.exception))
+
+    def test_126_failed_b_rollback_execution_failure_records_isolation(self) -> None:
+        """TEST-126: FAILED-B rollback execution exception isolates Armature in _ISOLATED_FAILED_ARMATURES."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-126")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Secondary rollback execution fault in TEST-126")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.85)
+            self.assertIn("Primary write fault in TEST-126", str(cm.exception))
+            self.assertIn("Secondary rollback execution fault in TEST-126", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_B.value)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_rec["registry_session_id"], session_id)
+        self.assertEqual(iso_rec["transaction_id"], tx.tx_id)
+        self.assertEqual(iso_rec["failure_class"], "FAILED-B")
+        self.assertEqual(iso_rec["isolation_state"], "ISOLATED_FAILED_B")
+        self.assertEqual(iso_rec["liveness_status"], "ALIVE_VERIFIED")
+        self.assertEqual(iso_rec["registration_pointer"], self.armature.as_pointer())
+        self.assertEqual(iso_rec["original_data_pointer"], self.armature.data.as_pointer())
+        self.assertIn("Primary write fault in TEST-126", iso_rec["primary_exception"])
+        self.assertIn("Secondary rollback execution fault in TEST-126", iso_rec["secondary_exception"])
+        self.assertIsNotNone(iso_rec["snapshot_reference"])
+        self.assertTrue(iso_rec["snapshot_trusted"])
+
+        # Subsequent write call must be blocked before SNAPSHOTTING
+        with self.assertRaises(RuntimeError) as cm_block:
+            set_arm_ik_influence(self.armature, "L", 0.5)
+        self.assertIn("FAILED-B", str(cm_block.exception))
+        self.assertIn(tx.tx_id, str(cm_block.exception))
+        self.assertIn(session_id, str(cm_block.exception))
+
+    def test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation(self) -> None:
+        """TEST-127: FAILED-C post-rollback verification failure or RECOVERY_UNCERTAIN isolates Armature."""
+        # Part A: Post-rollback verification failure
+        setup_arm_ik(self.armature, initial_influence=0.3)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx_a = []
+
+        def fault_hook_a(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx_a.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-127A")
+            elif stage == "during_rollback_verification":
+                raise RuntimeError("Post-rollback verifier discrepancy in TEST-127A")
+
+        _set_test_fault_injection_hook(fault_hook_a)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm_a:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.8)
+            self.assertIn("Primary write fault in TEST-127A", str(cm_a.exception))
+            self.assertIn("Post-rollback verifier discrepancy in TEST-127A", str(cm_a.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx_a[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx_a.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], "FAILED-C")
+
+        # De-isolate Part A after verification so we can test Part B on the same Armature
+        deiso_a = request_armature_deisolation(self.armature, reason="Clear Part A in TEST-127")
+        self.assertTrue(deiso_a["approved"])
+
+        # Part B: Relationship operation log RECOVERY_UNCERTAIN during rollback
+        char_col = bpy.data.collections["Character"]
+        hand_r = bpy.data.objects["HandIK.R"]
+        char_col.objects.unlink(hand_r)
+        captured_tx_b = []
+
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary fault in TEST-127B")
+            elif stage == "during_relationship_rollback_undo":
+                op = ctx.get("op", {})
+                if op.get("target_identity", {}).get("name") == "HandIK.R":
+                    raise RuntimeError("Relationship undo failure in TEST-127B")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError) as cm_b:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            self.assertIn("Primary fault in TEST-127B", str(cm_b.exception))
+            self.assertIn("RECOVERY_UNCERTAIN", str(cm_b.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_tx_b[0]
+        self.assertEqual(tx_b.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx_b.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        iso_b = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_b["failure_class"], "FAILED-C")
+        self.assertEqual(len(iso_b["recovery_uncertain_operations"]), 1)
+
+    def test_128_isolated_armature_renamed_still_rejected_before_snapshotting(self) -> None:
+        """TEST-128: Isolated Armature renamed after FAILED-B/C is still recognized by session identity and rejected before SNAPSHOTTING."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        orig_session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary fault in TEST-128")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-128")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        # Rename both the Armature Object and its Armature DataBlock
+        self.armature.name = "CharacterArmature_Renamed_128"
+        self.armature.data.name = "ArmatureData_Renamed_128"
+
+        # Session identity must remain identical after rename
+        resolved_after_rename = ensure_armature_session_identity(self.armature)
+        self.assertIs(resolved_after_rename, session_rec)
+        self.assertEqual(resolved_after_rename.registry_session_id, orig_session_id)
+
+        # Count snapshot invocations to prove rejection happens strictly BEFORE SNAPSHOTTING
+        snapshot_calls = [0]
+        orig_snapshot_fn = sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state
+
+        def counting_snapshot(arm):
+            snapshot_calls[0] += 1
+            return orig_snapshot_fn(arm)
+
+        sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = counting_snapshot
+        try:
+            for write_fn in (
+                lambda: setup_arm_ik(self.armature),
+                lambda: set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15)),
+                lambda: set_arm_ik_influence(self.armature, "BOTH", 0.2),
+                lambda: reset_arm_ik(self.armature),
+            ):
+                with self.assertRaises(RuntimeError) as cm_gate:
+                    write_fn()
+                err = str(cm_gate.exception)
+                self.assertIn("FAILED-B", err)
+                self.assertIn(tx.tx_id, err)
+                self.assertIn(orig_session_id, err)
+        finally:
+            sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = orig_snapshot_fn
+
+        self.assertEqual(snapshot_calls[0], 0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_129_other_healthy_armature_unaffected_by_isolated_armature(self) -> None:
+        """TEST-129: Other healthy Armature executes transactions normally while Armature A is isolated."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_a = ensure_armature_session_identity(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise RuntimeError("Primary fault on Armature A in TEST-129")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault on Armature A in TEST-129")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_arm_ik_influence(self.armature, "L", 0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_a.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_a.registry_session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Build independent Armature B with the 6 required upper-limb bones
+        arm_b_data = bpy.data.armatures.new("ArmB_Data_129")
+        arm_b = bpy.data.objects.new("CharacterArmature_B_129", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+        bpy.context.view_layer.objects.active = arm_b
+        bpy.ops.object.mode_set(mode="EDIT")
+        for b_name in ("upper_arm.L", "upper_arm.R", "forearm.L", "forearm.R", "hand.L", "hand.R"):
+            eb = arm_b_data.edit_bones.new(b_name)
+            eb.head = (0.0, 0.0, 1.0)
+            eb.tail = (0.0, 0.0, 1.25)
+        bpy.ops.object.mode_set(mode="POSE")
+        bpy.context.view_layer.objects.active = self.armature
+        bpy.context.view_layer.update()
+
+        try:
+            session_b = ensure_armature_session_identity(arm_b)
+            self.assertNotEqual(session_b.registry_session_id, session_a.registry_session_id)
+            self.assertEqual(session_b.isolation_state, _ArmatureIsolationState.NONE)
+
+            with _arm_rig_transaction(arm_b) as tx_b:
+                arm_b.pose.bones["forearm.L"].location.y = 0.05
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+            self.assertAlmostEqual(arm_b.pose.bones["forearm.L"].location.y, 0.05, places=6)
+
+            # Armature A remains isolated and blocked
+            self.assertIn(session_a.registry_session_id, _ISOLATED_FAILED_ARMATURES)
+            with self.assertRaises(RuntimeError) as cm_a:
+                set_arm_ik_influence(self.armature, "L", 0.2)
+            self.assertIn(session_a.registry_session_id, str(cm_a.exception))
+        finally:
+            if arm_b.name in bpy.data.objects:
+                bpy.data.objects.remove(arm_b, do_unlink=True)
+            if arm_b_data.name in bpy.data.armatures:
+                bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_130_failed_d_armature_destroyed_during_active_records_tombstone_without_rollback(self) -> None:
+        """TEST-130: FAILED-D Armature destroyed during ACTIVE skips rollback on dead object, records tombstone, and isolates from same-name replacement."""
+        session_orig = ensure_armature_session_identity(self.armature)
+        orig_session_id = session_orig.registry_session_id
+        orig_arm_ptr = session_orig.registration_pointer
+        orig_data_ptr = session_orig.original_data_pointer
+
+        rollback_calls = [0]
+        orig_rollback_fn = sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state
+
+        def counting_rollback(arm, snapshot, tx=None):
+            rollback_calls[0] += 1
+            return orig_rollback_fn(arm, snapshot, tx)
+
+        sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = counting_rollback
+        captured_tx = []
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    bpy.data.objects.remove(self.armature, do_unlink=True)
+                    raise RuntimeError("Armature destroyed inside ACTIVE in TEST-130")
+            err_msg = str(cm.exception)
+            self.assertIn("Armature destroyed inside ACTIVE in TEST-130", err_msg)
+            self.assertIn(orig_session_id, err_msg)
+        finally:
+            sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = orig_rollback_fn
+
+        # Must NOT have executed _rollback_arm_rig_state on the dead Armature
+        self.assertEqual(rollback_calls[0], 0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_D.value)
+
+        # Verify Tombstone state
+        self.assertEqual(session_orig.liveness_status, _ArmatureLivenessStatus.INVALIDATED_DEAD)
+        self.assertFalse(session_orig.in_live_blender_collection)
+        self.assertEqual(session_orig.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertIsNotNone(session_orig.tombstone_record)
+        self.assertIn(orig_session_id, _ISOLATED_FAILED_ARMATURES)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[orig_session_id]
+        self.assertEqual(iso_rec["failure_class"], "FAILED-D")
+        self.assertEqual(iso_rec["isolation_state"], "TOMBSTONED_FAILED_D")
+        self.assertEqual(iso_rec["registration_pointer"], orig_arm_ptr)
+        self.assertEqual(iso_rec["original_data_pointer"], orig_data_ptr)
+
+        # Create a new Armature with the exact same name "CharacterArmature"
+        new_arm = build_rig(self.config)
+        self.assertEqual(new_arm.name, "CharacterArmature")
+        session_new = ensure_armature_session_identity(new_arm)
+        self.assertNotEqual(session_new.registry_session_id, orig_session_id)
+        self.assertEqual(session_new.isolation_state, _ArmatureIsolationState.NONE)
+
+        # Old tombstone remains in _ISOLATED_FAILED_ARMATURES untouched
+        self.assertIn(orig_session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[orig_session_id]["isolation_state"], "TOMBSTONED_FAILED_D")
+
+    def test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission(self) -> None:
+        """TEST-131: Full recovery verification de-isolates FAILED-B and FAILED-C Armature and restores write admission."""
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        # Part A: FAILED-B -> manual restoration -> verified de-isolation -> new write commits
+        captured_tx_b = []
+
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-131A")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-131A")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_tx_b[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # Restore scene to match tx_b.snapshot
+        _rollback_arm_rig_state(self.armature, tx_b.snapshot, tx_b)
+        _depsgraph_update()
+
+        res_b = request_armature_deisolation(self.armature, reason="Restored state verified in TEST-131A")
+        self.assertTrue(res_b["approved"])
+        self.assertEqual(res_b["isolation_state"], "NONE")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "APPROVED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["registry_session_id"], session_id)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["transaction_id"], tx_b.tx_id)
+
+        # Verify write admission is restored
+        state_after_b = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.18), influence=0.75)
+        self.assertIsNotNone(state_after_b)
+
+        # Part B: FAILED-C -> verified de-isolation -> new write commits
+        captured_tx_c = []
+
+        def fault_hook_c(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                captured_tx_c.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-131B")
+            elif stage == "during_rollback_verification":
+                raise RuntimeError("Verification fault in TEST-131B")
+
+        _set_test_fault_injection_hook(fault_hook_c)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_arm_ik_influence(self.armature, "L", 0.95)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_c = captured_tx_c[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+
+        res_c = request_armature_deisolation(self.armature, reason="Post-rollback state verified in TEST-131B")
+        self.assertTrue(res_c["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "APPROVED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["transaction_id"], tx_c.tx_id)
+
+        set_arm_ik_influence(self.armature, "BOTH", 0.55)
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence,
+            0.55,
+            places=5,
+        )
+
+    def test_132_incomplete_recovery_deisolation_rejected_with_audit_log(self) -> None:
+        """TEST-132: De-isolation request is rejected when scene state has not been fully restored to snapshot."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary write fault in TEST-132")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Abort rollback before restoring HandIK.L location in TEST-132")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.35, y_pos, 1.25), influence=0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # HandIK.L location is still mutated because rollback aborted at start
+        res = request_armature_deisolation(self.armature, reason="Premature deisolation attempt in TEST-132")
+        self.assertFalse(res["approved"])
+        self.assertEqual(res["action"], "REJECTED")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "REJECTED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["registry_session_id"], session_id)
+        self.assertEqual(res["evidence"]["status"], "RECOVERY_VERIFICATION_FAILED")
+
+        # Confirm raise_on_reject=True raises RuntimeError
+        with self.assertRaises(RuntimeError) as cm_rej:
+            request_armature_deisolation(
+                self.armature,
+                reason="Premature deisolation with raise_on_reject",
+                raise_on_reject=True,
+            )
+        self.assertIn("RECOVERY_VERIFICATION_FAILED", str(cm_rej.exception))
+
+        # Write admission remains blocked
+        with self.assertRaises(RuntimeError) as cm_gate:
+            set_arm_ik_influence(self.armature, "L", 0.1)
+        self.assertIn("FAILED-B", str(cm_gate.exception))
+
+    def test_133_missing_snapshot_deisolation_rejected_as_recovery_evidence_insufficient(self) -> None:
+        """TEST-133: Missing trusted snapshot returns RECOVERY_EVIDENCE_INSUFFICIENT and rejects de-isolation even if structure looks normal."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        orig_loc_x = self.armature.pose.bones["forearm.L"].location.x
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                self.armature.pose.bones["forearm.L"].location.x += 0.15
+                raise RuntimeError("Snapshot aborted after bone mutation in TEST-133")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIsNone(_ISOLATED_FAILED_ARMATURES[session_id]["snapshot_reference"])
+        self.assertFalse(_ISOLATED_FAILED_ARMATURES[session_id]["snapshot_trusted"])
+
+        # Manually restore bone location so the live Armature looks completely normal
+        self.armature.pose.bones["forearm.L"].location.x = orig_loc_x
+        _depsgraph_update()
+
+        # Layer 5 must still report RECOVERY_EVIDENCE_INSUFFICIENT because no trusted snapshot exists
+        evidence = verify_armature_deisolation_evidence(arm=self.armature)
+        self.assertFalse(evidence["can_deisolate"])
+        self.assertEqual(evidence["status"], "RECOVERY_EVIDENCE_INSUFFICIENT")
+        self.assertEqual(evidence["case"], "CASE_2_NO_TRUSTED_SNAPSHOT")
+
+        res = request_armature_deisolation(self.armature, reason="Attempt deisolation without snapshot in TEST-133")
+        self.assertFalse(res["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "REJECTED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["verification_status"], "RECOVERY_EVIDENCE_INSUFFICIENT")
+
+    def test_134_direct_isolation_dict_tampering_without_coordinator_verification_rejected(self) -> None:
+        """TEST-134: Direct tampering with _ISOLATED_FAILED_ARMATURES or calling Layer 2 without verified evidence cannot bypass isolation."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary write fault in TEST-134")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-134")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.33, y_pos, 1.22), influence=0.85)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # 1. Calling Layer 2 _clear_or_retire_failure_isolation_by_coordinator with unverified evidence must raise RuntimeError
+        with self.assertRaises(RuntimeError) as cm_l2:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Bypass attempt",
+                verification_evidence={"can_deisolate": False},
+            )
+        self.assertIn("Layer 2 rejected de-isolation", str(cm_l2.exception))
+
+        # 2. Directly popping from _ISOLATED_FAILED_ARMATURES without Coordinator de-isolation leaves session_rec.isolation_state == ISOLATED_FAILED_B
+        saved_iso_entry = _ISOLATED_FAILED_ARMATURES.pop(session_id)
+        try:
+            self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+            with self.assertRaises(RuntimeError) as cm_gate:
+                set_arm_ik_influence(self.armature, "L", 0.3)
+            self.assertIn("ISOLATED_FAILED_B", str(cm_gate.exception))
+            self.assertIn(session_id, str(cm_gate.exception))
+        finally:
+            _ISOLATED_FAILED_ARMATURES[session_id] = saved_iso_entry
+
+    def test_135_failed_d_tombstone_cannot_return_to_active_and_retires_to_archived(self) -> None:
+        """TEST-135: FAILED-D tombstone rejects de-isolation, verifies residual objects before retirement, and transitions to ARCHIVED_RETIRED."""
+        session_dead = ensure_armature_session_identity(self.armature)
+        dead_session_id = session_dead.registry_session_id
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                # HandIK.L has been created and registered on tx; now destroy the Armature
+                bpy.data.objects.remove(self.armature, do_unlink=True)
+                raise RuntimeError("Armature destroyed after HandIK.L creation in TEST-135")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Create a replacement Armature with the same name "CharacterArmature"
+        replacement_arm = build_rig(self.config)
+        self.assertEqual(replacement_arm.name, "CharacterArmature")
+        session_replacement = ensure_armature_session_identity(replacement_arm)
+        self.assertNotEqual(session_replacement.registry_session_id, dead_session_id)
+
+        # 1. Attempting to de-isolate the dead session (even passing replacement_arm) must be rejected
+        deiso_attempt = request_armature_deisolation(
+            replacement_arm,
+            reason="Attempt to revive FAILED-D tombstone in TEST-135",
+            session_id=dead_session_id,
+        )
+        self.assertFalse(deiso_attempt["approved"])
+        self.assertEqual(deiso_attempt["evidence"]["status"], "REJECTED_DEAD_ARMATURE_TOMBSTONE")
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        # 2. Attempting to retire tombstone while residual transaction-created HandIK.L still exists must be rejected
+        self.assertIsNotNone(bpy.data.objects.get("HandIK.L"))
+        retire_early = retire_dead_armature_tombstone(
+            dead_session_id,
+            reason="Attempt retirement while residual HandIK.L exists in TEST-135",
+        )
+        self.assertFalse(retire_early["approved"])
+        self.assertEqual(retire_early["evidence"]["status"], "TOMBSTONE_RETIREMENT_REJECTED")
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # 3. Clean up residual transaction-created HandIK.L, then retire tombstone
+        bpy.data.objects.remove(bpy.data.objects["HandIK.L"], do_unlink=True)
+        retire_ok = retire_dead_armature_tombstone(
+            dead_session_id,
+            reason="All residual resources cleaned in TEST-135",
+        )
+        self.assertTrue(retire_ok["approved"])
+        self.assertEqual(retire_ok["action"], "ARCHIVED_RETIRED")
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+        self.assertEqual(session_dead.lifecycle_stage, "ARCHIVED_RETIRED")
+        self.assertNotIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertIn(dead_session_id, _ARCHIVED_FAILED_D_TOMBSTONES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "APPROVED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["operation"], "RETIRE_DEAD_TOMBSTONE")
+
+        # 4. Archived tombstone can never be revived to active status
+        revive_archived = request_armature_deisolation(
+            None,
+            reason="Attempt to revive ARCHIVED_RETIRED tombstone",
+            session_id=dead_session_id,
+        )
+        self.assertFalse(revive_archived["approved"])
+        self.assertEqual(revive_archived["evidence"]["status"], "REJECTED_ARCHIVED_TOMBSTONE")
+
+        # 5. Replacement Armature operates cleanly under its own session identity
+        controls_new = setup_arm_ik(replacement_arm, initial_influence=0.5)
+        self.assertIsNotNone(controls_new)
+
+    def test_136_cleanup_pending_and_failed_isolation_strictly_separated(self) -> None:
+        """TEST-136: CLEANUP_PENDING and FAILED isolation remain strictly separated without cross-clearing or FAILED -> COMMITTED."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        # 1. Trigger FAILED-B transaction
+        captured_failed_tx = []
+
+        def fault_hook_failed(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_failed_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-136")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-136")
+
+        _set_test_fault_injection_hook(fault_hook_failed)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_failed = captured_failed_tx[0]
+        self.assertEqual(tx_failed.state, _ArmRigTransactionState.FAILED)
+
+        # retry_pending_arm_rig_cleanup and tx.retry_cleanup() must reject FAILED transactions and never transition FAILED -> COMMITTED
+        with self.assertRaises(RuntimeError) as cm_retry1:
+            retry_pending_arm_rig_cleanup(tx_failed.tx_id)
+        self.assertIn("FAILED", str(cm_retry1.exception))
+        with self.assertRaises(RuntimeError) as cm_retry2:
+            tx_failed.retry_cleanup()
+        self.assertIn("FAILED -> COMMITTED transition is strictly forbidden", str(cm_retry2.exception))
+        self.assertEqual(tx_failed.state, _ArmRigTransactionState.FAILED)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Restore scene and de-isolate so we can create a real CLEANUP_PENDING record
+        _rollback_arm_rig_state(self.armature, tx_failed.snapshot, tx_failed)
+        _depsgraph_update()
+        self.assertTrue(request_armature_deisolation(self.armature, reason="Restore before cleanup test in TEST-136")["approved"])
+
+        # 2. Trigger a real CLEANUP_PENDING transaction on self.armature
+        old_hand = bpy.data.objects["HandIK.L"]
+        bpy.data.objects.remove(old_hand, do_unlink=True)
+        doomed_mesh = bpy.data.meshes.new("DoomedMesh136")
+        wrong_obj = bpy.data.objects.new("HandIK.L", doomed_mesh)
+        bpy.data.collections["Character"].objects.link(wrong_obj)
+
+        def fault_hook_cleanup(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Phase 3 cleanup failure in TEST-136")
+
+        _set_test_fault_injection_hook(fault_hook_cleanup)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids), 1)
+        cleanup_tx_id = pending_ids[0]
+        cleanup_tx = _PENDING_ARM_RIG_CLEANUPS[cleanup_tx_id]
+
+        # 3. Also record a FAILED-C isolation on the same Armature (simulating coexistence of CLEANUP_PENDING and FAILED)
+        snap_current = _snapshot_arm_rig_state(self.armature)
+        coexisting_failed_tx = _ArmRigTransactionContext(self.armature, session_record=session_rec)
+        coexisting_failed_tx.state = _ArmRigTransactionState.FAILED
+        coexisting_failed_tx.snapshot = snap_current
+        from src.rig.arm_ik import _record_armature_failure_isolation_by_coordinator
+        _record_armature_failure_isolation_by_coordinator(
+            session_rec=session_rec,
+            tx=coexisting_failed_tx,
+            failure_class=_FailedTransactionClass.FAILED_C,
+            primary_exception=RuntimeError("Coexisting FAILED-C in TEST-136"),
+            secondary_exception=RuntimeError("Verifier fault in TEST-136"),
+            evidence_status="SNAPSHOT_AVAILABLE",
+        )
+
+        # De-isolation must be rejected while CLEANUP_PENDING is unresolved (Case 1 Condition 8), and must NOT clear _PENDING_ARM_RIG_CLEANUPS
+        deiso_while_cleanup = request_armature_deisolation(
+            self.armature,
+            reason="Attempt deisolation while CLEANUP_PENDING exists in TEST-136",
+        )
+        self.assertFalse(deiso_while_cleanup["approved"])
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Resolving CLEANUP_PENDING via retry_pending_arm_rig_cleanup transitions cleanup_tx -> COMMITTED,
+        # but must NOT clear FAILED isolation!
+        retry_pending_arm_rig_cleanup(cleanup_tx_id)
+        self.assertEqual(cleanup_tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+
+        # New write is STILL blocked by Gate 2 (FAILED Isolation Gate)
+        with self.assertRaises(RuntimeError) as cm_still_blocked:
+            set_arm_ik_influence(self.armature, "L", 0.5)
+        self.assertIn("FAILED-C", str(cm_still_blocked.exception))
+
+        # Now de-isolate FAILED-C after CLEANUP_PENDING has been resolved
+        deiso_final = request_armature_deisolation(
+            self.armature,
+            reason="De-isolate after CLEANUP_PENDING resolved in TEST-136",
+        )
+        self.assertTrue(deiso_final["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Now new write passes both gates and commits cleanly
+        set_arm_ik_influence(self.armature, "BOTH", 0.7)
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence,
+            0.7,
+            places=5,
+        )
 
 
 if __name__ == "__main__":
