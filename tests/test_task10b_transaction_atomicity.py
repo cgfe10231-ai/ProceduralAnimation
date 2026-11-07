@@ -3667,6 +3667,303 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
+    def test_118_normal_same_armature_nested_transaction(self) -> None:
+        """TEST-118: Normal same-Armature nested transaction shares outer context, snapshots once, and commits."""
+        setup_arm_ik(self.armature, initial_influence=0.3)
+        snapshot_calls = [0]
+        orig_snapshot_fn = sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state
+
+        def counting_snapshot(arm):
+            snapshot_calls[0] += 1
+            return orig_snapshot_fn(arm)
+
+        sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = counting_snapshot
+        try:
+            with _arm_rig_transaction(self.armature) as outer_tx:
+                self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                self.assertFalse(outer_tx.rollback_only)
+                self.assertIsNone(outer_tx.rollback_only_reason)
+
+                with _arm_rig_transaction(self.armature) as inner_tx:
+                    self.assertIs(inner_tx, outer_tx)
+                    self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                    set_arm_ik_influence(self.armature, "L", 0.75)
+
+                self.assertFalse(outer_tx.rollback_only)
+                self.assertIsNone(outer_tx.rollback_only_reason)
+                self.assertEqual(outer_tx.state, _ArmRigTransactionState.ACTIVE)
+        finally:
+            sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = orig_snapshot_fn
+
+        self.assertEqual(snapshot_calls[0], 1)
+        self.assertFalse(outer_tx.rollback_only)
+        self.assertEqual(outer_tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.75, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["hand.L"].constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, 0.75, places=6
+        )
+
+    def test_119_inner_exception_caught_by_outer_forces_rollback(self) -> None:
+        """TEST-119: Inner nested failure caught by outer caller marks rollback_only and forces full outer rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        observed_states = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise RuntimeError("Injected inner nested failure in TEST-119")
+            if stage in ("before_commit_prepare", "during_commit_prepare", "after_logical_commit"):
+                observed_states.append(stage)
+
+        _set_test_fault_injection_hook(fault_hook)
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(RuntimeError) as outer_cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    outer_tx_ref = tx
+                    try:
+                        set_arm_ik_influence(self.armature, "L", 0.9)
+                    except RuntimeError as caught_inner:
+                        self.assertIn("Injected inner nested failure in TEST-119", str(caught_inner))
+                    # Verify rollback_only was marked immediately upon inner failure
+                    self.assertTrue(tx.rollback_only)
+                    self.assertIsNotNone(tx.rollback_only_reason)
+                    self.assertIn("Injected inner nested failure in TEST-119", tx.rollback_only_reason)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertTrue(outer_tx_ref.rollback_only)
+        self.assertIn("rollback_only", str(outer_cm.exception))
+        self.assertIn("Injected inner nested failure in TEST-119", str(outer_cm.exception))
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(observed_states, [])
+
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.4, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["hand.L"].constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, 0.4, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.R"].constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, 0.4, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["hand.R"].constraints[HAND_ROT_CONSTRAINT_NAMES["R"]].influence, 0.4, places=6
+        )
+
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_120_multi_level_same_armature_nested_transaction_failure(self) -> None:
+        """TEST-120: Multi-level same-Armature nested failure (Outer -> Nested A -> Nested B) propagates rollback_only."""
+        setup_arm_ik(self.armature, initial_influence=0.25)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        tx_snapshot_calls = [0]
+        orig_snapshot_fn = sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state
+
+        def counting_snapshot(arm):
+            if _ACTIVE_TRANSACTION_STACK and _ACTIVE_TRANSACTION_STACK[-1].state == _ArmRigTransactionState.SNAPSHOTTING:
+                tx_snapshot_calls[0] += 1
+            return orig_snapshot_fn(arm)
+
+        sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = counting_snapshot
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(RuntimeError) as outer_cm:
+                with _arm_rig_transaction(self.armature) as outer_tx:
+                    outer_tx_ref = outer_tx
+                    pbone_forearm_l = self.armature.pose.bones["forearm.L"]
+                    pbone_hand_l = self.armature.pose.bones["hand.L"]
+                    pbone_forearm_l.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence = 0.6
+
+                    with _arm_rig_transaction(self.armature) as nested_a:
+                        self.assertIs(nested_a, outer_tx)
+                        self.assertIs(nested_a.snapshot, outer_tx.snapshot)
+                        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                        try:
+                            with _arm_rig_transaction(self.armature) as nested_b:
+                                self.assertIs(nested_b, outer_tx)
+                                self.assertIs(nested_b.snapshot, outer_tx.snapshot)
+                                self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                                pbone_hand_l.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence = 0.85
+                                raise RuntimeError("Deep nested B failure in TEST-120")
+                        except RuntimeError as caught_b:
+                            self.assertIn("Deep nested B failure in TEST-120", str(caught_b))
+
+                        self.assertTrue(outer_tx.rollback_only)
+                        self.assertIn("Deep nested B failure in TEST-120", outer_tx.rollback_only_reason)
+        finally:
+            sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = orig_snapshot_fn
+
+        self.assertEqual(tx_snapshot_calls[0], 1)
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertTrue(outer_tx_ref.rollback_only)
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn("Deep nested B failure in TEST-120", str(outer_cm.exception))
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_121_poisoned_rollback_only_transaction_rejects_subsequent_nested_writes(self) -> None:
+        """TEST-121: Poisoned rollback_only transaction rejects subsequent nested entries before body execution."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        second_body_executed = [False]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise RuntimeError("First nested failure reason in TEST-121")
+
+        _set_test_fault_injection_hook(fault_hook)
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(RuntimeError) as outer_cm:
+                with _arm_rig_transaction(self.armature) as outer_tx:
+                    outer_tx_ref = outer_tx
+                    try:
+                        set_arm_ik_influence(self.armature, "L", 0.9)
+                    except RuntimeError:
+                        pass
+
+                    self.assertTrue(outer_tx.rollback_only)
+                    first_reason = outer_tx.rollback_only_reason
+                    self.assertIn("First nested failure reason in TEST-121", first_reason)
+
+                    # Clear fault hook and verify second nested transaction is rejected at admission
+                    _clear_test_fault_injection_hook()
+                    pbone_r = self.armature.pose.bones["forearm.R"]
+                    r_before = pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence
+
+                    with self.assertRaises(RuntimeError) as second_cm:
+                        with _arm_rig_transaction(self.armature):
+                            second_body_executed[0] = True
+                            pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence = 0.99
+
+                    self.assertIn("already marked rollback_only", str(second_cm.exception))
+                    self.assertFalse(second_body_executed[0])
+                    self.assertAlmostEqual(
+                        pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, r_before, places=6
+                    )
+                    # Also verify public helper using nested transaction is rejected at admission
+                    with self.assertRaises(RuntimeError):
+                        set_arm_ik_influence(self.armature, "R", 0.99)
+                    self.assertAlmostEqual(
+                        pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, r_before, places=6
+                    )
+
+                    # Verify rollback_only remains True and first failure reason was preserved
+                    self.assertTrue(outer_tx.rollback_only)
+                    self.assertEqual(outer_tx.rollback_only_reason, first_reason)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn("First nested failure reason in TEST-121", str(outer_cm.exception))
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_122_normal_admission_restored_after_rollback(self) -> None:
+        """TEST-122: After nested-failure rollback, subsequent transactions on same and second Armature succeed."""
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+
+        # Create an independent second Armature to verify isolation
+        arm_b_data = bpy.data.armatures.new("IndependentArmB_122_Data")
+        arm_b = bpy.data.objects.new("IndependentArmB_122", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        try:
+            def fault_hook(stage: str, ctx: dict) -> None:
+                if stage == "set_arm_ik_influence_between_influences":
+                    raise RuntimeError("Transient nested fault in TEST-122")
+
+            _set_test_fault_injection_hook(fault_hook)
+            failed_tx = None
+            try:
+                with self.assertRaises(RuntimeError):
+                    with _arm_rig_transaction(self.armature) as tx1:
+                        failed_tx = tx1
+                        try:
+                            set_arm_ik_influence(self.armature, "L", 0.8)
+                        except RuntimeError:
+                            pass
+            finally:
+                _clear_test_fault_injection_hook()
+
+            self.assertIsNotNone(failed_tx)
+            self.assertEqual(failed_tx.state, _ArmRigTransactionState.ROLLED_BACK)
+            _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+            # Start a brand new transaction on the same Armature
+            with _arm_rig_transaction(self.armature) as tx2:
+                self.assertIsNot(tx2, failed_tx)
+                self.assertNotEqual(tx2.tx_id, failed_tx.tx_id)
+                self.assertFalse(tx2.rollback_only)
+                self.assertIsNone(tx2.rollback_only_reason)
+                set_arm_ik_influence(self.armature, "BOTH", 0.65)
+
+            self.assertEqual(tx2.state, _ArmRigTransactionState.COMMITTED)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+            pbone_l = self.armature.pose.bones["forearm.L"]
+            pbone_r = self.armature.pose.bones["forearm.R"]
+            self.assertAlmostEqual(pbone_l.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.65, places=6)
+            self.assertAlmostEqual(pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, 0.65, places=6)
+
+            # Verify independent second Armature is unaffected and can enter its own transaction
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertFalse(tx_b.rollback_only)
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            if arm_b.name in bpy.data.objects:
+                bpy.data.objects.remove(arm_b, do_unlink=True)
+            if arm_b_data.name in bpy.data.armatures:
+                bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_123_uncaught_inner_exception_preserves_historical_propagation_and_rollback(self) -> None:
+        """TEST-123: Uncaught inner exception propagates original error directly and triggers single outer rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.45)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        rollback_calls = [0]
+        orig_rollback_fn = sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state
+
+        def counting_rollback(arm, snapshot, tx=None):
+            rollback_calls[0] += 1
+            return orig_rollback_fn(arm, snapshot, tx)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise ValueError("Original uncaught inner ValueError in TEST-123")
+
+        sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = counting_rollback
+        _set_test_fault_injection_hook(fault_hook)
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(ValueError) as cm:
+                with _arm_rig_transaction(self.armature) as outer_tx:
+                    outer_tx_ref = outer_tx
+                    set_arm_ik_influence(self.armature, "L", 0.95)
+        finally:
+            _clear_test_fault_injection_hook()
+            sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = orig_rollback_fn
+
+        self.assertEqual(str(cm.exception), "Original uncaught inner ValueError in TEST-123")
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertTrue(outer_tx_ref.rollback_only)
+        self.assertIn("Original uncaught inner ValueError in TEST-123", outer_tx_ref.rollback_only_reason)
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(rollback_calls[0], 1)
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
 
 if __name__ == "__main__":
     args = [sys.argv[0]]

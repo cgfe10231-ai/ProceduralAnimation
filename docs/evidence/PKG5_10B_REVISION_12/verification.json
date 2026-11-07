@@ -1,0 +1,182 @@
+{
+  "task_id": "10-b-12",
+  "baseline_sha": "e599814845d79674e8b8e90d346e67fe31b931ed",
+  "changed_functions": [
+    "_ArmRigTransactionContext.__init__",
+    "_ArmRigTransactionContext.mark_rollback_only",
+    "_arm_rig_transaction"
+  ],
+  "contract_reference": [
+    "ARCHITECTURE_SYNC.md#10.2",
+    "ARCHITECTURE_SYNC.md#10.6.1",
+    "ARCHITECTURE_SYNC.md#10.6.2",
+    "ARCHITECTURE_SYNC.md#10.6.3",
+    "ARCHITECTURE_SYNC.md#10.9",
+    "CONTRACT-06",
+    "CONTRACT-10",
+    "IMPACT-06"
+  ],
+  "tests_118_to_123": {
+    "command": "blender -b -P tests/test_task10b_transaction_atomicity.py",
+    "exit_code": 0,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "tests/test_task10b_transaction_atomicity.py",
+    "test_cases": [
+      {
+        "test_id": "TEST-118",
+        "method": "test_118_normal_same_armature_nested_transaction",
+        "status": "PASSED",
+        "verified_invariants": [
+          "Inner and outer transactions share the identical _ArmRigTransactionContext instance",
+          "_ACTIVE_TRANSACTION_STACK depth remains 1",
+          "_snapshot_arm_rig_state is captured only once at outer transaction start",
+          "tx.rollback_only remains False",
+          "Outer transaction transitions cleanly to COMMITTED without extra cleanup and stack empties on exit"
+        ]
+      },
+      {
+        "test_id": "TEST-119",
+        "method": "test_119_inner_exception_caught_by_outer_forces_rollback",
+        "status": "PASSED",
+        "verified_invariants": [
+          "Fault injected inside nested set_arm_ik_influence caught by outer try/except marks tx.rollback_only = True",
+          "tx.rollback_only_reason records original inner exception type and message",
+          "Outer transaction exit rejects commit before COMMITTING/COMMITTED and raises RuntimeError containing rollback_only_reason",
+          "Outer transaction transitions ACTIVE -> ROLLING_BACK -> ROLLED_BACK and restores L/R constraint influences to initial snapshot",
+          "_verify_arm_rig_state_restored passes, _ACTIVE_TRANSACTION_STACK is empty, and zero CLEANUP_PENDING entries exist"
+        ]
+      },
+      {
+        "test_id": "TEST-120",
+        "method": "test_120_multi_level_same_armature_nested_transaction_failure",
+        "status": "PASSED",
+        "verified_invariants": [
+          "Three-level same-Armature nesting (Outer -> Nested A -> Nested B) shares a single _ArmRigTransactionContext and single snapshot",
+          "Fault raised in Nested B and caught in Nested A marks outer_tx.rollback_only = True",
+          "Outermost transaction rejects commit on exit and rolls back all mutations to initial snapshot (ROLLED_BACK)"
+        ]
+      },
+      {
+        "test_id": "TEST-121",
+        "method": "test_121_poisoned_rollback_only_transaction_rejects_subsequent_nested_writes",
+        "status": "PASSED",
+        "verified_invariants": [
+          "After first inner failure marks outer_tx.rollback_only = True, subsequent nested _arm_rig_transaction and set_arm_ik_influence calls are rejected at admission before body execution",
+          "Zero new Blender RNA writes occur during rejected second nested call",
+          "outer_tx.rollback_only remains True and outer_tx.rollback_only_reason preserves the first failure reason without overwrite",
+          "Outermost transaction completes full rollback to initial snapshot (ROLLED_BACK)"
+        ]
+      },
+      {
+        "test_id": "TEST-122",
+        "method": "test_122_normal_admission_restored_after_rollback",
+        "status": "PASSED",
+        "verified_invariants": [
+          "After nested failure and outer rollback (ROLLED_BACK), a new outermost transaction on the same Armature creates a fresh _ArmRigTransactionContext with rollback_only = False",
+          "Subsequent transaction commits normally (COMMITTED) and leaves _ACTIVE_TRANSACTION_STACK empty",
+          "Independent second Armature is unaffected and executes its own transaction cleanly"
+        ]
+      },
+      {
+        "test_id": "TEST-123",
+        "method": "test_123_uncaught_inner_exception_preserves_historical_propagation_and_rollback",
+        "status": "PASSED",
+        "verified_invariants": [
+          "Uncaught inner exception propagates original business exception type and message directly to outer caller without being overwritten by commit-gate RuntimeError",
+          "tx.rollback_only is True and outer transaction executes exactly one full rollback (ROLLED_BACK)",
+          "_verify_arm_rig_state_restored passes and _ACTIVE_TRANSACTION_STACK is empty"
+        ]
+      }
+    ]
+  },
+  "existing_transaction_tests": {
+    "command": "blender -b -P tests/test_task10b_transaction_atomicity.py",
+    "exit_code": 0,
+    "passed": 93,
+    "existing_31_to_117_passed": 87,
+    "new_118_to_123_passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "tests/test_task10b_transaction_atomicity.py"
+  },
+  "input_validation_tests": {
+    "command": "blender -b -P tests/test_task10b_input_validation.py",
+    "exit_code": 0,
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "tests/test_task10b_input_validation.py"
+  },
+  "task_10a_tests": {
+    "command": "blender -b -P tests/test_arm_ik_lifecycle_world_transform_contract.py",
+    "exit_code": 0,
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "tests/test_arm_ik_lifecycle_world_transform_contract.py"
+  },
+  "quick_regression": {
+    "command": "python tests/run_test_suite.py --tier quick",
+    "exit_code": 0,
+    "passed": 19,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "docs/evidence/PKG5_10B_REVISION_12/test_report_quick.json"
+  },
+  "physics_regression": {
+    "command": "python tests/run_test_suite.py --tier physics",
+    "exit_code": 0,
+    "passed": 27,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "docs/evidence/PKG5_10B_REVISION_12/test_report_physics.json"
+  },
+  "motion_regression": {
+    "command": "python tests/run_test_suite.py --tier motion",
+    "exit_code": 0,
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "docs/evidence/PKG5_10B_REVISION_12/test_report_motion.json"
+  },
+  "full_regression": {
+    "command": "python tests/run_test_suite.py --tier full",
+    "exit_code": 0,
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0,
+    "evidence_path": "docs/evidence/PKG5_10B_REVISION_12/test_report_full.json"
+  },
+  "failure_injection_evidence": {
+    "hook_stages_exercised": [
+      "set_arm_ik_influence_between_influences",
+      "before_commit_prepare",
+      "during_commit_prepare",
+      "after_logical_commit"
+    ],
+    "caught_inner_fault_behavior": "Inner nested _arm_rig_transaction catches BaseException, monotonically marks outer_tx.mark_rollback_only(reason), and re-raises. When outer caller catches the exception and attempts normal with-block exit, outer commit gate rejects commit before COMMITTING and triggers full outer rollback.",
+    "multi_level_nested_fault_behavior": "Exception raised in 3rd-level nested transaction and caught by 2nd-level nested transaction marks the shared outer_tx rollback_only and forces outermost rollback.",
+    "subsequent_nested_entry_rejection": "Once outer_tx.rollback_only is True, any subsequent nested _arm_rig_transaction on the same Armature is rejected at admission before yielding, preserving the first failure reason.",
+    "uncaught_inner_fault_behavior": "Uncaught inner exception marks outer_tx.rollback_only = True and propagates directly into outer except block, executing exactly one rollback and re-raising the original business exception."
+  },
+  "rollback_verification": {
+    "single_snapshot_authority": true,
+    "outer_commit_gate_enforced_before_committing": true,
+    "terminal_state_on_rollback_only_exit": "ROLLED_BACK",
+    "entered_committing_or_committed": false,
+    "entered_phase3_cleanup_or_cleanup_pending": false,
+    "state_restoration_verified_by": "_verify_arm_rig_state_restored(arm, tx.snapshot, active_tx=tx)",
+    "active_transaction_stack_empty_after_exit": true
+  },
+  "unresolved_issues": []
+}

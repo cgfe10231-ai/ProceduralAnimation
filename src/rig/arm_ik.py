@@ -2068,12 +2068,25 @@ class _ArmRigTransactionContext:
         self.uncleaned_stashed_objects: List[Dict[str, Any]] = []
         self.uncleaned_stashed_constraints: List[Dict[str, Any]] = []
         self.cleanup_error: Optional[str] = None
+        self.rollback_only: bool = False
+        self.rollback_only_reason: Optional[str] = None
         self.tx_id: str = uuid.uuid4().hex[:8]
 
     @property
     def committed(self) -> bool:
         """Backward-compatibility property reflecting logical commit status."""
         return self.state in (_ArmRigTransactionState.COMMITTED, _ArmRigTransactionState.CLEANUP_PENDING)
+
+    def mark_rollback_only(self, reason: str) -> None:
+        """Monotonically mark this transaction context as rollback-only preserving the first failure reason."""
+        normalized_reason = str(reason).strip() if reason is not None else ""
+        if not normalized_reason:
+            normalized_reason = "Unspecified nested transaction failure"
+        if not self.rollback_only:
+            self.rollback_only = True
+            self.rollback_only_reason = normalized_reason
+        elif not self.rollback_only_reason:
+            self.rollback_only_reason = normalized_reason
 
     def prepare_relationship_mutation(
         self,
@@ -2512,8 +2525,22 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                 f"Cross-armature nested transaction rejected: active transaction owns armature "
                 f"'{outer_tx.arm.name}', but requested transaction is for armature '{arm.name}'."
             )
+        if outer_tx.state != _ArmRigTransactionState.ACTIVE:
+            raise RuntimeError(
+                f"Nested transaction rejected: outer transaction {outer_tx.tx_id} is in state "
+                f"{outer_tx.state}, expected ACTIVE."
+            )
+        if outer_tx.rollback_only:
+            raise RuntimeError(
+                f"Nested transaction rejected: outer transaction {outer_tx.tx_id} is already marked "
+                f"rollback_only ({outer_tx.rollback_only_reason})."
+            )
         # Re-entrant invocation on same armature: outer transaction retains exclusive ownership
-        yield outer_tx
+        try:
+            yield outer_tx
+        except BaseException as nested_exc:
+            outer_tx.mark_rollback_only(f"{type(nested_exc).__name__}: {nested_exc}")
+            raise
         return
 
     # Reject a new outermost transaction when previous
@@ -2529,6 +2556,12 @@ def _arm_rig_transaction(arm: bpy.types.Object):
         tx.state = _ArmRigTransactionState.ACTIVE
 
         yield tx
+
+        if tx.rollback_only:
+            raise RuntimeError(
+                f"Arm rig transaction commit rejected: transaction {tx.tx_id} is marked rollback_only "
+                f"(first failure reason: {tx.rollback_only_reason})"
+            )
 
         # -------------------------------------------------------------
         # Phase 1: Reversible Commit Preparation
