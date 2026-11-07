@@ -80,8 +80,10 @@ from src.rig.arm_ik import (
     _ArmRigTransactionContext,
     _ArmRigTransactionState,
     _PENDING_ARM_RIG_CLEANUPS,
+    _RelationshipOperationState,
     _arm_rig_transaction,
     _assert_arm_rig_cleanup_gate,
+    _authorized_link_object_to_collection,
     _clear_test_depsgraph_updater,
     _clear_test_fault_injection_hook,
     _depsgraph_update,
@@ -3395,6 +3397,274 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         p_fore_l.constraints.remove(ext_con)
         bpy.data.objects.remove(ext_obj, do_unlink=True)
         bpy.data.meshes.remove(ext_mesh, do_unlink=True)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-11 Relationship Log & Ownership Tests (TEST-113 to TEST-117)
+    # -------------------------------------------------------------------------
+
+    def test_113_pre_existing_collection_link_transitions_to_no_effect_without_revocation_authority(self) -> None:
+        """TEST-113: Duplicate link on PRE_EXISTING_ORIGINAL transitions PREPARED -> NO_EFFECT without revocation authority."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        char_col = bpy.data.collections["Character"]
+        hand_l = bpy.data.objects["HandIK.L"]
+        hand_l_ptr = hand_l.as_pointer()
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        captured_tx = []
+        observed_prepared_states = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "relationship_link_after_prepare":
+                op = ctx.get("op", {})
+                observed_prepared_states.append(op.get("operation_state"))
+            elif stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault in TEST-113 after idempotent controller link checks")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            self.assertIn("Fault in TEST-113", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        # All 4 existing controllers were already linked (PRE_EXISTING_ORIGINAL)
+        self.assertEqual(len(tx.created_collection_links), 0)
+        self.assertEqual(len(tx.prepared_relationship_mutations), 4)
+        self.assertTrue(all(s == _RelationshipOperationState.PREPARED for s in observed_prepared_states))
+
+        required_fields = {
+            "operation_id",
+            "transaction_id",
+            "source_reference",
+            "target_reference",
+            "source_identity",
+            "target_identity",
+            "original_relationship_state",
+            "intended_mutation",
+            "operation_state",
+        }
+        for rec in tx.prepared_relationship_mutations:
+            self.assertTrue(required_fields.issubset(rec.keys()))
+            self.assertEqual(rec["transaction_id"], tx.tx_id)
+            self.assertEqual(rec["intended_mutation"], "COLLECTION_OBJECT_LINK")
+            self.assertEqual(rec["original_relationship_state"]["category"], "PRE_EXISTING_ORIGINAL")
+            self.assertTrue(rec["original_relationship_state"]["linked"])
+            self.assertEqual(rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        # Original collection link must remain 100% preserved after rollback
+        self.assertIn("HandIK.L", char_col.objects)
+        self.assertEqual(char_col.objects["HandIK.L"].as_pointer(), hand_l_ptr)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_114_apply_succeeded_before_confirm_exception_safely_reverted_on_rollback(self) -> None:
+        """TEST-114: Exception after C-API link apply (before CONFIRM) logs APPLIED_VERIFIED and reverts to REVERTED on rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        char_col = bpy.data.collections["Character"]
+        initial_member_ptrs = {o.as_pointer() for o in char_col.objects}
+
+        for fault_stage in ("relationship_link_during_apply_after_c_api", "relationship_link_before_confirm"):
+            captured_ops = []
+
+            def fault_hook(stage: str, ctx: dict, target_stage: str = fault_stage) -> None:
+                if stage == target_stage and ctx.get("name") == "HandIK.L":
+                    captured_ops.append(ctx["op"])
+                    raise RuntimeError(f"Injected fault at {target_stage} in TEST-114")
+
+            _set_test_fault_injection_hook(fault_hook)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    setup_arm_ik(self.armature)
+                self.assertIn(f"Injected fault at {fault_stage} in TEST-114", str(cm.exception))
+            finally:
+                _clear_test_fault_injection_hook()
+
+            self.assertEqual(len(captured_ops), 1)
+            op_rec = captured_ops[0]
+            # Rollback must have reverted the APPLIED_VERIFIED relationship to REVERTED
+            self.assertEqual(op_rec[" intended_mutation" if " intended_mutation" in op_rec else "intended_mutation"], "COLLECTION_OBJECT_LINK")
+            self.assertEqual(op_rec["original_relationship_state"]["category"], "TX_ADDED")
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.REVERTED)
+
+            # Zero residual link or controller in scene
+            self.assertNotIn("HandIK.L", char_col.objects)
+            self.assertNotIn("HandIK.L", bpy.data.objects)
+            self.assertEqual({o.as_pointer() for o in char_col.objects}, initial_member_ptrs)
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_115_apply_exception_with_zero_side_effect_transitions_log_to_no_effect(self) -> None:
+        """TEST-115: Exception during APPLYING before C-API link with zero RNA side effect transitions log to NO_EFFECT."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        char_col = bpy.data.collections["Character"]
+        captured_ops = []
+        observed_applying_state = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "relationship_link_during_apply_before_c_api" and ctx.get("name") == "HandIK.L":
+                op = ctx["op"]
+                observed_applying_state.append(op["operation_state"])
+                captured_ops.append(op)
+                raise RuntimeError("Fault during APPLYING before C-API link in TEST-115")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault during APPLYING before C-API link in TEST-115", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(observed_applying_state, [_RelationshipOperationState.APPLYING])
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        self.assertNotIn("HandIK.L", char_col.objects)
+        self.assertNotIn("HandIK.L", bpy.data.objects)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_116_external_same_name_object_and_external_collection_link_protected_on_rollback(self) -> None:
+        """TEST-116: External same-name object and EXTERNAL_ADDED collection link are never unlinked or deleted on rollback."""
+        char_col = bpy.data.collections["Character"]
+        ext_same_name_ptr = [None]
+        ext_member_ptr = [None]
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                tx = _ACTIVE_TRANSACTION_STACK[-1]
+                captured_tx.append(tx)
+                # Rename transaction-created HandIK.L and create an external same-name HandIK.L linked to Character
+                tx_hand = bpy.data.objects["HandIK.L"]
+                tx_hand.name = "HandIK_L_TX_Owned_116"
+
+                ext_same = bpy.data.objects.new("HandIK.L", None)
+                char_col.objects.link(ext_same)
+                ext_same_name_ptr[0] = ext_same.as_pointer()
+
+                ext_other = bpy.data.objects.new("ExternalAddedMember116", None)
+                char_col.objects.link(ext_other)
+                ext_member_ptr[0] = ext_other.as_pointer()
+
+                raise RuntimeError("Fault injected in TEST-116 after external links")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected in TEST-116", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(len(tx.prepared_relationship_mutations), 1)
+        self.assertEqual(tx.prepared_relationship_mutations[0]["operation_state"], _RelationshipOperationState.REVERTED)
+
+        # Transaction-owned controller was unlinked and deleted
+        self.assertIsNone(bpy.data.objects.get("HandIK_L_TX_Owned_116"))
+
+        # External same-name HandIK.L and ExternalAddedMember116 remain linked in Character collection
+        self.assertIn("HandIK.L", char_col.objects)
+        self.assertEqual(char_col.objects["HandIK.L"].as_pointer(), ext_same_name_ptr[0])
+        self.assertIn("ExternalAddedMember116", char_col.objects)
+        self.assertEqual(char_col.objects["ExternalAddedMember116"].as_pointer(), ext_member_ptr[0])
+
+        bpy.data.objects.remove(bpy.data.objects["HandIK.L"], do_unlink=True)
+        bpy.data.objects.remove(bpy.data.objects["ExternalAddedMember116"], do_unlink=True)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_117_rollback_verifies_relationship_log_terminal_states_and_reports_recovery_uncertain(self) -> None:
+        """TEST-117: Rollback verifies all relationship log entries reach NO_EFFECT/REVERTED and raises on RECOVERY_UNCERTAIN."""
+        # Part A: Mixed PRE_EXISTING_ORIGINAL (NO_EFFECT) and TX_ADDED (REVERTED) in a single transaction rollback
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        char_col = bpy.data.collections["Character"]
+        # Unlink HandIK.R before transaction so HandIK.L is PRE_EXISTING_ORIGINAL and HandIK.R is TX_ADDED
+        hand_r = bpy.data.objects["HandIK.R"]
+        char_col.objects.unlink(hand_r)
+        snap_mixed = _snapshot_arm_rig_state(self.armature)
+
+        captured_tx_a = []
+
+        def fault_hook_a(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                captured_tx_a.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault in TEST-117 Part A")
+
+        _set_test_fault_injection_hook(fault_hook_a)
+        try:
+            with self.assertRaises(RuntimeError) as cm_a:
+                setup_arm_ik(self.armature, initial_influence=0.8)
+            self.assertIn("Fault in TEST-117 Part A", str(cm_a.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx_a), 1)
+        tx_a = captured_tx_a[0]
+        states_by_name = {
+            rec["target_identity"]["name"]: rec["operation_state"]
+            for rec in tx_a.prepared_relationship_mutations
+        }
+        self.assertEqual(states_by_name["HandIK.L"], _RelationshipOperationState.NO_EFFECT)
+        self.assertEqual(states_by_name["ElbowPole.L"], _RelationshipOperationState.NO_EFFECT)
+        self.assertEqual(states_by_name["HandIK.R"], _RelationshipOperationState.REVERTED)
+        self.assertEqual(states_by_name["ElbowPole.R"], _RelationshipOperationState.NO_EFFECT)
+        _verify_arm_rig_state_restored(self.armature, snap_mixed)
+
+        # Restore HandIK.R link for Part B
+        char_col.objects.link(hand_r)
+        snap_clean = _snapshot_arm_rig_state(self.armature)
+
+        # Part B: Fault during relationship rollback undo transitions record to RECOVERY_UNCERTAIN and raises RuntimeError
+        char_col.objects.unlink(hand_r)
+        captured_tx_b = []
+
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary business fault in TEST-117 Part B")
+            elif stage == "during_relationship_rollback_undo":
+                op = ctx.get("op", {})
+                if op.get("target_identity", {}).get("name") == "HandIK.R":
+                    raise RuntimeError("Simulated C-API unlink failure during rollback")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError) as cm_b:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            err_msg = str(cm_b.exception)
+            self.assertIn("Primary business fault in TEST-117 Part B", err_msg)
+            self.assertIn("rollback verification failed", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx_b), 1)
+        tx_b = captured_tx_b[0]
+        self.assertEqual(tx_b.state, _ArmRigTransactionState.FAILED)
+        hand_r_ops = [
+            r for r in tx_b.prepared_relationship_mutations
+            if r["target_identity"]["name"] == "HandIK.R"
+        ]
+        self.assertEqual(len(hand_r_ops), 1)
+        self.assertEqual(hand_r_ops[0]["operation_state"], _RelationshipOperationState.RECOVERY_UNCERTAIN)
+
+        # Part C: Direct verifier check rejects any transaction context containing a RECOVERY_UNCERTAIN record
+        _ACTIVE_TRANSACTION_STACK.append(tx_b)
+        try:
+            with self.assertRaises(RuntimeError) as cm_c:
+                _verify_arm_rig_state_restored(self.armature, snap_clean, active_tx=tx_b)
+            self.assertIn("RECOVERY_UNCERTAIN", str(cm_c.exception))
+        finally:
+            _ACTIVE_TRANSACTION_STACK.pop()
+
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
 

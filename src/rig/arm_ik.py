@@ -173,6 +173,33 @@ class _ArmRigTransactionState(str, Enum):
     FAILED = "FAILED"
 
 
+class _RelationshipOperationState(str, Enum):
+    """Explicit 7-state machine for relationship mutation log entries (Task 10-B-11)."""
+    PREPARED = "PREPARED"
+    APPLYING = "APPLYING"
+    APPLIED_VERIFIED = "APPLIED_VERIFIED"
+    CONFIRMED = "CONFIRMED"
+    NO_EFFECT = "NO_EFFECT"
+    REVERTED = "REVERTED"
+    RECOVERY_UNCERTAIN = "RECOVERY_UNCERTAIN"
+
+
+_LEGAL_RELATIONSHIP_LOG_TRANSITIONS: Dict[
+    Tuple[_RelationshipOperationState, _RelationshipOperationState], str
+] = {
+    (_RelationshipOperationState.PREPARED, _RelationshipOperationState.NO_EFFECT): "PREPARED -> NO_EFFECT",
+    (_RelationshipOperationState.PREPARED, _RelationshipOperationState.APPLYING): "PREPARED -> APPLYING",
+    (_RelationshipOperationState.APPLYING, _RelationshipOperationState.APPLIED_VERIFIED): "APPLYING -> APPLIED_VERIFIED",
+    (_RelationshipOperationState.APPLYING, _RelationshipOperationState.NO_EFFECT): "APPLYING -> NO_EFFECT",
+    (_RelationshipOperationState.APPLYING, _RelationshipOperationState.RECOVERY_UNCERTAIN): "APPLYING -> RECOVERY_UNCERTAIN",
+    (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED): "APPLIED_VERIFIED -> CONFIRMED",
+    (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.REVERTED): "APPLIED_VERIFIED -> REVERTED",
+    (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.RECOVERY_UNCERTAIN): "APPLIED_VERIFIED -> RECOVERY_UNCERTAIN",
+    (_RelationshipOperationState.CONFIRMED, _RelationshipOperationState.REVERTED): "CONFIRMED -> REVERTED",
+    (_RelationshipOperationState.CONFIRMED, _RelationshipOperationState.RECOVERY_UNCERTAIN): "CONFIRMED -> RECOVERY_UNCERTAIN",
+}
+
+
 _FAULT_INJECTION_HOOK: Optional[Callable[[str, Dict[str, Any]], None]] = None
 
 
@@ -312,6 +339,12 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
                 "empty_display_type": getattr(c_obj, "empty_display_type", None) if c_obj.type == "EMPTY" else None,
                 "empty_display_size": getattr(c_obj, "empty_display_size", None) if c_obj.type == "EMPTY" else None,
                 "collections": [c.name for c in c_obj.users_collection],
+                "collection_refs": list(c_obj.users_collection),
+                "collection_ptrs": [
+                    c.as_pointer()
+                    for c in c_obj.users_collection
+                    if hasattr(c, "as_pointer")
+                ],
             }
 
     # 3. Pose bones snapshot (upper_arm, forearm, hand across L and R)
@@ -437,6 +470,683 @@ def _find_live_object_by_identity(
     return None
 
 
+def _find_live_collection_by_identity(
+    col_ref: Optional[bpy.types.Collection],
+    expected_ptr: Optional[int],
+) -> Optional[bpy.types.Collection]:
+    """Resolve the original live Blender Collection (user or scene master collection) by identity.
+
+    A matching name alone never proves identity.
+    """
+    if col_ref is None and expected_ptr is None:
+        return None
+
+    if col_ref is not None:
+        try:
+            ref_ptr = col_ref.as_pointer()
+        except ReferenceError:
+            return None
+        if expected_ptr is not None and ref_ptr != expected_ptr:
+            return None
+        target_ptr = expected_ptr if expected_ptr is not None else ref_ptr
+    else:
+        target_ptr = expected_ptr
+
+    for candidate in bpy.data.collections:
+        try:
+            if candidate.as_pointer() != target_ptr:
+                continue
+            if col_ref is None or candidate == col_ref:
+                return candidate
+        except ReferenceError:
+            continue
+
+    if bpy.context and getattr(bpy.context, "scene", None) and getattr(bpy.context.scene, "collection", None):
+        sc = bpy.context.scene.collection
+        try:
+            if sc.as_pointer() == target_ptr and (col_ref is None or sc == col_ref):
+                return sc
+        except ReferenceError:
+            pass
+
+    for scene in bpy.data.scenes:
+        sc = getattr(scene, "collection", None)
+        if sc is None:
+            continue
+        try:
+            if sc.as_pointer() == target_ptr and (col_ref is None or sc == col_ref):
+                return sc
+        except ReferenceError:
+            continue
+
+    return None
+
+
+def _is_object_linked_to_collection_by_identity(
+    collection: bpy.types.Collection,
+    obj_ref: Optional[bpy.types.Object],
+    expected_obj_ptr: Optional[int],
+) -> bool:
+    """Check whether an object is currently linked to a collection by reference and pointer identity."""
+    if collection is None:
+        return False
+    if obj_ref is None and expected_obj_ptr is None:
+        return False
+
+    if obj_ref is not None:
+        try:
+            ref_ptr = obj_ref.as_pointer()
+        except ReferenceError:
+            return False
+        if expected_obj_ptr is not None and ref_ptr != expected_obj_ptr:
+            return False
+        target_ptr = expected_obj_ptr if expected_obj_ptr is not None else ref_ptr
+    else:
+        target_ptr = expected_obj_ptr
+
+    try:
+        for candidate in collection.objects:
+            try:
+                if candidate.as_pointer() != target_ptr:
+                    continue
+                if obj_ref is None or candidate == obj_ref:
+                    return True
+            except ReferenceError:
+                continue
+    except ReferenceError:
+        return False
+
+    return False
+
+
+def _authorized_link_object_to_collection(
+    collection: bpy.types.Collection,
+    obj: bpy.types.Object,
+    active_tx: Optional[Any] = None,
+) -> Optional[Dict[str, Any]]:
+    """Layer 3 authorized Collection <-> Object link executing 3-step PREPARE -> APPLY -> CONFIRM protocol."""
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    if active_tx is None:
+        obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
+        if not _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
+            collection.objects.link(obj)
+        return None
+
+    col_ptr = collection.as_pointer() if hasattr(collection, "as_pointer") else None
+    obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
+    obj_name = getattr(obj, "name", "<unknown>")
+
+    # 1. PREPARE: Register relationship mutation before executing any Blender C-API write
+    already_linked = _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr)
+    category = "PRE_EXISTING_ORIGINAL" if already_linked else "TX_ADDED"
+    op_record = active_tx.prepare_relationship_mutation(
+        source_reference=collection,
+        target_reference=obj,
+        original_relationship_state={
+            "linked": already_linked,
+            "category": category,
+            "col_ptr": col_ptr,
+            "obj_ptr": obj_ptr,
+        },
+        intended_mutation="COLLECTION_OBJECT_LINK",
+    )
+
+    _trigger_fault_injection(
+        "relationship_link_after_prepare",
+        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+    )
+
+    # Duplicate link on pre-existing relationship: transition PREPARED -> NO_EFFECT with zero revocation rights
+    if already_linked:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.NO_EFFECT,
+        )
+        return op_record
+
+    # 2. APPLY: Transition PREPARED -> APPLYING and execute C-API link with exception-window inspection
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLYING,
+    )
+    try:
+        _trigger_fault_injection(
+            "relationship_link_during_apply_before_c_api",
+            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+        )
+        live_col = _find_live_collection_by_identity(collection, col_ptr)
+        live_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
+        if live_col is None or live_obj is None:
+            raise RuntimeError("Target object or collection identity invalid during link apply")
+
+        live_col.objects.link(live_obj)
+
+        _trigger_fault_injection(
+            "relationship_link_during_apply_after_c_api",
+            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+        )
+    except BaseException:
+        check_col = _find_live_collection_by_identity(collection, col_ptr)
+        check_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
+        if check_col is None or check_obj is None:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+        elif _is_object_linked_to_collection_by_identity(check_col, check_obj, obj_ptr):
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+            active_tx.register_created_collection_link(check_col, check_obj)
+        else:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.NO_EFFECT,
+            )
+        raise
+
+    if not _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Collection link apply did not take effect in RNA for '{obj_name}'")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLIED_VERIFIED,
+    )
+    active_tx.register_created_collection_link(collection, obj)
+
+    # 3. CONFIRM: Verify live RNA state and transition APPLIED_VERIFIED -> CONFIRMED
+    _trigger_fault_injection(
+        "relationship_link_before_confirm",
+        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+    )
+    confirm_col = _find_live_collection_by_identity(collection, col_ptr)
+    confirm_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
+    if (
+        confirm_col is None
+        or confirm_obj is None
+        or not _is_object_linked_to_collection_by_identity(confirm_col, confirm_obj, obj_ptr)
+    ):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Collection link verification failed at CONFIRM stage for '{obj_name}'")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.CONFIRMED,
+    )
+    return op_record
+
+
+def _authorized_unlink_object_from_collection(
+    collection: bpy.types.Collection,
+    obj: bpy.types.Object,
+    active_tx: Optional[Any] = None,
+    category: str = "TX_UNLINKED_ORIGINAL",
+) -> Optional[Dict[str, Any]]:
+    """Layer 3 authorized Collection <-> Object unlink executing 3-step PREPARE -> APPLY -> CONFIRM protocol."""
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    if active_tx is None:
+        obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
+        if _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
+            collection.objects.unlink(obj)
+        return None
+
+    col_ptr = collection.as_pointer() if hasattr(collection, "as_pointer") else None
+    obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
+    obj_name = getattr(obj, "name", "<unknown>")
+
+    # 1. PREPARE
+    already_linked = _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr)
+    op_record = active_tx.prepare_relationship_mutation(
+        source_reference=collection,
+        target_reference=obj,
+        original_relationship_state={
+            "linked": already_linked,
+            "category": category,
+            "col_ptr": col_ptr,
+            "obj_ptr": obj_ptr,
+        },
+        intended_mutation="COLLECTION_OBJECT_UNLINK",
+    )
+
+    _trigger_fault_injection(
+        "relationship_unlink_after_prepare",
+        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+    )
+
+    if not already_linked:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.NO_EFFECT,
+        )
+        return op_record
+
+    # 2. APPLY
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLYING,
+    )
+    try:
+        _trigger_fault_injection(
+            "relationship_unlink_during_apply_before_c_api",
+            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+        )
+        live_col = _find_live_collection_by_identity(collection, col_ptr)
+        live_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
+        if live_col is None or live_obj is None:
+            raise RuntimeError("Target object or collection identity invalid during unlink apply")
+
+        live_col.objects.unlink(live_obj)
+
+        _trigger_fault_injection(
+            "relationship_unlink_during_apply_after_c_api",
+            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+        )
+    except BaseException:
+        check_col = _find_live_collection_by_identity(collection, col_ptr)
+        check_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
+        if check_col is None or check_obj is None:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+        elif not _is_object_linked_to_collection_by_identity(check_col, check_obj, obj_ptr):
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+        else:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.NO_EFFECT,
+            )
+        raise
+
+    if _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Collection unlink apply did not take effect in RNA for '{obj_name}'")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLIED_VERIFIED,
+    )
+
+    # 3. CONFIRM
+    _trigger_fault_injection(
+        "relationship_unlink_before_confirm",
+        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
+    )
+    confirm_col = _find_live_collection_by_identity(collection, col_ptr)
+    confirm_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
+    if (
+        confirm_col is None
+        or confirm_obj is None
+        or _is_object_linked_to_collection_by_identity(confirm_col, confirm_obj, obj_ptr)
+    ):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Collection unlink verification failed at CONFIRM stage for '{obj_name}'")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.CONFIRMED,
+    )
+    return op_record
+
+
+def _authorized_revert_relationship_record(
+    op_record: Dict[str, Any],
+    active_tx: Any,
+    restoration_errors: List[str],
+) -> None:
+    """Layer 3 atomic reversal of a single relationship operation record."""
+    op_id = op_record.get("operation_id", "<unknown>")
+    state = op_record.get("operation_state")
+
+    if state in (_RelationshipOperationState.NO_EFFECT, _RelationshipOperationState.REVERTED):
+        return
+
+    if state == _RelationshipOperationState.PREPARED:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.NO_EFFECT,
+        )
+        return
+
+    if state == _RelationshipOperationState.RECOVERY_UNCERTAIN:
+        restoration_errors.append(
+            f"Relationship operation '{op_id}' is in RECOVERY_UNCERTAIN state"
+        )
+        return
+
+    try:
+        _trigger_fault_injection(
+            "during_relationship_rollback_undo",
+            {"op": op_record, "tx": active_tx},
+        )
+    except BaseException as hook_exc:
+        if op_record.get("operation_state") in (
+            _RelationshipOperationState.APPLYING,
+            _RelationshipOperationState.APPLIED_VERIFIED,
+            _RelationshipOperationState.CONFIRMED,
+        ):
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+        restoration_errors.append(
+            f"Relationship operation '{op_id}' rollback failed due to fault: {hook_exc}"
+        )
+        return
+
+    src_id = op_record.get("source_identity", {})
+    tgt_id = op_record.get("target_identity", {})
+    orig_rel = op_record.get("original_relationship_state", {})
+    category = orig_rel.get("category", "OWNERSHIP_UNKNOWN")
+    mutation = op_record.get("intended_mutation")
+
+    col_ref = src_id.get("ref", op_record.get("source_reference"))
+    col_ptr = src_id.get("ptr")
+    obj_ref = tgt_id.get("ref", op_record.get("target_reference"))
+    obj_ptr = tgt_id.get("ptr")
+
+    live_col = _find_live_collection_by_identity(col_ref, col_ptr)
+    live_obj = _find_live_object_by_identity(obj_ref, obj_ptr) if obj_ptr is not None else None
+
+    if state == _RelationshipOperationState.APPLYING:
+        if live_col is None or live_obj is None or category == "OWNERSHIP_UNKNOWN":
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Relationship operation '{op_id}' interrupted in APPLYING with invalid identity or unknown ownership"
+            )
+            return
+
+        is_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
+        if mutation == "COLLECTION_OBJECT_LINK":
+            if not is_linked:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.NO_EFFECT,
+                )
+                return
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+            state = _RelationshipOperationState.APPLIED_VERIFIED
+        elif mutation == "COLLECTION_OBJECT_UNLINK":
+            if is_linked:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.NO_EFFECT,
+                )
+                return
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+            state = _RelationshipOperationState.APPLIED_VERIFIED
+        else:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Relationship operation '{op_id}' has unsupported mutation '{mutation}'"
+            )
+            return
+
+    if state not in (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED):
+        restoration_errors.append(
+            f"Relationship operation '{op_id}' in unexpected state '{state}' during rollback"
+        )
+        return
+
+    if live_col is None or live_obj is None or category == "OWNERSHIP_UNKNOWN":
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        restoration_errors.append(
+            f"Relationship operation '{op_id}' cannot be reverted: target/source identity invalid or ownership unknown (category={category})"
+        )
+        return
+
+    if mutation == "COLLECTION_OBJECT_LINK":
+        if category != "TX_ADDED":
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Relationship operation '{op_id}' has non-revocable category '{category}' in state '{state}'"
+            )
+            return
+        try:
+            if _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
+                live_col.objects.unlink(live_obj)
+            still_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
+        except BaseException as unlink_exc:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Failed to revert COLLECTION_OBJECT_LINK '{op_id}': {unlink_exc}"
+            )
+            return
+
+        if still_linked:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Failed to revert COLLECTION_OBJECT_LINK '{op_id}': object still linked after unlink"
+            )
+            return
+
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.REVERTED,
+        )
+    elif mutation == "COLLECTION_OBJECT_UNLINK":
+        if category != "TX_UNLINKED_ORIGINAL":
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Relationship operation '{op_id}' has invalid unlink category '{category}' in state '{state}'"
+            )
+            return
+        try:
+            if not _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
+                live_col.objects.link(live_obj)
+            now_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
+        except BaseException as link_exc:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Failed to revert COLLECTION_OBJECT_UNLINK '{op_id}': {link_exc}"
+            )
+            return
+
+        if not now_linked:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(
+                f"Failed to revert COLLECTION_OBJECT_UNLINK '{op_id}': object not linked after link"
+            )
+            return
+
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.REVERTED,
+        )
+    else:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        restoration_errors.append(
+            f"Relationship operation '{op_id}' has unsupported mutation '{mutation}'"
+        )
+
+
+def _authorized_ensure_snapshot_collection_link(
+    col: Optional[bpy.types.Collection],
+    obj_ref: bpy.types.Object,
+    obj_ptr: Optional[int],
+    restoration_errors: List[str],
+) -> None:
+    """Layer 3 restoration of a pre-existing snapshot Collection <-> Object membership by verified identity."""
+    if col is None:
+        return
+    try:
+        col_ptr = col.as_pointer()
+    except ReferenceError:
+        restoration_errors.append("Snapshot collection reference destroyed before membership restoration")
+        return
+
+    live_col = _find_live_collection_by_identity(col, col_ptr)
+    if live_col is None:
+        restoration_errors.append("Snapshot collection identity lost during membership restoration")
+        return
+
+    if obj_ptr is None:
+        try:
+            obj_ptr = obj_ref.as_pointer()
+        except ReferenceError:
+            restoration_errors.append("Snapshot member object destroyed before membership restoration")
+            return
+
+    live_obj = _find_live_object_by_identity(obj_ref, obj_ptr)
+    if live_obj is None:
+        restoration_errors.append("Snapshot member object identity lost during membership restoration")
+        return
+
+    if not _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
+        live_col.objects.link(live_obj)
+
+
+def _authorized_restore_collection_object_relationships(
+    active_tx: Optional[Any],
+    snapshot: Dict[str, Any],
+    restoration_errors: List[str],
+    phase: str = "ALL",
+) -> None:
+    """Layer 3 authoritative rollback and restoration of Collection <-> Object relationships."""
+    if phase in ("ALL", "PRE_CONTROLLER_REMOVE") and active_tx is not None:
+        logged_records = list(getattr(active_tx, "prepared_relationship_mutations", []))
+        logged_link_pairs = set()
+        for op_record in reversed(logged_records):
+            if op_record.get("intended_mutation") == "COLLECTION_OBJECT_LINK":
+                src_id = op_record.get("source_identity", {})
+                tgt_id = op_record.get("target_identity", {})
+                logged_link_pairs.add((src_id.get("ptr"), tgt_id.get("ptr")))
+                _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
+
+        # Backward-compatibility for any manually registered created_collection_links not in prepared_relationship_mutations
+        for link_rec in reversed(list(getattr(active_tx, "created_collection_links", []))):
+            col_ref = link_rec.get("col_ref")
+            col_ptr = link_rec.get("col_ptr")
+            obj_ref = link_rec.get("obj_ref")
+            obj_ptr = link_rec.get("obj_ptr")
+            if (col_ptr, obj_ptr) in logged_link_pairs:
+                continue
+            live_col = _find_live_collection_by_identity(col_ref, col_ptr)
+            live_obj = _find_live_object_by_identity(obj_ref, obj_ptr) if obj_ptr is not None else None
+            if live_col is not None and live_obj is not None:
+                if _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
+                    live_col.objects.unlink(live_obj)
+
+    if phase in ("ALL", "POST_CONTROLLER_RESTORE"):
+        if active_tx is not None:
+            for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
+                if op_record.get("intended_mutation") != "COLLECTION_OBJECT_LINK" or phase == "ALL":
+                    _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
+
+        # Ensure pre-existing controller collection memberships from snapshot are intact by identity
+        controllers_snap = snapshot.get("controllers", {})
+        for c_name, c_snap in controllers_snap.items():
+            if not c_snap.get("exists"):
+                continue
+            original_ref = c_snap.get("obj_ref")
+            original_ptr = c_snap.get("obj_ptr")
+            if original_ref is None or original_ptr is None:
+                continue
+            live_original = _find_live_object_by_identity(original_ref, original_ptr)
+            if live_original is None:
+                continue
+            col_refs = c_snap.get("collection_refs")
+            col_ptrs = c_snap.get("collection_ptrs")
+            if col_refs is not None and col_ptrs is not None and len(col_refs) == len(col_ptrs):
+                for c_ref, c_ptr in zip(col_refs, col_ptrs):
+                    live_col = _find_live_collection_by_identity(c_ref, c_ptr)
+                    if live_col is not None:
+                        _authorized_ensure_snapshot_collection_link(
+                            live_col, live_original, original_ptr, restoration_errors
+                        )
+            else:
+                for col_name in c_snap.get("collections", []):
+                    col = _find_collection_by_name(col_name)
+                    if col is not None:
+                        _authorized_ensure_snapshot_collection_link(
+                            col, live_original, original_ptr, restoration_errors
+                        )
+
+        # Ensure stashed objects' original collection memberships are intact by identity
+        if active_tx is not None:
+            for stashed in getattr(active_tx, "stashed_objects", []):
+                obj = stashed.get("stashed_obj")
+                obj_ptr = stashed.get("stashed_obj_ptr")
+                live_stashed = _find_live_object_by_identity(obj, obj_ptr) if (obj and obj_ptr) else obj
+                if live_stashed is None:
+                    continue
+                s_col_refs = stashed.get("collection_refs")
+                s_col_ptrs = stashed.get("collection_ptrs")
+                if s_col_refs is not None and s_col_ptrs is not None and len(s_col_refs) == len(s_col_ptrs):
+                    for c_ref, c_ptr in zip(s_col_refs, s_col_ptrs):
+                        live_col = _find_live_collection_by_identity(c_ref, c_ptr)
+                        if live_col is not None:
+                            _authorized_ensure_snapshot_collection_link(
+                                live_col, live_stashed, obj_ptr, restoration_errors
+                            )
+                else:
+                    for col_name in stashed.get("collections", []):
+                        col = _find_collection_by_name(col_name)
+                        if col is not None:
+                            _authorized_ensure_snapshot_collection_link(
+                                col, live_stashed, obj_ptr, restoration_errors
+                            )
+
+
 def _rollback_arm_rig_state(
     arm: bpy.types.Object,
     snapshot: Dict[str, Any],
@@ -446,7 +1156,15 @@ def _rollback_arm_rig_state(
     restoration_errors: List[str] = []
 
     # Step 1: Controller cleanup, stashed object restoration, and transform restoration
-    # 1.0: First clean up transaction-owned controller objects by identity
+    # 1.0a: Revert transaction-created Collection <-> Object links via Layer 3 before removing created controllers
+    _authorized_restore_collection_object_relationships(
+        active_tx,
+        snapshot,
+        restoration_errors,
+        phase="PRE_CONTROLLER_REMOVE",
+    )
+
+    # 1.0b: Clean up transaction-owned controller objects by identity
     if active_tx is not None:
         for record in getattr(active_tx, "created_controller_objects", []):
             live_obj = _find_live_object_by_identity(
@@ -511,31 +1229,6 @@ def _rollback_arm_rig_state(
         if live_original.name != original_name:
             live_original.name = original_name
 
-        for col_name in c_snap.get("collections", []):
-            col = _find_collection_by_name(col_name)
-            if col is not None and live_original.name not in col.objects:
-                col.objects.link(live_original)
-
-        if active_tx is not None:
-            for link_rec in list(getattr(active_tx, "created_collection_links", [])):
-                if link_rec.get("obj_ptr") == original_ptr or link_rec.get("obj_ref") == live_original:
-                    col_ref = link_rec.get("col_ref")
-                    col_ptr = link_rec.get("col_ptr")
-                    col_name = link_rec.get("col_name")
-                    for col in list(live_original.users_collection):
-                        try:
-                            matches = False
-                            if col_ptr and col.as_pointer() == col_ptr:
-                                matches = True
-                            elif col_ref is not None and col == col_ref:
-                                matches = True
-                            elif col.name == col_name:
-                                matches = True
-                            if matches and col.name not in c_snap.get("collections", []):
-                                col.objects.unlink(live_original)
-                        except ReferenceError:
-                            continue
-
         live_original.parent = c_snap["parent"]
         live_original.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
         live_original.rotation_mode = c_snap["rotation_mode"]
@@ -550,7 +1243,7 @@ def _rollback_arm_rig_state(
             if c_snap.get("empty_display_size") is not None:
                 live_original.empty_display_size = c_snap["empty_display_size"]
 
-    # Also ensure any other stashed objects from active_tx are restored
+    # Also ensure any other stashed objects from active_tx have their names restored before re-linking
     if active_tx is not None:
         for stashed in getattr(active_tx, "stashed_objects", []):
             obj = stashed.get("stashed_obj")
@@ -562,10 +1255,14 @@ def _rollback_arm_rig_state(
                     name_owner = bpy.data.objects.get(orig_name)
                     if name_owner is None or name_owner == live_stashed:
                         live_stashed.name = orig_name
-                for col_name in stashed.get("collections", []):
-                    col = _find_collection_by_name(col_name)
-                    if col is not None and live_stashed.name not in col.objects:
-                        col.objects.link(live_stashed)
+
+    # 1.1: Restore unlinked original Collection <-> Object memberships via Layer 3
+    _authorized_restore_collection_object_relationships(
+        active_tx,
+        snapshot,
+        restoration_errors,
+        phase="POST_CONTROLLER_RESTORE",
+    )
 
     # Step 2: Pose bones and constraints restoration
     pose_bones_snap = snapshot.get("pose_bones", {})
@@ -873,7 +1570,7 @@ def _rollback_arm_rig_state(
                         if not linked:
                             col.children.link(child)
 
-                    # Member Objects restoration by reference
+                    # Member Objects restoration by reference via Layer 3
                     expected_refs = char_col_snap.get(
                         "object_refs", []
                     )
@@ -887,12 +1584,12 @@ def _rollback_arm_rig_state(
                             )
                             continue
 
-                        found = any(
-                            current.as_pointer() == obj_ptr
-                            for current in col.objects
+                        _authorized_ensure_snapshot_collection_link(
+                            col,
+                            obj,
+                            obj_ptr,
+                            restoration_errors,
                         )
-                        if not found:
-                            col.objects.link(obj)
 
     _depsgraph_update()
 
@@ -1323,6 +2020,24 @@ def _verify_arm_rig_state_restored(
         if _ACTIVE_TRANSACTION_STACK != [active_tx]:
             diffs.append(f"Active transaction stack contains unexpected transactions: {_ACTIVE_TRANSACTION_STACK}")
 
+    # 5. Relationship operation log terminal state verification (Task 10-B-11)
+    if active_tx is not None:
+        for op_rec in getattr(active_tx, "prepared_relationship_mutations", []):
+            op_id = op_rec.get("operation_id", "<unknown>")
+            op_state = op_rec.get("operation_state")
+            if op_state == _RelationshipOperationState.RECOVERY_UNCERTAIN:
+                diffs.append(
+                    f"Relationship operation '{op_id}' is in RECOVERY_UNCERTAIN state after rollback"
+                )
+            elif op_state not in (
+                _RelationshipOperationState.NO_EFFECT,
+                _RelationshipOperationState.REVERTED,
+            ):
+                diffs.append(
+                    f"Relationship operation '{op_id}' did not reach a valid rollback terminal state "
+                    f"(expected NO_EFFECT or REVERTED, got {op_state})"
+                )
+
     if diffs:
         raise RuntimeError("Arm rig rollback verification failed: " + "; ".join(diffs))
 
@@ -1344,6 +2059,9 @@ class _ArmRigTransactionContext:
         self.created_collection_links: List[
             Dict[str, Any]
         ] = []
+        self.prepared_relationship_mutations: List[
+            Dict[str, Any]
+        ] = []
         self.stashed_objects: List[Dict[str, Any]] = []
         self.stashed_constraints: List[Dict[str, Any]] = []
         self.created_collections: List[Dict[str, Any]] = []
@@ -1356,6 +2074,66 @@ class _ArmRigTransactionContext:
     def committed(self) -> bool:
         """Backward-compatibility property reflecting logical commit status."""
         return self.state in (_ArmRigTransactionState.COMMITTED, _ArmRigTransactionState.CLEANUP_PENDING)
+
+    def prepare_relationship_mutation(
+        self,
+        source_reference: Any,
+        target_reference: Any,
+        original_relationship_state: Dict[str, Any],
+        intended_mutation: str,
+    ) -> Dict[str, Any]:
+        """PREPARE stage: create and register a 7-state relationship operation log record before mutation."""
+        src_ptr = source_reference.as_pointer() if hasattr(source_reference, "as_pointer") else None
+        tgt_ptr = target_reference.as_pointer() if hasattr(target_reference, "as_pointer") else None
+        src_name = getattr(source_reference, "name", None)
+        tgt_name = getattr(target_reference, "name", None)
+
+        op_record: Dict[str, Any] = {
+            "operation_id": f"rel_{self.tx_id}_{len(self.prepared_relationship_mutations) + 1:04d}_{uuid.uuid4().hex[:6]}",
+            "transaction_id": self.tx_id,
+            "source_reference": source_reference,
+            "target_reference": target_reference,
+            "source_identity": {
+                "ref": source_reference,
+                "ptr": src_ptr,
+                "name": src_name,
+                "kind": type(source_reference).__name__,
+            },
+            "target_identity": {
+                "ref": target_reference,
+                "ptr": tgt_ptr,
+                "name": tgt_name,
+                "kind": type(target_reference).__name__,
+            },
+            "original_relationship_state": dict(original_relationship_state),
+            "intended_mutation": intended_mutation,
+            "operation_state": _RelationshipOperationState.PREPARED,
+        }
+        self.prepared_relationship_mutations.append(op_record)
+        return op_record
+
+    def update_relationship_mutation_state(
+        self,
+        op_record: Dict[str, Any],
+        new_state: _RelationshipOperationState,
+    ) -> None:
+        """Transition a relationship operation record across the approved 7-state machine."""
+        raw_current = op_record.get("operation_state")
+        current_state = (
+            raw_current
+            if isinstance(raw_current, _RelationshipOperationState)
+            else _RelationshipOperationState(raw_current)
+        )
+        target_state = (
+            new_state
+            if isinstance(new_state, _RelationshipOperationState)
+            else _RelationshipOperationState(new_state)
+        )
+        if (current_state, target_state) not in _LEGAL_RELATIONSHIP_LOG_TRANSITIONS:
+            raise RuntimeError(
+                f"Illegal relationship operation state transition: {current_state} -> {target_state}"
+            )
+        op_record["operation_state"] = target_state
 
     def register_created_controller(
         self,
@@ -1853,13 +2631,24 @@ def _get_or_create_empty(
                 "stashed_data_ptr": getattr(obj, "data", None).as_pointer() if (getattr(obj, "data", None) and hasattr(getattr(obj, "data", None), "as_pointer")) else None,
                 "stashed_data_name": getattr(obj, "data", None).name if getattr(obj, "data", None) else None,
                 "collections": [c.name for c in obj.users_collection],
+                "collection_refs": list(obj.users_collection),
+                "collection_ptrs": [
+                    c.as_pointer()
+                    for c in obj.users_collection
+                    if hasattr(c, "as_pointer")
+                ],
                 "obj_cleaned": False,
                 "data_cleaned": False,
             }
             tx.stashed_objects.append(stashed_record)
             obj.name = f"__stashed_doomed_{name}__"
             for c in list(obj.users_collection):
-                c.objects.unlink(obj)
+                _authorized_unlink_object_from_collection(
+                    c,
+                    obj,
+                    active_tx=tx,
+                    category="TX_UNLINKED_ORIGINAL",
+                )
             obj = None
             replaced_wrong_type = True
         else:
@@ -1869,13 +2658,11 @@ def _get_or_create_empty(
 
     if obj is None:
         obj = bpy.data.objects.new(name, None)
-        if _ACTIVE_TRANSACTION_STACK:
-            active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
+        if active_tx is not None:
             active_tx.register_created_controller(obj)
         _trigger_fault_injection("get_or_create_empty_after_register", {"obj": obj, "name": name})
-        collection.objects.link(obj)
-        if _ACTIVE_TRANSACTION_STACK:
-            active_tx.register_created_collection_link(collection, obj)
+        _authorized_link_object_to_collection(collection, obj, active_tx=active_tx)
         obj.empty_display_type = display_type
         obj.empty_display_size = display_size
         obj.rotation_mode = "XYZ"
@@ -1886,11 +2673,9 @@ def _get_or_create_empty(
             _trigger_fault_injection("setup_arm_ik_after_controller_replaced", {"obj": obj, "name": name})
         return obj, True
 
-    # Existing valid Empty: ensure linked to collection and update display properties
-    if obj.name not in collection.objects:
-        collection.objects.link(obj)
-        if _ACTIVE_TRANSACTION_STACK:
-            _ACTIVE_TRANSACTION_STACK[-1].register_created_collection_link(collection, obj)
+    # Existing valid Empty: ensure linked to collection via Layer 3 and update display properties
+    active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
+    _authorized_link_object_to_collection(collection, obj, active_tx=active_tx)
     obj.empty_display_type = display_type
     obj.empty_display_size = display_size
     return obj, False
