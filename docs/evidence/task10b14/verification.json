@@ -1,0 +1,169 @@
+{
+  "task": "TASK 10-B-14",
+  "baseline_commit": "792262e8e7dc7e19c10444d4ff407cb2a87ad8aa",
+  "branch": "audit/task-10-b-9",
+  "created_at_utc": "2026-11-08T15:30:00Z",
+  "audit_scope": [
+    "src/rig/arm_ik.py",
+    "tests/test_task10b_transaction_atomicity.py",
+    "tests/test_task10b_input_validation.py",
+    "tests/test_arm_ik_lifecycle_world_transform_contract.py",
+    "ARCHITECTURE_SYNC.md (Section 10)",
+    "docs/ARCHITECTURE_CHANGE_GATE.md"
+  ],
+  "contracts_audited": {
+    "CONTRACT-01": "VERIFIED",
+    "CONTRACT-02": "VERIFIED",
+    "CONTRACT-03": "VERIFIED",
+    "CONTRACT-04": "VERIFIED",
+    "CONTRACT-05": "VERIFIED",
+    "CONTRACT-06": "VERIFIED",
+    "CONTRACT-07": "VERIFIED",
+    "CONTRACT-08": "VERIFIED",
+    "CONTRACT-09": "VERIFIED",
+    "CONTRACT-10": "VERIFIED",
+    "CONTRACT-11": "VERIFIED",
+    "CONTRACT-12": "VERIFIED"
+  },
+  "results": [
+    {
+      "suite": "atomicity",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "--background",
+        "--factory-startup",
+        "--python",
+        "tests/test_task10b_transaction_atomicity.py"
+      ],
+      "exit_code": 0,
+      "expected_tests": 157,
+      "observed_tests": 157,
+      "passed": 157,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/atomicity.log"
+    },
+    {
+      "suite": "input_validation",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "--background",
+        "--factory-startup",
+        "--python",
+        "tests/test_task10b_input_validation.py"
+      ],
+      "exit_code": 0,
+      "expected_tests": 30,
+      "observed_tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/input_validation.log"
+    },
+    {
+      "suite": "lifecycle",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "--background",
+        "--factory-startup",
+        "--python",
+        "tests/test_arm_ik_lifecycle_world_transform_contract.py"
+      ],
+      "exit_code": 0,
+      "expected_tests": 30,
+      "observed_tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/lifecycle.log"
+    },
+    {
+      "suite": "tier_quick",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+        "tests/run_test_suite.py",
+        "--tier",
+        "quick",
+        "--output-dir",
+        "docs/evidence/task10b14/tier_quick"
+      ],
+      "exit_code": 0,
+      "expected_tests": 19,
+      "observed_tests": 19,
+      "passed": 19,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/tier_quick.log"
+    },
+    {
+      "suite": "tier_physics",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+        "tests/run_test_suite.py",
+        "--tier",
+        "physics",
+        "--output-dir",
+        "docs/evidence/task10b14/tier_physics"
+      ],
+      "exit_code": 0,
+      "expected_tests": 27,
+      "observed_tests": 27,
+      "passed": 27,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/tier_physics.log"
+    },
+    {
+      "suite": "tier_motion",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+        "tests/run_test_suite.py",
+        "--tier",
+        "motion",
+        "--output-dir",
+        "docs/evidence/task10b14/tier_motion"
+      ],
+      "exit_code": 0,
+      "expected_tests": 12,
+      "observed_tests": 12,
+      "passed": 12,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/tier_motion.log"
+    },
+    {
+      "suite": "tier_full",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+        "tests/run_test_suite.py",
+        "--tier",
+        "full",
+        "--output-dir",
+        "docs/evidence/task10b14/tier_full"
+      ],
+      "exit_code": 0,
+      "expected_tests": 42,
+      "observed_tests": 42,
+      "passed": 42,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/tier_full.log"
+    },
+    {
+      "suite": "architecture_integrity_gate",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+        "tests/test_architecture_integrity_gate.py"
+      ],
+      "exit_code": 0,
+      "expected_tests": 1,
+      "observed_tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "success": true,
+      "log": "docs/evidence/task10b14/architecture_integrity_gate.log"
+    }
+  ],
+  "open_defects_count": 0,
+  "status": "AUDIT_COMPLETED_ZERO_DEFECTS"
+}
