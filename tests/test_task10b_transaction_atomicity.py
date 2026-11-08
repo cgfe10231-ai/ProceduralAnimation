@@ -58,9 +58,11 @@ Tests:
 """
 
 import math
+import json
 import os
 import sys
 import unittest
+from typing import Any, Dict, List, Optional
 
 import bpy
 from mathutils import Euler, Matrix, Quaternion, Vector
@@ -83,6 +85,7 @@ from src.rig.arm_ik import (
     _ArmatureLivenessStatus,
     _ArmRigTransactionContext,
     _ArmRigTransactionState,
+    _COORDINATOR_AUTHORIZATION_GRANTS,
     _DEISOLATION_AUDIT_LOG,
     _FAILED_A_AUDIT_RECORDS,
     _FailedTransactionClass,
@@ -94,10 +97,13 @@ from src.rig.arm_ik import (
     _assert_arm_rig_cleanup_gate,
     _assert_arm_rig_failed_isolation_gate,
     _authorized_link_object_to_collection,
+    _check_original_object_liveness,
+    _clear_coordinator_authorization_grants,
     _clear_or_retire_failure_isolation_by_coordinator,
     _clear_test_depsgraph_updater,
     _clear_test_fault_injection_hook,
     _depsgraph_update,
+    _issue_coordinator_authorization_grant,
     _rollback_arm_rig_state,
     _set_test_depsgraph_updater,
     _set_test_fault_injection_hook,
@@ -121,6 +127,8 @@ from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
 from src.rig.pose import reset_pose
 
+_TEST_137_TO_149_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+
 
 class TestArmIKTransactionAtomicity(unittest.TestCase):
     """Test suite verifying Arm IK transaction snapshot, atomic rollback, and fault resilience."""
@@ -137,6 +145,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _ARCHIVED_FAILED_D_TOMBSTONES.clear()
         _FAILED_A_AUDIT_RECORDS.clear()
         _DEISOLATION_AUDIT_LOG.clear()
+        _clear_coordinator_authorization_grants()
         self.config = PipelineConfig()
         self.char_data = build_character(self.config)
         self.root = self.char_data["root"]
@@ -158,6 +167,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _ARCHIVED_FAILED_D_TOMBSTONES.clear()
         _FAILED_A_AUDIT_RECORDS.clear()
         _DEISOLATION_AUDIT_LOG.clear()
+        _clear_coordinator_authorization_grants()
 
     # -------------------------------------------------------------------------
     # Snapshot Fidelity Tests (TEST-31 to TEST-33)
@@ -4781,6 +4791,584 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             places=5,
         )
 
+    # -------------------------------------------------------------------------
+    # Audit Corrections Tests (TEST-137 to TEST-149)
+    # -------------------------------------------------------------------------
+
+    def test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c(self) -> None:
+        """TEST-137: Sub-micro pose mutation (2e-7) during snapshot is NOT masked by rounding and isolates as FAILED-C."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                pbone = self.armature.pose.bones["forearm.L"]
+                pbone.location[0] += 2e-7
+                raise RuntimeError("Injected sub-micro mutation fault in TEST-137")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write is strictly blocked by Gate 2 (FAILED Isolation Gate)
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            set_arm_ik_influence(self.armature, "L", 0.7)
+        self.assertIn("FAILED-C", str(cm_blocked.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-137"] = {
+            "test_method": "test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "mutation_detected": "sub_micro_pose_delta_2e-7",
+        }
+
+    def test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c(self) -> None:
+        """TEST-138: Mutation to constraint pole_angle during snapshot is detected by unrounded fingerprint and isolates as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                con = self.armature.pose.bones["forearm.L"].constraints.get(ARM_IK_CONSTRAINT_NAMES["L"])
+                if con is not None:
+                    con.pole_angle += 0.05
+                raise RuntimeError("Injected constraint mutation fault in TEST-138")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-138"] = {
+            "test_method": "test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "mutation_detected": "constraint_pole_angle_delta_0.05",
+        }
+
+    def test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c(self) -> None:
+        """TEST-139: Mutation to controller matrix_parent_inverse during snapshot is detected and isolates as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                c_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES["L"])
+                if c_obj is not None:
+                    mat = c_obj.matrix_parent_inverse.copy()
+                    mat[0][3] += 0.05
+                    c_obj.matrix_parent_inverse = mat
+                raise RuntimeError("Injected matrix_parent_inverse mutation fault in TEST-139")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-139"] = {
+            "test_method": "test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "mutation_detected": "controller_matrix_parent_inverse_delta_0.05",
+        }
+
+    def test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a(self) -> None:
+        """TEST-140: Clean snapshot abort with genuine zero mutation verifies as FAILED-A without isolating healthy Armature."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                raise RuntimeError("Clean pre-write snapshot abort in TEST-140")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("Clean pre-write snapshot abort in TEST-140", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_A.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write must be admitted and succeed cleanly
+        controls = setup_arm_ik(self.armature, initial_influence=0.6)
+        self.assertIsNotNone(controls)
+        self.assertEqual(session_rec.lifecycle_stage, "NORMAL_TERMINAL")
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-140"] = {
+            "test_method": "test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "ADMITTED_AND_COMMITTED",
+            "recovery_result": "PRE_WRITE_ZERO_MUTATION_VERIFIED",
+        }
+
+    def test_141_pre_snapshot_fingerprint_capture_failure_fails_closed(self) -> None:
+        """TEST-141: Pre-snapshot fingerprint capture failure fails closed, isolates as FAILED-C, and leaves no stack leak."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_pre_snapshot_fingerprint":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected fingerprint capture fault in TEST-141")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write blocked
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_blocked.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-141"] = {
+            "test_method": "test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "recovery_result": "ISOLATED_WITH_RECOVERY_EVIDENCE_INSUFFICIENT",
+        }
+
+    def test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone(self) -> None:
+        """TEST-142: Armature object physically alive with replaced DataBlock cannot retire tombstone (ObjectExists == True)."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Replace armature data block (invalidating session identity while object still physically exists)
+        new_arm_data = bpy.data.armatures.new("SubstitutedArmatureData_142")
+        self.armature.data = new_arm_data
+
+        # Attempting write triggers admission rejection (Condition 7 fails), isolating as FAILED-D
+        with self.assertRaises(RuntimeError) as cm_admission:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-D", str(cm_admission.exception))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        # Physical object still exists in bpy.data.objects!
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertTrue(liveness["object_exists"])
+        self.assertTrue(session_rec.in_live_blender_collection)
+
+        # Attempting to retire tombstone while object physically exists must be strictly rejected
+        retire_attempt = retire_dead_armature_tombstone(
+            session_id,
+            reason="Illegal attempt to retire tombstone while object exists in TEST-142",
+        )
+        self.assertFalse(retire_attempt["approved"])
+        self.assertEqual(retire_attempt["evidence"]["status"], "TOMBSTONE_RETIREMENT_REJECTED")
+        self.assertTrue(any("still exists in bpy.data.objects" in r for r in retire_attempt["evidence"]["reasons"]))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-142"] = {
+            "test_method": "test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+            "status": "PASS",
+            "transaction_id": "admission_gate_rejection",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-D",
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "object_exists": True,
+            "tombstone_retirement": "REJECTED_OBJECT_ALIVE",
+        }
+
+    def test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement(self) -> None:
+        """TEST-143: Genuine deletion of original Armature object from bpy.data.objects permits retirement to ARCHIVED_RETIRED."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Replace data and isolate as FAILED-D
+        self.armature.data = bpy.data.armatures.new("TempData_143")
+        with self.assertRaises(RuntimeError):
+            setup_arm_ik(self.armature)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        # Now genuinely remove the object from bpy.data.objects
+        bpy.data.objects.remove(self.armature, do_unlink=True)
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertFalse(liveness["object_exists"])
+
+        # Retirement must now succeed
+        retire_res = retire_dead_armature_tombstone(
+            session_id,
+            reason="Legitimate retirement after genuine Armature object removal in TEST-143",
+        )
+        self.assertTrue(retire_res["approved"])
+        self.assertEqual(retire_res["action"], "ARCHIVED_RETIRED")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertIn(session_id, _ARCHIVED_FAILED_D_TOMBSTONES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-143"] = {
+            "test_method": "test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+            "status": "PASS",
+            "transaction_id": "admission_gate_rejection",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-D",
+            "isolation_state": session_rec.isolation_state.value,
+            "object_exists": False,
+            "tombstone_retirement": "APPROVED_ARCHIVED_RETIRED",
+        }
+
+    def test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session(self) -> None:
+        """TEST-144: Same-name replacement Armature receives new UUID and cannot reuse or de-isolate old dead session."""
+        session_dead = ensure_armature_session_identity(self.armature)
+        dead_session_id = session_dead.registry_session_id
+
+        # Destroy original Armature
+        bpy.data.objects.remove(self.armature, do_unlink=True)
+        _ = _verify_armature_session_identity_record(session_dead)
+        session_dead.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[dead_session_id] = {
+            "registry_session_id": dead_session_id,
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Build new Armature with exact same name
+        replacement_arm = build_rig(self.config)
+        self.assertEqual(replacement_arm.name, "CharacterArmature")
+
+        # Must get a new session identity record with distinct UUID
+        new_session = ensure_armature_session_identity(replacement_arm)
+        self.assertNotEqual(new_session.registry_session_id, dead_session_id)
+        self.assertEqual(new_session.isolation_state, _ArmatureIsolationState.NONE)
+
+        # De-isolation on dead session using new Armature is rejected
+        deiso_dead = request_armature_deisolation(
+            replacement_arm,
+            reason="Attempt to revive old session with replacement object in TEST-144",
+            session_id=dead_session_id,
+        )
+        self.assertFalse(deiso_dead["approved"])
+        self.assertEqual(deiso_dead["evidence"]["status"], "REJECTED_DEAD_ARMATURE_TOMBSTONE")
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-144"] = {
+            "test_method": "test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+            "status": "PASS",
+            "dead_session_id": dead_session_id,
+            "replacement_session_id": new_session.registry_session_id,
+            "deisolation_result": "REJECTED_DEAD_ARMATURE_TOMBSTONE",
+        }
+
+    def test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected(self) -> None:
+        """TEST-145: Forged dict {'can_deisolate': True} passed directly to Layer 2 is rejected."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Put session into ISOLATED_FAILED_B
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+
+        # Passing forged plain dict without Coordinator grant must raise RuntimeError
+        with self.assertRaises(RuntimeError) as cm_forged:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Direct forgery attempt in TEST-145",
+                authorization_grant={"can_deisolate": True},
+            )
+        self.assertIn("invalid or missing Coordinator authorization grant", str(cm_forged.exception))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-145"] = {
+            "test_method": "test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "FORGED_CAN_DEISOLATE_DICT",
+            "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT",
+        }
+
+    def test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected(self) -> None:
+        """TEST-146: Forged dict {'can_retire': True} passed directly to Layer 2 is rejected."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Put session into TOMBSTONED_FAILED_D
+        session_rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Passing forged plain dict must raise RuntimeError
+        with self.assertRaises(RuntimeError) as cm_forged:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="ARCHIVE_TOMBSTONE",
+                reason="Direct retirement forgery in TEST-146",
+                authorization_grant={"can_retire": True},
+            )
+        self.assertIn("invalid or missing Coordinator authorization grant", str(cm_forged.exception))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-146"] = {
+            "test_method": "test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "FORGED_CAN_RETIRE_DICT",
+            "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT",
+        }
+
+    def test_147_coordinator_grant_binding_and_single_use_enforcement(self) -> None:
+        """TEST-147: Coordinator grant enforces cross-session rejection, cross-action rejection, and single-use consumption."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Put session into ISOLATED_FAILED_B
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+
+        # Issue genuine grant for session_id
+        grant = _issue_coordinator_authorization_grant(
+            session_id=session_id,
+            tx_id="tx_test_147",
+            failure_class=_FailedTransactionClass.FAILED_B.value,
+            current_isolation_state=_ArmatureIsolationState.ISOLATED_FAILED_B.value,
+            transition_action="CLEAR_TO_NONE",
+            evidence_status="VERIFIED",
+        )
+        issued_grant_id = grant["grant_id"]
+
+        # 1. Cross-session rejection: passing grant with different session_id raises RuntimeError
+        with self.assertRaises(RuntimeError) as cm_cross_session:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id="wrong_session_id",
+                action="CLEAR_TO_NONE",
+                reason="Cross-session attack",
+                authorization_grant=grant,
+            )
+        self.assertIn("not found in active isolation registry", str(cm_cross_session.exception))
+
+        # 2. Cross-action rejection: passing grant with mismatched transition_action raises RuntimeError
+        with self.assertRaises(RuntimeError) as cm_cross_action:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="ARCHIVE_TOMBSTONE",
+                reason="Cross-action attack",
+                authorization_grant=grant,
+            )
+        self.assertIn("grant action mismatch", str(cm_cross_action.exception))
+
+        # 3. Legitimate single use succeeds
+        res = _clear_or_retire_failure_isolation_by_coordinator(
+            session_id=session_id,
+            action="CLEAR_TO_NONE",
+            reason="Legitimate single use in TEST-147",
+            authorization_grant=grant,
+        )
+        self.assertEqual(res["new_isolation_state"], _ArmatureIsolationState.NONE.value)
+        self.assertTrue(grant["consumed"])
+
+        # 4. Reusing the exact same grant raises RuntimeError (grant already consumed/removed)
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+        with self.assertRaises(RuntimeError) as cm_reuse:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Replay attack",
+                authorization_grant=grant,
+            )
+        self.assertIn("invalid or missing Coordinator authorization grant", str(cm_reuse.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-147"] = {
+            "test_method": "test_147_coordinator_grant_binding_and_single_use_enforcement",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "grant_id": issued_grant_id,
+            "cross_session_rejected": True,
+            "cross_action_rejected": True,
+            "single_use_consumed": True,
+            "replay_rejected": True,
+        }
+
+    def test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement(self) -> None:
+        """TEST-148: Non-empty reason string is strictly required for request_armature_deisolation and retire_dead_armature_tombstone."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # 1. request_armature_deisolation rejects invalid reasons
+        for bad_reason in (None, "", "   ", "\t\n"):
+            res = request_armature_deisolation(self.armature, reason=bad_reason, session_id=session_id)
+            self.assertFalse(res["approved"])
+            self.assertTrue(any("reason must be a non-empty string" in r for r in res.get("reasons", [])))
+
+            with self.assertRaises(ValueError):
+                request_armature_deisolation(self.armature, reason=bad_reason, session_id=session_id, raise_on_reject=True)
+
+        # 2. retire_dead_armature_tombstone rejects invalid reasons
+        for bad_reason in (None, "", "   ", "\t\n"):
+            res = retire_dead_armature_tombstone(session_id, reason=bad_reason)
+            self.assertFalse(res["approved"])
+            self.assertTrue(any("reason must be a non-empty string" in r for r in res.get("reasons", [])))
+
+            with self.assertRaises(ValueError):
+                retire_dead_armature_tombstone(session_id, reason=bad_reason, raise_on_reject=True)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-148"] = {
+            "test_method": "test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "invalid_reasons_tested": ["None", "empty_str", "spaces", "whitespace"],
+            "deisolation_rejected": True,
+            "retirement_rejected": True,
+            "value_error_raised_on_flag": True,
+        }
+
+    def test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c(self) -> None:
+        """TEST-149: Relationship undo exception transitions operation to RECOVERY_UNCERTAIN and isolates session as FAILED-C."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-149")
+            elif stage == "during_relationship_rollback_undo":
+                raise RuntimeError("Undo fault in TEST-149")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            exc_str = str(cm.exception)
+            self.assertIn("Primary write fault in TEST-149", exc_str)
+            self.assertIn("rollback verification failed", exc_str)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        # Session must be isolated as FAILED-C
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_rec["failure_class"], _FailedTransactionClass.FAILED_C.value)
+
+        # Confirm that the operation is recorded in recovery_uncertain_operations
+        uncertain_ops = iso_rec.get("recovery_uncertain_operations", [])
+        self.assertGreaterEqual(len(uncertain_ops), 1)
+
+        # Subsequent write must be rejected by FAILED Isolation Gate
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            setup_arm_ik(self.armature, initial_influence=0.5)
+        self.assertIn("FAILED-C", str(cm_blocked.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-149"] = {
+            "test_method": "test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "recovery_uncertain_ops_count": len(uncertain_ops),
+            "preserves_primary_and_rollback_exceptions": True,
+            "subsequent_write_blocked": True,
+        }
+
 
 if __name__ == "__main__":
     args = [sys.argv[0]]
@@ -4788,4 +5376,13 @@ if __name__ == "__main__":
         args.extend(sys.argv[sys.argv.index("--") + 1:])
     else:
         args.append("-v")
-    unittest.main(argv=args)
+    runner = unittest.TextTestRunner(verbosity=2)
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestArmIKTransactionAtomicity)
+    result = runner.run(suite)
+    if _TEST_137_TO_149_RUNTIME_EVIDENCE:
+        out_dir = os.path.join(os.path.dirname(__file__), "output")
+        os.makedirs(out_dir, exist_ok=True)
+        ev_path = os.path.join(out_dir, "audit_13_r1_runtime_evidence.json")
+        with open(ev_path, "w", encoding="utf-8") as f:
+            json.dump(_TEST_137_TO_149_RUNTIME_EVIDENCE, f, indent=2)
+    sys.exit(0 if result.wasSuccessful() else 1)

@@ -33,6 +33,7 @@ Task 10-A Contracts:
 """
 
 import math
+import time
 import uuid
 from contextlib import contextmanager
 from enum import Enum
@@ -334,6 +335,51 @@ def _safe_object_pointer(obj: Any, fallback: int = 0) -> int:
         return fallback
 
 
+def _check_original_object_liveness(record: ArmatureSessionIdentityRecord) -> Dict[str, Any]:
+    """Evaluate physical Blender Object existence (Eo) independently from data block identity (Ed)."""
+    if record is None:
+        return {"object_exists": False, "reason": "ArmatureSessionIdentityRecord is None"}
+    ref = record.original_blender_ref
+    if ref is None:
+        return {"object_exists": False, "reason": "original_blender_ref is None"}
+    try:
+        ref_ptr = int(ref.as_pointer())
+        ref_type = str(ref.type)
+        ref_name = str(ref.name)
+    except ReferenceError as re_err:
+        return {"object_exists": False, "reason": f"original_blender_ref raised ReferenceError ({re_err})"}
+    except BaseException as exc:
+        return {"object_exists": False, "reason": f"original_blender_ref access error ({exc})"}
+
+    if ref_ptr != record.registration_pointer:
+        return {
+            "object_exists": False,
+            "reason": f"Pointer mismatch: {ref_ptr} != {record.registration_pointer}",
+        }
+
+    in_live_objects = False
+    try:
+        for live_obj in bpy.data.objects.values():
+            try:
+                if live_obj.as_pointer() == ref_ptr and live_obj == ref:
+                    in_live_objects = True
+                    break
+            except ReferenceError:
+                continue
+    except BaseException:
+        in_live_objects = False
+
+    if not in_live_objects:
+        return {"object_exists": False, "reason": "original_blender_ref is absent from live bpy.data.objects.values()"}
+
+    return {
+        "object_exists": True,
+        "pointer": ref_ptr,
+        "type": ref_type,
+        "name": ref_name,
+    }
+
+
 def _verify_armature_session_identity_record(
     record: ArmatureSessionIdentityRecord,
     candidate_arm: Optional[bpy.types.Object] = None,
@@ -345,14 +391,20 @@ def _verify_armature_session_identity_record(
             "checks": {},
             "reasons": ["ArmatureSessionIdentityRecord is None"],
             "registry_session_id": None,
+            "object_exists": False,
         }
 
     reasons: List[str] = []
     ref = record.original_blender_ref
 
+    # Independent Object Liveness Evaluation (Eo)
+    obj_liveness = _check_original_object_liveness(record)
+    object_exists = bool(obj_liveness["object_exists"])
+    record.in_live_blender_collection = object_exists
+
     # Condition 1: original_blender_ref has not been invalidated
     c1_not_invalidated = (
-        ref is not None
+        object_exists
         and record.liveness_status != _ArmatureLivenessStatus.INVALIDATED_DEAD
         and record.isolation_state not in (
             _ArmatureIsolationState.TOMBSTONED_FAILED_D,
@@ -366,36 +418,26 @@ def _verify_armature_session_identity_record(
         )
 
     # Condition 2: accessing ref does not raise ReferenceError
-    c2_no_ref_error = False
+    c2_no_ref_error = object_exists
     ref_ptr: Optional[int] = None
     ref_type: Optional[str] = None
     ref_data: Optional[Any] = None
-    if ref is not None:
+    if object_exists and ref is not None:
         try:
             ref_ptr = int(ref.as_pointer())
             ref_type = str(ref.type)
             ref_data = ref.data
-            c2_no_ref_error = True
         except ReferenceError as re_err:
+            c2_no_ref_error = False
             reasons.append(f"Condition 2 failed: original_blender_ref raised ReferenceError ({re_err})")
         except BaseException as exc:
+            c2_no_ref_error = False
             reasons.append(f"Condition 2 failed: original_blender_ref access error ({exc})")
     else:
-        reasons.append("Condition 2 failed: original_blender_ref is None")
+        reasons.append(f"Condition 2 failed: {obj_liveness.get('reason', 'original_blender_ref is not live')}")
 
     # Condition 3: object is in live bpy.data.objects.values()
-    c3_in_live_collection = False
-    if c2_no_ref_error and ref_ptr is not None:
-        try:
-            for live_obj in bpy.data.objects.values():
-                try:
-                    if live_obj.as_pointer() == ref_ptr and live_obj == ref:
-                        c3_in_live_collection = True
-                        break
-                except ReferenceError:
-                    continue
-        except BaseException:
-            c3_in_live_collection = False
+    c3_in_live_collection = object_exists
     if not c3_in_live_collection:
         reasons.append("Condition 3 failed: original_blender_ref is absent from live bpy.data.objects.values()")
 
@@ -445,27 +487,32 @@ def _verify_armature_session_identity_record(
             "Condition 7 failed: Armature data block is invalid, removed, or pointer does not match original_data_pointer"
         )
 
-    # Update record liveness based on the registered object's own liveness checks (1, 2, 3, 4, 6, 7)
-    registered_obj_alive = (
-        c1_not_invalidated
-        and c2_no_ref_error
-        and c3_in_live_collection
-        and c4_is_armature_type
-        and c6_ref_ptr_matches
-        and c7_data_valid_and_matches
-    )
-    if not registered_obj_alive:
+    # Update record liveness: separate physical object death from session identity invalidation
+    if not object_exists:
         record.in_live_blender_collection = False
         record.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
         if record.lifecycle_stage not in ("TOMBSTONED_FAILED_D", "ARCHIVED_RETIRED"):
             record.lifecycle_stage = "INVALIDATED_DEAD"
     else:
         record.in_live_blender_collection = True
-        record.liveness_status = _ArmatureLivenessStatus.ALIVE_VERIFIED
-        try:
-            record.registered_name_snapshot = str(ref.name)
-        except BaseException:
-            pass
+        registered_obj_alive = (
+            c1_not_invalidated
+            and c2_no_ref_error
+            and c3_in_live_collection
+            and c4_is_armature_type
+            and c6_ref_ptr_matches
+            and c7_data_valid_and_matches
+        )
+        if registered_obj_alive:
+            record.liveness_status = _ArmatureLivenessStatus.ALIVE_VERIFIED
+            try:
+                record.registered_name_snapshot = str(ref.name)
+            except BaseException:
+                pass
+        else:
+            record.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
+            if record.lifecycle_stage not in ("TOMBSTONED_FAILED_D", "ARCHIVED_RETIRED"):
+                record.lifecycle_stage = "INVALIDATED_DEAD"
 
     # Condition 5 & Condition 6 on candidate_arm (if provided)
     c5_same_blender_ref = True
@@ -511,6 +558,7 @@ def _verify_armature_session_identity_record(
         "checks": checks,
         "reasons": reasons,
         "registry_session_id": record.registry_session_id,
+        "object_exists": object_exists,
     }
 
 
@@ -661,7 +709,8 @@ def _record_armature_failure_isolation_by_coordinator(
     session_rec.isolation_state = iso_state
     if f_class == _FailedTransactionClass.FAILED_D:
         session_rec.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
-        session_rec.in_live_blender_collection = False
+        obj_liveness = _check_original_object_liveness(session_rec)
+        session_rec.in_live_blender_collection = bool(obj_liveness["object_exists"])
         session_rec.lifecycle_stage = "TOMBSTONED_FAILED_D"
 
     snapshot_trusted = bool(
@@ -738,21 +787,86 @@ def _record_armature_failure_isolation_by_coordinator(
     return iso_record
 
 
+_COORDINATOR_AUTHORIZATION_GRANTS: Dict[str, Dict[str, Any]] = {}
+
+
+def _issue_coordinator_authorization_grant(
+    session_id: str,
+    tx_id: Optional[str],
+    failure_class: str,
+    current_isolation_state: str,
+    transition_action: str,
+    evidence_status: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Layer 1 Coordinator: Issue a single-use internal authorization grant binding session, action, and state."""
+    grant_id = f"grant_{uuid.uuid4().hex}"
+    grant = {
+        "grant_id": grant_id,
+        "registry_session_id": session_id,
+        "transaction_id": tx_id,
+        "failure_class": failure_class,
+        "current_isolation_state": current_isolation_state,
+        "transition_action": transition_action,
+        "evidence_status": evidence_status or "VERIFIED",
+        "consumed": False,
+        "created_at": time.time(),
+    }
+    _COORDINATOR_AUTHORIZATION_GRANTS[grant_id] = grant
+    return grant
+
+
+def _clear_coordinator_authorization_grants() -> None:
+    """Clear active Coordinator authorization grants (test fixture cleanup)."""
+    _COORDINATOR_AUTHORIZATION_GRANTS.clear()
+
+
 def _clear_or_retire_failure_isolation_by_coordinator(
     session_id: str,
     action: str,
     reason: str,
-    verification_evidence: Dict[str, Any],
+    authorization_grant: Optional[Dict[str, Any]] = None,
+    verification_evidence: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Layer 2: Clear FAILED-B/C isolation or archive FAILED-D tombstone exclusively for Layer 1 Coordinator."""
+    grant_candidate = authorization_grant if authorization_grant is not None else verification_evidence
     session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
     iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
     if session_rec is None or iso_rec is None:
         raise RuntimeError(f"Cannot modify isolation state: session {session_id} not found in active isolation registry")
 
+    action_label = "de-isolation" if action == "CLEAR_TO_NONE" else "tombstone retirement"
+
+    # Audit & validate Coordinator single-use authorization grant
+    if not isinstance(grant_candidate, dict):
+        raise RuntimeError(f"Layer 2 rejected {action_label}: authorization_grant must be a valid dictionary")
+    grant_id = grant_candidate.get("grant_id")
+    if not grant_id or grant_id not in _COORDINATOR_AUTHORIZATION_GRANTS:
+        raise RuntimeError(f"Layer 2 rejected {action_label}: invalid or missing Coordinator authorization grant")
+
+    registered_grant = _COORDINATOR_AUTHORIZATION_GRANTS[grant_id]
+    if registered_grant.get("consumed", False):
+        raise RuntimeError(f"Layer 2 rejected {action_label}: Coordinator authorization grant has already been consumed")
+    if registered_grant.get("registry_session_id") != session_id:
+        raise RuntimeError(
+            f"Layer 2 rejected {action_label}: grant session mismatch "
+            f"('{registered_grant.get('registry_session_id')}' != '{session_id}')"
+        )
+    if registered_grant.get("transition_action") != action:
+        raise RuntimeError(
+            f"Layer 2 rejected {action_label}: grant action mismatch "
+            f"('{registered_grant.get('transition_action')}' != '{action}')"
+        )
+    if registered_grant.get("current_isolation_state") != session_rec.isolation_state.value:
+        raise RuntimeError(
+            f"Layer 2 rejected {action_label}: grant isolation state mismatch "
+            f"('{registered_grant.get('current_isolation_state')}' != '{session_rec.isolation_state.value}')"
+        )
+
+    # Consume the grant immediately (single-use enforcement)
+    registered_grant["consumed"] = True
+    _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
+
     if action == "CLEAR_TO_NONE":
-        if not verification_evidence.get("can_deisolate", False):
-            raise RuntimeError("Layer 2 rejected de-isolation: Layer 5 verification_evidence did not pass")
         if session_rec.isolation_state == _ArmatureIsolationState.TOMBSTONED_FAILED_D:
             raise RuntimeError("Layer 2 rejected de-isolation: TOMBSTONED_FAILED_D cannot return to active status")
         previous_state = session_rec.isolation_state.value
@@ -765,10 +879,9 @@ def _clear_or_retire_failure_isolation_by_coordinator(
             "new_isolation_state": _ArmatureIsolationState.NONE.value,
             "action": "CLEAR_TO_NONE",
             "reason": reason,
+            "grant_id": grant_id,
         }
     elif action == "ARCHIVE_TOMBSTONE":
-        if not verification_evidence.get("can_retire", False):
-            raise RuntimeError("Layer 2 rejected tombstone retirement: Layer 5 retirement evidence did not pass")
         if session_rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D:
             raise RuntimeError(
                 f"Layer 2 rejected tombstone retirement: session {session_id} is in {session_rec.isolation_state}, "
@@ -790,6 +903,7 @@ def _clear_or_retire_failure_isolation_by_coordinator(
             "new_isolation_state": _ArmatureIsolationState.ARCHIVED_RETIRED.value,
             "action": "ARCHIVE_TOMBSTONE",
             "reason": reason,
+            "grant_id": grant_id,
         }
     else:
         raise RuntimeError(f"Unsupported Layer 2 isolation transition action: {action!r}")
@@ -873,20 +987,32 @@ _REQUIRED_ARM_IK_BONE_NAMES: Tuple[str, ...] = (
 )
 
 
+def _has_nan_or_inf(val: Any) -> bool:
+    """Return True if any floating-point number within val is NaN or Infinite."""
+    if isinstance(val, float):
+        return math.isnan(val) or math.isinf(val)
+    if isinstance(val, (tuple, list, set, frozenset)):
+        return any(_has_nan_or_inf(elem) for elem in val)
+    if isinstance(val, dict):
+        return any(_has_nan_or_inf(k) or _has_nan_or_inf(v) for k, v in val.items())
+    return False
+
+
 def _capture_pre_snapshot_structural_fingerprint(arm: bpy.types.Object) -> Dict[str, Any]:
-    """Capture a lightweight read-only structural and value fingerprint before SNAPSHOTTING."""
+    """Capture a comprehensive read-only unrounded structural and value fingerprint before SNAPSHOTTING."""
     char_col = bpy.data.collections.get("Character")
     scene_children = bpy.context.scene.collection.children if (bpy.context and bpy.context.scene) else []
     char_col_fp = None
     if char_col is not None:
-        char_col_fp = (
-            int(char_col.as_pointer()),
-            str(char_col.name),
-            bool(char_col.name in scene_children),
-            tuple(sorted(p.as_pointer() for p in bpy.data.collections if any(ch.as_pointer() == char_col.as_pointer() for ch in p.children))),
-            tuple(sorted(ch.as_pointer() for ch in char_col.children)),
-            tuple(sorted(o.as_pointer() for o in char_col.objects)),
-        )
+        char_col_fp = {
+            "col_ptr": int(char_col.as_pointer()),
+            "name": str(char_col.name),
+            "children_of_scene": bool(char_col.name in scene_children),
+            "parent_ptrs": tuple(sorted(p.as_pointer() for p in bpy.data.collections if any(ch.as_pointer() == char_col.as_pointer() for ch in p.children))),
+            "child_ptrs": tuple(sorted(ch.as_pointer() for ch in char_col.children)),
+            "object_ptrs": tuple(sorted(o.as_pointer() for o in char_col.objects)),
+            "object_names": tuple(sorted(str(o.name) for o in char_col.objects)),
+        }
 
     ctrl_names = (
         ARM_IK_TARGET_NAMES["L"],
@@ -900,20 +1026,25 @@ def _capture_pre_snapshot_structural_fingerprint(arm: bpy.types.Object) -> Dict[
         if c_obj is None:
             ctrls_fp[c_name] = None
         else:
-            ctrls_fp[c_name] = (
-                int(c_obj.as_pointer()),
-                int(c_obj.data.as_pointer()) if getattr(c_obj, "data", None) is not None else None,
-                str(c_obj.name),
-                str(c_obj.type),
-                int(c_obj.parent.as_pointer()) if c_obj.parent is not None else None,
-                tuple(round(float(v), 6) for v in c_obj.location),
-                str(c_obj.rotation_mode),
-                tuple(round(float(v), 6) for v in c_obj.rotation_euler),
-                tuple(round(float(v), 6) for v in c_obj.rotation_quaternion),
-                tuple(round(float(v), 6) for v in c_obj.rotation_axis_angle),
-                tuple(round(float(v), 6) for v in c_obj.scale),
-                tuple(sorted(c.as_pointer() for c in c_obj.users_collection)),
-            )
+            ctrls_fp[c_name] = {
+                "obj_ptr": int(c_obj.as_pointer()),
+                "data_ptr": int(c_obj.data.as_pointer()) if getattr(c_obj, "data", None) is not None else None,
+                "name": str(c_obj.name),
+                "type": str(c_obj.type),
+                "parent_ptr": int(c_obj.parent.as_pointer()) if c_obj.parent is not None else None,
+                "matrix_parent_inverse": tuple(tuple(float(v) for v in row) for row in c_obj.matrix_parent_inverse),
+                "location": tuple(float(v) for v in c_obj.location),
+                "rotation_mode": str(c_obj.rotation_mode),
+                "rotation_euler": tuple(float(v) for v in c_obj.rotation_euler),
+                "rotation_quaternion": tuple(float(v) for v in c_obj.rotation_quaternion),
+                "rotation_axis_angle": tuple(float(v) for v in c_obj.rotation_axis_angle),
+                "scale": tuple(float(v) for v in c_obj.scale),
+                "matrix_world": tuple(tuple(float(v) for v in row) for row in c_obj.matrix_world),
+                "empty_display_type": getattr(c_obj, "empty_display_type", None) if c_obj.type == "EMPTY" else None,
+                "empty_display_size": float(getattr(c_obj, "empty_display_size", 0.0)) if (c_obj.type == "EMPTY" and getattr(c_obj, "empty_display_size", None) is not None) else None,
+                "users_collection_ptrs": tuple(sorted(c.as_pointer() for c in c_obj.users_collection)),
+                "users_collection_names": tuple(sorted(str(c.name) for c in c_obj.users_collection)),
+            }
 
     bones_fp: Dict[str, Any] = {}
     present_arm_bones: List[str] = []
@@ -923,35 +1054,74 @@ def _capture_pre_snapshot_structural_fingerprint(arm: bpy.types.Object) -> Dict[
             bones_fp[b_name] = None
             continue
         present_arm_bones.append(b_name)
-        cons_fp = tuple(
-            (
-                int(con.as_pointer()),
-                str(con.name),
-                str(con.type),
-                round(float(con.influence), 6),
-                bool(con.mute),
-                int(con.target.as_pointer()) if getattr(con, "target", None) is not None else None,
-                str(getattr(con, "subtarget", "")),
-                int(con.pole_target.as_pointer()) if getattr(con, "pole_target", None) is not None else None,
-                str(getattr(con, "pole_subtarget", "")),
-            )
-            for con in pbone.constraints
-        )
-        bones_fp[b_name] = (
-            tuple(round(float(v), 6) for v in pbone.location),
-            str(pbone.rotation_mode),
-            tuple(round(float(v), 6) for v in pbone.rotation_euler),
-            tuple(round(float(v), 6) for v in pbone.rotation_quaternion),
-            tuple(round(float(v), 6) for v in pbone.rotation_axis_angle),
-            tuple(round(float(v), 6) for v in pbone.scale),
-            bool(pbone.lock_ik_x),
-            bool(pbone.lock_ik_y),
-            bool(pbone.lock_ik_z),
-            bool(pbone.use_ik_limit_x),
-            bool(pbone.use_ik_limit_y),
-            bool(pbone.use_ik_limit_z),
-            cons_fp,
-        )
+        con_list: List[Dict[str, Any]] = []
+        for con in pbone.constraints:
+            c_dict: Dict[str, Any] = {
+                "con_ptr": int(con.as_pointer()),
+                "name": str(con.name),
+                "type": str(con.type),
+                "influence": float(con.influence),
+                "mute": bool(con.mute),
+                "target_ptr": int(con.target.as_pointer()) if getattr(con, "target", None) is not None else None,
+                "subtarget": str(getattr(con, "subtarget", "")),
+                "pole_target_ptr": int(con.pole_target.as_pointer()) if getattr(con, "pole_target", None) is not None else None,
+                "pole_subtarget": str(getattr(con, "pole_subtarget", "")),
+            }
+            if con.type == "IK":
+                c_dict.update({
+                    "chain_count": int(getattr(con, "chain_count", 0)),
+                    "use_tail": bool(getattr(con, "use_tail", True)),
+                    "use_stretch": bool(getattr(con, "use_stretch", False)),
+                    "pole_angle": float(getattr(con, "pole_angle", 0.0)),
+                    "iterations": int(getattr(con, "iterations", 500)),
+                })
+            elif con.type == "COPY_ROTATION":
+                c_dict.update({
+                    "target_space": str(getattr(con, "target_space", "WORLD")),
+                    "owner_space": str(getattr(con, "owner_space", "WORLD")),
+                    "mix_mode": str(getattr(con, "mix_mode", "REPLACE")),
+                    "use_x": bool(getattr(con, "use_x", True)),
+                    "use_y": bool(getattr(con, "use_y", True)),
+                    "use_z": bool(getattr(con, "use_z", True)),
+                    "invert_x": bool(getattr(con, "invert_x", False)),
+                    "invert_y": bool(getattr(con, "invert_y", False)),
+                    "invert_z": bool(getattr(con, "invert_z", False)),
+                    "use_offset": bool(getattr(con, "use_offset", False)),
+                })
+
+            generic_props: Dict[str, Any] = {}
+            for p in con.rna_type.properties:
+                if not p.is_readonly and p.identifier not in ("rna_type", "name", "mute", "influence"):
+                    try:
+                        val = getattr(con, p.identifier)
+                        generic_props[p.identifier] = _clone_snapshot_property_value(val)
+                    except BaseException:
+                        pass
+            c_dict["generic_props"] = generic_props
+            con_list.append(c_dict)
+
+        bones_fp[b_name] = {
+            "location": tuple(float(v) for v in pbone.location),
+            "rotation_mode": str(pbone.rotation_mode),
+            "rotation_euler": tuple(float(v) for v in pbone.rotation_euler),
+            "rotation_quaternion": tuple(float(v) for v in pbone.rotation_quaternion),
+            "rotation_axis_angle": tuple(float(v) for v in pbone.rotation_axis_angle),
+            "scale": tuple(float(v) for v in pbone.scale),
+            "matrix_basis": tuple(tuple(float(v) for v in row) for row in pbone.matrix_basis),
+            "lock_ik_x": bool(pbone.lock_ik_x),
+            "lock_ik_y": bool(pbone.lock_ik_y),
+            "lock_ik_z": bool(pbone.lock_ik_z),
+            "use_ik_limit_x": bool(pbone.use_ik_limit_x),
+            "use_ik_limit_y": bool(pbone.use_ik_limit_y),
+            "use_ik_limit_z": bool(pbone.use_ik_limit_z),
+            "ik_min_x": float(pbone.ik_min_x),
+            "ik_max_x": float(pbone.ik_max_x),
+            "ik_min_y": float(pbone.ik_min_y),
+            "ik_max_y": float(pbone.ik_max_y),
+            "ik_min_z": float(pbone.ik_min_z),
+            "ik_max_z": float(pbone.ik_max_z),
+            "constraints": tuple(con_list),
+        }
 
     return {
         "arm_ptr": int(arm.as_pointer()),
@@ -975,9 +1145,23 @@ def _verify_pre_write_zero_mutation_and_integrity(
     """Layer 5: Verify zero mutations and structural integrity when a transaction aborts before ACTIVE."""
     reasons: List[str] = []
 
+    # 1. Verification of Transaction Execution Phase
     if getattr(tx, "pre_write_integrity_compromised", False):
         extra = getattr(tx, "pre_write_integrity_reasons", [])
         reasons.extend(extra if extra else ["Transaction pre-write integrity explicitly marked compromised"])
+
+    if tx.snapshot is not None:
+        reasons.append("Transaction captured full snapshot; cannot be verified via pre-snapshot zero-mutation path")
+
+    if tx.state not in (
+        _ArmRigTransactionState.CREATED,
+        _ArmRigTransactionState.SNAPSHOTTING,
+        _ArmRigTransactionState.FAILED,
+    ):
+        reasons.append(
+            f"Transaction reached post-snapshot execution state '{tx.state.value}'; "
+            "cannot be verified as FAILED-A pre-write abort"
+        )
 
     if (
         tx.created_controller_objects
@@ -1000,14 +1184,20 @@ def _verify_pre_write_zero_mutation_and_integrity(
         reasons.append(f"Failed to capture post-exception structural fingerprint: {exc}")
         return {"is_verified": False, "reasons": reasons}
 
-    if post_fp["total_pose_bone_count"] > 0:
+    # 2. Check for NaN or Infinite values
+    if _has_nan_or_inf(pre_fp) or _has_nan_or_inf(post_fp):
+        reasons.append("Pre-write structural fingerprint contains NaN or Infinite floating point values")
+
+    # 3. Check for missing bones
+    if post_fp.get("total_pose_bone_count", 0) > 0:
         missing_bones = [
             b for b in _REQUIRED_ARM_IK_BONE_NAMES
-            if b not in post_fp["present_arm_bones"]
+            if b not in post_fp.get("present_arm_bones", ())
         ]
         if missing_bones:
             reasons.append(f"Required upper-limb pose bones missing: {missing_bones}")
 
+    # 4. Compare every key in fingerprint for exact unrounded equality
     for key in (
         "arm_ptr",
         "arm_name",
@@ -1020,7 +1210,9 @@ def _verify_pre_write_zero_mutation_and_integrity(
         "all_object_ptrs",
         "all_collection_ptrs",
     ):
-        if pre_fp.get(key) != post_fp.get(key):
+        pre_val = pre_fp.get(key)
+        post_val = post_fp.get(key)
+        if pre_val != post_val:
             reasons.append(f"Pre-write state mutated during SNAPSHOTTING in field '{key}'")
 
     return {
@@ -3633,10 +3825,14 @@ def _verify_dead_armature_tombstone_retirement_evidence(session_id: str) -> Dict
         )
 
     # 1. Confirm original Armature is genuinely absent from live Blender objects
-    # (Never mistake a same-name replacement Armature for the original)
-    id_ver = _verify_armature_session_identity_record(session_rec, candidate_arm=None)
-    if id_ver["is_valid"] or session_rec.in_live_blender_collection:
-        reasons.append("Original Armature is still alive in bpy.data.objects; cannot retire as dead tombstone")
+    # (Never mistake a same-name replacement Armature for the original,
+    # and NEVER mistake data invalidation on an existing Armature for object death)
+    obj_liveness = _check_original_object_liveness(session_rec)
+    if obj_liveness["object_exists"] or session_rec.in_live_blender_collection:
+        reasons.append(
+            f"Original Armature object still exists in bpy.data.objects (ptr={session_rec.registration_pointer}); "
+            "cannot retire tombstone"
+        )
 
     # 2. Confirm no transaction-created objects or collections from the failed transaction remain in bpy.data
     for ctrl_rec in iso_rec.get("created_controller_objects", []):
@@ -3692,6 +3888,33 @@ def request_armature_deisolation(
     raise_on_reject: bool = False,
 ) -> Dict[str, Any]:
     """Layer 1 Coordinator: Evaluate Layer 5 evidence and authorize or reject de-isolation (Section 8.1/8.3)."""
+    # Enforce non-empty string reason
+    if not isinstance(reason, str) or not reason.strip():
+        reason_err = "De-isolation rejected: reason must be a non-empty string"
+        audit_entry = {
+            "audit_id": f"deiso_{uuid.uuid4().hex[:8]}",
+            "operation": "REQUEST_DEISOLATION",
+            "decision": "REJECTED",
+            "registry_session_id": session_id,
+            "transaction_id": None,
+            "failure_class": None,
+            "previous_isolation_state": None,
+            "new_isolation_state": None,
+            "reason": reason,
+            "verification_status": "INVALID_REASON",
+            "verification_reasons": [reason_err],
+        }
+        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        if raise_on_reject:
+            raise ValueError(reason_err)
+        return {
+            "approved": False,
+            "action": "REJECTED",
+            "registry_session_id": session_id,
+            "reasons": [reason_err],
+            "audit_entry": audit_entry,
+        }
+
     evidence = verify_armature_deisolation_evidence(arm=arm, session_id=session_id)
     resolved_session_id = evidence.get("registry_session_id") or session_id
     iso_rec = _ISOLATED_FAILED_ARMATURES.get(resolved_session_id) if resolved_session_id else None
@@ -3703,11 +3926,19 @@ def request_armature_deisolation(
     previous_state = evidence.get("isolation_state")
 
     if evidence.get("can_deisolate", False) and resolved_session_id is not None:
+        grant = _issue_coordinator_authorization_grant(
+            session_id=resolved_session_id,
+            tx_id=tx_id,
+            failure_class=str(failure_class),
+            current_isolation_state=str(previous_state),
+            transition_action="CLEAR_TO_NONE",
+            evidence_status=evidence.get("status"),
+        )
         transition = _clear_or_retire_failure_isolation_by_coordinator(
             session_id=resolved_session_id,
             action="CLEAR_TO_NONE",
             reason=reason,
-            verification_evidence=evidence,
+            authorization_grant=grant,
         )
         audit_entry = {
             "audit_id": f"deiso_{uuid.uuid4().hex[:8]}",
@@ -3718,6 +3949,7 @@ def request_armature_deisolation(
             "failure_class": failure_class,
             "previous_isolation_state": previous_state,
             "new_isolation_state": transition["new_isolation_state"],
+            "grant_id": grant["grant_id"],
             "reason": reason,
             "verification_status": evidence.get("status"),
             "verification_reasons": list(evidence.get("reasons", [])),
@@ -3773,17 +4005,52 @@ def retire_dead_armature_tombstone(
     raise_on_reject: bool = False,
 ) -> Dict[str, Any]:
     """Layer 1 Coordinator: Verify dead Armature tombstone retirement evidence and transition to ARCHIVED_RETIRED."""
+    # Enforce non-empty string reason
+    if not isinstance(reason, str) or not reason.strip():
+        reason_err = "Tombstone retirement rejected: reason must be a non-empty string"
+        audit_entry = {
+            "audit_id": f"retire_{uuid.uuid4().hex[:8]}",
+            "operation": "RETIRE_DEAD_TOMBSTONE",
+            "decision": "REJECTED",
+            "registry_session_id": session_id,
+            "transaction_id": None,
+            "failure_class": None,
+            "previous_isolation_state": None,
+            "new_isolation_state": None,
+            "reason": reason,
+            "verification_status": "INVALID_REASON",
+            "verification_reasons": [reason_err],
+        }
+        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        if raise_on_reject:
+            raise ValueError(reason_err)
+        return {
+            "approved": False,
+            "action": "REJECTED",
+            "registry_session_id": session_id,
+            "reasons": [reason_err],
+            "audit_entry": audit_entry,
+        }
+
     evidence = _verify_dead_armature_tombstone_retirement_evidence(session_id)
     previous_state = evidence.get("isolation_state")
     tx_id = evidence.get("transaction_id")
     failure_class = evidence.get("failure_class")
 
     if evidence.get("can_retire", False):
+        grant = _issue_coordinator_authorization_grant(
+            session_id=session_id,
+            tx_id=tx_id,
+            failure_class=str(failure_class),
+            current_isolation_state=str(previous_state),
+            transition_action="ARCHIVE_TOMBSTONE",
+            evidence_status=evidence.get("status"),
+        )
         transition = _clear_or_retire_failure_isolation_by_coordinator(
             session_id=session_id,
             action="ARCHIVE_TOMBSTONE",
             reason=reason,
-            verification_evidence=evidence,
+            authorization_grant=grant,
         )
         audit_entry = {
             "audit_id": f"retire_{uuid.uuid4().hex[:8]}",
@@ -3794,6 +4061,7 @@ def retire_dead_armature_tombstone(
             "failure_class": failure_class,
             "previous_isolation_state": previous_state,
             "new_isolation_state": transition["new_isolation_state"],
+            "grant_id": grant["grant_id"],
             "reason": reason,
             "verification_status": evidence.get("status"),
             "verification_reasons": list(evidence.get("reasons", [])),
@@ -3906,12 +4174,20 @@ def _arm_rig_transaction(arm: bpy.types.Object):
             + "; ".join(admission_id_check["reasons"])
         )
 
-    pre_snap_fp = _capture_pre_snapshot_structural_fingerprint(arm)
     tx = _ArmRigTransactionContext(arm, session_record=session_rec)
     session_rec.lifecycle_stage = "ACTIVE_TRANSACTION"
     _ACTIVE_TRANSACTION_STACK.append(tx)
+    pre_snap_fp = None
 
     try:
+        _trigger_fault_injection("during_pre_snapshot_fingerprint", {"arm": arm, "tx": tx})
+        try:
+            pre_snap_fp = _capture_pre_snapshot_structural_fingerprint(arm)
+        except BaseException as fp_exc:
+            tx.pre_write_integrity_compromised = True
+            tx.pre_write_integrity_reasons = [f"Pre-snapshot fingerprint capture failed: {fp_exc}"]
+            raise
+
         tx.state = _ArmRigTransactionState.SNAPSHOTTING
         tx.snapshot = _snapshot_arm_rig_state(arm)
         tx.state = _ArmRigTransactionState.ACTIVE
