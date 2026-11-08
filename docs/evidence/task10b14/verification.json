@@ -14,16 +14,16 @@
   "contracts_audited": {
     "CONTRACT-01": "VERIFIED",
     "CONTRACT-02": "VERIFIED",
-    "CONTRACT-03": "VERIFIED",
-    "CONTRACT-04": "VERIFIED",
-    "CONTRACT-05": "VERIFIED",
+    "CONTRACT-03": "DEFECT",
+    "CONTRACT-04": "DEFECT",
+    "CONTRACT-05": "DEFECT",
     "CONTRACT-06": "VERIFIED",
     "CONTRACT-07": "VERIFIED",
-    "CONTRACT-08": "VERIFIED",
-    "CONTRACT-09": "VERIFIED",
-    "CONTRACT-10": "VERIFIED",
+    "CONTRACT-08": "DEFECT",
+    "CONTRACT-09": "DEFECT",
+    "CONTRACT-10": "UNVERIFIED",
     "CONTRACT-11": "VERIFIED",
-    "CONTRACT-12": "VERIFIED"
+    "CONTRACT-12": "DEFECT"
   },
   "results": [
     {
@@ -164,6 +164,6 @@
       "log": "docs/evidence/task10b14/architecture_integrity_gate.log"
     }
   ],
-  "open_defects_count": 0,
-  "status": "AUDIT_COMPLETED_ZERO_DEFECTS"
+  "open_defects_count": 6,
+  "status": "AUDIT_COMPLETED_WITH_CONFIRMED_ARCHITECTURE_GAPS"
 }
