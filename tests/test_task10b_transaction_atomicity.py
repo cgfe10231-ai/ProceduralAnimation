@@ -57,11 +57,14 @@ Tests:
 - TEST-76: Verifier captures 6 distinct corruption dimensions with exact field names without mutating scene.
 """
 
-import math
+import inspect
 import json
+import math
 import os
 import sys
+import time
 import unittest
+import uuid
 from typing import Any, Dict, List, Optional
 
 import bpy
@@ -122,12 +125,50 @@ from src.rig.arm_ik import (
     set_hand_ik_target,
     setup_arm_ik,
     verify_armature_deisolation_evidence,
+    _verify_dead_armature_tombstone_retirement_evidence,
 )
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
 from src.rig.pose import reset_pose
 
 _TEST_137_TO_149_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+_TEST_150_TO_155_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+
+
+def _request_coordinator_grant_for_test(
+    session_id: str,
+    transition_action: str = "CLEAR_TO_NONE",
+    arm: Optional[bpy.types.Object] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Helper to invoke _issue_coordinator_authorization_grant across legacy and updated signatures."""
+    sig = inspect.signature(_issue_coordinator_authorization_grant)
+    param_names = list(sig.parameters.keys())
+    if len(param_names) >= 2 and param_names[1] == "transition_action":
+        return _issue_coordinator_authorization_grant(
+            session_id=session_id,
+            transition_action=transition_action,
+            arm=arm,
+            **kwargs,
+        )
+    else:
+        iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id, {})
+        session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
+        tx_id = kwargs.get("tx_id", iso_rec.get("transaction_id", "tx_test"))
+        f_class = kwargs.get("failure_class", iso_rec.get("failure_class", "FAILED-B"))
+        iso_state = kwargs.get(
+            "current_isolation_state",
+            (session_rec.isolation_state.value if session_rec else "ISOLATED_FAILED_B"),
+        )
+        ev_status = kwargs.get("evidence_status", "VERIFIED")
+        return _issue_coordinator_authorization_grant(
+            session_id=session_id,
+            tx_id=tx_id,
+            failure_class=f_class,
+            current_isolation_state=iso_state,
+            transition_action=transition_action,
+            evidence_status=ev_status,
+        )
 
 
 class TestArmIKTransactionAtomicity(unittest.TestCase):
@@ -5203,30 +5244,64 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         }
 
     def test_147_coordinator_grant_binding_and_single_use_enforcement(self) -> None:
-        """TEST-147: Coordinator grant enforces cross-session rejection, cross-action rejection, and single-use consumption."""
+        """TEST-147: Coordinator grant enforces cross-session rejection, cross-action rejection, and single-use consumption.
+
+        Corrected invalid historical test premise:
+        Grant issuance requires verified recovery evidence and binds strictly to session, transaction ID,
+        failure class, isolation state, and action.
+        """
+        setup_arm_ik(self.armature, initial_influence=0.35)
         session_rec = ensure_armature_session_identity(self.armature)
         session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
 
-        # Put session into ISOLATED_FAILED_B
-        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
-        _ISOLATED_FAILED_ARMATURES[session_id] = {
-            "registry_session_id": session_id,
-            "failure_class": _FailedTransactionClass.FAILED_B.value,
-            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
-        }
+        # Fault injection into FAILED-B
+        captured_tx = []
 
-        # Issue genuine grant for session_id
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-147")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-147")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # 1. Unverified recovery: grant issuance is rejected
+        with self.assertRaises(RuntimeError) as cm_unverified:
+            _issue_coordinator_authorization_grant(
+                session_id=session_id,
+                transition_action="CLEAR_TO_NONE",
+                arm=self.armature,
+            )
+        self.assertIn("recovery verification failed", str(cm_unverified.exception).lower())
+
+        # 2. Genuine restoration to snapshot
+        _rollback_arm_rig_state(self.armature, tx.snapshot, tx)
+        _depsgraph_update()
+
+        # 3. Verified recovery: grant issuance succeeds and binds to tx.tx_id and FAILED-B
         grant = _issue_coordinator_authorization_grant(
             session_id=session_id,
-            tx_id="tx_test_147",
-            failure_class=_FailedTransactionClass.FAILED_B.value,
-            current_isolation_state=_ArmatureIsolationState.ISOLATED_FAILED_B.value,
             transition_action="CLEAR_TO_NONE",
-            evidence_status="VERIFIED",
+            arm=self.armature,
         )
         issued_grant_id = grant["grant_id"]
+        self.assertEqual(grant["registry_session_id"], session_id)
+        self.assertEqual(grant["transaction_id"], tx.tx_id)
+        self.assertEqual(grant["failure_class"], _FailedTransactionClass.FAILED_B.value)
+        self.assertEqual(grant["current_isolation_state"], _ArmatureIsolationState.ISOLATED_FAILED_B.value)
+        self.assertEqual(grant["transition_action"], "CLEAR_TO_NONE")
 
-        # 1. Cross-session rejection: passing grant with different session_id raises RuntimeError
+        # 4. Cross-session rejection: passing grant with different session_id raises RuntimeError
         with self.assertRaises(RuntimeError) as cm_cross_session:
             _clear_or_retire_failure_isolation_by_coordinator(
                 session_id="wrong_session_id",
@@ -5236,7 +5311,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             )
         self.assertIn("not found in active isolation registry", str(cm_cross_session.exception))
 
-        # 2. Cross-action rejection: passing grant with mismatched transition_action raises RuntimeError
+        # 5. Cross-action rejection: passing grant with mismatched transition_action raises RuntimeError
         with self.assertRaises(RuntimeError) as cm_cross_action:
             _clear_or_retire_failure_isolation_by_coordinator(
                 session_id=session_id,
@@ -5246,7 +5321,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             )
         self.assertIn("grant action mismatch", str(cm_cross_action.exception))
 
-        # 3. Legitimate single use succeeds
+        # 6. Legitimate single use succeeds
         res = _clear_or_retire_failure_isolation_by_coordinator(
             session_id=session_id,
             action="CLEAR_TO_NONE",
@@ -5256,10 +5331,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(res["new_isolation_state"], _ArmatureIsolationState.NONE.value)
         self.assertTrue(grant["consumed"])
 
-        # 4. Reusing the exact same grant raises RuntimeError (grant already consumed/removed)
+        # 7. Reusing the exact same grant raises RuntimeError (grant already consumed/removed)
         session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
         _ISOLATED_FAILED_ARMATURES[session_id] = {
             "registry_session_id": session_id,
+            "transaction_id": tx.tx_id,
             "failure_class": _FailedTransactionClass.FAILED_B.value,
             "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
         }
@@ -5369,6 +5445,313 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             "subsequent_write_blocked": True,
         }
 
+    def test_150_failed_b_unrestored_grant_issuance_rejected(self) -> None:
+        """TEST-150: Requesting Coordinator grant when FAILED-B is unrestored must be rejected."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary write fault in TEST-150")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-150 leaving scene unrestored")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.35, y_pos, 1.25), influence=0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # FAILED-B scene state has not been restored (HandIK.L position mutated).
+        # Coordinator must reject issuing an authorization grant.
+        with self.assertRaises(RuntimeError) as cm:
+            _request_coordinator_grant_for_test(
+                session_id=session_id,
+                transition_action="CLEAR_TO_NONE",
+                arm=self.armature,
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("recovery", "verification", "grant", "cannot issue", "rejected")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-150"] = {
+            "test_method": "test_150_failed_b_unrestored_grant_issuance_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-B",
+            "issuance_result": "REJECTED_UNRESTORED",
+        }
+
+    def test_151_failed_c_recovery_uncertain_forged_verified_rejected(self) -> None:
+        """TEST-151: Requesting Coordinator grant with RECOVERY_UNCERTAIN relationship while forging VERIFIED must be rejected."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        tx_id = f"tx_151_{uuid.uuid4().hex[:6]}"
+
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_C
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": tx_id,
+            "failure_class": _FailedTransactionClass.FAILED_C.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_C.value,
+            "prepared_relationship_mutations": [
+                {
+                    "operation_id": "op_test_151",
+                    "operation_state": _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                }
+            ],
+        }
+
+        # Attempting to obtain grant by supplying forged VERIFIED status must be rejected
+        with self.assertRaises(RuntimeError) as cm:
+            _request_coordinator_grant_for_test(
+                session_id=session_id,
+                transition_action="CLEAR_TO_NONE",
+                arm=self.armature,
+                evidence_status="VERIFIED",
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("recovery", "uncertain", "verification", "grant", "cannot issue")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-151"] = {
+            "test_method": "test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "attack_type": "FORGED_VERIFIED_WITH_RECOVERY_UNCERTAIN",
+            "issuance_result": "REJECTED_RECOVERY_UNCERTAIN",
+        }
+
+    def test_152_grant_transaction_id_mismatch_rejected(self) -> None:
+        """TEST-152: Layer 2 rejects state transition when Grant transaction_id mismatches Registry transaction_id."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_real_152",
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+
+        # Forged/Mismatched grant with different transaction_id
+        grant_id = f"grant_{uuid.uuid4().hex}"
+        grant = {
+            "grant_id": grant_id,
+            "registry_session_id": session_id,
+            "transaction_id": "tx_forged_152",
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "current_isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+            "transition_action": "CLEAR_TO_NONE",
+            "evidence_status": "RECOVERY_VERIFIED",
+            "consumed": False,
+            "created_at": time.time(),
+        }
+        _COORDINATOR_AUTHORIZATION_GRANTS[grant_id] = grant
+
+        with self.assertRaises(RuntimeError) as cm:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Testing mismatched tx_id in TEST-152",
+                authorization_grant=grant,
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("transaction", "mismatch", "rejected")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-152"] = {
+            "test_method": "test_152_grant_transaction_id_mismatch_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "MISMATCHED_TRANSACTION_ID",
+            "transition_result": "REJECTED_TRANSACTION_MISMATCH",
+        }
+
+    def test_153_grant_failure_class_mismatch_rejected(self) -> None:
+        """TEST-153: Layer 2 rejects state transition when Grant failure_class mismatches Registry failure_class."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_153",
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+
+        # Forged/Mismatched grant with different failure_class
+        grant_id = f"grant_{uuid.uuid4().hex}"
+        grant = {
+            "grant_id": grant_id,
+            "registry_session_id": session_id,
+            "transaction_id": "tx_153",
+            "failure_class": _FailedTransactionClass.FAILED_C.value,
+            "current_isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+            "transition_action": "CLEAR_TO_NONE",
+            "evidence_status": "RECOVERY_VERIFIED",
+            "consumed": False,
+            "created_at": time.time(),
+        }
+        _COORDINATOR_AUTHORIZATION_GRANTS[grant_id] = grant
+
+        with self.assertRaises(RuntimeError) as cm:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Testing mismatched failure_class in TEST-153",
+                authorization_grant=grant,
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("failure", "class", "mismatch", "rejected")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-153"] = {
+            "test_method": "test_153_grant_failure_class_mismatch_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "MISMATCHED_FAILURE_CLASS",
+            "transition_result": "REJECTED_FAILURE_CLASS_MISMATCH",
+        }
+
+    def test_154_failed_d_unmet_retirement_conditions_grant_rejected(self) -> None:
+        """TEST-154: Coordinator rejects issuing ARCHIVE_TOMBSTONE grant when retirement conditions are unmet (Armature object alive)."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        session_rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_154",
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Original Armature object is still alive in bpy.data.objects
+        # Tombstone retirement conditions are unmet, so Coordinator must reject issuing grant
+        with self.assertRaises(RuntimeError) as cm:
+            _request_coordinator_grant_for_test(
+                session_id=session_id,
+                transition_action="ARCHIVE_TOMBSTONE",
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("tombstone", "retire", "grant", "object", "alive", "rejected", "cannot issue")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-154"] = {
+            "test_method": "test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-D",
+            "issuance_result": "REJECTED_OBJECT_ALIVE",
+        }
+
+    def test_155_verified_recovery_issues_grant_and_single_use_consumed(self) -> None:
+        """TEST-155: Verified recovery successfully issues Coordinator grant, Layer 2 consumes it, and replay fails."""
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-155")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-155")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # Genuinely restore scene to match snapshot
+        _rollback_arm_rig_state(self.armature, tx.snapshot, tx)
+        _depsgraph_update()
+
+        # Step 1: Issue grant based on real recovery evidence
+        grant = _request_coordinator_grant_for_test(
+            session_id=session_id,
+            transition_action="CLEAR_TO_NONE",
+            arm=self.armature,
+            tx_id=tx.tx_id,
+            failure_class=_FailedTransactionClass.FAILED_B.value,
+        )
+        self.assertIsNotNone(grant)
+        self.assertEqual(grant["registry_session_id"], session_id)
+        self.assertEqual(grant["transition_action"], "CLEAR_TO_NONE")
+
+        # Step 2: Layer 2 transition succeeds
+        transition = _clear_or_retire_failure_isolation_by_coordinator(
+            session_id=session_id,
+            action="CLEAR_TO_NONE",
+            reason="Legitimate recovery verified in TEST-155",
+            authorization_grant=grant,
+        )
+        self.assertEqual(transition["new_isolation_state"], _ArmatureIsolationState.NONE.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Step 3: Replay attack fails
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": tx.tx_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+        with self.assertRaises(RuntimeError) as cm_replay:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Replay attack in TEST-155",
+                authorization_grant=grant,
+            )
+        self.assertTrue(
+            any(k in str(cm_replay.exception).lower() for k in ("grant", "consumed", "missing", "invalid", "rejected")),
+            f"Unexpected replay exception message: {cm_replay.exception}",
+        )
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-155"] = {
+            "test_method": "test_155_verified_recovery_issues_grant_and_single_use_consumed",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "transaction_id": tx.tx_id,
+            "grant_id": grant["grant_id"],
+            "legitimate_consumption_succeeded": True,
+            "replay_rejected": True,
+        }
+
 
 if __name__ == "__main__":
     args = [sys.argv[0]]
@@ -5379,10 +5762,14 @@ if __name__ == "__main__":
     runner = unittest.TextTestRunner(verbosity=2)
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestArmIKTransactionAtomicity)
     result = runner.run(suite)
+    out_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(out_dir, exist_ok=True)
     if _TEST_137_TO_149_RUNTIME_EVIDENCE:
-        out_dir = os.path.join(os.path.dirname(__file__), "output")
-        os.makedirs(out_dir, exist_ok=True)
         ev_path = os.path.join(out_dir, "audit_13_r1_runtime_evidence.json")
         with open(ev_path, "w", encoding="utf-8") as f:
             json.dump(_TEST_137_TO_149_RUNTIME_EVIDENCE, f, indent=2)
+    if _TEST_150_TO_155_RUNTIME_EVIDENCE:
+        ev_path_150 = os.path.join(out_dir, "audit_13_authorization_runtime_evidence.json")
+        with open(ev_path_150, "w", encoding="utf-8") as f:
+            json.dump(_TEST_150_TO_155_RUNTIME_EVIDENCE, f, indent=2)
     sys.exit(0 if result.wasSuccessful() else 1)

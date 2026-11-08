@@ -1,0 +1,167 @@
+{
+  "task_id": "10-b-13",
+  "round": "1/5",
+  "baseline_sha": "401867df2c402beee40098d1882ad11e9bed0619",
+  "target_chain": "Layer 1 -> Layer 5 -> Layer 2",
+  "core_defect_addressed": "Coordinator authorization grant detachment from verified recovery evidence",
+  "red_phase_evidence": {
+    "status": "VERIFIED_RED",
+    "failed_tests_count": 5,
+    "passed_tests_count": 120,
+    "findings": [
+      {
+        "test_id": "TEST-150",
+        "actual_exception": "AssertionError: RuntimeError not raised",
+        "expected_exception": "RuntimeError",
+        "failed_assertion": "with self.assertRaises(RuntimeError)",
+        "related_function": "_issue_coordinator_authorization_grant",
+        "defect_demonstrated": "Grant issued for unrestored FAILED-B without Layer 5 recovery verification"
+      },
+      {
+        "test_id": "TEST-151",
+        "actual_exception": "AssertionError: RuntimeError not raised",
+        "expected_exception": "RuntimeError",
+        "failed_assertion": "with self.assertRaises(RuntimeError)",
+        "related_function": "_issue_coordinator_authorization_grant",
+        "defect_demonstrated": "Grant issued despite RECOVERY_UNCERTAIN relationship by accepting caller-supplied VERIFIED status"
+      },
+      {
+        "test_id": "TEST-152",
+        "actual_exception": "AssertionError: RuntimeError not raised",
+        "expected_exception": "RuntimeError",
+        "failed_assertion": "with self.assertRaises(RuntimeError)",
+        "related_function": "_clear_or_retire_failure_isolation_by_coordinator",
+        "defect_demonstrated": "Layer 2 permitted state transition with mismatched transaction_id"
+      },
+      {
+        "test_id": "TEST-153",
+        "actual_exception": "AssertionError: RuntimeError not raised",
+        "expected_exception": "RuntimeError",
+        "failed_assertion": "with self.assertRaises(RuntimeError)",
+        "related_function": "_clear_or_retire_failure_isolation_by_coordinator",
+        "defect_demonstrated": "Layer 2 permitted state transition with mismatched failure_class"
+      },
+      {
+        "test_id": "TEST-154",
+        "actual_exception": "AssertionError: RuntimeError not raised",
+        "expected_exception": "RuntimeError",
+        "failed_assertion": "with self.assertRaises(RuntimeError)",
+        "related_function": "_issue_coordinator_authorization_grant",
+        "defect_demonstrated": "ARCHIVE_TOMBSTONE grant issued when Armature object physically exists in scene"
+      }
+    ]
+  },
+  "green_phase_evidence": {
+    "status": "ALL_TESTS_PASS",
+    "modified_functions": [
+      "src/rig/arm_ik.py::_issue_coordinator_authorization_grant",
+      "src/rig/arm_ik.py::_clear_or_retire_failure_isolation_by_coordinator",
+      "src/rig/arm_ik.py::request_armature_deisolation",
+      "src/rig/arm_ik.py::retire_dead_armature_tombstone",
+      "tests/test_task10b_transaction_atomicity.py::test_147_coordinator_grant_binding_and_single_use_enforcement",
+      "tests/test_task10b_transaction_atomicity.py::test_150_failed_b_unrestored_grant_issuance_rejected",
+      "tests/test_task10b_transaction_atomicity.py::test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+      "tests/test_task10b_transaction_atomicity.py::test_152_grant_transaction_id_mismatch_rejected",
+      "tests/test_task10b_transaction_atomicity.py::test_153_grant_failure_class_mismatch_rejected",
+      "tests/test_task10b_transaction_atomicity.py::test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+      "tests/test_task10b_transaction_atomicity.py::test_155_verified_recovery_issues_grant_and_single_use_consumed"
+    ],
+    "tests_150_to_155": {
+      "TEST-150": {
+        "test_method": "test_150_failed_b_unrestored_grant_issuance_rejected",
+        "status": "PASS",
+        "registry_session_id": "a6d5b501-a4af-4709-a8f3-5c237f851314",
+        "failure_class": "FAILED-B",
+        "issuance_result": "REJECTED_UNRESTORED"
+      },
+      "TEST-151": {
+        "test_method": "test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+        "status": "PASS",
+        "registry_session_id": "b0b33a25-4b9f-43f2-89b2-64d5bfb8adc3",
+        "failure_class": "FAILED-C",
+        "attack_type": "FORGED_VERIFIED_WITH_RECOVERY_UNCERTAIN",
+        "issuance_result": "REJECTED_RECOVERY_UNCERTAIN"
+      },
+      "TEST-152": {
+        "test_method": "test_152_grant_transaction_id_mismatch_rejected",
+        "status": "PASS",
+        "registry_session_id": "1b598474-ddc8-4515-b049-d4233b54f389",
+        "attack_type": "MISMATCHED_TRANSACTION_ID",
+        "transition_result": "REJECTED_TRANSACTION_MISMATCH"
+      },
+      "TEST-153": {
+        "test_method": "test_153_grant_failure_class_mismatch_rejected",
+        "status": "PASS",
+        "registry_session_id": "c940ef18-898a-40e0-b6d1-6635c3a4da12",
+        "attack_type": "MISMATCHED_FAILURE_CLASS",
+        "transition_result": "REJECTED_FAILURE_CLASS_MISMATCH"
+      },
+      "TEST-154": {
+        "test_method": "test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+        "status": "PASS",
+        "registry_session_id": "3866313c-66b0-4738-9f26-0b27b0ae5024",
+        "failure_class": "FAILED-D",
+        "issuance_result": "REJECTED_OBJECT_ALIVE"
+      },
+      "TEST-155": {
+        "test_method": "test_155_verified_recovery_issues_grant_and_single_use_consumed",
+        "status": "PASS",
+        "registry_session_id": "0ceb6eff-bc7b-4092-8ea4-dc1760ce58d8",
+        "transaction_id": "a7be16d2",
+        "grant_id": "grant_0e9c91d4b92b4fc3b4cf570af983265d",
+        "legitimate_consumption_succeeded": true,
+        "replay_rejected": true
+      }
+    },
+    "test_execution_summary": {
+      "transaction_atomicity_suite": {
+        "total_tests": 125,
+        "passed": 125,
+        "failed": 0,
+        "status": "PASS"
+      },
+      "input_validation_suite": {
+        "total_tests": 30,
+        "passed": 30,
+        "failed": 0,
+        "status": "PASS"
+      },
+      "task10a_world_transform_contract": {
+        "total_tests": 30,
+        "passed": 30,
+        "failed": 0,
+        "status": "PASS"
+      },
+      "regression_tiers": {
+        "quick": {
+          "planned": 19,
+          "executed": 19,
+          "passed": 19,
+          "failed": 0,
+          "status": "PASS"
+        },
+        "physics": {
+          "planned": 27,
+          "executed": 27,
+          "passed": 27,
+          "failed": 0,
+          "status": "PASS"
+        },
+        "motion": {
+          "planned": 12,
+          "executed": 12,
+          "passed": 12,
+          "failed": 0,
+          "status": "PASS"
+        },
+        "full": {
+          "planned": 42,
+          "executed": 42,
+          "passed": 42,
+          "failed": 0,
+          "status": "PASS"
+        }
+      }
+    }
+  }
+}
