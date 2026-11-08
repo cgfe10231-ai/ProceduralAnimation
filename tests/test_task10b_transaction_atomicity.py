@@ -5597,47 +5597,44 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         }
 
     def test_151_failed_c_recovery_uncertain_forged_verified_rejected(self) -> None:
-        """TEST-151: Requesting Coordinator grant with RECOVERY_UNCERTAIN relationship while forging VERIFIED must be rejected."""
+        """TEST-151: trusted snapshot passes Case 2, but a real uncertain journal blocks Case 1."""
         setup_arm_ik(self.armature, initial_influence=0.5)
         session_rec = ensure_armature_session_identity(self.armature)
         session_id = session_rec.registry_session_id
         tx_id = f"tx_151_{uuid.uuid4().hex[:6]}"
-
+        trusted_snapshot = _snapshot_arm_rig_state(self.armature)
         session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_C
         _ISOLATED_FAILED_ARMATURES[session_id] = {
             "registry_session_id": session_id,
             "transaction_id": tx_id,
             "failure_class": _FailedTransactionClass.FAILED_C.value,
             "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_C.value,
-            "prepared_relationship_mutations": [
-                {
-                    "operation_id": "op_test_151",
-                    "operation_state": _RelationshipOperationState.RECOVERY_UNCERTAIN,
-                }
-            ],
+            "snapshot_reference": trusted_snapshot,
+            "snapshot_trusted": True,
+            "prepared_relationship_mutations": [{
+                "operation_id": "op_test_151",
+                "operation_state": _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            }],
         }
-
-        # Attempting to obtain grant by supplying forged VERIFIED status must be rejected
-        with self.assertRaises(RuntimeError) as cm:
+        direct = verify_armature_deisolation_evidence(arm=self.armature, session_id=session_id)
+        self.assertEqual(direct["case"], "CASE_1_SNAPSHOT_VERIFIED")
+        self.assertEqual(direct["status"], "RECOVERY_VERIFICATION_FAILED")
+        self.assertFalse(direct["can_deisolate"])
+        self.assertTrue(any("RECOVERY_UNCERTAIN" in r for r in direct["reasons"]), direct)
+        with self.assertRaisesRegex(RuntimeError, "RECOVERY_UNCERTAIN"):
             _request_coordinator_grant_for_test(
-                session_id=session_id,
-                transition_action="CLEAR_TO_NONE",
-                arm=self.armature,
-                evidence_status="VERIFIED",
+                session_id=session_id, transition_action="CLEAR_TO_NONE", arm=self.armature,
             )
-        self.assertTrue(
-            any(k in str(cm.exception).lower() for k in ("recovery", "uncertain", "verification", "grant", "cannot issue")),
-            f"Unexpected exception message: {cm.exception}",
-        )
         self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
-
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
         _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-151"] = {
             "test_method": "test_151_failed_c_recovery_uncertain_forged_verified_rejected",
             "status": "PASS",
             "registry_session_id": session_id,
             "failure_class": "FAILED-C",
-            "attack_type": "FORGED_VERIFIED_WITH_RECOVERY_UNCERTAIN",
-            "issuance_result": "REJECTED_RECOVERY_UNCERTAIN",
+            "case": direct["case"],
+            "actual_verification_status": direct["status"],
+            "reasons": direct["reasons"],
         }
 
     def test_152_grant_transaction_id_mismatch_rejected(self) -> None:
@@ -6622,6 +6619,294 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             "registry_session_id": None,
             "fingerprint_snapshot_coexistence": "VERIFIED",
         }
+
+
+    # TASK 10-B-13 final repair: exact regression tests written before execution.
+    def test_174_unknown_admission_rejected_without_isolation(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        pre = _snapshot_arm_rig_state(self.armature)
+        def unknown(_rec):
+            return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-174 transient lookup"}
+        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", unknown):
+            with self.assertRaisesRegex(RuntimeError, "ARMATURE_IDENTITY_UNVERIFIED_AT_ADMISSION"):
+                with _arm_rig_transaction(self.armature):
+                    self.fail("UNKNOWN must not admit writes")
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session.registry_session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session.liveness_status, _ArmatureLivenessStatus.ALIVE_VERIFIED)
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        _verify_arm_rig_state_restored(self.armature, pre)
+        with _arm_rig_transaction(self.armature) as tx:
+            self.assertEqual(tx.state, _ArmRigTransactionState.ACTIVE)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+    def test_175_unknown_before_rollback_keeps_failed_c(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        uncertain = [False]
+        real = arm_ik._check_original_object_liveness
+        def maybe_unknown(rec):
+            if uncertain[0]:
+                return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-175 transient"}
+            return real(rec)
+        def fault(stage, ctx):
+            if stage == "set_arm_ik_influence_between_influences":
+                uncertain[0] = True
+                raise ValueError("TEST-175 primary write fault")
+        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", maybe_unknown):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    set_arm_ik_influence(self.armature, "L", 0.8)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("TEST-175 primary write fault", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_176_unknown_after_rollback_verification_is_failed_c(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        uncertain = [False]
+        real = arm_ik._check_original_object_liveness
+        def maybe_unknown(rec):
+            if uncertain[0]:
+                return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-176 query"}
+            return real(rec)
+        def fault(stage, ctx):
+            if stage == "set_arm_ik_influence_between_influences":
+                raise ValueError("TEST-176 primary")
+            if stage == "during_rollback_verification":
+                uncertain[0] = True
+                raise RuntimeError("TEST-176 verifier fault")
+        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", maybe_unknown):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    set_arm_ik_influence(self.armature, "L", 0.8)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("TEST-176 primary", str(cm.exception))
+        self.assertIn("TEST-176 verifier fault", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_177_unknown_during_snapshot_is_failed_c(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        uncertain = [False]
+        real = arm_ik._check_original_object_liveness
+        def maybe_unknown(rec):
+            if uncertain[0]:
+                return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-177 query"}
+            return real(rec)
+        def fault(stage, ctx):
+            if stage == "during_snapshot_creation":
+                uncertain[0] = True
+                raise RuntimeError("TEST-177 snapshot")
+        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", maybe_unknown):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    setup_arm_ik(self.armature)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("FAILED-C", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_178_verified_data_replacement_remains_failed_d(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        self.armature.data = bpy.data.armatures.new("TEST_178_replaced_data")
+        with self.assertRaisesRegex(RuntimeError, "FAILED-D"):
+            setup_arm_ik(self.armature)
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-D")
+        self.assertEqual(_check_original_object_liveness(session)["status"], "ALIVE")
+
+    def test_179_fingerprint_strictly_freezes_or_rejects(self) -> None:
+        freeze = arm_ik._freeze_fingerprint_property_value
+        src = {"x": [1.0, 2.0]}
+        frozen = freeze(src)
+        self.assertIsInstance(frozen, tuple)
+        src["x"].append(999.0)
+        self.assertNotIn("999.0", str(frozen))
+        with self.assertRaisesRegex(TypeError, "FINGERPRINT_UNSUPPORTED_TYPE"):
+            freeze(object())
+        live_obj = bpy.data.objects.new("test_179_ref", None)
+        bpy.context.scene.collection.objects.link(live_obj)
+        try:
+            ref_frozen = freeze(live_obj)
+            self.assertIsInstance(ref_frozen, tuple)
+            self.assertEqual(ref_frozen[0], "RNA_IDENTITY")
+            self.assertEqual(ref_frozen[2], live_obj.as_pointer())
+        finally:
+            bpy.data.objects.remove(live_obj, do_unlink=True)
+
+    def test_180_nonfinite_iterator_failure_cannot_prove_finite(self) -> None:
+        class BrokenIterator:
+            def __iter__(self):
+                raise RuntimeError("TEST-180 scan failed")
+        with self.assertRaisesRegex(RuntimeError, "TEST-180 scan failed"):
+            _has_nan_or_inf({"deep": (0.1, BrokenIterator())})
+        with self.assertRaisesRegex(TypeError, "NONFINITE_SCAN_UNSUPPORTED_TYPE"):
+            _has_nan_or_inf(object())
+        self.assertTrue(_has_nan_or_inf({"deep": [1.0, float("inf")]}))
+
+    def test_181_unverified_data_enumeration_is_not_failed_d(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        real = arm_ik.bpy
+        class ArmatureDataProxy:
+            def __getattr__(self, name):
+                if name == "armatures":
+                    class BrokenArmatures:
+                        def values(self):
+                            raise RuntimeError("TEST-181 enumeration unavailable")
+                    return BrokenArmatures()
+                return getattr(real.data, name)
+        class BpyProxy:
+            data = ArmatureDataProxy()
+            def __getattr__(self, name):
+                return getattr(real, name)
+        with _ScopedModuleAttributeProxy(arm_ik, "bpy", BpyProxy()):
+            check = _verify_armature_session_identity_record(session, candidate_arm=self.armature)
+            self.assertFalse(check["is_valid"])
+            self.assertTrue(check["identity_verification_uncertain"])
+            self.assertEqual(session.liveness_status, _ArmatureLivenessStatus.ALIVE_VERIFIED)
+            _sweep_dead_managed_armature_identities()
+            self.assertEqual(session.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertIsNone(session.tombstone_record)
+
+    def test_182_verification_evidence_cannot_replace_explicit_grant(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        sid = session.registry_session_id
+        session.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[sid] = {
+            "registry_session_id": sid,
+            "transaction_id": "tx_182",
+            "failure_class": "FAILED-B",
+            "isolation_state": "ISOLATED_FAILED_B",
+            "snapshot_reference": _snapshot_arm_rig_state(self.armature),
+            "snapshot_trusted": True,
+            "prepared_relationship_mutations": [],
+        }
+        grant = _issue_coordinator_authorization_grant(sid, transition_action="CLEAR_TO_NONE", arm=self.armature)
+        with self.assertRaisesRegex(RuntimeError, "authorization_grant is required"):
+            _clear_or_retire_failure_isolation_by_coordinator(
+                sid, "CLEAR_TO_NONE", "TEST-182", authorization_grant=None,
+                verification_evidence=grant,
+            )
+        self.assertIn(grant["grant_id"], _COORDINATOR_AUTHORIZATION_GRANTS)
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        verified = _clear_or_retire_failure_isolation_by_coordinator(
+            sid, "CLEAR_TO_NONE", "TEST-182", authorization_grant=grant,
+        )
+        self.assertEqual(verified["new_isolation_state"], "NONE")
+        self.assertNotIn(grant["grant_id"], _COORDINATOR_AUTHORIZATION_GRANTS)
+
+    def test_183_nested_dual_exception_chain_and_isolation_record(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        def fault(stage, ctx):
+            if stage == "set_arm_ik_influence_between_influences":
+                raise ValueError("TEST-183 inner failure")
+            if stage == "during_rollback_execution":
+                raise RuntimeError("TEST-183 rollback failure")
+        _set_test_fault_injection_hook(fault)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature):
+                    set_arm_ik_influence(self.armature, "L", 0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+        self.assertIn("TEST-183 inner failure", str(cm.exception))
+        self.assertIn("TEST-183 rollback failure", str(cm.exception))
+        self.assertIsInstance(cm.exception.__cause__, ValueError)
+        iso = _ISOLATED_FAILED_ARMATURES[session.registry_session_id]
+        self.assertIn("TEST-183 inner failure", iso["primary_exception"])
+        self.assertIn("TEST-183 rollback failure", iso["secondary_exception"])
+        self.assertEqual(iso["failure_class"], "FAILED-B")
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_184_shared_curve_and_armature_data_are_preserved(self) -> None:
+        char_col = bpy.data.collections["Character"]
+        curve = bpy.data.curves.new("TEST_184_shared_curve", type="CURVE")
+        curve.dimensions = "3D"
+        arm_data = bpy.data.armatures.new("TEST_184_shared_armature")
+        wrong_curve = bpy.data.objects.new("HandIK.L", curve)
+        wrong_arm = bpy.data.objects.new("HandIK.R", arm_data)
+        ext_curve = bpy.data.objects.new("TEST_184_curve_user", curve)
+        ext_arm = bpy.data.objects.new("TEST_184_arm_user", arm_data)
+        for obj in (wrong_curve, wrong_arm):
+            char_col.objects.link(obj)
+        for obj in (ext_curve, ext_arm):
+            bpy.context.scene.collection.objects.link(obj)
+        curve_ptr, arm_ptr = curve.as_pointer(), arm_data.as_pointer()
+        self.assertEqual(curve.users, 2)
+        self.assertEqual(arm_data.users, 2)
+        setup_arm_ik(self.armature)
+        self.assertTrue(any(c.as_pointer() == curve_ptr for c in bpy.data.curves))
+        self.assertTrue(any(a.as_pointer() == arm_ptr for a in bpy.data.armatures))
+        self.assertEqual(bpy.data.curves["TEST_184_shared_curve"].users, 1)
+        self.assertEqual(bpy.data.armatures["TEST_184_shared_armature"].users, 1)
+        self.assertEqual(bpy.data.objects["TEST_184_curve_user"].data.as_pointer(), curve_ptr)
+        self.assertEqual(bpy.data.objects["TEST_184_arm_user"].data.as_pointer(), arm_ptr)
+
+    def test_185_destroyed_rna_reference_fingerprint_fails_closed(self) -> None:
+        removed_obj = bpy.data.objects.new("TEST_185_destroyed_ref", None)
+        bpy.context.scene.collection.objects.link(removed_obj)
+        bpy.data.objects.remove(removed_obj, do_unlink=True)
+        with self.assertRaisesRegex(RuntimeError, "FINGERPRINT_RNA_IDENTITY_UNVERIFIED"):
+            arm_ik._freeze_fingerprint_property_value(removed_obj)
+
+    def test_186_unsupported_constraint_property_never_proves_failed_a(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        original_getattr = getattr
+        def unsupported_property(obj, name, *args):
+            if name == "use_location" and original_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                return object()
+            return original_getattr(obj, name, *args)
+        with _ScopedModuleAttributeProxy(arm_ik, "getattr", unsupported_property):
+            with self.assertRaises(RuntimeError) as cm:
+                set_arm_ik_influence(self.armature, "L", 0.9)
+        self.assertIn("FAILED-C", str(cm.exception))
+        self.assertIn("FINGERPRINT_UNSUPPORTED_TYPE", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_187_nonfinite_scan_exception_isolated_as_failed_c(self) -> None:
+        """TEST-187: FAILED-A zero-mutation verifier must not lose isolation on scan errors."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        def fault(stage, ctx):
+            if stage == "during_snapshot_creation":
+                raise RuntimeError("TEST-187 primary snapshot failure")
+        def unreadable(_val):
+            raise RuntimeError("TEST-187 finiteness scan unavailable")
+        with _ScopedModuleAttributeProxy(arm_ik, "_has_nan_or_inf", unreadable):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    setup_arm_ik(self.armature, initial_influence=0.6)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("FAILED-C", str(cm.exception))
+        self.assertIn("TEST-187 finiteness scan unavailable", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        with self.assertRaisesRegex(RuntimeError, "FAILED-C"):
+            setup_arm_ik(self.armature, initial_influence=0.7)
 
 
 if __name__ == "__main__":

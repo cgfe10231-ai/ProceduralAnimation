@@ -40,7 +40,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import bpy
-from mathutils import Euler, Matrix, Quaternion, Vector
+from mathutils import Color, Euler, Matrix, Quaternion, Vector
 
 from src.rig.transform_utils import (
     apply_target_rotation,
@@ -431,6 +431,7 @@ def _verify_armature_session_identity_record(
         }
 
     reasons: List[str] = []
+    identity_uncertain = False
     ref = record.original_blender_ref
 
     # Independent Object Liveness Evaluation (Eo)
@@ -446,6 +447,7 @@ def _verify_armature_session_identity_record(
         if record.lifecycle_stage not in ("TOMBSTONED_FAILED_D", "ARCHIVED_RETIRED"):
             record.lifecycle_stage = "INVALIDATED_DEAD"
     else:  # UNKNOWN
+        identity_uncertain = True
         reasons.append(
             f"OBJECT_LIVENESS_UNKNOWN: original object existence cannot be verified ({obj_liveness.get('reason', 'unverified')})"
         )
@@ -479,6 +481,7 @@ def _verify_armature_session_identity_record(
             c2_no_ref_error = False
             reasons.append(f"Condition 2 failed: original_blender_ref raised ReferenceError ({re_err})")
         except BaseException as exc:
+            identity_uncertain = True
             c2_no_ref_error = False
             reasons.append(f"Condition 2 failed: original_blender_ref access error ({exc})")
     else:
@@ -532,6 +535,7 @@ def _verify_armature_session_identity_record(
         except ReferenceError:
             c7_data_valid_and_matches = False
         except BaseException:
+            identity_uncertain = True
             c7_data_valid_and_matches = False
     if not c7_data_valid_and_matches:
         reasons.append(
@@ -554,7 +558,7 @@ def _verify_armature_session_identity_record(
                 record.registered_name_snapshot = str(ref.name)
             except BaseException:
                 pass
-        else:
+        elif not identity_uncertain:
             record.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
             if record.lifecycle_stage not in ("TOMBSTONED_FAILED_D", "ARCHIVED_RETIRED"):
                 record.lifecycle_stage = "INVALIDATED_DEAD"
@@ -579,6 +583,7 @@ def _verify_armature_session_identity_record(
             c6_pointer_matches = False
             reasons.append(f"Condition 5/6 failed: candidate_arm raised ReferenceError ({cand_re})")
         except BaseException as cand_exc:
+            identity_uncertain = True
             c5_same_blender_ref = False
             c6_pointer_matches = False
             reasons.append(f"Condition 5/6 failed: candidate_arm invalid ({cand_exc})")
@@ -605,6 +610,7 @@ def _verify_armature_session_identity_record(
         "registry_session_id": record.registry_session_id,
         "object_exists": object_exists,
         "object_liveness_status": object_liveness_status,
+        "identity_verification_uncertain": identity_uncertain,
     }
 
 
@@ -623,6 +629,7 @@ def _sweep_dead_managed_armature_identities() -> None:
         is_dead = (obj_liveness["status"] == "ABSENT")
         is_data_invalidated = (
             obj_liveness["status"] == "ALIVE"
+            and not ver.get("identity_verification_uncertain", False)
             and not ver["checks"].get("c7_data_valid_and_pointer_matches", False)
         )
         if is_dead or is_data_invalidated:
@@ -955,7 +962,12 @@ def _clear_or_retire_failure_isolation_by_coordinator(
     verification_evidence: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Layer 2: Clear FAILED-B/C isolation or archive FAILED-D tombstone exclusively for Layer 1 Coordinator."""
-    grant_candidate = authorization_grant if authorization_grant is not None else verification_evidence
+    if authorization_grant is None:
+        raise RuntimeError(
+            f"Layer 2 rejected {'de-isolation' if action == 'CLEAR_TO_NONE' else 'tombstone retirement'}: "
+            "authorization_grant is required; verification_evidence is not authorization"
+        )
+    grant_candidate = authorization_grant
     session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
     iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
     if session_rec is None or iso_rec is None:
@@ -1115,15 +1127,8 @@ def _clone_snapshot_property_value(val: Any) -> Any:
 
 
 def _freeze_fingerprint_property_value(val: Any) -> Any:
-    """Safely convert a property value into an immutable frozen representation for structural fingerprinting."""
-    if val is None:
-        return None
-    if isinstance(val, bool):
-        return val
-    if isinstance(val, (int, str)):
-        return val
-    if isinstance(val, float):
-        # Exact unrounded float
+    """Clone RNA values to recursively immutable, strict structural evidence."""
+    if val is None or isinstance(val, (bool, int, float, str, bytes)):
         return val
     if isinstance(val, Vector):
         return tuple(float(v) for v in val)
@@ -1133,24 +1138,33 @@ def _freeze_fingerprint_property_value(val: Any) -> Any:
         return (float(val.w), float(val.x), float(val.y), float(val.z))
     if isinstance(val, Matrix):
         return tuple(tuple(float(v) for v in row) for row in val)
+    if isinstance(val, Color):
+        return tuple(float(v) for v in val)
     if isinstance(val, (tuple, list)):
-        return tuple(_freeze_fingerprint_property_value(elem) for elem in val)
+        return tuple(_freeze_fingerprint_property_value(v) for v in val)
     if isinstance(val, (set, frozenset)):
-        return frozenset(_freeze_fingerprint_property_value(elem) for elem in val)
+        return frozenset(_freeze_fingerprint_property_value(v) for v in val)
     if isinstance(val, dict):
-        return {k: _freeze_fingerprint_property_value(v) for k, v in val.items()}
-    if hasattr(val, "__len__") and hasattr(val, "__getitem__") and not isinstance(val, (str, bytes, dict)):
-        return tuple(_freeze_fingerprint_property_value(elem) for elem in val)
+        return tuple(( _freeze_fingerprint_property_value(k),
+                       _freeze_fingerprint_property_value(v)) for k, v in val.items())
     if isinstance(val, (bpy.types.Object, bpy.types.ID, bpy.types.bpy_struct)):
         try:
-            return {
-                "_rna_type": str(getattr(getattr(val, "rna_type", None), "identifier", type(val).__name__)),
-                "ptr": int(val.as_pointer()),
-                "name": str(getattr(val, "name", "")),
-            }
-        except ReferenceError:
-            return None
-    return val
+            ptr = int(val.as_pointer())
+            if ptr <= 0:
+                raise RuntimeError("RNA identity pointer is non-positive")
+            rna = getattr(val, "rna_type", None)
+            kind = str(getattr(rna, "identifier", type(val).__name__))
+            name = str(getattr(val, "name", ""))
+            return ("RNA_IDENTITY", kind, ptr, name)
+        except BaseException as exc:
+            raise RuntimeError(
+                f"FINGERPRINT_RNA_IDENTITY_UNVERIFIED: {type(exc).__name__}: {exc}"
+            ) from exc
+    if hasattr(val, "__len__") and hasattr(val, "__getitem__"):
+        return tuple(_freeze_fingerprint_property_value(v) for v in val)
+    raise TypeError(f"FINGERPRINT_UNSUPPORTED_TYPE: {type(val).__name__}")
+
+
 
 
 _REQUIRED_ARM_IK_BONE_NAMES: Tuple[str, ...] = (
@@ -1164,25 +1178,23 @@ _REQUIRED_ARM_IK_BONE_NAMES: Tuple[str, ...] = (
 
 
 def _has_nan_or_inf(val: Any) -> bool:
-    """Return True if any floating-point number within val is NaN or Infinite."""
-    if isinstance(val, (int, bool, str, bytes)) or val is None:
+    """Detect non-finite values; incomplete scans must fail closed, never return False."""
+    if val is None or isinstance(val, (bool, int, str, bytes)):
         return False
     if isinstance(val, float):
-        return math.isnan(val) or math.isinf(val)
-    if isinstance(val, (Vector, Euler, Quaternion)):
-        return any(_has_nan_or_inf(float(elem)) for elem in val)
+        return not math.isfinite(val)
+    if isinstance(val, (Vector, Euler, Quaternion, Color)):
+        return any(_has_nan_or_inf(float(v)) for v in val)
     if isinstance(val, Matrix):
         return any(_has_nan_or_inf(row) for row in val)
-    if isinstance(val, (tuple, list, set, frozenset)):
-        return any(_has_nan_or_inf(elem) for elem in val)
     if isinstance(val, dict):
         return any(_has_nan_or_inf(k) or _has_nan_or_inf(v) for k, v in val.items())
-    if hasattr(val, "__iter__") and not isinstance(val, (str, bytes)):
-        try:
-            return any(_has_nan_or_inf(elem) for elem in val)
-        except Exception:
-            pass
-    return False
+    if isinstance(val, (tuple, list, set, frozenset)):
+        return any(_has_nan_or_inf(v) for v in val)
+    if hasattr(val, "__iter__"):
+        # An iterator exception is evidence failure, NOT proof of finiteness.
+        return any(_has_nan_or_inf(v) for v in val)
+    raise TypeError(f"NONFINITE_SCAN_UNSUPPORTED_TYPE: {type(val).__name__}")
 
 
 def _capture_pre_snapshot_structural_fingerprint(arm: bpy.types.Object) -> Dict[str, Any]:
@@ -1379,9 +1391,17 @@ def _verify_pre_write_zero_mutation_and_integrity(
         reasons.append(f"Failed to capture post-exception structural fingerprint: {exc}")
         return {"is_verified": False, "reasons": reasons}
 
-    # 2. Check for NaN or Infinite values
-    if _has_nan_or_inf(pre_fp) or _has_nan_or_inf(post_fp):
-        reasons.append("Pre-write structural fingerprint contains NaN or Infinite floating point values")
+    # 2. A failed finiteness check is untrusted evidence, not a verified clean state.
+    try:
+        nonfinite = _has_nan_or_inf(pre_fp) or _has_nan_or_inf(post_fp)
+    except BaseException as scan_exc:
+        reasons.append(
+            f"Pre-write fingerprint finiteness could not be verified: "
+            f"{type(scan_exc).__name__}: {scan_exc}"
+        )
+    else:
+        if nonfinite:
+            reasons.append("Pre-write structural fingerprint contains NaN or Infinite floating point values")
 
     # 3. Check for missing bones
     if post_fp.get("total_pose_bone_count", 0) > 0:
@@ -4310,6 +4330,14 @@ def retire_dead_armature_tombstone(
     }
 
 
+def _identity_failure_is_uncertain(verification: Dict[str, Any]) -> bool:
+    """Keep indeterminate Blender reads separate from confirmed session invalidation."""
+    return bool(
+        verification.get("object_liveness_status", "UNKNOWN") == "UNKNOWN"
+        or verification.get("identity_verification_uncertain", False)
+    )
+
+
 @contextmanager
 def _arm_rig_transaction(arm: bpy.types.Object):
     """Context manager executing Arm IK mutations under atomic transaction protection."""
@@ -4356,6 +4384,14 @@ def _arm_rig_transaction(arm: bpy.types.Object):
     # Gate 3: Verify 7-condition Armature Session Identity
     admission_id_check = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
     if not admission_id_check["is_valid"]:
+        if _identity_failure_is_uncertain(admission_id_check):
+            # Admission is before snapshot/business writes. An indeterminate read
+            # denies this attempt but does not permanently isolate a healthy rig.
+            raise RuntimeError(
+                "Arm IK write blocked: ARMATURE_IDENTITY_UNVERIFIED_AT_ADMISSION "
+                f"(registry_session_id={session_rec.registry_session_id}): "
+                + "; ".join(admission_id_check["reasons"])
+            )
         dead_tx = _ArmRigTransactionContext(arm, session_record=session_rec)
         dead_tx.state = _ArmRigTransactionState.FAILED
         _record_armature_failure_isolation_by_coordinator(
@@ -4431,8 +4467,9 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                 pre_rb_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
 
                 if not pre_rb_id["is_valid"]:
-                    # FAILED-D: Armature destroyed or identity invalidated during ACTIVE/COMMITTING.
-                    # Never execute rollback on a dead or substitute Armature!
+                    # An unverified identity is not a proven-dead Armature.
+                    # Never roll back through an uncertain or substituted RNA reference.
+                    uncertain = _identity_failure_is_uncertain(pre_rb_id)
                     tx.state = _ArmRigTransactionState.FAILED
                     rollback_err = RuntimeError(
                         "Armature session identity invalidated before rollback "
@@ -4442,10 +4479,12 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                     _record_armature_failure_isolation_by_coordinator(
                         session_rec=session_rec,
                         tx=tx,
-                        failure_class=_FailedTransactionClass.FAILED_D,
+                        failure_class=(_FailedTransactionClass.FAILED_C if uncertain
+                                       else _FailedTransactionClass.FAILED_D),
                         primary_exception=orig_exc,
                         secondary_exception=rollback_err,
-                        evidence_status="ARMATURE_DESTROYED_DURING_TRANSACTION",
+                        evidence_status=("ARMATURE_IDENTITY_UNVERIFIED_BEFORE_ROLLBACK" if uncertain
+                                         else "ARMATURE_DESTROYED_DURING_TRANSACTION"),
                         missing_evidence_reasons=pre_rb_id["reasons"],
                     )
                 else:
@@ -4463,8 +4502,11 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                         rollback_err = rb_exc
                         post_rb_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
                         if not post_rb_id["is_valid"]:
-                            f_class = _FailedTransactionClass.FAILED_D
-                            ev_status = "ARMATURE_DESTROYED_DURING_ROLLBACK"
+                            uncertain = _identity_failure_is_uncertain(post_rb_id)
+                            f_class = (_FailedTransactionClass.FAILED_C if uncertain
+                                       else _FailedTransactionClass.FAILED_D)
+                            ev_status = ("ARMATURE_IDENTITY_UNVERIFIED_DURING_ROLLBACK" if uncertain
+                                         else "ARMATURE_DESTROYED_DURING_ROLLBACK")
                             ev_reasons = post_rb_id["reasons"]
                         elif not rollback_execution_completed:
                             f_class = _FailedTransactionClass.FAILED_B
@@ -4496,17 +4538,21 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                 tx.state = _ArmRigTransactionState.FAILED
                 pre_active_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
                 if not pre_active_id["is_valid"]:
+                    uncertain = _identity_failure_is_uncertain(pre_active_id)
+                    f_class = (_FailedTransactionClass.FAILED_C if uncertain
+                               else _FailedTransactionClass.FAILED_D)
                     _record_armature_failure_isolation_by_coordinator(
                         session_rec=session_rec,
                         tx=tx,
-                        failure_class=_FailedTransactionClass.FAILED_D,
+                        failure_class=f_class,
                         primary_exception=orig_exc,
-                        evidence_status="ARMATURE_DESTROYED_DURING_SNAPSHOTTING",
+                        evidence_status=("RECOVERY_EVIDENCE_INSUFFICIENT" if uncertain
+                                         else "ARMATURE_DESTROYED_DURING_SNAPSHOTTING"),
                         missing_evidence_reasons=pre_active_id["reasons"],
                     )
                     raise RuntimeError(
                         f"Arm rig transaction failed during SNAPSHOTTING with {type(orig_exc).__name__}: {orig_exc}, "
-                        f"AND Armature session identity was invalidated (FAILED-D, "
+                        f"AND Armature session identity was invalidated ({f_class.value}, "
                         f"registry_session_id={session_rec.registry_session_id})"
                     ) from orig_exc
 
