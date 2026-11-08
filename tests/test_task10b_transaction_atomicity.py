@@ -127,7 +127,12 @@ from src.rig.arm_ik import (
     setup_arm_ik,
     verify_armature_deisolation_evidence,
     _verify_dead_armature_tombstone_retirement_evidence,
+    _capture_pre_snapshot_structural_fingerprint,
+    _verify_pre_write_zero_mutation_and_integrity,
+    _has_nan_or_inf,
+    _clone_snapshot_property_value,
 )
+import src.rig.arm_ik as arm_ik
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
 from src.rig.pose import reset_pose
@@ -135,6 +140,28 @@ from src.rig.pose import reset_pose
 _TEST_137_TO_149_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
 _TEST_150_TO_155_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
 _TEST_156_TO_164_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+_TEST_165_TO_173_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+
+
+class _ScopedModuleAttributeProxy:
+    """Context manager to safely and temporarily override or set a module-level global attribute."""
+
+    def __init__(self, target_module: Any, attr_name: str, replacement: Any) -> None:
+        self._module = target_module
+        self._attr = attr_name
+        self._replacement = replacement
+        self._had_attr = hasattr(target_module, attr_name)
+        self._orig = getattr(target_module, attr_name, None)
+
+    def __enter__(self) -> "_ScopedModuleAttributeProxy":
+        setattr(self._module, self._attr, self._replacement)
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._had_attr:
+            setattr(self._module, self._attr, self._orig)
+        else:
+            self._module.__dict__.pop(self._attr, None)
 
 
 class _FaultyObjectRefProxy:
@@ -6190,6 +6217,412 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             "verification_status": "RETIREMENT_BLOCKED_UNDER_UNKNOWN",
         }
 
+    def test_165_constraint_property_getter_failure_is_not_silently_ignored(self) -> None:
+        """TEST-165: Constraint property getter failure is not silently ignored and aborts with FINGERPRINT_PROPERTY_CAPTURE_FAILED."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        pbone = self.armature.pose.bones["forearm.L"]
+        con = pbone.constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
+        self.assertTrue(hasattr(con, "use_location"))
+
+        orig_getattr = getattr
+        def faulty_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                raise RuntimeError("TEST-165 getter failure")
+            return orig_getattr(obj, name, *args)
+
+        with _ScopedModuleAttributeProxy(arm_ik, "getattr", faulty_getattr):
+            with self.assertRaises(RuntimeError) as cm:
+                _capture_pre_snapshot_structural_fingerprint(self.armature)
+
+            err_msg = str(cm.exception)
+            self.assertIn("FINGERPRINT_PROPERTY_CAPTURE_FAILED", err_msg)
+            self.assertIn("forearm.L", err_msg)
+            self.assertIn("use_location", err_msg)
+            self.assertIn("TEST-165 getter failure", err_msg)
+            self.assertIsInstance(cm.exception.__cause__, RuntimeError)
+            self.assertEqual(str(cm.exception.__cause__), "TEST-165 getter failure")
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-165"] = {
+            "test_method": "test_165_constraint_property_getter_failure_is_not_silently_ignored",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "failure_injection_stage": "fingerprint_property_getter",
+            "actual_exception": "RuntimeError: FINGERPRINT_PROPERTY_CAPTURE_FAILED",
+        }
+
+    def test_166_constraint_property_clone_failure_is_not_silently_ignored(self) -> None:
+        """TEST-166: Constraint property clone failure is not silently ignored and aborts fingerprint capture."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        class _CloneFaultMarker:
+            pass
+
+        orig_getattr = getattr
+        def faulty_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                return _CloneFaultMarker()
+            return orig_getattr(obj, name, *args)
+
+        orig_clone = arm_ik._clone_snapshot_property_value
+        def faulty_clone(val: Any) -> Any:
+            if isinstance(val, _CloneFaultMarker):
+                raise RuntimeError("TEST-166 clone failure")
+            return orig_clone(val)
+
+        with _ScopedModuleAttributeProxy(arm_ik, "getattr", faulty_getattr):
+            with _ScopedModuleAttributeProxy(arm_ik, "_clone_snapshot_property_value", faulty_clone):
+                with self.assertRaises(RuntimeError) as cm:
+                    _capture_pre_snapshot_structural_fingerprint(self.armature)
+
+                err_msg = str(cm.exception)
+                self.assertIn("FINGERPRINT_PROPERTY_CAPTURE_FAILED", err_msg)
+                self.assertIn("forearm.L", err_msg)
+                self.assertIn("use_location", err_msg)
+                self.assertIn("TEST-166 clone failure", err_msg)
+                self.assertIsInstance(cm.exception.__cause__, RuntimeError)
+                self.assertEqual(str(cm.exception.__cause__), "TEST-166 clone failure")
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-166"] = {
+            "test_method": "test_166_constraint_property_clone_failure_is_not_silently_ignored",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "failure_injection_stage": "fingerprint_property_clone",
+            "actual_exception": "RuntimeError: FINGERPRINT_PROPERTY_CAPTURE_FAILED",
+        }
+
+    def test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a(self) -> None:
+        """TEST-167: Same property unreadable before and after cannot prove zero mutation and must isolate as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        orig_getattr = getattr
+        def faulty_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                raise RuntimeError("Persistent unreadable property in TEST-167")
+            return orig_getattr(obj, name, *args)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage in ("during_pre_snapshot_fingerprint", "during_snapshot_creation"):
+                tx = ctx.get("tx")
+                if tx is not None and tx not in captured_tx:
+                    captured_tx.append(tx)
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with _ScopedModuleAttributeProxy(arm_ik, "getattr", faulty_getattr):
+                with self.assertRaises(RuntimeError) as cm:
+                    set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
+                err_msg = str(cm.exception)
+                self.assertIn("FAILED-C", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.registry_session_id, session_id)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write transaction must be rejected by FAILED isolation gate
+        with self.assertRaises(RuntimeError) as cm_gate:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_gate.exception))
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-167"] = {
+            "test_method": "test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "isolation_state": "ISOLATED_FAILED_C",
+            "admission_result": "REJECTED_AFTER_FAILED_C",
+        }
+
+    def test_168_post_exception_fingerprint_capture_failure_preserves_primary_error(self) -> None:
+        """TEST-168: Post-exception fingerprint capture failure preserves primary snapshot exception and isolates as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        post_fp_active = [False]
+        orig_getattr = getattr
+        def selective_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if post_fp_active[0] and name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                raise RuntimeError("Secondary post-fingerprint fault in TEST-168")
+            return orig_getattr(obj, name, *args)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                post_fp_active[0] = True
+                raise RuntimeError("Primary snapshot fault in TEST-168")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with _ScopedModuleAttributeProxy(arm_ik, "getattr", selective_getattr):
+                with self.assertRaises(RuntimeError) as cm:
+                    set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
+                err_msg = str(cm.exception)
+                self.assertIn("Primary snapshot fault in TEST-168", err_msg)
+                self.assertIn("FAILED-C", err_msg)
+                self.assertIn("Secondary post-fingerprint fault in TEST-168", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        with self.assertRaises(RuntimeError) as cm_gate:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_gate.exception))
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-168"] = {
+            "test_method": "test_168_post_exception_fingerprint_capture_failure_preserves_primary_error",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "isolation_state": "ISOLATED_FAILED_C",
+            "admission_result": "REJECTED_AFTER_FAILED_C",
+        }
+
+    def test_169_real_generic_ik_property_mutation_is_detected(self) -> None:
+        """TEST-169: Generic IK property mutation during SNAPSHOTTING is detected by unrounded fingerprint comparison."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        con = self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
+        orig_use_location = con.use_location
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                # Mutate generic property use_location
+                con.use_location = not orig_use_location
+                raise RuntimeError("Fault after mutating generic IK property in TEST-169")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
+            err_msg = str(cm.exception)
+            self.assertIn("FAILED-C", err_msg)
+            self.assertIn("pose_bones", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+            con.use_location = orig_use_location
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-169"] = {
+            "test_method": "test_169_real_generic_ik_property_mutation_is_detected",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "isolation_state": "ISOLATED_FAILED_C",
+            "admission_result": "REJECTED_AFTER_FAILED_C",
+        }
+
+    def test_170_clean_snapshot_exception_still_allows_failed_a(self) -> None:
+        """TEST-170: Clean snapshot exception with verified zero mutation still allows FAILED-A without isolating Armature."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                raise RuntimeError("Clean snapshot abort without mutation in TEST-170")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("Clean snapshot abort without mutation in TEST-170", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_A.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent independent transaction can be admitted and commit cleanly
+        res = setup_arm_ik(self.armature, initial_influence=0.5)
+        self.assertIsNotNone(res)
+        self.assertEqual(session_rec.lifecycle_stage, "NORMAL_TERMINAL")
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-170"] = {
+            "test_method": "test_170_clean_snapshot_exception_still_allows_failed_a",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-A",
+            "isolation_state": "NONE",
+            "admission_result": "ADMITTED_AND_COMMITTED",
+        }
+
+    def test_171_nonfinite_nested_fingerprint_values_are_rejected(self) -> None:
+        """TEST-171: _has_nan_or_inf detects NaN and Inf in nested structures including vectors, quaternions, matrices."""
+        # Vector containing NaN
+        v_nan = Vector((float("nan"), 0.0, 1.0))
+        self.assertTrue(_has_nan_or_inf(v_nan))
+
+        # Quaternion containing Inf
+        q_inf = Quaternion((float("inf"), 0.0, 0.0, 1.0))
+        self.assertTrue(_has_nan_or_inf(q_inf))
+
+        # Matrix containing NaN
+        mat_nan = Matrix(((1.0, 0.0, 0.0, 0.0), (0.0, float("nan"), 0.0, 0.0), (0.0, 0.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0)))
+        self.assertTrue(_has_nan_or_inf(mat_nan))
+
+        # Nested tuple with Inf
+        nested_inf = (1.0, (2.0, (3.0, float("inf"))))
+        self.assertTrue(_has_nan_or_inf(nested_inf))
+
+        # Nested dict with NaN
+        nested_nan_dict = {"a": {"b": [1.0, float("nan")]}}
+        self.assertTrue(_has_nan_or_inf(nested_nan_dict))
+
+        # Purely finite structures
+        v_ok = Vector((1.0, 2.0, 3.0))
+        q_ok = Quaternion((1.0, 0.0, 0.0, 0.0))
+        mat_ok = Matrix.Identity(4)
+        nested_ok = {"a": [(1.0, 2.0), {"b": (3.0, 4.0)}]}
+        self.assertFalse(_has_nan_or_inf(v_ok))
+        self.assertFalse(_has_nan_or_inf(q_ok))
+        self.assertFalse(_has_nan_or_inf(mat_ok))
+        self.assertFalse(_has_nan_or_inf(nested_ok))
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-171"] = {
+            "test_method": "test_171_nonfinite_nested_fingerprint_values_are_rejected",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "nan_inf_detection": "VERIFIED_ALL_TYPES",
+        }
+
+    def test_172_fingerprint_freeze_does_not_alias_mutable_mathutils(self) -> None:
+        """TEST-172: _freeze_fingerprint_property_value produces immutable frozen values that do not alias mutable Mathutils."""
+        freeze_fn = getattr(arm_ik, "_freeze_fingerprint_property_value", None)
+        if freeze_fn is None:
+            self.fail("_freeze_fingerprint_property_value is not implemented in arm_ik")
+
+        v = Vector((1.0, 2.0, 3.0))
+        e = Euler((0.25, 0.5, 0.75), "XYZ")
+        q = Quaternion((1.0, 0.0, 0.0, 0.0))
+        m = Matrix.Translation(Vector((1.0, 2.0, 3.0)))
+
+        frozen_v = freeze_fn(v)
+        frozen_e = freeze_fn(e)
+        frozen_q = freeze_fn(q)
+        frozen_m = freeze_fn(m)
+
+        # Mutate original objects
+        v.x = 999.0
+        e.x = 999.0
+        e.order = "ZYX"
+        q.w = 999.0
+        m[0][3] = 999.0
+
+        # Verify frozen values did not change
+        self.assertEqual(frozen_v, (1.0, 2.0, 3.0))
+        self.assertEqual(frozen_e, ((0.25, 0.5, 0.75), "XYZ"))
+        self.assertEqual(frozen_q, (1.0, 0.0, 0.0, 0.0))
+        self.assertIsInstance(frozen_m, tuple)
+        self.assertTrue(all(isinstance(row, tuple) for row in frozen_m))
+        self.assertEqual(frozen_m[0][3], 1.0)
+
+        # Frozen values must not equal mutated values
+        self.assertNotEqual(frozen_v, tuple(v))
+        self.assertNotEqual(frozen_m[0][3], m[0][3])
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-172"] = {
+            "test_method": "test_172_fingerprint_freeze_does_not_alias_mutable_mathutils",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "freeze_immutability": "VERIFIED",
+        }
+
+    def test_173_complete_fingerprint_and_existing_snapshot_contract_coexist(self) -> None:
+        """TEST-173: Complete unrounded fingerprint capture and full snapshot contract coexist with zero regression."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Part A: Fingerprint completeness
+        fp = _capture_pre_snapshot_structural_fingerprint(self.armature)
+        self.assertIn("controllers", fp)
+        self.assertIn("pose_bones", fp)
+        self.assertIn("forearm.L", fp["pose_bones"])
+        con_fp_list = fp["pose_bones"]["forearm.L"]["constraints"]
+        self.assertGreater(len(con_fp_list), 0)
+        ik_con_fp = con_fp_list[0]
+        self.assertIn("generic_props", ik_con_fp)
+        self.assertIn("use_location", ik_con_fp["generic_props"])
+        self.assertIn("use_rotation", ik_con_fp["generic_props"])
+
+        # Repeat capture yields identical fingerprint
+        fp2 = _capture_pre_snapshot_structural_fingerprint(self.armature)
+        self.assertEqual(fp, fp2)
+
+        # Part B: Full snapshot contract & rollback fidelity
+        snap = _snapshot_arm_rig_state(self.armature)
+        self.assertIn("controllers", snap)
+        self.assertIn("pose_bones", snap)
+        self.assertIn("constraints", snap["pose_bones"]["forearm.L"])
+
+        # Verify rollback works cleanly
+        _rollback_arm_rig_state(self.armature, snap)
+        _depsgraph_update()
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-173"] = {
+            "test_method": "test_173_complete_fingerprint_and_existing_snapshot_contract_coexist",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "fingerprint_snapshot_coexistence": "VERIFIED",
+        }
+
 
 if __name__ == "__main__":
     args = [sys.argv[0]]
@@ -6214,4 +6647,8 @@ if __name__ == "__main__":
         ev_path_156 = os.path.join(out_dir, "audit_13_round02_runtime_evidence.json")
         with open(ev_path_156, "w", encoding="utf-8") as f:
             json.dump(_TEST_156_TO_164_RUNTIME_EVIDENCE, f, indent=2)
+    if _TEST_165_TO_173_RUNTIME_EVIDENCE:
+        ev_path_165 = os.path.join(out_dir, "audit_13_round03_runtime_evidence.json")
+        with open(ev_path_165, "w", encoding="utf-8") as f:
+            json.dump(_TEST_165_TO_173_RUNTIME_EVIDENCE, f, indent=2)
     sys.exit(0 if result.wasSuccessful() else 1)

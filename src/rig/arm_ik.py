@@ -1114,6 +1114,45 @@ def _clone_snapshot_property_value(val: Any) -> Any:
     return val
 
 
+def _freeze_fingerprint_property_value(val: Any) -> Any:
+    """Safely convert a property value into an immutable frozen representation for structural fingerprinting."""
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, str)):
+        return val
+    if isinstance(val, float):
+        # Exact unrounded float
+        return val
+    if isinstance(val, Vector):
+        return tuple(float(v) for v in val)
+    if isinstance(val, Euler):
+        return ((float(val.x), float(val.y), float(val.z)), str(val.order))
+    if isinstance(val, Quaternion):
+        return (float(val.w), float(val.x), float(val.y), float(val.z))
+    if isinstance(val, Matrix):
+        return tuple(tuple(float(v) for v in row) for row in val)
+    if isinstance(val, (tuple, list)):
+        return tuple(_freeze_fingerprint_property_value(elem) for elem in val)
+    if isinstance(val, (set, frozenset)):
+        return frozenset(_freeze_fingerprint_property_value(elem) for elem in val)
+    if isinstance(val, dict):
+        return {k: _freeze_fingerprint_property_value(v) for k, v in val.items()}
+    if hasattr(val, "__len__") and hasattr(val, "__getitem__") and not isinstance(val, (str, bytes, dict)):
+        return tuple(_freeze_fingerprint_property_value(elem) for elem in val)
+    if isinstance(val, (bpy.types.Object, bpy.types.ID, bpy.types.bpy_struct)):
+        try:
+            return {
+                "_rna_type": str(getattr(getattr(val, "rna_type", None), "identifier", type(val).__name__)),
+                "ptr": int(val.as_pointer()),
+                "name": str(getattr(val, "name", "")),
+            }
+        except ReferenceError:
+            return None
+    return val
+
+
 _REQUIRED_ARM_IK_BONE_NAMES: Tuple[str, ...] = (
     "upper_arm.L",
     "upper_arm.R",
@@ -1126,12 +1165,23 @@ _REQUIRED_ARM_IK_BONE_NAMES: Tuple[str, ...] = (
 
 def _has_nan_or_inf(val: Any) -> bool:
     """Return True if any floating-point number within val is NaN or Infinite."""
+    if isinstance(val, (int, bool, str, bytes)) or val is None:
+        return False
     if isinstance(val, float):
         return math.isnan(val) or math.isinf(val)
+    if isinstance(val, (Vector, Euler, Quaternion)):
+        return any(_has_nan_or_inf(float(elem)) for elem in val)
+    if isinstance(val, Matrix):
+        return any(_has_nan_or_inf(row) for row in val)
     if isinstance(val, (tuple, list, set, frozenset)):
         return any(_has_nan_or_inf(elem) for elem in val)
     if isinstance(val, dict):
         return any(_has_nan_or_inf(k) or _has_nan_or_inf(v) for k, v in val.items())
+    if hasattr(val, "__iter__") and not isinstance(val, (str, bytes)):
+        try:
+            return any(_has_nan_or_inf(elem) for elem in val)
+        except Exception:
+            pass
     return False
 
 
@@ -1231,9 +1281,17 @@ def _capture_pre_snapshot_structural_fingerprint(arm: bpy.types.Object) -> Dict[
                 if not p.is_readonly and p.identifier not in ("rna_type", "name", "mute", "influence"):
                     try:
                         val = getattr(con, p.identifier)
-                        generic_props[p.identifier] = _clone_snapshot_property_value(val)
-                    except BaseException:
-                        pass
+                        cloned = _clone_snapshot_property_value(val)
+                        generic_props[p.identifier] = _freeze_fingerprint_property_value(cloned)
+                    except BaseException as exc:
+                        raise RuntimeError(
+                            "FINGERPRINT_PROPERTY_CAPTURE_FAILED: "
+                            f"bone={pbone.name}, "
+                            f"constraint={con.name}, "
+                            f"type={con.type}, "
+                            f"property={p.identifier}, "
+                            f"cause={type(exc).__name__}: {exc}"
+                        ) from exc
             c_dict["generic_props"] = generic_props
             con_list.append(c_dict)
 
