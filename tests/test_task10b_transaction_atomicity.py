@@ -111,6 +111,7 @@ from src.rig.arm_ik import (
     _set_test_depsgraph_updater,
     _set_test_fault_injection_hook,
     _snapshot_arm_rig_state,
+    _sweep_dead_managed_armature_identities,
     _verify_arm_rig_state_restored,
     _verify_armature_session_identity_record,
     ensure_armature_session_identity,
@@ -133,6 +134,85 @@ from src.rig.pose import reset_pose
 
 _TEST_137_TO_149_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
 _TEST_150_TO_155_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+_TEST_156_TO_164_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+
+
+class _FaultyObjectRefProxy:
+    """Controlled read-only proxy for original_blender_ref to simulate non-ReferenceError access faults."""
+
+    def __init__(self, real_obj: Any, exception_to_raise: Optional[BaseException] = None) -> None:
+        self._real = real_obj
+        self._exc = exception_to_raise or RuntimeError("Controlled reference access failure in test")
+
+    def as_pointer(self) -> int:
+        raise self._exc
+
+    @property
+    def type(self) -> str:
+        raise self._exc
+
+    @property
+    def name(self) -> str:
+        raise self._exc
+
+    def __getattr__(self, name: str) -> Any:
+        raise self._exc
+
+
+class _FaultyObjectsCollectionProxy:
+    """Controlled read-only proxy for bpy.data.objects that raises during values() enumeration."""
+
+    def __init__(self, real_objects: Any, exception_to_raise: Optional[BaseException] = None) -> None:
+        self._real = real_objects
+        self._exc = exception_to_raise or RuntimeError("Controlled objects enumeration failure in test")
+
+    def values(self) -> List[Any]:
+        raise self._exc
+
+    def get(self, *args: Any, **kwargs: Any) -> Any:
+        return self._real.get(*args, **kwargs)
+
+    def __iter__(self) -> Any:
+        raise self._exc
+
+    def __len__(self) -> int:
+        return len(self._real)
+
+    def __getitem__(self, item: Any) -> Any:
+        return self._real[item]
+
+
+class _ScopedBpyObjectsProxy:
+    """Context manager to temporarily override arm_ik.bpy with a proxy having a faulty objects collection."""
+
+    def __init__(self, faulty_objects_proxy: Any) -> None:
+        self._faulty_objects = faulty_objects_proxy
+        self._arm_ik_module = sys.modules["src.rig.arm_ik"]
+        self._orig_bpy = self._arm_ik_module.bpy
+
+    def __enter__(self) -> "_ScopedBpyObjectsProxy":
+        real_bpy = self._orig_bpy
+        faulty_objs = self._faulty_objects
+
+        class _BpyProxy:
+            def __init__(self) -> None:
+                class _DataProxy:
+                    def __init__(self) -> None:
+                        self.objects = faulty_objs
+
+                    def __getattr__(self, name: str) -> Any:
+                        return getattr(real_bpy.data, name)
+
+                self.data = _DataProxy()
+
+            def __getattr__(self, name: str) -> Any:
+                return getattr(real_bpy, name)
+
+        self._arm_ik_module.bpy = _BpyProxy()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self._arm_ik_module.bpy = self._orig_bpy
 
 
 def _request_coordinator_grant_for_test(
@@ -5752,6 +5832,364 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             "replay_rejected": True,
         }
 
+    def test_156_live_armature_object_reports_alive(self) -> None:
+        """TEST-156: Live Armature with valid RNA reference and live collection membership reports ALIVE."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness["status"], "ALIVE")
+        self.assertIs(liveness["object_exists"], True)
+
+        ver = _verify_armature_session_identity_record(session_rec)
+        self.assertTrue(ver["is_valid"])
+        self.assertNotEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        resolved = ensure_armature_session_identity(self.armature)
+        self.assertEqual(resolved.registry_session_id, session_id)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-156"] = {
+            "test_method": "test_156_live_armature_object_reports_alive",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "ALIVE_VERIFIED",
+        }
+
+    def test_157_live_object_with_replaced_data_remains_alive(self) -> None:
+        """TEST-157: Object alive with replaced DataBlock maintains ALIVE object existence and rejects tombstone retirement."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Replace Armature data block with a new unassociated data block
+        new_data = bpy.data.armatures.new("ReplacedArmatureData_157")
+        self.armature.data = new_data
+
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness["status"], "ALIVE")
+        self.assertIs(liveness["object_exists"], True)
+
+        ver = _verify_armature_session_identity_record(session_rec)
+        self.assertFalse(ver["is_valid"])
+        self.assertIs(session_rec.in_live_blender_collection, True)
+        self.assertEqual(session_rec.registry_session_id, session_id)
+
+        # Attempting tombstone retirement must be rejected because object is ALIVE
+        ret_res = retire_dead_armature_tombstone(session_id, reason="Attempt retirement while object is ALIVE")
+        self.assertFalse(ret_res["approved"])
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-157"] = {
+            "test_method": "test_157_live_object_with_replaced_data_remains_alive",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "DATA_REPLACED_REJECTED",
+        }
+
+    def test_158_deleted_original_object_reports_absent(self) -> None:
+        """TEST-158: Genuinely deleted original Armature reports ABSENT and permits valid tombstone retirement."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Put into FAILED-D
+        session_rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_158",
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Genuinely delete the Armature object
+        bpy.data.objects.remove(self.armature, do_unlink=True)
+
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness["status"], "ABSENT")
+        self.assertIs(liveness["object_exists"], False)
+
+        # Replacement armature receives a new UUID
+        replacement_arm = build_rig(self.config)
+        session_new = ensure_armature_session_identity(replacement_arm)
+        self.assertNotEqual(session_new.registry_session_id, session_id)
+
+        # Tombstone retirement succeeds when object is genuinely ABSENT
+        ret_res = retire_dead_armature_tombstone(session_id, reason="Legitimate retirement in TEST-158")
+        self.assertTrue(ret_res["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-158"] = {
+            "test_method": "test_158_deleted_original_object_reports_absent",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": "tx_158",
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "ARCHIVED_RETIRED",
+        }
+
+    def test_159_live_object_enumeration_failure_returns_unknown(self) -> None:
+        """TEST-159: Live object collection enumeration failure returns UNKNOWN and does not infer ABSENT."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            liveness = _check_original_object_liveness(session_rec)
+            self.assertEqual(liveness["status"], "UNKNOWN")
+            self.assertIsNone(liveness["object_exists"])
+            self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        # After restoring collection enumeration, liveness is ALIVE
+        liveness_restored = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness_restored["status"], "ALIVE")
+        self.assertIs(liveness_restored["object_exists"], True)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-159"] = {
+            "test_method": "test_159_live_object_enumeration_failure_returns_unknown",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "ENUMERATION_FAILURE_UNKNOWN",
+        }
+
+    def test_160_unverified_reference_access_returns_unknown(self) -> None:
+        """TEST-160: Non-ReferenceError exception reading original reference returns UNKNOWN without claiming death."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        faulty_rec = ArmatureSessionIdentityRecord(
+            registry_session_id=str(uuid.uuid4()),
+            original_blender_ref=_FaultyObjectRefProxy(self.armature),
+            registration_pointer=int(self.armature.as_pointer()),
+            original_data_pointer=int(self.armature.data.as_pointer()),
+            liveness_status=_ArmatureLivenessStatus.ALIVE_VERIFIED,
+            in_live_blender_collection=True,
+            isolation_state=_ArmatureIsolationState.NONE,
+            tombstone_record=None,
+        )
+
+        liveness = _check_original_object_liveness(faulty_rec)
+        self.assertEqual(liveness["status"], "UNKNOWN")
+        self.assertIsNone(liveness["object_exists"])
+        self.assertIn("Controlled reference access failure", str(liveness.get("reason", "")))
+        self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-160"] = {
+            "test_method": "test_160_unverified_reference_access_returns_unknown",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "UNVERIFIED_REFERENCE_UNKNOWN",
+        }
+
+    def test_161_pointer_mismatch_cannot_prove_absence(self) -> None:
+        """TEST-161: Pointer mismatch alone does not prove absence and must return UNKNOWN."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        mismatched_rec = ArmatureSessionIdentityRecord(
+            registry_session_id=str(uuid.uuid4()),
+            original_blender_ref=self.armature,
+            registration_pointer=999999999,
+            original_data_pointer=int(self.armature.data.as_pointer()),
+            liveness_status=_ArmatureLivenessStatus.ALIVE_VERIFIED,
+            in_live_blender_collection=True,
+            isolation_state=_ArmatureIsolationState.NONE,
+            tombstone_record=None,
+        )
+
+        liveness = _check_original_object_liveness(mismatched_rec)
+        self.assertEqual(liveness["status"], "UNKNOWN")
+        self.assertIsNone(liveness["object_exists"])
+        self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-161"] = {
+            "test_method": "test_161_pointer_mismatch_cannot_prove_absence",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "POINTER_MISMATCH_UNKNOWN",
+        }
+
+    def test_162_missing_original_reference_is_unknown(self) -> None:
+        """TEST-162: Missing original reference (None) returns UNKNOWN rather than inferring ABSENT."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        none_ref_rec = ArmatureSessionIdentityRecord(
+            registry_session_id=str(uuid.uuid4()),
+            original_blender_ref=None,
+            registration_pointer=int(self.armature.as_pointer()),
+            original_data_pointer=int(self.armature.data.as_pointer()),
+            liveness_status=_ArmatureLivenessStatus.ALIVE_VERIFIED,
+            in_live_blender_collection=True,
+            isolation_state=_ArmatureIsolationState.NONE,
+            tombstone_record=None,
+        )
+
+        liveness = _check_original_object_liveness(none_ref_rec)
+        self.assertEqual(liveness["status"], "UNKNOWN")
+        self.assertIsNone(liveness["object_exists"])
+        self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-162"] = {
+            "test_method": "test_162_missing_original_reference_is_unknown",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "MISSING_REF_UNKNOWN",
+        }
+
+    def test_163_unknown_liveness_preserves_failed_isolation(self) -> None:
+        """TEST-163: UNKNOWN liveness preserves existing FAILED-B and FAILED-C isolation without false death escalation."""
+        # Part A: FAILED-B
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        captured_tx_b = []
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-163B")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-163B")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_tx_b[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            _sweep_dead_managed_armature_identities()
+            # Must NOT escalate to TOMBSTONED_FAILED_D
+            self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["isolation_state"], "ISOLATED_FAILED_B")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], "FAILED-B")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], tx_b.tx_id)
+            self.assertEqual(session_rec.registry_session_id, session_id)
+
+            # Subsequent write is blocked by FAILED isolation gate
+            with self.assertRaises(RuntimeError) as cm_blocked_b:
+                setup_arm_ik(self.armature)
+            self.assertIn("FAILED-B", str(cm_blocked_b.exception))
+
+        # Part B: FAILED-C
+        captured_tx_c = []
+        def fault_hook_c(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                captured_tx_c.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-163C")
+            elif stage == "during_rollback_verification":
+                raise RuntimeError("Verification fault in TEST-163C")
+
+        # Manually deisolate session_rec to test FAILED-C cleanly
+        _rollback_arm_rig_state(self.armature, tx_b.snapshot, tx_b)
+        _depsgraph_update()
+        request_armature_deisolation(self.armature, reason="Clean state for TEST-163C")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+
+        _set_test_fault_injection_hook(fault_hook_c)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_arm_ik_influence(self.armature, "L", 0.95)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        tx_c_id = _ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"]
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            _sweep_dead_managed_armature_identities()
+            # Must NOT escalate to TOMBSTONED_FAILED_D
+            self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["isolation_state"], "ISOLATED_FAILED_C")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], "FAILED-C")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], tx_c_id)
+
+            with self.assertRaises(RuntimeError) as cm_blocked_c:
+                setup_arm_ik(self.armature)
+            self.assertIn("FAILED-C", str(cm_blocked_c.exception))
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-163"] = {
+            "test_method": "test_163_unknown_liveness_preserves_failed_isolation",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx_b.tx_id,
+            "registry_session_id": session_id,
+            "object_liveness_status": "UNKNOWN",
+            "verification_status": "FAILED_B_C_PRESERVED",
+        }
+
+    def test_164_unknown_liveness_blocks_tombstone_retirement(self) -> None:
+        """TEST-164: UNKNOWN liveness strictly blocks tombstone retirement and authorization grant issuance."""
+        session_dead = ensure_armature_session_identity(self.armature)
+        dead_session_id = session_dead.registry_session_id
+
+        # Destroy Armature during transaction to enter FAILED-D
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                bpy.data.objects.remove(self.armature, do_unlink=True)
+                raise RuntimeError("Armature destroyed in TEST-164")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        # Remove any residual HandIK.L so only object liveness is the decisive retirement condition
+        if "HandIK.L" in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects["HandIK.L"], do_unlink=True)
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            ev = _verify_dead_armature_tombstone_retirement_evidence(dead_session_id)
+            self.assertFalse(ev["can_retire"])
+            self.assertEqual(ev["status"], "TOMBSTONE_RETIREMENT_REJECTED")
+            self.assertTrue(
+                any("OBJECT_EXISTENCE_UNVERIFIED" in r for r in ev.get("reasons", [])),
+                f"Expected OBJECT_EXISTENCE_UNVERIFIED in reasons, got: {ev.get('reasons')}",
+            )
+
+            ret_res = retire_dead_armature_tombstone(dead_session_id, reason="Attempt retirement under UNKNOWN")
+            self.assertFalse(ret_res["approved"])
+            self.assertIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+            self.assertNotIn(dead_session_id, _ARCHIVED_FAILED_D_TOMBSTONES)
+
+        # After restoring normal query, legitimate retirement succeeds
+        ret_res_ok = retire_dead_armature_tombstone(dead_session_id, reason="Legitimate retirement after restored query")
+        self.assertTrue(ret_res_ok["approved"])
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-164"] = {
+            "test_method": "test_164_unknown_liveness_blocks_tombstone_retirement",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": _ARCHIVED_FAILED_D_TOMBSTONES[dead_session_id].get("transaction_id"),
+            "registry_session_id": dead_session_id,
+            "object_liveness_status": "UNKNOWN_THEN_ABSENT",
+            "verification_status": "RETIREMENT_BLOCKED_UNDER_UNKNOWN",
+        }
+
 
 if __name__ == "__main__":
     args = [sys.argv[0]]
@@ -5772,4 +6210,8 @@ if __name__ == "__main__":
         ev_path_150 = os.path.join(out_dir, "audit_13_authorization_runtime_evidence.json")
         with open(ev_path_150, "w", encoding="utf-8") as f:
             json.dump(_TEST_150_TO_155_RUNTIME_EVIDENCE, f, indent=2)
+    if _TEST_156_TO_164_RUNTIME_EVIDENCE:
+        ev_path_156 = os.path.join(out_dir, "audit_13_round02_runtime_evidence.json")
+        with open(ev_path_156, "w", encoding="utf-8") as f:
+            json.dump(_TEST_156_TO_164_RUNTIME_EVIDENCE, f, indent=2)
     sys.exit(0 if result.wasSuccessful() else 1)

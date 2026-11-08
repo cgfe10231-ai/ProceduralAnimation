@@ -338,45 +338,80 @@ def _safe_object_pointer(obj: Any, fallback: int = 0) -> int:
 def _check_original_object_liveness(record: ArmatureSessionIdentityRecord) -> Dict[str, Any]:
     """Evaluate physical Blender Object existence (Eo) independently from data block identity (Ed)."""
     if record is None:
-        return {"object_exists": False, "reason": "ArmatureSessionIdentityRecord is None"}
+        return {
+            "status": "UNKNOWN",
+            "object_exists": None,
+            "reason": "ArmatureSessionIdentityRecord is None",
+        }
     ref = record.original_blender_ref
     if ref is None:
-        return {"object_exists": False, "reason": "original_blender_ref is None"}
+        return {
+            "status": "UNKNOWN",
+            "object_exists": None,
+            "reason": "original_blender_ref is None",
+        }
+
+    ref_dead = False
+    ref_ptr: Optional[int] = None
+    ref_type: Optional[str] = None
+    ref_name: Optional[str] = None
     try:
         ref_ptr = int(ref.as_pointer())
         ref_type = str(ref.type)
         ref_name = str(ref.name)
     except ReferenceError as re_err:
-        return {"object_exists": False, "reason": f"original_blender_ref raised ReferenceError ({re_err})"}
+        ref_dead = True
     except BaseException as exc:
-        return {"object_exists": False, "reason": f"original_blender_ref access error ({exc})"}
-
-    if ref_ptr != record.registration_pointer:
         return {
-            "object_exists": False,
-            "reason": f"Pointer mismatch: {ref_ptr} != {record.registration_pointer}",
+            "status": "UNKNOWN",
+            "object_exists": None,
+            "reason": f"Controlled reference access failure: original_blender_ref access error ({exc})",
         }
+
+    if not ref_dead:
+        if ref_ptr != record.registration_pointer:
+            return {
+                "status": "UNKNOWN",
+                "object_exists": None,
+                "reason": f"Pointer mismatch: {ref_ptr} != {record.registration_pointer}",
+            }
 
     in_live_objects = False
     try:
         for live_obj in bpy.data.objects.values():
             try:
-                if live_obj.as_pointer() == ref_ptr and live_obj == ref:
+                if not ref_dead and live_obj.as_pointer() == ref_ptr and live_obj == ref:
                     in_live_objects = True
                     break
             except ReferenceError:
                 continue
-    except BaseException:
-        in_live_objects = False
+    except BaseException as exc:
+        return {
+            "status": "UNKNOWN",
+            "object_exists": None,
+            "reason": f"bpy.data.objects enumeration failure ({exc})",
+        }
 
-    if not in_live_objects:
-        return {"object_exists": False, "reason": "original_blender_ref is absent from live bpy.data.objects.values()"}
+    if in_live_objects:
+        return {
+            "status": "ALIVE",
+            "object_exists": True,
+            "pointer": ref_ptr,
+            "type": ref_type,
+            "name": ref_name,
+        }
+
+    if ref_dead:
+        return {
+            "status": "ABSENT",
+            "object_exists": False,
+            "reason": "original_blender_ref destroyed (ReferenceError) and absent from live bpy.data.objects",
+        }
 
     return {
-        "object_exists": True,
-        "pointer": ref_ptr,
-        "type": ref_type,
-        "name": ref_name,
+        "status": "UNKNOWN",
+        "object_exists": None,
+        "reason": "original_blender_ref is absent from live bpy.data.objects.values() without ReferenceError proof",
     }
 
 
@@ -391,7 +426,8 @@ def _verify_armature_session_identity_record(
             "checks": {},
             "reasons": ["ArmatureSessionIdentityRecord is None"],
             "registry_session_id": None,
-            "object_exists": False,
+            "object_exists": None,
+            "object_liveness_status": "UNKNOWN",
         }
 
     reasons: List[str] = []
@@ -399,12 +435,24 @@ def _verify_armature_session_identity_record(
 
     # Independent Object Liveness Evaluation (Eo)
     obj_liveness = _check_original_object_liveness(record)
-    object_exists = bool(obj_liveness["object_exists"])
-    record.in_live_blender_collection = object_exists
+    object_liveness_status = obj_liveness.get("status", "UNKNOWN")
+    object_exists = obj_liveness.get("object_exists")
+
+    if object_liveness_status == "ALIVE":
+        record.in_live_blender_collection = True
+    elif object_liveness_status == "ABSENT":
+        record.in_live_blender_collection = False
+        record.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
+        if record.lifecycle_stage not in ("TOMBSTONED_FAILED_D", "ARCHIVED_RETIRED"):
+            record.lifecycle_stage = "INVALIDATED_DEAD"
+    else:  # UNKNOWN
+        reasons.append(
+            f"OBJECT_LIVENESS_UNKNOWN: original object existence cannot be verified ({obj_liveness.get('reason', 'unverified')})"
+        )
 
     # Condition 1: original_blender_ref has not been invalidated
     c1_not_invalidated = (
-        object_exists
+        object_liveness_status == "ALIVE"
         and record.liveness_status != _ArmatureLivenessStatus.INVALIDATED_DEAD
         and record.isolation_state not in (
             _ArmatureIsolationState.TOMBSTONED_FAILED_D,
@@ -414,15 +462,15 @@ def _verify_armature_session_identity_record(
     if not c1_not_invalidated:
         reasons.append(
             f"Condition 1 failed: record liveness_status={record.liveness_status}, "
-            f"isolation_state={record.isolation_state}"
+            f"isolation_state={record.isolation_state}, object_liveness_status={object_liveness_status}"
         )
 
     # Condition 2: accessing ref does not raise ReferenceError
-    c2_no_ref_error = object_exists
+    c2_no_ref_error = (object_liveness_status == "ALIVE")
     ref_ptr: Optional[int] = None
     ref_type: Optional[str] = None
     ref_data: Optional[Any] = None
-    if object_exists and ref is not None:
+    if object_liveness_status == "ALIVE" and ref is not None:
         try:
             ref_ptr = int(ref.as_pointer())
             ref_type = str(ref.type)
@@ -434,12 +482,15 @@ def _verify_armature_session_identity_record(
             c2_no_ref_error = False
             reasons.append(f"Condition 2 failed: original_blender_ref access error ({exc})")
     else:
+        c2_no_ref_error = False
         reasons.append(f"Condition 2 failed: {obj_liveness.get('reason', 'original_blender_ref is not live')}")
 
     # Condition 3: object is in live bpy.data.objects.values()
-    c3_in_live_collection = object_exists
+    c3_in_live_collection = (object_liveness_status == "ALIVE")
     if not c3_in_live_collection:
-        reasons.append("Condition 3 failed: original_blender_ref is absent from live bpy.data.objects.values()")
+        reasons.append(
+            f"Condition 3 failed: original_blender_ref is absent or unverified in live bpy.data.objects.values() (status={object_liveness_status})"
+        )
 
     # Condition 4: obj.type == 'ARMATURE'
     c4_is_armature_type = bool(c2_no_ref_error and ref_type == "ARMATURE")
@@ -488,13 +539,7 @@ def _verify_armature_session_identity_record(
         )
 
     # Update record liveness: separate physical object death from session identity invalidation
-    if not object_exists:
-        record.in_live_blender_collection = False
-        record.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
-        if record.lifecycle_stage not in ("TOMBSTONED_FAILED_D", "ARCHIVED_RETIRED"):
-            record.lifecycle_stage = "INVALIDATED_DEAD"
-    else:
-        record.in_live_blender_collection = True
+    if object_liveness_status == "ALIVE":
         registered_obj_alive = (
             c1_not_invalidated
             and c2_no_ref_error
@@ -552,13 +597,14 @@ def _verify_armature_session_identity_record(
         "c6_pointer_matches": c6_pointer_matches,
         "c7_data_valid_and_pointer_matches": c7_data_valid_and_matches,
     }
-    is_valid = all(checks.values())
+    is_valid = all(checks.values()) and (object_liveness_status == "ALIVE")
     return {
         "is_valid": is_valid,
         "checks": checks,
         "reasons": reasons,
         "registry_session_id": record.registry_session_id,
         "object_exists": object_exists,
+        "object_liveness_status": object_liveness_status,
     }
 
 
@@ -567,10 +613,19 @@ def _sweep_dead_managed_armature_identities() -> None:
     for session_id, rec in list(_MANAGED_ARMATURE_IDENTITIES.items()):
         if rec.isolation_state == _ArmatureIsolationState.ARCHIVED_RETIRED:
             continue
+        obj_liveness = _check_original_object_liveness(rec)
+        if obj_liveness["status"] == "UNKNOWN":
+            # Cannot prove death or liveness; preserve existing isolation state without escalation
+            continue
         ver = _verify_armature_session_identity_record(rec, candidate_arm=None)
-        if not ver["is_valid"]:
-            # If this session was already in _ISOLATED_FAILED_ARMATURES as FAILED-B or FAILED-C,
-            # escalate it to TOMBSTONED_FAILED_D because the underlying Armature has died.
+        # Only escalate to TOMBSTONED_FAILED_D if object is genuinely ABSENT
+        # or if object is ALIVE but data block identity has been invalidated/replaced (Condition 7 failed).
+        is_dead = (obj_liveness["status"] == "ABSENT")
+        is_data_invalidated = (
+            obj_liveness["status"] == "ALIVE"
+            and not ver["checks"].get("c7_data_valid_and_pointer_matches", False)
+        )
+        if is_dead or is_data_invalidated:
             iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
             if iso_rec is not None and rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D:
                 rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
@@ -628,10 +683,16 @@ def ensure_armature_session_identity(arm: bpy.types.Object) -> ArmatureSessionId
             f"Armature session identity rejected: invalid object ({exc})"
         ) from exc
 
-    in_live_objects = any(
-        o.as_pointer() == arm_ptr and o == arm
-        for o in bpy.data.objects.values()
-    )
+    in_live_objects = False
+    try:
+        in_live_objects = any(
+            o.as_pointer() == arm_ptr and o == arm
+            for o in bpy.data.objects.values()
+        )
+    except BaseException as exc:
+        raise RuntimeError(
+            f"Armature session identity rejected: cannot verify presence in bpy.data.objects ({exc})"
+        ) from exc
     if not in_live_objects or arm_type != "ARMATURE" or arm_data is None:
         raise RuntimeError(
             f"Armature session identity rejected: object '{arm_name}' is not a live ARMATURE in bpy.data.objects"
@@ -710,7 +771,10 @@ def _record_armature_failure_isolation_by_coordinator(
     if f_class == _FailedTransactionClass.FAILED_D:
         session_rec.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
         obj_liveness = _check_original_object_liveness(session_rec)
-        session_rec.in_live_blender_collection = bool(obj_liveness["object_exists"])
+        if obj_liveness["status"] == "ALIVE":
+            session_rec.in_live_blender_collection = True
+        elif obj_liveness["status"] == "ABSENT":
+            session_rec.in_live_blender_collection = False
         session_rec.lifecycle_stage = "TOMBSTONED_FAILED_D"
 
     snapshot_trusted = bool(
@@ -3901,9 +3965,20 @@ def _verify_dead_armature_tombstone_retirement_evidence(session_id: str) -> Dict
     # (Never mistake a same-name replacement Armature for the original,
     # and NEVER mistake data invalidation on an existing Armature for object death)
     obj_liveness = _check_original_object_liveness(session_rec)
-    if obj_liveness["object_exists"] or session_rec.in_live_blender_collection:
+    if obj_liveness["status"] != "ABSENT":
+        if obj_liveness["status"] == "UNKNOWN":
+            reasons.append(
+                f"OBJECT_EXISTENCE_UNVERIFIED: Cannot verify absence of original Armature "
+                f"(ptr={session_rec.registration_pointer}, status=UNKNOWN); cannot retire tombstone"
+            )
+        else:
+            reasons.append(
+                f"Original Armature object still exists in bpy.data.objects (ptr={session_rec.registration_pointer}); "
+                "cannot retire tombstone"
+            )
+    elif session_rec.in_live_blender_collection:
         reasons.append(
-            f"Original Armature object still exists in bpy.data.objects (ptr={session_rec.registration_pointer}); "
+            f"Original Armature object still marked as present in live collection (ptr={session_rec.registration_pointer}); "
             "cannot retire tombstone"
         )
 
