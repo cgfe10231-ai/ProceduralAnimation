@@ -1,13 +1,13 @@
 # AI_SYNC：当前工程状态与跨 AI 交接卡片
 
-<!-- TASK10B15_R2_EXECUTION_STATE -->
-> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 2/6 (F14-05: 修复错误类型对象的所有权判断 + F14-06: 修复 Collection 创建登记顺序) 已完成。
-> - **生产代码修改**：在 `src/rig/arm_ik.py` 修复了 `_ensure_character_collection()` 的创建-登记-链接时序并注入 3 处故障点与异常清理；在事务入口保存 `tx.entry_object_ptrs` 基线；实现 `_verify_transaction_wrong_type_object_ownership()` 8 条件所有权校验；在 `_get_or_create_empty()`、`setup_arm_ik()` 入口 A 与 `_preflight_arm_ik_parent_transforms()` 入口 B 严格实施无所有权非 EMPTY 控制器阻断 (`ExternalControllerNameConflictError("EXTERNAL_CONTROLLER_NAME_CONFLICT")`)。
-> - **测试更新与新增**：`tests/test_task10b_input_validation.py` 更新 TEST-28/29/30 验证 8 维零场景突变；`tests/test_task10b_transaction_atomicity.py` 更新 TEST-35/40/65 及原有 13 项 Cleanup 测试适配受控事务场景，并新增 TEST-194～201（共 8 项）。
-> - **测试结果**：Atomicity 171/171 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
-> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `60159bc44ae6557f430cbe966668295dce5c3c90`。
-> - **证据归档**：`docs/evidence/task10b15/round2/`（含 `verification.json`、`implementation_evidence.md` 及全部 8 份原始 `.log` 与测试报告）。
-> - **遗留项与后续**：R1-TAIL-01～03 维持 OPEN（留至 6/6 处理）；F14-02～F14-04 维持既有状态；等待 ChatGPT 独立验收；禁止擅自开始 3/6。
+<!-- TASK10B15_R3_EXECUTION_STATE -->
+> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 3/6 (F14-03: Constraint 资源操作 + F14-02: Target 关系日志) 已完成。
+> - **生产代码修改**：在 `src/rig/arm_ik.py` 实现 Layer 3 约束授权创建与删除接口 `_authorized_create_constraint()`、`_authorized_remove_constraint()`，以及约束目标与极向目标写入与 7 状态日志管理函数 `_authorized_assign_constraint_targets()`、`_apply_single_constraint_target_unit()`；扩充 `_authorized_revert_relationship_record()` 支持目标关系逆向恢复；在 `_rollback_arm_rig_state()` 实施 Step 0 目标关系恢复时序，先于控制器对象删除执行；重写 `retry_cleanup()` 委托 Layer 3 清理暂存约束；收敛 `setup_arm_ik()` 约束与目标写入入口。
+> - **测试更新与新增**：`tests/test_task10b_transaction_atomicity.py` 适配 TEST-113/117 关系日志分区断言，并新增 TEST-202～216（共 15 项），总测试集扩增至 186 项。
+> - **测试结果**：Atomicity 186/186 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
+> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `2372fc4a3f1bec46e1c46523459db695cdb3224e`。
+> - **证据归档**：`docs/evidence/task10b15/round3/`（含 `verification.json`、`implementation_evidence.md` 及全部 8 份原始 `.log` 与测试报告）。
+> - **遗留项与后续**：R1-TAIL-01～03、R2-TAIL-01～02 维持 OPEN（留至 6/6 统一处理）；等待 ChatGPT 独立验收；禁止擅自开始 4/6。
 
 
 > **项目**：ProceduralAnimation | **分支**：`audit/task-10-b-9`

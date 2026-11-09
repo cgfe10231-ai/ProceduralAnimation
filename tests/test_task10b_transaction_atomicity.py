@@ -81,6 +81,9 @@ from src.rig.arm_ik import (
     ARM_IK_TARGET_NAMES,
     ARM_POLE_TARGET_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
+    _authorized_create_constraint,
+    _authorized_remove_constraint,
+    _authorized_assign_constraint_targets,
     ArmatureSessionIdentityRecord,
     _ACTIVE_TRANSACTION_STACK,
     _ARCHIVED_FAILED_D_TOMBSTONES,
@@ -3661,7 +3664,17 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # All 4 existing controllers were already linked (PRE_EXISTING_ORIGINAL)
         self.assertEqual(len(tx.created_collection_links), 0)
-        self.assertEqual(len(tx.prepared_relationship_mutations), 4)
+        col_mutations = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "COLLECTION_OBJECT_LINK"
+        ]
+        self.assertEqual(len(col_mutations), 4)
+        con_mutations = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") in ("CONSTRAINT_TARGET_ASSIGN", "CONSTRAINT_POLE_TARGET_ASSIGN")
+        ]
+        self.assertEqual(len(con_mutations), 6)
+        self.assertEqual(len(tx.prepared_relationship_mutations), 10)
         self.assertTrue(all(s == _RelationshipOperationState.PREPARED for s in observed_prepared_states))
 
         required_fields = {
@@ -3678,10 +3691,16 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         for rec in tx.prepared_relationship_mutations:
             self.assertTrue(required_fields.issubset(rec.keys()))
             self.assertEqual(rec["transaction_id"], tx.tx_id)
+            self.assertEqual(rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        for rec in col_mutations:
             self.assertEqual(rec["intended_mutation"], "COLLECTION_OBJECT_LINK")
             self.assertEqual(rec["original_relationship_state"]["category"], "PRE_EXISTING_ORIGINAL")
             self.assertTrue(rec["original_relationship_state"]["linked"])
-            self.assertEqual(rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        for rec in con_mutations:
+            self.assertIn(rec["intended_mutation"], ("CONSTRAINT_TARGET_ASSIGN", "CONSTRAINT_POLE_TARGET_ASSIGN"))
+            self.assertEqual(rec["original_relationship_state"]["category"], "PRE_EXISTING")
 
         # Original collection link must remain 100% preserved after rollback
         self.assertIn("HandIK.L", char_col.objects)
@@ -3837,6 +3856,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         states_by_name = {
             rec["target_identity"]["name"]: rec["operation_state"]
             for rec in tx_a.prepared_relationship_mutations
+            if rec.get("intended_mutation") == "COLLECTION_OBJECT_LINK"
         }
         self.assertEqual(states_by_name["HandIK.L"], _RelationshipOperationState.NO_EFFECT)
         self.assertEqual(states_by_name["ElbowPole.L"], _RelationshipOperationState.NO_EFFECT)
@@ -3877,6 +3897,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         hand_r_ops = [
             r for r in tx_b.prepared_relationship_mutations
             if r["target_identity"]["name"] == "HandIK.R"
+            and r.get("intended_mutation") == "COLLECTION_OBJECT_LINK"
         ]
         self.assertEqual(len(hand_r_ops), 1)
         self.assertEqual(hand_r_ops[0]["operation_state"], _RelationshipOperationState.RECOVERY_UNCERTAIN)
@@ -7392,6 +7413,501 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(list(char_col_after.children), orig_children)
         self.assertEqual(list(char_col_after.objects), orig_objects)
         self.assertIn("Character", bpy.context.scene.collection.children)
+
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-15 Round 3/6: TEST-202 through TEST-216 (Constraint & Targets)
+    # -------------------------------------------------------------------------
+
+    def test_202_constraints_created_via_layer_3_with_identity_registration(self) -> None:
+        """TEST-202: L/R arm IK and copy rotation constraints created via Layer 3 with exact identity registration."""
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            setup_arm_ik(self.armature, initial_influence=0.6)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        # 4 constraints registered: ArmIK.L, ArmIK.R, HandRotation.L, HandRotation.R
+        self.assertEqual(len(tx.created_constraints), 4)
+
+        registered_by_bone = {rec["bone_name"]: rec for rec in tx.created_constraints}
+        self.assertIn("forearm.L", registered_by_bone)
+        self.assertIn("forearm.R", registered_by_bone)
+        self.assertIn("hand.L", registered_by_bone)
+        self.assertIn("hand.R", registered_by_bone)
+
+        for bone_name, rec in registered_by_bone.items():
+            pbone = self.armature.pose.bones[bone_name]
+            self.assertEqual(rec["pbone"], pbone)
+            con = rec["con_ref"]
+            self.assertEqual(rec["con_ptr"], con.as_pointer())
+            self.assertIn(con, pbone.constraints.values())
+            self.assertEqual(rec["created_name"], con.name)
+
+        # Verify live constraints after successful commit
+        self.assertAlmostEqual(self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"].influence, 0.6, places=5)
+        self.assertAlmostEqual(self.armature.pose.bones["hand.L"].constraints["HandRotation.L"].influence, 0.6, places=5)
+
+    def test_203_constraint_fault_after_creation_before_registration_cleaned_up(self) -> None:
+        """TEST-203: Constraint creation fault before registration cleans up instance safely without deleting external constraints."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ext_limit = p_fore.constraints.new(type="LIMIT_ROTATION")
+        ext_limit.name = "ExternalLimit203"
+        ext_ptr = ext_limit.as_pointer()
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_constraint_after_creation_before_registration" and ctx.get("name") == "ArmIK.L":
+                raise RuntimeError("Fault after creation before registration in TEST-203")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after creation before registration in TEST-203", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Newly created ArmIK.L was cleaned up immediately by pointer; not present on bone
+        self.assertNotIn("ArmIK.L", p_fore.constraints)
+        # External constraint strictly preserved
+        self.assertIn("ExternalLimit203", p_fore.constraints)
+        self.assertEqual(p_fore.constraints["ExternalLimit203"].as_pointer(), ext_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_204_constraint_fault_after_registration_before_config_rolls_back(self) -> None:
+        """TEST-204: Fault after constraint registration before config rolls back registered constraint via Layer 3."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ext_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        ext_con.name = "PreExistingExt204"
+        ext_ptr = ext_con.as_pointer()
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_constraint_after_registration_before_config" and ctx.get("name") == "ArmIK.L":
+                raise RuntimeError("Fault after registration before config in TEST-204")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after registration before config in TEST-204", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # ArmIK.L registered constraint rolled back via Layer 3
+        self.assertNotIn("ArmIK.L", p_fore.constraints)
+        # Pre-existing constraint unchanged
+        self.assertIn("PreExistingExt204", p_fore.constraints)
+        self.assertEqual(p_fore.constraints["PreExistingExt204"].as_pointer(), ext_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_205_stashed_constraint_lossless_rollback_recovery(self) -> None:
+        """TEST-205: Wrong-type constraint stashed during setup is losslessly recovered on rollback (ref, ptr, name, mute, order)."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+
+        # Insert a predecessor constraint
+        pred_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        pred_con.name = "PredCon205"
+
+        # Wrong-type ArmIK.L (COPY_ROTATION instead of IK)
+        wrong_con = p_fore.constraints.new(type="COPY_ROTATION")
+        wrong_con.name = "ArmIK.L"
+        wrong_con.mute = False
+        wrong_ptr = wrong_con.as_pointer()
+
+        # Successor constraint
+        succ_con = p_fore.constraints.new(type="DAMPED_TRACK")
+        succ_con.name = "SuccCon205"
+
+        orig_order_ptrs = [c.as_pointer() for c in p_fore.constraints]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                raise RuntimeError("Fault on side R in TEST-205")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault on side R in TEST-205", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Verify wrong_con restored losslessly
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        restored_con = p_fore.constraints["ArmIK.L"]
+        self.assertEqual(restored_con.as_pointer(), wrong_ptr)
+        self.assertEqual(restored_con, wrong_con)
+        self.assertEqual(restored_con.type, "COPY_ROTATION")
+        self.assertFalse(restored_con.mute)
+
+        curr_order_ptrs = [c.as_pointer() for c in p_fore.constraints]
+        self.assertEqual(curr_order_ptrs, orig_order_ptrs)
+
+    def test_206_external_same_name_constraint_on_other_bone_not_deleted(self) -> None:
+        """TEST-206: External constraint named 'ArmIK.L' on another bone is never deleted on rollback or cleanup."""
+        p_up = self.armature.pose.bones["upper_arm.L"]
+        alien_con = p_up.constraints.new(type="LIMIT_ROTATION")
+        alien_con.name = "ArmIK.L"
+        alien_ptr = alien_con.as_pointer()
+
+        # Part A: Rollback verification
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "L":
+                raise RuntimeError("Fault in TEST-206 Part A")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault in TEST-206 Part A", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIn("ArmIK.L", p_up.constraints)
+        self.assertEqual(p_up.constraints["ArmIK.L"].as_pointer(), alien_ptr)
+
+        # Part B: Commit and cleanup verification
+        setup_arm_ik(self.armature)
+        self.assertIn("ArmIK.L", p_up.constraints)
+        self.assertEqual(p_up.constraints["ArmIK.L"].as_pointer(), alien_ptr)
+        # Forearm also has its own ArmIK.L
+        p_fore = self.armature.pose.bones["forearm.L"]
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        self.assertNotEqual(p_fore.constraints["ArmIK.L"].as_pointer(), alien_ptr)
+
+    def test_207_stashed_constraint_cleanup_only_removes_authorized_identity(self) -> None:
+        """TEST-207: Post-commit cleanup only removes stashed constraint matching authorized identity; same-name replacement preserved."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        wrong_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        wrong_con.name = "ArmIK.L"
+        wrong_ptr = wrong_con.as_pointer()
+
+        setup_arm_ik(self.armature)
+
+        # The new IK constraint named ArmIK.L is present
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        live_con = p_fore.constraints["ArmIK.L"]
+        self.assertEqual(live_con.type, "IK")
+        self.assertNotEqual(live_con.as_pointer(), wrong_ptr)
+
+        # The stashed wrong_con is physically removed
+        all_con_ptrs = {c.as_pointer() for c in p_fore.constraints}
+        self.assertNotIn(wrong_ptr, all_con_ptrs)
+
+    def test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds(self) -> None:
+        """TEST-208: Constraint removal fault during post-commit cleanup enters CLEANUP_PENDING; subsequent retry succeeds."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        wrong_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        wrong_con.name = "ArmIK.L"
+        wrong_ptr = wrong_con.as_pointer()
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_constraint_removal" and ctx.get("phase") == "POST_COMMIT_CLEANUP":
+                rec = ctx.get("record", {})
+                if rec.get("con_ptr") == wrong_ptr:
+                    tx_obj = ctx.get("tx") or (_ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None)
+                    if tx_obj:
+                        captured_tx.append(tx_obj)
+                    raise RuntimeError("Injected cleanup failure in TEST-208")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Injected cleanup failure in TEST-208", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 1)
+
+        # Clear fault hook and retry cleanup
+        tx.retry_cleanup()
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+        # Confirm wrong_con is now gone
+        all_con_ptrs = {c.as_pointer() for c in p_fore.constraints}
+        self.assertNotIn(wrong_ptr, all_con_ptrs)
+
+    def test_209_ik_target_assignment_7_state_logging_confirmed(self) -> None:
+        """TEST-209: IK constraint target assignment creates 7-state log, verified in RNA, and confirmed on commit."""
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        target_records = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "CONSTRAINT_TARGET_ASSIGN"
+        ]
+        self.assertEqual(len(target_records), 4)  # 2 forearms + 2 hands
+
+        ik_l_rec = next(r for r in target_records if r.get("bone_name") == "forearm.L")
+        self.assertEqual(ik_l_rec["operation_state"], _RelationshipOperationState.CONFIRMED)
+        self.assertEqual(ik_l_rec["field"], "target")
+        self.assertEqual(ik_l_rec["con_ref"].name, "ArmIK.L")
+        self.assertEqual(ik_l_rec["dest_target_ref"].name, "HandIK.L")
+        self.assertEqual(ik_l_rec["dest_target_ptr"], bpy.data.objects["HandIK.L"].as_pointer())
+
+        # Live verification
+        ik_con_l = self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"]
+        self.assertEqual(ik_con_l.target, bpy.data.objects["HandIK.L"])
+
+    def test_210_ik_pole_target_assignment_and_pole_subtarget_logging(self) -> None:
+        """TEST-210: IK pole target assignment and pole subtarget logged and restored with 7-state fidelity."""
+        setup_arm_ik(self.armature)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault after pole target config in TEST-210")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after pole target config in TEST-210", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        pole_records = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "CONSTRAINT_POLE_TARGET_ASSIGN"
+        ]
+        self.assertGreaterEqual(len(pole_records), 1)
+        for r in pole_records:
+            self.assertEqual(r["field"], "pole_target")
+            self.assertIn(r["operation_state"], (_RelationshipOperationState.NO_EFFECT, _RelationshipOperationState.REVERTED))
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_211_copy_rotation_target_assignment_preserves_wrist_constraints(self) -> None:
+        """TEST-211: Hand COPY_ROTATION target assignment operates through Layer 3 without perturbing other wrist constraints."""
+        p_hand = self.armature.pose.bones["hand.L"]
+        ext_rot = p_hand.constraints.new(type="LIMIT_ROTATION")
+        ext_rot.name = "WristLimit211"
+        ext_ptr = ext_rot.as_pointer()
+
+        setup_arm_ik(self.armature)
+
+        # HandRotation.L target is HandIK.L
+        self.assertIn("HandRotation.L", p_hand.constraints)
+        rot_con = p_hand.constraints["HandRotation.L"]
+        self.assertEqual(rot_con.target, bpy.data.objects["HandIK.L"])
+
+        # External wrist constraint untouched
+        self.assertIn("WristLimit211", p_hand.constraints)
+        self.assertEqual(p_hand.constraints["WristLimit211"].as_pointer(), ext_ptr)
+
+    def test_212_unchanged_target_and_subtarget_transitions_to_no_effect(self) -> None:
+        """TEST-212: Target and subtarget re-assignment with identical references transitions PREPARED -> NO_EFFECT."""
+        setup_arm_ik(self.armature)
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            # Second setup_arm_ik with existing controllers & constraints
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        target_records = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") in ("CONSTRAINT_TARGET_ASSIGN", "CONSTRAINT_POLE_TARGET_ASSIGN")
+        ]
+        self.assertEqual(len(target_records), 6)  # 3 on L, 3 on R
+        for r in target_records:
+            self.assertEqual(
+                r["operation_state"],
+                _RelationshipOperationState.NO_EFFECT,
+                f"Expected NO_EFFECT for unchanged {r.get('field')} on {r.get('bone_name')}, got {r.get('operation_state')}"
+            )
+
+    def test_213_fault_before_target_write_transitions_to_no_effect_and_rolls_back(self) -> None:
+        """TEST-213: Fault before RNA target write transitions log to NO_EFFECT with zero side effects and clean rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_constraint_target_apply_before_write":
+                op = ctx.get("op", {})
+                if op.get("bone_name") == "forearm.L" and op.get("field") == "target":
+                    captured_ops.append(op)
+                    raise RuntimeError("Fault before RNA target write in TEST-213")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault before RNA target write in TEST-213", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_214_fault_after_target_write_before_confirm_reverts(self) -> None:
+        """TEST-214: Fault after target write (before CONFIRM) transitions APPLIED_VERIFIED -> REVERTED on rollback."""
+        setup_arm_ik(self.armature)
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "constraint_target_before_confirm":
+                op = ctx.get("op", {})
+                if op.get("bone_name") == "forearm.L" and op.get("field") == "target":
+                    captured_ops.append(op)
+                    raise RuntimeError("Fault before confirm in TEST-214")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            # Change target temporarily to trigger a real write
+            p_fore = self.armature.pose.bones["forearm.L"]
+            ik_con = p_fore.constraints["ArmIK.L"]
+            alt_target = bpy.data.objects["ElbowPole.L"]
+
+            with _arm_rig_transaction(self.armature) as tx:
+                _authorized_assign_constraint_targets(
+                    pbone=p_fore,
+                    con=ik_con,
+                    target=alt_target,
+                    active_tx=tx,
+                )
+        except RuntimeError as cm:
+            self.assertIn("Fault before confirm in TEST-214", str(cm))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_215_replaced_target_or_constraint_identity_enters_recovery_uncertain(self) -> None:
+        """TEST-215: Target or constraint identity replaced/destroyed during undo transitions to RECOVERY_UNCERTAIN and isolates session."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        setup_arm_ik(self.armature)
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ik_con = p_fore.constraints["ArmIK.L"]
+        alt_target = bpy.data.objects["ElbowPole.L"]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_relationship_rollback_undo":
+                op = ctx.get("op", {})
+                if op.get("intended_mutation") == "CONSTRAINT_TARGET_ASSIGN":
+                    raise RuntimeError("Simulated target relationship rollback undo failure in TEST-215")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_constraint_targets(
+                        pbone=p_fore,
+                        con=ik_con,
+                        target=alt_target,
+                        active_tx=tx,
+                    )
+                    raise RuntimeError("Primary business failure in TEST-215")
+            exc_str = str(cm.exception)
+            self.assertIn("Primary business failure in TEST-215", exc_str)
+            self.assertIn("rollback verification failed", exc_str)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Session isolated as FAILED-B or FAILED-C due to rollback failure / RECOVERY_UNCERTAIN
+        self.assertIn(session_rec.isolation_state, (_ArmatureIsolationState.ISOLATED_FAILED_B, _ArmatureIsolationState.ISOLATED_FAILED_C))
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertIn(iso_rec["failure_class"], (_FailedTransactionClass.FAILED_B.value, _FailedTransactionClass.FAILED_C.value))
+
+        uncertain_ops = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("operation_state") == _RelationshipOperationState.RECOVERY_UNCERTAIN
+        ]
+        self.assertGreaterEqual(len(uncertain_ops), 1)
+
+    def test_216_joint_left_right_fault_rollback_preserves_all_constraints_and_targets(self) -> None:
+        """TEST-216: Bilateral fault rollback losslessly preserves all constraints, targets, pole targets, subtargets, and external constraints."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Add external constraints on forearm and hand
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        ext_limit_l = p_fore_l.constraints.new(type="LIMIT_ROTATION")
+        ext_limit_l.name = "ExtLimit216_L"
+        ext_limit_l_ptr = ext_limit_l.as_pointer()
+
+        p_hand_r = self.armature.pose.bones["hand.R"]
+        ext_track_r = p_hand_r.constraints.new(type="TRACK_TO")
+        ext_track_r.name = "ExtTrack216_R"
+        ext_track_r_ptr = ext_track_r.as_pointer()
+
+        snap_full = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                raise RuntimeError("Joint bilateral fault on side R in TEST-216")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            self.assertIn("Joint bilateral fault on side R in TEST-216", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        _verify_arm_rig_state_restored(self.armature, snap_full)
+
+        # Confirm external constraints intact
+        self.assertIn("ExtLimit216_L", p_fore_l.constraints)
+        self.assertEqual(p_fore_l.constraints["ExtLimit216_L"].as_pointer(), ext_limit_l_ptr)
+        self.assertIn("ExtTrack216_R", p_hand_r.constraints)
+        self.assertEqual(p_hand_r.constraints["ExtTrack216_R"].as_pointer(), ext_track_r_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
 
 if __name__ == "__main__":

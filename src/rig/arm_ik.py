@@ -2036,6 +2036,487 @@ def _authorized_unlink_object_from_collection(
     return op_record
 
 
+_TARGET_UNSET = object()
+
+
+def _authorized_create_constraint(
+    pbone: bpy.types.PoseBone,
+    con_type: str,
+    con_name: str,
+    active_tx: Optional[Any] = None,
+    arm: Optional[bpy.types.Object] = None,
+) -> bpy.types.Constraint:
+    """Layer 3 authorized creation of a managed constraint on a pose bone.
+
+    Enforces:
+    1. Active transaction in ACTIVE state.
+    2. Armature session identity matches transaction.
+    3. Pose bone belongs to armature.
+    4. Pose bone identity is live and verifiable.
+    5. Constraint type must be 'IK' or 'COPY_ROTATION'.
+    6. No duplicate live constraint with same identity and type.
+    7. Immediate registration before any property assignment.
+    8. Safe cleanup if registration fails.
+    """
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    if active_tx is None:
+        raise RuntimeError("Cannot create constraint: active transaction is required")
+
+    if active_tx.state != _ArmRigTransactionState.ACTIVE:
+        raise RuntimeError(
+            f"Cannot create constraint: transaction is in state {active_tx.state}, expected ACTIVE"
+        )
+
+    if con_type not in ("IK", "COPY_ROTATION"):
+        raise ValueError(f"Unauthorized constraint type for arm IK rig: {con_type}")
+
+    # Armature identity verification
+    if arm is not None:
+        arm_ptr = arm.as_pointer() if hasattr(arm, "as_pointer") else None
+        if active_tx.arm_ptr is not None and arm_ptr is not None and arm_ptr != active_tx.arm_ptr:
+            raise RuntimeError("Armature identity does not match active transaction")
+
+    # Pose bone verification
+    try:
+        pbone_ptr = pbone.as_pointer()
+    except ReferenceError as re:
+        raise RuntimeError(f"PoseBone reference is dead: {re}") from re
+
+    if arm is not None:
+        if pbone.name not in arm.pose.bones or arm.pose.bones[pbone.name] != pbone:
+            raise RuntimeError(f"PoseBone '{pbone.name}' does not belong to active armature")
+
+    # Check no duplicate live constraint with same name and type
+    for existing in pbone.constraints:
+        if existing.name == con_name and existing.type == con_type:
+            raise RuntimeError(
+                f"Duplicate constraint creation: '{con_name}' ({con_type}) already exists on bone '{pbone.name}'"
+            )
+
+    # Create constraint via Blender C-API
+    con = pbone.constraints.new(type=con_type)
+    con.name = con_name
+    con_ptr = con.as_pointer()
+
+    # Fault injection window B: created but before registration
+    try:
+        _trigger_fault_injection(
+            "character_constraint_after_creation_before_registration",
+            {"pbone": pbone, "con": con, "tx": active_tx, "name": con_name, "type": con_type},
+        )
+    except BaseException:
+        # Window B cleanup: safely remove only this live constraint instance
+        try:
+            if con in pbone.constraints.values() and con.as_pointer() == con_ptr:
+                pbone.constraints.remove(con)
+        except Exception:
+            pass
+        raise
+
+    # Register with active transaction
+    active_tx.register_created_constraint(pbone, con)
+
+    # Verify registration
+    registered_ptrs = {rec.get("con_ptr") for rec in active_tx.created_constraints}
+    if con_ptr not in registered_ptrs:
+        try:
+            if con in pbone.constraints.values() and con.as_pointer() == con_ptr:
+                pbone.constraints.remove(con)
+        except Exception:
+            pass
+        raise RuntimeError(f"Constraint '{con_name}' registration verification failed")
+
+    # Fault injection window C: registered but before property configuration
+    _trigger_fault_injection(
+        "character_constraint_after_registration_before_config",
+        {"pbone": pbone, "con": con, "tx": active_tx, "name": con_name, "type": con_type},
+    )
+
+    return con
+
+
+def _authorized_remove_constraint(
+    pbone: bpy.types.PoseBone,
+    con_record_or_ref: Any,
+    phase: str,
+    active_tx: Optional[Any] = None,
+) -> bool:
+    """Layer 3 authoritative removal of a managed constraint.
+
+    Only allowed in:
+    1. phase == "ROLLBACK": for constraints in active_tx.created_constraints.
+    2. phase == "POST_COMMIT_CLEANUP": for constraints in active_tx.stashed_constraints.
+
+    Requires joint verification of:
+    - live reference
+    - pointer identity
+    - owning pose bone
+    - transaction registration record
+    """
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    if active_tx is None:
+        raise RuntimeError("Active transaction required for authorized constraint removal")
+
+    if phase not in ("ROLLBACK", "POST_COMMIT_CLEANUP"):
+        raise RuntimeError(f"Unauthorized constraint removal phase: '{phase}'")
+
+    # Resolve the transaction record
+    target_record: Optional[Dict[str, Any]] = None
+    if phase == "ROLLBACK":
+        allowed_records = list(getattr(active_tx, "created_constraints", []))
+    else:  # POST_COMMIT_CLEANUP
+        allowed_records = list(getattr(active_tx, "stashed_constraints", [])) + list(getattr(active_tx, "uncleaned_stashed_constraints", []))
+
+    if isinstance(con_record_or_ref, dict):
+        rec_ptr = con_record_or_ref.get("con_ptr")
+        for rec in allowed_records:
+            if rec.get("con_ptr") == rec_ptr:
+                target_record = rec
+                break
+    else:  # Constraint object
+        try:
+            cand_ptr = con_record_or_ref.as_pointer()
+        except ReferenceError:
+            cand_ptr = None
+        for rec in allowed_records:
+            if rec.get("con_ref") == con_record_or_ref or (cand_ptr is not None and rec.get("con_ptr") == cand_ptr):
+                target_record = rec
+                break
+
+    if target_record is None:
+        raise RuntimeError(
+            f"Unauthorized constraint removal: resource not found in active transaction records for phase {phase}"
+        )
+
+    # Verify bone identity
+    rec_pbone = target_record.get("pbone")
+    rec_bone_name = target_record.get("bone_name")
+    if pbone is None and rec_pbone is not None:
+        pbone = rec_pbone
+    if pbone is None:
+        raise RuntimeError("Owning PoseBone is required for constraint removal")
+
+    if rec_pbone is not None and rec_pbone != pbone:
+        raise RuntimeError("Constraint record owning PoseBone reference mismatch")
+    if rec_bone_name is not None and pbone.name != rec_bone_name:
+        raise RuntimeError(f"Constraint record bone name mismatch: {pbone.name} != {rec_bone_name}")
+
+    expected_ptr = target_record.get("con_ptr")
+    con_ref = target_record.get("con_ref", target_record.get("con"))
+
+    # Check if constraint is already deleted (idempotent removal)
+    if con_ref is not None:
+        try:
+            live_ptr = con_ref.as_pointer()
+            if expected_ptr is not None and live_ptr != expected_ptr:
+                raise RuntimeError("Live constraint pointer changed unexpectedly")
+        except ReferenceError:
+            orig_name = target_record.get("orig_name")
+            if any((orig_name and c.name == orig_name) or (expected_ptr and c.as_pointer() == expected_ptr) for c in pbone.constraints):
+                raise RuntimeError("Stashed constraint original reference invalid")
+            return True
+
+    # Search for matching candidate in pbone.constraints
+    matched_candidate = None
+    for cand in list(pbone.constraints):
+        try:
+            if expected_ptr is not None and cand.as_pointer() == expected_ptr:
+                if con_ref is not None and cand != con_ref:
+                    raise RuntimeError("Constraint pointer matches but live reference differs")
+                matched_candidate = cand
+                break
+            elif con_ref is not None and cand == con_ref:
+                matched_candidate = cand
+                break
+        except ReferenceError:
+            continue
+
+    if matched_candidate is None:
+        # Resource is already absent. Verify no substitute is touched.
+        return True
+
+    # Trigger fault injection before physical removal
+    _trigger_fault_injection(
+        "during_constraint_removal",
+        {"pbone": pbone, "con": matched_candidate, "record": target_record, "phase": phase, "tx": active_tx},
+    )
+
+    # Physical removal via Blender C-API
+    pbone.constraints.remove(matched_candidate)
+
+    # Verify removal: re-enumerate constraints on pbone
+    still_present = any(
+        (expected_ptr is not None and c.as_pointer() == expected_ptr) or (con_ref is not None and c == con_ref)
+        for c in pbone.constraints
+    )
+    if still_present:
+        raise RuntimeError(f"Constraint removal verification failed: constraint still present on '{pbone.name}'")
+
+    return True
+
+
+def _apply_single_constraint_target_unit(
+    pbone: bpy.types.PoseBone,
+    con: bpy.types.Constraint,
+    field: str,
+    subtarget_field: str,
+    target_obj: Optional[bpy.types.Object],
+    target_subtarget: str,
+    intended_mutation: str,
+    active_tx: Optional[Any],
+) -> Optional[Dict[str, Any]]:
+    """Execute a single constraint target or pole target assignment unit under 7-state protocol."""
+    if not hasattr(con, field):
+        raise AttributeError(f"Constraint '{con.name}' ({con.type}) does not have property '{field}'")
+
+    # Identity validation of target_obj
+    dest_ptr: Optional[int] = None
+    if target_obj is not None:
+        if not isinstance(target_obj, bpy.types.Object):
+            raise TypeError(f"Target must be a Blender Object, got {type(target_obj)}")
+        try:
+            dest_ptr = target_obj.as_pointer()
+        except ReferenceError as re:
+            raise RuntimeError(f"Target object reference is dead: {re}") from re
+        live_obj = _find_live_object_by_identity(target_obj, dest_ptr)
+        if live_obj is None or live_obj != target_obj:
+            raise RuntimeError(f"Target object identity verification failed for '{target_obj.name}'")
+
+    orig_target = getattr(con, field, None)
+    orig_subtarget = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
+    orig_ptr: Optional[int] = None
+    if orig_target is not None:
+        try:
+            orig_ptr = orig_target.as_pointer()
+        except ReferenceError:
+            orig_ptr = None
+
+    # If active_tx is None (backward-compatible restoration without transaction):
+    if active_tx is None:
+        setattr(con, field, target_obj)
+        if hasattr(con, subtarget_field):
+            setattr(con, subtarget_field, target_subtarget)
+        return None
+
+    # Check if unchanged
+    orig_matches_dest = False
+    if target_obj is None and orig_target is None and orig_subtarget == target_subtarget:
+        orig_matches_dest = True
+    elif target_obj is not None and orig_target is not None:
+        if orig_target == target_obj and orig_ptr == dest_ptr and orig_subtarget == target_subtarget:
+            orig_matches_dest = True
+
+    category = "PRE_EXISTING" if orig_target is not None else "UNASSIGNED"
+
+    # 1. PREPARE: register mutation log record
+    op_record = active_tx.prepare_relationship_mutation(
+        source_reference=con,
+        target_reference=target_obj,
+        original_relationship_state={
+            "field": field,
+            "subtarget_field": subtarget_field,
+            "category": category,
+            "pbone_ref": pbone,
+            "pbone_ptr": pbone.as_pointer(),
+            "bone_name": pbone.name,
+            "con_ref": con,
+            "con_ptr": con.as_pointer(),
+            "con_name": con.name,
+            "orig_target_ref": orig_target,
+            "orig_target_ptr": orig_ptr,
+            "orig_subtarget": orig_subtarget,
+            "dest_target_ref": target_obj,
+            "dest_target_ptr": dest_ptr,
+            "dest_subtarget": target_subtarget,
+        },
+        intended_mutation=intended_mutation,
+    )
+    # Populate top-level fields for convenience
+    op_record["pbone_ref"] = pbone
+    op_record["pbone_ptr"] = pbone.as_pointer()
+    op_record["bone_name"] = pbone.name
+    op_record["con_ref"] = con
+    op_record["con_ptr"] = con.as_pointer()
+    op_record["con_name"] = con.name
+    op_record["field"] = field
+    op_record["subtarget_field"] = subtarget_field
+    op_record["orig_target_ref"] = orig_target
+    op_record["orig_target_ptr"] = orig_ptr
+    op_record["orig_subtarget"] = orig_subtarget
+    op_record["dest_target_ref"] = target_obj
+    op_record["dest_target_ptr"] = dest_ptr
+    op_record["dest_subtarget"] = target_subtarget
+    op_record["category"] = category
+
+    _trigger_fault_injection(
+        "relationship_constraint_target_after_prepare",
+        {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
+    )
+
+    # If unchanged, transition to NO_EFFECT without calling Blender C-API write
+    if orig_matches_dest:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.NO_EFFECT,
+        )
+        return op_record
+
+    # 2. APPLY: transition PREPARED -> APPLYING
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLYING,
+    )
+    try:
+        _trigger_fault_injection(
+            "during_constraint_target_apply_before_write",
+            {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
+        )
+
+        setattr(con, field, target_obj)
+        if hasattr(con, subtarget_field):
+            setattr(con, subtarget_field, target_subtarget)
+
+        _trigger_fault_injection(
+            "during_constraint_target_apply_after_write",
+            {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
+        )
+    except BaseException:
+        try:
+            curr_target = getattr(con, field, None)
+            curr_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
+            curr_target_ptr = curr_target.as_pointer() if (curr_target and hasattr(curr_target, "as_pointer")) else None
+
+            target_ok = (curr_target == target_obj if target_obj is not None else curr_target is None)
+            ptr_ok = (curr_target_ptr == dest_ptr)
+            sub_ok = (curr_sub == target_subtarget)
+
+            if target_ok and ptr_ok and sub_ok:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.APPLIED_VERIFIED,
+                )
+            else:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.NO_EFFECT,
+                )
+        except Exception:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+        raise
+
+    # Verify RNA write
+    curr_target = getattr(con, field, None)
+    curr_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
+    curr_target_ptr = curr_target.as_pointer() if (curr_target and hasattr(curr_target, "as_pointer")) else None
+    target_ok = (curr_target == target_obj if target_obj is not None else curr_target is None)
+    ptr_ok = (curr_target_ptr == dest_ptr)
+    sub_ok = (curr_sub == target_subtarget)
+
+    if not (target_ok and ptr_ok and sub_ok):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Constraint {field} assignment did not take effect in RNA")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLIED_VERIFIED,
+    )
+
+    # 3. CONFIRM
+    _trigger_fault_injection(
+        "constraint_target_before_confirm",
+        {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
+    )
+
+    confirm_target = getattr(con, field, None)
+    confirm_ptr = confirm_target.as_pointer() if (confirm_target and hasattr(confirm_target, "as_pointer")) else None
+    c_tgt_ok = (confirm_target == target_obj if target_obj is not None else confirm_target is None)
+    c_ptr_ok = (confirm_ptr == dest_ptr)
+    if c_tgt_ok and c_ptr_ok:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.CONFIRMED,
+        )
+    else:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Constraint {field} verification failed at CONFIRM stage")
+
+    return op_record
+
+
+def _authorized_assign_constraint_targets(
+    pbone: bpy.types.PoseBone,
+    con: bpy.types.Constraint,
+    target: Any = _TARGET_UNSET,
+    subtarget: Any = _TARGET_UNSET,
+    pole_target: Any = _TARGET_UNSET,
+    pole_subtarget: Any = _TARGET_UNSET,
+    active_tx: Optional[Any] = None,
+) -> None:
+    """Layer 3 authorized constraint target and pole target assignment.
+
+    Applies the 7-state relation machine (PREPARE -> APPLY -> VERIFY -> CONFIRM)
+    for each target/subtarget relationship mutation unit.
+    """
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    # Pose bone and constraint identity checks
+    try:
+        pbone_ptr = pbone.as_pointer()
+    except ReferenceError as re:
+        raise RuntimeError(f"PoseBone reference is dead: {re}") from re
+
+    try:
+        con_ptr = con.as_pointer()
+    except ReferenceError as re:
+        raise RuntimeError(f"Constraint reference is dead: {re}") from re
+
+    if con not in pbone.constraints.values():
+        raise RuntimeError(f"Constraint '{con.name}' does not belong to bone '{pbone.name}'")
+
+    # Process Target unit if specified
+    if target is not _TARGET_UNSET:
+        _apply_single_constraint_target_unit(
+            pbone=pbone,
+            con=con,
+            field="target",
+            subtarget_field="subtarget",
+            target_obj=target,
+            target_subtarget=subtarget if subtarget is not _TARGET_UNSET else getattr(con, "subtarget", ""),
+            intended_mutation="CONSTRAINT_TARGET_ASSIGN",
+            active_tx=active_tx,
+        )
+
+    # Process Pole Target unit if specified
+    if pole_target is not _TARGET_UNSET:
+        _apply_single_constraint_target_unit(
+            pbone=pbone,
+            con=con,
+            field="pole_target",
+            subtarget_field="pole_subtarget",
+            target_obj=pole_target,
+            target_subtarget=pole_subtarget if pole_subtarget is not _TARGET_UNSET else getattr(con, "pole_subtarget", ""),
+            intended_mutation="CONSTRAINT_POLE_TARGET_ASSIGN",
+            active_tx=active_tx,
+        )
+
+
 def _authorized_revert_relationship_record(
     op_record: Dict[str, Any],
     active_tx: Any,
@@ -2080,6 +2561,129 @@ def _authorized_revert_relationship_record(
     orig_rel = op_record.get("original_relationship_state", {})
     category = orig_rel.get("category", "OWNERSHIP_UNKNOWN")
     mutation = op_record.get("intended_mutation")
+
+    if mutation in ("CONSTRAINT_TARGET_ASSIGN", "CONSTRAINT_POLE_TARGET_ASSIGN"):
+        field = op_record.get("field", "target" if mutation == "CONSTRAINT_TARGET_ASSIGN" else "pole_target")
+        subtarget_field = op_record.get("subtarget_field", "subtarget" if mutation == "CONSTRAINT_TARGET_ASSIGN" else "pole_subtarget")
+
+        pbone = op_record.get("pbone_ref", orig_rel.get("pbone_ref"))
+        pbone_ptr = op_record.get("pbone_ptr", orig_rel.get("pbone_ptr"))
+        con = op_record.get("con_ref", orig_rel.get("con_ref"))
+        con_ptr = op_record.get("con_ptr", orig_rel.get("con_ptr"))
+
+        orig_target = op_record.get("orig_target_ref", orig_rel.get("orig_target_ref"))
+        orig_target_ptr = op_record.get("orig_target_ptr", orig_rel.get("orig_target_ptr"))
+        orig_subtarget = op_record.get("orig_subtarget", orig_rel.get("orig_subtarget", ""))
+
+        dest_target = op_record.get("dest_target_ref", orig_rel.get("dest_target_ref"))
+        dest_target_ptr = op_record.get("dest_target_ptr", orig_rel.get("dest_target_ptr"))
+
+        # Verify pbone and con identity
+        con_alive = False
+        if con is not None and con_ptr is not None:
+            try:
+                if con.as_pointer() == con_ptr:
+                    con_alive = True
+            except ReferenceError:
+                con_alive = False
+
+        if not con_alive:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(f"Constraint identity lost during target relationship rollback for {mutation}")
+            return
+
+        # Verify orig_target identity if not None
+        if orig_target is not None:
+            try:
+                live_target_ptr = orig_target.as_pointer()
+                if orig_target_ptr is not None and live_target_ptr != orig_target_ptr:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                    )
+                    restoration_errors.append("Original constraint target pointer changed during rollback")
+                    return
+                if _find_live_object_by_identity(orig_target, orig_target_ptr) is None:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                    )
+                    restoration_errors.append("Original constraint target object destroyed during rollback")
+                    return
+            except ReferenceError:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                restoration_errors.append("Original constraint target destroyed during rollback")
+                return
+
+        if state == _RelationshipOperationState.APPLYING:
+            # Check if write occurred
+            try:
+                curr_target = getattr(con, field, None)
+                curr_target_ptr = curr_target.as_pointer() if (curr_target and hasattr(curr_target, "as_pointer")) else None
+                if curr_target == dest_target and (dest_target_ptr is None or curr_target_ptr == dest_target_ptr):
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.APPLIED_VERIFIED,
+                    )
+                    state = _RelationshipOperationState.APPLIED_VERIFIED
+                else:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.NO_EFFECT,
+                    )
+                    return
+            except Exception:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                return
+
+        if state not in (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED):
+            restoration_errors.append(
+                f"Relationship operation '{op_id}' in unexpected state '{state}' during target rollback"
+            )
+            return
+
+        try:
+            setattr(con, field, orig_target)
+            if hasattr(con, subtarget_field):
+                setattr(con, subtarget_field, orig_subtarget)
+
+            rev_target = getattr(con, field, None)
+            rev_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
+            rev_target_ptr = rev_target.as_pointer() if (rev_target and hasattr(rev_target, "as_pointer")) else None
+
+            tgt_matches = (rev_target == orig_target if orig_target is not None else rev_target is None)
+            ptr_matches = (rev_target_ptr == orig_target_ptr)
+            sub_matches = (rev_sub == orig_subtarget)
+
+            if not (tgt_matches and ptr_matches and sub_matches):
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                restoration_errors.append(f"Failed to verify constraint {field} reversion")
+                return
+        except BaseException as be:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(f"Exception during constraint {field} reversion: {be}")
+            return
+
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.REVERTED,
+        )
+        return
 
     col_ref = src_id.get("ref", op_record.get("source_reference"))
     col_ptr = src_id.get("ptr")
@@ -2277,7 +2881,7 @@ def _authorized_restore_collection_object_relationships(
     if phase in ("ALL", "POST_CONTROLLER_RESTORE"):
         if active_tx is not None:
             for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
-                if op_record.get("intended_mutation") != "COLLECTION_OBJECT_LINK" or phase == "ALL":
+                if op_record.get("intended_mutation") == "COLLECTION_OBJECT_UNLINK":
                     _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
 
         # Ensure pre-existing controller collection memberships from snapshot are intact by identity
@@ -2346,6 +2950,16 @@ def _rollback_arm_rig_state(
         {"arm": arm, "snapshot": snapshot, "tx": active_tx},
     )
     restoration_errors: List[str] = []
+
+    # Step 0: Authoritatively revert constraint target/pole target relationships FIRST,
+    # before any transaction-created target controller objects are deleted.
+    if active_tx is not None:
+        for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
+            if op_record.get("intended_mutation") in (
+                "CONSTRAINT_TARGET_ASSIGN",
+                "CONSTRAINT_POLE_TARGET_ASSIGN",
+            ):
+                _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
 
     # Step 1: Controller cleanup, stashed object restoration, and transform restoration
     # 1.0a: Revert transaction-created Collection <-> Object links via Layer 3 before removing created controllers
@@ -2489,33 +3103,21 @@ def _rollback_arm_rig_state(
         saved_cons = b_snap.get("constraints", [])
         saved_con_refs = {sc["con_ref"] for sc in saved_cons if "con_ref" in sc}
 
-        # 2.1: Remove ONLY constraints explicitly registered as created by this transaction
+        # 2.1: Remove ONLY constraints explicitly registered as created by this transaction via Layer 3
         if active_tx is not None:
             for reg_con in list(getattr(active_tx, "created_constraints", [])):
                 if reg_con.get("bone_name") == b_name or reg_con.get("pbone") == pbone:
-                    expected_ptr = reg_con.get("con_ptr")
-                    con_ref = reg_con.get("con_ref")
-                    target = None
-                    for candidate in list(pbone.constraints):
-                        try:
-                            if expected_ptr and candidate.as_pointer() == expected_ptr:
-                                target = candidate
-                                break
-                            elif con_ref is not None and candidate == con_ref:
-                                target = candidate
-                                break
-                        except ReferenceError:
-                            continue
-                    if target is not None:
-                        pbone.constraints.remove(target)
-                        still_present = any(
-                            (expected_ptr and c.as_pointer() == expected_ptr)
-                            for c in pbone.constraints
+                    try:
+                        _authorized_remove_constraint(
+                            pbone,
+                            reg_con,
+                            phase="ROLLBACK",
+                            active_tx=active_tx,
                         )
-                        if still_present:
-                            restoration_errors.append(
-                                f"Failed to remove transaction-created constraint: {reg_con.get('created_name')}"
-                            )
+                    except Exception as ce:
+                        restoration_errors.append(
+                            f"Failed to remove transaction-created constraint '{reg_con.get('created_name')}': {ce}"
+                        )
 
         # 2.2: Restore names and mutes for any stashed constraints on this bone
         if active_tx is not None:
@@ -2584,6 +3186,8 @@ def _rollback_arm_rig_state(
             con.mute = sc["mute"]
 
             for prop, val in sc.get("generic_props", {}).items():
+                if prop in ("target", "pole_target", "subtarget", "pole_subtarget"):
+                    continue
                 try:
                     _trigger_fault_injection("during_constraint_property_restore", {
                         "bone": b_name, "con": sc["name"], "prop": prop, "val": val
@@ -2606,14 +3210,38 @@ def _rollback_arm_rig_state(
                         f"on bone '{b_name}' with value {val!r}: {ce}"
                     )
 
-            if hasattr(con, "target"):
-                con.target = sc.get("target")
-            if hasattr(con, "subtarget"):
-                con.subtarget = sc.get("subtarget", "")
-            if hasattr(con, "pole_target"):
-                con.pole_target = sc.get("pole_target")
-            if hasattr(con, "pole_subtarget"):
-                con.pole_subtarget = sc.get("pole_subtarget", "")
+            if active_tx is None:
+                # Direct rollback without transaction: assign targets with identity verification
+                if hasattr(con, "target"):
+                    con.target = sc.get("target")
+                if hasattr(con, "subtarget"):
+                    con.subtarget = sc.get("subtarget", "")
+                if hasattr(con, "pole_target"):
+                    con.pole_target = sc.get("pole_target")
+                if hasattr(con, "pole_subtarget"):
+                    con.pole_subtarget = sc.get("pole_subtarget", "")
+            else:
+                # When active_tx is present, verify targets match snapshot after Step 0 reversion
+                if hasattr(con, "target") and con.target != sc.get("target"):
+                    restoration_errors.append(
+                        f"Constraint '{con.name}' target does not match snapshot after rollback: "
+                        f"{con.target} != {sc.get('target')}"
+                    )
+                if hasattr(con, "subtarget") and con.subtarget != sc.get("subtarget", ""):
+                    restoration_errors.append(
+                        f"Constraint '{con.name}' subtarget does not match snapshot after rollback: "
+                        f"'{con.subtarget}' != '{sc.get('subtarget', '')}'"
+                    )
+                if hasattr(con, "pole_target") and con.pole_target != sc.get("pole_target"):
+                    restoration_errors.append(
+                        f"Constraint '{con.name}' pole_target does not match snapshot after rollback: "
+                        f"{con.pole_target} != {sc.get('pole_target')}"
+                    )
+                if hasattr(con, "pole_subtarget") and con.pole_subtarget != sc.get("pole_subtarget", ""):
+                    restoration_errors.append(
+                        f"Constraint '{con.name}' pole_subtarget does not match snapshot after rollback: "
+                        f"'{con.pole_subtarget}' != '{sc.get('pole_subtarget', '')}'"
+                    )
 
             if sc["type"] == "IK":
                 con.chain_count = sc.get("chain_count", 0)
@@ -3463,77 +4091,16 @@ class _ArmRigTransactionContext:
         # Identity-safe cleanup of stashed constraints
         # ------------------------------------------------------
 
-        for stashed_con in list(
-            self.uncleaned_stashed_constraints
-        ):
+        for stashed_con in list(self.uncleaned_stashed_constraints):
             try:
-                pbone = stashed_con["pbone"]
-
-                original_ref = stashed_con.get("con")
-                expected_ptr = stashed_con.get("con_ptr")
-
-                if expected_ptr is None and original_ref is None:
-                    raise RuntimeError(
-                        "Stashed constraint identity record incomplete"
-                    )
-
-                if original_ref is not None:
-                    try:
-                        live_ptr = original_ref.as_pointer()
-                    except ReferenceError:
-                        raise RuntimeError(
-                            "Stashed constraint original reference invalid"
-                        )
-
-                    if expected_ptr is not None and live_ptr != expected_ptr:
-                        raise RuntimeError(
-                            "Stashed constraint identity changed"
-                        )
-
-                    matches = [
-                        candidate
-                        for candidate in pbone.constraints
-                        if (
-                            (expected_ptr is None or candidate.as_pointer() == expected_ptr)
-                            and candidate == original_ref
-                        )
-                    ]
-                else:
-                    matches = [
-                        candidate
-                        for candidate in pbone.constraints
-                        if candidate.as_pointer() == expected_ptr
-                    ]
-
-                if len(matches) > 1:
-                    raise RuntimeError(
-                        "Multiple live constraints match "
-                        "the same recorded identity"
-                    )
-
-                if len(matches) == 1:
-                    target = matches[0]
-
-                    pbone.constraints.remove(target)
-
-                    still_present = any(
-                        candidate.as_pointer() == expected_ptr
-                        for candidate in pbone.constraints
-                    )
-
-                    if still_present:
-                        raise RuntimeError(
-                            "Stashed constraint removal did not "
-                            "remove the recorded identity"
-                        )
-
-                # No live match means the recorded resource
-                # is already absent. Never remove by name.
-
-                self.uncleaned_stashed_constraints.remove(
-                    stashed_con
+                pbone = stashed_con.get("pbone")
+                _authorized_remove_constraint(
+                    pbone=pbone,
+                    con_record_or_ref=stashed_con,
+                    phase="POST_COMMIT_CLEANUP",
+                    active_tx=self,
                 )
-
+                self.uncleaned_stashed_constraints.remove(stashed_con)
             except Exception as exc:
                 cleanup_failures.append(
                     "Failed to clean up stashed constraint "
@@ -5117,7 +5684,7 @@ def setup_arm_ik(
                                 "orig_idx": orig_idx,
                             })
                         else:
-                            p_fore.constraints.remove(con)
+                            raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
                 elif con.type == "IK" and con.name.startswith("ArmIK"):
                     if _ACTIVE_TRANSACTION_STACK:
                         tx = _ACTIVE_TRANSACTION_STACK[-1]
@@ -5136,19 +5703,28 @@ def setup_arm_ik(
                             "orig_idx": orig_idx,
                         })
                     else:
-                        p_fore.constraints.remove(con)
+                        raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
 
             newly_created_ik_con = False
+            tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
             if ik_con is None:
-                ik_con = p_fore.constraints.new(type="IK")
-                ik_con.name = con_name_ik
+                ik_con = _authorized_create_constraint(
+                    pbone=p_fore,
+                    con_type="IK",
+                    con_name=con_name_ik,
+                    active_tx=tx,
+                    arm=arm,
+                )
                 ik_con.influence = valid_influence
-                if _ACTIVE_TRANSACTION_STACK:
-                    _ACTIVE_TRANSACTION_STACK[-1].register_created_constraint(p_fore, ik_con)
                 newly_created_ik_con = True
 
-            ik_con.target = ik_obj
-            ik_con.pole_target = pole_obj
+            _authorized_assign_constraint_targets(
+                pbone=p_fore,
+                con=ik_con,
+                target=ik_obj,
+                pole_target=pole_obj,
+                active_tx=tx,
+            )
             ik_con.chain_count = 2
             ik_con.use_tail = True
             ik_con.use_stretch = False
@@ -5179,7 +5755,7 @@ def setup_arm_ik(
                                 "orig_idx": orig_idx,
                             })
                         else:
-                            p_hand.constraints.remove(con)
+                            raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
                 elif con.type == "COPY_ROTATION" and con.name.startswith("HandRotation"):
                     if _ACTIVE_TRANSACTION_STACK:
                         tx = _ACTIVE_TRANSACTION_STACK[-1]
@@ -5198,16 +5774,24 @@ def setup_arm_ik(
                             "orig_idx": orig_idx,
                         })
                     else:
-                        p_hand.constraints.remove(con)
+                        raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
 
             if rot_con is None:
-                rot_con = p_hand.constraints.new(type="COPY_ROTATION")
-                rot_con.name = con_name_rot
+                rot_con = _authorized_create_constraint(
+                    pbone=p_hand,
+                    con_type="COPY_ROTATION",
+                    con_name=con_name_rot,
+                    active_tx=tx,
+                    arm=arm,
+                )
                 rot_con.influence = valid_influence
-                if _ACTIVE_TRANSACTION_STACK:
-                    _ACTIVE_TRANSACTION_STACK[-1].register_created_constraint(p_hand, rot_con)
 
-            rot_con.target = ik_obj
+            _authorized_assign_constraint_targets(
+                pbone=p_hand,
+                con=rot_con,
+                target=ik_obj,
+                active_tx=tx,
+            )
             rot_con.target_space = "WORLD"
             rot_con.owner_space = "WORLD"
             rot_con.mix_mode = "REPLACE"
