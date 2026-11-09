@@ -8780,6 +8780,394 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
         self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
 
+    def test_246_cleanup_pending_blocks_bilateral_reset(self) -> None:
+        """TEST-246: CLEANUP_PENDING 阻断双臂 Reset."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2), pole_world_xyz=(0.4, 0.0, 1.3), influence=0.7)
+        set_hand_ik_target(self.armature, "R", world_xyz=(-0.5, 0.3, 1.1), pole_world_xyz=(-0.4, 0.1, 1.2), influence=0.8)
+        set_arm_ik_influence(self.armature, "BOTH", influence=0.75)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-246")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        snap_before = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("unresolved cleanup", str(cm.exception).lower())
+
+            _verify_arm_rig_state_restored(self.armature, snap_before)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_247_all_bilateral_write_entrypoints_blocked_under_cleanup_pending(self) -> None:
+        """TEST-247: 同一 Armature 的所有双臂写入入口均被阻断."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-247")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            # 1. set_hand_ik_target Left
+            with self.assertRaises(RuntimeError) as cm_l:
+                set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2))
+            self.assertIn("unresolved cleanup", str(cm_l.exception).lower())
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+            # 2. set_hand_ik_target Right
+            with self.assertRaises(RuntimeError) as cm_r:
+                set_hand_ik_target(self.armature, "R", world_xyz=(-0.5, 0.2, 1.2))
+            self.assertIn("unresolved cleanup", str(cm_r.exception).lower())
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+            # 3. set_arm_ik_influence BOTH
+            with self.assertRaises(RuntimeError) as cm_inf:
+                set_arm_ik_influence(self.armature, "BOTH", influence=0.9)
+            self.assertIn("unresolved cleanup", str(cm_inf.exception).lower())
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_248_reinitialization_under_pending_cannot_bypass_gate(self) -> None:
+        """TEST-248: Pending 状态下重新初始化不得绕过门禁."""
+        setup_arm_ik(self.armature, initial_influence=0.6)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-248")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.0)
+            self.assertIn("unresolved cleanup", str(cm.exception).lower())
+
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_249_armature_a_pending_does_not_block_independent_armature_b(self) -> None:
+        """TEST-249: Armature A Pending 不得阻断独立 Armature B."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-249")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_249")
+        arm_b = bpy.data.objects.new("ArmatureB_249", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        snap_a = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            sess_a = ensure_armature_session_identity(self.armature)
+            sess_b = ensure_armature_session_identity(arm_b)
+
+            self.assertNotEqual(arm_b.as_pointer(), self.armature.as_pointer())
+            self.assertNotEqual(sess_b.registry_session_id, sess_a.registry_session_id)
+
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertIsNotNone(tx_b)
+                self.assertEqual(tx_b.arm, arm_b)
+                self.assertEqual(tx_b.state, _ArmRigTransactionState.ACTIVE)
+
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            _verify_arm_rig_state_restored(self.armature, snap_a)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_250_alternating_execution_pending_a_and_healthy_b(self) -> None:
+        """TEST-250: A Pending 与 B 正常事务交替执行."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-250")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_250")
+        arm_b = bpy.data.objects.new("ArmatureB_250", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        sess_a = ensure_armature_session_identity(self.armature)
+        sess_b = ensure_armature_session_identity(arm_b)
+        self.assertNotEqual(sess_a.registry_session_id, sess_b.registry_session_id)
+
+        try:
+            with _arm_rig_transaction(arm_b) as tx_b1:
+                self.assertEqual(tx_b1.state, _ArmRigTransactionState.ACTIVE)
+            self.assertEqual(tx_b1.state, _ArmRigTransactionState.COMMITTED)
+            self.assertNotEqual(tx_b1.tx_id, tx_a.tx_id)
+
+            with self.assertRaises(RuntimeError) as cm_a1:
+                reset_arm_ik(self.armature)
+            self.assertIn("unresolved cleanup", str(cm_a1.exception).lower())
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+            with _arm_rig_transaction(arm_b) as tx_b2:
+                self.assertEqual(tx_b2.state, _ArmRigTransactionState.ACTIVE)
+            self.assertEqual(tx_b2.state, _ArmRigTransactionState.COMMITTED)
+
+            with self.assertRaises(RuntimeError) as cm_a2:
+                set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2))
+            self.assertIn("unresolved cleanup", str(cm_a2.exception).lower())
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_251_retry_cleanup_failure_on_a_preserves_b_admission(self) -> None:
+        """TEST-251: A 的 Cleanup Retry 再次失败，不得影响 B."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook_commit(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Commit cleanup fault for TEST-251")
+
+        _set_test_fault_injection_hook(fault_hook_commit)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_251")
+        arm_b = bpy.data.objects.new("ArmatureB_251", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        injected_retry_exc = RuntimeError("Persistent retry failure for TEST-251")
+        def fault_hook_retry(stage: str, ctx: dict) -> None:
+            if stage == "during_cleanup_object_removal":
+                raise injected_retry_exc
+
+        try:
+            _set_test_fault_injection_hook(fault_hook_retry)
+            tx_a.uncleaned_stashed_objects.append({"original_name": "Doomed251", "obj_cleaned": False})
+            with self.assertRaises(RuntimeError) as cm_retry:
+                retry_pending_arm_rig_cleanup(tx_a.tx_id)
+            self.assertIn("CLEANUP_INCOMPLETE", str(cm_retry.exception))
+            _clear_test_fault_injection_hook()
+
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
+
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertEqual(tx_b.state, _ArmRigTransactionState.ACTIVE)
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+        finally:
+            _clear_test_fault_injection_hook()
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_252_a_cleanup_success_restores_bilateral_reset_admission(self) -> None:
+        """TEST-252: A 的 Pending 清理成功后，双臂 Reset 恢复准入."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2), influence=0.7)
+        set_hand_ik_target(self.armature, "R", world_xyz=(-0.5, 0.3, 1.1), influence=0.8)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-252")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        with self.assertRaises(RuntimeError):
+            reset_arm_ik(self.armature)
+
+        retry_pending_arm_rig_cleanup(tx_a.tx_id)
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        reset_arm_ik(self.armature)
+
+        state_l = get_arm_ik_state(self.armature, "L")
+        state_r = get_arm_ik_state(self.armature, "R")
+        self.assertEqual(state_l["ik_influence"], 0.0)
+        self.assertEqual(state_r["ik_influence"], 0.0)
+        self.assertEqual(state_l["rot_influence"], 0.0)
+        self.assertEqual(state_r["rot_influence"], 0.0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_253_concurrent_pending_records_on_distinct_armatures(self) -> None:
+        """TEST-253: 两个独立 Armature 同时存在 Pending 记录."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_253")
+        arm_b = bpy.data.objects.new("ArmatureB_253", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        captured_a = []
+        def fault_hook_a(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_a.append(ctx["tx"])
+                raise RuntimeError("Fault on A in TEST-253")
+
+        _set_test_fault_injection_hook(fault_hook_a)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_a_in:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_a[0]
+
+        captured_b = []
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_b.append(ctx["tx"])
+                raise RuntimeError("Fault on B in TEST-253")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(arm_b) as tx_b_in:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_b[0]
+
+        try:
+            self.assertNotEqual(tx_a.tx_id, tx_b.tx_id)
+            self.assertNotEqual(tx_a.session_id, tx_b.session_id)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertIn(tx_b.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+            retry_pending_arm_rig_cleanup(tx_a.tx_id)
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.COMMITTED)
+            self.assertNotIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertIn(tx_b.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(arm_b):
+                    pass
+
+            retry_pending_arm_rig_cleanup(tx_b.tx_id)
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+            self.assertNotIn(tx_b.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        finally:
+            _clear_test_fault_injection_hook()
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_b.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
 
 if __name__ == "__main__":
     args = [sys.argv[0]]

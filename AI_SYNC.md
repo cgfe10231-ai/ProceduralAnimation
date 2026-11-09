@@ -1,8 +1,20 @@
 # AI_SYNC：当前工程状态与跨 AI 交接卡片
 
+<!-- TASK10B15_R6_EXECUTION_STATE -->
+> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 6/6 (F-06 / CONTRACT-10 / 十二项合同证据收束) 已完成。
+> - **执行状态标定**：`ROUND_6_VERIFICATION_COMPLETED_WITH_OPEN_DEFECTS`（专项验证与证据收束完成，如实保留真实缺陷与遗留项，不伪报成功，严禁声明最终验收）。
+> - **生产代码冻结**：`src/rig/arm_ik.py` 等 6 份核心代码严格保持 0 行修改（完全冻结）。
+> - **测试更新与新增**：
+>   - `tests/test_task10b_transaction_atomicity.py`：追加历史 F-06 专项测试用例 TEST-246～TEST-253（共 8 项），覆盖双臂与跨 Armature 在 CLEANUP_PENDING 下的准入隔离，测试集扩增至 223 项（223/223 PASS）。
+>   - `tests/test_task10b_wbc_failure_contract.py`：新建 CONTRACT-10 专项测试套件（共 6 项），实测 WholeBodyController 与 Arm IK 单帧交互边界（CONTRACT10-01, CONTRACT10-05 PASS；CONTRACT10-02, CONTRACT10-03, CONTRACT10-04, CONTRACT10-06 触发真实断言失败 TRUE FAIL，证实 WBC 缺少单帧事务机制导致的场景残留缺陷）。
+> - **测试与回归结果**：Atomicity 223/223 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；WBC Failure Contract 2 PASS / 4 FAIL (真实缺陷)；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
+> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `56fcf62630b331b3e6c7233351d7ddc263be9919`。
+> - **证据归档**：`docs/evidence/task10b15/round6/`（包含 `verification.json`、`implementation_evidence.md`、`contract_status_delta.md`、`deferred_observations.md` 以及全部 8 份原始 `.log` 与测试报告）。
+> - **遗留缺陷与后续**：11 项历史技术遗留项（R1-TAIL-01～03、R2-TAIL-01～02、R3-TAIL-01、R4-TAIL-01～05）与 4 项 CONTRACT-10 真实单帧撕裂缺陷严格维持 OPEN；等待独立审计验收；严禁擅自修复或放宽断言。
+
 <!-- TASK10B15_R5_EXECUTION_STATE -->
 > **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 5/6 (F14-04: CleanupOutcome 与 Coordinator 状态决策权) 已完成。
-> - **生产代码修改**：在 `src/rig/arm_ik.py` 引入不可变结果模型 `_CleanupOutcome` (CLEANUP_SUCCESS, CLEANUP_INCOMPLETE, CLEANUP_FAILED) 与 `_CleanupResult` (frozen dataclass)；纯化 Layer 6 清理执行器 `_ArmRigTransactionContext.retry_cleanup()`，彻底移除内部状态修改及直接操作 `_PENDING_ARM_RIG_CLEANUPS`，改为只读幂等执行并返回结构化结果；实现 Coordinator 独占状态决策函数 `_coordinator_apply_cleanup_result(tx, result, phase)`，强制执行 10 项前置校验、独占状态转移（COMMITTED / CLEANUP_PENDING）、注册表维护及底层异常链传播；改造 `_arm_rig_transaction` Phase 3 与 `retry_pending_arm_rig_cleanup` 入口。
+> - **生产代码修改**：在 `src/rig/arm_ik.py` 引入不可变结果模型 `_CleanupOutcome` (CLEANUP_SUCCESS, CLEANUP_INCOMPLETE, CLEANUP_FAILED) 与 `_CleanupResult` (frozen dataclass)；纯化 Layer 6 清理执行器 `_ArmRigTransactionContext 方法 retry_cleanup()`，彻底移除内部状态修改及直接操作 `_PENDING_ARM_RIG_CLEANUPS`，改为只读幂等执行并返回结构化结果；实现 Coordinator 独占状态决策函数 `_coordinator_apply_cleanup_result(tx, result, phase)`，强制执行 10 项前置校验、独占状态转移（COMMITTED / CLEANUP_PENDING）、注册表维护及底层异常链传播；改造 `_arm_rig_transaction` Phase 3 与 `retry_pending_arm_rig_cleanup` 入口。
 > - **测试更新与新增**：`tests/test_task10b_transaction_atomicity.py` 适配 6 处历史测试调用点（TEST-66, 67, 88, 97, 192, 208），并新增专项测试 TEST-234～TEST-245（共 12 项），总测试集扩增至 215 项。
 > - **测试结果**：Atomicity 215/215 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
 > - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `b03fe2f48b5fe1ac70116334af9e6d77ca5ad232`。
