@@ -88,6 +88,9 @@ from src.rig.arm_ik import (
     _authorized_link_child_collection,
     _authorized_unlink_child_collection,
     _authorized_restore_relationship,
+    _CleanupOutcome,
+    _CleanupResult,
+    _coordinator_apply_cleanup_result,
     ArmatureSessionIdentityRecord,
     _ACTIVE_TRANSACTION_STACK,
     _ARCHIVED_FAILED_D_TOMBSTONES,
@@ -1648,7 +1651,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # 4. Clear the fault hook and execute idempotent retry
         _clear_test_fault_injection_hook()
-        tx.retry_cleanup()
+        retry_pending_arm_rig_cleanup(tx.tx_id)
 
         # After retry, transaction converges to COMMITTED with no cleanup error
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
@@ -1732,7 +1735,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # Retry cleanup converges cleanly
         _clear_test_fault_injection_hook()
-        tx.retry_cleanup()
+        retry_pending_arm_rig_cleanup(tx.tx_id)
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
         self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
         self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
@@ -2628,7 +2631,10 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         tx.uncleaned_stashed_constraints.append(stashed_record)
 
         # Execute retry_cleanup()
-        tx.retry_cleanup()
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        res88 = tx.retry_cleanup()
+        self.assertEqual(res88.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(res88.remaining_constraints, 0)
 
         # The live ArmIK.L constraint must NOT have been removed because pointers differ
         self.assertIn("ArmIK.L", p_fore.constraints)
@@ -2997,10 +3003,10 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         replacement.name = "Stashed_Con_97"
         replacement_ptr = replacement.as_pointer()
 
-        with self.assertRaises(RuntimeError) as cm:
-            tx.retry_cleanup()
-
-        self.assertIn("original reference invalid", str(cm.exception))
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        res97 = tx.retry_cleanup()
+        self.assertEqual(res97.outcome, _CleanupOutcome.CLEANUP_INCOMPLETE)
+        self.assertTrue(any("original reference invalid" in e for e in res97.errors))
         self.assertIn("Stashed_Con_97", p_fore.constraints)
         self.assertEqual(p_fore.constraints["Stashed_Con_97"].as_pointer(), replacement_ptr)
         self.assertEqual(len(tx.uncleaned_stashed_constraints), 1)
@@ -7117,7 +7123,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
             _clear_test_fault_injection_hook()
             with self.assertRaises(RuntimeError) as cm:
-                tx.retry_cleanup()
+                retry_pending_arm_rig_cleanup(tx.tx_id)
 
             self.assertIn("TYPE_A_TX_CREATED", str(cm.exception))
             self.assertIn("lacks credible transaction creation provenance", str(cm.exception))
@@ -7641,7 +7647,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(tx.uncleaned_stashed_constraints), 1)
 
         # Clear fault hook and retry cleanup
-        tx.retry_cleanup()
+        retry_pending_arm_rig_cleanup(tx.tx_id)
         self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
 
@@ -8391,6 +8397,388 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertNotIn("TestCol233", char_col.children)
         bpy.data.collections.remove(test_col)
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+
+    def test_234_layer6_returns_cleanup_success_without_state_mutation(self) -> None:
+        """TEST-234: Layer 6 正常清理返回 CLEANUP_SUCCESS，不直接修改事务状态."""
+        setup_arm_ik(self.armature)
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.state = _ArmRigTransactionState.COMMITTED
+        wrong_mesh = bpy.data.meshes.new("Test234_Mesh")
+        wrong_obj = bpy.data.objects.new("Test234_Obj", wrong_mesh)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+        stashed = {
+            "stashed_obj": wrong_obj,
+            "stashed_obj_ptr": wrong_obj.as_pointer(),
+            "original_name": "Test234_Obj",
+            "stashed_data": wrong_mesh,
+            "stashed_data_ptr": wrong_mesh.as_pointer(),
+            "stashed_data_name": "Test234_Mesh",
+            "obj_cleaned": False,
+            "data_cleaned": False,
+        }
+        tx.stashed_objects.append(stashed)
+        tx.uncleaned_stashed_objects.append(stashed)
+
+        result = tx.retry_cleanup()
+        self.assertIsInstance(result, _CleanupResult)
+        self.assertEqual(result.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(result.remaining_objects, 0)
+        self.assertEqual(result.remaining_constraints, 0)
+        self.assertEqual(len(result.errors), 0)
+        self.assertIsNone(result.cause)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_235_initial_cleanup_failure_coordinator_sets_cleanup_pending_and_chains_cause(self) -> None:
+        """TEST-235: 初次清理失败，Coordinator 设置 CLEANUP_PENDING、登记门禁并抛出原始异常链."""
+        captured_tx = []
+        injected_exc = RuntimeError("Injected cleanup failure in TEST-235")
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                raise injected_exc
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    wrong_mesh = bpy.data.meshes.new("Test235_Mesh")
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx_outer.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                    setup_arm_ik(self.armature)
+            self.assertIn("CLEANUP_INCOMPLETE", str(cm.exception))
+            self.assertIs(cm.exception.__cause__, injected_exc)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertIn(tx.tx_id, get_pending_arm_rig_cleanup_ids())
+        self.assertGreater(len(tx.uncleaned_stashed_objects), 0)
+
+    def test_236_pending_retry_failure_preserves_state_and_pending_gate_with_chain(self) -> None:
+        """TEST-236: Pending Retry 再次失败，状态和 Pending Gate 保留，异常明确传播."""
+        captured_tx = []
+        injected_exc = RuntimeError("Persistent cleanup failure in TEST-236")
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                raise injected_exc
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    wrong_mesh = bpy.data.meshes.new("Test236_Mesh")
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx_outer.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                    setup_arm_ik(self.armature)
+        finally:
+            pass
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            self.assertIn("CLEANUP_INCOMPLETE", str(cm.exception))
+            self.assertIs(cm.exception.__cause__, injected_exc)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertIn(tx.tx_id, get_pending_arm_rig_cleanup_ids())
+
+    def test_237_pending_retry_success_coordinator_transitions_committed_and_unregisters(self) -> None:
+        """TEST-237: Pending Retry 成功，Coordinator 转入 COMMITTED，并准确注销对应注册表条目."""
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                raise RuntimeError("Temporary failure in TEST-237")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    wrong_mesh = bpy.data.meshes.new("Test237_Mesh")
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx_outer.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                    setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertNotIn(tx.tx_id, get_pending_arm_rig_cleanup_ids())
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+
+    def test_238_failed_transaction_rejected_by_cleanup_isolation_preserved(self) -> None:
+        """TEST-238: FAILED-B/C/D 不得通过 Cleanup 转换为 COMMITTED；原隔离记录完全保留."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault in TEST-238")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        tx.state = _ArmRigTransactionState.FAILED
+
+        with self.assertRaises(RuntimeError) as cm1:
+            tx.retry_cleanup()
+        self.assertIn("FAILED -> COMMITTED transition is strictly forbidden", str(cm1.exception))
+
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+        try:
+            with self.assertRaises(RuntimeError) as cm2:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            self.assertIn("FAILED", str(cm2.exception))
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+        dummy_result = _CleanupResult(
+            transaction_id=tx.tx_id,
+            outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+            errors=(),
+            remaining_objects=0,
+            remaining_constraints=0,
+        )
+        with self.assertRaises(RuntimeError) as cm3:
+            _coordinator_apply_cleanup_result(tx, dummy_result, phase="PENDING_RETRY")
+        self.assertIn("FAILED", str(cm3.exception))
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_239_pending_registry_invalid_state_or_identity_rejects_and_refuses_pop(self) -> None:
+        """TEST-239: Pending Registry 存在错误状态或错误事务身份时，必须抛出异常，不得注销."""
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.state = _ArmRigTransactionState.ACTIVE
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            self.assertIn("expected CLEANUP_PENDING", str(cm.exception))
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_240_forged_cleanup_success_with_remaining_resources_rejected_by_coordinator(self) -> None:
+        """TEST-240: 伪造 CLEANUP_SUCCESS 但仍有未完成资源，Coordinator 必须拒绝成功结论."""
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+        dummy_stashed = {"original_name": "GhostObj240", "obj_cleaned": False, "data_cleaned": False}
+        tx.uncleaned_stashed_objects.append(dummy_stashed)
+
+        try:
+            forged_result = _CleanupResult(
+                transaction_id=tx.tx_id,
+                outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+                errors=(),
+                remaining_objects=0,
+                remaining_constraints=0,
+            )
+            with self.assertRaises(RuntimeError) as cm1:
+                _coordinator_apply_cleanup_result(tx, forged_result, phase="PENDING_RETRY")
+            self.assertIn("remaining resource count mismatch", str(cm1.exception))
+
+            forged_result2 = _CleanupResult(
+                transaction_id=tx.tx_id,
+                outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+                errors=(),
+                remaining_objects=1,
+                remaining_constraints=0,
+            )
+            with self.assertRaises(RuntimeError) as cm2:
+                _coordinator_apply_cleanup_result(tx, forged_result2, phase="PENDING_RETRY")
+            self.assertIn("cannot have remaining resources", str(cm2.exception))
+
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_241_cross_armature_cannot_borrow_cleanup_result_or_pending_gate(self) -> None:
+        """TEST-241: 其他 Armature 的事务不得借用当前事务的 Cleanup Result 或 Pending Gate."""
+        bpy.ops.object.armature_add()
+        other_arm = bpy.context.active_object
+        other_arm.name = "OtherArm241"
+
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+
+        tx.session_id = "forged-session-id-241"
+        res = _CleanupResult(
+            transaction_id=tx.tx_id,
+            outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+            errors=(),
+            remaining_objects=0,
+            remaining_constraints=0,
+        )
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                _coordinator_apply_cleanup_result(tx, res, phase="PENDING_RETRY")
+            self.assertIn("session_id mismatch", str(cm.exception))
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+            bpy.data.objects.remove(other_arm, do_unlink=True)
+
+    def test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback(self) -> None:
+        """TEST-242: after_logical_commit 故障发生在清理器运行前，仍进入 CLEANUP_PENDING，不能执行普通回滚."""
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "after_logical_commit":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Fault injected in TEST-242 after_logical_commit")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected in TEST-242 after_logical_commit", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        self.assertIn("HandIK.L", bpy.data.objects)
+        self.assertIn("HandIK.R", bpy.data.objects)
+
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending(self) -> None:
+        """TEST-243: 清理成功后的重复请求不得重复删除资源、重复登记或产生幽灵 Pending."""
+        setup_arm_ik(self.armature)
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.state = _ArmRigTransactionState.COMMITTED
+
+        res1 = tx.retry_cleanup()
+        self.assertEqual(res1.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(res1.remaining_objects, 0)
+        self.assertEqual(res1.remaining_constraints, 0)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        res2 = tx.retry_cleanup()
+        self.assertEqual(res2.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation(self) -> None:
+        """TEST-244: CLEANUP_PENDING 与 FAILED 隔离同时存在时，清理重试不得清除 FAILED 隔离."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "transaction_id": "other-failed-tx-244",
+            "armature_name": self.armature.name,
+            "armature_pointer": self.armature.as_pointer(),
+            "timestamp": time.time(),
+        }
+
+        tx = _ArmRigTransactionContext(self.armature)
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+
+        try:
+            retry_pending_arm_rig_cleanup(tx.tx_id)
+            self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+            self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], "other-failed-tx-244")
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+            _ISOLATED_FAILED_ARMATURES.pop(session_id, None)
+
+    def test_245_partial_cleanup_progress_preserved_subsequent_retry_only_processes_remaining(self) -> None:
+        """TEST-245: 资源清理发生部分成功后抛异常，保留已完成进度，下一次重试只处理剩余资源."""
+        captured_tx = []
+        fail_count = [0]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                stashed = ctx.get("stashed", {})
+                if stashed.get("original_name") == "HandIK.R":
+                    fail_count[0] += 1
+                    raise RuntimeError("Simulated failure on HandIK.R in TEST-245")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    mesh_l = bpy.data.meshes.new("Mesh245_L")
+                    obj_l = bpy.data.objects.new("HandIK.L", mesh_l)
+                    tx_outer.register_created_controller(obj_l)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, obj_l, tx_outer)
+
+                    mesh_r = bpy.data.meshes.new("Mesh245_R")
+                    obj_r = bpy.data.objects.new("HandIK.R", mesh_r)
+                    tx_outer.register_created_controller(obj_r)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, obj_r, tx_outer)
+
+                    setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 1)
+        rem_name = tx.uncleaned_stashed_objects[0]["original_name"]
+        self.assertEqual(rem_name, "HandIK.R")
+
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
 
 
 if __name__ == "__main__":

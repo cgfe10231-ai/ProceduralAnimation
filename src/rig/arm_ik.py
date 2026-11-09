@@ -36,6 +36,7 @@ import math
 import time
 import uuid
 from contextlib import contextmanager
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
@@ -222,6 +223,22 @@ class _ArmRigTransactionState(str, Enum):
     COMMITTED = "COMMITTED"
     CLEANUP_PENDING = "CLEANUP_PENDING"
     FAILED = "FAILED"
+
+
+class _CleanupOutcome(str, Enum):
+    CLEANUP_SUCCESS = "CLEANUP_SUCCESS"
+    CLEANUP_INCOMPLETE = "CLEANUP_INCOMPLETE"
+    CLEANUP_FAILED = "CLEANUP_FAILED"
+
+
+@dataclass(frozen=True)
+class _CleanupResult:
+    transaction_id: str
+    outcome: _CleanupOutcome
+    errors: Tuple[str, ...]
+    remaining_objects: int
+    remaining_constraints: int
+    cause: Optional[BaseException] = None
 
 
 class _RelationshipOperationState(str, Enum):
@@ -4965,14 +4982,22 @@ class _ArmRigTransactionContext:
         }
         self.created_collections.append(rec)
 
-    def retry_cleanup(self) -> None:
+    def retry_cleanup(self) -> _CleanupResult:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
-        if self.state == _ArmRigTransactionState.FAILED:
+        if self.state in (
+            _ArmRigTransactionState.FAILED,
+            _ArmRigTransactionState.ROLLING_BACK,
+            _ArmRigTransactionState.ROLLED_BACK,
+            _ArmRigTransactionState.ACTIVE,
+            _ArmRigTransactionState.SNAPSHOTTING,
+            _ArmRigTransactionState.CREATED,
+        ):
             raise RuntimeError(
-                f"Cannot execute retry_cleanup on FAILED transaction {self.tx_id}: "
-                "FAILED -> COMMITTED transition is strictly forbidden"
+                f"Cannot execute retry_cleanup on transaction {self.tx_id} in state {self.state}: "
+                f"FAILED -> COMMITTED transition is strictly forbidden"
             )
         cleanup_failures: List[str] = []
+        first_cause: Optional[BaseException] = None
 
         # ------------------------------------------------------
         # Task 10-B-8
@@ -4990,6 +5015,8 @@ class _ArmRigTransactionContext:
                 )
                 self.uncleaned_stashed_constraints.remove(stashed_con)
             except Exception as exc:
+                if first_cause is None:
+                    first_cause = exc
                 cleanup_failures.append(
                     "Failed to clean up stashed constraint "
                     f"{stashed_con.get('orig_name')}: {exc}"
@@ -5031,6 +5058,8 @@ class _ArmRigTransactionContext:
                     else:
                         stashed["obj_cleaned"] = True
                 except Exception as oe:
+                    if first_cause is None:
+                        first_cause = oe
                     cleanup_failures.append(f"Failed to clean up stashed object {stashed.get('original_name')}: {oe}")
 
             # Step 2.2: DataBlock cleanup (runs only if object cleanup has succeeded)
@@ -5232,6 +5261,8 @@ class _ArmRigTransactionContext:
                                             "tx_id": self.tx_id,
                                         })
                 except Exception as de:
+                    if first_cause is None:
+                        first_cause = de
                     cleanup_failures.append(f"Failed to clean up datablock for {stashed.get('original_name')}: {de}")
 
             # Only remove record from uncleaned_stashed_objects when BOTH object and datablock are cleaned
@@ -5239,14 +5270,28 @@ class _ArmRigTransactionContext:
                 if stashed in self.uncleaned_stashed_objects:
                     self.uncleaned_stashed_objects.remove(stashed)
 
-        if cleanup_failures:
-            self.cleanup_error = "; ".join(cleanup_failures)
-            self.state = _ArmRigTransactionState.CLEANUP_PENDING
-            raise RuntimeError("Arm rig transaction commit cleanup failed: " + self.cleanup_error)
-        else:
+        rem_objs = len(self.uncleaned_stashed_objects)
+        rem_cons = len(self.uncleaned_stashed_constraints)
+        err_tuple = tuple(cleanup_failures)
+
+        if not err_tuple and rem_objs == 0 and rem_cons == 0:
+            outcome = _CleanupOutcome.CLEANUP_SUCCESS
             self.cleanup_error = None
-            if self.state == _ArmRigTransactionState.CLEANUP_PENDING:
-                self.state = _ArmRigTransactionState.COMMITTED
+        elif rem_objs > 0 or rem_cons > 0:
+            outcome = _CleanupOutcome.CLEANUP_INCOMPLETE
+            self.cleanup_error = "; ".join(err_tuple) if err_tuple else "Cleanup incomplete: remaining stashed resources"
+        else:
+            outcome = _CleanupOutcome.CLEANUP_FAILED
+            self.cleanup_error = "; ".join(err_tuple) if err_tuple else "Cleanup result unprovable or failed"
+
+        return _CleanupResult(
+            transaction_id=self.tx_id,
+            outcome=outcome,
+            errors=err_tuple,
+            remaining_objects=rem_objs,
+            remaining_constraints=rem_cons,
+            cause=first_cause,
+        )
 
 
 _ACTIVE_TRANSACTION_STACK: List[_ArmRigTransactionContext] = []
@@ -5259,6 +5304,135 @@ _PENDING_ARM_RIG_CLEANUPS: Dict[
     str,
     "_ArmRigTransactionContext"
 ] = {}
+
+
+def _coordinator_apply_cleanup_result(
+    tx: "_ArmRigTransactionContext",
+    result: "_CleanupResult",
+    phase: str,
+) -> None:
+    """Coordinator-exclusive decision entry point for transaction cleanup results.
+
+    Enforces 10 pre-decision validation rules, state transitions, and exception propagation.
+    Valid phases: 'INITIAL_CLEANUP', 'PENDING_RETRY'.
+    """
+    if phase not in ("INITIAL_CLEANUP", "PENDING_RETRY"):
+        raise ValueError(f"Invalid cleanup decision phase: {phase!r}")
+
+    # 1. Result type check
+    if not isinstance(result, _CleanupResult):
+        raise RuntimeError(f"Coordinator rejected cleanup result: expected _CleanupResult instance, got {type(result)}")
+
+    # 2. Result transaction_id match
+    if result.transaction_id != tx.tx_id:
+        raise RuntimeError(
+            f"Coordinator rejected cleanup result: transaction_id mismatch "
+            f"({result.transaction_id} != {tx.tx_id})"
+        )
+
+    # 3. Transaction state matches phase
+    if phase == "INITIAL_CLEANUP":
+        if tx.state != _ArmRigTransactionState.COMMITTED:
+            raise RuntimeError(
+                f"Coordinator rejected cleanup result: phase INITIAL_CLEANUP requires state COMMITTED, got {tx.state}"
+            )
+    elif phase == "PENDING_RETRY":
+        if tx.state != _ArmRigTransactionState.CLEANUP_PENDING:
+            raise RuntimeError(
+                f"Coordinator rejected cleanup result: phase PENDING_RETRY requires state CLEANUP_PENDING, got {tx.state}"
+            )
+
+    # 4. Transaction cannot be FAILED
+    if tx.state == _ArmRigTransactionState.FAILED:
+        raise RuntimeError(
+            f"Coordinator rejected cleanup result: transaction {tx.tx_id} is in FAILED state; "
+            "FAILED -> COMMITTED transition is strictly forbidden"
+        )
+
+    # 5. Armature session identity matches
+    if tx.arm is not None:
+        try:
+            sess_rec = ensure_armature_session_identity(tx.arm)
+            if tx.session_id is not None and tx.session_id != sess_rec.registry_session_id:
+                raise RuntimeError(
+                    f"Coordinator rejected cleanup result: session_id mismatch "
+                    f"({tx.session_id} != {sess_rec.registry_session_id})"
+                )
+        except Exception as e:
+            if not isinstance(e, RuntimeError):
+                raise RuntimeError(f"Armature session identity check failed: {e}") from e
+            raise
+
+    # 6. Pending Retry corresponds to registered entry and is the identical transaction object
+    if phase == "PENDING_RETRY":
+        reg_tx = _PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id)
+        if reg_tx is None or reg_tx is not tx:
+            raise RuntimeError(
+                f"Coordinator rejected cleanup result: transaction {tx.tx_id} identity mismatch or absent in _PENDING_ARM_RIG_CLEANUPS"
+            )
+
+    # 7. Remaining resources match actual queue
+    actual_rem_objs = len(getattr(tx, "uncleaned_stashed_objects", []))
+    actual_rem_cons = len(getattr(tx, "uncleaned_stashed_constraints", []))
+    if result.remaining_objects != actual_rem_objs or result.remaining_constraints != actual_rem_cons:
+        raise RuntimeError(
+            f"Coordinator rejected cleanup result: remaining resource count mismatch "
+            f"(reported: objs={result.remaining_objects}, cons={result.remaining_constraints}; "
+            f"actual: objs={actual_rem_objs}, cons={actual_rem_cons})"
+        )
+
+    # 8. CLEANUP_SUCCESS cannot carry errors
+    if result.outcome == _CleanupOutcome.CLEANUP_SUCCESS and len(result.errors) > 0:
+        raise RuntimeError(
+            f"Coordinator rejected cleanup result: CLEANUP_SUCCESS cannot carry errors: {result.errors}"
+        )
+
+    # 9. CLEANUP_SUCCESS cannot have remaining resources
+    if result.outcome == _CleanupOutcome.CLEANUP_SUCCESS and (result.remaining_objects > 0 or result.remaining_constraints > 0):
+        raise RuntimeError(
+            f"Coordinator rejected cleanup result: CLEANUP_SUCCESS cannot have remaining resources "
+            f"(objs={result.remaining_objects}, cons={result.remaining_constraints})"
+        )
+
+    # 10. FAILED isolation records cannot be cleared by cleanup result
+    if tx.arm is not None:
+        try:
+            s_rec = ensure_armature_session_identity(tx.arm)
+            if s_rec.registry_session_id in _ISOLATED_FAILED_ARMATURES:
+                iso = _ISOLATED_FAILED_ARMATURES[s_rec.registry_session_id]
+                if iso.get("transaction_id") == tx.tx_id:
+                    raise RuntimeError(
+                        f"Coordinator rejected cleanup result: transaction {tx.tx_id} is associated with FAILED isolation "
+                        f"({iso.get('failure_class')}); cleanup cannot clear isolation"
+                    )
+        except Exception as e:
+            if isinstance(e, RuntimeError) and "associated with FAILED isolation" in str(e):
+                raise
+
+    # Decision Application
+    if result.outcome == _CleanupOutcome.CLEANUP_SUCCESS:
+        tx.cleanup_error = None
+        tx.state = _ArmRigTransactionState.COMMITTED
+        if phase == "PENDING_RETRY":
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+        return
+
+    # Outcome is CLEANUP_INCOMPLETE or CLEANUP_FAILED
+    tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+    tx.cleanup_error = "; ".join(result.errors) if result.errors else "Cleanup incomplete or failed"
+    _register_pending_arm_rig_cleanup(tx)
+
+    err_msg = (
+        f"Arm rig transaction commit cleanup {result.outcome.value}: "
+        f"transaction={tx.tx_id}; phase={phase}; "
+        f"remaining_objects={result.remaining_objects}; "
+        f"remaining_constraints={result.remaining_constraints}; "
+        f"errors={'; '.join(result.errors)}"
+    )
+    if result.cause is not None:
+        raise RuntimeError(err_msg) from result.cause
+    else:
+        raise RuntimeError(err_msg)
 
 
 def _register_pending_arm_rig_cleanup(
@@ -5305,22 +5479,13 @@ def retry_pending_arm_rig_cleanup(tx_id: str) -> None:
             "FAILED -> COMMITTED transition is strictly forbidden"
         )
 
-    tx.retry_cleanup()
-
-    if tx.state == _ArmRigTransactionState.COMMITTED:
-        if (
-            tx.uncleaned_stashed_objects
-            or tx.uncleaned_stashed_constraints
-        ):
-            raise RuntimeError(
-                "Cleanup reported COMMITTED "
-                "while pending resources remain"
-            )
-
-        _PENDING_ARM_RIG_CLEANUPS.pop(
-            tx_id,
-            None
+    if tx.state != _ArmRigTransactionState.CLEANUP_PENDING:
+        raise RuntimeError(
+            f"Transaction {tx_id} is in state {tx.state}, expected CLEANUP_PENDING for pending cleanup retry"
         )
+
+    cleanup_result = tx.retry_cleanup()
+    _coordinator_apply_cleanup_result(tx, cleanup_result, phase="PENDING_RETRY")
 
 
 def _assert_arm_rig_cleanup_gate(
@@ -6265,7 +6430,7 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                 "during_commit_cleanup",
                 {"tx": tx}
             )
-            tx.retry_cleanup()
+            cleanup_result = tx.retry_cleanup()
         except BaseException as exc:
             tx.state = _ArmRigTransactionState.CLEANUP_PENDING
             tx.cleanup_error = str(exc)
@@ -6275,6 +6440,8 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                 "but post-commit cleanup failed (irreversible cleanup failed): "
                 f"{exc}"
             ) from exc
+
+        _coordinator_apply_cleanup_result(tx, cleanup_result, phase="INITIAL_CLEANUP")
 
 
 def _verify_transaction_wrong_type_object_ownership(

@@ -1,5 +1,14 @@
 # AI_SYNC：当前工程状态与跨 AI 交接卡片
 
+<!-- TASK10B15_R5_EXECUTION_STATE -->
+> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 5/6 (F14-04: CleanupOutcome 与 Coordinator 状态决策权) 已完成。
+> - **生产代码修改**：在 `src/rig/arm_ik.py` 引入不可变结果模型 `_CleanupOutcome` (CLEANUP_SUCCESS, CLEANUP_INCOMPLETE, CLEANUP_FAILED) 与 `_CleanupResult` (frozen dataclass)；纯化 Layer 6 清理执行器 `_ArmRigTransactionContext.retry_cleanup()`，彻底移除内部状态修改及直接操作 `_PENDING_ARM_RIG_CLEANUPS`，改为只读幂等执行并返回结构化结果；实现 Coordinator 独占状态决策函数 `_coordinator_apply_cleanup_result(tx, result, phase)`，强制执行 10 项前置校验、独占状态转移（COMMITTED / CLEANUP_PENDING）、注册表维护及底层异常链传播；改造 `_arm_rig_transaction` Phase 3 与 `retry_pending_arm_rig_cleanup` 入口。
+> - **测试更新与新增**：`tests/test_task10b_transaction_atomicity.py` 适配 6 处历史测试调用点（TEST-66, 67, 88, 97, 192, 208），并新增专项测试 TEST-234～TEST-245（共 12 项），总测试集扩增至 215 项。
+> - **测试结果**：Atomicity 215/215 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
+> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `b03fe2f48b5fe1ac70116334af9e6d77ca5ad232`。
+> - **证据归档**：`docs/evidence/task10b15/round5/`（含 `verification.json`、`implementation_evidence.md`、`test_change_audit.md` 及全部 8 份原始 `.log` 与测试报告）。
+> - **遗留项与后续**：11 项历史遗留项（R1-TAIL-01～03、R2-TAIL-01～02、R3-TAIL-01、R4-TAIL-01～05）维持 OPEN（留至 6/6 集中处理）；等待 ChatGPT 独立验收；禁止擅自开始 6/6。
+
 <!-- TASK10B15_R4_EXECUTION_STATE -->
 > **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 4/6 (F14-02: Object Parent 与 Collection Parent/Child 关系授权闭环) 已完成。
 > - **生产代码修改**：在 `src/rig/arm_ik.py` 实现 Layer 3 辅助与关系授权函数 `_matrix_equals()`、`_is_child_collection_linked_by_identity()`、`_is_collection_descendant_of()`、`_authorized_assign_object_parent()`、`_authorized_link_child_collection()`、`_authorized_unlink_child_collection()` 及 `_authorized_restore_relationship()`；收敛 `_get_or_create_empty()` 中的父级与矩阵逆赋值、`_ensure_character_collection()` 中的集合挂载至 Layer 3；升级快照 `_capture_snapshot()` 包含集合父子指针及控制器父级指针；升级回滚时序在 Step 0.5 优先恢复 Object Parent 关系，在 Step 1 跳过已恢复父级，在 Step 3.0 倒序恢复集合挂载/解绑关系，并在 Step 3.1 严格实施第 9.2 节外部依赖隔离检查（无外部成员、外部子集合、外部父级方可安全删除）。
