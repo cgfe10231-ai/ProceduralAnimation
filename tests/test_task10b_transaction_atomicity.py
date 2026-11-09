@@ -446,34 +446,44 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(self.armature.pose.bones["forearm.L"].constraints), 0)
 
     def test_35_direct_rollback_wrong_type_controller(self) -> None:
-        """TEST-35: Rollback on wrong-type controller restores original object type, data block, and collections."""
+        """TEST-35: Pre-transaction wrong-type controller is rejected and original object, datablock, parent, collections, TRS fully preserved."""
         mesh_data = bpy.data.meshes.new("OriginalHandIKMesh")
         wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
         bpy.context.scene.collection.objects.link(wrong_obj)
         wrong_obj.location = Vector((1.0, 2.0, 3.0))
+        wrong_obj.rotation_euler = Euler((0.1, 0.2, 0.3))
+        wrong_obj.scale = Vector((1.1, 1.2, 1.3))
+
+        orig_obj_ptr = wrong_obj.as_pointer()
+        orig_data_ptr = mesh_data.as_pointer()
+        orig_parent = wrong_obj.parent
+        orig_collections = list(wrong_obj.users_collection)
+        orig_loc = Vector(wrong_obj.location)
+        orig_rot = Euler(wrong_obj.rotation_euler)
+        orig_scale = Vector(wrong_obj.scale)
 
         snap = _snapshot_arm_rig_state(self.armature)
         self.assertTrue(snap["controllers"]["HandIK.L"]["exists"])
         self.assertEqual(snap["controllers"]["HandIK.L"]["type"], "MESH")
 
-        # Execute setup under transaction which replaces wrong-type object
-        with self.assertRaises(RuntimeError):
-            with _arm_rig_transaction(self.armature):
-                setup_arm_ik(self.armature)
-                # Verify that inside the transaction, HandIK.L is now an Empty
-                curr_empty = bpy.data.objects.get("HandIK.L")
-                self.assertIsNotNone(curr_empty)
-                self.assertEqual(curr_empty.type, "EMPTY")
-                raise RuntimeError("Fault injected to trigger rollback")
+        # Calling setup_arm_ik rejects the pre-transaction wrong-type object with EXTERNAL_CONTROLLER_NAME_CONFLICT
+        with self.assertRaises(RuntimeError) as ctx:
+            setup_arm_ik(self.armature)
+        self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
 
-        # After rollback, verify original object reference, datablock, and type are restored
-        restored_obj = bpy.data.objects.get("HandIK.L")
-        self.assertIsNotNone(restored_obj)
-        self.assertEqual(restored_obj.type, "MESH")
-        self.assertIs(restored_obj, wrong_obj)
-        self.assertIs(restored_obj.data, mesh_data)
-        self.assertIn(restored_obj.name, bpy.context.scene.collection.objects)
-        self.assertAlmostEqual((restored_obj.location - Vector((1.0, 2.0, 3.0))).length, 0.0, places=5)
+        # Original object, data block, parent, collections, and TRS are fully preserved
+        preserved_obj = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(preserved_obj)
+        self.assertEqual(preserved_obj.as_pointer(), orig_obj_ptr)
+        self.assertEqual(preserved_obj.type, "MESH")
+        self.assertIs(preserved_obj, wrong_obj)
+        self.assertIs(preserved_obj.data, mesh_data)
+        self.assertEqual(preserved_obj.data.as_pointer(), orig_data_ptr)
+        self.assertEqual(preserved_obj.parent, orig_parent)
+        self.assertEqual(list(preserved_obj.users_collection), orig_collections)
+        self.assertEqual(preserved_obj.location, orig_loc)
+        self.assertEqual(preserved_obj.rotation_euler, orig_rot)
+        self.assertEqual(preserved_obj.scale, orig_scale)
         _verify_arm_rig_state_restored(self.armature, snap)
 
     def test_36_direct_rollback_initialized_scene_controllers(self) -> None:
@@ -662,10 +672,8 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertNotIn("ElbowPole.L", bpy.data.objects)
 
     def test_40_fault_injection_setup_arm_ik_after_controller_replaced(self) -> None:
-        """TEST-40: Fault injection in setup_arm_ik() after wrong-type controller replaced restores original object."""
+        """TEST-40: Fault injection in setup_arm_ik() after transaction-created wrong-type controller replaced rolls back cleanly."""
         mesh_data = bpy.data.meshes.new("WrongTypeMesh")
-        mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(mesh_obj)
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
         def fault_hook(stage: str, ctx: dict) -> None:
@@ -675,13 +683,14 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
 
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx:
+                mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx.register_created_controller(mesh_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, mesh_obj, tx)
+                setup_arm_ik(self.armature)
         self.assertIn("Fault injected after wrong controller replaced", str(cm.exception))
 
         _verify_arm_rig_state_restored(self.armature, snap_initial)
-        restored = bpy.data.objects.get("HandIK.L")
-        self.assertIs(restored, mesh_obj)
-        self.assertIs(restored.data, mesh_data)
 
     def test_41_fault_injection_setup_arm_ik_after_constraints_or_prebend(self) -> None:
         """TEST-41: Fault injection in setup_arm_ik() after constraints/pre-bend modified restores state."""
@@ -1503,24 +1512,28 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         error reporting. Complementary test TEST-66 verifies transaction state transitions
         (COMMITTED / CLEANUP_PENDING) and retry_cleanup() idempotency.
         """
-        # 1. Create wrong-type HandIK.L with MESH data block
+        # 1. Create DataBlocks before transaction
         mesh_data = bpy.data.meshes.new("DoomedMesh")
         mesh_data_ptr = mesh_data.as_pointer()
-        wrong_mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(wrong_mesh_obj)
-
-        # 2. Create wrong-type ElbowPole.L with CURVE data block that is shared with another object
         curve_data = bpy.data.curves.new("SharedCurve", type="CURVE")
-        wrong_curve_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
-        bpy.context.scene.collection.objects.link(wrong_curve_obj)
-
         sharing_obj = bpy.data.objects.new("SharingCurveObj", curve_data)
         bpy.context.scene.collection.objects.link(sharing_obj)
 
-        self.assertGreater(curve_data.users, 1)
+        self.assertGreater(curve_data.users, 0)
 
-        # 3. Successful transaction commit
-        setup_arm_ik(self.armature)
+        # 2 & 3: Successful transaction commit with transaction-created wrong-type controllers
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+            tx.register_created_controller(wrong_mesh_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_mesh_obj, tx)
+
+            wrong_curve_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
+            tx.register_created_controller(wrong_curve_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_curve_obj, tx)
+
+            self.assertGreater(curve_data.users, 1)
+
+            setup_arm_ik(self.armature)
 
         # Wrong-type controller HandIK.L is replaced with an EMPTY
         self.assertEqual(bpy.data.objects["HandIK.L"].type, "EMPTY")
@@ -1548,25 +1561,21 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # Add another wrong-type object to trigger commit cleanup
         mesh_data_2 = bpy.data.meshes.new("DoomedMesh2")
-        wrong_obj_2 = bpy.data.objects.new("HandIK.R", mesh_data_2)
-        bpy.context.scene.collection.objects.link(wrong_obj_2)
 
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx2:
+                wrong_obj_2 = bpy.data.objects.new("HandIK.R", mesh_data_2)
+                tx2.register_created_controller(wrong_obj_2)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj_2, tx2)
+                setup_arm_ik(self.armature)
         self.assertIn("Simulated commit cleanup failure", str(cm.exception))
 
     def test_65_reversible_commit_preparation_failure_rolls_back(self) -> None:
         """TEST-65: Reversible commit preparation failure (Phase 1) rolls back without destroying stashed resources."""
-        # 1. Setup initial state with a wrong-type controller to verify it's stashed and restored intact
         mesh_data = bpy.data.meshes.new("TestMesh65")
-        mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(mesh_obj)
-        orig_obj_ptr = mesh_obj.as_pointer()
-        orig_data_ptr = mesh_data.as_pointer()
-
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
-        # 2. Inject failure at Phase 1 before_commit_prepare
+        # Inject failure at Phase 1 before_commit_prepare
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "before_commit_prepare":
                 raise RuntimeError("Simulated Phase 1 preparation failure")
@@ -1574,17 +1583,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
 
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx:
+                mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx.register_created_controller(mesh_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, mesh_obj, tx)
+                setup_arm_ik(self.armature)
         self.assertIn("Simulated Phase 1 preparation failure", str(cm.exception))
-
-        # 3. Assertions
-        # Stashed wrong-type object and mesh data block identities must NOT be destroyed
-        self.assertIn("HandIK.L", bpy.data.objects)
-        restored_obj = bpy.data.objects["HandIK.L"]
-        self.assertEqual(restored_obj.as_pointer(), orig_obj_ptr)
-        self.assertEqual(restored_obj.type, "MESH")
-        self.assertIn("TestMesh65", bpy.data.meshes)
-        self.assertEqual(restored_obj.data.as_pointer(), orig_data_ptr)
 
         # Active transaction stack restored to empty
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
@@ -1597,8 +1601,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # 1. Add a wrong-type object that requires cleanup
         mesh_data = bpy.data.meshes.new("DoomedMesh66")
         orig_mesh_ptr = mesh_data.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(wrong_obj)
 
         captured_tx = []
 
@@ -1609,9 +1611,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         _set_test_fault_injection_hook(fault_hook)
 
-        # 2. Call setup_arm_ik() -> must raise RuntimeError because cleanup failed
+        # 2. Call setup_arm_ik() inside outer transaction with transaction-created wrong-type controller
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx_outer:
+                wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx_outer.register_created_controller(wrong_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                setup_arm_ik(self.armature)
         self.assertIn("Simulated Phase 3 irreversible cleanup failure", str(cm.exception))
 
         # 3. Verify transaction state and semantics
@@ -1660,17 +1666,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # Setup 2 wrong-type controllers:
         # 1) HandIK.L with exclusive mesh
         mesh_excl = bpy.data.meshes.new("ExclMesh67")
-        wrong_l = bpy.data.objects.new("HandIK.L", mesh_excl)
-        bpy.context.scene.collection.objects.link(wrong_l)
 
         # 2) HandIK.R with shared curve
         curve_shared = bpy.data.curves.new("SharedCurve67", type="CURVE")
-        wrong_r = bpy.data.objects.new("HandIK.R", curve_shared)
-        bpy.context.scene.collection.objects.link(wrong_r)
-
         other_obj = bpy.data.objects.new("OtherObj67", curve_shared)
         bpy.context.scene.collection.objects.link(other_obj)
-        self.assertGreaterEqual(curve_shared.users, 2)
+        self.assertGreaterEqual(curve_shared.users, 1)
 
         # Setup 2 wrong-type constraints on forearm.L
         pbone_l = self.armature.pose.bones["forearm.L"]
@@ -1700,7 +1701,16 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
 
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx_outer:
+                wrong_l = bpy.data.objects.new("HandIK.L", mesh_excl)
+                tx_outer.register_created_controller(wrong_l)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_l, tx_outer)
+
+                wrong_r = bpy.data.objects.new("HandIK.R", curve_shared)
+                tx_outer.register_created_controller(wrong_r)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_r, tx_outer)
+
+                setup_arm_ik(self.armature)
         self.assertIn("Simulated partial commit cleanup failure", str(cm.exception))
 
         self.assertEqual(len(captured_tx), 1)
@@ -2362,8 +2372,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
     def test_81_cleanup_pending_registry_and_retry(self) -> None:
         """TEST-81: Phase 3 cleanup failure registers pending cleanup; queryable and retriable without test callbacks."""
         wrong_mesh = bpy.data.meshes.new("DoomedMesh81")
-        wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
-        bpy.data.collections["Character"].objects.link(wrong_obj)
 
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
@@ -2372,7 +2380,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
         try:
             with self.assertRaises(RuntimeError) as cm:
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                    setup_arm_ik(self.armature)
 
             self.assertIn("irreversible cleanup failed", str(cm.exception))
 
@@ -2391,9 +2403,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-82: Object removed but datablock removal fails; pending state retained and retried without RNA error."""
         exclusive_mesh = bpy.data.meshes.new("ExclusiveMesh82")
         exclusive_mesh_ptr = exclusive_mesh.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.L", exclusive_mesh)
-        wrong_obj_ptr = wrong_obj.as_pointer()
-        bpy.data.collections["Character"].objects.link(wrong_obj)
+        wrong_obj_ptr = None
 
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_cleanup_datablock_removal":
@@ -2402,7 +2412,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
         try:
             with self.assertRaises(RuntimeError):
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", exclusive_mesh)
+                    wrong_obj_ptr = wrong_obj.as_pointer()
+                    tx.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                    setup_arm_ik(self.armature)
 
             pending_ids = get_pending_arm_rig_cleanup_ids()
             self.assertGreaterEqual(len(pending_ids), 1)
@@ -2432,15 +2447,15 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         shared_mesh = bpy.data.meshes.new("SharedPropMesh83")
         shared_mesh_ptr = shared_mesh.as_pointer()
 
-        wrong_obj = bpy.data.objects.new("HandIK.L", shared_mesh)
-        bpy.data.collections["Character"].objects.link(wrong_obj)
-
         external_user = bpy.data.objects.new("ExternalBackgroundObj83", shared_mesh)
         bpy.context.scene.collection.objects.link(external_user)
 
-        self.assertGreater(shared_mesh.users, 1)
-
-        setup_arm_ik(self.armature)
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.L", shared_mesh)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            self.assertGreater(shared_mesh.users, 1)
+            setup_arm_ik(self.armature)
 
         self.assertIn("SharedPropMesh83", bpy.data.meshes)
         self.assertEqual(bpy.data.meshes["SharedPropMesh83"].as_pointer(), shared_mesh_ptr)
@@ -2763,9 +2778,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # 4. Replace controller, commit successfully but inject Phase 3 cleanup failure
         old_hand = bpy.data.objects["HandIK.L"]
         mesh_data = bpy.data.meshes.new("DoomedMesh92")
-        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
         bpy.data.objects.remove(old_hand, do_unlink=True)
-        bpy.context.scene.collection.objects.link(wrong_obj)
 
         def fault_hook_clean(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
@@ -2774,7 +2787,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook_clean)
         try:
             with self.assertRaises(RuntimeError) as cm_cf:
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx_clean:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                    tx_clean.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_clean)
+                    setup_arm_ik(self.armature)
             self.assertIn("Injected Phase 3 cleanup failure in TEST-92", str(cm_cf.exception))
         finally:
             _clear_test_fault_injection_hook()
@@ -3188,8 +3205,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         shared_mesh = bpy.data.meshes.new("DoomedMesh102")
         old_hand_r = bpy.data.objects["HandIK.R"]
         bpy.data.objects.remove(old_hand_r, do_unlink=True)
-        wrong_obj = bpy.data.objects.new("HandIK.R", shared_mesh)
-        char_col.objects.link(wrong_obj)
 
         # 6. Commit setup_arm_ik but inject post-commit cleanup failure
         def fault_hook_clean(stage: str, ctx: dict) -> None:
@@ -3199,7 +3214,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook_clean)
         try:
             with self.assertRaises(RuntimeError) as cm_cf:
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx_clean:
+                    wrong_obj = bpy.data.objects.new("HandIK.R", shared_mesh)
+                    tx_clean.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(char_col, wrong_obj, tx_clean)
+                    setup_arm_ik(self.armature)
             self.assertIn("post-commit cleanup failed", str(cm_cf.exception))
         finally:
             _clear_test_fault_injection_hook()
@@ -4887,8 +4906,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         old_hand = bpy.data.objects["HandIK.L"]
         bpy.data.objects.remove(old_hand, do_unlink=True)
         doomed_mesh = bpy.data.meshes.new("DoomedMesh136")
-        wrong_obj = bpy.data.objects.new("HandIK.L", doomed_mesh)
-        bpy.data.collections["Character"].objects.link(wrong_obj)
 
         def fault_hook_cleanup(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
@@ -4897,7 +4914,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook_cleanup)
         try:
             with self.assertRaises(RuntimeError):
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx_clean:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", doomed_mesh)
+                    tx_clean.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.data.collections["Character"], wrong_obj, tx_clean)
+                    setup_arm_ik(self.armature)
         finally:
             _clear_test_fault_injection_hook()
 
@@ -6861,18 +6882,23 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         curve = bpy.data.curves.new("TEST_184_shared_curve", type="CURVE")
         curve.dimensions = "3D"
         arm_data = bpy.data.armatures.new("TEST_184_shared_armature")
-        wrong_curve = bpy.data.objects.new("HandIK.L", curve)
-        wrong_arm = bpy.data.objects.new("HandIK.R", arm_data)
         ext_curve = bpy.data.objects.new("TEST_184_curve_user", curve)
         ext_arm = bpy.data.objects.new("TEST_184_arm_user", arm_data)
-        for obj in (wrong_curve, wrong_arm):
-            char_col.objects.link(obj)
         for obj in (ext_curve, ext_arm):
             bpy.context.scene.collection.objects.link(obj)
         curve_ptr, arm_ptr = curve.as_pointer(), arm_data.as_pointer()
-        self.assertEqual(curve.users, 2)
-        self.assertEqual(arm_data.users, 2)
-        setup_arm_ik(self.armature)
+        self.assertEqual(curve.users, 1)
+        self.assertEqual(arm_data.users, 1)
+
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_curve = bpy.data.objects.new("HandIK.L", curve)
+            wrong_arm = bpy.data.objects.new("HandIK.R", arm_data)
+            tx.register_created_controller(wrong_curve)
+            tx.register_created_controller(wrong_arm)
+            _authorized_link_object_to_collection(char_col, wrong_curve, tx)
+            _authorized_link_object_to_collection(char_col, wrong_arm, tx)
+            setup_arm_ik(self.armature)
+
         self.assertTrue(any(c.as_pointer() == curve_ptr for c in bpy.data.curves))
         self.assertTrue(any(a.as_pointer() == arm_ptr for a in bpy.data.armatures))
         self.assertEqual(bpy.data.curves["TEST_184_shared_curve"].users, 1)
@@ -6933,12 +6959,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-188: Zero-user Mesh DataBlock without delete authority is preserved upon normal commit."""
         mesh_data = bpy.data.meshes.new("Test188_UnauthorizedMesh")
         mesh_ptr = mesh_data.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(wrong_obj)
 
-        self.assertGreaterEqual(mesh_data.users, 1)
-
-        setup_arm_ik(self.armature)
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
 
         controller = bpy.data.objects.get("HandIK.L")
         self.assertIsNotNone(controller)
@@ -6955,12 +6981,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-189: Zero-user Curve DataBlock without delete authority is preserved upon normal commit."""
         curve_data = bpy.data.curves.new("Test189_UnauthorizedCurve", type="CURVE")
         curve_ptr = curve_data.as_pointer()
-        wrong_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
-        bpy.context.scene.collection.objects.link(wrong_obj)
 
-        self.assertGreaterEqual(curve_data.users, 1)
-
-        setup_arm_ik(self.armature)
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
 
         controller = bpy.data.objects.get("ElbowPole.L")
         self.assertIsNotNone(controller)
@@ -6977,12 +7003,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-190: Zero-user Armature DataBlock without delete authority is preserved upon normal commit."""
         arm_data = bpy.data.armatures.new("Test190_UnauthorizedArmature")
         arm_ptr = arm_data.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.R", arm_data)
-        bpy.context.scene.collection.objects.link(wrong_obj)
 
-        self.assertGreaterEqual(arm_data.users, 1)
-
-        setup_arm_ik(self.armature)
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.R", arm_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
 
         controller = bpy.data.objects.get("HandIK.R")
         self.assertIsNotNone(controller)
@@ -6999,9 +7025,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-191: Same-name different-identity DataBlocks are not erroneously deleted; both resources protected."""
         orig_mesh = bpy.data.meshes.new("Test191_Mesh")
         orig_mesh_ptr = orig_mesh.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.L", orig_mesh)
-        bpy.context.scene.collection.objects.link(wrong_obj)
-
         other_mesh = bpy.data.meshes.new("Test191_Mesh")
         other_mesh_ptr = other_mesh.as_pointer()
         self.assertNotEqual(orig_mesh_ptr, other_mesh_ptr)
@@ -7013,7 +7036,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(cap_hook)
 
         try:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx:
+                wrong_obj = bpy.data.objects.new("HandIK.L", orig_mesh)
+                tx.register_created_controller(wrong_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                setup_arm_ik(self.armature)
         finally:
             _clear_test_fault_injection_hook()
 
@@ -7030,8 +7057,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-192: Forged Type A authorization lacking credible creation provenance cannot bypass DataBlock protection."""
         mesh_data = bpy.data.meshes.new("Test192_ProtectedMesh")
         mesh_ptr = mesh_data.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(wrong_obj)
 
         captured_tx = []
         def fault_hook(stage: str, ctx: dict) -> None:
@@ -7054,7 +7079,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
         try:
             with self.assertRaises(RuntimeError):
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                    tx.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                    setup_arm_ik(self.armature)
 
             self.assertEqual(len(captured_tx), 1)
             tx = captured_tx[0]
@@ -7080,8 +7109,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-193: PRESERVED_NO_DELETE_AUTHORITY is a legal terminal state; repeated cleanup is idempotent."""
         mesh_data = bpy.data.meshes.new("Test193_Mesh")
         mesh_ptr = mesh_data.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(wrong_obj)
 
         captured_tx = []
         def cap_hook(stage: str, ctx: dict) -> None:
@@ -7090,7 +7117,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         _set_test_fault_injection_hook(cap_hook)
         try:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx:
+                wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx.register_created_controller(wrong_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                setup_arm_ik(self.armature)
         finally:
             _clear_test_fault_injection_hook()
 
@@ -7118,6 +7149,249 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         self.assertIn("Test193_Mesh", bpy.data.meshes)
         self.assertEqual(bpy.data.meshes["Test193_Mesh"].as_pointer(), mesh_ptr)
+
+    def test_194_external_mesh_occupying_handik_l_rejected_by_setup(self) -> None:
+        """TEST-194: External pre-existing Mesh occupying HandIK.L rejected by setup_arm_ik(); all external resources preserved."""
+        ext_mesh = bpy.data.meshes.new("ExtMesh194")
+        ext_obj = bpy.data.objects.new("HandIK.L", ext_mesh)
+        ext_obj.location = Vector((1.2, -0.5, 0.8))
+        ext_obj.rotation_euler = Euler((0.2, 0.4, 0.6))
+        ext_obj.scale = Vector((1.1, 1.1, 1.1))
+        bpy.context.scene.collection.objects.link(ext_obj)
+
+        orig_obj_ptr = ext_obj.as_pointer()
+        orig_mesh_ptr = ext_mesh.as_pointer()
+        orig_parent = ext_obj.parent
+        orig_collections = list(ext_obj.users_collection)
+        orig_loc = Vector(ext_obj.location)
+        orig_rot = Euler(ext_obj.rotation_euler)
+        orig_scale = Vector(ext_obj.scale)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            setup_arm_ik(self.armature)
+        self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
+
+        # Check external resource 100% preserved
+        live_obj = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(live_obj)
+        self.assertEqual(live_obj.as_pointer(), orig_obj_ptr)
+        self.assertEqual(live_obj.type, "MESH")
+        self.assertEqual(live_obj.data.as_pointer(), orig_mesh_ptr)
+        self.assertEqual(live_obj.parent, orig_parent)
+        self.assertEqual(list(live_obj.users_collection), orig_collections)
+        self.assertEqual(live_obj.location, orig_loc)
+        self.assertEqual(live_obj.rotation_euler, orig_rot)
+        self.assertEqual(live_obj.scale, orig_scale)
+
+        # Zero new constraints on bones
+        for b in ("forearm.L", "forearm.R", "hand.L", "hand.R"):
+            self.assertEqual(len(self.armature.pose.bones[b].constraints), 0)
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_195_opposite_elbowpole_curve_preflight_rejected_by_hand_target(self) -> None:
+        """TEST-195: External Curve occupying ElbowPole.R rejected before auto-init; zero business writes."""
+        # Setup HandIK.L as valid EMPTY under root
+        hand_l = bpy.data.objects.new("HandIK.L", None)
+        hand_l.parent = self.root
+        bpy.context.scene.collection.objects.link(hand_l)
+
+        # External curve occupying opposite pole
+        ext_curve = bpy.data.curves.new("ExtCurve195", type="CURVE")
+        ext_pole = bpy.data.objects.new("ElbowPole.R", ext_curve)
+        ext_pole.location = Vector((0.4, 0.5, 0.6))
+        bpy.context.scene.collection.objects.link(ext_pole)
+
+        orig_pole_ptr = ext_pole.as_pointer()
+        orig_curve_ptr = ext_curve.as_pointer()
+        orig_pole_parent = ext_pole.parent
+        orig_pole_collections = list(ext_pole.users_collection)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            set_hand_ik_target(
+                self.armature,
+                side="L",
+                world_xyz=(-0.35, -0.1, 1.1),
+                influence=0.8,
+            )
+        self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
+
+        # Check external object preserved
+        live_pole = bpy.data.objects.get("ElbowPole.R")
+        self.assertIsNotNone(live_pole)
+        self.assertEqual(live_pole.as_pointer(), orig_pole_ptr)
+        self.assertEqual(live_pole.type, "CURVE")
+        self.assertEqual(live_pole.data.as_pointer(), orig_curve_ptr)
+        self.assertEqual(live_pole.parent, orig_pole_parent)
+        self.assertEqual(list(live_pole.users_collection), orig_pole_collections)
+
+        # Other controllers not created
+        self.assertNotIn("HandIK.R", bpy.data.objects)
+        self.assertNotIn("ElbowPole.L", bpy.data.objects)
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_196_transaction_created_wrong_type_object_safely_replaced(self) -> None:
+        """TEST-196: Transaction-created & registered wrong-type object safely replaced; unauth datablock preserved."""
+        mesh_data = bpy.data.meshes.new("TxMesh196")
+        mesh_ptr = mesh_data.as_pointer()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
+
+        # HandIK.L replaced with valid EMPTY controller
+        ctrl = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(ctrl)
+        self.assertEqual(ctrl.type, "EMPTY")
+        self.assertEqual(ctrl.parent, self.root)
+
+        # Mesh data block preserved because it has no delete authority
+        self.assertIn("TxMesh196", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["TxMesh196"].as_pointer(), mesh_ptr)
+        self.assertEqual(bpy.data.meshes["TxMesh196"].users, 0)
+        self.assertTrue(any(o.get("status") == "PRESERVED_NO_DELETE_AUTHORITY" for o in tx.datablock_cleanup_outcomes))
+
+    def test_197_pre_existing_object_added_to_created_controller_objects_rejected(self) -> None:
+        """TEST-197: Pre-existing object erroneously added to created_controller_objects denied replacement."""
+        pre_mesh = bpy.data.meshes.new("PreMesh197")
+        pre_obj = bpy.data.objects.new("HandIK.L", pre_mesh)
+        bpy.context.scene.collection.objects.link(pre_obj)
+        orig_ptr = pre_obj.as_pointer()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            # Mistakenly registering pre-existing object into created_controller_objects
+            tx.register_created_controller(pre_obj)
+
+            # Verify ownership verification returns False due to Condition 6 (in entry_object_ptrs)
+            from src.rig.arm_ik import _verify_transaction_wrong_type_object_ownership
+            self.assertFalse(_verify_transaction_wrong_type_object_ownership(pre_obj, tx, self.armature))
+
+            # setup_arm_ik rejects replacement with EXTERNAL_CONTROLLER_NAME_CONFLICT
+            with self.assertRaises(RuntimeError) as ctx:
+                setup_arm_ik(self.armature)
+            self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
+
+            # Remove the erroneously added record before transaction exit so rollback does not destroy external object
+            tx.created_controller_objects = [
+                r for r in tx.created_controller_objects if r["obj_ptr"] != orig_ptr
+            ]
+
+        # Object was not replaced
+        live_obj = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(live_obj)
+        self.assertEqual(live_obj.as_pointer(), orig_ptr)
+        self.assertEqual(live_obj.type, "MESH")
+
+    def test_198_collection_creation_fault_before_registration_no_orphan(self) -> None:
+        """TEST-198: Collection creation failure before registration leaves zero orphan collections."""
+        # Ensure Character collection does not exist before test
+        old_char = bpy.data.collections.get("Character")
+        if old_char is not None:
+            bpy.data.collections.remove(old_char)
+
+        initial_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_collection_before_registration":
+                raise RuntimeError("Fault injected before Character collection registration")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected before Character collection registration", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Zero orphan collections left
+        current_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+        self.assertEqual(current_col_ptrs, initial_col_ptrs)
+        self.assertNotIn("Character", bpy.data.collections)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_199_collection_fault_after_registration_before_link_rolls_back(self) -> None:
+        """TEST-199: Collection failure after registration before link rolls back cleanly by pointer identity."""
+        old_char = bpy.data.collections.get("Character")
+        if old_char is not None:
+            bpy.data.collections.remove(old_char)
+
+        initial_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_collection_after_registration_before_link":
+                raise RuntimeError("Fault injected after registration before scene link")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected after registration before scene link", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Registered collection removed by transaction rollback
+        current_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+        self.assertEqual(current_col_ptrs, initial_col_ptrs)
+        self.assertNotIn("Character", bpy.data.collections)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_200_collection_fault_after_link_rolls_back_parent_child_and_collection(self) -> None:
+        """TEST-200: Collection failure after link rolls back parent-child link and removes collection."""
+        old_char = bpy.data.collections.get("Character")
+        if old_char is not None:
+            bpy.data.collections.remove(old_char)
+
+        initial_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_collection_after_link":
+                raise RuntimeError("Fault injected after scene link")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected after scene link", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both parent-child link unlinked and collection removed
+        self.assertNotIn("Character", bpy.context.scene.collection.children)
+        current_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+        self.assertEqual(current_col_ptrs, initial_col_ptrs)
+        self.assertNotIn("Character", bpy.data.collections)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_201_pre_existing_character_collection_preserved_on_reentry(self) -> None:
+        """TEST-201: Pre-existing Character collection preserved identically on re-entry."""
+        setup_arm_ik(self.armature)
+        char_col = bpy.data.collections.get("Character")
+        self.assertIsNotNone(char_col)
+        orig_col_ptr = char_col.as_pointer()
+        orig_children = list(char_col.children)
+        orig_objects = list(char_col.objects)
+        self.assertIn("Character", bpy.context.scene.collection.children)
+
+        # Re-entry invocation
+        setup_arm_ik(self.armature)
+
+        char_col_after = bpy.data.collections.get("Character")
+        self.assertIsNotNone(char_col_after)
+        self.assertEqual(char_col_after.as_pointer(), orig_col_ptr)
+        self.assertEqual(list(char_col_after.children), orig_children)
+        self.assertEqual(list(char_col_after.objects), orig_objects)
+        self.assertIn("Character", bpy.context.scene.collection.children)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,13 @@
 # AI_SYNC：当前工程状态与跨 AI 交接卡片
 
-<!-- TASK10B15_R1_EXECUTION_STATE -->
-> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 1/6 (F14-01: DataBlock 授权删除与无授权资源保护) 已完成。已在 `src/rig/arm_ik.py` 建立 DataBlock 授权容器并封闭无授权物理删除路径；`tests/test_task10b_transaction_atomicity.py` 纠正 TEST-64/66/82 旧删除预期并新增 TEST-188～193。自动化专项测试：Atomicity 163/163 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 PASS。分支 `audit/task-10-b-9`，基线 `7d2c96501b136903e84385accda340628cbff039`。具体证据归档于 `docs/evidence/task10b15/round1/`。等待 ChatGPT 独立验收；禁止擅自开始 2/6。
+<!-- TASK10B15_R2_EXECUTION_STATE -->
+> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 2/6 (F14-05: 修复错误类型对象的所有权判断 + F14-06: 修复 Collection 创建登记顺序) 已完成。
+> - **生产代码修改**：在 `src/rig/arm_ik.py` 修复了 `_ensure_character_collection()` 的创建-登记-链接时序并注入 3 处故障点与异常清理；在事务入口保存 `tx.entry_object_ptrs` 基线；实现 `_verify_transaction_wrong_type_object_ownership()` 8 条件所有权校验；在 `_get_or_create_empty()`、`setup_arm_ik()` 入口 A 与 `_preflight_arm_ik_parent_transforms()` 入口 B 严格实施无所有权非 EMPTY 控制器阻断 (`ExternalControllerNameConflictError("EXTERNAL_CONTROLLER_NAME_CONFLICT")`)。
+> - **测试更新与新增**：`tests/test_task10b_input_validation.py` 更新 TEST-28/29/30 验证 8 维零场景突变；`tests/test_task10b_transaction_atomicity.py` 更新 TEST-35/40/65 及原有 13 项 Cleanup 测试适配受控事务场景，并新增 TEST-194～201（共 8 项）。
+> - **测试结果**：Atomicity 171/171 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
+> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `60159bc44ae6557f430cbe966668295dce5c3c90`。
+> - **证据归档**：`docs/evidence/task10b15/round2/`（含 `verification.json`、`implementation_evidence.md` 及全部 8 份原始 `.log` 与测试报告）。
+> - **遗留项与后续**：R1-TAIL-01～03 维持 OPEN（留至 6/6 处理）；F14-02～F14-04 维持既有状态；等待 ChatGPT 独立验收；禁止擅自开始 3/6。
 
 
 > **项目**：ProceduralAnimation | **分支**：`audit/task-10-b-9`

@@ -136,14 +136,59 @@ def _resolve_armature(armature_obj: Optional[bpy.types.Object] = None) -> bpy.ty
 
 
 def _ensure_character_collection() -> bpy.types.Collection:
-    """Ensure the Character collection exists in the active scene."""
+    """Ensure the Character collection exists in the active scene with strict registration-before-link order (F14-06)."""
     scene = bpy.context.scene
     col = bpy.data.collections.get("Character")
-    if col is None:
-        col = bpy.data.collections.new("Character")
-        scene.collection.children.link(col)
-        if _ACTIVE_TRANSACTION_STACK:
-            _ACTIVE_TRANSACTION_STACK[-1].register_created_collection(col, initial_parent=scene.collection)
+    if col is not None:
+        return col
+
+    active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
+    if active_tx is None or active_tx.state != _ArmRigTransactionState.ACTIVE:
+        raise RuntimeError("Cannot create Character collection: must be within an ACTIVE transaction")
+
+    col = bpy.data.collections.new("Character")
+    new_col_ptr = col.as_pointer() if hasattr(col, "as_pointer") else None
+
+    # Step 1: Fault injection point: character_collection_before_registration
+    try:
+        _trigger_fault_injection("character_collection_before_registration", {"col": col, "col_ptr": new_col_ptr, "scene": scene})
+    except BaseException:
+        try:
+            if hasattr(col, "as_pointer") and col.as_pointer() == new_col_ptr:
+                if getattr(col, "users", 0) == 0 and col.name in bpy.data.collections:
+                    bpy.data.collections.remove(col)
+        except Exception:
+            pass
+        raise
+
+    # Step 2: Immediate identity registration
+    try:
+        active_tx.register_created_collection(col, initial_parent=scene.collection)
+        reg = active_tx.created_collections[-1] if active_tx.created_collections else None
+        if reg is None or reg.get("col_ref") != col or reg.get("col_ptr") != new_col_ptr:
+            raise RuntimeError("Failed to verify Character collection identity registration")
+    except BaseException:
+        try:
+            if hasattr(col, "as_pointer") and col.as_pointer() == new_col_ptr:
+                if getattr(col, "users", 0) == 0 and col.name in bpy.data.collections:
+                    bpy.data.collections.remove(col)
+        except Exception:
+            pass
+        raise
+
+    # Step 3: Fault injection point: character_collection_after_registration_before_link
+    _trigger_fault_injection("character_collection_after_registration_before_link", {"col": col, "col_ptr": new_col_ptr, "scene": scene})
+
+    # Step 4: Authorized link to scene
+    scene.collection.children.link(col)
+
+    # Step 5: Verify parent-child relationship genuinely exists
+    if col.name not in scene.collection.children or scene.collection.children[col.name] != col:
+        raise RuntimeError("Failed to verify Character collection scene linkage")
+
+    # Step 6: Fault injection point: character_collection_after_link
+    _trigger_fault_injection("character_collection_after_link", {"col": col, "col_ptr": new_col_ptr, "scene": scene})
+
     return col
 
 
@@ -155,6 +200,11 @@ def _find_collection_by_name(col_name: str) -> Optional[bpy.types.Collection]:
         if scene.collection.name == col_name:
             return scene.collection
     return bpy.data.collections.get(col_name)
+
+
+class ExternalControllerNameConflictError(RuntimeError, ValueError):
+    """Raised when a controller name is occupied by an external/pre-existing non-EMPTY object (F14-05)."""
+    pass
 
 
 # =============================================================================
@@ -3237,6 +3287,7 @@ class _ArmRigTransactionContext:
         self.tx_id: str = uuid.uuid4().hex[:8]
         self.datablock_authorizations: List[Dict[str, Any]] = []
         self.datablock_cleanup_outcomes: List[Dict[str, Any]] = []
+        self.entry_object_ptrs: Optional[FrozenSet[int]] = None
 
     @property
     def committed(self) -> bool:
@@ -4571,6 +4622,7 @@ def _arm_rig_transaction(arm: bpy.types.Object):
             tx.pre_write_integrity_reasons = [f"Pre-snapshot fingerprint capture failed: {fp_exc}"]
             raise
 
+        tx.entry_object_ptrs = pre_snap_fp.get("all_object_ptrs") if isinstance(pre_snap_fp, dict) else None
         tx.state = _ArmRigTransactionState.SNAPSHOTTING
         tx.snapshot = _snapshot_arm_rig_state(arm)
         tx.state = _ArmRigTransactionState.ACTIVE
@@ -4770,6 +4822,67 @@ def _arm_rig_transaction(arm: bpy.types.Object):
             ) from exc
 
 
+def _verify_transaction_wrong_type_object_ownership(
+    obj: bpy.types.Object,
+    tx: Optional["_ArmRigTransactionContext"],
+    arm: Optional[bpy.types.Object] = None,
+) -> bool:
+    """Verify whether the current active transaction owns a wrong-type object per F14-05.
+
+    Must satisfy all 8 conditions:
+    1. Active transaction exists and is in ACTIVE state.
+    2. Object exists in current transaction's created_controller_objects.
+    3. Registered obj_ref and live Blender object are the identical entity.
+    4. Registered obj_ptr matches current live pointer.
+    5. Object genuinely exists in bpy.data.objects.
+    6. Object pointer does NOT exist in transaction entry's original object pointer set.
+    7. Current transaction matches target Armature's session identity.
+    8. No ReferenceError, identity substitution, or unprovable state occurred.
+    """
+    if tx is None or tx.state != _ArmRigTransactionState.ACTIVE:
+        return False
+
+    if tx.entry_object_ptrs is None:
+        return False
+
+    try:
+        live_ptr = int(obj.as_pointer())
+        live_name = str(obj.name)
+        if live_name not in bpy.data.objects or bpy.data.objects[live_name] != obj:
+            return False
+    except (ReferenceError, Exception):
+        return False
+
+    if live_ptr in tx.entry_object_ptrs:
+        return False
+
+    matched = False
+    for reg in getattr(tx, "created_controller_objects", []):
+        if not isinstance(reg, dict):
+            continue
+        reg_ref = reg.get("obj_ref")
+        reg_ptr = reg.get("obj_ptr")
+        try:
+            if reg_ptr == live_ptr and reg_ref is not None and reg_ref == obj:
+                matched = True
+                break
+        except (ReferenceError, Exception):
+            continue
+
+    if not matched:
+        return False
+
+    if arm is not None:
+        try:
+            session_rec = ensure_armature_session_identity(arm)
+            if tx.session_id is not None and tx.session_id != session_rec.registry_session_id:
+                return False
+        except Exception:
+            return False
+
+    return True
+
+
 def _get_or_create_empty(
     name: str,
     display_type: str,
@@ -4787,41 +4900,44 @@ def _get_or_create_empty(
     replaced_wrong_type = False
 
     if obj is not None and obj.type != "EMPTY":
-        if _ACTIVE_TRANSACTION_STACK:
-            # Active transaction: safely stash the doomed wrong-type object to allow complete rollback
-            tx = _ACTIVE_TRANSACTION_STACK[-1]
-            stashed_record = {
-                "original_name": name,
-                "stashed_obj": obj,
-                "stashed_obj_ptr": obj.as_pointer() if hasattr(obj, "as_pointer") else None,
-                "stashed_data": getattr(obj, "data", None),
-                "stashed_data_ptr": getattr(obj, "data", None).as_pointer() if (getattr(obj, "data", None) and hasattr(getattr(obj, "data", None), "as_pointer")) else None,
-                "stashed_data_name": getattr(obj, "data", None).name if getattr(obj, "data", None) else None,
-                "collections": [c.name for c in obj.users_collection],
-                "collection_refs": list(obj.users_collection),
-                "collection_ptrs": [
-                    c.as_pointer()
-                    for c in obj.users_collection
-                    if hasattr(c, "as_pointer")
-                ],
-                "obj_cleaned": False,
-                "data_cleaned": False,
-            }
-            tx.stashed_objects.append(stashed_record)
-            obj.name = f"__stashed_doomed_{name}__"
-            for c in list(obj.users_collection):
-                _authorized_unlink_object_from_collection(
-                    c,
-                    obj,
-                    active_tx=tx,
-                    category="TX_UNLINKED_ORIGINAL",
-                )
-            obj = None
-            replaced_wrong_type = True
-        else:
-            bpy.data.objects.remove(obj, do_unlink=True)
-            obj = None
-            replaced_wrong_type = True
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
+        target_arm = active_tx.arm if active_tx is not None else None
+        if not _verify_transaction_wrong_type_object_ownership(obj, active_tx, target_arm):
+            raise ExternalControllerNameConflictError(
+                f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{name}' matches an existing non-EMPTY "
+                f"object '{obj.name}' (type='{obj.type}', ptr={obj.as_pointer() if hasattr(obj, 'as_pointer') else 'None'}) "
+                f"that is not owned by the active transaction."
+            )
+
+        tx = active_tx
+        stashed_record = {
+            "original_name": name,
+            "stashed_obj": obj,
+            "stashed_obj_ptr": obj.as_pointer() if hasattr(obj, "as_pointer") else None,
+            "stashed_data": getattr(obj, "data", None),
+            "stashed_data_ptr": getattr(obj, "data", None).as_pointer() if (getattr(obj, "data", None) and hasattr(getattr(obj, "data", None), "as_pointer")) else None,
+            "stashed_data_name": getattr(obj, "data", None).name if getattr(obj, "data", None) else None,
+            "collections": [c.name for c in obj.users_collection],
+            "collection_refs": list(obj.users_collection),
+            "collection_ptrs": [
+                c.as_pointer()
+                for c in obj.users_collection
+                if hasattr(c, "as_pointer")
+            ],
+            "obj_cleaned": False,
+            "data_cleaned": False,
+        }
+        tx.stashed_objects.append(stashed_record)
+        obj.name = f"__stashed_doomed_{name}__"
+        for c in list(obj.users_collection):
+            _authorized_unlink_object_from_collection(
+                c,
+                obj,
+                active_tx=tx,
+                category="TX_UNLINKED_ORIGINAL",
+            )
+        obj = None
+        replaced_wrong_type = True
 
     if obj is None:
         obj = bpy.data.objects.new(name, None)
@@ -4896,6 +5012,22 @@ def setup_arm_ik(
     """
     valid_influence = _validate_influence(initial_influence, param_name="initial_influence")
     arm = _resolve_armature(armature_obj)
+
+    # Preflight check 4 controller names for external wrong-type conflicts before entering transaction (F14-05 Entrance A)
+    active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
+    for c_name in (
+        ARM_IK_TARGET_NAMES["L"],
+        ARM_IK_TARGET_NAMES["R"],
+        ARM_POLE_TARGET_NAMES["L"],
+        ARM_POLE_TARGET_NAMES["R"],
+    ):
+        c_obj = bpy.data.objects.get(c_name)
+        if c_obj is not None and c_obj.type != "EMPTY":
+            if not _verify_transaction_wrong_type_object_ownership(c_obj, active_tx, arm):
+                raise ExternalControllerNameConflictError(
+                    f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{c_name}' matches pre-existing or external "
+                    f"non-EMPTY object '{c_obj.name}' (type='{c_obj.type}') not owned by active transaction."
+                )
 
     with _arm_rig_transaction(arm):
         root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
@@ -5296,8 +5428,8 @@ def _preflight_arm_ik_parent_transforms(
     Preflight rules:
     - Case A: Existing object is an EMPTY -> compute actual effective parent matrix.
     - Case B: Object does not exist -> compute expected effective parent matrix (root_obj @ Identity).
-    - Case C: Object exists but type != 'EMPTY' -> it will be unlinked and recreated by _get_or_create_empty();
-      anticipate the expected effective parent matrix for the new EMPTY, NOT the doomed object's matrix.
+    - Case C: Object exists but type != 'EMPTY' -> must be a verified transaction-owned controller (F14-05);
+      unowned non-EMPTY objects are rejected with EXTERNAL_CONTROLLER_NAME_CONFLICT before scene writes.
 
     Returns:
         (needs_auto_init, eff_ik_mat, eff_pole_mat)
@@ -5317,6 +5449,7 @@ def _preflight_arm_ik_parent_transforms(
     if needs_auto_init:
         # setup_arm_ik() processes all four controllers (L and R);
         # validate effective parent transforms for existing valid controls and anticipated new controls.
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
         other_side = "R" if valid_side == "L" else "L"
         all_ctrl_names = (
             ARM_IK_TARGET_NAMES[valid_side],
@@ -5326,11 +5459,17 @@ def _preflight_arm_ik_parent_transforms(
         )
         for ctrl_name in all_ctrl_names:
             existing_obj = bpy.data.objects.get(ctrl_name)
+            if existing_obj is not None and existing_obj.type != "EMPTY":
+                if not _verify_transaction_wrong_type_object_ownership(existing_obj, active_tx, arm):
+                    raise ExternalControllerNameConflictError(
+                        f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{ctrl_name}' matches pre-existing or external "
+                        f"non-EMPTY object '{existing_obj.name}' (type='{existing_obj.type}') not owned by active transaction."
+                    )
             if existing_obj is not None and existing_obj.type == "EMPTY":
                 # Case A: Existing valid EMPTY controller
                 ctrl_eff_mat = compute_effective_parent_matrix(existing_obj)
             else:
-                # Case B (missing) & Case C (wrong type, will be unlinked/recreated):
+                # Case B (missing) or verified transaction-created replacement:
                 # Use expected effective parent matrix for the new Empty
                 ctrl_eff_mat = expected_new_eff_mat
             validate_effective_parent_transform(ctrl_eff_mat, ctrl_name)
