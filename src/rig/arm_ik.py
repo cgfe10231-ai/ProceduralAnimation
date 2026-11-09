@@ -3235,6 +3235,8 @@ class _ArmRigTransactionContext:
         self.pre_write_integrity_compromised: bool = False
         self.pre_write_integrity_reasons: List[str] = []
         self.tx_id: str = uuid.uuid4().hex[:8]
+        self.datablock_authorizations: List[Dict[str, Any]] = []
+        self.datablock_cleanup_outcomes: List[Dict[str, Any]] = []
 
     @property
     def committed(self) -> bool:
@@ -3558,25 +3560,171 @@ class _ArmRigTransactionContext:
 
                         if target_data is None:
                             stashed["data_cleaned"] = True
+                            stashed["data_cleanup_status"] = "DATA_ALREADY_ABSENT"
                         else:
-                            try:
-                                user_count = getattr(target_data, "users", 0)
-                            except ReferenceError:
-                                user_count = 0
+                            # Step 1: Check independent DataBlock deletion authorization
+                            matching_auth = None
+                            for auth in self.datablock_authorizations:
+                                if not isinstance(auth, dict):
+                                    continue
+                                if auth.get("authorized_transaction") != self.tx_id:
+                                    continue
+                                auth_ptr = auth.get("original_pointer")
+                                auth_ref = auth.get("original_reference")
+                                if (auth_ptr is not None and auth_ptr == data_ptr) or (auth_ref is not None and auth_ref == target_data):
+                                    matching_auth = auth
+                                    break
 
-                            if user_count > 0:
-                                # Shared datablock with remaining users: preserve it per DataBlock rules
+                            if matching_auth is None:
+                                # Step 1.1: No authorization -> preserve datablock without deletion
+                                stashed["data_cleanup_status"] = "PRESERVED_NO_DELETE_AUTHORITY"
                                 stashed["data_cleaned"] = True
-                            else:
-                                target_coll.remove(target_data, do_unlink=True)
-                                still_present = any(
-                                    (data_ptr and item.as_pointer() == data_ptr)
-                                    for item in target_coll
+                                already_recorded = any(
+                                    (o.get("resource_pointer") == data_ptr or (data_ref is not None and o.get("original_reference") == data_ref))
+                                    and o.get("tx_id") == self.tx_id
+                                    for o in self.datablock_cleanup_outcomes
                                 )
+                                if not already_recorded:
+                                    self.datablock_cleanup_outcomes.append({
+                                        "action": "PRESERVED",
+                                        "status": "PRESERVED_NO_DELETE_AUTHORITY",
+                                        "reason": "NO_DELETE_AUTHORITY",
+                                        "resource_kind": getattr(target_coll, "name", type(target_data).__name__),
+                                        "resource_name": data_name,
+                                        "resource_pointer": data_ptr,
+                                        "original_reference": data_ref,
+                                        "tx_id": self.tx_id,
+                                    })
+                            else:
+                                # Step 2: Strictly validate 12 conditions (Fail-Closed)
+                                required_fields = (
+                                    "resource_kind",
+                                    "original_reference",
+                                    "original_pointer",
+                                    "provenance",
+                                    "authorization_source",
+                                    "authorization_scope",
+                                    "authorized_transaction",
+                                    "expected_lifecycle",
+                                )
+                                missing_fields = [f for f in required_fields if f not in matching_auth]
+                                if missing_fields:
+                                    raise RuntimeError(f"DataBlock authorization for {data_name} missing fields: {missing_fields}")
+
+                                if matching_auth["authorized_transaction"] != self.tx_id:
+                                    raise RuntimeError(f"DataBlock authorization tx mismatch: {matching_auth['authorized_transaction']} != {self.tx_id}")
+
+                                if matching_auth.get("authorization_scope") != "PHYSICAL_DELETE_IF_ZERO_USERS":
+                                    raise RuntimeError(f"DataBlock authorization scope invalid: {matching_auth.get('authorization_scope')}")
+
+                                provenance = matching_auth.get("provenance")
+                                if provenance not in ("TYPE_A_TX_CREATED", "TYPE_B_PRE_EXISTING_EXPLICIT_GRANT"):
+                                    raise RuntimeError(f"DataBlock deletion authorization provenance rejected: {provenance}")
+
+                                if provenance == "TYPE_A_TX_CREATED":
+                                    stashed_orig_name = stashed.get("original_name")
+                                    if stashed_orig_name is not None or not getattr(self, "created_datablocks", None):
+                                        raise RuntimeError(
+                                            f"DataBlock {data_name} claims TYPE_A_TX_CREATED but lacks credible transaction creation provenance"
+                                        )
+                                elif provenance == "TYPE_B_PRE_EXISTING_EXPLICIT_GRANT":
+                                    auth_src = matching_auth.get("authorization_source")
+                                    if not auth_src or auth_src in ("UNKNOWN", "NONE", "UNPROVEN"):
+                                        raise RuntimeError(
+                                            f"DataBlock {data_name} with TYPE_B provenance lacks valid explicit authorization_source: {auth_src}"
+                                        )
+
+                                orig_ref = matching_auth.get("original_reference")
+                                if orig_ref is None:
+                                    raise RuntimeError(f"DataBlock authorization original_reference is None")
+                                try:
+                                    _ = getattr(orig_ref, "name")
+                                except Exception as ref_err:
+                                    raise RuntimeError(f"DataBlock original_reference is invalid or dead: {ref_err}")
+
+                                try:
+                                    live_ptr = target_data.as_pointer()
+                                except Exception as ptr_err:
+                                    raise RuntimeError(f"Fail-closed: failed to read live pointer for {data_name}: {ptr_err}")
+
+                                if matching_auth.get("original_pointer") != live_ptr:
+                                    raise RuntimeError(f"DataBlock original_pointer mismatch: {matching_auth.get('original_pointer')} != {live_ptr}")
+                                if data_ptr is not None and data_ptr != live_ptr:
+                                    raise RuntimeError(f"DataBlock stashed pointer mismatch: {data_ptr} != {live_ptr}")
+
+                                if target_coll is None:
+                                    raise RuntimeError(f"DataBlock {data_name} collection not found in bpy.data")
+                                try:
+                                    item_in_coll = any(item.as_pointer() == live_ptr for item in target_coll)
+                                except Exception as coll_err:
+                                    raise RuntimeError(f"Fail-closed: failed to enumerate collection for {data_name}: {coll_err}")
+                                if not item_in_coll:
+                                    raise RuntimeError(f"DataBlock {data_name} does not exist in collection {target_coll}")
+
+                                if orig_ref != target_data:
+                                    raise RuntimeError(f"DataBlock current live reference does not match original_reference")
+
+                                try:
+                                    user_count = target_data.users
+                                except Exception as u_err:
+                                    raise RuntimeError(f"Fail-closed: failed to read users attribute on {data_name}: {u_err}")
+                                if user_count != 0:
+                                    raise RuntimeError(f"DataBlock {data_name} cannot be deleted: users count is {user_count} > 0")
+
+                                try:
+                                    fake_user = target_data.use_fake_user
+                                except Exception as fu_err:
+                                    raise RuntimeError(f"Fail-closed: failed to read use_fake_user attribute on {data_name}: {fu_err}")
+                                if fake_user is not False:
+                                    raise RuntimeError(f"DataBlock {data_name} has use_fake_user == True; cannot delete")
+
+                                try:
+                                    lib = target_data.library
+                                except Exception as lib_err:
+                                    raise RuntimeError(f"Fail-closed: failed to read library attribute on {data_name}: {lib_err}")
+                                if lib is not None:
+                                    raise RuntimeError(f"DataBlock {data_name} belongs to library {lib}; cannot delete")
+
+                                try:
+                                    if hasattr(target_data, "override_library") and target_data.override_library is not None:
+                                        raise RuntimeError(f"DataBlock {data_name} has override_library; cannot delete")
+                                except AttributeError:
+                                    pass
+                                except Exception as dep_err:
+                                    raise RuntimeError(f"Fail-closed: failed checking external dependencies on {data_name}: {dep_err}")
+
+                                # All 12 conditions verified: delete without do_unlink=True
+                                target_coll.remove(target_data, do_unlink=False)
+
+                                still_present = False
+                                try:
+                                    still_present = any(
+                                        (data_ptr and item.as_pointer() == data_ptr)
+                                        for item in target_coll
+                                    )
+                                except Exception:
+                                    still_present = True
+
                                 if still_present:
-                                    cleanup_failures.append(f"Failed to delete datablock {data_name}: still exists in {target_coll}")
+                                    raise RuntimeError(f"Failed to delete datablock {data_name}: still exists in {target_coll}")
                                 else:
                                     stashed["data_cleaned"] = True
+                                    stashed["data_cleanup_status"] = "PHYSICALLY_DELETED"
+                                    already_recorded = any(
+                                        (o.get("resource_pointer") == data_ptr or (data_ref is not None and o.get("original_reference") == data_ref))
+                                        and o.get("tx_id") == self.tx_id
+                                        for o in self.datablock_cleanup_outcomes
+                                    )
+                                    if not already_recorded:
+                                        self.datablock_cleanup_outcomes.append({
+                                            "action": "DELETED",
+                                            "status": "PHYSICALLY_DELETED",
+                                            "reason": "AUTHORIZED_CLEANUP",
+                                            "resource_kind": getattr(target_coll, "name", type(target_data).__name__),
+                                            "resource_name": data_name,
+                                            "resource_pointer": data_ptr,
+                                            "tx_id": self.tx_id,
+                                        })
                 except Exception as de:
                     cleanup_failures.append(f"Failed to clean up datablock for {stashed.get('original_name')}: {de}")
 

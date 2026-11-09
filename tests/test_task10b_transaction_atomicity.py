@@ -1505,6 +1505,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """
         # 1. Create wrong-type HandIK.L with MESH data block
         mesh_data = bpy.data.meshes.new("DoomedMesh")
+        mesh_data_ptr = mesh_data.as_pointer()
         wrong_mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
         bpy.context.scene.collection.objects.link(wrong_mesh_obj)
 
@@ -1521,9 +1522,17 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # 3. Successful transaction commit
         setup_arm_ik(self.armature)
 
-        # Doomed mesh data block must be cleaned up, and controller must now be an EMPTY
-        self.assertNotIn("DoomedMesh", bpy.data.meshes)
+        # Wrong-type controller HandIK.L is replaced with an EMPTY
         self.assertEqual(bpy.data.objects["HandIK.L"].type, "EMPTY")
+
+        # Doomed mesh data block has NO delete authority -> MUST be preserved
+        self.assertIn("DoomedMesh", bpy.data.meshes)
+        preserved_mesh = bpy.data.meshes["DoomedMesh"]
+        self.assertEqual(preserved_mesh.as_pointer(), mesh_data_ptr)
+        self.assertEqual(preserved_mesh.users, 0)
+
+        # Unauthorized preservation does NOT trigger cleanup pending
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
 
         # Shared curve object replaced with an EMPTY, but shared curve data block preserved!
         self.assertEqual(bpy.data.objects["ElbowPole.L"].type, "EMPTY")
@@ -1587,6 +1596,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-66: Irreversible cleanup failure (Phase 3) leaves rig COMMITTED, tracks uncleaned resources, and retries cleanly."""
         # 1. Add a wrong-type object that requires cleanup
         mesh_data = bpy.data.meshes.new("DoomedMesh66")
+        orig_mesh_ptr = mesh_data.as_pointer()
         wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
         bpy.context.scene.collection.objects.link(wrong_obj)
 
@@ -1631,11 +1641,19 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
         self.assertIsNone(tx.cleanup_error)
         self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
-        self.assertNotIn("DoomedMesh66", bpy.data.meshes)
+
+        # DoomedMesh66 has no delete authority -> MUST be preserved after retry
+        self.assertIn("DoomedMesh66", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["DoomedMesh66"].as_pointer(), orig_mesh_ptr)
+        self.assertEqual(bpy.data.meshes["DoomedMesh66"].users, 0)
+        mesh66_outcomes = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_name") == "DoomedMesh66"]
+        self.assertTrue(any(o.get("status") == "PRESERVED_NO_DELETE_AUTHORITY" for o in mesh66_outcomes))
 
         # Second retry is idempotent and harmless
         tx.retry_cleanup()
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        mesh66_outcomes_second = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_name") == "DoomedMesh66"]
+        self.assertEqual(len(mesh66_outcomes), len(mesh66_outcomes_second))
 
     def test_67_partial_cleanup_failure_and_convergence(self) -> None:
         """TEST-67: Partial cleanup failure prevents duplicate deletions, protects shared resources, and converges on retry."""
@@ -2400,7 +2418,10 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             retry_pending_arm_rig_cleanup(target_id)
 
             mesh_alive_after_retry = any(m.as_pointer() == exclusive_mesh_ptr for m in bpy.data.meshes)
-            self.assertFalse(mesh_alive_after_retry, "Mesh datablock should be cleaned up on retry")
+            self.assertTrue(mesh_alive_after_retry, "Mesh datablock without delete authority must be preserved on retry")
+            self.assertIn("ExclusiveMesh82", bpy.data.meshes)
+            self.assertEqual(bpy.data.meshes["ExclusiveMesh82"].as_pointer(), exclusive_mesh_ptr)
+            self.assertEqual(bpy.data.meshes["ExclusiveMesh82"].users, 0)
 
             self.assertNotIn(target_id, get_pending_arm_rig_cleanup_ids())
         finally:
@@ -6907,6 +6928,196 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
         with self.assertRaisesRegex(RuntimeError, "FAILED-C"):
             setup_arm_ik(self.armature, initial_influence=0.7)
+
+    def test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit(self) -> None:
+        """TEST-188: Zero-user Mesh DataBlock without delete authority is preserved upon normal commit."""
+        mesh_data = bpy.data.meshes.new("Test188_UnauthorizedMesh")
+        mesh_ptr = mesh_data.as_pointer()
+        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        self.assertGreaterEqual(mesh_data.users, 1)
+
+        setup_arm_ik(self.armature)
+
+        controller = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(controller)
+        self.assertEqual(controller.type, "EMPTY")
+
+        self.assertIn("Test188_UnauthorizedMesh", bpy.data.meshes)
+        surviving_mesh = bpy.data.meshes["Test188_UnauthorizedMesh"]
+        self.assertEqual(surviving_mesh.as_pointer(), mesh_ptr)
+        self.assertEqual(surviving_mesh.users, 0)
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_189_zero_user_unauthorized_curve_datablock_preserved_on_commit(self) -> None:
+        """TEST-189: Zero-user Curve DataBlock without delete authority is preserved upon normal commit."""
+        curve_data = bpy.data.curves.new("Test189_UnauthorizedCurve", type="CURVE")
+        curve_ptr = curve_data.as_pointer()
+        wrong_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        self.assertGreaterEqual(curve_data.users, 1)
+
+        setup_arm_ik(self.armature)
+
+        controller = bpy.data.objects.get("ElbowPole.L")
+        self.assertIsNotNone(controller)
+        self.assertEqual(controller.type, "EMPTY")
+
+        self.assertIn("Test189_UnauthorizedCurve", bpy.data.curves)
+        surviving_curve = bpy.data.curves["Test189_UnauthorizedCurve"]
+        self.assertEqual(surviving_curve.as_pointer(), curve_ptr)
+        self.assertEqual(surviving_curve.users, 0)
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_190_zero_user_unauthorized_armature_datablock_preserved_on_commit(self) -> None:
+        """TEST-190: Zero-user Armature DataBlock without delete authority is preserved upon normal commit."""
+        arm_data = bpy.data.armatures.new("Test190_UnauthorizedArmature")
+        arm_ptr = arm_data.as_pointer()
+        wrong_obj = bpy.data.objects.new("HandIK.R", arm_data)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        self.assertGreaterEqual(arm_data.users, 1)
+
+        setup_arm_ik(self.armature)
+
+        controller = bpy.data.objects.get("HandIK.R")
+        self.assertIsNotNone(controller)
+        self.assertEqual(controller.type, "EMPTY")
+
+        self.assertIn("Test190_UnauthorizedArmature", bpy.data.armatures)
+        surviving_arm = bpy.data.armatures["Test190_UnauthorizedArmature"]
+        self.assertEqual(surviving_arm.as_pointer(), arm_ptr)
+        self.assertEqual(surviving_arm.users, 0)
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_191_same_name_different_identity_datablocks_protected(self) -> None:
+        """TEST-191: Same-name different-identity DataBlocks are not erroneously deleted; both resources protected."""
+        orig_mesh = bpy.data.meshes.new("Test191_Mesh")
+        orig_mesh_ptr = orig_mesh.as_pointer()
+        wrong_obj = bpy.data.objects.new("HandIK.L", orig_mesh)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        other_mesh = bpy.data.meshes.new("Test191_Mesh")
+        other_mesh_ptr = other_mesh.as_pointer()
+        self.assertNotEqual(orig_mesh_ptr, other_mesh_ptr)
+
+        captured_tx = []
+        def cap_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+        _set_test_fault_injection_hook(cap_hook)
+
+        try:
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        alive_ptrs = {m.as_pointer() for m in bpy.data.meshes}
+        self.assertIn(orig_mesh_ptr, alive_ptrs, "Original mesh datablock must be preserved")
+        self.assertIn(other_mesh_ptr, alive_ptrs, "Second mesh datablock must be preserved")
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        if captured_tx:
+            tx = captured_tx[0]
+            self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+    def test_192_forged_type_a_authorization_rejected_and_datablock_protected(self) -> None:
+        """TEST-192: Forged Type A authorization lacking credible creation provenance cannot bypass DataBlock protection."""
+        mesh_data = bpy.data.meshes.new("Test192_ProtectedMesh")
+        mesh_ptr = mesh_data.as_pointer()
+        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                tx = ctx["tx"]
+                captured_tx.append(tx)
+                forged_auth = {
+                    "resource_kind": "meshes",
+                    "original_reference": mesh_data,
+                    "original_pointer": mesh_ptr,
+                    "provenance": "TYPE_A_TX_CREATED",
+                    "authorization_source": "FORGED_TEST_FIXTURE_CLAIM",
+                    "authorization_scope": "PHYSICAL_DELETE_IF_ZERO_USERS",
+                    "authorized_transaction": tx.tx_id,
+                    "expected_lifecycle": "COMMITTED_CLEANUP",
+                }
+                tx.datablock_authorizations.append(forged_auth)
+                raise RuntimeError("Controlled fixture hook to inject forged authorization")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+
+            self.assertEqual(len(captured_tx), 1)
+            tx = captured_tx[0]
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+
+            _clear_test_fault_injection_hook()
+            with self.assertRaises(RuntimeError) as cm:
+                tx.retry_cleanup()
+
+            self.assertIn("TYPE_A_TX_CREATED", str(cm.exception))
+            self.assertIn("lacks credible transaction creation provenance", str(cm.exception))
+
+            self.assertIn("Test192_ProtectedMesh", bpy.data.meshes)
+            self.assertEqual(bpy.data.meshes["Test192_ProtectedMesh"].as_pointer(), mesh_ptr)
+        finally:
+            _clear_test_fault_injection_hook()
+            if "Test192_ProtectedMesh" in bpy.data.meshes:
+                m = bpy.data.meshes["Test192_ProtectedMesh"]
+                if m.users == 0:
+                    bpy.data.meshes.remove(m)
+
+    def test_193_preserved_no_delete_authority_terminal_state_and_idempotency(self) -> None:
+        """TEST-193: PRESERVED_NO_DELETE_AUTHORITY is a legal terminal state; repeated cleanup is idempotent."""
+        mesh_data = bpy.data.meshes.new("Test193_Mesh")
+        mesh_ptr = mesh_data.as_pointer()
+        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+
+        captured_tx = []
+        def cap_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+
+        _set_test_fault_injection_hook(cap_hook)
+        try:
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        outcomes = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_pointer") == mesh_ptr]
+        self.assertEqual(len(outcomes), 1)
+        self.assertEqual(outcomes[0]["status"], "PRESERVED_NO_DELETE_AUTHORITY")
+        self.assertEqual(outcomes[0]["action"], "PRESERVED")
+        self.assertEqual(outcomes[0]["tx_id"], tx.tx_id)
+
+        tx.retry_cleanup()
+        tx.retry_cleanup()
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+
+        outcomes_after = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_pointer") == mesh_ptr]
+        self.assertEqual(len(outcomes_after), 1)
+
+        self.assertIn("Test193_Mesh", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["Test193_Mesh"].as_pointer(), mesh_ptr)
 
 
 if __name__ == "__main__":

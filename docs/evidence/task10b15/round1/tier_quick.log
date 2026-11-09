@@ -1,0 +1,113 @@
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: QUICK | Fail-Fast: False
+================================================================================
+
+Resolved 19 test suite(s) to execute:
+  01. [architecture_integrity_gate] Architecture Documentation Integrity & Symbol Existence Gate (python, timeout=15.0s)
+  02. [spatial_layout_clearance] Spatial Corridor Clearance & Math Layout (blender_headless, timeout=15.0s)
+  03. [dynamics_environment_query] Dynamics Environment Query & 3D Surface Geometry (python, timeout=15.0s)
+  04. [contact_dynamics_math] Contact Dynamics Foundation & Momentum Impulse (python, timeout=15.0s)
+  05. [contact_force_solver] Multi-Contact Force Solver & Constraint Allocation (python, timeout=30.0s)
+  06. [forward_dynamics] Forward Dynamics Single-Step Integration Kernel (python, timeout=15.0s)
+  07. [closed_loop_dynamics] Multi-Frame Dynamics Closed-Loop Control & State Feedback (python, timeout=30.0s)
+  08. [runner_unit_tests] Test Suite Runner Unit Tests (python, timeout=30.0s)
+  09. [physics_joint_limits] Anatomical Joint ROM Limit Verification (blender_headless, timeout=45.0s)
+  10. [physics_rigid_link_com] Rigid Link Segments & Whole-Body CoM (blender_headless, timeout=45.0s)
+  11. [mesh_environment_query] Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity (blender_headless, timeout=45.0s)
+  12. [task7a2_p0_teleport_regression] Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect (blender_headless, timeout=30.0s)
+  13. [task7a2_negative_invariance] Task 7A-2: Terrain Walk Invariance & Negative Physics Verification (blender_headless, timeout=20.0s)
+  14. [environment_gate01_unit3] Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification (blender_headless, timeout=60.0s)
+  15. [environment_gate01_u3_s1] Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps (blender_headless, timeout=60.0s)
+  16. [environment_gate01_u3_s2] Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair (blender_headless, timeout=60.0s)
+  17. [environment_gate01_unit4] Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency (blender_headless, timeout=60.0s)
+  18. [environment_gate01_unit4_closure] Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure (blender_headless, timeout=60.0s)
+  19. [terrain_planning_contract] Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts (blender_headless, timeout=120.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[architecture_integrity_gate] Starting: Architecture Documentation Integrity & Symbol Existence Gate
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_architecture_integrity_gate.py
+  [PASS] Test completed successfully (1.18s)
+
+[spatial_layout_clearance] Starting: Spatial Corridor Clearance & Math Layout
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_task3_spatial.py
+  [PASS] Test completed successfully (1.67s)
+
+[dynamics_environment_query] Starting: Dynamics Environment Query & 3D Surface Geometry
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_dynamics_playground.py
+  [PASS] Test completed successfully (0.62s)
+
+[contact_dynamics_math] Starting: Contact Dynamics Foundation & Momentum Impulse
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_dynamics.py
+  [PASS] Test completed successfully (0.61s)
+
+[contact_force_solver] Starting: Multi-Contact Force Solver & Constraint Allocation
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_force_solver.py
+  [PASS] Test completed successfully (0.69s)
+
+[forward_dynamics] Starting: Forward Dynamics Single-Step Integration Kernel
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_forward_dynamics.py
+  [PASS] Test completed successfully (0.7s)
+
+[closed_loop_dynamics] Starting: Multi-Frame Dynamics Closed-Loop Control & State Feedback
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_closed_loop_dynamics.py
+  [PASS] Test completed successfully (1.2s)
+
+[runner_unit_tests] Starting: Test Suite Runner Unit Tests
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_runner_unit.py
+  [PASS] Test completed successfully (1.29s)
+
+[physics_joint_limits] Starting: Anatomical Joint ROM Limit Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fc_joint_limits.py
+  [PASS] Test completed successfully (1.67s)
+
+[physics_rigid_link_com] Starting: Rigid Link Segments & Whole-Body CoM
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fb_rigid_link.py
+  [PASS] Test completed successfully (1.74s)
+
+[mesh_environment_query] Starting: Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_mesh_environment_query.py
+  [PASS] Test completed successfully (4.66s)
+
+[task7a2_p0_teleport_regression] Starting: Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_p0_frame226_teleport_regression.py
+  [PASS] Test completed successfully (2.47s)
+
+[task7a2_negative_invariance] Starting: Task 7A-2: Terrain Walk Invariance & Negative Physics Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_walk_negative.py
+  [PASS] Test completed successfully (1.75s)
+
+[environment_gate01_unit3] Starting: Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit3.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (15.69s)
+
+[environment_gate01_u3_s1] Starting: Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s1.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (4.79s)
+
+[environment_gate01_u3_s2] Starting: Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s2.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (4.75s)
+
+[environment_gate01_unit4] Starting: Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4.py
+  [PASS] Test completed successfully (2.04s)
+
+[environment_gate01_unit4_closure] Starting: Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4_closure.py
+  [PASS] Test completed successfully (1.94s)
+
+[terrain_planning_contract] Starting: Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_planning_contract.py
+  [PASS] Test completed successfully (2.29s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 51.75s
+Planned: 19 | Executed: 19 | Passed: 19 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\task10b15\round1\tier_quick\test_report.json
+  - Markdown: C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\task10b15\round1\tier_quick\test_report.md
+================================================================================
