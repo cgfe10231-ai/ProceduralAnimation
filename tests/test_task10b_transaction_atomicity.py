@@ -84,6 +84,10 @@ from src.rig.arm_ik import (
     _authorized_create_constraint,
     _authorized_remove_constraint,
     _authorized_assign_constraint_targets,
+    _authorized_assign_object_parent,
+    _authorized_link_child_collection,
+    _authorized_unlink_child_collection,
+    _authorized_restore_relationship,
     ArmatureSessionIdentityRecord,
     _ACTIVE_TRANSACTION_STACK,
     _ARCHIVED_FAILED_D_TOMBSTONES,
@@ -3810,8 +3814,9 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         self.assertEqual(len(captured_tx), 1)
         tx = captured_tx[0]
-        self.assertEqual(len(tx.prepared_relationship_mutations), 1)
-        self.assertEqual(tx.prepared_relationship_mutations[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertEqual(len(tx.prepared_relationship_mutations), 2)
+        for mut_rec in tx.prepared_relationship_mutations:
+            self.assertEqual(mut_rec["operation_state"], _RelationshipOperationState.REVERTED)
 
         # Transaction-owned controller was unlinked and deleted
         self.assertIsNone(bpy.data.objects.get("HandIK_L_TX_Owned_116"))
@@ -7907,6 +7912,484 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(p_fore_l.constraints["ExtLimit216_L"].as_pointer(), ext_limit_l_ptr)
         self.assertIn("ExtTrack216_R", p_hand_r.constraints)
         self.assertEqual(p_hand_r.constraints["ExtTrack216_R"].as_pointer(), ext_track_r_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+
+    def test_217_hand_ik_parent_and_inverse_layer3_confirmed(self) -> None:
+        """TEST-217: HandIK Parent and Matrix Parent Inverse Layer 3 write and 7-state log fidelity."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        orig_parent = hand_l.parent
+        orig_inv = hand_l.matrix_parent_inverse.copy()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            new_inv = Matrix.Translation(Vector((0.0, 0.0, 0.5)))
+            op_rec = _authorized_assign_object_parent(
+                obj=hand_l,
+                parent=self.armature,
+                matrix_parent_inverse=new_inv,
+                active_tx=tx,
+            )
+            self.assertIsNotNone(op_rec)
+            self.assertEqual(op_rec["intended_mutation"], "OBJECT_PARENT_ASSIGN")
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.CONFIRMED)
+            self.assertEqual(hand_l.parent, self.armature)
+            for r in range(4):
+                for c in range(4):
+                    self.assertAlmostEqual(hand_l.matrix_parent_inverse[r][c], new_inv[r][c], places=5)
+
+    def test_218_parent_and_inverse_unchanged_transitions_to_no_effect(self) -> None:
+        """TEST-218: Parent/Inverse unchanged -> NO_EFFECT, zero writes."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        curr_parent = hand_l.parent
+        curr_inv = hand_l.matrix_parent_inverse.copy()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            op_rec = _authorized_assign_object_parent(
+                obj=hand_l,
+                parent=curr_parent,
+                matrix_parent_inverse=curr_inv,
+                active_tx=tx,
+            )
+            self.assertIsNotNone(op_rec)
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+    def test_219_invalid_parent_rejected_controller_untouched(self) -> None:
+        """TEST-219: Invalid parent / cross-armature rejected, controller untouched."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        curr_parent = hand_l.parent
+        curr_inv = hand_l.matrix_parent_inverse.copy()
+
+        # Create a second armature
+        bpy.ops.object.armature_add()
+        other_arm = bpy.context.active_object
+        other_arm.name = "OtherArmature219"
+
+        with _arm_rig_transaction(self.armature) as tx:
+            with self.assertRaises(RuntimeError) as cm:
+                _authorized_assign_object_parent(
+                    obj=hand_l,
+                    parent=other_arm,
+                    matrix_parent_inverse=Matrix.Identity(4),
+                    active_tx=tx,
+                )
+            self.assertIn("Cross-armature parent assignment rejected", str(cm.exception))
+
+        self.assertEqual(hand_l.parent, curr_parent)
+        for r in range(4):
+            for c in range(4):
+                self.assertAlmostEqual(hand_l.matrix_parent_inverse[r][c], curr_inv[r][c], places=5)
+        bpy.data.objects.remove(other_arm, do_unlink=True)
+
+    def test_220_fault_before_parent_write_transitions_to_no_effect(self) -> None:
+        """TEST-220: Fault before C-API write (object_parent_before_write) -> NO_EFFECT."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_before_write":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-220 before parent write")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=None,
+                        matrix_parent_inverse=Matrix.Identity(4),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-220 before parent write", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_221_fault_after_parent_before_inverse_rollback_restores_initial(self) -> None:
+        """TEST-221: Fault after parent before inverse -> APPLIED_VERIFIED, clean rollback."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        orig_parent = hand_l.parent
+        orig_inv = hand_l.matrix_parent_inverse.copy()
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_after_parent_before_inverse":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-221 after parent before inverse")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=None,
+                        matrix_parent_inverse=Matrix.Translation(Vector((1.0, 2.0, 3.0))),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-221", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_222_fault_after_inverse_before_confirm_reverts_with_matrix_diff(self) -> None:
+        """TEST-222: Fault after inverse before confirm -> APPLIED_VERIFIED, rollback to REVERTED with matrix diff <= 1e-5."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_before_confirm":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-222 before confirm")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=None,
+                        matrix_parent_inverse=Matrix.Translation(Vector((0.0, 0.0, 1.0))),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-222", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_223_original_parent_destroyed_enters_recovery_uncertain(self) -> None:
+        """TEST-223: Original parent destroyed -> RECOVERY_UNCERTAIN and session isolation."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        temp_parent = bpy.data.objects.new("TempParent223", None)
+        bpy.context.scene.collection.objects.link(temp_parent)
+        hand_l.parent = temp_parent
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_after_parent_before_inverse":
+                bpy.data.objects.remove(temp_parent, do_unlink=True)
+                raise RuntimeError("Fault injected in TEST-223 after parent destroyed")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=self.armature,
+                        matrix_parent_inverse=Matrix.Identity(4),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-223", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIn(session_rec.isolation_state, (_ArmatureIsolationState.ISOLATED_FAILED_B, _ArmatureIsolationState.ISOLATED_FAILED_C))
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+    def test_224_external_unowned_object_parent_assignment_rejected(self) -> None:
+        """TEST-224: External unowned object parent assignment rejected."""
+        setup_arm_ik(self.armature)
+        ext_obj = bpy.data.objects.new("ExternalObj224", None)
+        bpy.context.scene.collection.objects.link(ext_obj)
+
+        with _arm_rig_transaction(self.armature) as tx:
+            with self.assertRaises(RuntimeError) as cm:
+                _authorized_assign_object_parent(
+                    obj=ext_obj,
+                    parent=self.armature,
+                    matrix_parent_inverse=Matrix.Identity(4),
+                    active_tx=tx,
+                )
+            self.assertIn("is not owned or managed by the active transaction (TEST-224)", str(cm.exception))
+
+        self.assertIsNone(ext_obj.parent)
+        bpy.data.objects.remove(ext_obj, do_unlink=True)
+
+    def test_225_character_collection_scene_link_has_tx_added_and_confirms(self) -> None:
+        """TEST-225: Character collection scene link has TX_ADDED 7-state log and confirms."""
+        char_col = bpy.data.collections.get("Character")
+        if char_col is not None:
+            if char_col.name in bpy.context.scene.collection.children:
+                bpy.context.scene.collection.children.unlink(char_col)
+            bpy.data.collections.remove(char_col)
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        link_ops = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "COLLECTION_CHILD_LINK"
+        ]
+        self.assertGreaterEqual(len(link_ops), 1)
+        char_link = link_ops[0]
+        self.assertEqual(char_link["category"], "TX_ADDED")
+        self.assertEqual(char_link["operation_state"], _RelationshipOperationState.CONFIRMED)
+        self.assertIn("Character", bpy.context.scene.collection.children)
+
+    def test_226_pre_existing_collection_child_link_transitions_to_no_effect(self) -> None:
+        """TEST-226: Pre-existing collection child link -> NO_EFFECT."""
+        col_child = bpy.data.collections.new("Child226")
+        bpy.context.scene.collection.children.link(col_child)
+
+        with _arm_rig_transaction(self.armature) as tx:
+            op_rec = _authorized_link_child_collection(
+                parent_collection=bpy.context.scene.collection,
+                child_collection=col_child,
+                active_tx=tx,
+            )
+            self.assertIsNotNone(op_rec)
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        bpy.context.scene.collection.children.unlink(col_child)
+        bpy.data.collections.remove(col_child)
+
+    def test_227_collection_child_link_fault_before_c_api_no_effect(self) -> None:
+        """TEST-227: Collection child link fault before C-API -> NO_EFFECT."""
+        col_child = bpy.data.collections.new("Child227")
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "collection_child_link_during_apply_before_c_api":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-227 before C-API")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=col_child,
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-227", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+        self.assertNotIn("Child227", bpy.context.scene.collection.children)
+        bpy.data.collections.remove(col_child)
+
+    def test_228_collection_child_link_fault_before_confirm_reverts(self) -> None:
+        """TEST-228: Collection child link fault before confirm -> APPLIED_VERIFIED, rollback to REVERTED."""
+        col_child = bpy.data.collections.new("Child228")
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "collection_child_link_before_confirm":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-228 before confirm")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=col_child,
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-228", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertNotIn("Child228", bpy.context.scene.collection.children)
+        bpy.data.collections.remove(col_child)
+
+    def test_229_authorized_unlinked_child_collection_restored_on_rollback(self) -> None:
+        """TEST-229: Authorized unlinked pre-existing child collection restored on rollback."""
+        col_child = bpy.data.collections.new("Child229")
+        bpy.context.scene.collection.children.link(col_child)
+        captured_ops = []
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    op_rec = _authorized_unlink_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=col_child,
+                        active_tx=tx,
+                    )
+                    captured_ops.append(op_rec)
+                    self.assertNotIn("Child229", bpy.context.scene.collection.children)
+                    raise RuntimeError("Fault injected in TEST-229 to test relink on rollback")
+            self.assertIn("Fault injected in TEST-229", str(cm.exception))
+        finally:
+            pass
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertIn("Child229", bpy.context.scene.collection.children)
+        bpy.context.scene.collection.children.unlink(col_child)
+        bpy.data.collections.remove(col_child)
+
+    def test_230_external_second_parent_preserved_on_rollback(self) -> None:
+        """TEST-230: External script added second collection parent preserved on rollback."""
+        created_col = None
+        second_parent = bpy.data.collections.new("SecondParent230")
+        bpy.context.scene.collection.children.link(second_parent)
+
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    created_col = bpy.data.collections.new("CreatedCol230")
+                    tx.register_created_collection(created_col, initial_parent=bpy.context.scene.collection)
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=created_col,
+                        active_tx=tx,
+                    )
+                    second_parent.children.link(created_col)
+                    raise RuntimeError("Fault in TEST-230 after external parent link")
+        finally:
+            pass
+
+        self.assertIn("CreatedCol230", bpy.data.collections)
+        self.assertIn("CreatedCol230", second_parent.children)
+
+        second_parent.children.unlink(created_col)
+        bpy.data.collections.remove(created_col)
+        bpy.context.scene.collection.children.unlink(second_parent)
+        bpy.data.collections.remove(second_parent)
+
+    def test_231_renamed_collection_with_same_name_replacement_preserved(self) -> None:
+        """TEST-231: Renamed collection with same-name external replacement preserved."""
+        tx_col = None
+        ext_same_name_col = None
+
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    tx_col = bpy.data.collections.new("Col231")
+                    tx_ptr = tx_col.as_pointer()
+                    tx.register_created_collection(tx_col, initial_parent=bpy.context.scene.collection)
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=tx_col,
+                        active_tx=tx,
+                    )
+                    tx_col.name = "Col231_Renamed"
+                    ext_same_name_col = bpy.data.collections.new("Col231")
+                    bpy.context.scene.collection.children.link(ext_same_name_col)
+                    raise RuntimeError("Fault in TEST-231 after same-name replacement")
+        finally:
+            pass
+
+        self.assertNotIn("Col231_Renamed", bpy.data.collections)
+        self.assertIn("Col231", bpy.data.collections)
+        self.assertEqual(bpy.data.collections["Col231"].as_pointer(), ext_same_name_col.as_pointer())
+
+        bpy.context.scene.collection.children.unlink(ext_same_name_col)
+        bpy.data.collections.remove(ext_same_name_col)
+
+    def test_232_created_collection_with_external_members_refuses_deletion(self) -> None:
+        """TEST-232: Created collection with external members/children/parents refuses deletion."""
+        ext_member = bpy.data.objects.new("ExternalMember232", None)
+        tx_col = None
+
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    tx_col = bpy.data.collections.new("Col232")
+                    tx.register_created_collection(tx_col, initial_parent=bpy.context.scene.collection)
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=tx_col,
+                        active_tx=tx,
+                    )
+                    tx_col.objects.link(ext_member)
+                    raise RuntimeError("Fault in TEST-232 with external member")
+        finally:
+            pass
+
+        self.assertIn("Col232", bpy.data.collections)
+        self.assertIn("ExternalMember232", tx_col.objects)
+
+        tx_col.objects.unlink(ext_member)
+        bpy.data.objects.remove(ext_member)
+        bpy.data.collections.remove(tx_col)
+
+    def test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets(self) -> None:
+        """TEST-233: Joint bilateral rollback of parent, collection child, constraint targets with 100% snapshot fidelity."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        hand_l = bpy.data.objects["HandIK.L"]
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ik_con = p_fore.constraints["ArmIK.L"]
+        alt_target = bpy.data.objects["ElbowPole.L"]
+
+        test_col = bpy.data.collections.new("TestCol233")
+        char_col = bpy.data.collections["Character"]
+
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=None,
+                        matrix_parent_inverse=Matrix.Translation(Vector((1.0, 1.0, 1.0))),
+                        active_tx=tx,
+                    )
+                    _authorized_assign_constraint_targets(
+                        pbone=p_fore,
+                        con=ik_con,
+                        target=alt_target,
+                        active_tx=tx,
+                    )
+                    _authorized_link_child_collection(
+                        parent_collection=char_col,
+                        child_collection=test_col,
+                        active_tx=tx,
+                    )
+                    raise RuntimeError("Joint fault across parent, constraint, and collection in TEST-233")
+        finally:
+            pass
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertNotIn("TestCol233", char_col.children)
+        bpy.data.collections.remove(test_col)
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
 

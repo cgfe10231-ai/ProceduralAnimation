@@ -179,11 +179,11 @@ def _ensure_character_collection() -> bpy.types.Collection:
     # Step 3: Fault injection point: character_collection_after_registration_before_link
     _trigger_fault_injection("character_collection_after_registration_before_link", {"col": col, "col_ptr": new_col_ptr, "scene": scene})
 
-    # Step 4: Authorized link to scene
-    scene.collection.children.link(col)
+    # Step 4: Authorized link to scene via Layer 3 (F14-02 / Task 10-B-15 4/6)
+    _authorized_link_child_collection(scene.collection, col, active_tx=active_tx)
 
     # Step 5: Verify parent-child relationship genuinely exists
-    if col.name not in scene.collection.children or scene.collection.children[col.name] != col:
+    if not _is_child_collection_linked_by_identity(scene.collection, col, new_col_ptr):
         raise RuntimeError("Failed to verify Character collection scene linkage")
 
     # Step 6: Fault injection point: character_collection_after_link
@@ -1518,11 +1518,23 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
             if char_col is not None
             and any(child.as_pointer() == char_col.as_pointer() for child in parent.children)
         ],
+        "parent_ptrs": [
+            parent.as_pointer()
+            for parent in bpy.data.collections
+            if char_col is not None
+            and any(child.as_pointer() == char_col.as_pointer() for child in parent.children)
+            and hasattr(parent, "as_pointer")
+        ],
         "child_refs": (
             list(char_col.children)
             if char_col is not None
             else []
         ),
+        "child_ptrs": [
+            child.as_pointer()
+            for child in (list(char_col.children) if char_col is not None else [])
+            if hasattr(child, "as_pointer")
+        ],
         "object_refs": (
             list(char_col.objects)
             if char_col is not None
@@ -1552,6 +1564,7 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
                 "obj_name": c_obj.name,
                 "type": c_obj.type,
                 "parent": c_obj.parent,
+                "parent_ptr": c_obj.parent.as_pointer() if c_obj.parent is not None and hasattr(c_obj.parent, "as_pointer") else None,
                 "matrix_parent_inverse": c_obj.matrix_parent_inverse.copy(),
                 "location": c_obj.location.copy(),
                 "rotation_mode": c_obj.rotation_mode,
@@ -2034,6 +2047,571 @@ def _authorized_unlink_object_from_collection(
         _RelationshipOperationState.CONFIRMED,
     )
     return op_record
+
+
+def _matrix_equals(m1: Any, m2: Any, tol: float = 1e-5) -> bool:
+    """Check element-wise matrix equality within specified tolerance."""
+    if m1 is None or m2 is None:
+        return m1 is m2
+    try:
+        for r in range(4):
+            for c in range(4):
+                if abs(float(m1[r][c]) - float(m2[r][c])) > tol:
+                    return False
+        return True
+    except (IndexError, TypeError, ValueError):
+        return False
+
+
+def _is_child_collection_linked_by_identity(
+    parent: bpy.types.Collection,
+    child: bpy.types.Collection,
+    child_ptr: Optional[int] = None,
+) -> bool:
+    """Verify whether child is linked under parent by identity pointer and reference."""
+    try:
+        if child_ptr is None and hasattr(child, "as_pointer"):
+            child_ptr = child.as_pointer()
+        for c in parent.children:
+            try:
+                if c == child or (child_ptr is not None and c.as_pointer() == child_ptr):
+                    return True
+            except ReferenceError:
+                continue
+    except (ReferenceError, Exception):
+        return False
+    return False
+
+
+def _is_collection_descendant_of(
+    candidate_child: bpy.types.Collection,
+    candidate_ancestor: bpy.types.Collection,
+    visited: Optional[Set[int]] = None,
+) -> bool:
+    """Check if candidate_ancestor is equal to or an ancestor of candidate_child."""
+    if visited is None:
+        visited = set()
+    anc_ptr = candidate_ancestor.as_pointer() if hasattr(candidate_ancestor, "as_pointer") else None
+    ch_ptr = candidate_child.as_pointer() if hasattr(candidate_child, "as_pointer") else None
+    if anc_ptr is not None and ch_ptr is not None and anc_ptr == ch_ptr:
+        return True
+    if anc_ptr in visited:
+        return False
+    if anc_ptr is not None:
+        visited.add(anc_ptr)
+    for sub in candidate_ancestor.children:
+        if _is_collection_descendant_of(candidate_child, sub, visited):
+            return True
+    return False
+
+
+def _authorized_assign_object_parent(
+    obj: bpy.types.Object,
+    parent: Optional[bpy.types.Object],
+    matrix_parent_inverse: Optional[Matrix] = None,
+    active_tx: Optional[Any] = None,
+) -> Optional[Dict[str, Any]]:
+    """Layer 3 authorized Object Parent and Matrix Parent Inverse assignment under 7-state protocol."""
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    # Pre-write verification (Section 3.3)
+    # 1. Active transaction exists and is ACTIVE
+    if active_tx is None or active_tx.state != _ArmRigTransactionState.ACTIVE:
+        raise RuntimeError("Object parent assignment requires an active transaction in ACTIVE state")
+
+    # 10. Rollback-only check
+    if getattr(active_tx, "rollback_only", False):
+        raise RuntimeError(f"Cannot assign object parent: transaction is rollback_only ({active_tx.rollback_only_reason})")
+
+    # 2 & 3. Controller live reference valid and pointer matches
+    try:
+        obj_ptr = obj.as_pointer()
+    except (ReferenceError, Exception) as re:
+        raise RuntimeError(f"Target controller object reference is invalid: {re}") from re
+
+    live_obj = _find_live_object_by_identity(obj, obj_ptr)
+    if live_obj is None or live_obj != obj:
+        raise RuntimeError(f"Target controller identity verification failed for '{obj.name}'")
+
+    # 4. Controller is an object the active transaction has authority to modify
+    is_tx_created = False
+    for reg in getattr(active_tx, "created_controller_objects", []):
+        if reg.get("obj_ptr") == obj_ptr or reg.get("obj_ref") == obj:
+            is_tx_created = True
+            break
+
+    is_snap_controller = False
+    if active_tx.snapshot and "controllers" in active_tx.snapshot:
+        for c_name, c_snap in active_tx.snapshot["controllers"].items():
+            if c_snap.get("obj_ptr") == obj_ptr or c_snap.get("obj_ref") == obj:
+                is_snap_controller = True
+                break
+
+    is_named_controller = obj.name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R")
+    if not (is_tx_created or is_snap_controller or (is_named_controller and active_tx.arm is not None)):
+        raise RuntimeError(f"Object '{obj.name}' is not owned or managed by the active transaction (TEST-224)")
+
+    # 9. Armature session identity matches
+    if active_tx.arm is not None:
+        try:
+            sess_rec = ensure_armature_session_identity(active_tx.arm)
+            if active_tx.session_id is not None and active_tx.session_id != sess_rec.registry_session_id:
+                raise RuntimeError("Armature session identity mismatch during object parent assignment")
+        except Exception as e:
+            if not isinstance(e, RuntimeError):
+                raise RuntimeError(f"Armature session identity check failed: {e}") from e
+            raise
+
+    # 5 & 6. New parent verification
+    dest_parent_ptr: Optional[int] = None
+    if parent is not None:
+        if not isinstance(parent, bpy.types.Object):
+            raise TypeError(f"Parent must be a Blender Object, got {type(parent)}")
+        try:
+            dest_parent_ptr = parent.as_pointer()
+        except ReferenceError as re:
+            raise RuntimeError(f"Parent object reference is dead: {re}") from re
+        live_parent = _find_live_object_by_identity(parent, dest_parent_ptr)
+        if live_parent is None or live_parent != parent:
+            raise RuntimeError(f"Parent object identity verification failed for '{parent.name}'")
+
+        # 6. Cross-armature check (Section 3.3, item 6)
+        if active_tx.arm is not None and parent != active_tx.arm:
+            if parent.type == "ARMATURE" or (getattr(parent, "parent", None) is not None and getattr(parent, "parent") != active_tx.arm and getattr(parent, "parent").type == "ARMATURE"):
+                raise RuntimeError(f"Cross-armature parent assignment rejected: parent '{parent.name}' != active armature '{active_tx.arm.name}'")
+
+        # 7. No self-parenting and no cycle
+        if parent == obj:
+            raise ValueError("Self-parenting not permitted")
+        curr = getattr(parent, "parent", None)
+        while curr is not None:
+            if curr == obj:
+                raise ValueError("Cyclic parent hierarchy detected")
+            curr = getattr(curr, "parent", None)
+
+    # Matrix parent inverse resolution
+    target_inv = matrix_parent_inverse.copy() if matrix_parent_inverse is not None else Matrix.Identity(4)
+
+    # Check finite
+    for r in range(4):
+        for c in range(4):
+            if not math.isfinite(target_inv[r][c]):
+                raise ValueError(f"Non-finite matrix_parent_inverse element at ({r}, {c})")
+
+    # 8. Conformal matrix check
+    if parent is not None:
+        eff_matrix = parent.matrix_world @ target_inv
+        validate_effective_parent_transform(eff_matrix, obj.name)
+
+    # Capture original state
+    orig_parent = getattr(obj, "parent", None)
+    orig_parent_ptr: Optional[int] = None
+    if orig_parent is not None:
+        try:
+            orig_parent_ptr = orig_parent.as_pointer()
+        except ReferenceError:
+            orig_parent_ptr = None
+
+    orig_inv = getattr(obj, "matrix_parent_inverse", Matrix.Identity(4)).copy()
+    category = "PRE_EXISTING_ORIGINAL" if orig_parent is not None else "TX_ADDED"
+
+    # 1. PREPARE stage
+    op_record = active_tx.prepare_relationship_mutation(
+        source_reference=parent,
+        target_reference=obj,
+        original_relationship_state={
+            "controller_ref": obj,
+            "controller_ptr": obj_ptr,
+            "controller_name": obj.name,
+            "orig_parent_ref": orig_parent,
+            "orig_parent_ptr": orig_parent_ptr,
+            "orig_parent_name": orig_parent.name if orig_parent is not None else None,
+            "orig_matrix_parent_inverse": orig_inv,
+            "dest_parent_ref": parent,
+            "dest_parent_ptr": dest_parent_ptr,
+            "dest_parent_name": parent.name if parent is not None else None,
+            "dest_matrix_parent_inverse": target_inv,
+            "category": category,
+        },
+        intended_mutation="OBJECT_PARENT_ASSIGN",
+    )
+    op_record["controller_ref"] = obj
+    op_record["controller_ptr"] = obj_ptr
+    op_record["controller_name"] = obj.name
+    op_record["orig_parent_ref"] = orig_parent
+    op_record["orig_parent_ptr"] = orig_parent_ptr
+    op_record["orig_parent_name"] = orig_parent.name if orig_parent is not None else None
+    op_record["orig_matrix_parent_inverse"] = orig_inv
+    op_record["dest_parent_ref"] = parent
+    op_record["dest_parent_ptr"] = dest_parent_ptr
+    op_record["dest_parent_name"] = parent.name if parent is not None else None
+    op_record["dest_matrix_parent_inverse"] = target_inv
+    op_record["category"] = category
+
+    _trigger_fault_injection(
+        "object_parent_after_prepare",
+        {"op": op_record, "obj": obj, "parent": parent, "inv": target_inv, "tx": active_tx},
+    )
+
+    # Check for NO_EFFECT
+    parent_is_same = False
+    if orig_parent is None and parent is None:
+        parent_is_same = True
+    elif orig_parent is not None and parent is not None:
+        try:
+            if orig_parent == parent and orig_parent_ptr == dest_parent_ptr:
+                parent_is_same = True
+        except ReferenceError:
+            parent_is_same = False
+
+    inv_is_same = _matrix_equals(orig_inv, target_inv, tol=1e-5)
+
+    if parent_is_same and inv_is_same:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.NO_EFFECT,
+        )
+        return op_record
+
+    # 2. APPLY stage
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLYING,
+    )
+
+    try:
+        _trigger_fault_injection(
+            "object_parent_before_write",
+            {"op": op_record, "obj": obj, "parent": parent, "inv": target_inv, "tx": active_tx},
+        )
+
+        obj.parent = parent
+
+        _trigger_fault_injection(
+            "object_parent_after_parent_before_inverse",
+            {"op": op_record, "obj": obj, "parent": parent, "inv": target_inv, "tx": active_tx},
+        )
+
+        obj.matrix_parent_inverse = target_inv.copy()
+
+        _trigger_fault_injection(
+            "object_parent_after_write",
+            {"op": op_record, "obj": obj, "parent": parent, "inv": target_inv, "tx": active_tx},
+        )
+    except BaseException:
+        curr_p = getattr(obj, "parent", None)
+        curr_inv = getattr(obj, "matrix_parent_inverse", Matrix.Identity(4))
+        p_changed = False
+        if orig_parent is None and curr_p is not None:
+            p_changed = True
+        elif orig_parent is not None and (curr_p is None or curr_p != orig_parent):
+            p_changed = True
+        inv_changed = not _matrix_equals(orig_inv, curr_inv, tol=1e-5)
+
+        if p_changed or inv_changed:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+        else:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.NO_EFFECT,
+            )
+        raise
+
+    # Verify write took effect in RNA
+    v_parent = getattr(obj, "parent", None)
+    v_inv = getattr(obj, "matrix_parent_inverse", Matrix.Identity(4))
+    p_ok = (v_parent == parent)
+    inv_ok = _matrix_equals(v_inv, target_inv, tol=1e-5)
+
+    if not (p_ok and inv_ok):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Object parent/inverse verification failed for '{obj.name}' (p_ok={p_ok}, inv_ok={inv_ok})")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLIED_VERIFIED,
+    )
+
+    # 3. CONFIRM stage
+    _trigger_fault_injection(
+        "object_parent_before_confirm",
+        {"op": op_record, "obj": obj, "parent": parent, "inv": target_inv, "tx": active_tx},
+    )
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.CONFIRMED,
+    )
+    return op_record
+
+
+def _authorized_link_child_collection(
+    parent_collection: bpy.types.Collection,
+    child_collection: bpy.types.Collection,
+    active_tx: Optional[Any] = None,
+    category: str = "TX_ADDED",
+) -> Optional[Dict[str, Any]]:
+    """Layer 3 authorized Collection child linking executing 3-step PREPARE -> APPLY -> CONFIRM protocol."""
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    if active_tx is None or active_tx.state != _ArmRigTransactionState.ACTIVE:
+        raise RuntimeError("Collection child link requires an active transaction in ACTIVE state")
+
+    if getattr(active_tx, "rollback_only", False):
+        raise RuntimeError(f"Cannot link collection child: transaction is rollback_only ({active_tx.rollback_only_reason})")
+
+    p_ptr = parent_collection.as_pointer() if hasattr(parent_collection, "as_pointer") else None
+    c_ptr = child_collection.as_pointer() if hasattr(child_collection, "as_pointer") else None
+
+    live_parent = _find_live_collection_by_identity(parent_collection, p_ptr)
+    live_child = _find_live_collection_by_identity(child_collection, c_ptr)
+    if live_parent is None or live_child is None:
+        raise RuntimeError("Parent or child collection identity invalid during child link")
+
+    if _is_collection_descendant_of(live_parent, live_child):
+        raise ValueError("Cannot link collection: creates circular dependency in collection hierarchy")
+
+    already_linked = _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr)
+    child_name = getattr(child_collection, "name", "<unknown>")
+
+    # 1. PREPARE
+    op_record = active_tx.prepare_relationship_mutation(
+        source_reference=parent_collection,
+        target_reference=child_collection,
+        original_relationship_state={
+            "linked": already_linked,
+            "category": category,
+            "parent_col_ref": parent_collection,
+            "parent_col_ptr": p_ptr,
+            "parent_col_name": parent_collection.name,
+            "child_col_ref": child_collection,
+            "child_col_ptr": c_ptr,
+            "child_col_name": child_name,
+        },
+        intended_mutation="COLLECTION_CHILD_LINK",
+    )
+    op_record["parent_col_ref"] = parent_collection
+    op_record["parent_col_ptr"] = p_ptr
+    op_record["parent_col_name"] = parent_collection.name
+    op_record["child_col_ref"] = child_collection
+    op_record["child_col_ptr"] = c_ptr
+    op_record["child_col_name"] = child_name
+    op_record["category"] = category
+
+    _trigger_fault_injection(
+        "collection_child_link_after_prepare",
+        {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+    )
+
+    if already_linked:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.NO_EFFECT,
+        )
+        return op_record
+
+    # 2. APPLY
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLYING,
+    )
+
+    try:
+        _trigger_fault_injection(
+            "collection_child_link_during_apply_before_c_api",
+            {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+        )
+
+        parent_collection.children.link(child_collection)
+
+        _trigger_fault_injection(
+            "collection_child_link_during_apply_after_c_api",
+            {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+        )
+    except BaseException:
+        if _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr):
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+        else:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.NO_EFFECT,
+            )
+        raise
+
+    if not _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Collection child link did not take effect in RNA for '{child_name}'")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLIED_VERIFIED,
+    )
+
+    # 3. CONFIRM
+    _trigger_fault_injection(
+        "collection_child_link_before_confirm",
+        {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+    )
+
+    if not _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Collection child link verification failed at CONFIRM stage for '{child_name}'")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.CONFIRMED,
+    )
+    return op_record
+
+
+def _authorized_unlink_child_collection(
+    parent_collection: bpy.types.Collection,
+    child_collection: bpy.types.Collection,
+    active_tx: Optional[Any] = None,
+    category: str = "TX_UNLINKED_ORIGINAL",
+) -> Optional[Dict[str, Any]]:
+    """Layer 3 authorized Collection child unlinking executing 3-step PREPARE -> APPLY -> CONFIRM protocol."""
+    global _ACTIVE_TRANSACTION_STACK
+    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
+        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
+
+    if active_tx is None or active_tx.state != _ArmRigTransactionState.ACTIVE:
+        raise RuntimeError("Collection child unlink requires an active transaction in ACTIVE state")
+
+    p_ptr = parent_collection.as_pointer() if hasattr(parent_collection, "as_pointer") else None
+    c_ptr = child_collection.as_pointer() if hasattr(child_collection, "as_pointer") else None
+
+    live_parent = _find_live_collection_by_identity(parent_collection, p_ptr)
+    live_child = _find_live_collection_by_identity(child_collection, c_ptr)
+    if live_parent is None or live_child is None:
+        raise RuntimeError("Parent or child collection identity invalid during child unlink")
+
+    already_linked = _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr)
+    child_name = getattr(child_collection, "name", "<unknown>")
+
+    # 1. PREPARE
+    op_record = active_tx.prepare_relationship_mutation(
+        source_reference=parent_collection,
+        target_reference=child_collection,
+        original_relationship_state={
+            "linked": already_linked,
+            "category": category,
+            "parent_col_ref": parent_collection,
+            "parent_col_ptr": p_ptr,
+            "parent_col_name": parent_collection.name,
+            "child_col_ref": child_collection,
+            "child_col_ptr": c_ptr,
+            "child_col_name": child_name,
+        },
+        intended_mutation="COLLECTION_CHILD_UNLINK",
+    )
+    op_record["parent_col_ref"] = parent_collection
+    op_record["parent_col_ptr"] = p_ptr
+    op_record["parent_col_name"] = parent_collection.name
+    op_record["child_col_ref"] = child_collection
+    op_record["child_col_ptr"] = c_ptr
+    op_record["child_col_name"] = child_name
+    op_record["category"] = category
+
+    _trigger_fault_injection(
+        "collection_child_unlink_after_prepare",
+        {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+    )
+
+    if not already_linked:
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.NO_EFFECT,
+        )
+        return op_record
+
+    # 2. APPLY
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLYING,
+    )
+
+    try:
+        _trigger_fault_injection(
+            "collection_child_unlink_during_apply_before_c_api",
+            {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+        )
+
+        parent_collection.children.unlink(child_collection)
+
+        _trigger_fault_injection(
+            "collection_child_unlink_during_apply_after_c_api",
+            {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+        )
+    except BaseException:
+        if not _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr):
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+        else:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.NO_EFFECT,
+            )
+        raise
+
+    if _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr):
+        active_tx.update_relationship_mutation_state(
+            op_record,
+            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        raise RuntimeError(f"Collection child unlink did not take effect in RNA for '{child_name}'")
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.APPLIED_VERIFIED,
+    )
+
+    # 3. CONFIRM
+    _trigger_fault_injection(
+        "collection_child_unlink_before_confirm",
+        {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
+    )
+
+    active_tx.update_relationship_mutation_state(
+        op_record,
+        _RelationshipOperationState.CONFIRMED,
+    )
+    return op_record
+
+
+def _authorized_restore_relationship(
+    active_tx: Optional[Any],
+    snapshot: Optional[Dict[str, Any]],
+    restoration_errors: List[str],
+    mutation_type: Optional[str] = None,
+) -> None:
+    """Authoritatively revert and restore relationships via Layer 3 records."""
+    if active_tx is None:
+        return
+    for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
+        if mutation_type is None or op_record.get("intended_mutation") == mutation_type:
+            _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
 
 
 _TARGET_UNSET = object()
@@ -2685,6 +3263,226 @@ def _authorized_revert_relationship_record(
         )
         return
 
+    elif mutation == "OBJECT_PARENT_ASSIGN":
+        obj = op_record.get("controller_ref", orig_rel.get("controller_ref"))
+        obj_ptr = op_record.get("controller_ptr", orig_rel.get("controller_ptr"))
+        orig_parent = op_record.get("orig_parent_ref", orig_rel.get("orig_parent_ref"))
+        orig_parent_ptr = op_record.get("orig_parent_ptr", orig_rel.get("orig_parent_ptr"))
+        orig_parent_name = op_record.get("orig_parent_name", orig_rel.get("orig_parent_name"))
+        orig_inv = op_record.get("orig_matrix_parent_inverse", orig_rel.get("orig_matrix_parent_inverse"))
+        if orig_inv is None:
+            orig_inv = Matrix.Identity(4)
+
+        live_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
+        if live_obj is None:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(f"Controller identity lost during object parent rollback for '{op_id}'")
+            return
+
+        if state == _RelationshipOperationState.APPLYING:
+            curr_p = getattr(live_obj, "parent", None)
+            curr_p_ptr = curr_p.as_pointer() if (curr_p is not None and hasattr(curr_p, "as_pointer")) else None
+            curr_inv = getattr(live_obj, "matrix_parent_inverse", Matrix.Identity(4)).copy()
+
+            p_changed = False
+            if orig_parent is None and curr_p is not None:
+                p_changed = True
+            elif orig_parent is not None and (curr_p is None or curr_p != orig_parent or curr_p_ptr != orig_parent_ptr):
+                p_changed = True
+
+            inv_changed = not _matrix_equals(orig_inv, curr_inv, tol=1e-5)
+            if not p_changed and not inv_changed:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.NO_EFFECT,
+                )
+                return
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+            state = _RelationshipOperationState.APPLIED_VERIFIED
+
+        if state not in (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED):
+            restoration_errors.append(
+                f"Relationship operation '{op_id}' in unexpected state '{state}' during object parent rollback"
+            )
+            return
+
+        live_parent = None
+        if orig_parent is not None:
+            try:
+                if orig_parent_ptr is not None and orig_parent.as_pointer() != orig_parent_ptr:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                    )
+                    restoration_errors.append("Original parent pointer changed during rollback")
+                    return
+                live_parent = _find_live_object_by_identity(orig_parent, orig_parent_ptr)
+                if live_parent is None:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                    )
+                    restoration_errors.append("Original parent object destroyed during rollback")
+                    return
+                if orig_parent_name and orig_parent_name in bpy.data.objects:
+                    if bpy.data.objects[orig_parent_name] != live_parent:
+                        active_tx.update_relationship_mutation_state(
+                            op_record,
+                            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                        )
+                        restoration_errors.append(f"Original parent name '{orig_parent_name}' occupied by another object")
+                        return
+            except ReferenceError:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                restoration_errors.append("Original parent destroyed during rollback")
+                return
+
+        try:
+            live_obj.parent = live_parent
+            live_obj.matrix_parent_inverse = orig_inv.copy()
+        except BaseException as be:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append(f"Exception during object parent reversion: {be}")
+            return
+
+        rev_p = getattr(live_obj, "parent", None)
+        rev_inv = getattr(live_obj, "matrix_parent_inverse", Matrix.Identity(4))
+        p_ok = (rev_p == live_parent)
+        inv_ok = _matrix_equals(rev_inv, orig_inv, tol=1e-5)
+        if p_ok and inv_ok:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.REVERTED,
+            )
+        else:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append("Object parent restoration RNA verification failed")
+        return
+
+    elif mutation in ("COLLECTION_CHILD_LINK", "COLLECTION_CHILD_UNLINK"):
+        parent_col = op_record.get("parent_col_ref", orig_rel.get("parent_col_ref"))
+        parent_ptr = op_record.get("parent_col_ptr", orig_rel.get("parent_col_ptr"))
+        child_col = op_record.get("child_col_ref", orig_rel.get("child_col_ref"))
+        child_ptr = op_record.get("child_col_ptr", orig_rel.get("child_col_ptr"))
+
+        live_parent = _find_live_collection_by_identity(parent_col, parent_ptr)
+        live_child = _find_live_collection_by_identity(child_col, child_ptr)
+
+        if state == _RelationshipOperationState.APPLYING:
+            if live_parent is None or live_child is None:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                return
+            is_linked = _is_child_collection_linked_by_identity(live_parent, live_child, child_ptr)
+            if mutation == "COLLECTION_CHILD_LINK":
+                if not is_linked:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.NO_EFFECT,
+                    )
+                    return
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.APPLIED_VERIFIED,
+                )
+                state = _RelationshipOperationState.APPLIED_VERIFIED
+            else:
+                if is_linked:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.NO_EFFECT,
+                    )
+                    return
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.APPLIED_VERIFIED,
+                )
+                state = _RelationshipOperationState.APPLIED_VERIFIED
+
+        if state not in (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED):
+            restoration_errors.append(
+                f"Relationship operation '{op_id}' in unexpected state '{state}' during collection child rollback"
+            )
+            return
+
+        if live_parent is None or live_child is None:
+            if mutation == "COLLECTION_CHILD_LINK" and not _is_child_collection_linked_by_identity(parent_col, child_col, child_ptr):
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.REVERTED,
+                )
+                return
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+            restoration_errors.append("Parent or child collection identity lost during collection child rollback")
+            return
+
+        if mutation == "COLLECTION_CHILD_LINK":
+            if _is_child_collection_linked_by_identity(live_parent, live_child, child_ptr):
+                try:
+                    live_parent.children.unlink(live_child)
+                except Exception as e:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                    )
+                    restoration_errors.append(f"Failed to unlink child collection '{live_child.name}': {e}")
+                    return
+            if not _is_child_collection_linked_by_identity(live_parent, live_child, child_ptr):
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.REVERTED,
+                )
+            else:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                restoration_errors.append(f"Child collection '{live_child.name}' still linked after unlink")
+            return
+        else:
+            if not _is_child_collection_linked_by_identity(live_parent, live_child, child_ptr):
+                try:
+                    live_parent.children.link(live_child)
+                except Exception as e:
+                    active_tx.update_relationship_mutation_state(
+                        op_record,
+                        _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                    )
+                    restoration_errors.append(f"Failed to relink child collection '{live_child.name}': {e}")
+                    return
+            if _is_child_collection_linked_by_identity(live_parent, live_child, child_ptr):
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.REVERTED,
+                )
+            else:
+                active_tx.update_relationship_mutation_state(
+                    op_record,
+                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                restoration_errors.append(f"Child collection '{live_child.name}' not linked after restoration")
+            return
+
     col_ref = src_id.get("ref", op_record.get("source_reference"))
     col_ptr = src_id.get("ptr")
     obj_ref = tgt_id.get("ref", op_record.get("target_reference"))
@@ -2961,6 +3759,12 @@ def _rollback_arm_rig_state(
             ):
                 _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
 
+    # Step 0.5: Authoritatively revert Object Parent relationships before created controller objects are deleted
+    if active_tx is not None:
+        for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
+            if op_record.get("intended_mutation") == "OBJECT_PARENT_ASSIGN":
+                _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
+
     # Step 1: Controller cleanup, stashed object restoration, and transform restoration
     # 1.0a: Revert transaction-created Collection <-> Object links via Layer 3 before removing created controllers
     _authorized_restore_collection_object_relationships(
@@ -3035,8 +3839,29 @@ def _rollback_arm_rig_state(
         if live_original.name != original_name:
             live_original.name = original_name
 
-        live_original.parent = c_snap["parent"]
-        live_original.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
+        # Check if parent was already restored via Layer 3 relationship record
+        parent_restored_via_tx = False
+        if active_tx is not None:
+            for op_rec in getattr(active_tx, "prepared_relationship_mutations", []):
+                if op_rec.get("intended_mutation") == "OBJECT_PARENT_ASSIGN":
+                    if op_rec.get("controller_ptr") == original_ptr or op_rec.get("controller_ref") == live_original:
+                        parent_restored_via_tx = True
+                        break
+
+        if not parent_restored_via_tx:
+            snap_parent = c_snap.get("parent")
+            snap_parent_ptr = c_snap.get("parent_ptr")
+            live_parent = None
+            if snap_parent is not None:
+                live_parent = _find_live_object_by_identity(snap_parent, snap_parent_ptr)
+                if live_parent is None:
+                    restoration_errors.append(
+                        f"Original controller '{original_name}' parent destroyed or identity lost"
+                    )
+            live_original.parent = live_parent
+            if "matrix_parent_inverse" in c_snap:
+                live_original.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
+
         live_original.rotation_mode = c_snap["rotation_mode"]
         live_original.location = c_snap["location"].copy()
         live_original.rotation_euler = c_snap["rotation_euler"].copy()
@@ -3276,33 +4101,96 @@ def _rollback_arm_rig_state(
                         live_ptr_to_idx = {c.as_pointer(): idx for idx, c in enumerate(pbone.constraints)}
 
     # Step 3: Collection hierarchy restoration with strict ownership isolation
-    # Only delete collections explicitly registered as created by this transaction!
+    # 3.0: Revert transaction-created / transaction-unlinked Collection Parent/Child relationships via Layer 3
+    if active_tx is not None:
+        for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
+            if op_record.get("intended_mutation") in (
+                "COLLECTION_CHILD_LINK",
+                "COLLECTION_CHILD_UNLINK",
+            ):
+                _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
+
+    # 3.1: Only delete collections explicitly registered as created by this transaction!
     if active_tx is not None:
         for reg in list(getattr(active_tx, "created_collections", [])):
             col_ref = reg.get("col_ref")
             col_ptr = reg.get("col_ptr")
             created_name = reg.get("created_name")
 
-            target_col = None
-            if col_ref is not None:
-                try:
-                    if col_ref.name in bpy.data.collections and bpy.data.collections[col_ref.name] == col_ref:
-                        target_col = col_ref
-                except ReferenceError:
-                    target_col = None
+            target_col = _find_live_collection_by_identity(col_ref, col_ptr)
             if target_col is None and created_name in bpy.data.collections:
                 c_candidate = bpy.data.collections[created_name]
                 if col_ptr is None or c_candidate.as_pointer() == col_ptr:
                     target_col = c_candidate
 
-            if target_col is not None:
-                for p_col in list(bpy.data.collections):
-                    if target_col.name in p_col.children:
+            if target_col is None:
+                continue
+
+            # Check external dependencies before deletion (Section 9.2, TEST-230, TEST-232)
+            tx_obj_ptrs = {
+                r.get("obj_ptr")
+                for r in getattr(active_tx, "created_controller_objects", [])
+                if r.get("obj_ptr") is not None
+            }
+            for s in getattr(active_tx, "stashed_objects", []):
+                if s.get("stashed_obj_ptr") is not None:
+                    tx_obj_ptrs.add(s.get("stashed_obj_ptr"))
+
+            has_external_members = False
+            for obj in target_col.objects:
+                try:
+                    if obj.as_pointer() not in tx_obj_ptrs:
+                        has_external_members = True
+                        break
+                except ReferenceError:
+                    pass
+
+            has_external_children = len(target_col.children) > 0
+
+            init_parent = reg.get("initial_parent")
+            init_parent_ptr = init_parent.as_pointer() if (init_parent is not None and hasattr(init_parent, "as_pointer")) else None
+
+            has_external_parents = False
+            for sc in bpy.data.scenes:
+                if getattr(sc, "collection", None) is not None:
+                    if _is_child_collection_linked_by_identity(sc.collection, target_col, col_ptr):
+                        if init_parent is not None and (sc.collection == init_parent or (init_parent_ptr is not None and sc.collection.as_pointer() == init_parent_ptr)):
+                            continue
+                        has_external_parents = True
+                        break
+            if not has_external_parents:
+                for c_col in bpy.data.collections:
+                    if c_col != target_col and _is_child_collection_linked_by_identity(c_col, target_col, col_ptr):
+                        if init_parent is not None and (c_col == init_parent or (init_parent_ptr is not None and c_col.as_pointer() == init_parent_ptr)):
+                            continue
+                        has_external_parents = True
+                        break
+
+            if has_external_members or has_external_children or has_external_parents:
+                restoration_errors.append(
+                    f"Transaction-created collection '{target_col.name}' has external dependencies "
+                    f"(members={has_external_members}, children={has_external_children}, parents={has_external_parents}); "
+                    "refusing deletion"
+                )
+                continue
+
+            for p_col in list(bpy.data.collections):
+                if _is_child_collection_linked_by_identity(p_col, target_col, col_ptr):
+                    try:
                         p_col.children.unlink(target_col)
-                for scene in list(bpy.data.scenes):
-                    if target_col.name in scene.collection.children:
-                        scene.collection.children.unlink(target_col)
+                    except Exception:
+                        pass
+            for sc in list(bpy.data.scenes):
+                if getattr(sc, "collection", None) is not None and _is_child_collection_linked_by_identity(sc.collection, target_col, col_ptr):
+                    try:
+                        sc.collection.children.unlink(target_col)
+                    except Exception:
+                        pass
+
+            try:
                 bpy.data.collections.remove(target_col)
+            except Exception as e:
+                restoration_errors.append(f"Failed to remove transaction-created collection '{target_col.name}': {e}")
 
     char_col_snap = snapshot.get("character_collection", {})
     if not char_col_snap.get("existed", False):
@@ -5517,8 +6405,12 @@ def _get_or_create_empty(
         obj.empty_display_size = display_size
         obj.rotation_mode = "XYZ"
         if parent is not None:
-            obj.parent = parent
-            obj.matrix_parent_inverse = Matrix.Identity(4)
+            _authorized_assign_object_parent(
+                obj=obj,
+                parent=parent,
+                matrix_parent_inverse=Matrix.Identity(4),
+                active_tx=active_tx,
+            )
         if replaced_wrong_type:
             _trigger_fault_injection("setup_arm_ik_after_controller_replaced", {"obj": obj, "name": name})
         return obj, True

@@ -1,13 +1,13 @@
 # AI_SYNC：当前工程状态与跨 AI 交接卡片
 
-<!-- TASK10B15_R3_EXECUTION_STATE -->
-> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 3/6 (F14-03: Constraint 资源操作 + F14-02: Target 关系日志) 已完成。
-> - **生产代码修改**：在 `src/rig/arm_ik.py` 实现 Layer 3 约束授权创建与删除接口 `_authorized_create_constraint()`、`_authorized_remove_constraint()`，以及约束目标与极向目标写入与 7 状态日志管理函数 `_authorized_assign_constraint_targets()`、`_apply_single_constraint_target_unit()`；扩充 `_authorized_revert_relationship_record()` 支持目标关系逆向恢复；在 `_rollback_arm_rig_state()` 实施 Step 0 目标关系恢复时序，先于控制器对象删除执行；重写 `retry_cleanup()` 委托 Layer 3 清理暂存约束；收敛 `setup_arm_ik()` 约束与目标写入入口。
-> - **测试更新与新增**：`tests/test_task10b_transaction_atomicity.py` 适配 TEST-113/117 关系日志分区断言，并新增 TEST-202～216（共 15 项），总测试集扩增至 186 项。
-> - **测试结果**：Atomicity 186/186 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
-> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `2372fc4a3f1bec46e1c46523459db695cdb3224e`。
-> - **证据归档**：`docs/evidence/task10b15/round3/`（含 `verification.json`、`implementation_evidence.md` 及全部 8 份原始 `.log` 与测试报告）。
-> - **遗留项与后续**：R1-TAIL-01～03、R2-TAIL-01～02 维持 OPEN（留至 6/6 统一处理）；等待 ChatGPT 独立验收；禁止擅自开始 4/6。
+<!-- TASK10B15_R4_EXECUTION_STATE -->
+> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 4/6 (F14-02: Object Parent 与 Collection Parent/Child 关系授权闭环) 已完成。
+> - **生产代码修改**：在 `src/rig/arm_ik.py` 实现 Layer 3 辅助与关系授权函数 `_matrix_equals()`、`_is_child_collection_linked_by_identity()`、`_is_collection_descendant_of()`、`_authorized_assign_object_parent()`、`_authorized_link_child_collection()`、`_authorized_unlink_child_collection()` 及 `_authorized_restore_relationship()`；收敛 `_get_or_create_empty()` 中的父级与矩阵逆赋值、`_ensure_character_collection()` 中的集合挂载至 Layer 3；升级快照 `_capture_snapshot()` 包含集合父子指针及控制器父级指针；升级回滚时序在 Step 0.5 优先恢复 Object Parent 关系，在 Step 1 跳过已恢复父级，在 Step 3.0 倒序恢复集合挂载/解绑关系，并在 Step 3.1 严格实施第 9.2 节外部依赖隔离检查（无外部成员、外部子集合、外部父级方可安全删除）。
+> - **测试更新与新增**：`tests/test_task10b_transaction_atomicity.py` 适配 TEST-116 关系日志数量，并新增 TEST-217～TEST-233（共 17 项），总测试集扩增至 203 项。
+> - **测试结果**：Atomicity 203/203 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
+> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `4d1091ccafa52ac8be2dd261a258a76017282c5e`。
+> - **证据归档**：`docs/evidence/task10b15/round4/`（含 `verification.json`、`implementation_evidence.md` 及全部 8 份原始 `.log` 与测试报告）。
+> - **遗留项与后续**：8 项历史遗留项（R1-TAIL-01～03、R2-TAIL-01～02、R3-TAIL-01～03）维持 OPEN（留至 6/6 集中处理）；等待 ChatGPT 独立验收；禁止擅自开始 5/6。
 
 
 > **项目**：ProceduralAnimation | **分支**：`audit/task-10-b-9`
