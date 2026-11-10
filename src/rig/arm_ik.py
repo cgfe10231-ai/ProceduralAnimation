@@ -3165,6 +3165,79 @@ def _authorized_restore_relationship(
 _TARGET_UNSET = object()
 
 
+
+def _cleanup_failed_constraint_creation(
+    pbone: bpy.types.PoseBone,
+    con: bpy.types.Constraint,
+    expected_ptr: int,
+    pbone_ptr: int,
+    before_ptrs: frozenset[int],
+    active_tx: Any,
+) -> None:
+    """Compensate an unregistered C-API creation; leave registered IDs to rollback.
+
+    Never use a constraint name to select an object for destructive cleanup.
+    An ambiguous partial registration is NOT permission to delete.
+    """
+    if (not _ACTIVE_TRANSACTION_STACK
+            or _ACTIVE_TRANSACTION_STACK[-1] is not active_tx
+            or active_tx.state != _ArmRigTransactionState.ACTIVE):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: transaction not ACTIVE")
+    if (type(expected_ptr) is not int or expected_ptr <= 0
+            or type(pbone_ptr) is not int or pbone_ptr <= 0
+            or not isinstance(before_ptrs, frozenset)
+            or expected_ptr in before_ptrs):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation baseline invalid")
+    try:
+        live_arm = active_tx.arm
+        if (live_arm is None or live_arm.pose is None
+                or live_arm.pose.bones.get(pbone.name) != pbone
+                or int(pbone.as_pointer()) != pbone_ptr
+                or int(con.as_pointer()) != expected_ptr):
+            raise RuntimeError("original PoseBone/Constraint identity changed")
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: identity mismatch") from exc
+
+    registry = active_tx.created_constraints
+    if (not isinstance(registry, list)
+            or any(not isinstance(rec, dict) for rec in registry)):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registry malformed")
+    related = [rec for rec in registry
+               if rec.get("con_ptr") == expected_ptr or rec.get("con_ref") == con]
+    if related:
+        # Once a complete registration exists, the enclosing transaction's
+        # existing Layer-3 rollback exclusively owns destruction.
+        if (len(related) != 1
+                or related[0].get("con_ref") != con
+                or related[0].get("con_ptr") != expected_ptr
+                or related[0].get("pbone") != pbone
+                or related[0].get("bone_name") != pbone.name):
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: partial/mismatched registration")
+        return
+
+    # Only the exact instance returned by this invocation's constraints.new()
+    # may be removed before it becomes registered. No name-based fallback.
+    try:
+        live = [candidate for candidate in pbone.constraints
+                if int(candidate.as_pointer()) == expected_ptr]
+        if len(live) != 1 or live[0] != con:
+            raise RuntimeError("fresh Constraint no longer uniquely live on owning PoseBone")
+        pbone.constraints.remove(live[0])
+    except BaseException as exc:
+        raise RuntimeError(
+            f"CONSTRAINT_CREATION_CLEANUP_REMOVE_FAILED: ptr={expected_ptr}; "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    try:
+        if any(int(candidate.as_pointer()) == expected_ptr for candidate in pbone.constraints):
+            raise RuntimeError("original Constraint still live after C-API removal")
+    except BaseException as exc:
+        raise RuntimeError(
+            f"CONSTRAINT_CREATION_CLEANUP_REMOVE_UNVERIFIED: ptr={expected_ptr}; "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+
+
 def _authorized_create_constraint(
     pbone: bpy.types.PoseBone,
     con_type: str,
@@ -3222,46 +3295,60 @@ def _authorized_create_constraint(
                 f"Duplicate constraint creation: '{con_name}' ({con_type}) already exists on bone '{pbone.name}'"
             )
 
-    # Create constraint via Blender C-API
-    con = pbone.constraints.new(type=con_type)
-    con.name = con_name
-    con_ptr = con.as_pointer()
-
-    # Fault injection window B: created but before registration
+    # Capture the complete owner-chain identity BEFORE the creation C-API.
+    # This local witness prevents any name-matched pre-existing constraint
+    # from being considered removable in a fault-injection window.
     try:
+        before_ptrs = frozenset(int(c.as_pointer()) for c in pbone.constraints)
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError("CONSTRAINT_CREATION_BASELINE_UNREADABLE") from exc
+
+    con = pbone.constraints.new(type=con_type)
+    try:
+        con_ptr = int(con.as_pointer())
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+        # No stable identity is available; refusing deletion is safer than
+        # substituting another constraint in the owning PoseBone chain.
+        raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_UNREADABLE: refusing name-based cleanup") from exc
+    if con_ptr <= 0 or con_ptr in before_ptrs:
+        raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_COLLISION: refusing cleanup without provenance")
+
+    try:
+        # Name setting is also fallible and must be within the compensation
+        # window, rather than creating an unregistered orphan on exception.
+        con.name = con_name
         _trigger_fault_injection(
             "character_constraint_after_creation_before_registration",
             {"pbone": pbone, "con": con, "tx": active_tx, "name": con_name, "type": con_type},
         )
-    except BaseException:
-        # Window B cleanup: safely remove only this live constraint instance
+
+        # Registration is fallible. Even a register() that raises after append
+        # is handled by the single cleanup decision below.
+        active_tx.register_created_constraint(pbone, con)
+        records = [rec for rec in active_tx.created_constraints
+                   if isinstance(rec, dict) and rec.get("con_ptr") == con_ptr]
+        if (len(records) != 1 or records[0].get("con_ref") != con
+                or records[0].get("pbone") != pbone
+                or records[0].get("bone_name") != pbone.name):
+            raise RuntimeError(f"Constraint '{con_name}' registration verification failed")
+
+        _trigger_fault_injection(
+            "character_constraint_after_registration_before_config",
+            {"pbone": pbone, "con": con, "tx": active_tx, "name": con_name, "type": con_type},
+        )
+        return con
+    except BaseException as creation_exc:
         try:
-            if con in pbone.constraints.values() and con.as_pointer() == con_ptr:
-                pbone.constraints.remove(con)
-        except Exception:
-            pass
+            _cleanup_failed_constraint_creation(
+                pbone, con, con_ptr, pbone_ptr, before_ptrs, active_tx,
+            )
+        except BaseException as cleanup_exc:
+            raise RuntimeError(
+                "CONSTRAINT_CREATION_CLEANUP_FAILED: "
+                f"original={type(creation_exc).__name__}: {creation_exc}; "
+                f"cleanup={type(cleanup_exc).__name__}: {cleanup_exc}"
+            ) from cleanup_exc
         raise
-
-    # Register with active transaction
-    active_tx.register_created_constraint(pbone, con)
-
-    # Verify registration
-    registered_ptrs = {rec.get("con_ptr") for rec in active_tx.created_constraints}
-    if con_ptr not in registered_ptrs:
-        try:
-            if con in pbone.constraints.values() and con.as_pointer() == con_ptr:
-                pbone.constraints.remove(con)
-        except Exception:
-            pass
-        raise RuntimeError(f"Constraint '{con_name}' registration verification failed")
-
-    # Fault injection window C: registered but before property configuration
-    _trigger_fault_injection(
-        "character_constraint_after_registration_before_config",
-        {"pbone": pbone, "con": con, "tx": active_tx, "name": con_name, "type": con_type},
-    )
-
-    return con
 
 
 def _authorized_remove_constraint(
