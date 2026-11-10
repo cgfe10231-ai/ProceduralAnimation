@@ -2322,26 +2322,36 @@ def _controller_is_borrowed_by_other_armature(
     obj: bpy.types.Object,
     role: tuple[str, str],
 ) -> bool:
-    """Deny ambiguous multi-rig ownership even if the target rig has a binding."""
-    side, field = role
+    """Deny a controller referenced by ANY constraint on another Armature.
+
+    Retain the existing role parameter and the original Coordinator-owned
+    permission path. Inspect all foreign Armature pose-bone and object
+    constraints, not just a same-named IK constraint on forearm.L/R.
+    """
     try:
+        obj_ptr = int(obj.as_pointer())
+        if obj_ptr <= 0 or _find_live_object_by_identity(obj, obj_ptr) is None:
+            return True
         for other in bpy.data.objects:
-            if other == arm or other.type != 'ARMATURE' or other.pose is None:
+            if other == arm or other.type != 'ARMATURE':
                 continue
-            bone = other.pose.bones.get(f'forearm.{side}')
-            if bone is None:
-                continue
-            con = bone.constraints.get(ARM_IK_CONSTRAINT_NAMES[side])
-            if con is None or con.type != 'IK':
-                continue
-            bound = getattr(con, field, None)
-            if bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj:
-                return True
-    except (AttributeError, ReferenceError, TypeError, ValueError):
-        # An indeterminate cross-rig ownership probe cannot grant permission.
+            # Object-level constraints on the foreign Armature may also borrow
+            # the controller. A matching target in any pose-bone constraint
+            # independently proves that ownership is shared or ambiguous.
+            constraints = list(other.constraints)
+            if other.pose is not None:
+                for bone in other.pose.bones:
+                    constraints.extend(bone.constraints)
+            for con in constraints:
+                for field in ('target', 'pole_target'):
+                    bound = getattr(con, field, None)
+                    if (bound is not None and bound == obj
+                            and int(bound.as_pointer()) == obj_ptr):
+                        return True
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
+        # A failed inspection cannot certify exclusive controller ownership.
         return True
     return False
-
 
 def _verify_controller_object_transaction_authority(
     obj: bpy.types.Object,
@@ -2427,10 +2437,14 @@ def _require_existing_arm_ik_controller_ownership(
     *,
     scope: str,
 ) -> None:
-    """Read-only fail-closed preflight of every currently existing Arm IK role.
+    """Read-only Arm IK ownership admission; never upgrade an active transaction.
 
-    Run before setup/target/reset/influence writes. The sole owner is the
-    existing Arm IK Coordinator and transaction; this is NOT a second registry.
+    When a transaction is active, only its entry snapshot proof or its
+    transaction-created receipt can authorize a controller. A constraint
+    assigned *after* transaction entry cannot retroactively authorize an
+    originally unrelated same-name Empty. Outside transactions, established
+    live Arm IK bindings remain the backwards-compatible proof of ownership.
+    Unbound pre-existing Empties fail closed: their ownership is unknowable.
     """
     tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
     for side in ('L', 'R'):
@@ -2444,11 +2458,19 @@ def _require_existing_arm_ik_controller_ownership(
                     raise RuntimeError('invalid Blender object identity')
             except (ReferenceError, AttributeError, ValueError, TypeError) as exc:
                 raise RuntimeError(f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: {name} identity unreadable') from exc
-            if tx is not None and tx.arm == arm:
-                if _verify_controller_object_transaction_authority(obj, tx, created_only=True) == 'TX_CREATED':
-                    continue
-                if _verify_controller_object_transaction_authority(obj, tx) == 'SNAPSHOT_ORIGINAL':
-                    continue
+            if tx is not None:
+                if tx.arm is arm:
+                    if _verify_controller_object_transaction_authority(obj, tx, created_only=True) == 'TX_CREATED':
+                        continue
+                    if _verify_controller_object_transaction_authority(obj, tx) == 'SNAPSHOT_ORIGINAL':
+                        continue
+                # Important: no live-binding fallback inside a transaction.
+                # Live constraints may have been modified since its snapshot;
+                # they do not confer ownership on an entry-time external Empty.
+                raise ExternalControllerNameConflictError(
+                    f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: controller {name!r} '
+                    'has no proven ownership in the active transaction'
+                )
             role = _controller_role_for_name(name)
             if (obj.type == 'EMPTY' and role is not None
                     and _controller_constraint_binding_proven(arm, obj, role)
@@ -2458,7 +2480,6 @@ def _require_existing_arm_ik_controller_ownership(
                 f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: controller {name!r} '
                 'is present without a verified owning Armature/transaction binding'
             )
-
 
 def _authorized_assign_object_parent(
     obj: bpy.types.Object,
