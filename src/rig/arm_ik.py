@@ -2710,6 +2710,71 @@ def _authorized_assign_object_parent(
     return op_record
 
 
+def _require_collection_child_relationship_ownership(
+    parent_collection: bpy.types.Collection,
+    child_collection: bpy.types.Collection,
+    active_tx: Any,
+    *,
+    unlink: bool,
+) -> None:
+    """Admit writes only to an original-parent edge of a proven TX-created child.
+
+    A live reference, a Collection name, or an unsealed created_collections
+    registry entry is not sufficient to establish mutation authority.
+    """
+    if (not isinstance(active_tx, _ArmRigTransactionContext)
+            or active_tx.state != _ArmRigTransactionState.ACTIVE
+            or active_tx.rollback_only
+            or not _ACTIVE_TRANSACTION_STACK
+            or _ACTIVE_TRANSACTION_STACK[-1] is not active_tx):
+        raise RuntimeError("COLLECTION_RELATION_OWNERSHIP_UNPROVEN: transaction not authorized")
+    if (active_tx.session_record is None
+            or _MANAGED_ARMATURE_IDENTITIES.get(active_tx.session_id) is not active_tx.session_record
+            or active_tx.session_record.original_blender_ref is not active_tx.arm
+            or not isinstance(active_tx.entry_collection_ptrs, (set, frozenset))):
+        raise RuntimeError("COLLECTION_RELATION_OWNERSHIP_UNPROVEN: entry/session provenance unavailable")
+    try:
+        parent_ptr = int(parent_collection.as_pointer())
+        child_ptr = int(child_collection.as_pointer())
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError("COLLECTION_RELATION_OWNERSHIP_UNPROVEN: Collection identity unreadable") from exc
+    if (parent_ptr <= 0 or child_ptr <= 0
+            or _find_live_collection_by_identity(parent_collection, parent_ptr) is None
+            or _find_live_collection_by_identity(child_collection, child_ptr) is None
+            or child_ptr in active_tx.entry_collection_ptrs):
+        raise RuntimeError("COLLECTION_RELATION_OWNERSHIP_UNPROVEN: child is not a live TX-created Collection")
+    records = [r for r in active_tx.created_collections
+               if isinstance(r, dict) and r.get("col_ptr") == child_ptr]
+    receipt = active_tx._collection_creation_receipts.get(child_ptr)
+    if (len(records) != 1 or not isinstance(receipt, tuple) or len(receipt) != 5
+            or records[0].get("col_ref") != child_collection
+            or records[0].get("initial_parent") != parent_collection
+            or records[0].get("initial_parent_ptr") != parent_ptr
+            or receipt[0] != child_collection or receipt[1] != parent_collection
+            or receipt[2] != active_tx.session_id or receipt[3] != active_tx.tx_id
+            or receipt[4] is not active_tx._collection_receipt_seal):
+        raise RuntimeError("COLLECTION_RELATION_OWNERSHIP_UNPROVEN: creation receipt/initial parent mismatch")
+    if unlink:
+        # Merely discovering a link between owned objects cannot prove that
+        # THIS transaction created that edge. Require its confirmed link log.
+        proven_link = any(
+            isinstance(op, dict)
+            and op.get("intended_mutation") == "COLLECTION_CHILD_LINK"
+            and op.get("operation_state") in (
+                _RelationshipOperationState.CONFIRMED,
+                _RelationshipOperationState.APPLIED_VERIFIED,
+            )
+            and op.get("parent_col_ref") == parent_collection
+            and op.get("parent_col_ptr") == parent_ptr
+            and op.get("child_col_ref") == child_collection
+            and op.get("child_col_ptr") == child_ptr
+            and op.get("original_relationship_state", {}).get("linked") is False
+            for op in active_tx.prepared_relationship_mutations
+        )
+        if not proven_link:
+            raise RuntimeError("COLLECTION_RELATION_OWNERSHIP_UNPROVEN: link not created by transaction")
+
+
 def _authorized_link_child_collection(
     parent_collection: bpy.types.Collection,
     child_collection: bpy.types.Collection,
@@ -2740,6 +2805,12 @@ def _authorized_link_child_collection(
 
     already_linked = _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr)
     child_name = getattr(child_collection, "name", "<unknown>")
+    if not already_linked:
+        if category != "TX_ADDED":
+            raise RuntimeError("COLLECTION_RELATION_OWNERSHIP_UNPROVEN: unexpected link category")
+        _require_collection_child_relationship_ownership(
+            parent_collection, child_collection, active_tx, unlink=False,
+        )
 
     # 1. PREPARE
     op_record = active_tx.prepare_relationship_mutation(
@@ -2864,6 +2935,10 @@ def _authorized_unlink_child_collection(
 
     already_linked = _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr)
     child_name = getattr(child_collection, "name", "<unknown>")
+    if already_linked:
+        _require_collection_child_relationship_ownership(
+            parent_collection, child_collection, active_tx, unlink=True,
+        )
 
     # 1. PREPARE
     op_record = active_tx.prepare_relationship_mutation(
@@ -5226,6 +5301,9 @@ class _ArmRigTransactionContext:
         self.datablock_authorizations: List[Dict[str, Any]] = []
         self.datablock_cleanup_outcomes: List[Dict[str, Any]] = []
         self.entry_object_ptrs: Optional[FrozenSet[int]] = None
+        self.entry_collection_ptrs: Optional[FrozenSet[int]] = None
+        self._collection_receipt_seal = object()
+        self._collection_creation_receipts: Dict[int, Tuple[Any, Any, str, str, object]] = {}
 
     @property
     def committed(self) -> bool:
@@ -5411,14 +5489,63 @@ class _ArmRigTransactionContext:
         col: bpy.types.Collection,
         initial_parent: Optional[bpy.types.Collection] = None,
     ) -> None:
-        """Register a collection created within this transaction for ownership tracking."""
-        rec = {
+        """Attest a newly created, not-yet-linked Collection and intended parent."""
+        if (self.state != _ArmRigTransactionState.ACTIVE
+                or not _ACTIVE_TRANSACTION_STACK
+                or _ACTIVE_TRANSACTION_STACK[-1] is not self):
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: registration requires owning ACTIVE transaction")
+        if not isinstance(self.entry_collection_ptrs, (set, frozenset)):
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: missing entry Collection baseline")
+        if (self.session_record is None
+                or _MANAGED_ARMATURE_IDENTITIES.get(self.session_id) is not self.session_record
+                or self.session_record.original_blender_ref is not self.arm):
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: Armature session provenance mismatch")
+        try:
+            col_ptr = int(col.as_pointer())
+            live_col = _find_live_collection_by_identity(col, col_ptr)
+            in_datablocks = any(c.as_pointer() == col_ptr and c == col for c in bpy.data.collections)
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: Collection identity unreadable") from exc
+        if (col_ptr <= 0 or live_col is None or not in_datablocks
+                or col_ptr in self.entry_collection_ptrs):
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: Collection was not created after transaction entry")
+        if col.users != 0:
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: register before any Collection link")
+        if initial_parent is None:
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: initial parent required")
+        try:
+            parent_ptr = int(initial_parent.as_pointer())
+            live_parent = _find_live_collection_by_identity(initial_parent, parent_ptr)
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: original parent identity unreadable") from exc
+        if parent_ptr <= 0 or live_parent is None:
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: original parent is not live")
+        scene = bpy.context.scene if bpy.context else None
+        is_current_scene_root = (scene is not None and scene.collection == initial_parent
+                                 and int(scene.collection.as_pointer()) == parent_ptr)
+        is_tx_created_parent = any(
+            r.get("col_ref") == initial_parent and r.get("col_ptr") == parent_ptr
+            and parent_ptr in self._collection_creation_receipts
+            and self._collection_creation_receipts[parent_ptr][0] == initial_parent
+            and self._collection_creation_receipts[parent_ptr][4] is self._collection_receipt_seal
+            for r in self.created_collections if isinstance(r, dict)
+        )
+        if not (is_current_scene_root or is_tx_created_parent):
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: parent outside owned Collection hierarchy")
+        if col_ptr in self._collection_creation_receipts or any(
+                isinstance(r, dict) and r.get("col_ptr") == col_ptr
+                for r in self.created_collections):
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: duplicate Collection registration")
+        self.created_collections.append({
             "col_ref": col,
-            "col_ptr": col.as_pointer() if hasattr(col, "as_pointer") else None,
+            "col_ptr": col_ptr,
             "created_name": col.name,
             "initial_parent": initial_parent,
-        }
-        self.created_collections.append(rec)
+            "initial_parent_ptr": parent_ptr,
+        })
+        self._collection_creation_receipts[col_ptr] = (
+            col, initial_parent, self.session_id, self.tx_id, self._collection_receipt_seal,
+        )
 
     def retry_cleanup(self) -> _CleanupResult:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
@@ -6918,6 +7045,7 @@ def _arm_rig_transaction(arm: bpy.types.Object):
             raise
 
         tx.entry_object_ptrs = pre_snap_fp.get("all_object_ptrs") if isinstance(pre_snap_fp, dict) else None
+        tx.entry_collection_ptrs = pre_snap_fp.get("all_collection_ptrs") if isinstance(pre_snap_fp, dict) else None
         tx.state = _ArmRigTransactionState.SNAPSHOTTING
         tx.snapshot = _snapshot_arm_rig_state(arm)
         tx.state = _ArmRigTransactionState.ACTIVE
