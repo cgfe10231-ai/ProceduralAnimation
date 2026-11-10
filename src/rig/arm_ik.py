@@ -5601,11 +5601,12 @@ class _ArmRigTransactionContext:
                                             f"DataBlock {data_name} claims TYPE_A_TX_CREATED but lacks credible transaction creation provenance"
                                         )
                                 elif provenance == "TYPE_B_PRE_EXISTING_EXPLICIT_GRANT":
-                                    auth_src = matching_auth.get("authorization_source")
-                                    if not auth_src or auth_src in ("UNKNOWN", "NONE", "UNPROVEN"):
-                                        raise RuntimeError(
-                                            f"DataBlock {data_name} with TYPE_B provenance lacks valid explicit authorization_source: {auth_src}"
-                                        )
+                                    raise RuntimeError(
+                                        f"DATA_BLOCK_DELETE_AUTHORITY_UNPROVEN: {data_name}: "
+                                        "TYPE_B deletion requires verified authorization "
+                                        "from a trusted issuer; authorization_source "
+                                        "string is not sufficient proof"
+                                    )
 
                                 orig_ref = matching_auth.get("original_reference")
                                 if orig_ref is None:
