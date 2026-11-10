@@ -5306,6 +5306,121 @@ _PENDING_ARM_RIG_CLEANUPS: Dict[
 ] = {}
 
 
+def _coordinator_validate_cleanup_preflight(
+    tx: "_ArmRigTransactionContext",
+    phase: str,
+) -> None:
+    """Authorize cleanup BEFORE its first destructive resource operation.
+
+    This is the Coordinator's phase-admission decision, distinct from the
+    post-operation CleanupResult validator. It performs no resource deletion,
+    relationship mutation, gate clearing, or transaction-state transition.
+    An unknown live identity or an isolation mismatch must fail closed.
+    """
+    if phase not in ("INITIAL_CLEANUP", "PENDING_RETRY"):
+        raise ValueError(f"Invalid cleanup preflight phase: {phase!r}")
+    if not isinstance(tx, _ArmRigTransactionContext):
+        raise RuntimeError("CLEANUP_PREFLIGHT_REJECTED: transaction context type is invalid")
+    if not isinstance(tx.tx_id, str) or not tx.tx_id:
+        raise RuntimeError("CLEANUP_PREFLIGHT_REJECTED: missing transaction ID")
+
+    expected_state = (
+        _ArmRigTransactionState.COMMITTED
+        if phase == "INITIAL_CLEANUP"
+        else _ArmRigTransactionState.CLEANUP_PENDING
+    )
+    if tx.state != expected_state:
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: transaction {tx.tx_id} "
+            f"is {tx.state}, expected {expected_state}"
+        )
+
+    if _ACTIVE_TRANSACTION_STACK:
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: active transaction stack is nonempty "
+            f"during {phase}"
+        )
+
+    registered_pending = _PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id)
+    if phase == "PENDING_RETRY":
+        if registered_pending is not tx:
+            raise RuntimeError(
+                "CLEANUP_PREFLIGHT_REJECTED: pending registry transaction "
+                f"identity mismatch for {tx.tx_id}"
+            )
+    elif registered_pending is not None:
+        raise RuntimeError(
+            "CLEANUP_PREFLIGHT_REJECTED: initial cleanup transaction "
+            f"{tx.tx_id} already exists in the pending registry"
+        )
+
+    # Check both registry provenance and Blender's current object identity.
+    # Never call ensure_armature_session_identity() here: it can register a new
+    # session, which is not a valid substitute for the transaction's original.
+    record = tx.session_record
+    session_id = tx.session_id
+    if not isinstance(session_id, str) or not session_id:
+        raise RuntimeError("CLEANUP_PREFLIGHT_REJECTED: missing original session ID")
+    if record is None or _MANAGED_ARMATURE_IDENTITIES.get(session_id) is not record:
+        raise RuntimeError(
+            "CLEANUP_PREFLIGHT_REJECTED: original session registry record "
+            f"not found or substituted for {tx.tx_id}"
+        )
+    if record.registry_session_id != session_id or record.original_blender_ref is not tx.arm:
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: session and original Armature provenance "
+            f"mismatch for {tx.tx_id}"
+        )
+    try:
+        live_ptr = int(tx.arm.as_pointer())
+    except BaseException as exc:
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: cannot read original Armature identity "
+            f"for {tx.tx_id}: {exc}"
+        ) from exc
+    if live_ptr != tx.arm_ptr or live_ptr != record.registration_pointer:
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: original Armature pointer mismatch "
+            f"for {tx.tx_id}"
+        )
+    try:
+        identity_check = _verify_armature_session_identity_record(record, candidate_arm=tx.arm)
+    except BaseException as exc:
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: Armature identity verification raised "
+            f"for {tx.tx_id}: {exc}"
+        ) from exc
+    if identity_check.get("is_valid") is not True:
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: original Armature session not verified "
+            f"for {tx.tx_id}: {identity_check.get('reasons', [])}"
+        )
+
+    if (record.isolation_state != _ArmatureIsolationState.NONE
+            or session_id in _ISOLATED_FAILED_ARMATURES):
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: transaction {tx.tx_id} "
+            f"is associated with active FAILED isolation"
+        )
+    # Also defend against a malformed isolation registry record whose key is
+    # different from the transaction's session ID, but whose tx_id matches.
+    for isolation in _ISOLATED_FAILED_ARMATURES.values():
+        if isolation.get("transaction_id") == tx.tx_id:
+            raise RuntimeError(
+                f"CLEANUP_PREFLIGHT_REJECTED: transaction {tx.tx_id} "
+                "is referenced by FAILED isolation under another registry key"
+            )
+
+    if (not isinstance(tx.uncleaned_stashed_objects, list)
+            or not isinstance(tx.uncleaned_stashed_constraints, list)
+            or any(not isinstance(entry, dict) for entry in tx.uncleaned_stashed_objects)
+            or any(not isinstance(entry, dict) for entry in tx.uncleaned_stashed_constraints)):
+        raise RuntimeError(
+            f"CLEANUP_PREFLIGHT_REJECTED: cleanup resource queue is malformed "
+            f"for {tx.tx_id}"
+        )
+
+
 def _coordinator_apply_cleanup_result(
     tx: "_ArmRigTransactionContext",
     result: "_CleanupResult",
@@ -5484,6 +5599,7 @@ def retry_pending_arm_rig_cleanup(tx_id: str) -> None:
             f"Transaction {tx_id} is in state {tx.state}, expected CLEANUP_PENDING for pending cleanup retry"
         )
 
+    _coordinator_validate_cleanup_preflight(tx, phase="PENDING_RETRY")
     cleanup_result = tx.retry_cleanup()
     _coordinator_apply_cleanup_result(tx, cleanup_result, phase="PENDING_RETRY")
 
@@ -6430,6 +6546,7 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                 "during_commit_cleanup",
                 {"tx": tx}
             )
+            _coordinator_validate_cleanup_preflight(tx, phase="INITIAL_CLEANUP")
             cleanup_result = tx.retry_cleanup()
         except BaseException as exc:
             tx.state = _ArmRigTransactionState.CLEANUP_PENDING
