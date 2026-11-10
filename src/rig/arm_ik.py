@@ -5808,6 +5808,88 @@ def _verify_arm_rig_state_restored(
         raise RuntimeError("Arm rig rollback verification failed: " + "; ".join(diffs))
 
 
+
+# BUG-10: the only positive Type-A DataBlock authority issuer.
+# It physically creates the Mesh before minting a transaction-bound receipt.
+def _authorized_create_type_a_mesh(name: str, active_tx: Any) -> bpy.types.Mesh:
+    """Create a transaction-owned Mesh with an identity-bound deletion receipt.
+
+    Only this creation-returned Blender ID can receive TYPE_A_TX_CREATED
+    authority. Observing an existing ID or appending an authorization dict
+    never proves transaction creation.
+    """
+    if type(name) is not str or not name.strip():
+        raise ValueError("TYPE_A_CREATE_DENIED: Mesh name must be nonempty")
+    if (active_tx is None or not _ACTIVE_TRANSACTION_STACK
+            or _ACTIVE_TRANSACTION_STACK[-1] is not active_tx
+            or active_tx.state != _ArmRigTransactionState.ACTIVE):
+        raise RuntimeError("TYPE_A_CREATE_DENIED: owning ACTIVE transaction required")
+    if (not isinstance(active_tx._type_a_datablock_receipts, dict)
+            or not isinstance(active_tx.datablock_authorizations, list)
+            or active_tx.session_record is None
+            or _MANAGED_ARMATURE_IDENTITIES.get(active_tx.session_id) is not active_tx.session_record
+            or active_tx.session_record.original_blender_ref is not active_tx.arm):
+        raise RuntimeError("TYPE_A_CREATE_DENIED: transaction provenance/ledger invalid")
+    before = frozenset(int(item.as_pointer()) for item in bpy.data.meshes)
+    mesh = bpy.data.meshes.new(name)
+    new_ptr = None
+    auth = None
+    receipt_registered = False
+    try:
+        new_ptr = int(mesh.as_pointer())
+        if (new_ptr <= 0 or new_ptr in before
+                or new_ptr in active_tx._type_a_datablock_receipts
+                or not any(int(item.as_pointer()) == new_ptr and item == mesh
+                           for item in bpy.data.meshes)
+                or int(mesh.users) != 0):
+            raise RuntimeError("TYPE_A_CREATE_DENIED: fresh Mesh identity is unproven")
+        active_tx._type_a_datablock_receipts[new_ptr] = (
+            mesh, active_tx.session_id, active_tx.tx_id,
+            active_tx._type_a_datablock_receipt_seal,
+        )
+        receipt_registered = True
+        auth = {
+            "resource_kind": "meshes",
+            "original_reference": mesh,
+            "original_pointer": new_ptr,
+            "provenance": "TYPE_A_TX_CREATED",
+            "authorization_source": "TX_CREATE_RECEIPT",
+            "authorization_scope": "PHYSICAL_DELETE_IF_ZERO_USERS",
+            "authorized_transaction": active_tx.tx_id,
+            "expected_lifecycle": "COMMITTED_CLEANUP",
+        }
+        active_tx.datablock_authorizations.append(auth)
+        return mesh
+    except BaseException as creation_exc:
+        # Compensate only the same newly-created zero-user ID. Never use name
+        # matching or a pointer that existed before this creation call.
+        cleanup_exc = None
+        try:
+            if receipt_registered and new_ptr is not None:
+                receipt = active_tx._type_a_datablock_receipts.get(new_ptr)
+                if receipt is not None and receipt[0] == mesh:
+                    active_tx._type_a_datablock_receipts.pop(new_ptr, None)
+            if auth is not None and auth in active_tx.datablock_authorizations:
+                active_tx.datablock_authorizations.remove(auth)
+            if (new_ptr is None or new_ptr in before or new_ptr <= 0
+                    or int(mesh.as_pointer()) != new_ptr
+                    or int(mesh.users) != 0
+                    or not any(int(item.as_pointer()) == new_ptr and item == mesh
+                               for item in bpy.data.meshes)):
+                raise RuntimeError("TYPE_A_CREATE_CLEANUP_UNPROVEN: refusing deletion")
+            bpy.data.meshes.remove(mesh, do_unlink=False)
+            if any(int(item.as_pointer()) == new_ptr for item in bpy.data.meshes):
+                raise RuntimeError("TYPE_A_CREATE_CLEANUP_FAILED: Mesh remains live")
+        except BaseException as exc:
+            cleanup_exc = exc
+        if cleanup_exc is not None:
+            raise RuntimeError(
+                "TYPE_A_CREATE_AND_CLEANUP_FAILED: "
+                f"original={type(creation_exc).__name__}: {creation_exc}; "
+                f"cleanup={type(cleanup_exc).__name__}: {cleanup_exc}"
+            ) from cleanup_exc
+        raise
+
 class _ArmRigTransactionContext:
     """Active transaction execution state tracking."""
 
@@ -5869,6 +5951,9 @@ class _ArmRigTransactionContext:
         self.entry_collection_ptrs: Optional[FrozenSet[int]] = None
         self._collection_receipt_seal = object()
         self._collection_creation_receipts: Dict[int, Tuple[Any, Any, str, str, object]] = {}
+        # BUG-10: identity/seal created only by _authorized_create_type_a_mesh.
+        self._type_a_datablock_receipt_seal = object()
+        self._type_a_datablock_receipts: Dict[int, Tuple[Any, str, str, object]] = {}
 
     @property
     def committed(self) -> bool:
@@ -6287,8 +6372,21 @@ class _ArmRigTransactionContext:
                                     raise RuntimeError(f"DataBlock deletion authorization provenance rejected: {provenance}")
 
                                 if provenance == "TYPE_A_TX_CREATED":
-                                    stashed_orig_name = stashed.get("original_name")
-                                    if stashed_orig_name is not None or not getattr(self, "created_datablocks", None):
+                                    # Positive Type-A path: authorization comes from
+                                    # this transaction's actual Mesh creation call,
+                                    # never from a free-form claim or name.
+                                    receipt = self._type_a_datablock_receipts.get(data_ptr)
+                                    if (not isinstance(receipt, tuple) or len(receipt) != 4
+                                            or receipt[0] != target_data
+                                            or receipt[1] != self.session_id
+                                            or receipt[2] != self.tx_id
+                                            or receipt[3] is not self._type_a_datablock_receipt_seal
+                                            or matching_auth.get("authorization_source") != "TX_CREATE_RECEIPT"
+                                            or matching_auth.get("resource_kind") != "meshes"
+                                            or matching_auth.get("original_reference") != target_data
+                                            or matching_auth.get("original_pointer") != data_ptr
+                                            or not any(int(item.as_pointer()) == data_ptr and item == target_data
+                                                       for item in bpy.data.meshes)):
                                         raise RuntimeError(
                                             f"DataBlock {data_name} claims TYPE_A_TX_CREATED but lacks credible transaction creation provenance"
                                         )
