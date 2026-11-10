@@ -2268,6 +2268,81 @@ def _is_collection_descendant_of(
     return False
 
 
+def _verify_controller_object_transaction_authority(
+    obj: bpy.types.Object,
+    tx: Any,
+    *,
+    created_only: bool = False,
+) -> Optional[str]:
+    """Prove controller authority using BOTH Blender identity and transaction entry evidence.
+
+    Names do not grant permissions. A created-object registry entry alone does not
+    grant permissions either: a pre-existing object's pointer must never become
+    transaction-created merely because an entry was inserted in the registry.
+    Returns 'TX_CREATED', 'SNAPSHOT_ORIGINAL', or None. Does not mutate resources.
+    """
+    if not isinstance(tx, _ArmRigTransactionContext):
+        return None
+    if tx.state not in (_ArmRigTransactionState.ACTIVE, _ArmRigTransactionState.ROLLING_BACK):
+        return None
+    entry_ptrs = tx.entry_object_ptrs
+    if not isinstance(entry_ptrs, (frozenset, set)):
+        return None
+    session_id = tx.session_id
+    record = tx.session_record
+    if not isinstance(session_id, str) or not session_id or record is None:
+        return None
+    if _MANAGED_ARMATURE_IDENTITIES.get(session_id) is not record:
+        return None
+    if record.registry_session_id != session_id or record.original_blender_ref is not tx.arm:
+        return None
+    try:
+        if int(tx.arm.as_pointer()) != tx.arm_ptr or tx.arm_ptr != record.registration_pointer:
+            return None
+        obj_ptr = int(obj.as_pointer())
+    except (ReferenceError, AttributeError, TypeError, ValueError):
+        return None
+    if obj_ptr <= 0 or _find_live_object_by_identity(obj, obj_ptr) is None:
+        return None
+
+    created = False
+    for registered in tx.created_controller_objects:
+        if not isinstance(registered, dict):
+            return None
+        if registered.get('obj_ptr') == obj_ptr:
+            if registered.get('obj_ref') != obj:
+                return None
+            created = True
+            break
+
+    snap = tx.snapshot
+    original = False
+    if isinstance(snap, dict):
+        controllers = snap.get('controllers')
+        if isinstance(controllers, dict):
+            for name, saved in controllers.items():
+                if name not in (
+                    ARM_IK_TARGET_NAMES['L'], ARM_IK_TARGET_NAMES['R'],
+                    ARM_POLE_TARGET_NAMES['L'], ARM_POLE_TARGET_NAMES['R'],
+                ):
+                    continue
+                if not isinstance(saved, dict) or not saved.get('exists'):
+                    continue
+                if saved.get('obj_ptr') == obj_ptr:
+                    if saved.get('obj_ref') != obj:
+                        return None
+                    original = True
+                    break
+
+    # An object cannot simultaneously be original in the entry snapshot and
+    # newly created by this transaction, irrespective of a forged registry.
+    if created and obj_ptr not in entry_ptrs and not original:
+        return 'TX_CREATED'
+    if not created_only and original and obj_ptr in entry_ptrs and not created:
+        return 'SNAPSHOT_ORIGINAL'
+    return None
+
+
 def _authorized_assign_object_parent(
     obj: bpy.types.Object,
     parent: Optional[bpy.types.Object],
@@ -2298,34 +2373,16 @@ def _authorized_assign_object_parent(
     if live_obj is None or live_obj != obj:
         raise RuntimeError(f"Target controller identity verification failed for '{obj.name}'")
 
-    # 4. Controller is an object the active transaction has authority to modify
-    is_tx_created = False
-    for reg in getattr(active_tx, "created_controller_objects", []):
-        if reg.get("obj_ptr") == obj_ptr or reg.get("obj_ref") == obj:
-            is_tx_created = True
-            break
-
-    is_snap_controller = False
-    if active_tx.snapshot and "controllers" in active_tx.snapshot:
-        for c_name, c_snap in active_tx.snapshot["controllers"].items():
-            if c_snap.get("obj_ptr") == obj_ptr or c_snap.get("obj_ref") == obj:
-                is_snap_controller = True
-                break
-
-    is_named_controller = obj.name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R")
-    if not (is_tx_created or is_snap_controller or (is_named_controller and active_tx.arm is not None)):
-        raise RuntimeError(f"Object '{obj.name}' is not owned or managed by the active transaction (TEST-224)")
-
-    # 9. Armature session identity matches
-    if active_tx.arm is not None:
-        try:
-            sess_rec = ensure_armature_session_identity(active_tx.arm)
-            if active_tx.session_id is not None and active_tx.session_id != sess_rec.registry_session_id:
-                raise RuntimeError("Armature session identity mismatch during object parent assignment")
-        except Exception as e:
-            if not isinstance(e, RuntimeError):
-                raise RuntimeError(f"Armature session identity check failed: {e}") from e
-            raise
+    # 4 & 9. Ownership needs exact transaction provenance, not a controller name.
+    # Fail before preparing any relationship log or mutating parent fields.
+    if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not active_tx:
+        raise RuntimeError("Object parent assignment rejected: transaction is not the active stack owner")
+    controller_authority = _verify_controller_object_transaction_authority(obj, active_tx)
+    if controller_authority is None:
+        raise RuntimeError(
+            f"Object '{obj.name}' is not owned or identity-verified as managed by "
+            "the active transaction (TEST-224)"
+        )
 
     # 5 & 6. New parent verification
     dest_parent_ptr: Optional[int] = None
@@ -3937,32 +3994,38 @@ def _rollback_arm_rig_state(
         phase="PRE_CONTROLLER_REMOVE",
     )
 
-    # 1.0b: Clean up transaction-owned controller objects by identity
+    # 1.0b: Remove only controllers proven created AFTER this transaction's
+    # entry baseline. A forged or stale registry entry is never deletion authority.
     if active_tx is not None:
-        for record in getattr(active_tx, "created_controller_objects", []):
-            live_obj = _find_live_object_by_identity(
-                record["obj_ref"],
-                record["obj_ptr"],
-            )
-
-            if live_obj is None:
-                # Never delete a replacement by name.
-                continue
-
-            bpy.data.objects.remove(
-                live_obj,
-                do_unlink=True,
-            )
-
-            remaining = _find_live_object_by_identity(
-                record["obj_ref"],
-                record["obj_ptr"],
-            )
-
-            if remaining is not None:
-                restoration_errors.append(
-                    "Transaction-owned controller removal failed"
-                )
+        if active_tx.arm is not arm or active_tx.snapshot is not snapshot:
+            restoration_errors.append("Controller cleanup rejected: transaction/snapshot ownership mismatch")
+        else:
+            for record in getattr(active_tx, "created_controller_objects", []):
+                if not isinstance(record, dict):
+                    restoration_errors.append("Created controller registry contains a non-dictionary record")
+                    continue
+                obj_ref = record.get("obj_ref")
+                obj_ptr = record.get("obj_ptr")
+                if obj_ref is None or type(obj_ptr) is not int or obj_ptr <= 0:
+                    restoration_errors.append("Created controller registry entry has invalid identity fields")
+                    continue
+                live_obj = _find_live_object_by_identity(obj_ref, obj_ptr)
+                if live_obj is None:
+                    # Already absent: never substitute an identically named object.
+                    continue
+                if _verify_controller_object_transaction_authority(
+                    live_obj, active_tx, created_only=True,
+                ) != "TX_CREATED":
+                    restoration_errors.append(
+                        f"Controller deletion refused: object pointer {obj_ptr} "
+                        "was not proven created by this transaction"
+                    )
+                    continue
+                bpy.data.objects.remove(live_obj, do_unlink=True)
+                if _find_live_object_by_identity(obj_ref, obj_ptr) is not None:
+                    restoration_errors.append(
+                        f"Transaction-created controller removal failed (pointer {obj_ptr})"
+                    )
 
     controllers_snap = snapshot.get("controllers", {})
     for c_name, c_snap in controllers_snap.items():
@@ -5055,15 +5118,25 @@ class _ArmRigTransactionContext:
         self,
         obj: bpy.types.Object,
     ) -> None:
-        """Register a controller created by this transaction."""
-        obj_ptr = obj.as_pointer()
-
+        """Register creation only if the live object did not exist at tx entry."""
+        if self.state != _ArmRigTransactionState.ACTIVE:
+            raise RuntimeError("Cannot register created controller outside ACTIVE transaction")
+        if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not self:
+            raise RuntimeError("Created controller registration requires its owning transaction")
+        if not isinstance(self.entry_object_ptrs, (frozenset, set)):
+            raise RuntimeError("Created controller registration has no trusted entry object baseline")
+        try:
+            obj_ptr = int(obj.as_pointer())
+            live = _find_live_object_by_identity(obj, obj_ptr)
+        except (ReferenceError, AttributeError, TypeError, ValueError) as exc:
+            raise RuntimeError("Created controller identity could not be verified") from exc
+        if obj_ptr <= 0 or live is None:
+            raise RuntimeError("Created controller is not a live Blender Object")
+        if obj_ptr in self.entry_object_ptrs:
+            raise RuntimeError("Cannot register a pre-existing object as transaction-created")
         for record in self.created_controller_objects:
-            if record["obj_ptr"] == obj_ptr:
-                raise RuntimeError(
-                    "Duplicate transaction controller registration"
-                )
-
+            if not isinstance(record, dict) or record.get("obj_ptr") == obj_ptr:
+                raise RuntimeError("Duplicate or malformed transaction controller registration")
         self.created_controller_objects.append({
             "obj_ref": obj,
             "obj_ptr": obj_ptr,
