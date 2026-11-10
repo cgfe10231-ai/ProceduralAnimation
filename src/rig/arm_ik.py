@@ -4142,32 +4142,76 @@ def _rollback_arm_rig_state(
         if active_tx.arm is not arm or active_tx.snapshot is not snapshot:
             restoration_errors.append("Controller cleanup rejected: transaction/snapshot ownership mismatch")
         else:
-            for record in getattr(active_tx, "created_controller_objects", []):
-                if not isinstance(record, dict):
-                    restoration_errors.append("Created controller registry contains a non-dictionary record")
-                    continue
-                obj_ref = record.get("obj_ref")
-                obj_ptr = record.get("obj_ptr")
-                if obj_ref is None or type(obj_ptr) is not int or obj_ptr <= 0:
-                    restoration_errors.append("Created controller registry entry has invalid identity fields")
-                    continue
-                live_obj = _find_live_object_by_identity(obj_ref, obj_ptr)
-                if live_obj is None:
-                    # Already absent: never substitute an identically named object.
-                    continue
-                if _verify_controller_object_transaction_authority(
-                    live_obj, active_tx, created_only=True,
-                ) != "TX_CREATED":
-                    restoration_errors.append(
-                        f"Controller deletion refused: object pointer {obj_ptr} "
-                        "was not proven created by this transaction"
-                    )
-                    continue
-                bpy.data.objects.remove(live_obj, do_unlink=True)
-                if _find_live_object_by_identity(obj_ref, obj_ptr) is not None:
-                    restoration_errors.append(
-                        f"Transaction-created controller removal failed (pointer {obj_ptr})"
-                    )
+            # Validate the entire creation ledger before ANY destructive write.
+            # A missing or forged list record must not silently hide a live
+            # transaction-created Object from rollback verification.
+            registry = getattr(active_tx, 'created_controller_objects', None)
+            receipts = getattr(active_tx, '_controller_creation_receipts', None)
+            entry_ptrs = active_tx.entry_object_ptrs
+            proof_errors: List[str] = []
+            validated: Dict[int, Dict[str, Any]] = {}
+            if not isinstance(registry, list) or not isinstance(receipts, dict):
+                proof_errors.append('Created controller registry/receipt ledger is malformed')
+            elif not isinstance(entry_ptrs, (set, frozenset)):
+                proof_errors.append('Created controller entry-pointer baseline is unavailable')
+            else:
+                for record in registry:
+                    if not isinstance(record, dict):
+                        proof_errors.append('Created controller registry contains a non-dictionary record')
+                        continue
+                    obj_ref, obj_ptr = record.get('obj_ref'), record.get('obj_ptr')
+                    if obj_ref is None or type(obj_ptr) is not int or obj_ptr <= 0:
+                        proof_errors.append('Created controller registry entry has invalid identity fields')
+                        continue
+                    if obj_ptr in validated:
+                        proof_errors.append(f'Duplicate created controller identity pointer {obj_ptr}')
+                        continue
+                    validated[obj_ptr] = record
+                    if obj_ptr in entry_ptrs:
+                        proof_errors.append(f'Created controller pointer {obj_ptr} existed at transaction entry')
+                    if _controller_role_for_name(record.get('created_name')) is None:
+                        proof_errors.append(f'Created controller pointer {obj_ptr} lacks an original controller role')
+                    receipt = receipts.get(obj_ptr)
+                    if (not isinstance(receipt, tuple) or len(receipt) != 4
+                            or receipt[0] is not obj_ref
+                            or receipt[1] != active_tx.session_id
+                            or receipt[2] != active_tx.tx_id
+                            or receipt[3] is not active_tx._controller_receipt_seal):
+                        proof_errors.append(f'Created controller pointer {obj_ptr} has no matching original receipt')
+                if set(validated) != set(receipts):
+                    proof_errors.append('Created controller registry and creation receipts diverged')
+            if proof_errors:
+                # Fail closed rather than partially deleting objects under an
+                # inconsistent or incomplete transaction ownership ledger.
+                restoration_errors.extend(proof_errors)
+            else:
+                for obj_ptr, record in validated.items():
+                    obj_ref = record['obj_ref']
+                    live_obj = _find_live_object_by_identity(obj_ref, obj_ptr)
+                    if live_obj is None:
+                        # Do not substitute a new Blender Object sharing the name.
+                        continue
+                    if _verify_controller_object_transaction_authority(
+                        live_obj, active_tx, created_only=True,
+                    ) != 'TX_CREATED':
+                        restoration_errors.append(
+                            f'Controller deletion refused: pointer {obj_ptr} lacks transaction creation authority'
+                        )
+                        continue
+                    # A foreign Armature referring to a newly-created controller
+                    # removes exclusive deletion rights. Keep that resource and
+                    # surface an explicit rollback failure for Coordinator isolation.
+                    role = _controller_role_for_name(record['created_name'])
+                    if _controller_is_borrowed_by_other_armature(active_tx.arm, live_obj, role):
+                        restoration_errors.append(
+                            f'Controller deletion refused: pointer {obj_ptr} is referenced by another Armature'
+                        )
+                        continue
+                    bpy.data.objects.remove(live_obj, do_unlink=True)
+                    if _find_live_object_by_identity(obj_ref, obj_ptr) is not None:
+                        restoration_errors.append(
+                            f'Transaction-created controller removal failed (pointer {obj_ptr})'
+                        )
 
     controllers_snap = snapshot.get("controllers", {})
     for c_name, c_snap in controllers_snap.items():
@@ -5295,6 +5339,15 @@ class _ArmRigTransactionContext:
             raise RuntimeError('Created controller is not a live Blender Object')
         if obj_ptr in self.entry_object_ptrs:
             raise RuntimeError('Cannot register a pre-existing object as transaction-created')
+        # A transaction-created Controller must be registered immediately, before
+        # ANY Collection link. An arbitrary scene Object cannot be adopted through
+        # the legacy registration API merely because it was created after entry.
+        if _controller_role_for_name(str(obj.name)) is None:
+            raise RuntimeError('Created controller registration requires an Arm IK controller role')
+        if obj.users_collection:
+            raise RuntimeError('Created controller must be registered before Collection links')
+        if obj.parent is not None:
+            raise RuntimeError('Created controller must be registered before parent assignment')
         if obj_ptr in self._controller_creation_receipts:
             raise RuntimeError('Duplicate controller creation receipt')
         for registered in self.created_controller_objects:
