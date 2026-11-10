@@ -6457,8 +6457,20 @@ class _ArmRigTransactionContext:
                                 except Exception as dep_err:
                                     raise RuntimeError(f"Fail-closed: failed checking external dependencies on {data_name}: {dep_err}")
 
-                                # All 12 conditions verified: delete without do_unlink=True
+                                # BUG-11: fault windows bracket physical DataBlock deletion
+                                # AFTER all existing authorization/dependency checks pass.
+                                # This adds no bypass, no alternate deletion path.
+                                _trigger_fault_injection(
+                                    "during_cleanup_datablock_after_auth_before_remove",
+                                    {"stashed": stashed, "data_ptr": data_ptr,
+                                     "data": target_data, "tx": self},
+                                )
                                 target_coll.remove(target_data, do_unlink=False)
+                                _trigger_fault_injection(
+                                    "during_cleanup_datablock_after_remove_before_verify",
+                                    {"stashed": stashed, "data_ptr": data_ptr,
+                                     "tx": self},
+                                )
 
                                 still_present = False
                                 try:
