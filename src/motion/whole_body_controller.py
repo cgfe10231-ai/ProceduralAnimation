@@ -41,6 +41,8 @@ from src.rig.arm_ik import (
     MAX_ARM_REACH,
     MIN_ARM_REACH,
     get_arm_ik_state,
+    ensure_armature_session_identity,
+    query_admission_gate_status,
     reset_arm_ik,
     set_arm_ik_influence,
     set_hand_ik_target,
@@ -298,9 +300,37 @@ class WholeBodyController:
         self.joint_model = joint_model or DEFAULT_HUMANOID_ROM_MODEL
         self.mass_distribution = mass_distribution or DEMPSTER_WINTER_15_SEGMENT_MODEL
 
+        # The WBC constructor must not mutate Leg IK before discovering an
+        # Armature-wide Arm IK admission failure (CLEANUP_PENDING / FAILED).
+        self._require_arm_ik_frame_admission()
+
         # Ensure IK constraints exist on the rig
         setup_leg_ik(self.armature_obj)
         setup_arm_ik(self.armature_obj, initial_influence=0.0)
+
+    def _require_arm_ik_frame_admission(self) -> None:
+        """Fail closed before any WBC-controlled Blender scene mutation.
+
+        Registration resolves the current live Armature identity. The existing
+        Arm IK public gate determines whether that identity is writable.
+        This method never repairs, clears, or bypasses isolation records.
+        """
+        session = ensure_armature_session_identity(self.armature_obj)
+        gate = query_admission_gate_status(
+            arm=self.armature_obj,
+            session_id=session.registry_session_id,
+        )
+        if gate.get("can_admit") is True:
+            return
+        raise RuntimeError(
+            "WBC_FRAME_ADMISSION_REJECTED: Arm IK admission denied before scene writes "
+            f"(session_id={session.registry_session_id}, "
+            f"cleanup_pending={gate.get('cleanup_pending_blocked')}, "
+            f"failed_isolation={gate.get('failed_isolation_blocked')}, "
+            f"identity_valid={gate.get('identity_valid')}, "
+            f"pending_transactions={gate.get('pending_cleanup_transaction_ids')}, "
+            f"identity_reasons={gate.get('identity_reasons')})"
+        )
 
     def execute_frame(
         self,
@@ -329,6 +359,10 @@ class WholeBodyController:
         """
         arm = self.armature_obj
         root = self.root_obj
+
+        # Global frame-level admission comes BEFORE Root/Pelvis/FK/Leg dispatch.
+        # Local Arm IK gates alone are too late for a WBC multi-system frame.
+        self._require_arm_ik_frame_admission()
 
         # ---------------------------------------------------------------------
         # 1. Base / Floating Frame Dispatch
