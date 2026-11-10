@@ -3271,6 +3271,48 @@ def _authorized_remove_constraint(
     return True
 
 
+def _classify_constraint_target_pair_effect(
+    current_target: Optional[bpy.types.Object],
+    current_subtarget: str,
+    orig_target: Optional[bpy.types.Object],
+    orig_target_ptr: Optional[int],
+    orig_subtarget: str,
+    dest_target: Optional[bpy.types.Object],
+    dest_target_ptr: Optional[int],
+    dest_subtarget: str,
+) -> _RelationshipOperationState:
+    """Classify two-field RNA state conservatively after interrupted target writes.
+
+    NO_EFFECT is allowed ONLY for an exact original target AND subtarget pair.
+    A recognized partial or complete write must stay reversible (APPLIED_VERIFIED).
+    A third-party value or unreadable identity is RECOVERY_UNCERTAIN.
+    """
+    def matches_target(ref: Any, expected: Any, expected_ptr: Optional[int]) -> bool:
+        if expected is None:
+            return ref is None and expected_ptr is None
+        if ref is None or expected_ptr is None:
+            return False
+        try:
+            return (
+                ref == expected
+                and int(ref.as_pointer()) == expected_ptr
+                and _find_live_object_by_identity(expected, expected_ptr) is not None
+            )
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
+            return False
+
+    is_orig_target = matches_target(current_target, orig_target, orig_target_ptr)
+    is_dest_target = matches_target(current_target, dest_target, dest_target_ptr)
+    is_orig_sub = current_subtarget == orig_subtarget
+    is_dest_sub = current_subtarget == dest_subtarget
+
+    if is_orig_target and is_orig_sub:
+        return _RelationshipOperationState.NO_EFFECT
+    if (is_orig_target or is_dest_target) and (is_orig_sub or is_dest_sub):
+        return _RelationshipOperationState.APPLIED_VERIFIED
+    return _RelationshipOperationState.RECOVERY_UNCERTAIN
+
+
 def _apply_single_constraint_target_unit(
     pbone: bpy.types.PoseBone,
     con: bpy.types.Constraint,
@@ -3389,6 +3431,11 @@ def _apply_single_constraint_target_unit(
         )
 
         setattr(con, field, target_obj)
+        # Distinct C-API setters: expose the genuinely partial write window.
+        _trigger_fault_injection(
+            "during_constraint_target_apply_between_fields",
+            {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
+        )
         if hasattr(con, subtarget_field):
             setattr(con, subtarget_field, target_subtarget)
 
@@ -3397,30 +3444,20 @@ def _apply_single_constraint_target_unit(
             {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
         )
     except BaseException:
+        # The two RNA setters are separate. After the first succeeds, the
+        # second can fail: TARGET=destination + SUBTARGET=original is NOT
+        # NO_EFFECT. Keep it undoable when both values have known provenance.
         try:
             curr_target = getattr(con, field, None)
             curr_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
-            curr_target_ptr = curr_target.as_pointer() if (curr_target and hasattr(curr_target, "as_pointer")) else None
-
-            target_ok = (curr_target == target_obj if target_obj is not None else curr_target is None)
-            ptr_ok = (curr_target_ptr == dest_ptr)
-            sub_ok = (curr_sub == target_subtarget)
-
-            if target_ok and ptr_ok and sub_ok:
-                active_tx.update_relationship_mutation_state(
-                    op_record,
-                    _RelationshipOperationState.APPLIED_VERIFIED,
-                )
-            else:
-                active_tx.update_relationship_mutation_state(
-                    op_record,
-                    _RelationshipOperationState.NO_EFFECT,
-                )
-        except Exception:
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            classification = _classify_constraint_target_pair_effect(
+                curr_target, curr_sub,
+                orig_target, orig_ptr, orig_subtarget,
+                target_obj, dest_ptr, target_subtarget,
             )
+        except Exception:
+            classification = _RelationshipOperationState.RECOVERY_UNCERTAIN
+        active_tx.update_relationship_mutation_state(op_record, classification)
         raise
 
     # Verify RNA write
@@ -3432,10 +3469,14 @@ def _apply_single_constraint_target_unit(
     sub_ok = (curr_sub == target_subtarget)
 
     if not (target_ok and ptr_ok and sub_ok):
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        # RNA returned without raising, but at least one property differs.
+        # A recognizable partial write is still undoable; it is never NO_EFFECT.
+        classification = _classify_constraint_target_pair_effect(
+            curr_target, curr_sub,
+            orig_target, orig_ptr, orig_subtarget,
+            target_obj, dest_ptr, target_subtarget,
         )
+        active_tx.update_relationship_mutation_state(op_record, classification)
         raise RuntimeError(f"Constraint {field} assignment did not take effect in RNA")
 
     active_tx.update_relationship_mutation_state(
@@ -3450,20 +3491,29 @@ def _apply_single_constraint_target_unit(
     )
 
     confirm_target = getattr(con, field, None)
-    confirm_ptr = confirm_target.as_pointer() if (confirm_target and hasattr(confirm_target, "as_pointer")) else None
+    confirm_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
+    confirm_ptr = confirm_target.as_pointer() if (confirm_target is not None and hasattr(confirm_target, "as_pointer")) else None
     c_tgt_ok = (confirm_target == target_obj if target_obj is not None else confirm_target is None)
     c_ptr_ok = (confirm_ptr == dest_ptr)
-    if c_tgt_ok and c_ptr_ok:
+    if c_tgt_ok and c_ptr_ok and confirm_sub == target_subtarget:
         active_tx.update_relationship_mutation_state(
             op_record,
             _RelationshipOperationState.CONFIRMED,
         )
     else:
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        classification = _classify_constraint_target_pair_effect(
+            confirm_target, confirm_sub,
+            orig_target, orig_ptr, orig_subtarget,
+            target_obj, dest_ptr, target_subtarget,
         )
-        raise RuntimeError(f"Constraint {field} verification failed at CONFIRM stage")
+        if classification == _RelationshipOperationState.RECOVERY_UNCERTAIN:
+            active_tx.update_relationship_mutation_state(
+                op_record,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            )
+        # An already APPLIED_VERIFIED operation stays there for reversal if
+        # values are still within this transaction's original/destination pair.
+        raise RuntimeError(f"Constraint {field}/{subtarget_field} verification failed at CONFIRM stage")
 
     return op_record
 
@@ -3638,31 +3688,37 @@ def _authorized_revert_relationship_record(
                 return
 
         if state == _RelationshipOperationState.APPLYING:
-            # Check if write occurred
+            # An interrupted two-field assignment can change only the target,
+            # only the subtarget, or both. Never infer NO_EFFECT from the
+            # target alone; preserve reversible partial writes.
             try:
+                if "dest_subtarget" not in op_record and "dest_subtarget" not in orig_rel:
+                    raise RuntimeError("Destination subtarget evidence missing")
+                dest_subtarget = op_record.get("dest_subtarget", orig_rel.get("dest_subtarget"))
                 curr_target = getattr(con, field, None)
-                curr_target_ptr = curr_target.as_pointer() if (curr_target and hasattr(curr_target, "as_pointer")) else None
-                if curr_target == dest_target and (dest_target_ptr is None or curr_target_ptr == dest_target_ptr):
-                    active_tx.update_relationship_mutation_state(
-                        op_record,
-                        _RelationshipOperationState.APPLIED_VERIFIED,
-                    )
-                    state = _RelationshipOperationState.APPLIED_VERIFIED
-                else:
-                    active_tx.update_relationship_mutation_state(
-                        op_record,
-                        _RelationshipOperationState.NO_EFFECT,
-                    )
-                    return
+                curr_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
+                classification = _classify_constraint_target_pair_effect(
+                    curr_target, curr_sub,
+                    orig_target, orig_target_ptr, orig_subtarget,
+                    dest_target, dest_target_ptr, dest_subtarget,
+                )
             except Exception as exc:
                 active_tx.update_relationship_mutation_state(
-                    op_record,
-                    _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                    op_record, _RelationshipOperationState.RECOVERY_UNCERTAIN,
                 )
                 restoration_errors.append(
-                    f"Constraint target rollback '{op_id}' inspection failed: {type(exc).__name__}: {exc}"
+                    f"Constraint target rollback '{op_id}' pair inspection failed: {type(exc).__name__}: {exc}"
                 )
                 return
+            active_tx.update_relationship_mutation_state(op_record, classification)
+            if classification == _RelationshipOperationState.NO_EFFECT:
+                return
+            if classification == _RelationshipOperationState.RECOVERY_UNCERTAIN:
+                restoration_errors.append(
+                    f"Constraint target rollback '{op_id}' observed unrecognized target/subtarget pair"
+                )
+                return
+            state = _RelationshipOperationState.APPLIED_VERIFIED
 
         if state not in (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED):
             restoration_errors.append(
