@@ -2268,28 +2268,100 @@ def _is_collection_descendant_of(
     return False
 
 
+def _controller_role_for_name(name: str) -> tuple[str, str] | None:
+    """Resolve one of four Arm IK roles, never grant authority on its own."""
+    for side in ('L', 'R'):
+        if name == ARM_IK_TARGET_NAMES[side]:
+            return (side, 'target')
+        if name == ARM_POLE_TARGET_NAMES[side]:
+            return (side, 'pole_target')
+    return None
+
+
+def _controller_constraint_binding_proven(
+    arm: bpy.types.Object,
+    obj: bpy.types.Object,
+    role: tuple[str, str],
+    snapshot: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Prove the target Armature owns the original IK relationship by identity.
+
+    The transaction snapshot is read for rollback-time provenance, because the
+    live constraint target may already have been changed by the transaction.
+    An existing object with a familiar name or parent is not proof of a binding.
+    """
+    side, field = role
+    try:
+        pbone = arm.pose.bones.get(f'forearm.{side}')
+        if pbone is None:
+            return False
+        constraint = pbone.constraints.get(ARM_IK_CONSTRAINT_NAMES[side])
+        if constraint is None or constraint.type != 'IK':
+            return False
+        if snapshot is None:
+            bound = getattr(constraint, field, None)
+            return bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj
+        saved_bone = snapshot.get('pose_bones', {}).get(f'forearm.{side}', {})
+        for saved in saved_bone.get('constraints', ()):
+            if (saved.get('name') != ARM_IK_CONSTRAINT_NAMES[side]
+                    or saved.get('type') != 'IK'):
+                continue
+            if saved.get('con_ptr') != int(constraint.as_pointer()):
+                continue
+            if saved.get('con_ref') != constraint:
+                continue
+            bound = saved.get(field)
+            return bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj
+    except (AttributeError, KeyError, ReferenceError, TypeError, ValueError):
+        return False
+    return False
+
+
+def _controller_is_borrowed_by_other_armature(
+    arm: bpy.types.Object,
+    obj: bpy.types.Object,
+    role: tuple[str, str],
+) -> bool:
+    """Deny ambiguous multi-rig ownership even if the target rig has a binding."""
+    side, field = role
+    try:
+        for other in bpy.data.objects:
+            if other == arm or other.type != 'ARMATURE' or other.pose is None:
+                continue
+            bone = other.pose.bones.get(f'forearm.{side}')
+            if bone is None:
+                continue
+            con = bone.constraints.get(ARM_IK_CONSTRAINT_NAMES[side])
+            if con is None or con.type != 'IK':
+                continue
+            bound = getattr(con, field, None)
+            if bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj:
+                return True
+    except (AttributeError, ReferenceError, TypeError, ValueError):
+        # An indeterminate cross-rig ownership probe cannot grant permission.
+        return True
+    return False
+
+
 def _verify_controller_object_transaction_authority(
     obj: bpy.types.Object,
     tx: Any,
     *,
     created_only: bool = False,
 ) -> Optional[str]:
-    """Prove controller authority using BOTH Blender identity and transaction entry evidence.
+    """Check the existing transaction controller authorization boundary.
 
-    Names do not grant permissions. A created-object registry entry alone does not
-    grant permissions either: a pre-existing object's pointer must never become
-    transaction-created merely because an entry was inserted in the registry.
-    Returns 'TX_CREATED', 'SNAPSHOT_ORIGINAL', or None. Does not mutate resources.
+    TX_CREATED needs an independently minted registration receipt and absence
+    from the entry pointer baseline. SNAPSHOT_ORIGINAL additionally needs a
+    real original IK constraint binding, not merely a name-based snapshot.
     """
     if not isinstance(tx, _ArmRigTransactionContext):
         return None
     if tx.state not in (_ArmRigTransactionState.ACTIVE, _ArmRigTransactionState.ROLLING_BACK):
         return None
-    entry_ptrs = tx.entry_object_ptrs
-    if not isinstance(entry_ptrs, (frozenset, set)):
+    if not isinstance(tx.entry_object_ptrs, (frozenset, set)):
         return None
-    session_id = tx.session_id
-    record = tx.session_record
+    session_id, record = tx.session_id, tx.session_record
     if not isinstance(session_id, str) or not session_id or record is None:
         return None
     if _MANAGED_ARMATURE_IDENTITIES.get(session_id) is not record:
@@ -2299,48 +2371,93 @@ def _verify_controller_object_transaction_authority(
     try:
         if int(tx.arm.as_pointer()) != tx.arm_ptr or tx.arm_ptr != record.registration_pointer:
             return None
-        obj_ptr = int(obj.as_pointer())
-    except (ReferenceError, AttributeError, TypeError, ValueError):
-        return None
-    if obj_ptr <= 0 or _find_live_object_by_identity(obj, obj_ptr) is None:
-        return None
-
-    created = False
-    for registered in tx.created_controller_objects:
-        if not isinstance(registered, dict):
+        ptr = int(obj.as_pointer())
+        name = str(obj.name)
+        if ptr <= 0 or _find_live_object_by_identity(obj, ptr) is None:
             return None
-        if registered.get('obj_ptr') == obj_ptr:
-            if registered.get('obj_ref') != obj:
-                return None
-            created = True
-            break
-
-    snap = tx.snapshot
-    original = False
-    if isinstance(snap, dict):
-        controllers = snap.get('controllers')
-        if isinstance(controllers, dict):
-            for name, saved in controllers.items():
-                if name not in (
-                    ARM_IK_TARGET_NAMES['L'], ARM_IK_TARGET_NAMES['R'],
-                    ARM_POLE_TARGET_NAMES['L'], ARM_POLE_TARGET_NAMES['R'],
-                ):
-                    continue
-                if not isinstance(saved, dict) or not saved.get('exists'):
-                    continue
-                if saved.get('obj_ptr') == obj_ptr:
-                    if saved.get('obj_ref') != obj:
-                        return None
-                    original = True
-                    break
-
-    # An object cannot simultaneously be original in the entry snapshot and
-    # newly created by this transaction, irrespective of a forged registry.
-    if created and obj_ptr not in entry_ptrs and not original:
+    except (AttributeError, ReferenceError, TypeError, ValueError):
+        return None
+    role = _controller_role_for_name(name)
+    # Renaming a controller during a transaction does not erase its creation
+    # provenance; it does, however, bar new relationship authorizations by name.
+    created_regs = [r for r in tx.created_controller_objects
+                    if isinstance(r, dict) and r.get('obj_ptr') == ptr]
+    receipts = getattr(tx, '_controller_creation_receipts', None)
+    receipt = receipts.get(ptr) if isinstance(receipts, dict) else None
+    created = (
+        len(created_regs) == 1
+        and created_regs[0].get('obj_ref') == obj
+        and isinstance(receipt, tuple) and len(receipt) == 4
+        and receipt[0] == obj and receipt[1] == session_id
+        and receipt[2] == tx.tx_id and receipt[3] is tx._controller_receipt_seal
+        and ptr not in tx.entry_object_ptrs
+    )
+    if created:
         return 'TX_CREATED'
-    if not created_only and original and obj_ptr in entry_ptrs and not created:
-        return 'SNAPSHOT_ORIGINAL'
-    return None
+    if created_only or ptr not in tx.entry_object_ptrs or created_regs:
+        return None
+    snapshot = tx.snapshot
+    if not isinstance(snapshot, dict):
+        return None
+    # Resolve the ORIGINAL name and role by snapshot pointer/reference, so a
+    # renamed live object can still be safely restored without trusting its
+    # current name or borrowing another same-name replacement.
+    saved = None
+    for original_name, original_rec in snapshot.get('controllers', {}).items():
+        if not isinstance(original_rec, dict):
+            continue
+        if original_rec.get('obj_ptr') == ptr and original_rec.get('obj_ref') == obj:
+            if saved is not None:
+                return None
+            saved = original_rec
+            role = _controller_role_for_name(original_name)
+    if (role is None or not isinstance(saved, dict)
+            or saved.get('exists') is not True
+            or saved.get('type') != 'EMPTY' or obj.type != 'EMPTY'):
+        return None
+    if not _controller_constraint_binding_proven(tx.arm, obj, role, snapshot):
+        return None
+    if _controller_is_borrowed_by_other_armature(tx.arm, obj, role):
+        return None
+    return 'SNAPSHOT_ORIGINAL'
+
+
+def _require_existing_arm_ik_controller_ownership(
+    arm: bpy.types.Object,
+    *,
+    scope: str,
+) -> None:
+    """Read-only fail-closed preflight of every currently existing Arm IK role.
+
+    Run before setup/target/reset/influence writes. The sole owner is the
+    existing Arm IK Coordinator and transaction; this is NOT a second registry.
+    """
+    tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
+    for side in ('L', 'R'):
+        for name in (ARM_IK_TARGET_NAMES[side], ARM_POLE_TARGET_NAMES[side]):
+            obj = bpy.data.objects.get(name)
+            if obj is None:
+                continue
+            try:
+                ptr = int(obj.as_pointer())
+                if ptr <= 0 or _find_live_object_by_identity(obj, ptr) is None:
+                    raise RuntimeError('invalid Blender object identity')
+            except (ReferenceError, AttributeError, ValueError, TypeError) as exc:
+                raise RuntimeError(f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: {name} identity unreadable') from exc
+            if tx is not None and tx.arm == arm:
+                if _verify_controller_object_transaction_authority(obj, tx, created_only=True) == 'TX_CREATED':
+                    continue
+                if _verify_controller_object_transaction_authority(obj, tx) == 'SNAPSHOT_ORIGINAL':
+                    continue
+            role = _controller_role_for_name(name)
+            if (obj.type == 'EMPTY' and role is not None
+                    and _controller_constraint_binding_proven(arm, obj, role)
+                    and not _controller_is_borrowed_by_other_armature(arm, obj, role)):
+                continue
+            raise ExternalControllerNameConflictError(
+                f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: controller {name!r} '
+                'is present without a verified owning Armature/transaction binding'
+            )
 
 
 def _authorized_assign_object_parent(
@@ -2380,8 +2497,7 @@ def _authorized_assign_object_parent(
     controller_authority = _verify_controller_object_transaction_authority(obj, active_tx)
     if controller_authority is None:
         raise RuntimeError(
-            f"Object '{obj.name}' is not owned or identity-verified as managed by "
-            "the active transaction (TEST-224)"
+            f"Object '{obj.name}' is not owned or managed by the active transaction (TEST-224)"
         )
 
     # 5 & 6. New parent verification
@@ -3914,6 +4030,11 @@ def _authorized_restore_collection_object_relationships(
             live_original = _find_live_object_by_identity(original_ref, original_ptr)
             if live_original is None:
                 continue
+            if active_tx is not None and _verify_controller_object_transaction_authority(
+                live_original, active_tx,
+            ) != 'SNAPSHOT_ORIGINAL':
+                # Never restore memberships of merely observed external objects.
+                continue
             col_refs = c_snap.get("collection_refs")
             col_ptrs = c_snap.get("collection_ptrs")
             if col_refs is not None and col_ptrs is not None and len(col_refs) == len(col_ptrs):
@@ -4048,6 +4169,12 @@ def _rollback_arm_rig_state(
             restoration_errors.append(
                 f"Original controller identity lost: {original_name}"
             )
+            continue
+        if active_tx is not None and _verify_controller_object_transaction_authority(
+            live_original, active_tx,
+        ) != 'SNAPSHOT_ORIGINAL':
+            # An unrelated same-name controller may have been observed by the
+            # snapshot; observing is not authority to restore or reparent it.
             continue
 
         name_owner = bpy.data.objects.get(original_name)
@@ -5005,6 +5132,10 @@ class _ArmRigTransactionContext:
         self.created_controller_objects: List[
             Dict[str, Any]
         ] = []
+        # Independent transaction-local receipt ledger; names and legacy
+        # created_controller_objects alone are not deletion authority.
+        self._controller_receipt_seal = object()
+        self._controller_creation_receipts: Dict[int, Tuple[Any, str, str, object]] = {}
         self.created_constraints: List[
             Dict[str, Any]
         ] = []
@@ -5118,30 +5249,44 @@ class _ArmRigTransactionContext:
         self,
         obj: bpy.types.Object,
     ) -> None:
-        """Register creation only if the live object did not exist at tx entry."""
+        """Preserve the legacy API; attest an explicit creation in this ACTIVE tx.
+
+        This registration is a trusted explicit transaction operation, not an
+        automatically inferred permission from a controller name or a mutable
+        created_controller_objects entry alone.
+        """
         if self.state != _ArmRigTransactionState.ACTIVE:
-            raise RuntimeError("Cannot register created controller outside ACTIVE transaction")
+            raise RuntimeError('Cannot register created controller outside ACTIVE transaction')
         if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not self:
-            raise RuntimeError("Created controller registration requires its owning transaction")
+            raise RuntimeError('Created controller registration requires its owning transaction')
         if not isinstance(self.entry_object_ptrs, (frozenset, set)):
-            raise RuntimeError("Created controller registration has no trusted entry object baseline")
+            raise RuntimeError('Created controller registration has no trusted entry object baseline')
+        if (self.session_record is None
+                or _MANAGED_ARMATURE_IDENTITIES.get(self.session_id) is not self.session_record
+                or self.session_record.original_blender_ref is not self.arm):
+            raise RuntimeError('Created controller registration has no original Armature session identity')
         try:
             obj_ptr = int(obj.as_pointer())
             live = _find_live_object_by_identity(obj, obj_ptr)
         except (ReferenceError, AttributeError, TypeError, ValueError) as exc:
-            raise RuntimeError("Created controller identity could not be verified") from exc
+            raise RuntimeError('Created controller identity could not be verified') from exc
         if obj_ptr <= 0 or live is None:
-            raise RuntimeError("Created controller is not a live Blender Object")
+            raise RuntimeError('Created controller is not a live Blender Object')
         if obj_ptr in self.entry_object_ptrs:
-            raise RuntimeError("Cannot register a pre-existing object as transaction-created")
-        for record in self.created_controller_objects:
-            if not isinstance(record, dict) or record.get("obj_ptr") == obj_ptr:
-                raise RuntimeError("Duplicate or malformed transaction controller registration")
+            raise RuntimeError('Cannot register a pre-existing object as transaction-created')
+        if obj_ptr in self._controller_creation_receipts:
+            raise RuntimeError('Duplicate controller creation receipt')
+        for registered in self.created_controller_objects:
+            if not isinstance(registered, dict) or registered.get('obj_ptr') == obj_ptr:
+                raise RuntimeError('Duplicate or malformed transaction controller registration')
         self.created_controller_objects.append({
-            "obj_ref": obj,
-            "obj_ptr": obj_ptr,
-            "created_name": obj.name,
+            'obj_ref': obj, 'obj_ptr': obj_ptr, 'created_name': obj.name,
         })
+        # Receipt is independent of the mutable public legacy registry list.
+        self._controller_creation_receipts[obj_ptr] = (
+            obj, self.session_id, self.tx_id, self._controller_receipt_seal,
+        )
+
 
     def register_created_constraint(
         self,
@@ -6906,63 +7051,19 @@ def _arm_rig_transaction(arm: bpy.types.Object):
 
 def _verify_transaction_wrong_type_object_ownership(
     obj: bpy.types.Object,
-    tx: Optional["_ArmRigTransactionContext"],
+    tx: Optional['_ArmRigTransactionContext'],
     arm: Optional[bpy.types.Object] = None,
 ) -> bool:
-    """Verify whether the current active transaction owns a wrong-type object per F14-05.
-
-    Must satisfy all 8 conditions:
-    1. Active transaction exists and is in ACTIVE state.
-    2. Object exists in current transaction's created_controller_objects.
-    3. Registered obj_ref and live Blender object are the identical entity.
-    4. Registered obj_ptr matches current live pointer.
-    5. Object genuinely exists in bpy.data.objects.
-    6. Object pointer does NOT exist in transaction entry's original object pointer set.
-    7. Current transaction matches target Armature's session identity.
-    8. No ReferenceError, identity substitution, or unprovable state occurred.
-    """
+    """Only current transaction-created objects may be replaced by controller name."""
     if tx is None or tx.state != _ArmRigTransactionState.ACTIVE:
         return False
-
-    if tx.entry_object_ptrs is None:
+    if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not tx:
         return False
-
-    try:
-        live_ptr = int(obj.as_pointer())
-        live_name = str(obj.name)
-        if live_name not in bpy.data.objects or bpy.data.objects[live_name] != obj:
-            return False
-    except (ReferenceError, Exception):
+    if arm is not None and tx.arm is not arm:
         return False
-
-    if live_ptr in tx.entry_object_ptrs:
-        return False
-
-    matched = False
-    for reg in getattr(tx, "created_controller_objects", []):
-        if not isinstance(reg, dict):
-            continue
-        reg_ref = reg.get("obj_ref")
-        reg_ptr = reg.get("obj_ptr")
-        try:
-            if reg_ptr == live_ptr and reg_ref is not None and reg_ref == obj:
-                matched = True
-                break
-        except (ReferenceError, Exception):
-            continue
-
-    if not matched:
-        return False
-
-    if arm is not None:
-        try:
-            session_rec = ensure_armature_session_identity(arm)
-            if tx.session_id is not None and tx.session_id != session_rec.registry_session_id:
-                return False
-        except Exception:
-            return False
-
-    return True
+    return _verify_controller_object_transaction_authority(
+        obj, tx, created_only=True,
+    ) == 'TX_CREATED'
 
 
 def _get_or_create_empty(
@@ -6979,6 +7080,12 @@ def _get_or_create_empty(
     """
     global _ACTIVE_TRANSACTION_STACK
     obj = bpy.data.objects.get(name)
+    # Do not adopt an existing EMPTY simply because its global name matches.
+    if obj is not None:
+        tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
+        if tx is None:
+            raise RuntimeError('Controller lookup requires an active Arm IK transaction')
+        _require_existing_arm_ik_controller_ownership(tx.arm, scope='_get_or_create_empty')
     replaced_wrong_type = False
 
     if obj is not None and obj.type != "EMPTY":
@@ -7098,6 +7205,10 @@ def setup_arm_ik(
     """
     valid_influence = _validate_influence(initial_influence, param_name="initial_influence")
     arm = _resolve_armature(armature_obj)
+
+    # Full role ownership admission, including same-name external EMPTY
+    # objects. This runs before creating collections or modifying controllers.
+    _require_existing_arm_ik_controller_ownership(arm, scope='setup_arm_ik')
 
     # Preflight check 4 controller names for external wrong-type conflicts before entering transaction (F14-05 Entrance A)
     active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
@@ -7341,6 +7452,7 @@ def set_arm_ik_influence(
     valid_influence = _validate_influence(influence, param_name="influence")
     arm = _resolve_armature(armature_obj)
     sides = ("L", "R") if valid_side == "BOTH" else (valid_side,)
+    _require_existing_arm_ik_controller_ownership(arm, scope='set_arm_ik_influence')
 
     with _arm_rig_transaction(arm):
         for s in sides:
@@ -7370,6 +7482,7 @@ def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
     - Phase 5: Synchronizes dependency graph and commits. Any write exception triggers atomic rollback.
     """
     arm = _resolve_armature(armature_obj)
+    _require_existing_arm_ik_controller_ownership(arm, scope='reset_arm_ik')
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
     _depsgraph_update()
 
@@ -7447,6 +7560,7 @@ def get_arm_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dic
     """Inspect current world-space arm bone positions, target errors, bone lengths, and flexion."""
     valid_side = _validate_side(side, allow_both=False, param_name="side")
     arm = _resolve_armature(armature_obj)
+    _require_existing_arm_ik_controller_ownership(arm, scope='get_arm_ik_state')
     _depsgraph_update()
 
     p_up = arm.pose.bones[f"upper_arm.{valid_side}"]
@@ -7537,6 +7651,7 @@ def _preflight_arm_ik_parent_transforms(
     Returns:
         (needs_auto_init, eff_ik_mat, eff_pole_mat)
     """
+    _require_existing_arm_ik_controller_ownership(arm, scope='_preflight_arm_ik_parent_transforms')
     ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[valid_side])
     pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[valid_side])
     ik_valid = (ik_obj is not None and ik_obj.type == "EMPTY")
@@ -7644,6 +7759,7 @@ def set_hand_ik_target(
 
     # Phase B: Zero-mutation controller and environment preflight
     arm = _resolve_armature(armature_obj)
+    _require_existing_arm_ik_controller_ownership(arm, scope='set_hand_ik_target')
     _depsgraph_update()
     root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
 

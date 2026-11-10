@@ -43,6 +43,7 @@ from src.rig.arm_ik import (
     MIN_ARM_REACH,
     _ACTIVE_TRANSACTION_STACK,
     _arm_rig_transaction,
+    _require_existing_arm_ik_controller_ownership,
     get_arm_ik_state,
     ensure_armature_session_identity,
     query_admission_gate_status,
@@ -324,6 +325,11 @@ class WholeBodyController:
             session_id=session.registry_session_id,
         )
         if gate.get("can_admit") is True:
+            # Shared Arm IK ownership admission, before Leg IK initialization
+            # and before any WholeBodyController frame writes.
+            _require_existing_arm_ik_controller_ownership(
+                self.armature_obj, scope='WholeBodyController',
+            )
             return
         raise RuntimeError(
             "WBC_FRAME_ADMISSION_REJECTED: Arm IK admission denied before scene writes "
