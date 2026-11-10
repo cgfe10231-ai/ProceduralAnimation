@@ -3547,6 +3547,9 @@ def _authorized_revert_relationship_record(
         return
 
     if state == _RelationshipOperationState.RECOVERY_UNCERTAIN:
+        restoration_errors.append(
+            f"Relationship rollback '{op_id}' remains RECOVERY_UNCERTAIN; refusing undo"
+        )
         return
 
     try:
@@ -3554,7 +3557,7 @@ def _authorized_revert_relationship_record(
             "during_relationship_rollback_undo",
             {"op": op_record, "tx": active_tx},
         )
-    except BaseException:
+    except BaseException as exc:
         if op_record.get("operation_state") in (
             _RelationshipOperationState.APPLYING,
             _RelationshipOperationState.APPLIED_VERIFIED,
@@ -3564,6 +3567,9 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+        restoration_errors.append(
+            f"Relationship rollback '{op_id}' fault: {type(exc).__name__}: {exc}"
+        )
         return
 
     src_id = op_record.get("source_identity", {})
@@ -3648,10 +3654,13 @@ def _authorized_revert_relationship_record(
                         _RelationshipOperationState.NO_EFFECT,
                     )
                     return
-            except Exception:
+            except Exception as exc:
                 active_tx.update_relationship_mutation_state(
                     op_record,
                     _RelationshipOperationState.RECOVERY_UNCERTAIN,
+                )
+                restoration_errors.append(
+                    f"Constraint target rollback '{op_id}' inspection failed: {type(exc).__name__}: {exc}"
                 )
                 return
 
@@ -3929,6 +3938,7 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+            restoration_errors.append(f"Collection/Object APPLYING rollback '{op_id}' identity/ownership unproven")
             return
 
         is_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
@@ -3974,6 +3984,7 @@ def _authorized_revert_relationship_record(
             op_record,
             _RelationshipOperationState.RECOVERY_UNCERTAIN,
         )
+        restoration_errors.append(f"Collection/Object rollback '{op_id}' identity or ownership unproven")
         return
 
     if mutation == "COLLECTION_OBJECT_LINK":
@@ -3982,16 +3993,18 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+            restoration_errors.append(f"Collection/Object link rollback '{op_id}' lacks TX_ADDED authority")
             return
         try:
             if _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
                 live_col.objects.unlink(live_obj)
             still_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
-        except BaseException:
+        except BaseException as exc:
             active_tx.update_relationship_mutation_state(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+            restoration_errors.append(f"Collection/Object unlink rollback '{op_id}' failed: {type(exc).__name__}: {exc}")
             return
 
         if still_linked:
@@ -3999,6 +4012,7 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+            restoration_errors.append(f"Collection/Object link rollback '{op_id}' failed RNA unlink verification")
             return
 
         active_tx.update_relationship_mutation_state(
@@ -4011,16 +4025,18 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+            restoration_errors.append(f"Collection/Object unlink rollback '{op_id}' lacks TX_UNLINKED_ORIGINAL authority")
             return
         try:
             if not _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
                 live_col.objects.link(live_obj)
             now_linked = _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)
-        except BaseException:
+        except BaseException as exc:
             active_tx.update_relationship_mutation_state(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+            restoration_errors.append(f"Collection/Object relink rollback '{op_id}' failed: {type(exc).__name__}: {exc}")
             return
 
         if not now_linked:
@@ -4028,6 +4044,7 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
+            restoration_errors.append(f"Collection/Object unlink rollback '{op_id}' failed RNA relink verification")
             return
 
         active_tx.update_relationship_mutation_state(
@@ -4038,6 +4055,37 @@ def _authorized_revert_relationship_record(
         active_tx.update_relationship_mutation_state(
             op_record,
             _RelationshipOperationState.RECOVERY_UNCERTAIN,
+        )
+        restoration_errors.append(f"Unknown relationship rollback mutation '{mutation}' for '{op_id}'")
+
+
+def _authorized_restore_snapshot_collection_child(
+    parent_ref: bpy.types.Collection,
+    parent_ptr: int,
+    child_ref: bpy.types.Collection,
+    child_ptr: int,
+    restoration_errors: List[str],
+) -> None:
+    """Restore a baseline Collection hierarchy edge by original live identity."""
+    parent = _find_live_collection_by_identity(parent_ref, parent_ptr)
+    child = _find_live_collection_by_identity(child_ref, child_ptr)
+    if parent is None or child is None:
+        restoration_errors.append(
+            f"Snapshot Collection hierarchy identity unproven: parent={parent_ptr}, child={child_ptr}"
+        )
+        return
+    if _is_child_collection_linked_by_identity(parent, child, child_ptr):
+        return
+    try:
+        parent.children.link(child)
+    except BaseException as exc:
+        restoration_errors.append(
+            f"Snapshot Collection hierarchy relink failed: {type(exc).__name__}: {exc}"
+        )
+        return
+    if not _is_child_collection_linked_by_identity(parent, child, child_ptr):
+        restoration_errors.append(
+            f"Snapshot Collection hierarchy relink not reflected in RNA: parent={parent_ptr}, child={child_ptr}"
         )
 
 
@@ -4074,7 +4122,19 @@ def _authorized_ensure_snapshot_collection_link(
         return
 
     if not _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
-        live_col.objects.link(live_obj)
+        try:
+            live_col.objects.link(live_obj)
+        except BaseException as exc:
+            restoration_errors.append(
+                f"Snapshot Collection/Object membership restore failed (col={col_ptr}, obj={obj_ptr}): "
+                f"{type(exc).__name__}: {exc}"
+            )
+            return
+        if not _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
+            restoration_errors.append(
+                f"Snapshot Collection/Object membership restore did not take effect "
+                f"(col={col_ptr}, obj={obj_ptr})"
+            )
 
 
 def _authorized_restore_collection_object_relationships(
@@ -4094,7 +4154,8 @@ def _authorized_restore_collection_object_relationships(
                 logged_link_pairs.add((src_id.get("ptr"), tgt_id.get("ptr")))
                 _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
 
-        # Backward-compatibility for any manually registered created_collection_links not in prepared_relationship_mutations
+        # A legacy created_collection_links entry does NOT authorize destructive
+        # unlink. Only an actual Layer 3 relationship operation may be undone.
         for link_rec in reversed(list(getattr(active_tx, "created_collection_links", []))):
             col_ref = link_rec.get("col_ref")
             col_ptr = link_rec.get("col_ptr")
@@ -4104,9 +4165,12 @@ def _authorized_restore_collection_object_relationships(
                 continue
             live_col = _find_live_collection_by_identity(col_ref, col_ptr)
             live_obj = _find_live_object_by_identity(obj_ref, obj_ptr) if obj_ptr is not None else None
-            if live_col is not None and live_obj is not None:
-                if _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr):
-                    live_col.objects.unlink(live_obj)
+            if (live_col is not None and live_obj is not None
+                    and _is_object_linked_to_collection_by_identity(live_col, live_obj, obj_ptr)):
+                restoration_errors.append(
+                    f"Collection/Object rollback unauthorized without Layer 3 log: "
+                    f"collection_ptr={col_ptr}, object_ptr={obj_ptr}; no unlink performed"
+                )
 
     if phase in ("ALL", "POST_CONTROLLER_RESTORE"):
         if active_tx is not None:
@@ -4141,12 +4205,11 @@ def _authorized_restore_collection_object_relationships(
                             live_col, live_original, original_ptr, restoration_errors
                         )
             else:
-                for col_name in c_snap.get("collections", []):
-                    col = _find_collection_by_name(col_name)
-                    if col is not None:
-                        _authorized_ensure_snapshot_collection_link(
-                            col, live_original, original_ptr, restoration_errors
-                        )
+                if c_snap.get("collections"):
+                    restoration_errors.append(
+                        f"Controller '{c_name}' snapshot Collection identity metadata missing; "
+                        "refusing membership restoration by name"
+                    )
 
         # Ensure stashed objects' original collection memberships are intact by identity
         if active_tx is not None:
@@ -4166,12 +4229,57 @@ def _authorized_restore_collection_object_relationships(
                                 live_col, live_stashed, obj_ptr, restoration_errors
                             )
                 else:
-                    for col_name in stashed.get("collections", []):
-                        col = _find_collection_by_name(col_name)
-                        if col is not None:
-                            _authorized_ensure_snapshot_collection_link(
-                                col, live_stashed, obj_ptr, restoration_errors
-                            )
+                    if stashed.get("collections"):
+                        restoration_errors.append(
+                            "Stashed object snapshot Collection identity metadata missing; "
+                            "refusing membership restoration by name"
+                        )
+
+
+def _authorized_restore_snapshot_object_parent(
+    obj_ref: bpy.types.Object,
+    obj_ptr: int,
+    parent_ref: Optional[bpy.types.Object],
+    parent_ptr: Optional[int],
+    orig_inverse: Any,
+    restoration_errors: List[str],
+) -> None:
+    """Restore a snapshot parent relationship only with proved live identities."""
+    live_obj = _find_live_object_by_identity(obj_ref, obj_ptr)
+    if live_obj is None or orig_inverse is None:
+        restoration_errors.append("Snapshot object parent authority missing: original object/inverse unavailable")
+        return
+    if parent_ref is None:
+        if parent_ptr is not None:
+            restoration_errors.append("Snapshot object parent reference missing for recorded pointer")
+            return
+        live_parent = None
+    else:
+        if not isinstance(parent_ptr, int) or parent_ptr <= 0:
+            restoration_errors.append("Snapshot object parent original pointer missing")
+            return
+        live_parent = _find_live_object_by_identity(parent_ref, parent_ptr)
+        if live_parent is None:
+            restoration_errors.append("Snapshot object parent identity lost; refusing reparent")
+            return
+    try:
+        current_parent = live_obj.parent
+        current_ptr = current_parent.as_pointer() if current_parent is not None else None
+        current_inv = live_obj.matrix_parent_inverse
+        if (current_parent == live_parent and current_ptr == parent_ptr
+                and _matrix_equals(current_inv, orig_inverse)):
+            return
+        live_obj.parent = live_parent
+        live_obj.matrix_parent_inverse = orig_inverse.copy()
+        final_parent = live_obj.parent
+        final_ptr = final_parent.as_pointer() if final_parent is not None else None
+        if (final_parent != live_parent or final_ptr != parent_ptr
+                or not _matrix_equals(live_obj.matrix_parent_inverse, orig_inverse)):
+            restoration_errors.append("Snapshot object parent restoration failed identity/inverse verification")
+    except BaseException as exc:
+        restoration_errors.append(
+            f"Snapshot object parent restoration failed: {type(exc).__name__}: {exc}"
+        )
 
 
 def _rollback_arm_rig_state(
@@ -4342,18 +4450,24 @@ def _rollback_arm_rig_state(
                         break
 
         if not parent_restored_via_tx:
+            _authorized_restore_snapshot_object_parent(
+                live_original, original_ptr, c_snap.get("parent"),
+                c_snap.get("parent_ptr"), c_snap.get("matrix_parent_inverse"),
+                restoration_errors,
+            )
+        else:
+            # A logged rollback owns the undo: never overwrite it with a second
+            # unlogged parent write. Check that it actually restored the snapshot.
             snap_parent = c_snap.get("parent")
             snap_parent_ptr = c_snap.get("parent_ptr")
-            live_parent = None
-            if snap_parent is not None:
-                live_parent = _find_live_object_by_identity(snap_parent, snap_parent_ptr)
-                if live_parent is None:
-                    restoration_errors.append(
-                        f"Original controller '{original_name}' parent destroyed or identity lost"
-                    )
-            live_original.parent = live_parent
-            if "matrix_parent_inverse" in c_snap:
-                live_original.matrix_parent_inverse = c_snap["matrix_parent_inverse"].copy()
+            curr_parent = live_original.parent
+            curr_ptr = curr_parent.as_pointer() if curr_parent is not None else None
+            if (curr_parent != snap_parent or curr_ptr != snap_parent_ptr
+                    or not _matrix_equals(live_original.matrix_parent_inverse,
+                                          c_snap.get("matrix_parent_inverse"))):
+                restoration_errors.append(
+                    f"Controller '{original_name}' logged parent rollback does not match snapshot"
+                )
 
         live_original.rotation_mode = c_snap["rotation_mode"]
         live_original.location = c_snap["location"].copy()
@@ -4814,62 +4928,46 @@ def _rollback_arm_rig_state(
                     "Original Character collection destroyed"
                 )
             else:
-                if live_ptr != original_ptr:
+                if (live_ptr != original_ptr
+                        or _find_live_collection_by_identity(col, original_ptr) is None):
                     restoration_errors.append(
-                        "Character collection identity changed"
+                        "Character collection original live identity changed"
                     )
                 else:
-                    # Identity verified! Restore name, parents, children, and members.
+                    # Only snapshot-proven hierarchy edges may be restored.
                     if orig_name is not None and col.name != orig_name:
                         col.name = orig_name
 
-                    should_be_in_scene = char_col_snap.get("children_of_scene", False)
-                    is_in_scene = any(
-                        c.as_pointer() == col.as_pointer()
-                        for c in (bpy.context.scene.collection.children if bpy.context.scene else [])
-                    )
-                    if should_be_in_scene and not is_in_scene:
-                        bpy.context.scene.collection.children.link(col)
-
-                    # Parent Collection restoration by reference
-                    expected_parents = char_col_snap.get(
-                        "parent_refs", []
-                    )
-                    for parent in expected_parents:
-                        try:
-                            parent_ptr = parent.as_pointer()
-                        except ReferenceError:
-                            restoration_errors.append(
-                                "Original Character parent collection destroyed"
+                    if char_col_snap.get("children_of_scene", False):
+                        scene = bpy.context.scene if bpy.context else None
+                        if scene is None:
+                            restoration_errors.append("Original scene root unavailable for Character collection")
+                        else:
+                            scene_root = scene.collection
+                            _authorized_restore_snapshot_collection_child(
+                                scene_root, scene_root.as_pointer(), col, original_ptr,
+                                restoration_errors,
                             )
-                            continue
 
-                        linked = any(
-                            child.as_pointer() == col.as_pointer()
-                            for child in parent.children
-                        )
-                        if not linked:
-                            parent.children.link(col)
-
-                    # Child Collection restoration by reference
-                    expected_children = char_col_snap.get(
-                        "child_refs", []
-                    )
-                    for child in expected_children:
-                        try:
-                            child_ptr = child.as_pointer()
-                        except ReferenceError:
-                            restoration_errors.append(
-                                "Original Character child collection destroyed"
+                    expected_parents = char_col_snap.get("parent_refs", [])
+                    expected_parent_ptrs = char_col_snap.get("parent_ptrs", [])
+                    if len(expected_parents) != len(expected_parent_ptrs):
+                        restoration_errors.append("Character parent snapshot refs/pointers length mismatch")
+                    else:
+                        for parent, parent_ptr in zip(expected_parents, expected_parent_ptrs):
+                            _authorized_restore_snapshot_collection_child(
+                                parent, parent_ptr, col, original_ptr, restoration_errors,
                             )
-                            continue
 
-                        linked = any(
-                            current.as_pointer() == child_ptr
-                            for current in col.children
-                        )
-                        if not linked:
-                            col.children.link(child)
+                    expected_children = char_col_snap.get("child_refs", [])
+                    expected_child_ptrs = char_col_snap.get("child_ptrs", [])
+                    if len(expected_children) != len(expected_child_ptrs):
+                        restoration_errors.append("Character child snapshot refs/pointers length mismatch")
+                    else:
+                        for child, child_ptr in zip(expected_children, expected_child_ptrs):
+                            _authorized_restore_snapshot_collection_child(
+                                col, original_ptr, child, child_ptr, restoration_errors,
+                            )
 
                     # Member Objects restoration by reference via Layer 3
                     expected_refs = char_col_snap.get(
