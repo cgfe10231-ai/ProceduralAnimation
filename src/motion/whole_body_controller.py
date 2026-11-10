@@ -16,6 +16,7 @@ whole-body controller coordinating:
 from __future__ import annotations
 
 import math
+import copy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
@@ -40,6 +41,8 @@ from src.motion.rigid_link import (
 from src.rig.arm_ik import (
     MAX_ARM_REACH,
     MIN_ARM_REACH,
+    _ACTIVE_TRANSACTION_STACK,
+    _arm_rig_transaction,
     get_arm_ik_state,
     ensure_armature_session_identity,
     query_admission_gate_status,
@@ -332,7 +335,296 @@ class WholeBodyController:
             f"identity_reasons={gate.get('identity_reasons')})"
         )
 
+    # WBC-02: A frame is one failure domain across Root, pose/FK, Leg and Arm IK.
+    # This is a logical boundary only; physical six-layer extraction comes later.
+    _WBC_FOOT_METADATA_KEYS = (
+        "is_locked",
+        "contact_world_xyz",
+        "locked_ankle_world_xyz",
+        "target_rotation_deg",
+        "locked_foot_head_xyz",
+        "locked_foot_tail_xyz",
+        "locked_foot_center_xyz",
+        "locked_foot_min_z",
+    )
+
+    @staticmethod
+    def _wbc_clone_idprop(value: Any) -> Any:
+        """Copy Blender IDProperty values to detached Python-native snapshots."""
+        if isinstance(value, (str, bool, int, float, type(None))):
+            return value
+        if hasattr(value, "to_list"):
+            return [WholeBodyController._wbc_clone_idprop(v) for v in value.to_list()]
+        if isinstance(value, Mapping) or hasattr(value, "items"):
+            return {str(k): WholeBodyController._wbc_clone_idprop(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [WholeBodyController._wbc_clone_idprop(v) for v in value]
+        return copy.deepcopy(value)
+
+    @staticmethod
+    def _wbc_verify_live_object(obj: bpy.types.Object, expected_ptr: int, label: str) -> None:
+        """A same-named replacement is never the original Blender resource."""
+        try:
+            actual_ptr = int(obj.as_pointer())
+            is_registered = any(
+                candidate == obj and int(candidate.as_pointer()) == expected_ptr
+                for candidate in bpy.data.objects
+            )
+        except BaseException as exc:
+            raise RuntimeError(f"WBC_FRAME_IDENTITY_UNVERIFIED: {label}: {exc}") from exc
+        if actual_ptr != expected_ptr or not is_registered:
+            raise RuntimeError(
+                f"WBC_FRAME_IDENTITY_UNVERIFIED: {label}: live pointer changed "
+                f"({actual_ptr} != {expected_ptr}) or original object is absent"
+            )
+
+    @staticmethod
+    def _wbc_object_snapshot(obj: bpy.types.Object, label: str, foot: bool = False) -> Dict[str, Any]:
+        ptr = int(obj.as_pointer())
+        WholeBodyController._wbc_verify_live_object(obj, ptr, label)
+        parent = obj.parent
+        parent_ptr = int(parent.as_pointer()) if parent is not None else None
+        if parent is not None:
+            WholeBodyController._wbc_verify_live_object(parent, parent_ptr, f"{label}.parent")
+        meta = {}
+        if foot:
+            meta = {
+                key: WholeBodyController._wbc_clone_idprop(obj[key])
+                for key in WholeBodyController._WBC_FOOT_METADATA_KEYS
+                if key in obj
+            }
+        return {
+            "ref": obj,
+            "ptr": ptr,
+            "parent": parent,
+            "parent_ptr": parent_ptr,
+            "matrix_parent_inverse": obj.matrix_parent_inverse.copy(),
+            "matrix_world": obj.matrix_world.copy(),
+            "rotation_mode": str(obj.rotation_mode),
+            "location": obj.location.copy(),
+            "rotation_euler": obj.rotation_euler.copy(),
+            "rotation_quaternion": obj.rotation_quaternion.copy(),
+            "rotation_axis_angle": tuple(obj.rotation_axis_angle),
+            "scale": obj.scale.copy(),
+            "delta_location": obj.delta_location.copy(),
+            "delta_rotation_euler": obj.delta_rotation_euler.copy(),
+            "delta_rotation_quaternion": obj.delta_rotation_quaternion.copy(),
+            "delta_scale": obj.delta_scale.copy(),
+            "foot": foot,
+            "metadata": meta,
+        }
+
+    def _wbc_capture_frame_state(self) -> Dict[str, Any]:
+        """Read-only pre-frame snapshot of every non-Arm-IK WBC-controlled write."""
+        arm = self.armature_obj
+        arm_ptr = int(arm.as_pointer())
+        self._wbc_verify_live_object(arm, arm_ptr, "armature")
+        entries: Dict[str, Dict[str, Any]] = {}
+        if self.root_obj is not None:
+            entries["root"] = self._wbc_object_snapshot(self.root_obj, "root")
+        entries["armature"] = self._wbc_object_snapshot(arm, "armature")
+        # Foot controllers must already be initialized. Refuse before any frame
+        # write rather than letting legacy leg code create untracked resources.
+        for label in ("FootIK.L", "FootIK.R", "KneePole.L", "KneePole.R"):
+            obj = bpy.data.objects.get(label)
+            if obj is None or obj.type != "EMPTY":
+                raise RuntimeError(f"WBC_FRAME_SNAPSHOT_REJECTED: missing/invalid {label}")
+            entries[label] = self._wbc_object_snapshot(obj, label, foot=True)
+        bones: Dict[str, Dict[str, Any]] = {}
+        for pb in arm.pose.bones:
+            bones[pb.name] = {
+                "ref": pb,
+                "ptr": int(pb.as_pointer()),
+                "location": pb.location.copy(),
+                "rotation_mode": str(pb.rotation_mode),
+                "rotation_euler": pb.rotation_euler.copy(),
+                "rotation_quaternion": pb.rotation_quaternion.copy(),
+                "rotation_axis_angle": tuple(pb.rotation_axis_angle),
+                "scale": pb.scale.copy(),
+                "matrix_basis": pb.matrix_basis.copy(),
+            }
+        return {"arm_ref": arm, "arm_ptr": arm_ptr, "objects": entries, "bones": bones}
+
+    @staticmethod
+    def _wbc_max_difference(actual: Any, expected: Any) -> float:
+        return max((abs(float(a) - float(b)) for a, b in zip(actual, expected)), default=0.0)
+
+    def _wbc_restore_frame_state(self, snap: Dict[str, Any]) -> None:
+        """Restore Root, all pose channels, and leg controllers; Arm IK then rolls back itself.
+
+        Called *inside* the outer Arm IK transaction, before propagating the
+        original exception to the Arm transaction's own rollback machinery.
+        All resource identity checks precede the first compensating write.
+        """
+        arm = snap["arm_ref"]
+        self._wbc_verify_live_object(arm, snap["arm_ptr"], "armature")
+        for label, data in snap["objects"].items():
+            self._wbc_verify_live_object(data["ref"], data["ptr"], label)
+            parent = data["parent"]
+            if parent is not None:
+                self._wbc_verify_live_object(parent, data["parent_ptr"], f"{label}.original_parent")
+        for name, data in snap["bones"].items():
+            try:
+                bone = arm.pose.bones.get(name)
+                if bone is None or bone != data["ref"] or int(bone.as_pointer()) != data["ptr"]:
+                    raise RuntimeError("original PoseBone identity lost")
+            except BaseException as exc:
+                raise RuntimeError(f"WBC_FRAME_IDENTITY_UNVERIFIED: PoseBone {name}: {exc}") from exc
+
+        for label, data in snap["objects"].items():
+            obj = data["ref"]
+            obj.parent = data["parent"]
+            obj.matrix_parent_inverse = data["matrix_parent_inverse"].copy()
+            obj.rotation_mode = data["rotation_mode"]
+            obj.location = data["location"].copy()
+            obj.rotation_euler = data["rotation_euler"].copy()
+            obj.rotation_quaternion = data["rotation_quaternion"].copy()
+            obj.rotation_axis_angle = data["rotation_axis_angle"]
+            obj.scale = data["scale"].copy()
+            obj.delta_location = data["delta_location"].copy()
+            obj.delta_rotation_euler = data["delta_rotation_euler"].copy()
+            obj.delta_rotation_quaternion = data["delta_rotation_quaternion"].copy()
+            obj.delta_scale = data["delta_scale"].copy()
+            if data["foot"]:
+                for key in self._WBC_FOOT_METADATA_KEYS:
+                    if key in data["metadata"]:
+                        obj[key] = self._wbc_clone_idprop(data["metadata"][key])
+                    elif key in obj:
+                        del obj[key]
+
+        for name, data in snap["bones"].items():
+            bone = data["ref"]
+            bone.rotation_mode = data["rotation_mode"]
+            bone.location = data["location"].copy()
+            bone.rotation_euler = data["rotation_euler"].copy()
+            bone.rotation_quaternion = data["rotation_quaternion"].copy()
+            bone.rotation_axis_angle = data["rotation_axis_angle"]
+            bone.scale = data["scale"].copy()
+            bone.matrix_basis = data["matrix_basis"].copy()
+
+        bpy.context.view_layer.update()
+        # Prove restored state, do not merely assume setter calls succeeded.
+        tol = 1e-5
+        for label, data in snap["objects"].items():
+            obj = data["ref"]
+            cur_parent = obj.parent
+            if cur_parent != data["parent"]:
+                raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {label}.parent")
+            if cur_parent is not None and int(cur_parent.as_pointer()) != data["parent_ptr"]:
+                raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {label}.parent_ptr")
+            if str(obj.rotation_mode) != data["rotation_mode"]:
+                raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {label}.rotation_mode")
+            for field in (
+                "location", "rotation_euler", "rotation_quaternion", "rotation_axis_angle",
+                "scale", "delta_location", "delta_rotation_euler",
+                "delta_rotation_quaternion", "delta_scale",
+            ):
+                if self._wbc_max_difference(getattr(obj, field), data[field]) > tol:
+                    raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {label}.{field}")
+            for matrix_field in ("matrix_parent_inverse", "matrix_world"):
+                now_mat = getattr(obj, matrix_field)
+                saved_mat = data[matrix_field]
+                max_diff = max(
+                    abs(float(now_mat[row][col]) - float(saved_mat[row][col]))
+                    for row in range(4) for col in range(4)
+                )
+                if max_diff > 1e-4:
+                    raise RuntimeError(
+                        f"WBC_FRAME_ROLLBACK_UNVERIFIED: {label}.{matrix_field} diff={max_diff}"
+                    )
+            if data["foot"]:
+                for key in self._WBC_FOOT_METADATA_KEYS:
+                    if (key in obj) != (key in data["metadata"]):
+                        raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {label}[{key}] presence")
+                    if key in data["metadata"]:
+                        if self._wbc_clone_idprop(obj[key]) != data["metadata"][key]:
+                            raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {label}[{key}] value")
+        for name, data in snap["bones"].items():
+            bone = data["ref"]
+            if str(bone.rotation_mode) != data["rotation_mode"]:
+                raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {name}.rotation_mode")
+            for field in ("location", "rotation_euler", "rotation_quaternion", "rotation_axis_angle", "scale"):
+                if self._wbc_max_difference(getattr(bone, field), data[field]) > tol:
+                    raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {name}.{field}")
+            basis = bone.matrix_basis
+            old_basis = data["matrix_basis"]
+            if max(abs(float(basis[i][j]) - float(old_basis[i][j])) for i in range(4) for j in range(4)) > 1e-4:
+                raise RuntimeError(f"WBC_FRAME_ROLLBACK_UNVERIFIED: {name}.matrix_basis")
+
     def execute_frame(
+        self,
+        targets: WholeBodyControlTargets,
+        update_scene: bool = True,
+        enforce_rom_clamping: bool = False,
+        tolerance_position_m: float = 0.005,
+        tolerance_rotation_deg: float = 1.0,
+    ) -> WholeBodyControlResult:
+        """Atomic WBC failure domain; preserves genuine negative reachability feedback.
+
+        All hand target writes share ONE Arm IK transaction. Failure in either
+        hand rolls back both; WBC first compensates Root/Leg/FK changes so that
+        the Arm IK rollback sees exactly its original outer scene transforms.
+        No cleanup-state decisions or resource deletion authority are added.
+        """
+        self._require_arm_ik_frame_admission()
+        # A WBC frame must own the outermost arm transaction. Entering while
+        # another caller owns one would leave Root/Leg writes outside that
+        # caller's rollback responsibilities if it aborts later.
+        if _ACTIVE_TRANSACTION_STACK:
+            raise RuntimeError(
+                "WBC_FRAME_NESTED_TRANSACTION_REJECTED: another Arm IK transaction is active"
+            )
+        frame_snapshot = self._wbc_capture_frame_state()
+        # Existing Arm IK coordinator is the only owner of Arm IK transaction
+        # state. Never implement another competing Arm IK state machine here.
+        outer_tx = None
+        compensation_attempted = False
+        try:
+            with _arm_rig_transaction(self.armature_obj) as outer_tx:
+                try:
+                    outcome = self._execute_frame_dispatch(
+                        targets,
+                        update_scene=update_scene,
+                        enforce_rom_clamping=enforce_rom_clamping,
+                        tolerance_position_m=tolerance_position_m,
+                        tolerance_rotation_deg=tolerance_rotation_deg,
+                    )
+                except BaseException as primary_exc:
+                    compensation_attempted = True
+                    try:
+                        # Restore Root/Leg/FK before the Arm IK coordinator
+                        # executes its own rollback and snapshot verification.
+                        self._wbc_restore_frame_state(frame_snapshot)
+                    except BaseException as restore_exc:
+                        raise RuntimeError(
+                            "WBC_FRAME_ROLLBACK_FAILED: non-Arm frame compensation "
+                            f"failed after {type(primary_exc).__name__}: {primary_exc}; "
+                            f"restoration error {type(restore_exc).__name__}: {restore_exc}"
+                        ) from restore_exc
+                    raise
+        except BaseException as coordinator_exc:
+            # A failure during coordinator COMMIT preparation happens *after*
+            # dispatch returned, i.e. outside its exception handler. Make a
+            # best-effort, identity-verified WBC compensation, but do not
+            # conceal or clear FAILED isolation created by Arm IK itself.
+            # A failure AFTER logical commit is different: CLEANUP_PENDING
+            # retains irreversible committed work and must never be undone.
+            state_name = getattr(getattr(outer_tx, "state", None), "value", None)
+            if (not compensation_attempted and outer_tx is not None
+                    and state_name != "COMMITTED" and state_name != "CLEANUP_PENDING"):
+                try:
+                    self._wbc_restore_frame_state(frame_snapshot)
+                except BaseException as restore_exc:
+                    raise RuntimeError(
+                        "WBC_FRAME_ROLLBACK_FAILED: coordinator failure followed "
+                        f"by non-Arm rollback failure: {type(restore_exc).__name__}: {restore_exc}; "
+                        f"coordinator error: {type(coordinator_exc).__name__}: {coordinator_exc}"
+                    ) from restore_exc
+            raise
+        # Success or a truthful nonexception 'unreachable target' result.
+        return outcome
+
+    def _execute_frame_dispatch(
         self,
         targets: WholeBodyControlTargets,
         update_scene: bool = True,
