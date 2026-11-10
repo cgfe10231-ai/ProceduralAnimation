@@ -1773,6 +1773,25 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
                 "pole_target": getattr(con, "pole_target", None),
                 "pole_subtarget": getattr(con, "pole_subtarget", ""),
             }
+            # Save original Blender Object identity while the snapshot is taken.
+            # A later live pointer lookup alone cannot prove the original target.
+            for target_field in ("target", "pole_target"):
+                original_target = c_dict[target_field]
+                if original_target is None:
+                    c_dict[f"{target_field}_ptr"] = None
+                    continue
+                try:
+                    original_target_ptr = int(original_target.as_pointer())
+                except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+                    raise RuntimeError(
+                        f"Constraint snapshot identity unreadable: {pbone.name}/{con.name}/{target_field}"
+                    ) from exc
+                if (original_target_ptr <= 0
+                        or _find_live_object_by_identity(original_target, original_target_ptr) is None):
+                    raise RuntimeError(
+                        f"Constraint snapshot target identity unverified: {pbone.name}/{con.name}/{target_field}"
+                    )
+                c_dict[f"{target_field}_ptr"] = original_target_ptr
             if con.type == "IK":
                 c_dict.update({
                     "chain_count": getattr(con, "chain_count", 0),
@@ -4338,6 +4357,120 @@ def _authorized_restore_snapshot_object_parent(
         )
 
 
+def _authorized_restore_snapshot_constraint_targets_without_tx(
+    con: bpy.types.Constraint,
+    sc: Dict[str, Any],
+    bone_name: str,
+    restoration_errors: List[str],
+) -> None:
+    """Restore snapshot Constraint target pairs, refusing unproved Blender identities.
+
+    All original target identities and BOTH field pairs are checked before writes.
+    If a setter fails or verification fails, attempt a compensating restoration
+    of the pre-call state and ALWAYS record a rollback error (never claim success).
+    """
+    label = f"{bone_name}/{sc.get('name', '<unknown>')}"
+    planned = []
+    previous = []
+
+    def target_matches(current: Any, expected: Any, expected_ptr: Optional[int]) -> bool:
+        if expected is None:
+            return current is None and expected_ptr is None
+        if current is None or type(expected_ptr) is not int or expected_ptr <= 0:
+            return False
+        try:
+            return (current == expected
+                    and int(current.as_pointer()) == expected_ptr
+                    and _find_live_object_by_identity(expected, expected_ptr) is not None)
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
+            return False
+
+    try:
+        original_con = sc.get("con_ref")
+        original_con_ptr = sc.get("con_ptr")
+        if (original_con is None or type(original_con_ptr) is not int
+                or original_con_ptr <= 0 or con != original_con
+                or int(con.as_pointer()) != original_con_ptr
+                or int(original_con.as_pointer()) != original_con_ptr):
+            raise RuntimeError("original Constraint identity mismatch")
+
+        for field, subfield in (("target", "subtarget"), ("pole_target", "pole_subtarget")):
+            has_target = hasattr(con, field)
+            has_sub = hasattr(con, subfield)
+            expected_target = sc.get(field)
+            expected_sub = sc.get(subfield, "")
+            ptr_key = f"{field}_ptr"
+            if ptr_key not in sc:
+                raise RuntimeError(f"snapshot lacks captured original pointer for {field}")
+            expected_ptr = sc[ptr_key]
+            if not isinstance(expected_sub, str):
+                raise RuntimeError(f"{subfield} snapshot is not a string")
+            if not has_target:
+                if (has_sub or expected_target is not None or expected_ptr is not None
+                        or expected_sub != ""):
+                    raise RuntimeError(f"{field} unavailable but snapshot contains relationship")
+                continue
+            if not has_sub and expected_sub:
+                raise RuntimeError(f"{subfield} property absent but snapshot is nonempty")
+            if not target_matches(expected_target, expected_target, expected_ptr):
+                raise RuntimeError(f"{field} original Object identity unproven/dead")
+            current_target = getattr(con, field)
+            current_ptr = None
+            if current_target is not None:
+                current_ptr = int(current_target.as_pointer())
+                if (current_ptr <= 0
+                        or _find_live_object_by_identity(current_target, current_ptr) is None):
+                    raise RuntimeError(f"{field} current Object identity unreadable/dead")
+            current_sub = getattr(con, subfield) if has_sub else ""
+            if not isinstance(current_sub, str):
+                raise RuntimeError(f"{subfield} current value is not a string")
+            planned.append((field, subfield, has_sub, expected_target, expected_ptr, expected_sub))
+            previous.append((field, subfield, has_sub, current_target, current_ptr, current_sub))
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+        restoration_errors.append(f"BUG-07 snapshot Constraint target authority denied [{label}]: {exc}")
+        return
+
+    if not planned:
+        return
+
+    try:
+        for field, subfield, has_sub, expected_target, expected_ptr, expected_sub in planned:
+            if not target_matches(getattr(con, field), expected_target, expected_ptr):
+                setattr(con, field, expected_target)
+            if has_sub and getattr(con, subfield) != expected_sub:
+                setattr(con, subfield, expected_sub)
+
+        for field, subfield, has_sub, expected_target, expected_ptr, expected_sub in planned:
+            if not target_matches(getattr(con, field), expected_target, expected_ptr):
+                raise RuntimeError(f"{field} RNA did not restore original pointer")
+            if has_sub and getattr(con, subfield) != expected_sub:
+                raise RuntimeError(f"{subfield} RNA did not restore original string")
+    except BaseException as exc:
+        # A pair of RNA setters is not physically atomic. Compensate any
+        # partial writes back to the exact pre-call values, without hiding error.
+        compensation_errors = []
+        for field, subfield, has_sub, old_target, old_ptr, old_sub in reversed(previous):
+            try:
+                actual_target = getattr(con, field)
+                if not target_matches(actual_target, old_target, old_ptr):
+                    setattr(con, field, old_target)
+                if has_sub and getattr(con, subfield) != old_sub:
+                    setattr(con, subfield, old_sub)
+                if not target_matches(getattr(con, field), old_target, old_ptr):
+                    raise RuntimeError(f"{field} compensation RNA identity mismatch")
+                if has_sub and getattr(con, subfield) != old_sub:
+                    raise RuntimeError(f"{subfield} compensation RNA value mismatch")
+            except BaseException as compensation_exc:
+                compensation_errors.append(
+                    f"{field}/{subfield}: {type(compensation_exc).__name__}: {compensation_exc}"
+                )
+        restoration_errors.append(
+            f"BUG-07 snapshot Constraint targets restore failed [{label}]: "
+            f"{type(exc).__name__}: {exc}; compensation="
+            + ("OK" if not compensation_errors else "FAILED [" + "; ".join(compensation_errors) + "]")
+        )
+
+
 def _rollback_arm_rig_state(
     arm: bpy.types.Object,
     snapshot: Dict[str, Any],
@@ -4699,15 +4832,9 @@ def _rollback_arm_rig_state(
                     )
 
             if active_tx is None:
-                # Direct rollback without transaction: assign targets with identity verification
-                if hasattr(con, "target"):
-                    con.target = sc.get("target")
-                if hasattr(con, "subtarget"):
-                    con.subtarget = sc.get("subtarget", "")
-                if hasattr(con, "pole_target"):
-                    con.pole_target = sc.get("pole_target")
-                if hasattr(con, "pole_subtarget"):
-                    con.pole_subtarget = sc.get("pole_subtarget", "")
+                _authorized_restore_snapshot_constraint_targets_without_tx(
+                    con, sc, b_name, restoration_errors,
+                )
             else:
                 # When active_tx is present, verify targets match snapshot after Step 0 reversion
                 if hasattr(con, "target") and con.target != sc.get("target"):
