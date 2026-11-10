@@ -4593,97 +4593,197 @@ def _rollback_arm_rig_state(
                         pbone.constraints.move(idx_i, idx_j)
                         live_ptr_to_idx = {c.as_pointer(): idx for idx, c in enumerate(pbone.constraints)}
 
-    # Step 3: Collection hierarchy restoration with strict ownership isolation
-    # 3.0: Revert transaction-created / transaction-unlinked Collection Parent/Child relationships via Layer 3
+    # Step 3: Collection hierarchy rollback. Both relationship undo and
+    # collection deletion must prove the same creation ownership.
+    # Validate the ENTIRE receipt ledger before the first Collection mutation:
+    # rejecting one forged entry must not leave earlier entries partly deleted.
+    verified_created_collections = {}
+    collection_rollback_authorized = active_tx is not None
     if active_tx is not None:
-        for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
-            if op_record.get("intended_mutation") in (
-                "COLLECTION_CHILD_LINK",
-                "COLLECTION_CHILD_UNLINK",
+        try:
+            registered = getattr(active_tx, "created_collections", None)
+            receipts = getattr(active_tx, "_collection_creation_receipts", None)
+            entry_ptrs = getattr(active_tx, "entry_collection_ptrs", None)
+            session = getattr(active_tx, "session_record", None)
+            if not isinstance(registered, list) or not isinstance(receipts, dict):
+                raise RuntimeError("Collection registry/receipt ledger unavailable")
+            if not isinstance(entry_ptrs, (set, frozenset)):
+                raise RuntimeError("Collection entry baseline unavailable")
+            if (session is None
+                    or getattr(active_tx, "session_id", None) is None
+                    or _MANAGED_ARMATURE_IDENTITIES.get(active_tx.session_id) is not session
+                    or session.original_blender_ref is not active_tx.arm):
+                raise RuntimeError("Collection transaction session identity mismatch")
+            for rec in registered:
+                if not isinstance(rec, dict):
+                    raise RuntimeError("Non-dictionary created Collection record")
+                col_ptr = rec.get("col_ptr")
+                col_ref = rec.get("col_ref")
+                parent_ref = rec.get("initial_parent")
+                parent_ptr = rec.get("initial_parent_ptr")
+                if (not isinstance(col_ptr, int) or col_ptr <= 0
+                        or not isinstance(parent_ptr, int) or parent_ptr <= 0
+                        or col_ptr in entry_ptrs
+                        or col_ptr in verified_created_collections
+                        or col_ref is None or parent_ref is None):
+                    raise RuntimeError(f"Invalid/duplicate Collection identity: {col_ptr!r}")
+                receipt = receipts.get(col_ptr)
+                if (not isinstance(receipt, tuple) or len(receipt) != 5
+                        or receipt[0] != col_ref
+                        or receipt[1] != parent_ref
+                        or receipt[2] != active_tx.session_id
+                        or receipt[3] != active_tx.tx_id
+                        or receipt[4] is not active_tx._collection_receipt_seal):
+                    raise RuntimeError(f"Collection creation receipt mismatch: {col_ptr}")
+                try:
+                    live_col_ptr = int(col_ref.as_pointer())
+                    live_parent_ptr = int(parent_ref.as_pointer())
+                except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+                    raise RuntimeError(f"Collection/parent identity unreadable: {col_ptr}") from exc
+                if (live_col_ptr != col_ptr or live_parent_ptr != parent_ptr
+                        or _find_live_collection_by_identity(col_ref, col_ptr) is None
+                        or _find_live_collection_by_identity(parent_ref, parent_ptr) is None):
+                    raise RuntimeError(f"Collection/parent is not the originally registered live identity: {col_ptr}")
+                verified_created_collections[col_ptr] = (col_ref, parent_ref, parent_ptr, receipt)
+            if set(verified_created_collections) != set(receipts):
+                raise RuntimeError("Collection registry and receipt ledger do not have identical identities")
+        except Exception as exc:
+            collection_rollback_authorized = False
+            restoration_errors.append(
+                f"COLLECTION_ROLLBACK_AUTHORITY_UNPROVEN: {exc}; refusing all Collection child undo/deletion"
+            )
+
+    # 3.0: Revert only the relationship edges authorized at creation.
+    # NO_EFFECT, PREPARED and REVERTED contain no outstanding C-API undo.
+    if active_tx is not None and collection_rollback_authorized:
+        relationship_ops = getattr(active_tx, "prepared_relationship_mutations", [])
+        for op_record in reversed(list(relationship_ops)):
+            mutation = op_record.get("intended_mutation")
+            if mutation not in ("COLLECTION_CHILD_LINK", "COLLECTION_CHILD_UNLINK"):
+                continue
+            state = op_record.get("operation_state")
+            if state in (
+                _RelationshipOperationState.NO_EFFECT,
+                _RelationshipOperationState.REVERTED,
+                _RelationshipOperationState.PREPARED,
+                _RelationshipOperationState.RECOVERY_UNCERTAIN,
             ):
                 _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
-
-    # 3.1: Only delete collections explicitly registered as created by this transaction!
-    if active_tx is not None:
-        for reg in list(getattr(active_tx, "created_collections", [])):
-            col_ref = reg.get("col_ref")
-            col_ptr = reg.get("col_ptr")
-            created_name = reg.get("created_name")
-
-            target_col = _find_live_collection_by_identity(col_ref, col_ptr)
-            if target_col is None and created_name in bpy.data.collections:
-                c_candidate = bpy.data.collections[created_name]
-                if col_ptr is None or c_candidate.as_pointer() == col_ptr:
-                    target_col = c_candidate
-
-            if target_col is None:
                 continue
-
-            # Check external dependencies before deletion (Section 9.2, TEST-230, TEST-232)
-            tx_obj_ptrs = {
-                r.get("obj_ptr")
-                for r in getattr(active_tx, "created_controller_objects", [])
-                if r.get("obj_ptr") is not None
-            }
-            for s in getattr(active_tx, "stashed_objects", []):
-                if s.get("stashed_obj_ptr") is not None:
-                    tx_obj_ptrs.add(s.get("stashed_obj_ptr"))
-
-            has_external_members = False
-            for obj in target_col.objects:
-                try:
-                    if obj.as_pointer() not in tx_obj_ptrs:
-                        has_external_members = True
-                        break
-                except ReferenceError:
-                    pass
-
-            has_external_children = len(target_col.children) > 0
-
-            init_parent = reg.get("initial_parent")
-            init_parent_ptr = init_parent.as_pointer() if (init_parent is not None and hasattr(init_parent, "as_pointer")) else None
-
-            has_external_parents = False
-            for sc in bpy.data.scenes:
-                if getattr(sc, "collection", None) is not None:
-                    if _is_child_collection_linked_by_identity(sc.collection, target_col, col_ptr):
-                        if init_parent is not None and (sc.collection == init_parent or (init_parent_ptr is not None and sc.collection.as_pointer() == init_parent_ptr)):
-                            continue
-                        has_external_parents = True
-                        break
-            if not has_external_parents:
-                for c_col in bpy.data.collections:
-                    if c_col != target_col and _is_child_collection_linked_by_identity(c_col, target_col, col_ptr):
-                        if init_parent is not None and (c_col == init_parent or (init_parent_ptr is not None and c_col.as_pointer() == init_parent_ptr)):
-                            continue
-                        has_external_parents = True
-                        break
-
-            if has_external_members or has_external_children or has_external_parents:
+            orig_rel = op_record.get("original_relationship_state")
+            parent_ptr = op_record.get("parent_col_ptr")
+            child_ptr = op_record.get("child_col_ptr")
+            parent_ref = op_record.get("parent_col_ref")
+            child_ref = op_record.get("child_col_ref")
+            owned = verified_created_collections.get(child_ptr)
+            valid_edge = (
+                isinstance(orig_rel, dict)
+                and owned is not None
+                and owned[0] == child_ref
+                and owned[1] == parent_ref
+                and owned[2] == parent_ptr
+                and _find_live_collection_by_identity(parent_ref, parent_ptr) is not None
+                and _find_live_collection_by_identity(child_ref, child_ptr) is not None
+            )
+            if mutation == "COLLECTION_CHILD_LINK":
+                valid_edge = (
+                    valid_edge and orig_rel.get("linked") is False
+                    and orig_rel.get("category") == "TX_ADDED"
+                )
+            else:
+                prior_link = any(
+                    isinstance(previous, dict)
+                    and previous.get("intended_mutation") == "COLLECTION_CHILD_LINK"
+                    and previous.get("parent_col_ptr") == parent_ptr
+                    and previous.get("child_col_ptr") == child_ptr
+                    and previous.get("parent_col_ref") == parent_ref
+                    and previous.get("child_col_ref") == child_ref
+                    and isinstance(previous.get("original_relationship_state"), dict)
+                    and previous["original_relationship_state"].get("linked") is False
+                    and previous["original_relationship_state"].get("category") == "TX_ADDED"
+                    and previous.get("operation_state") in (
+                        _RelationshipOperationState.APPLIED_VERIFIED,
+                        _RelationshipOperationState.CONFIRMED,
+                        _RelationshipOperationState.REVERTED,
+                    )
+                    for previous in relationship_ops
+                )
+                valid_edge = (
+                    valid_edge and orig_rel.get("linked") is True
+                    and orig_rel.get("category") == "TX_UNLINKED_ORIGINAL"
+                    and prior_link
+                )
+            if not valid_edge:
                 restoration_errors.append(
-                    f"Transaction-created collection '{target_col.name}' has external dependencies "
-                    f"(members={has_external_members}, children={has_external_children}, parents={has_external_parents}); "
-                    "refusing deletion"
+                    f"COLLECTION_RELATION_ROLLBACK_AUTHORITY_UNPROVEN: "
+                    f"{op_record.get('operation_id', '<unknown>')}; refusing relationship undo"
+                )
+                active_tx.update_relationship_mutation_state(
+                    op_record, _RelationshipOperationState.RECOVERY_UNCERTAIN,
                 )
                 continue
+            _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
 
-            for p_col in list(bpy.data.collections):
-                if _is_child_collection_linked_by_identity(p_col, target_col, col_ptr):
-                    try:
-                        p_col.children.unlink(target_col)
-                    except Exception:
-                        pass
-            for sc in list(bpy.data.scenes):
-                if getattr(sc, "collection", None) is not None and _is_child_collection_linked_by_identity(sc.collection, target_col, col_ptr):
-                    try:
-                        sc.collection.children.unlink(target_col)
-                    except Exception:
-                        pass
-
+    # 3.1: Delete only receipt-verified collections with NO remaining owners,
+    # members, children, parents or Blender users. Never unlink a parent as a
+    # side effect of deletion: an unexpected parent edge is external ownership.
+    if active_tx is not None and collection_rollback_authorized:
+        for col_ptr, (col_ref, parent_ref, parent_ptr, original_receipt) in verified_created_collections.items():
+            target_col = _find_live_collection_by_identity(col_ref, col_ptr)
+            if target_col is None:
+                restoration_errors.append(
+                    f"Verified transaction Collection ptr={col_ptr} was destroyed before rollback deletion"
+                )
+                continue
+            try:
+                member_count = len(target_col.objects)
+                child_count = len(target_col.children)
+                parent_count = sum(
+                    1 for p in bpy.data.collections
+                    if p != target_col and _is_child_collection_linked_by_identity(p, target_col, col_ptr)
+                ) + sum(
+                    1 for scene in bpy.data.scenes
+                    if (getattr(scene, "collection", None) is not None
+                        and _is_child_collection_linked_by_identity(scene.collection, target_col, col_ptr))
+                )
+                user_count = int(target_col.users)
+            except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+                restoration_errors.append(
+                    f"Cannot inspect verified Collection ptr={col_ptr} dependencies: {exc}"
+                )
+                continue
+            if member_count or child_count or parent_count or user_count:
+                restoration_errors.append(
+                    f"Verified Collection ptr={col_ptr} still has dependencies "
+                    f"(members={member_count}, children={child_count}, "
+                    f"parents={parent_count}, users={user_count}); refusing deletion"
+                )
+                continue
+            # Final revalidation immediately before destructive Blender call;
+            # fault hooks in preceding relationship undo may have changed logs.
+            final_records = [
+                rec for rec in active_tx.created_collections
+                if isinstance(rec, dict) and rec.get("col_ptr") == col_ptr
+            ]
+            latest_receipt = active_tx._collection_creation_receipts.get(col_ptr)
+            if (_find_live_collection_by_identity(col_ref, col_ptr) != target_col
+                    or _find_live_collection_by_identity(parent_ref, parent_ptr) is None
+                    or col_ptr in active_tx.entry_collection_ptrs
+                    or len(final_records) != 1
+                    or final_records[0].get("col_ref") != col_ref
+                    or final_records[0].get("initial_parent") != parent_ref
+                    or final_records[0].get("initial_parent_ptr") != parent_ptr
+                    or latest_receipt != original_receipt
+                    or original_receipt[4] is not active_tx._collection_receipt_seal):
+                restoration_errors.append(f"Collection ptr={col_ptr} identity/authority changed before deletion")
+                continue
             try:
                 bpy.data.collections.remove(target_col)
-            except Exception as e:
-                restoration_errors.append(f"Failed to remove transaction-created collection '{target_col.name}': {e}")
+            except Exception as exc:
+                restoration_errors.append(f"Failed to remove verified Collection ptr={col_ptr}: {exc}")
+                continue
+            if _find_live_collection_by_identity(col_ref, col_ptr) is not None:
+                restoration_errors.append(f"Verified Collection ptr={col_ptr} still exists after removal")
 
     char_col_snap = snapshot.get("character_collection", {})
     if not char_col_snap.get("existed", False):
