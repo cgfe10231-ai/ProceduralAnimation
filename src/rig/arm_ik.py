@@ -4655,6 +4655,156 @@ def _authorized_restore_snapshot_constraint_targets_without_tx(
         )
 
 
+def _verify_failed_isolation_controller_recovery_authority(
+    arm: bpy.types.Object,
+    obj: bpy.types.Object,
+    snapshot: Dict[str, Any],
+    tx: Any,
+    expected_role: Optional[tuple[str, str]],
+) -> tuple[bool, str]:
+    """Verify that a FAILED-isolated transaction holds legal authority to restore original Controller state.
+
+    Must verify all 8 conditions from Task 10-B dynamic acceptance requirements:
+    1. Armature identity and liveness
+    2. Session identity and isolation registration
+    3. Transaction identity and context binding
+    4. Snapshot reference and trustworthiness consistency
+    5. Controller original reference, pointer, and non-creation baseline
+    6. Original IK constraint binding provenance
+    7. Absence of borrowing by any foreign Armature
+    8. FAILED isolation class (FAILED-B or FAILED-C only; FAILED-D strictly denied)
+    """
+    if not isinstance(tx, _ArmRigTransactionContext):
+        return False, "Transaction is not an _ArmRigTransactionContext instance"
+
+    if tx.state != _ArmRigTransactionState.FAILED:
+        return False, f"Transaction state is {tx.state!r}, expected FAILED"
+
+    # 1. Armature identity
+    if arm is None or not isinstance(arm, bpy.types.Object) or arm.type != "ARMATURE":
+        return False, "Armature object is missing or invalid type"
+    try:
+        arm_ptr = int(arm.as_pointer())
+        if arm_ptr <= 0 or tx.arm is not arm or tx.arm_ptr != arm_ptr:
+            return False, "Armature reference/pointer does not match transaction"
+    except (AttributeError, ReferenceError, TypeError, ValueError) as exc:
+        return False, f"Armature pointer access error: {exc}"
+
+    # 2. Session identity
+    session_id = getattr(tx, "session_id", None)
+    if not isinstance(session_id, str) or not session_id:
+        return False, "Transaction session_id is missing or empty"
+
+    session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
+    if session_rec is None:
+        return False, f"Session ID {session_id!r} not found in _MANAGED_ARMATURE_IDENTITIES"
+    if tx.session_record is not session_rec or session_rec.registry_session_id != session_id:
+        return False, "Session record mismatch with transaction"
+    if session_rec.original_blender_ref is not arm or session_rec.registration_pointer != arm_ptr:
+        return False, "Session record registration does not match Armature"
+
+    # 3. Transaction identity and isolation record binding
+    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
+    if not isinstance(iso_rec, dict):
+        return False, f"No active isolation record in _ISOLATED_FAILED_ARMATURES for session {session_id!r}"
+    if iso_rec.get("transaction_id") != tx.tx_id:
+        return False, f"Isolation record transaction_id {iso_rec.get('transaction_id')!r} != tx.tx_id {tx.tx_id!r}"
+    if "transaction_context" in iso_rec and iso_rec.get("transaction_context") is not None:
+        if iso_rec.get("transaction_context") is not tx:
+            return False, "Isolation record transaction_context does not match active tx"
+
+    # 8. FAILED isolation class and evidence check
+    failure_class = iso_rec.get("failure_class")
+    if failure_class in (_FailedTransactionClass.FAILED_D.value, "FAILED-D"):
+        return False, "FAILED-D tombstones are strictly denied controller recovery authority"
+    if failure_class not in (
+        _FailedTransactionClass.FAILED_B.value,
+        _FailedTransactionClass.FAILED_C.value,
+        "FAILED-B",
+        "FAILED-C",
+    ):
+        return False, f"Unsupported failure class for recovery: {failure_class!r}"
+
+    iso_state = session_rec.isolation_state
+    if iso_state in (
+        _ArmatureIsolationState.TOMBSTONED_FAILED_D,
+        _ArmatureIsolationState.ARCHIVED_RETIRED,
+        _ArmatureIsolationState.NONE,
+    ):
+        return False, f"Armature session isolation state {iso_state!r} is not an active FAILED isolation"
+
+    if session_rec.liveness_status == _ArmatureLivenessStatus.INVALIDATED_DEAD:
+        return False, "Armature is marked INVALIDATED_DEAD"
+
+    id_ver = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+    if not id_ver.get("is_valid", False):
+        return False, f"Armature session identity record is invalid: {'; '.join(id_ver.get('reasons', []))}"
+
+    # 4. Snapshot reference and trustworthiness consistency
+    if not isinstance(snapshot, dict):
+        return False, "Snapshot is not a valid dictionary"
+
+    trusted_snap = iso_rec.get("snapshot_reference")
+    if not iso_rec.get("snapshot_trusted", False) or trusted_snap is None:
+        return False, "Isolation record indicates snapshot is not trusted or missing"
+    if iso_rec.get("evidence_status") == "RECOVERY_EVIDENCE_INSUFFICIENT":
+        return False, "Isolation record evidence_status is RECOVERY_EVIDENCE_INSUFFICIENT"
+    if trusted_snap is not snapshot or tx.snapshot is not snapshot:
+        return False, "Snapshot reference does not match trusted isolation snapshot or tx.snapshot"
+
+    # 5. Controller original reference, pointer, and baseline
+    if obj is None or not isinstance(obj, bpy.types.Object) or obj.type != "EMPTY":
+        return False, "Controller object is missing or not an EMPTY"
+    try:
+        obj_ptr = int(obj.as_pointer())
+        if obj_ptr <= 0 or _find_live_object_by_identity(obj, obj_ptr) is None:
+            return False, "Controller object is not live or cannot be identified"
+    except (AttributeError, ReferenceError, TypeError, ValueError) as exc:
+        return False, f"Controller pointer access error: {exc}"
+
+    if not isinstance(tx.entry_object_ptrs, (frozenset, set)):
+        return False, "Transaction entry_object_ptrs baseline is missing"
+    if obj_ptr not in tx.entry_object_ptrs:
+        return False, f"Controller ptr={obj_ptr} was not present in transaction entry_object_ptrs baseline"
+
+    created_regs = [
+        r for r in getattr(tx, "created_controller_objects", [])
+        if isinstance(r, dict) and r.get("obj_ptr") == obj_ptr
+    ]
+    if created_regs:
+        return False, f"Controller ptr={obj_ptr} is recorded as transaction-created; not an original controller"
+
+    saved = None
+    saved_name = None
+    for orig_name, orig_rec in snapshot.get("controllers", {}).items():
+        if isinstance(orig_rec, dict) and orig_rec.get("obj_ptr") == obj_ptr and orig_rec.get("obj_ref") == obj:
+            if saved is not None:
+                return False, f"Multiple snapshot controllers match ptr={obj_ptr}"
+            saved = orig_rec
+            saved_name = orig_name
+
+    if saved is None:
+        return False, f"Controller ptr={obj_ptr} has no matching entry in trusted snapshot"
+    if not saved.get("exists", False) or saved.get("type") != "EMPTY":
+        return False, f"Snapshot controller record for ptr={obj_ptr} is not a valid pre-existing EMPTY"
+
+    role = _controller_role_for_name(saved_name)
+    if role is None:
+        return False, f"Cannot determine controller role for snapshot name {saved_name!r}"
+    if expected_role is not None and role != expected_role:
+        return False, f"Controller role {role!r} does not match expected role {expected_role!r}"
+
+    # 6. Original IK constraint binding provenance
+    if not _controller_constraint_binding_proven(arm, obj, role, snapshot):
+        return False, f"Controller binding to IK constraint on role {role!r} cannot be proven from snapshot"
+
+    # 7. Absence of borrowing by any foreign Armature
+    if _controller_is_borrowed_by_other_armature(arm, obj, role):
+        return False, f"Controller is borrowed by another Armature constraint"
+
+    return True, "AUTHORIZED"
+
+
 def _rollback_arm_rig_state(
     arm: bpy.types.Object,
     snapshot: Dict[str, Any],
@@ -4791,11 +4941,40 @@ def _rollback_arm_rig_state(
                 f"Original controller identity lost: {original_name}"
             )
             continue
-        if active_tx is not None and _verify_controller_object_transaction_authority(
-            live_original, active_tx,
-        ) != 'SNAPSHOT_ORIGINAL':
-            # An unrelated same-name controller may have been observed by the
-            # snapshot; observing is not authority to restore or reparent it.
+        controller_authorized = False
+        if active_tx is None:
+            controller_authorized = True
+        elif active_tx.state in (_ArmRigTransactionState.ACTIVE, _ArmRigTransactionState.ROLLING_BACK):
+            if _verify_controller_object_transaction_authority(
+                live_original, active_tx,
+            ) == 'SNAPSHOT_ORIGINAL':
+                controller_authorized = True
+            else:
+                # An unrelated same-name controller may have been observed by the
+                # snapshot; observing is not authority to restore or reparent it.
+                continue
+        elif active_tx.state == _ArmRigTransactionState.FAILED:
+            auth_ok, auth_reason = _verify_failed_isolation_controller_recovery_authority(
+                arm=arm,
+                obj=live_original,
+                snapshot=snapshot,
+                tx=active_tx,
+                expected_role=_controller_role_for_name(original_name),
+            )
+            if auth_ok:
+                controller_authorized = True
+            else:
+                restoration_errors.append(
+                    f"FAILED isolation controller recovery authority denied for '{original_name}': {auth_reason}"
+                )
+                continue
+        else:
+            restoration_errors.append(
+                f"Controller recovery rejected: unsupported transaction state {active_tx.state!r} for '{original_name}'"
+            )
+            continue
+
+        if not controller_authorized:
             continue
 
         name_owner = bpy.data.objects.get(original_name)
