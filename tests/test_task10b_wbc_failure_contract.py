@@ -420,15 +420,34 @@ class TestTask10BWBCFailureContract(unittest.TestCase):
         """
         snap_before = _snapshot_arm_rig_state(self.armature)
 
+        # Retrieve authentic Right Hand IK controller reference and pointer from armature constraint
+        con_r_init = self.armature.pose.bones["forearm.R"].constraints.get("ArmIK.R")
+        self.assertIsNotNone(con_r_init, "ArmIK.R constraint must exist after setup")
+        expected_r_obj = con_r_init.target
+        self.assertIsNotNone(expected_r_obj, "ArmIK.R target object must exist")
+        self.assertEqual(expected_r_obj.name, "HandIK.R")
+        expected_r_ptr = int(expected_r_obj.as_pointer())
+
         targets = WholeBodyControlTargets()
         targets.set_hand(side="L", target_world_xyz=(0.25, -7.75, 1.20), weight=1.0, enabled=True)
         targets.set_hand(side="R", target_world_xyz=(-0.25, -7.75, 1.20), weight=1.0, enabled=True)
 
-        # Inject failure specifically when setting Right hand target
+        hit_count = 0
+        caught_exc: Optional[Exception] = None
+
+        # Inject failure specifically when setting verified Right Hand controller
         def fault_hook(stage: str, ctx: dict) -> None:
+            nonlocal hit_count
             if stage == "set_hand_ik_target_after_hand_location":
-                side = ctx.get("side")
-                if side == "R":
+                ik_obj = ctx.get("ik_obj")
+                if (
+                    ik_obj is not None
+                    and hasattr(ik_obj, "as_pointer")
+                    and int(ik_obj.as_pointer()) == expected_r_ptr
+                    and ik_obj == expected_r_obj
+                    and ik_obj.name == "HandIK.R"
+                ):
+                    hit_count += 1
                     raise RuntimeError("Simulated Right Hand write fault in CONTRACT10-06")
 
         _set_test_fault_injection_hook(fault_hook)
@@ -436,14 +455,26 @@ class TestTask10BWBCFailureContract(unittest.TestCase):
         threw_exc = False
         try:
             returned_res = self.wbc.execute_frame(targets)
-        except Exception:
+        except Exception as exc:
             threw_exc = True
+            caught_exc = exc
         finally:
             _clear_test_fault_injection_hook()
+
+        # 1. Confirm fault injection point actually hit Right Hand
+        self.assertEqual(hit_count, 1, f"Fault injection must hit Right Hand exactly once, got {hit_count}")
+
+        # 2. Confirm Right Hand fault actually threw the expected RuntimeError
+        self.assertTrue(threw_exc, "WBC frame execution must propagate exception when Right Hand write fails")
+        self.assertIsInstance(caught_exc, RuntimeError)
+        self.assertIn("Simulated Right Hand write fault in CONTRACT10-06", str(caught_exc))
 
         # If a result was returned, success must not be True
         if returned_res is not None:
             self.assertFalse(returned_res.success)
+
+        # 3. Confirm WBC did not treat this failure as a normal success=False return
+        self.assertIsNone(returned_res, "returned_res must be None when exception is thrown; WBC must not return normal result")
 
         # Bilateral atomicity check:
         # If right hand failed mid-frame, left hand must not remain committed as a partial write
