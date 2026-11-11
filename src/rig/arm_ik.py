@@ -3820,9 +3820,18 @@ def _authorized_revert_relationship_record(
                 op_record,
                 _RelationshipOperationState.RECOVERY_UNCERTAIN,
             )
-        restoration_errors.append(
-            f"Relationship rollback '{op_id}' fault: {type(exc).__name__}: {exc}"
-        )
+        # [INTRODUCED 2026-11-11T22:38:48+08:00]
+        # FUNCTION: _authorized_revert_relationship_record
+        # PURPOSE: Propagate RECOVERY_UNCERTAIN evidence or classify FAILED-C from verified relationship state
+        # REASON: Task 10-B fix-2, TEST-127 / TEST-149
+        if op_record.get("operation_state") == _RelationshipOperationState.RECOVERY_UNCERTAIN:
+            restoration_errors.append(
+                f"Relationship rollback '{op_id}' fault (RECOVERY_UNCERTAIN): {type(exc).__name__}: {exc}"
+            )
+        else:
+            restoration_errors.append(
+                f"Relationship rollback '{op_id}' fault: {type(exc).__name__}: {exc}"
+            )
         return
 
     src_id = op_record.get("source_identity", {})
@@ -8004,6 +8013,17 @@ def _arm_rig_transaction(arm: bpy.types.Object):
                             ev_status = ("ARMATURE_IDENTITY_UNVERIFIED_DURING_ROLLBACK" if uncertain
                                          else "ARMATURE_DESTROYED_DURING_ROLLBACK")
                             ev_reasons = post_rb_id["reasons"]
+                        # [INTRODUCED 2026-11-11T22:38:48+08:00]
+                        # FUNCTION: _arm_rig_transaction
+                        # PURPOSE: Propagate RECOVERY_UNCERTAIN evidence or classify FAILED-C from verified relationship state
+                        # REASON: Task 10-B fix-2, TEST-127 / TEST-149
+                        elif any(
+                            r.get("operation_state") == _RelationshipOperationState.RECOVERY_UNCERTAIN
+                            for r in getattr(tx, "prepared_relationship_mutations", [])
+                        ):
+                            f_class = _FailedTransactionClass.FAILED_C
+                            ev_status = "SNAPSHOT_AVAILABLE"
+                            ev_reasons = []
                         elif not rollback_execution_completed:
                             f_class = _FailedTransactionClass.FAILED_B
                             ev_status = "SNAPSHOT_AVAILABLE"
