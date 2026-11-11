@@ -4934,32 +4934,68 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _depsgraph_update()
         self.assertTrue(request_armature_deisolation(self.armature, reason="Restore before cleanup test in TEST-136")["approved"])
 
-        # 2. Trigger a real CLEANUP_PENDING transaction on self.armature
-        old_hand = bpy.data.objects["HandIK.L"]
-        bpy.data.objects.remove(old_hand, do_unlink=True)
-        doomed_mesh = bpy.data.meshes.new("DoomedMesh136")
+        # 2. Scenario A: When no active FAILED isolation exists, normal CLEANUP_PENDING can be retried successfully
+        old_hand_a = bpy.data.objects["HandIK.L"]
+        bpy.data.objects.remove(old_hand_a, do_unlink=True)
+        doomed_mesh_a = bpy.data.meshes.new("DoomedMesh136_A")
 
-        def fault_hook_cleanup(stage: str, ctx: dict) -> None:
+        def fault_hook_cleanup_a(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
-                raise RuntimeError("Phase 3 cleanup failure in TEST-136")
+                raise RuntimeError("Phase 3 cleanup failure in TEST-136 A")
 
-        _set_test_fault_injection_hook(fault_hook_cleanup)
+        _set_test_fault_injection_hook(fault_hook_cleanup_a)
         try:
             with self.assertRaises(RuntimeError):
-                with _arm_rig_transaction(self.armature) as tx_clean:
-                    wrong_obj = bpy.data.objects.new("HandIK.L", doomed_mesh)
-                    tx_clean.register_created_controller(wrong_obj)
-                    _authorized_link_object_to_collection(bpy.data.collections["Character"], wrong_obj, tx_clean)
+                with _arm_rig_transaction(self.armature) as tx_clean_a:
+                    wrong_obj_a = bpy.data.objects.new("HandIK.L", doomed_mesh_a)
+                    tx_clean_a.register_created_controller(wrong_obj_a)
+                    _authorized_link_object_to_collection(bpy.data.collections["Character"], wrong_obj_a, tx_clean_a)
                     setup_arm_ik(self.armature)
         finally:
             _clear_test_fault_injection_hook()
 
-        pending_ids = get_pending_arm_rig_cleanup_ids()
-        self.assertEqual(len(pending_ids), 1)
-        cleanup_tx_id = pending_ids[0]
-        cleanup_tx = _PENDING_ARM_RIG_CLEANUPS[cleanup_tx_id]
+        pending_ids_a = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids_a), 1)
+        cleanup_tx_id_a = pending_ids_a[0]
+        cleanup_tx_a = _PENDING_ARM_RIG_CLEANUPS[cleanup_tx_id_a]
 
-        # 3. Also record a FAILED-C isolation on the same Armature (simulating coexistence of CLEANUP_PENDING and FAILED)
+        # Confirm that no FAILED isolation is active on the Armature before retry
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Normal CLEANUP_PENDING retry succeeds when no FAILED isolation exists
+        retry_pending_arm_rig_cleanup(cleanup_tx_id_a)
+        self.assertEqual(cleanup_tx_a.state, _ArmRigTransactionState.COMMITTED)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertNotIn(cleanup_tx_id_a, _PENDING_ARM_RIG_CLEANUPS)
+
+        # 3. Scenario B: Coexistence of CLEANUP_PENDING and FAILED-C isolation
+        old_hand_b = bpy.data.objects.get("HandIK.L")
+        if old_hand_b is not None:
+            bpy.data.objects.remove(old_hand_b, do_unlink=True)
+        doomed_mesh_b = bpy.data.meshes.new("DoomedMesh136_B")
+
+        def fault_hook_cleanup_b(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Phase 3 cleanup failure in TEST-136 B")
+
+        _set_test_fault_injection_hook(fault_hook_cleanup_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_clean_b:
+                    wrong_obj_b = bpy.data.objects.new("HandIK.L", doomed_mesh_b)
+                    tx_clean_b.register_created_controller(wrong_obj_b)
+                    _authorized_link_object_to_collection(bpy.data.collections["Character"], wrong_obj_b, tx_clean_b)
+                    setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        pending_ids_b = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids_b), 1)
+        cleanup_tx_id_b = pending_ids_b[0]
+        cleanup_tx_b = _PENDING_ARM_RIG_CLEANUPS[cleanup_tx_id_b]
+
+        # Also record a FAILED-C isolation on the same Armature (simulating coexistence of CLEANUP_PENDING and FAILED)
         snap_current = _snapshot_arm_rig_state(self.armature)
         coexisting_failed_tx = _ArmRigTransactionContext(self.armature, session_record=session_rec)
         coexisting_failed_tx.state = _ArmRigTransactionState.FAILED
@@ -4974,7 +5010,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             evidence_status="SNAPSHOT_AVAILABLE",
         )
 
-        # De-isolation must be rejected while CLEANUP_PENDING is unresolved (Case 1 Condition 8), and must NOT clear _PENDING_ARM_RIG_CLEANUPS
+        # 3.1 De-isolation must be rejected while CLEANUP_PENDING is unresolved (Case 1 Condition 8), and must NOT clear _PENDING_ARM_RIG_CLEANUPS
         deiso_while_cleanup = request_armature_deisolation(
             self.armature,
             reason="Attempt deisolation while CLEANUP_PENDING exists in TEST-136",
@@ -4983,18 +5019,37 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
         self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
 
-        # Resolving CLEANUP_PENDING via retry_pending_arm_rig_cleanup transitions cleanup_tx -> COMMITTED,
-        # but must NOT clear FAILED isolation!
-        retry_pending_arm_rig_cleanup(cleanup_tx_id)
-        self.assertEqual(cleanup_tx.state, _ArmRigTransactionState.COMMITTED)
-        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        # 3.2 Cleanup Retry must be rejected by Coordinator preflight while FAILED isolation is active
+        grants_before = len(_COORDINATOR_AUTHORIZATION_GRANTS)
+        with self.assertRaises(RuntimeError) as cm_retry_coexist:
+            retry_pending_arm_rig_cleanup(cleanup_tx_id_b)
+        self.assertIn("CLEANUP_PREFLIGHT_REJECTED", str(cm_retry_coexist.exception))
+        self.assertIn("active FAILED isolation", str(cm_retry_coexist.exception))
+
+        # Negative contract verification under coexistence:
+        # - CLEANUP_PENDING must NOT be removed
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
+        self.assertIn(cleanup_tx_id_b, _PENDING_ARM_RIG_CLEANUPS)
+        # - FAILED-C isolation must remain intact
         self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
         self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        # - Transaction state cannot transition to COMMITTED
+        self.assertEqual(cleanup_tx_b.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertNotEqual(cleanup_tx_b.state, _ArmRigTransactionState.COMMITTED)
+        # - Original pending resource must not be deleted without authorization
+        self.assertIn(doomed_mesh_b.name, bpy.data.meshes)
+        self.assertIn("HandIK.L", bpy.data.objects)
+        # - No new Coordinator Grant may be generated
+        self.assertEqual(len(_COORDINATOR_AUTHORIZATION_GRANTS), grants_before)
 
-        # New write is STILL blocked by Gate 2 (FAILED Isolation Gate)
+        # 3.3 New write is STILL blocked by Gate 2 (FAILED Isolation Gate)
         with self.assertRaises(RuntimeError) as cm_still_blocked:
             set_arm_ik_influence(self.armature, "L", 0.5)
         self.assertIn("FAILED-C", str(cm_still_blocked.exception))
+
+        # 4. Resolve CLEANUP_PENDING fixture so Case 1 Condition 8 is satisfied, then de-isolate FAILED-C
+        _PENDING_ARM_RIG_CLEANUPS.pop(cleanup_tx_id_b, None)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
 
         # Now de-isolate FAILED-C after CLEANUP_PENDING has been resolved
         deiso_final = request_armature_deisolation(
