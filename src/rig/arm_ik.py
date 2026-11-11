@@ -8302,6 +8302,20 @@ def setup_arm_ik(
     valid_influence = _validate_influence(initial_influence, param_name="initial_influence")
     arm = _resolve_armature(armature_obj)
 
+    # [INTRODUCED 2026-11-12T00:01:12+08:00]
+    # FUNCTION: setup_arm_ik
+    # PURPOSE: Enforce existing cleanup and FAILED isolation gates before controller ownership object enumeration
+    # REASON: Task 10-B fix-3, TEST-163
+    for rec in _MANAGED_ARMATURE_IDENTITIES.values():
+        if rec.original_blender_ref is arm:
+            if (
+                rec.isolation_state != _ArmatureIsolationState.NONE
+                or rec.registry_session_id in _ISOLATED_FAILED_ARMATURES
+            ):
+                _assert_arm_rig_cleanup_gate(arm, rec)
+                _assert_arm_rig_failed_isolation_gate(arm, rec)
+            break
+
     # Full role ownership admission, including same-name external EMPTY
     # objects. This runs before creating collections or modifying controllers.
     _require_existing_arm_ik_controller_ownership(arm, scope='setup_arm_ik')
