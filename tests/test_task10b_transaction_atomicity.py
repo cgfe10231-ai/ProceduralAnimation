@@ -4968,12 +4968,56 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(cleanup_tx_a.state, _ArmRigTransactionState.COMMITTED)
         self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
         self.assertNotIn(cleanup_tx_id_a, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertEqual(len(cleanup_tx_a.uncleaned_stashed_objects), 0)
 
-        # 3. Scenario B: Coexistence of CLEANUP_PENDING and FAILED-C isolation
+        # 3. Legitimate FAILED-C de-isolation and subsequent write recovery after Pending registry is cleared by Coordinator
+        snap_after_cleanup_a = _snapshot_arm_rig_state(self.armature)
+        isolated_failed_c_tx = _ArmRigTransactionContext(self.armature, session_record=session_rec)
+        isolated_failed_c_tx.state = _ArmRigTransactionState.FAILED
+        isolated_failed_c_tx.snapshot = snap_after_cleanup_a
+        from src.rig.arm_ik import _record_armature_failure_isolation_by_coordinator
+        _record_armature_failure_isolation_by_coordinator(
+            session_rec=session_rec,
+            tx=isolated_failed_c_tx,
+            failure_class=_FailedTransactionClass.FAILED_C,
+            primary_exception=RuntimeError("FAILED-C after cleanup in TEST-136"),
+            secondary_exception=RuntimeError("Verifier fault in TEST-136"),
+            evidence_status="SNAPSHOT_AVAILABLE",
+        )
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+
+        # New write is STILL blocked by Gate 2 (FAILED Isolation Gate)
+        with self.assertRaises(RuntimeError) as cm_still_blocked:
+            set_arm_ik_influence(self.armature, "L", 0.5)
+        self.assertIn("FAILED-C", str(cm_still_blocked.exception))
+
+        # Now de-isolate FAILED-C after CLEANUP_PENDING has been legitimately resolved
+        deiso_final = request_armature_deisolation(
+            self.armature,
+            reason="De-isolate after CLEANUP_PENDING resolved in TEST-136",
+        )
+        self.assertTrue(deiso_final["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Now new write passes both gates and commits cleanly
+        set_arm_ik_influence(self.armature, "BOTH", 0.7)
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence,
+            0.7,
+            places=5,
+        )
+
+        # 4. Scenario B: Coexistence of CLEANUP_PENDING and FAILED-C isolation (final scenario)
         old_hand_b = bpy.data.objects.get("HandIK.L")
         if old_hand_b is not None:
             bpy.data.objects.remove(old_hand_b, do_unlink=True)
         doomed_mesh_b = bpy.data.meshes.new("DoomedMesh136_B")
+        doomed_mesh_b_ptr = doomed_mesh_b.as_pointer()
+        wrong_obj_b = None
+        wrong_obj_b_ptr = None
 
         def fault_hook_cleanup_b(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
@@ -4984,23 +5028,26 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 with _arm_rig_transaction(self.armature) as tx_clean_b:
                     wrong_obj_b = bpy.data.objects.new("HandIK.L", doomed_mesh_b)
+                    wrong_obj_b_ptr = wrong_obj_b.as_pointer()
                     tx_clean_b.register_created_controller(wrong_obj_b)
                     _authorized_link_object_to_collection(bpy.data.collections["Character"], wrong_obj_b, tx_clean_b)
                     setup_arm_ik(self.armature)
         finally:
             _clear_test_fault_injection_hook()
 
+        self.assertIsNotNone(wrong_obj_b)
+        self.assertIsNotNone(wrong_obj_b_ptr)
         pending_ids_b = get_pending_arm_rig_cleanup_ids()
         self.assertEqual(len(pending_ids_b), 1)
         cleanup_tx_id_b = pending_ids_b[0]
         cleanup_tx_b = _PENDING_ARM_RIG_CLEANUPS[cleanup_tx_id_b]
+        self.assertEqual(len(cleanup_tx_b.uncleaned_stashed_objects), 1)
 
         # Also record a FAILED-C isolation on the same Armature (simulating coexistence of CLEANUP_PENDING and FAILED)
         snap_current = _snapshot_arm_rig_state(self.armature)
         coexisting_failed_tx = _ArmRigTransactionContext(self.armature, session_record=session_rec)
         coexisting_failed_tx.state = _ArmRigTransactionState.FAILED
         coexisting_failed_tx.snapshot = snap_current
-        from src.rig.arm_ik import _record_armature_failure_isolation_by_coordinator
         _record_armature_failure_isolation_by_coordinator(
             session_rec=session_rec,
             tx=coexisting_failed_tx,
@@ -5010,7 +5057,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             evidence_status="SNAPSHOT_AVAILABLE",
         )
 
-        # 3.1 De-isolation must be rejected while CLEANUP_PENDING is unresolved (Case 1 Condition 8), and must NOT clear _PENDING_ARM_RIG_CLEANUPS
+        # 4.1 De-isolation must be rejected while CLEANUP_PENDING is unresolved (Case 1 Condition 8), and must NOT clear _PENDING_ARM_RIG_CLEANUPS
         deiso_while_cleanup = request_armature_deisolation(
             self.armature,
             reason="Attempt deisolation while CLEANUP_PENDING exists in TEST-136",
@@ -5019,7 +5066,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
         self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
 
-        # 3.2 Cleanup Retry must be rejected by Coordinator preflight while FAILED isolation is active
+        # 4.2 Cleanup Retry must be rejected by Coordinator preflight while FAILED isolation is active
         grants_before = len(_COORDINATOR_AUTHORIZATION_GRANTS)
         with self.assertRaises(RuntimeError) as cm_retry_coexist:
             retry_pending_arm_rig_cleanup(cleanup_tx_id_b)
@@ -5036,37 +5083,37 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # - Transaction state cannot transition to COMMITTED
         self.assertEqual(cleanup_tx_b.state, _ArmRigTransactionState.CLEANUP_PENDING)
         self.assertNotEqual(cleanup_tx_b.state, _ArmRigTransactionState.COMMITTED)
-        # - Original pending resource must not be deleted without authorization
-        self.assertIn(doomed_mesh_b.name, bpy.data.meshes)
-        self.assertIn("HandIK.L", bpy.data.objects)
+        # - Original pending resource must not be deleted without authorization (verified by original reference and pointer)
+        self.assertEqual(len(cleanup_tx_b.uncleaned_stashed_objects), 1)
+        stashed_entry = cleanup_tx_b.uncleaned_stashed_objects[0]
+        self.assertIs(stashed_entry["stashed_obj"], wrong_obj_b)
+        self.assertEqual(stashed_entry["stashed_obj_ptr"], wrong_obj_b_ptr)
+        self.assertIs(stashed_entry["stashed_data"], doomed_mesh_b)
+        self.assertEqual(stashed_entry["stashed_data_ptr"], doomed_mesh_b_ptr)
+        self.assertFalse(stashed_entry["obj_cleaned"])
+        self.assertFalse(stashed_entry["data_cleaned"])
+        self.assertEqual(wrong_obj_b.as_pointer(), wrong_obj_b_ptr)
+        self.assertTrue(
+            any(o == wrong_obj_b and o.as_pointer() == wrong_obj_b_ptr for o in bpy.data.objects.values())
+        )
+        self.assertEqual(doomed_mesh_b.as_pointer(), doomed_mesh_b_ptr)
+        self.assertTrue(
+            any(m == doomed_mesh_b and m.as_pointer() == doomed_mesh_b_ptr for m in bpy.data.meshes.values())
+        )
         # - No new Coordinator Grant may be generated
         self.assertEqual(len(_COORDINATOR_AUTHORIZATION_GRANTS), grants_before)
 
-        # 3.3 New write is STILL blocked by Gate 2 (FAILED Isolation Gate)
-        with self.assertRaises(RuntimeError) as cm_still_blocked:
+        # 4.3 New business write is blocked under coexisting pending cleanup and FAILED-C isolation
+        gate_status = query_admission_gate_status(self.armature)
+        self.assertTrue(gate_status["cleanup_pending_blocked"])
+        self.assertTrue(gate_status["failed_isolation_blocked"])
+        self.assertFalse(gate_status["can_admit"])
+        with self.assertRaises(RuntimeError) as cm_coexist_blocked:
             set_arm_ik_influence(self.armature, "L", 0.5)
-        self.assertIn("FAILED-C", str(cm_still_blocked.exception))
-
-        # 4. Resolve CLEANUP_PENDING fixture so Case 1 Condition 8 is satisfied, then de-isolate FAILED-C
-        _PENDING_ARM_RIG_CLEANUPS.pop(cleanup_tx_id_b, None)
-        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
-
-        # Now de-isolate FAILED-C after CLEANUP_PENDING has been resolved
-        deiso_final = request_armature_deisolation(
-            self.armature,
-            reason="De-isolate after CLEANUP_PENDING resolved in TEST-136",
-        )
-        self.assertTrue(deiso_final["approved"])
-        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
-        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
-
-        # Now new write passes both gates and commits cleanly
-        set_arm_ik_influence(self.armature, "BOTH", 0.7)
-        self.assertAlmostEqual(
-            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence,
-            0.7,
-            places=5,
-        )
+        self.assertIn("Arm IK write blocked", str(cm_coexist_blocked.exception))
+        with self.assertRaises(RuntimeError) as cm_coexist_iso_gate:
+            _assert_arm_rig_failed_isolation_gate(self.armature, session_rec)
+        self.assertIn("FAILED-C", str(cm_coexist_iso_gate.exception))
 
     # -------------------------------------------------------------------------
     # Audit Corrections Tests (TEST-137 to TEST-149)
