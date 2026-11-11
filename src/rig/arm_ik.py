@@ -4703,17 +4703,21 @@ def _verify_failed_isolation_controller_recovery_authority(
     if session_rec.original_blender_ref is not arm or session_rec.registration_pointer != arm_ptr:
         return False, "Session record registration does not match Armature"
 
-    # 3. Transaction identity and isolation record binding
+    # [INTRODUCED 2026-11-11T19:47:00+08:00]
+    # FUNCTION: _verify_failed_isolation_controller_recovery_authority
+    # PURPOSE: Enforce strict bidirectional consistency between isolation record, tx context, failure class, and session state
+    # REASON: Task 10-B fix-1: complete isolation record consistency validation for TEST-131, 136, 147, 155
     iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
     if not isinstance(iso_rec, dict):
         return False, f"No active isolation record in _ISOLATED_FAILED_ARMATURES for session {session_id!r}"
+    if iso_rec.get("registry_session_id") != session_id:
+        return False, f"Isolation record registry_session_id {iso_rec.get('registry_session_id')!r} != session_id {session_id!r}"
     if iso_rec.get("transaction_id") != tx.tx_id:
         return False, f"Isolation record transaction_id {iso_rec.get('transaction_id')!r} != tx.tx_id {tx.tx_id!r}"
-    if "transaction_context" in iso_rec and iso_rec.get("transaction_context") is not None:
-        if iso_rec.get("transaction_context") is not tx:
-            return False, "Isolation record transaction_context does not match active tx"
+    tx_ctx = iso_rec.get("transaction_context")
+    if tx_ctx is None or tx_ctx is not tx:
+        return False, "Isolation record transaction_context is missing, None, or does not match active tx"
 
-    # 8. FAILED isolation class and evidence check
     failure_class = iso_rec.get("failure_class")
     if failure_class in (_FailedTransactionClass.FAILED_D.value, "FAILED-D"):
         return False, "FAILED-D tombstones are strictly denied controller recovery authority"
@@ -4725,6 +4729,10 @@ def _verify_failed_isolation_controller_recovery_authority(
     ):
         return False, f"Unsupported failure class for recovery: {failure_class!r}"
 
+    tx_failure_class = getattr(tx, "failure_class", None)
+    if failure_class != tx_failure_class:
+        return False, f"Isolation record failure_class {failure_class!r} != tx.failure_class {tx_failure_class!r}"
+
     iso_state = session_rec.isolation_state
     if iso_state in (
         _ArmatureIsolationState.TOMBSTONED_FAILED_D,
@@ -4732,6 +4740,17 @@ def _verify_failed_isolation_controller_recovery_authority(
         _ArmatureIsolationState.NONE,
     ):
         return False, f"Armature session isolation state {iso_state!r} is not an active FAILED isolation"
+
+    if failure_class in (_FailedTransactionClass.FAILED_B.value, "FAILED-B"):
+        if iso_state != _ArmatureIsolationState.ISOLATED_FAILED_B:
+            return False, f"Failure class FAILED-B requires isolation_state ISOLATED_FAILED_B, got {iso_state!r}"
+    elif failure_class in (_FailedTransactionClass.FAILED_C.value, "FAILED-C"):
+        if iso_state != _ArmatureIsolationState.ISOLATED_FAILED_C:
+            return False, f"Failure class FAILED-C requires isolation_state ISOLATED_FAILED_C, got {iso_state!r}"
+
+    rec_iso_state_val = iso_state.value if hasattr(iso_state, "value") else str(iso_state)
+    if iso_rec.get("isolation_state") != rec_iso_state_val:
+        return False, f"Isolation record isolation_state {iso_rec.get('isolation_state')!r} != session_rec.isolation_state {rec_iso_state_val!r}"
 
     if session_rec.liveness_status == _ArmatureLivenessStatus.INVALIDATED_DEAD:
         return False, "Armature is marked INVALIDATED_DEAD"
