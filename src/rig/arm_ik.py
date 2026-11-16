@@ -3205,11 +3205,14 @@ def _cleanup_failed_constraint_creation(
     related = [rec for rec in registry
                if rec.get("con_ptr") == expected_ptr or rec.get("con_ref") == con]
 
-    # [INTRODUCED 2026-11-16T17:18:48+08:00]
+    # [INTRODUCED 2026-11-16T18:15:00+08:00]
     # FUNCTION: _cleanup_failed_constraint_creation
-    # PURPOSE: Enforce receipt validation on registered resources and revoke unregistered receipts upon compensation
+    # PURPOSE: Enforce strict 8-tuple receipt validation on registered resources and revoke unregistered receipts upon verified compensation
     # REASON: Task 10-B fix-4, handle Window 1 and Window 2 creation failure compensation safely without phantom receipts
     receipts = getattr(active_tx, "_constraint_creation_receipts", {})
+    if not isinstance(receipts, dict):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: receipt ledger malformed")
+
     if related:
         # Once a complete registration exists, the enclosing transaction's
         # existing Layer-3 rollback exclusively owns destruction.
@@ -3222,9 +3225,16 @@ def _cleanup_failed_constraint_creation(
         if expected_ptr not in receipts:
             raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registered constraint missing creation receipt")
         rc = receipts[expected_ptr]
-        if (rc[0] != con or rc[1] != expected_ptr or rc[2] != pbone or rc[3] != pbone_ptr
-                or rc[4] != active_tx.session_id or rc[5] != active_tx.tx_id
-                or rc[6] is not getattr(active_tx, "_constraint_receipt_seal", None)):
+        if not isinstance(rc, tuple) or len(rc) != 8:
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation receipt length must be exactly 8")
+        rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = rc
+        if (rc_con != con or rc_con_ptr != expected_ptr
+                or rc_pbone != pbone or type(rc_pbone_ptr) is not int or rc_pbone_ptr <= 0
+                or rc_pbone_ptr != pbone_ptr or int(pbone.as_pointer()) != rc_pbone_ptr
+                or rc_session_id != active_tx.session_id or rc_tx_id != active_tx.tx_id
+                or rc_seal is not getattr(active_tx, "_constraint_receipt_seal", None)
+                or not isinstance(rc_before_ptrs, frozenset)
+                or expected_ptr in rc_before_ptrs):
             raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registration and receipt mismatch")
         return
 
@@ -3250,7 +3260,7 @@ def _cleanup_failed_constraint_creation(
             f"{type(exc).__name__}: {exc}"
         ) from exc
 
-    if hasattr(active_tx, "_constraint_creation_receipts") and expected_ptr in active_tx._constraint_creation_receipts:
+    if hasattr(active_tx, "_constraint_creation_receipts") and isinstance(active_tx._constraint_creation_receipts, dict):
         active_tx._constraint_creation_receipts.pop(expected_ptr, None)
 
 
@@ -3330,32 +3340,41 @@ def _authorized_create_constraint(
         raise RuntimeError("CONSTRAINT_CREATION_BASELINE_UNREADABLE") from exc
 
     con = pbone.constraints.new(type=con_type)
+    con_ptr: Optional[int] = None
     try:
-        con_ptr = int(con.as_pointer())
-    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
-        # No stable identity is available; refusing deletion is safer than
-        # substituting another constraint in the owning PoseBone chain.
-        raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_UNREADABLE: refusing name-based cleanup") from exc
-    if con_ptr <= 0 or con_ptr in before_ptrs:
-        raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_COLLISION: refusing cleanup without provenance")
+        try:
+            con_ptr = int(con.as_pointer())
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+            # No stable identity is available; refusing deletion is safer than
+            # substituting another constraint in the owning PoseBone chain.
+            raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_UNREADABLE: refusing name-based cleanup") from exc
+        if con_ptr <= 0 or con_ptr in before_ptrs:
+            raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_COLLISION: refusing cleanup without provenance")
 
-    # [INTRODUCED 2026-11-16T17:18:48+08:00]
-    # FUNCTION: _authorized_create_constraint
-    # PURPOSE: Mint independent provenance receipt upon verified C-API constraint creation
-    # REASON: Task 10-B fix-4, establish independent creation receipt before registration
-    receipt = (
-        con,
-        con_ptr,
-        pbone,
-        pbone_ptr,
-        str(active_tx.session_id),
-        str(active_tx.tx_id),
-        active_tx._constraint_receipt_seal,
-        before_ptrs,
-    )
-    active_tx._constraint_creation_receipts[con_ptr] = receipt
+        # [INTRODUCED 2026-11-16T18:15:00+08:00]
+        # FUNCTION: _authorized_create_constraint
+        # PURPOSE: Mint independent provenance receipt within the exception compensation scope
+        # REASON: Task 10-B fix-4, ensure receipt write failures enter compensation to prevent uncompensated orphans
+        receipts = getattr(active_tx, "_constraint_creation_receipts", None)
+        if receipts is None or not isinstance(receipts, dict):
+            raise RuntimeError("CONSTRAINT_CREATION_RECEIPT_LEDGER_UNAVAILABLE")
 
-    try:
+        seal = getattr(active_tx, "_constraint_receipt_seal", None)
+        if seal is None:
+            raise RuntimeError("CONSTRAINT_CREATION_RECEIPT_SEAL_UNAVAILABLE")
+
+        receipt = (
+            con,
+            con_ptr,
+            pbone,
+            pbone_ptr,
+            str(active_tx.session_id),
+            str(active_tx.tx_id),
+            seal,
+            before_ptrs,
+        )
+        receipts[con_ptr] = receipt
+
         # Name setting is also fallible and must be within the compensation
         # window, rather than creating an unregistered orphan on exception.
         con.name = con_name
@@ -3380,16 +3399,17 @@ def _authorized_create_constraint(
         )
         return con
     except BaseException as creation_exc:
-        try:
-            _cleanup_failed_constraint_creation(
-                pbone, con, con_ptr, pbone_ptr, before_ptrs, active_tx,
-            )
-        except BaseException as cleanup_exc:
-            raise RuntimeError(
-                "CONSTRAINT_CREATION_CLEANUP_FAILED: "
-                f"original={type(creation_exc).__name__}: {creation_exc}; "
-                f"cleanup={type(cleanup_exc).__name__}: {cleanup_exc}"
-            ) from cleanup_exc
+        if con_ptr is not None and con_ptr > 0 and con_ptr not in before_ptrs:
+            try:
+                _cleanup_failed_constraint_creation(
+                    pbone, con, con_ptr, pbone_ptr, before_ptrs, active_tx,
+                )
+            except BaseException as cleanup_exc:
+                raise RuntimeError(
+                    "CONSTRAINT_CREATION_CLEANUP_FAILED: "
+                    f"original={type(creation_exc).__name__}: {creation_exc}; "
+                    f"cleanup={type(cleanup_exc).__name__}: {cleanup_exc}"
+                ) from cleanup_exc
         raise
 
 
@@ -3463,14 +3483,14 @@ def _authorized_remove_constraint(
         rec_pbone = target_record.get("pbone")
 
         receipts = getattr(active_tx, "_constraint_creation_receipts", {})
-        if rec_ptr not in receipts:
+        if not isinstance(receipts, dict) or rec_ptr not in receipts:
             raise RuntimeError(
                 f"Unauthorized constraint removal: no creation receipt found for constraint ptr={rec_ptr}"
             )
 
         receipt = receipts[rec_ptr]
-        if not isinstance(receipt, tuple) or len(receipt) < 8:
-            raise RuntimeError("Unauthorized constraint removal: malformed creation receipt")
+        if not isinstance(receipt, tuple) or len(receipt) != 8:
+            raise RuntimeError("Unauthorized constraint removal: creation receipt length must be exactly 8")
 
         rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = receipt
 
@@ -3487,14 +3507,35 @@ def _authorized_remove_constraint(
         if pbone is not None and rc_pbone != pbone:
             raise RuntimeError("Unauthorized constraint removal: target pose bone mismatch with receipt")
 
+        if type(rc_pbone_ptr) is not int or rc_pbone_ptr <= 0:
+            raise RuntimeError("Unauthorized constraint removal: invalid pose bone pointer in receipt")
+        target_pbone = pbone if pbone is not None else rec_pbone
+        try:
+            target_pbone_ptr = int(target_pbone.as_pointer())
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError(f"Unauthorized constraint removal: pose bone pointer unreadable: {exc}") from exc
+        if target_pbone_ptr != rc_pbone_ptr:
+            raise RuntimeError(
+                f"Unauthorized constraint removal: pose bone pointer mismatch: live={target_pbone_ptr} != receipt={rc_pbone_ptr}"
+            )
+
+        if not isinstance(rc_before_ptrs, frozenset):
+            raise RuntimeError("Unauthorized constraint removal: creation receipt before_ptrs must be frozenset")
+
         snapshot = getattr(active_tx, "snapshot", None)
-        if snapshot and isinstance(snapshot, dict):
-            for b_name_snap, b_data_snap in snapshot.get("pose_bones", {}).items():
+        if snapshot is None or not isinstance(snapshot, dict):
+            raise RuntimeError("Unauthorized constraint removal: active transaction missing trusted snapshot")
+        if active_tx.snapshot is not snapshot:
+            raise RuntimeError("Unauthorized constraint removal: transaction snapshot identity mismatch")
+
+        for b_name_snap, b_data_snap in snapshot.get("pose_bones", {}).items():
+            if isinstance(b_data_snap, dict):
                 for sc in b_data_snap.get("constraints", []):
-                    if sc.get("con_ptr") == rec_ptr or sc.get("con_ref") == rec_con_ref:
-                        raise RuntimeError(
-                            f"Unauthorized constraint removal: constraint ptr={rec_ptr} is an original snapshot constraint; deletion rejected"
-                        )
+                    if isinstance(sc, dict):
+                        if sc.get("con_ptr") == rec_ptr or sc.get("con_ref") == rec_con_ref:
+                            raise RuntimeError(
+                                f"Unauthorized constraint removal: constraint ptr={rec_ptr} is an original snapshot constraint; deletion rejected"
+                            )
 
         if rec_ptr in rc_before_ptrs:
             raise RuntimeError(
@@ -5201,63 +5242,151 @@ def _rollback_arm_rig_state(
     # Step 2: Pose bones and constraints restoration
     pose_bones_snap = snapshot.get("pose_bones", {})
 
-    # [INTRODUCED 2026-11-16T17:18:48+08:00]
+    # [INTRODUCED 2026-11-16T18:15:00+08:00]
     # FUNCTION: _rollback_arm_rig_state
-    # PURPOSE: Pre-deletion consistency audit between constraint creation registry and independent receipt ledger
-    # REASON: Task 10-B fix-4, prevent partial or unauthorized constraint deletions when registry and receipts diverge
+    # PURPOSE: Comprehensive pre-deletion ledger and receipt validation for all created constraints before any removal
+    # REASON: Task 10-B fix-4, enforce fail-closed pre-check ensuring zero partial deletions on any ledger defect
     constraint_creation_audit_passed = True
     if active_tx is not None:
-        created_constraints = getattr(active_tx, "created_constraints", [])
-        receipts = getattr(active_tx, "_constraint_creation_receipts", {})
+        proof_errors: List[str] = []
 
-        # 1. 创建登记表没有重复身份
-        reg_ptrs = [rec.get("con_ptr") for rec in created_constraints if rec.get("con_ptr") is not None]
-        if len(reg_ptrs) != len(set(reg_ptrs)):
+        # Snapshot identity and transaction ownership verification
+        if active_tx.arm is not arm or active_tx.snapshot is not snapshot or not isinstance(snapshot, dict):
+            proof_errors.append("Constraint rollback rejected: transaction/snapshot ownership mismatch")
             constraint_creation_audit_passed = False
-            restoration_errors.append("Constraint rollback consistency audit failed: duplicate constraint pointer in created_constraints registry")
 
-        # 2. 创建凭据表没有重复身份
-        rc_ptrs = list(receipts.keys())
-        if len(rc_ptrs) != len(set(rc_ptrs)):
+        created_constraints = getattr(active_tx, "created_constraints", None)
+        receipts = getattr(active_tx, "_constraint_creation_receipts", None)
+
+        # 1. 登记表结构合法
+        if not isinstance(created_constraints, list):
+            proof_errors.append("Constraint rollback rejected: created_constraints registry is not a list")
             constraint_creation_audit_passed = False
-            restoration_errors.append("Constraint rollback consistency audit failed: duplicate constraint pointer in _constraint_creation_receipts")
 
-        # 3. 两者的 Constraint 指针集合一致
-        set_reg_ptrs = set(reg_ptrs)
-        set_rc_ptrs = set(rc_ptrs)
-        if set_reg_ptrs != set_rc_ptrs:
+        # 2. 凭据表结构合法
+        if not isinstance(receipts, dict):
+            proof_errors.append("Constraint rollback rejected: _constraint_creation_receipts is not a dict")
             constraint_creation_audit_passed = False
-            restoration_errors.append(
-                f"Constraint rollback consistency audit failed: pointer mismatch between registry and receipts: "
-                f"registry_only={set_reg_ptrs - set_rc_ptrs}, receipts_only={set_rc_ptrs - set_reg_ptrs}"
-            )
 
-        # 4. 每条登记均有唯一匹配凭据
-        for rec in created_constraints:
-            c_ptr = rec.get("con_ptr")
-            c_ref = rec.get("con_ref")
-            if c_ptr not in receipts:
-                constraint_creation_audit_passed = False
-                restoration_errors.append(f"Constraint rollback consistency audit failed: missing receipt for registered constraint ptr={c_ptr}")
-            else:
-                rc = receipts[c_ptr]
-                if rc[0] != c_ref or rc[1] != c_ptr:
-                    constraint_creation_audit_passed = False
-                    restoration_errors.append(f"Constraint rollback consistency audit failed: receipt reference/pointer mismatch for ptr={c_ptr}")
+        if constraint_creation_audit_passed:
+            # 3. 无重复资源身份 & 登记表记录合法
+            reg_ptrs: List[int] = []
+            for rec in created_constraints:
+                if not isinstance(rec, dict):
+                    proof_errors.append("Constraint rollback rejected: registry record is not a dict")
+                    continue
+                c_ptr = rec.get("con_ptr")
+                c_ref = rec.get("con_ref")
+                pbone_ref = rec.get("pbone")
+                if c_ref is None or type(c_ptr) is not int or c_ptr <= 0 or pbone_ref is None:
+                    proof_errors.append(f"Constraint rollback rejected: invalid registry entry fields (ptr={c_ptr})")
+                    continue
+                if c_ptr in reg_ptrs:
+                    proof_errors.append(f"Constraint rollback rejected: duplicate constraint pointer {c_ptr} in registry")
+                else:
+                    reg_ptrs.append(c_ptr)
 
-        # 5. 不存在凭据指向事务进入时已存在的原始 Constraint
-        all_snapshot_con_ptrs = set()
-        for b_name_s, b_data_s in pose_bones_snap.items():
-            for sc in b_data_s.get("constraints", []):
-                if sc.get("con_ptr") is not None:
-                    all_snapshot_con_ptrs.add(sc["con_ptr"])
+            rc_ptrs: List[int] = []
+            for k in receipts.keys():
+                if type(k) is not int or k <= 0:
+                    proof_errors.append(f"Constraint rollback rejected: invalid receipt key {k}")
+                    continue
+                if k in rc_ptrs:
+                    proof_errors.append(f"Constraint rollback rejected: duplicate receipt pointer {k}")
+                else:
+                    rc_ptrs.append(k)
 
-        for c_ptr in set_rc_ptrs:
-            if c_ptr in all_snapshot_con_ptrs:
-                constraint_creation_audit_passed = False
-                restoration_errors.append(
-                    f"Constraint rollback consistency audit failed: receipt points to original constraint from snapshot (ptr={c_ptr})"
+            # 4. 登记表和凭据表指针集合完全一致
+            set_reg_ptrs = set(reg_ptrs)
+            set_rc_ptrs = set(rc_ptrs)
+            if set_reg_ptrs != set_rc_ptrs:
+                proof_errors.append(
+                    f"Constraint rollback rejected: pointer mismatch between registry and receipts: "
+                    f"registry_only={set_reg_ptrs - set_rc_ptrs}, receipts_only={set_rc_ptrs - set_reg_ptrs}"
                 )
+
+            # Collect all snapshot original constraint pointers and refs
+            all_snapshot_con_ptrs = set()
+            all_snapshot_con_refs = set()
+            for b_name_s, b_data_s in pose_bones_snap.items():
+                if isinstance(b_data_s, dict):
+                    for sc in b_data_s.get("constraints", []):
+                        if isinstance(sc, dict):
+                            if sc.get("con_ptr") is not None:
+                                all_snapshot_con_ptrs.add(sc["con_ptr"])
+                            if sc.get("con_ref") is not None:
+                                all_snapshot_con_refs.add(sc["con_ref"])
+
+            # 5. 逐一验证每份凭据与登记
+            seal = getattr(active_tx, "_constraint_receipt_seal", None)
+            for rec in created_constraints:
+                if not isinstance(rec, dict):
+                    continue
+                c_ptr = rec.get("con_ptr")
+                c_ref = rec.get("con_ref")
+                rec_pbone = rec.get("pbone")
+
+                if c_ptr not in receipts:
+                    proof_errors.append(f"Constraint rollback rejected: missing receipt for registered constraint ptr={c_ptr}")
+                    continue
+
+                rc = receipts[c_ptr]
+                # 每份凭据均为长度恰好为 8 的元组
+                if not isinstance(rc, tuple) or len(rc) != 8:
+                    proof_errors.append(f"Constraint rollback rejected: receipt for ptr={c_ptr} is not an 8-tuple")
+                    continue
+
+                rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = rc
+
+                # Constraint 引用、指针一致
+                if rc_con is None or rc_con != c_ref or rc_con_ptr != c_ptr:
+                    proof_errors.append(f"Constraint rollback rejected: receipt constraint mismatch for ptr={c_ptr}")
+                else:
+                    try:
+                        if int(rc_con.as_pointer()) != c_ptr:
+                            proof_errors.append(f"Constraint rollback rejected: live constraint pointer mismatch for ptr={c_ptr}")
+                    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
+                        proof_errors.append(f"Constraint rollback rejected: constraint reference dead for ptr={c_ptr}")
+
+                # PoseBone 引用、指针一致
+                if rc_pbone is None or rc_pbone != rec_pbone:
+                    proof_errors.append(f"Constraint rollback rejected: receipt pose bone reference mismatch for ptr={c_ptr}")
+                elif type(rc_pbone_ptr) is not int or rc_pbone_ptr <= 0:
+                    proof_errors.append(f"Constraint rollback rejected: receipt pose bone pointer invalid for ptr={c_ptr}")
+                else:
+                    try:
+                        live_pb_ptr = int(rc_pbone.as_pointer())
+                        if live_pb_ptr != rc_pbone_ptr:
+                            proof_errors.append(f"Constraint rollback rejected: live pose bone pointer mismatch for ptr={c_ptr}")
+                    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
+                        proof_errors.append(f"Constraint rollback rejected: pose bone dead for ptr={c_ptr}")
+
+                # Session ID 一致
+                if rc_session_id != active_tx.session_id:
+                    proof_errors.append(f"Constraint rollback rejected: session_id mismatch for ptr={c_ptr}")
+
+                # Transaction ID 一致
+                if rc_tx_id != active_tx.tx_id:
+                    proof_errors.append(f"Constraint rollback rejected: tx_id mismatch for ptr={c_ptr}")
+
+                # Seal 一致
+                if rc_seal is not seal or seal is None:
+                    proof_errors.append(f"Constraint rollback rejected: seal mismatch for ptr={c_ptr}")
+
+                # 创建前基线为 frozenset
+                if not isinstance(rc_before_ptrs, frozenset):
+                    proof_errors.append(f"Constraint rollback rejected: before_ptrs not frozenset for ptr={c_ptr}")
+                elif c_ptr in rc_before_ptrs:
+                    # Constraint 不属于创建前基线
+                    proof_errors.append(f"Constraint rollback rejected: constraint ptr={c_ptr} in before_ptrs")
+
+                # Constraint 不属于事务 Snapshot 原始资源
+                if c_ptr in all_snapshot_con_ptrs or c_ref in all_snapshot_con_refs:
+                    proof_errors.append(f"Constraint rollback rejected: constraint ptr={c_ptr} is snapshot original")
+
+        if proof_errors:
+            constraint_creation_audit_passed = False
+            restoration_errors.extend(proof_errors)
 
     for b_name, b_snap in pose_bones_snap.items():
         pbone = arm.pose.bones.get(b_name)
@@ -6555,15 +6684,15 @@ class _ArmRigTransactionContext:
                 )
 
         receipts = getattr(self, "_constraint_creation_receipts", None)
-        if receipts is None or con_ptr not in receipts:
+        if receipts is None or not isinstance(receipts, dict) or con_ptr not in receipts:
             raise RuntimeError(
                 f"Constraint registration rejected: no creation receipt found for constraint ptr={con_ptr}"
             )
 
         receipt = receipts[con_ptr]
-        if not isinstance(receipt, tuple) or len(receipt) < 8:
+        if not isinstance(receipt, tuple) or len(receipt) != 8:
             raise RuntimeError(
-                "Constraint registration rejected: malformed creation receipt"
+                "Constraint registration rejected: creation receipt length must be exactly 8"
             )
 
         rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = receipt
@@ -6584,9 +6713,33 @@ class _ArmRigTransactionContext:
             raise RuntimeError(
                 "Constraint registration rejected: creation receipt constraint reference/pointer mismatch"
             )
+        try:
+            live_con_ptr = int(con.as_pointer())
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError(f"Constraint registration rejected: live constraint pointer unreadable: {exc}") from exc
+        if live_con_ptr != con_ptr:
+            raise RuntimeError(
+                f"Constraint registration rejected: live constraint pointer mismatch: live={live_con_ptr} != con_ptr={con_ptr}"
+            )
         if rc_pbone != pbone:
             raise RuntimeError(
                 "Constraint registration rejected: creation receipt pose bone mismatch"
+            )
+        if type(rc_pbone_ptr) is not int or rc_pbone_ptr <= 0:
+            raise RuntimeError(
+                "Constraint registration rejected: invalid pose bone pointer in creation receipt"
+            )
+        try:
+            curr_pbone_ptr = int(pbone.as_pointer())
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError(f"Constraint registration rejected: pose bone pointer unreadable: {exc}") from exc
+        if curr_pbone_ptr != rc_pbone_ptr:
+            raise RuntimeError(
+                f"Constraint registration rejected: pose bone pointer mismatch: live={curr_pbone_ptr} != receipt={rc_pbone_ptr}"
+            )
+        if not isinstance(rc_before_ptrs, frozenset):
+            raise RuntimeError(
+                "Constraint registration rejected: creation receipt before_ptrs must be frozenset"
             )
         if con_ptr in rc_before_ptrs:
             raise RuntimeError(
