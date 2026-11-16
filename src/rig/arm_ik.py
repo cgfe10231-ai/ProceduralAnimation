@@ -3331,6 +3331,29 @@ def _authorized_create_constraint(
                 f"Duplicate constraint creation: '{con_name}' ({con_type}) already exists on bone '{pbone.name}'"
             )
 
+    # [INTRODUCED 2026-11-16T19:15:00+08:00]
+    # FUNCTION: _authorized_create_constraint
+    # PURPOSE: Validate receipt ledger structure, seal existence, and registry structure before physical C-API constraint creation
+    # REASON: Task 10-B fix-4 Round 1/2, reject malformed receipt ledger or missing seal prior to Blender constraint creation
+    receipts = getattr(active_tx, "_constraint_creation_receipts", None)
+    if (receipts is None or not isinstance(receipts, dict)
+            or any(type(k) is not int or k <= 0 or not isinstance(v, tuple) or len(v) != 8
+                   for k, v in receipts.items())):
+        raise RuntimeError("CONSTRAINT_CREATION_RECEIPT_LEDGER_UNAVAILABLE")
+
+    seal = getattr(active_tx, "_constraint_receipt_seal", None)
+    if seal is None:
+        raise RuntimeError("CONSTRAINT_CREATION_RECEIPT_SEAL_UNAVAILABLE")
+
+    registry = getattr(active_tx, "created_constraints", None)
+    if not isinstance(registry, list) or any(not isinstance(rec, dict) for rec in registry):
+        raise RuntimeError("CONSTRAINT_CREATION_REGISTRY_MALFORMED")
+
+    tx_session_id = getattr(active_tx, "session_id", None)
+    tx_id_val = getattr(active_tx, "tx_id", None)
+    if not isinstance(tx_session_id, str) or not tx_session_id or not isinstance(tx_id_val, str) or not tx_id_val:
+        raise RuntimeError("CONSTRAINT_CREATION_TRANSACTION_IDENTITY_UNAVAILABLE")
+
     # Capture the complete owner-chain identity BEFORE the creation C-API.
     # This local witness prevents any name-matched pre-existing constraint
     # from being considered removable in a fault-injection window.
@@ -3348,32 +3371,29 @@ def _authorized_create_constraint(
             # No stable identity is available; refusing deletion is safer than
             # substituting another constraint in the owning PoseBone chain.
             raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_UNREADABLE: refusing name-based cleanup") from exc
-        if con_ptr <= 0 or con_ptr in before_ptrs:
+        if con_ptr <= 0 or con_ptr in before_ptrs or con_ptr in receipts:
             raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_COLLISION: refusing cleanup without provenance")
 
         # [INTRODUCED 2026-11-16T18:15:00+08:00]
         # FUNCTION: _authorized_create_constraint
         # PURPOSE: Mint independent provenance receipt within the exception compensation scope
         # REASON: Task 10-B fix-4, ensure receipt write failures enter compensation to prevent uncompensated orphans
-        receipts = getattr(active_tx, "_constraint_creation_receipts", None)
-        if receipts is None or not isinstance(receipts, dict):
+        live_receipts = getattr(active_tx, "_constraint_creation_receipts", None)
+        live_seal = getattr(active_tx, "_constraint_receipt_seal", None)
+        if live_receipts is not receipts or not isinstance(live_receipts, dict) or live_seal is not seal or live_seal is None:
             raise RuntimeError("CONSTRAINT_CREATION_RECEIPT_LEDGER_UNAVAILABLE")
-
-        seal = getattr(active_tx, "_constraint_receipt_seal", None)
-        if seal is None:
-            raise RuntimeError("CONSTRAINT_CREATION_RECEIPT_SEAL_UNAVAILABLE")
 
         receipt = (
             con,
             con_ptr,
             pbone,
             pbone_ptr,
-            str(active_tx.session_id),
-            str(active_tx.tx_id),
-            seal,
+            tx_session_id,
+            tx_id_val,
+            live_seal,
             before_ptrs,
         )
-        receipts[con_ptr] = receipt
+        live_receipts[con_ptr] = receipt
 
         # Name setting is also fallible and must be within the compensation
         # window, rather than creating an unregistered orphan on exception.
@@ -5240,18 +5260,19 @@ def _rollback_arm_rig_state(
     )
 
     # Step 2: Pose bones and constraints restoration
-    pose_bones_snap = snapshot.get("pose_bones", {})
+    pose_bones_snap = snapshot.get("pose_bones", {}) if isinstance(snapshot, dict) else {}
 
-    # [INTRODUCED 2026-11-16T18:15:00+08:00]
+    # [INTRODUCED 2026-11-16T19:15:00+08:00]
     # FUNCTION: _rollback_arm_rig_state
-    # PURPOSE: Comprehensive pre-deletion ledger and receipt validation for all created constraints before any removal
-    # REASON: Task 10-B fix-4, enforce fail-closed pre-check ensuring zero partial deletions on any ledger defect
+    # PURPOSE: Comprehensive pre-deletion ledger, receipt, PoseBone identity, and live constraint membership validation before any removal
+    # REASON: Task 10-B fix-4 Round 1/2, close pre-check gaps on bone_name/PoseBone identity and live constraint membership to prevent partial deletion
     constraint_creation_audit_passed = True
     if active_tx is not None:
         proof_errors: List[str] = []
 
         # Snapshot identity and transaction ownership verification
-        if active_tx.arm is not arm or active_tx.snapshot is not snapshot or not isinstance(snapshot, dict):
+        if (active_tx.arm is not arm or active_tx.snapshot is not snapshot
+                or not isinstance(snapshot, dict) or not isinstance(pose_bones_snap, dict)):
             proof_errors.append("Constraint rollback rejected: transaction/snapshot ownership mismatch")
             constraint_creation_audit_passed = False
 
@@ -5269,8 +5290,19 @@ def _rollback_arm_rig_state(
             constraint_creation_audit_passed = False
 
         if constraint_creation_audit_passed:
+            if created_constraints or receipts:
+                if active_tx.state != _ArmRigTransactionState.ROLLING_BACK:
+                    proof_errors.append(
+                        f"Constraint rollback rejected: transaction state is {active_tx.state}, expected ROLLING_BACK"
+                    )
+                if not _ACTIVE_TRANSACTION_STACK or active_tx not in _ACTIVE_TRANSACTION_STACK:
+                    proof_errors.append(
+                        "Constraint rollback rejected: transaction does not belong to active transaction stack"
+                    )
+
             # 3. 无重复资源身份 & 登记表记录合法
             reg_ptrs: List[int] = []
+            reg_refs: List[Any] = []
             for rec in created_constraints:
                 if not isinstance(rec, dict):
                     proof_errors.append("Constraint rollback rejected: registry record is not a dict")
@@ -5278,13 +5310,16 @@ def _rollback_arm_rig_state(
                 c_ptr = rec.get("con_ptr")
                 c_ref = rec.get("con_ref")
                 pbone_ref = rec.get("pbone")
-                if c_ref is None or type(c_ptr) is not int or c_ptr <= 0 or pbone_ref is None:
+                b_name_rec = rec.get("bone_name")
+                if (c_ref is None or type(c_ptr) is not int or c_ptr <= 0
+                        or pbone_ref is None or not isinstance(b_name_rec, str) or not b_name_rec):
                     proof_errors.append(f"Constraint rollback rejected: invalid registry entry fields (ptr={c_ptr})")
                     continue
-                if c_ptr in reg_ptrs:
-                    proof_errors.append(f"Constraint rollback rejected: duplicate constraint pointer {c_ptr} in registry")
+                if c_ptr in reg_ptrs or any(r == c_ref for r in reg_refs):
+                    proof_errors.append(f"Constraint rollback rejected: duplicate constraint identity (ptr={c_ptr}) in registry")
                 else:
                     reg_ptrs.append(c_ptr)
+                    reg_refs.append(c_ref)
 
             rc_ptrs: List[int] = []
             for k in receipts.keys():
@@ -5317,7 +5352,7 @@ def _rollback_arm_rig_state(
                             if sc.get("con_ref") is not None:
                                 all_snapshot_con_refs.add(sc["con_ref"])
 
-            # 5. 逐一验证每份凭据与登记
+            # 5. 逐一验证每份凭据、PoseBone 实时身份与当前约束集合归属
             seal = getattr(active_tx, "_constraint_receipt_seal", None)
             for rec in created_constraints:
                 if not isinstance(rec, dict):
@@ -5325,6 +5360,36 @@ def _rollback_arm_rig_state(
                 c_ptr = rec.get("con_ptr")
                 c_ref = rec.get("con_ref")
                 rec_pbone = rec.get("pbone")
+                rec_bone_name = rec.get("bone_name")
+
+                # 核验登记 bone_name 与所属 PoseBone 实时身份一致
+                live_pbone = None
+                if not isinstance(rec_bone_name, str) or not rec_bone_name:
+                    proof_errors.append(f"Constraint rollback rejected: invalid bone_name for ptr={c_ptr}")
+                elif rec_bone_name not in pose_bones_snap:
+                    proof_errors.append(
+                        f"Constraint rollback rejected: registered bone_name '{rec_bone_name}' not in snapshot for ptr={c_ptr}"
+                    )
+                elif arm is None or getattr(arm, "pose", None) is None or getattr(arm.pose, "bones", None) is None:
+                    proof_errors.append(f"Constraint rollback rejected: armature pose bones unavailable for ptr={c_ptr}")
+                else:
+                    live_pbone = arm.pose.bones.get(rec_bone_name)
+                    if live_pbone is None:
+                        proof_errors.append(
+                            f"Constraint rollback rejected: PoseBone '{rec_bone_name}' not found on armature for ptr={c_ptr}"
+                        )
+                    elif rec_pbone is None or live_pbone != rec_pbone:
+                        proof_errors.append(
+                            f"Constraint rollback rejected: PoseBone reference mismatch for bone '{rec_bone_name}' (ptr={c_ptr})"
+                        )
+                    else:
+                        try:
+                            if getattr(rec_pbone, "name", None) != rec_bone_name:
+                                proof_errors.append(
+                                    f"Constraint rollback rejected: PoseBone live name '{getattr(rec_pbone, 'name', None)}' != registered bone_name '{rec_bone_name}' (ptr={c_ptr})"
+                                )
+                        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
+                            proof_errors.append(f"Constraint rollback rejected: PoseBone reference dead when reading name for ptr={c_ptr}")
 
                 if c_ptr not in receipts:
                     proof_errors.append(f"Constraint rollback rejected: missing receipt for registered constraint ptr={c_ptr}")
@@ -5349,7 +5414,7 @@ def _rollback_arm_rig_state(
                         proof_errors.append(f"Constraint rollback rejected: constraint reference dead for ptr={c_ptr}")
 
                 # PoseBone 引用、指针一致
-                if rc_pbone is None or rc_pbone != rec_pbone:
+                if rc_pbone is None or rc_pbone != rec_pbone or (live_pbone is not None and rc_pbone != live_pbone):
                     proof_errors.append(f"Constraint rollback rejected: receipt pose bone reference mismatch for ptr={c_ptr}")
                 elif type(rc_pbone_ptr) is not int or rc_pbone_ptr <= 0:
                     proof_errors.append(f"Constraint rollback rejected: receipt pose bone pointer invalid for ptr={c_ptr}")
@@ -5360,6 +5425,27 @@ def _rollback_arm_rig_state(
                             proof_errors.append(f"Constraint rollback rejected: live pose bone pointer mismatch for ptr={c_ptr}")
                     except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
                         proof_errors.append(f"Constraint rollback rejected: pose bone dead for ptr={c_ptr}")
+
+                # 核验 Constraint 引用和指针确实存在于登记的 PoseBone 当前约束集合
+                if rec_pbone is not None and c_ref is not None and type(c_ptr) is int and c_ptr > 0:
+                    try:
+                        bone_cons = list(rec_pbone.constraints)
+                        matched_cands = []
+                        cand_mismatch = False
+                        for cand in bone_cons:
+                            cand_ptr = int(cand.as_pointer())
+                            if cand_ptr == c_ptr or cand == c_ref:
+                                if cand_ptr != c_ptr or cand != c_ref:
+                                    cand_mismatch = True
+                                matched_cands.append(cand)
+                        if cand_mismatch or len(matched_cands) != 1:
+                            proof_errors.append(
+                                f"Constraint rollback rejected: constraint ptr={c_ptr} not uniquely present on PoseBone '{rec_bone_name}'"
+                            )
+                    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
+                        proof_errors.append(
+                            f"Constraint rollback rejected: failed to enumerate constraints on PoseBone '{rec_bone_name}' for ptr={c_ptr}"
+                        )
 
                 # Session ID 一致
                 if rc_session_id != active_tx.session_id:
