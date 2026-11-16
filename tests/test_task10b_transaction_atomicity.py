@@ -8823,6 +8823,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             "timestamp": time.time(),
         }
         orig_failed_record = dict(_ISOLATED_FAILED_ARMATURES[session_id])
+        orig_failed_record_ref = _ISOLATED_FAILED_ARMATURES[session_id]
 
         tx = _ArmRigTransactionContext(self.armature)
         tx.state = _ArmRigTransactionState.CLEANUP_PENDING
@@ -8852,6 +8853,10 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], _FailedTransactionClass.FAILED_B.value)
             self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], "other-failed-tx-244")
             self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id], orig_failed_record)
+            self.assertIs(
+                _ISOLATED_FAILED_ARMATURES[session_id],
+                orig_failed_record_ref
+            )
 
             # Assert no Coordinator authorization grant was issued or altered
             self.assertEqual(_COORDINATOR_AUTHORIZATION_GRANTS, grants_before)
