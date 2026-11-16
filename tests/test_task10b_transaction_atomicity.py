@@ -8810,7 +8810,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
 
     def test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation(self) -> None:
-        """TEST-244: CLEANUP_PENDING 与 FAILED 隔离同时存在时，清理重试不得清除 FAILED 隔离."""
+        """TEST-244: CLEANUP_PENDING 与 FAILED 隔离同时存在时，清理重试必须被 Coordinator 拒绝且不得清除 FAILED 隔离."""
         session_rec = ensure_armature_session_identity(self.armature)
         session_id = session_rec.registry_session_id
 
@@ -8822,17 +8822,39 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             "armature_pointer": self.armature.as_pointer(),
             "timestamp": time.time(),
         }
+        orig_failed_record = dict(_ISOLATED_FAILED_ARMATURES[session_id])
 
         tx = _ArmRigTransactionContext(self.armature)
         tx.state = _ArmRigTransactionState.CLEANUP_PENDING
         _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
 
-        try:
-            retry_pending_arm_rig_cleanup(tx.tx_id)
-            self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        # [INTRODUCED 2026-11-16T14:31:11+08:00]
+        # FUNCTION: test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation
+        # PURPOSE: Verify that Cleanup Retry is rejected by Coordinator Preflight under concurrent FAILED isolation without altering registries
+        # REASON: Task 10-B fix-3, align TEST-244 with TEST-136 Coordinator negative gate contract
+        grants_before = dict(_COORDINATOR_AUTHORIZATION_GRANTS)
 
+        try:
+            with self.assertRaises(RuntimeError) as cm_retry:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            err_msg = str(cm_retry.exception)
+            self.assertIn("CLEANUP_PREFLIGHT_REJECTED", err_msg)
+            self.assertIn("active FAILED isolation", err_msg)
+
+            # Assert pending transaction state and registry remain intact
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertNotEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertIs(_PENDING_ARM_RIG_CLEANUPS[tx.tx_id], tx)
+
+            # Assert FAILED isolation record remains intact
             self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], _FailedTransactionClass.FAILED_B.value)
             self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], "other-failed-tx-244")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id], orig_failed_record)
+
+            # Assert no Coordinator authorization grant was issued or altered
+            self.assertEqual(_COORDINATOR_AUTHORIZATION_GRANTS, grants_before)
         finally:
             _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
             _ISOLATED_FAILED_ARMATURES.pop(session_id, None)
