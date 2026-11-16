@@ -542,120 +542,96 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """
         TEST-38:
         Restore original constraint identity, order,
-        properties and remove transaction-added constraints.
+        properties and remove transaction-added constraints under live coordinator transaction.
 
         Physical destruction of an original constraint
         is covered separately by TEST-77 and TEST-78.
         """
-
         setup_arm_ik(
             self.armature,
             initial_influence=0.4,
         )
-
-        snap = _snapshot_arm_rig_state(self.armature)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
 
         p_fore = self.armature.pose.bones["forearm.L"]
-
         original = p_fore.constraints["ArmIK.L"]
         original_ptr = original.as_pointer()
-
         original_mute = original.mute
         original_influence = original.influence
+        original_order = [c.name for c in p_fore.constraints]
+        original_count = len(p_fore.constraints)
 
-        # Mutate the original constraint without destroying it.
-        original.influence = 0.9
-        original.mute = not original_mute
+        # [INTRODUCED 2026-11-16T15:45:22+08:00]
+        # FUNCTION: test_38_direct_rollback_constraints
+        # PURPOSE: Verify constraint rollback, order restoration, and created constraint removal under live coordinator transaction
+        # REASON: Task 10-B fix-4, replace mock transaction context with authorized transaction workflow
+        captured_tx = []
+        with self.assertRaises(RuntimeError) as cm:
+            with _arm_rig_transaction(self.armature) as tx:
+                captured_tx.append(tx)
+                self.assertEqual(tx.state, _ArmRigTransactionState.ACTIVE)
 
-        # Add an extraneous constraint.
-        extra = p_fore.constraints.new(type="TRACK_TO")
-        extra.name = "ExtraTrack_TEST38"
+                # Mutate original constraint without destroying it
+                original.influence = 0.9
+                original.mute = not original_mute
 
-        # Move the extra constraint before the original.
-        extra_idx = list(p_fore.constraints).index(extra)
-        p_fore.constraints.move(extra_idx, 0)
+                # Add an authorized transaction-created constraint
+                extra = _authorized_create_constraint(
+                    pbone=p_fore,
+                    con_type="COPY_ROTATION",
+                    con_name="ExtraCopyRotation_TEST38",
+                    active_tx=tx,
+                    arm=self.armature,
+                )
 
-        bpy.context.view_layer.update()
+                # Move the extra constraint before the original
+                extra_idx = list(p_fore.constraints).index(extra)
+                p_fore.constraints.move(extra_idx, 0)
 
-        # Confirm the test actually changed the scene.
-        self.assertEqual(
-            p_fore.constraints[0].name,
-            "ExtraTrack_TEST38",
-        )
+                bpy.context.view_layer.update()
 
-        self.assertAlmostEqual(
-            original.influence,
-            0.9,
-            places=5,
-        )
+                # Confirm scene changed
+                self.assertEqual(p_fore.constraints[0].name, "ExtraCopyRotation_TEST38")
+                self.assertAlmostEqual(original.influence, 0.9, places=5)
+                self.assertEqual(original.mute, not original_mute)
 
-        # Register extra constraint as transaction-created on mock transaction context
-        tx = _ArmRigTransactionContext(self.armature)
-        tx.snapshot = snap
-        tx.register_created_constraint(p_fore, extra)
+                raise RuntimeError("Fault injected in TEST-38")
 
-        _ACTIVE_TRANSACTION_STACK.append(tx)
-        try:
-            # Execute rollback.
-            _rollback_arm_rig_state(
-                self.armature,
-                snap,
-                active_tx=tx,
-            )
+        self.assertIn("Fault injected in TEST-38", str(cm.exception))
 
-            _verify_arm_rig_state_restored(
-                self.armature,
-                snap,
-                active_tx=tx,
-            )
-        finally:
-            _ACTIVE_TRANSACTION_STACK.pop()
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
-        # Original assertions: count, name, type, influence.
-        self.assertEqual(
-            len(p_fore.constraints),
-            1,
-        )
+        # Original assertions: count, name, type, influence, identity
+        self.assertEqual(len(p_fore.constraints), original_count)
+        self.assertEqual([c.name for c in p_fore.constraints], original_order)
 
         restored = p_fore.constraints[0]
+        self.assertEqual(restored.name, "ArmIK.L")
+        self.assertEqual(restored.type, "IK")
+        self.assertAlmostEqual(restored.influence, 0.4, places=5)
 
-        self.assertEqual(
-            restored.name,
-            "ArmIK.L",
-        )
-
-        self.assertEqual(
-            restored.type,
-            "IK",
-        )
-
-        self.assertAlmostEqual(
-            restored.influence,
-            0.4,
-            places=5,
-        )
-
-        # Additional strict identity assertions.
-        self.assertEqual(
-            restored.as_pointer(),
-            original_ptr,
-        )
-
-        self.assertAlmostEqual(
-            restored.influence,
-            original_influence,
-            places=5,
-        )
-
-        self.assertEqual(
-            restored.mute,
-            original_mute,
-        )
+        # Strict identity assertions
+        self.assertEqual(restored.as_pointer(), original_ptr)
+        self.assertAlmostEqual(restored.influence, original_influence, places=5)
+        self.assertEqual(restored.mute, original_mute)
 
         self.assertNotIn(
-            "ExtraTrack_TEST38",
+            "ExtraCopyRotation_TEST38",
             [c.name for c in p_fore.constraints],
         )
+
+        # Verify no FAILED isolation and no CLEANUP_PENDING
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        # Verify arm rig state restored precisely matches transaction snapshot
+        _verify_arm_rig_state_restored(self.armature, tx.snapshot, active_tx=tx)
 
     # -------------------------------------------------------------------------
     # Fault Injection Tests (TEST-39 to TEST-50)
