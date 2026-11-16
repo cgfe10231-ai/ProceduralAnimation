@@ -3355,38 +3355,94 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-106: Inserting external constraints before/between original constraints maintains relative ordering."""
         setup_arm_ik(self.armature, initial_influence=0.5)
 
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
         p_fore = self.armature.pose.bones["forearm.L"]
         # Add a second constraint so we have multiple original constraints
         orig_limit = p_fore.constraints.new(type="LIMIT_ROTATION")
         orig_limit.name = "OrigLimit106"
         bpy.context.view_layer.update()
 
-        snap = _snapshot_arm_rig_state(self.armature)
+        arm_ik_con = p_fore.constraints["ArmIK.L"]
+        arm_ik_ref = arm_ik_con
+        arm_ik_ptr = arm_ik_con.as_pointer()
 
-        # Invert original constraint order: move OrigLimit106 before ArmIK.L
-        p_fore.constraints.move(1, 0)
-        # Add an external constraint at index 0
-        ext_first = p_fore.constraints.new(type="TRACK_TO")
-        ext_first.name = "ExtFirst106"
-        p_fore.constraints.move(len(p_fore.constraints) - 1, 0)
-        bpy.context.view_layer.update()
+        orig_limit_ref = orig_limit
+        orig_limit_ptr = orig_limit.as_pointer()
 
-        # Execute mock transaction rollback
-        tx = _ArmRigTransactionContext(self.armature)
-        tx.snapshot = snap
-        _ACTIVE_TRANSACTION_STACK.append(tx)
-        try:
-            _rollback_arm_rig_state(self.armature, snap, active_tx=tx)
-            _verify_arm_rig_state_restored(self.armature, snap, active_tx=tx)
-        finally:
-            _ACTIVE_TRANSACTION_STACK.pop()
+        original_count = len(p_fore.constraints)
+        original_order = [c.name for c in p_fore.constraints]
 
-        # ArmIK.L must come before OrigLimit106 again
-        c_names = [c.name for c in p_fore.constraints]
-        self.assertIn("ArmIK.L", c_names)
-        self.assertIn("OrigLimit106", c_names)
-        self.assertLess(c_names.index("ArmIK.L"), c_names.index("OrigLimit106"))
+        # [INTRODUCED 2026-11-16T16:23:49+08:00]
+        # FUNCTION: test_106_external_constraint_insertion_preserves_original_constraint_order
+        # PURPOSE: Verify live coordinator transaction rollback preserves external constraints and restores original relative order
+        # REASON: Task 10-B fix-4, replace mock transaction context with authorized transaction workflow
+        captured_tx = []
+        ext_first_ref = None
+        ext_first_ptr = None
+
+        with self.assertRaises(RuntimeError) as cm:
+            with _arm_rig_transaction(self.armature) as tx:
+                captured_tx.append(tx)
+                self.assertEqual(tx.state, _ArmRigTransactionState.ACTIVE)
+
+                # Invert original constraint order: move OrigLimit106 before ArmIK.L
+                p_fore.constraints.move(1, 0)
+
+                # Add an external constraint at index 0 (unauthorized insertion)
+                ext_first = p_fore.constraints.new(type="TRACK_TO")
+                ext_first.name = "ExtFirst106"
+                ext_first_ref = ext_first
+                ext_first_ptr = ext_first.as_pointer()
+                p_fore.constraints.move(len(p_fore.constraints) - 1, 0)
+                bpy.context.view_layer.update()
+
+                # Confirm order was perturbed
+                perturbed_names = [c.name for c in p_fore.constraints]
+                self.assertEqual(perturbed_names[0], "ExtFirst106")
+                self.assertEqual(perturbed_names[1], "OrigLimit106")
+                self.assertEqual(perturbed_names[2], "ArmIK.L")
+
+                raise RuntimeError("Fault injected in TEST-106")
+
+        self.assertIn("Fault injected in TEST-106", str(cm.exception))
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.ROLLED_BACK)
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Original constraints identity and existence assertions
+        self.assertIn("ArmIK.L", [c.name for c in p_fore.constraints])
+        live_arm_ik = p_fore.constraints["ArmIK.L"]
+        self.assertIs(live_arm_ik, arm_ik_ref)
+        self.assertEqual(live_arm_ik.as_pointer(), arm_ik_ptr)
+
+        self.assertIn("OrigLimit106", [c.name for c in p_fore.constraints])
+        live_orig_limit = p_fore.constraints["OrigLimit106"]
+        self.assertIs(live_orig_limit, orig_limit_ref)
+        self.assertEqual(live_orig_limit.as_pointer(), orig_limit_ptr)
+
+        # ArmIK.L must come before OrigLimit106 again (relative ordering restored)
+        c_names = [c.name for c in p_fore.constraints]
+        self.assertLess(c_names.index("ArmIK.L"), c_names.index("OrigLimit106"))
+
+        # External constraint must be preserved untouched
+        self.assertIn("ExtFirst106", c_names)
+        live_ext = p_fore.constraints["ExtFirst106"]
+        self.assertIs(live_ext, ext_first_ref)
+        self.assertEqual(live_ext.as_pointer(), ext_first_ptr)
+        self.assertEqual(live_ext.type, "TRACK_TO")
+
+        # Total constraint count includes the preserved external constraint
+        self.assertEqual(len(p_fore.constraints), original_count + 1)
+
+        # Verify no FAILED isolation and no CLEANUP_PENDING
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
 
     def test_107_transaction_created_collection_link_undone_on_failure(self) -> None:
         """TEST-107: Controller collection links created within a transaction are unlinked on rollback."""
