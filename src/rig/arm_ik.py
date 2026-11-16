@@ -6914,16 +6914,72 @@ class _ArmRigTransactionContext:
                 isinstance(r, dict) and r.get("col_ptr") == col_ptr
                 for r in self.created_collections):
             raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: duplicate Collection registration")
-        self.created_collections.append({
+        # [INTRODUCED 2026-11-16T21:33:00+08:00]
+        # FUNCTION: _ArmRigTransactionContext.register_created_collection
+        # PURPOSE: Guarantee atomic in-memory consistency between created_collections registry and _collection_creation_receipts
+        # REASON: Task 10-B fix-5 (R2-TAIL-02), prevent unilateral collection registration record without matching receipt on failure
+        registry = getattr(self, "created_collections", None)
+        receipts = getattr(self, "_collection_creation_receipts", None)
+        seal = getattr(self, "_collection_receipt_seal", None)
+        session_id = getattr(self, "session_id", None)
+        tx_id = getattr(self, "tx_id", None)
+        if (not isinstance(registry, list)
+                or not isinstance(receipts, dict)
+                or seal is None
+                or not isinstance(session_id, str) or not session_id
+                or not isinstance(tx_id, str) or not tx_id):
+            raise RuntimeError("COLLECTION_OWNERSHIP_UNPROVEN: registration ledger or session metadata unavailable")
+
+        record = {
             "col_ref": col,
             "col_ptr": col_ptr,
             "created_name": col.name,
             "initial_parent": initial_parent,
             "initial_parent_ptr": parent_ptr,
-        })
-        self._collection_creation_receipts[col_ptr] = (
-            col, initial_parent, self.session_id, self.tx_id, self._collection_receipt_seal,
+        }
+        receipt = (
+            col, initial_parent, session_id, tx_id, seal,
         )
+
+        registry_appended = False
+        try:
+            registry.append(record)
+            registry_appended = True
+            receipts[col_ptr] = receipt
+            if (self.created_collections is not registry
+                    or self._collection_creation_receipts is not receipts
+                    or sum(1 for item in registry if item is record) != 1
+                    or col_ptr not in receipts
+                    or receipts.get(col_ptr) is not receipt):
+                raise RuntimeError("COLLECTION_REGISTRATION_UNVERIFIED: post-write ledger state inconsistent")
+        except BaseException as reg_exc:
+            try:
+                matched_indices = [idx for idx, item in enumerate(registry) if item is record]
+                if matched_indices:
+                    if len(matched_indices) != 1:
+                        raise RuntimeError(
+                            f"Ambiguous registry records ({len(matched_indices)}) matched current registration"
+                        )
+                    removed = registry.pop(matched_indices[0])
+                    if removed is not record or any(item is record for item in registry):
+                        raise RuntimeError("Failed to verify removal of current collection registry record")
+                elif registry_appended:
+                    raise RuntimeError("Current collection registry record missing before undo completion")
+
+                if col_ptr in receipts:
+                    if receipts.get(col_ptr) is receipt:
+                        popped_receipt = receipts.pop(col_ptr)
+                        if popped_receipt is not receipt or col_ptr in receipts:
+                            raise RuntimeError("Failed to verify removal of current collection creation receipt")
+                    else:
+                        raise RuntimeError("Unexpected receipt state encountered during registration undo")
+            except BaseException as undo_exc:
+                raise RuntimeError(
+                    "COLLECTION_REGISTRATION_ROLLBACK_FAILED: "
+                    f"original={type(reg_exc).__name__}: {reg_exc}; "
+                    f"rollback={type(undo_exc).__name__}: {undo_exc}"
+                ) from undo_exc
+            raise
 
     def retry_cleanup(self) -> _CleanupResult:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
