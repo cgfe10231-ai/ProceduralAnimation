@@ -3416,12 +3416,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # Original constraints identity and existence assertions
         self.assertIn("ArmIK.L", [c.name for c in p_fore.constraints])
         live_arm_ik = p_fore.constraints["ArmIK.L"]
-        self.assertIs(live_arm_ik, arm_ik_ref)
+        self.assertEqual(live_arm_ik, arm_ik_ref)
         self.assertEqual(live_arm_ik.as_pointer(), arm_ik_ptr)
 
         self.assertIn("OrigLimit106", [c.name for c in p_fore.constraints])
         live_orig_limit = p_fore.constraints["OrigLimit106"]
-        self.assertIs(live_orig_limit, orig_limit_ref)
+        self.assertEqual(live_orig_limit, orig_limit_ref)
         self.assertEqual(live_orig_limit.as_pointer(), orig_limit_ptr)
 
         # ArmIK.L must come before OrigLimit106 again (relative ordering restored)
@@ -3431,7 +3431,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # External constraint must be preserved untouched
         self.assertIn("ExtFirst106", c_names)
         live_ext = p_fore.constraints["ExtFirst106"]
-        self.assertIs(live_ext, ext_first_ref)
+        self.assertEqual(live_ext, ext_first_ref)
         self.assertEqual(live_ext.as_pointer(), ext_first_ptr)
         self.assertEqual(live_ext.type, "TRACK_TO")
 
