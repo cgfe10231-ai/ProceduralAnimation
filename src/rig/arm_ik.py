@@ -3204,6 +3204,12 @@ def _cleanup_failed_constraint_creation(
         raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registry malformed")
     related = [rec for rec in registry
                if rec.get("con_ptr") == expected_ptr or rec.get("con_ref") == con]
+
+    # [INTRODUCED 2026-11-16T17:18:48+08:00]
+    # FUNCTION: _cleanup_failed_constraint_creation
+    # PURPOSE: Enforce receipt validation on registered resources and revoke unregistered receipts upon compensation
+    # REASON: Task 10-B fix-4, handle Window 1 and Window 2 creation failure compensation safely without phantom receipts
+    receipts = getattr(active_tx, "_constraint_creation_receipts", {})
     if related:
         # Once a complete registration exists, the enclosing transaction's
         # existing Layer-3 rollback exclusively owns destruction.
@@ -3213,6 +3219,13 @@ def _cleanup_failed_constraint_creation(
                 or related[0].get("pbone") != pbone
                 or related[0].get("bone_name") != pbone.name):
             raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: partial/mismatched registration")
+        if expected_ptr not in receipts:
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registered constraint missing creation receipt")
+        rc = receipts[expected_ptr]
+        if (rc[0] != con or rc[1] != expected_ptr or rc[2] != pbone or rc[3] != pbone_ptr
+                or rc[4] != active_tx.session_id or rc[5] != active_tx.tx_id
+                or rc[6] is not getattr(active_tx, "_constraint_receipt_seal", None)):
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registration and receipt mismatch")
         return
 
     # Only the exact instance returned by this invocation's constraints.new()
@@ -3236,6 +3249,9 @@ def _cleanup_failed_constraint_creation(
             f"CONSTRAINT_CREATION_CLEANUP_REMOVE_UNVERIFIED: ptr={expected_ptr}; "
             f"{type(exc).__name__}: {exc}"
         ) from exc
+
+    if hasattr(active_tx, "_constraint_creation_receipts") and expected_ptr in active_tx._constraint_creation_receipts:
+        active_tx._constraint_creation_receipts.pop(expected_ptr, None)
 
 
 def _authorized_create_constraint(
@@ -3269,23 +3285,33 @@ def _authorized_create_constraint(
             f"Cannot create constraint: transaction is in state {active_tx.state}, expected ACTIVE"
         )
 
+    if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not active_tx:
+        raise RuntimeError("Cannot create constraint: active transaction is not top of transaction stack")
+
     if con_type not in ("IK", "COPY_ROTATION"):
         raise ValueError(f"Unauthorized constraint type for arm IK rig: {con_type}")
 
-    # Armature identity verification
-    if arm is not None:
-        arm_ptr = arm.as_pointer() if hasattr(arm, "as_pointer") else None
+    # Armature identity and session verification
+    target_arm = arm if arm is not None else getattr(active_tx, "arm", None)
+    if target_arm is not None:
+        arm_ptr = target_arm.as_pointer() if hasattr(target_arm, "as_pointer") else None
         if active_tx.arm_ptr is not None and arm_ptr is not None and arm_ptr != active_tx.arm_ptr:
             raise RuntimeError("Armature identity does not match active transaction")
+        try:
+            target_session = ensure_armature_session_identity(target_arm)
+            if target_session.registry_session_id != active_tx.session_id:
+                raise RuntimeError("Armature session ID does not match active transaction")
+        except Exception as sess_exc:
+            raise RuntimeError(f"Armature session identity verification failed: {sess_exc}") from sess_exc
 
     # Pose bone verification
     try:
-        pbone_ptr = pbone.as_pointer()
-    except ReferenceError as re:
+        pbone_ptr = int(pbone.as_pointer())
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as re:
         raise RuntimeError(f"PoseBone reference is dead: {re}") from re
 
-    if arm is not None:
-        if pbone.name not in arm.pose.bones or arm.pose.bones[pbone.name] != pbone:
+    if target_arm is not None and hasattr(target_arm, "pose") and target_arm.pose is not None:
+        if pbone.name not in target_arm.pose.bones or target_arm.pose.bones[pbone.name] != pbone:
             raise RuntimeError(f"PoseBone '{pbone.name}' does not belong to active armature")
 
     # Check no duplicate live constraint with same name and type
@@ -3312,6 +3338,22 @@ def _authorized_create_constraint(
         raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_UNREADABLE: refusing name-based cleanup") from exc
     if con_ptr <= 0 or con_ptr in before_ptrs:
         raise RuntimeError("CONSTRAINT_CREATION_IDENTITY_COLLISION: refusing cleanup without provenance")
+
+    # [INTRODUCED 2026-11-16T17:18:48+08:00]
+    # FUNCTION: _authorized_create_constraint
+    # PURPOSE: Mint independent provenance receipt upon verified C-API constraint creation
+    # REASON: Task 10-B fix-4, establish independent creation receipt before registration
+    receipt = (
+        con,
+        con_ptr,
+        pbone,
+        pbone_ptr,
+        str(active_tx.session_id),
+        str(active_tx.tx_id),
+        active_tx._constraint_receipt_seal,
+        before_ptrs,
+    )
+    active_tx._constraint_creation_receipts[con_ptr] = receipt
 
     try:
         # Name setting is also fallible and must be within the compensation
@@ -3382,30 +3424,104 @@ def _authorized_remove_constraint(
     # Resolve the transaction record
     target_record: Optional[Dict[str, Any]] = None
     if phase == "ROLLBACK":
+        # [INTRODUCED 2026-11-16T17:18:48+08:00]
+        # FUNCTION: _authorized_remove_constraint
+        # PURPOSE: Verify ROLLING_BACK state, active stack ownership, registry uniqueness, and creation receipt provenance
+        # REASON: Task 10-B fix-4, require independent provenance receipts for constraint rollback removal
+        if active_tx.state != _ArmRigTransactionState.ROLLING_BACK:
+            raise RuntimeError(
+                f"Unauthorized constraint removal in ROLLBACK phase: transaction state is {active_tx.state}, expected ROLLING_BACK"
+            )
+        if not _ACTIVE_TRANSACTION_STACK or active_tx not in _ACTIVE_TRANSACTION_STACK:
+            raise RuntimeError(
+                "Unauthorized constraint removal: transaction does not belong to active transaction stack"
+            )
+
         allowed_records = list(getattr(active_tx, "created_constraints", []))
+        matching_records = []
+        if isinstance(con_record_or_ref, dict):
+            rec_ptr = con_record_or_ref.get("con_ptr")
+            matching_records = [rec for rec in allowed_records if rec.get("con_ptr") == rec_ptr]
+        else:
+            try:
+                cand_ptr = con_record_or_ref.as_pointer()
+            except ReferenceError:
+                cand_ptr = None
+            matching_records = [
+                rec for rec in allowed_records
+                if rec.get("con_ref") == con_record_or_ref or (cand_ptr is not None and rec.get("con_ptr") == cand_ptr)
+            ]
+
+        if len(matching_records) != 1:
+            raise RuntimeError(
+                f"Unauthorized constraint removal: expected exactly 1 registration record in ROLLBACK, got {len(matching_records)}"
+            )
+        target_record = matching_records[0]
+
+        rec_ptr = target_record.get("con_ptr")
+        rec_con_ref = target_record.get("con_ref")
+        rec_pbone = target_record.get("pbone")
+
+        receipts = getattr(active_tx, "_constraint_creation_receipts", {})
+        if rec_ptr not in receipts:
+            raise RuntimeError(
+                f"Unauthorized constraint removal: no creation receipt found for constraint ptr={rec_ptr}"
+            )
+
+        receipt = receipts[rec_ptr]
+        if not isinstance(receipt, tuple) or len(receipt) < 8:
+            raise RuntimeError("Unauthorized constraint removal: malformed creation receipt")
+
+        rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = receipt
+
+        if rc_seal is not getattr(active_tx, "_constraint_receipt_seal", None):
+            raise RuntimeError("Unauthorized constraint removal: creation receipt seal mismatch")
+        if rc_tx_id != active_tx.tx_id:
+            raise RuntimeError(f"Unauthorized constraint removal: tx_id mismatch: {rc_tx_id} != {active_tx.tx_id}")
+        if rc_session_id != active_tx.session_id:
+            raise RuntimeError(f"Unauthorized constraint removal: session_id mismatch: {rc_session_id} != {active_tx.session_id}")
+        if rc_con_ptr != rec_ptr or rc_con != rec_con_ref:
+            raise RuntimeError("Unauthorized constraint removal: constraint reference or pointer mismatch with receipt")
+        if rc_pbone != rec_pbone:
+            raise RuntimeError("Unauthorized constraint removal: pose bone reference mismatch with receipt")
+        if pbone is not None and rc_pbone != pbone:
+            raise RuntimeError("Unauthorized constraint removal: target pose bone mismatch with receipt")
+
+        snapshot = getattr(active_tx, "snapshot", None)
+        if snapshot and isinstance(snapshot, dict):
+            for b_name_snap, b_data_snap in snapshot.get("pose_bones", {}).items():
+                for sc in b_data_snap.get("constraints", []):
+                    if sc.get("con_ptr") == rec_ptr or sc.get("con_ref") == rec_con_ref:
+                        raise RuntimeError(
+                            f"Unauthorized constraint removal: constraint ptr={rec_ptr} is an original snapshot constraint; deletion rejected"
+                        )
+
+        if rec_ptr in rc_before_ptrs:
+            raise RuntimeError(
+                f"Unauthorized constraint removal: constraint ptr={rec_ptr} was in pre-creation baseline; deletion rejected"
+            )
     else:  # POST_COMMIT_CLEANUP
         allowed_records = list(getattr(active_tx, "stashed_constraints", [])) + list(getattr(active_tx, "uncleaned_stashed_constraints", []))
+        if isinstance(con_record_or_ref, dict):
+            rec_ptr = con_record_or_ref.get("con_ptr")
+            for rec in allowed_records:
+                if rec.get("con_ptr") == rec_ptr:
+                    target_record = rec
+                    break
+        else:  # Constraint object
+            try:
+                cand_ptr = con_record_or_ref.as_pointer()
+            except ReferenceError:
+                cand_ptr = None
+            for rec in allowed_records:
+                if rec.get("con_ref") == con_record_or_ref or (cand_ptr is not None and rec.get("con_ptr") == cand_ptr):
+                    target_record = rec
+                    break
 
-    if isinstance(con_record_or_ref, dict):
-        rec_ptr = con_record_or_ref.get("con_ptr")
-        for rec in allowed_records:
-            if rec.get("con_ptr") == rec_ptr:
-                target_record = rec
-                break
-    else:  # Constraint object
-        try:
-            cand_ptr = con_record_or_ref.as_pointer()
-        except ReferenceError:
-            cand_ptr = None
-        for rec in allowed_records:
-            if rec.get("con_ref") == con_record_or_ref or (cand_ptr is not None and rec.get("con_ptr") == cand_ptr):
-                target_record = rec
-                break
-
-    if target_record is None:
-        raise RuntimeError(
-            f"Unauthorized constraint removal: resource not found in active transaction records for phase {phase}"
-        )
+        if target_record is None:
+            raise RuntimeError(
+                f"Unauthorized constraint removal: resource not found in active transaction records for phase {phase}"
+            )
 
     # Verify bone identity
     rec_pbone = target_record.get("pbone")
@@ -5085,6 +5201,64 @@ def _rollback_arm_rig_state(
     # Step 2: Pose bones and constraints restoration
     pose_bones_snap = snapshot.get("pose_bones", {})
 
+    # [INTRODUCED 2026-11-16T17:18:48+08:00]
+    # FUNCTION: _rollback_arm_rig_state
+    # PURPOSE: Pre-deletion consistency audit between constraint creation registry and independent receipt ledger
+    # REASON: Task 10-B fix-4, prevent partial or unauthorized constraint deletions when registry and receipts diverge
+    constraint_creation_audit_passed = True
+    if active_tx is not None:
+        created_constraints = getattr(active_tx, "created_constraints", [])
+        receipts = getattr(active_tx, "_constraint_creation_receipts", {})
+
+        # 1. 创建登记表没有重复身份
+        reg_ptrs = [rec.get("con_ptr") for rec in created_constraints if rec.get("con_ptr") is not None]
+        if len(reg_ptrs) != len(set(reg_ptrs)):
+            constraint_creation_audit_passed = False
+            restoration_errors.append("Constraint rollback consistency audit failed: duplicate constraint pointer in created_constraints registry")
+
+        # 2. 创建凭据表没有重复身份
+        rc_ptrs = list(receipts.keys())
+        if len(rc_ptrs) != len(set(rc_ptrs)):
+            constraint_creation_audit_passed = False
+            restoration_errors.append("Constraint rollback consistency audit failed: duplicate constraint pointer in _constraint_creation_receipts")
+
+        # 3. 两者的 Constraint 指针集合一致
+        set_reg_ptrs = set(reg_ptrs)
+        set_rc_ptrs = set(rc_ptrs)
+        if set_reg_ptrs != set_rc_ptrs:
+            constraint_creation_audit_passed = False
+            restoration_errors.append(
+                f"Constraint rollback consistency audit failed: pointer mismatch between registry and receipts: "
+                f"registry_only={set_reg_ptrs - set_rc_ptrs}, receipts_only={set_rc_ptrs - set_reg_ptrs}"
+            )
+
+        # 4. 每条登记均有唯一匹配凭据
+        for rec in created_constraints:
+            c_ptr = rec.get("con_ptr")
+            c_ref = rec.get("con_ref")
+            if c_ptr not in receipts:
+                constraint_creation_audit_passed = False
+                restoration_errors.append(f"Constraint rollback consistency audit failed: missing receipt for registered constraint ptr={c_ptr}")
+            else:
+                rc = receipts[c_ptr]
+                if rc[0] != c_ref or rc[1] != c_ptr:
+                    constraint_creation_audit_passed = False
+                    restoration_errors.append(f"Constraint rollback consistency audit failed: receipt reference/pointer mismatch for ptr={c_ptr}")
+
+        # 5. 不存在凭据指向事务进入时已存在的原始 Constraint
+        all_snapshot_con_ptrs = set()
+        for b_name_s, b_data_s in pose_bones_snap.items():
+            for sc in b_data_s.get("constraints", []):
+                if sc.get("con_ptr") is not None:
+                    all_snapshot_con_ptrs.add(sc["con_ptr"])
+
+        for c_ptr in set_rc_ptrs:
+            if c_ptr in all_snapshot_con_ptrs:
+                constraint_creation_audit_passed = False
+                restoration_errors.append(
+                    f"Constraint rollback consistency audit failed: receipt points to original constraint from snapshot (ptr={c_ptr})"
+                )
+
     for b_name, b_snap in pose_bones_snap.items():
         pbone = arm.pose.bones.get(b_name)
         if pbone is None:
@@ -5116,7 +5290,7 @@ def _rollback_arm_rig_state(
         saved_con_refs = {sc["con_ref"] for sc in saved_cons if "con_ref" in sc}
 
         # 2.1: Remove ONLY constraints explicitly registered as created by this transaction via Layer 3
-        if active_tx is not None:
+        if active_tx is not None and constraint_creation_audit_passed:
             for reg_con in list(getattr(active_tx, "created_constraints", [])):
                 if reg_con.get("bone_name") == b_name or reg_con.get("pbone") == pbone:
                     try:
@@ -6133,6 +6307,14 @@ class _ArmRigTransactionContext:
         self.created_constraints: List[
             Dict[str, Any]
         ] = []
+        # [INTRODUCED 2026-11-16T17:18:48+08:00]
+        # FUNCTION: _ArmRigTransactionContext.__init__
+        # PURPOSE: Establish independent receipt seal and receipt ledger for constraint creation
+        # REASON: Task 10-B fix-4, require independent provenance receipts for constraint rollback authorization
+        self._constraint_receipt_seal = object()
+        self._constraint_creation_receipts: Dict[
+            int, Tuple[Any, int, Any, int, str, str, object, FrozenSet[int]]
+        ] = {}
         self.created_collection_links: List[
             Dict[str, Any]
         ] = []
@@ -6297,19 +6479,119 @@ class _ArmRigTransactionContext:
         )
 
 
+    # [INTRODUCED 2026-11-16T17:18:48+08:00]
+    # FUNCTION: _ArmRigTransactionContext.register_created_constraint
+    # PURPOSE: Enforce receipt verification and active transaction ownership before registering created constraints
+    # REASON: Task 10-B fix-4, prevent unauthorized direct registration without independent creation receipt
     def register_created_constraint(
         self,
         pbone: bpy.types.PoseBone,
         con: bpy.types.Constraint,
     ) -> None:
         """Register a constraint created by this transaction for identity-based ownership."""
-        con_ptr = con.as_pointer()
+        if self.state != _ArmRigTransactionState.ACTIVE:
+            raise RuntimeError(
+                f"Constraint registration rejected: transaction state is {self.state}, expected ACTIVE"
+            )
+
+        global _ACTIVE_TRANSACTION_STACK
+        if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not self:
+            raise RuntimeError(
+                "Constraint registration rejected: transaction is not top of active transaction stack"
+            )
+
+        session_id = self.session_id
+        if not session_id or not self.session_record:
+            raise RuntimeError(
+                "Constraint registration rejected: missing armature session identity"
+            )
+        if self.arm is not None:
+            try:
+                cur_rec = ensure_armature_session_identity(self.arm)
+                if cur_rec.registry_session_id != session_id:
+                    raise RuntimeError(
+                        "Constraint registration rejected: armature session identity mismatch"
+                    )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Constraint registration rejected: failed to verify armature session identity: {e}"
+                ) from e
+
+        if self.arm is None or not hasattr(self.arm, "pose") or self.arm.pose is None:
+            raise RuntimeError(
+                "Constraint registration rejected: active armature pose is unavailable"
+            )
+        if pbone.name not in self.arm.pose.bones or self.arm.pose.bones[pbone.name] != pbone:
+            raise RuntimeError(
+                f"Constraint registration rejected: PoseBone '{pbone.name}' does not belong to active armature"
+            )
+
+        try:
+            con_ptr = int(con.as_pointer())
+        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+            raise RuntimeError(
+                "Constraint registration rejected: constraint reference is invalid or dead"
+            ) from exc
+
+        if con_ptr <= 0:
+            raise RuntimeError(
+                "Constraint registration rejected: invalid constraint pointer"
+            )
+
+        try:
+            if not any(int(c.as_pointer()) == con_ptr for c in pbone.constraints):
+                raise RuntimeError(
+                    f"Constraint registration rejected: constraint (ptr={con_ptr}) is not live on bone '{pbone.name}'"
+                )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Constraint registration rejected: cannot enumerate constraints on bone '{pbone.name}': {exc}"
+            ) from exc
 
         for record in self.created_constraints:
-            if record["con_ptr"] == con_ptr:
+            if record.get("con_ptr") == con_ptr:
                 raise RuntimeError(
                     "Duplicate transaction constraint registration"
                 )
+
+        receipts = getattr(self, "_constraint_creation_receipts", None)
+        if receipts is None or con_ptr not in receipts:
+            raise RuntimeError(
+                f"Constraint registration rejected: no creation receipt found for constraint ptr={con_ptr}"
+            )
+
+        receipt = receipts[con_ptr]
+        if not isinstance(receipt, tuple) or len(receipt) < 8:
+            raise RuntimeError(
+                "Constraint registration rejected: malformed creation receipt"
+            )
+
+        rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = receipt
+
+        if rc_seal is not getattr(self, "_constraint_receipt_seal", None):
+            raise RuntimeError(
+                "Constraint registration rejected: creation receipt seal mismatch"
+            )
+        if rc_tx_id != self.tx_id:
+            raise RuntimeError(
+                f"Constraint registration rejected: creation receipt tx_id mismatch: {rc_tx_id} != {self.tx_id}"
+            )
+        if rc_session_id != self.session_id:
+            raise RuntimeError(
+                f"Constraint registration rejected: creation receipt session_id mismatch: {rc_session_id} != {self.session_id}"
+            )
+        if rc_con_ptr != con_ptr or rc_con != con:
+            raise RuntimeError(
+                "Constraint registration rejected: creation receipt constraint reference/pointer mismatch"
+            )
+        if rc_pbone != pbone:
+            raise RuntimeError(
+                "Constraint registration rejected: creation receipt pose bone mismatch"
+            )
+        if con_ptr in rc_before_ptrs:
+            raise RuntimeError(
+                "Constraint registration rejected: constraint pointer was present in pre-creation baseline"
+            )
 
         self.created_constraints.append({
             "pbone": pbone,
