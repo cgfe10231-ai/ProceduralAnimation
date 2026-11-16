@@ -631,7 +631,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
 
         # Verify arm rig state restored precisely matches transaction snapshot
-        _verify_arm_rig_state_restored(self.armature, tx.snapshot, active_tx=tx)
+        _verify_arm_rig_state_restored(self.armature, tx.snapshot)
 
     # -------------------------------------------------------------------------
     # Fault Injection Tests (TEST-39 to TEST-50)
