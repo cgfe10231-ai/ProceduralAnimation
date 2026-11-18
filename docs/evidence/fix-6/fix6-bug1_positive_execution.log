@@ -1,0 +1,428 @@
+=== TASK 10-B / fix6-bug1 (R1-TAIL-02) POSITIVE VERIFICATION (TEST ONLY) ===
+NOTE: TEST-64 is NOT re-run and retains historical FAIL - LEGACY FIXTURE CONFLICT in fix6-bug1_test_report.md.
+
+--- PRE-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: 62909875359b44ad065aaa48e3ca32d6db3d592b
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? docs/evidence/fix-6/
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0
+
+--- PHASE 1: REMAINING EXISTING DATABLOCK TESTS (TEST-83, 188, 191, 192, 193) ---
+
+--- [TEST-83] test_83_datablock_shared_users_and_same_name_replacement_preserved ---
+HEAD_BEFORE: 62909875359b44ad065aaa48e3ca32d6db3d592b
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_83_datablock_shared_users_and_same_name_replacement_preserved'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: 62909875359b44ad065aaa48e3ca32d6db3d592b
+OUTPUT:
+test_83_datablock_shared_users_and_same_name_replacement_preserved (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_83_datablock_shared_users_and_same_name_replacement_preserved)
+TEST-83: Shared datablock with users > 0 and same-name different-identity resources are preserved. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.869s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-188] test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit ---
+HEAD_BEFORE: 62909875359b44ad065aaa48e3ca32d6db3d592b
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: 62909875359b44ad065aaa48e3ca32d6db3d592b
+OUTPUT:
+test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit)
+TEST-188: Zero-user Mesh DataBlock without delete authority is preserved upon normal commit. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.237s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-191] test_191_same_name_different_identity_datablocks_protected ---
+HEAD_BEFORE: 62909875359b44ad065aaa48e3ca32d6db3d592b
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_191_same_name_different_identity_datablocks_protected'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: 62909875359b44ad065aaa48e3ca32d6db3d592b
+OUTPUT:
+test_191_same_name_different_identity_datablocks_protected (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_191_same_name_different_identity_datablocks_protected)
+TEST-191: Same-name different-identity DataBlocks are not erroneously deleted; both resources protected. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.233s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-192] test_192_forged_type_a_authorization_rejected_and_datablock_protected ---
+HEAD_BEFORE: 62909875359b44ad065aaa48e3ca32d6db3d592b
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_192_forged_type_a_authorization_rejected_and_datablock_protected'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: 62909875359b44ad065aaa48e3ca32d6db3d592b
+OUTPUT:
+test_192_forged_type_a_authorization_rejected_and_datablock_protected (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_192_forged_type_a_authorization_rejected_and_datablock_protected)
+TEST-192: Forged Type A authorization lacking credible creation provenance cannot bypass DataBlock protection. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.233s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-193] test_193_preserved_no_delete_authority_terminal_state_and_idempotency ---
+HEAD_BEFORE: 62909875359b44ad065aaa48e3ca32d6db3d592b
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_193_preserved_no_delete_authority_terminal_state_and_idempotency'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: 62909875359b44ad065aaa48e3ca32d6db3d592b
+OUTPUT:
+test_193_preserved_no_delete_authority_terminal_state_and_idempotency (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_193_preserved_no_delete_authority_terminal_state_and_idempotency)
+TEST-193: PRESERVED_NO_DELETE_AUTHORITY is a legal terminal state; repeated cleanup is idempotent. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.233s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- PHASE 2: TYPE A POSITIVE LIFECYCLE VERIFICATION (IN-MEMORY) ---
+
+HEAD_BEFORE: 62909875359b44ad065aaa48e3ca32d6db3d592b
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr <IN_MEMORY_EXPR>
+EXIT_CODE: 0
+HEAD_AFTER: 62909875359b44ad065aaa48e3ca32d6db3d592b
+IN_MEMORY_EXPR:
+import os, sys, unittest, bpy
+sys.path.insert(0, os.path.abspath('.'))
+import src.rig.arm_ik as arm_ik
+from src.config import PipelineConfig
+from src.character.builder import build_character
+from src.rig.builder import build_rig, bind_character_to_rig
+from src.rig.ik import setup_leg_ik, reset_leg_ik
+from src.rig.pose import reset_pose
+
+def _build_clean_armature_fixture():
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    cfg = PipelineConfig()
+    char_data = build_character(cfg)
+    arm = build_rig(cfg)
+    bind_character_to_rig(arm, char_data['parts'])
+    setup_leg_ik(arm)
+    reset_leg_ik(arm)
+    reset_pose(arm)
+    bpy.context.view_layer.update()
+    return arm
+
+class TestFix6Bug1TypeAPositiveLifecycle(unittest.TestCase):
+    def setUp(self):
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+        self.armature = _build_clean_armature_fixture()
+
+    def tearDown(self):
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+
+    def test_01_type_a_full_positive_lifecycle_and_idempotency(self):
+        self.assertNotIn('HandIK.L', bpy.data.objects)
+        self.assertNotIn('HandIK.R', bpy.data.objects)
+
+        ext_pre_mesh = bpy.data.meshes.new('Fix6_ExtUnauthorized_Pre')
+        ext_pre_ptr = int(ext_pre_mesh.as_pointer())
+        self.assertEqual(ext_pre_mesh.users, 0)
+
+        ext_same_base_mesh = bpy.data.meshes.new('Fix6_TypeA_Target')
+        ext_same_base_ptr = int(ext_same_base_mesh.as_pointer())
+        self.assertEqual(ext_same_base_mesh.users, 0)
+
+        unauth_ctrl_mesh = bpy.data.meshes.new('Fix6_Unauth_HandIK_R')
+        unauth_ctrl_ptr = int(unauth_ctrl_mesh.as_pointer())
+        self.assertEqual(unauth_ctrl_mesh.users, 0)
+
+        observed_pre_remove_users = []
+        def observe_hook(stage, ctx):
+            if stage == 'during_cleanup_datablock_after_auth_before_remove':
+                data = ctx.get('data')
+                if data is not None and int(data.as_pointer()) == int(ctx.get('data_ptr') or 0):
+                    observed_pre_remove_users.append((int(ctx['data_ptr']), int(data.users), data.name))
+
+        arm_ik._set_test_fault_injection_hook(observe_hook)
+        try:
+            with arm_ik._arm_rig_transaction(self.armature) as tx:
+                self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.ACTIVE)
+                before_mesh_ptrs = frozenset(int(m.as_pointer()) for m in bpy.data.meshes)
+                self.assertIn(ext_pre_ptr, before_mesh_ptrs)
+                self.assertIn(ext_same_base_ptr, before_mesh_ptrs)
+                self.assertIn(unauth_ctrl_ptr, before_mesh_ptrs)
+
+                # Phase 2.A: Genuine Type A mesh creation
+                type_a_mesh = arm_ik._authorized_create_type_a_mesh('Fix6_TypeA_Target', tx)
+                type_a_ptr = int(type_a_mesh.as_pointer())
+                type_a_name = str(type_a_mesh.name)
+                self.assertGreater(type_a_ptr, 0)
+                self.assertNotIn(type_a_ptr, before_mesh_ptrs)
+                self.assertTrue(any(int(m.as_pointer()) == type_a_ptr and m == type_a_mesh for m in bpy.data.meshes))
+                self.assertEqual(int(type_a_mesh.users), 0)
+
+                receipt = tx._type_a_datablock_receipts.get(type_a_ptr)
+                self.assertIsInstance(receipt, tuple)
+                self.assertEqual(len(receipt), 4)
+                self.assertEqual(receipt[0], type_a_mesh)
+                self.assertEqual(receipt[1], tx.session_id)
+                self.assertEqual(receipt[2], tx.tx_id)
+                self.assertIs(receipt[3], tx._type_a_datablock_receipt_seal)
+
+                auths = [a for a in tx.datablock_authorizations if a.get('original_pointer') == type_a_ptr]
+                self.assertEqual(len(auths), 1)
+                auth = auths[0]
+                self.assertEqual(auth['resource_kind'], 'meshes')
+                self.assertEqual(auth['original_reference'], type_a_mesh)
+                self.assertEqual(auth['original_pointer'], type_a_ptr)
+                self.assertEqual(auth['provenance'], 'TYPE_A_TX_CREATED')
+                self.assertEqual(auth['authorization_source'], 'TX_CREATE_RECEIPT')
+                self.assertEqual(auth['authorization_scope'], 'PHYSICAL_DELETE_IF_ZERO_USERS')
+                self.assertEqual(auth['authorized_transaction'], tx.tx_id)
+                self.assertEqual(auth['expected_lifecycle'], 'COMMITTED_CLEANUP')
+                print('TYPE_A_CREATED:', 'ptr=', type_a_ptr, 'name=', type_a_name, 'tx_id=', tx.tx_id, 'session_id=', tx.session_id, 'users=', int(type_a_mesh.users), 'before_count=', len(before_mesh_ptrs), 'receipt_len=', len(receipt), 'auth_source=', auth['authorization_source'])
+
+                # Phase 2.B: Register wrong-type managed controller objects and run setup_arm_ik
+                wrong_obj_l = bpy.data.objects.new('HandIK.L', type_a_mesh)
+                wrong_l_ptr = int(wrong_obj_l.as_pointer())
+                self.assertEqual(wrong_obj_l.name, 'HandIK.L')
+                self.assertEqual(int(type_a_mesh.users), 1)
+                tx.register_created_controller(wrong_obj_l)
+                arm_ik._authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj_l, active_tx=tx)
+
+                wrong_obj_r = bpy.data.objects.new('HandIK.R', unauth_ctrl_mesh)
+                wrong_r_ptr = int(wrong_obj_r.as_pointer())
+                self.assertEqual(wrong_obj_r.name, 'HandIK.R')
+                self.assertEqual(int(unauth_ctrl_mesh.users), 1)
+                tx.register_created_controller(wrong_obj_r)
+                arm_ik._authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj_r, active_tx=tx)
+
+                controllers = arm_ik.setup_arm_ik(self.armature, initial_influence=0.5)
+                self.assertEqual(controllers['HandIK.L'].type, 'EMPTY')
+                self.assertEqual(controllers['HandIK.R'].type, 'EMPTY')
+                self.assertNotEqual(int(controllers['HandIK.L'].as_pointer()), wrong_l_ptr)
+                self.assertNotEqual(int(controllers['HandIK.R'].as_pointer()), wrong_r_ptr)
+                stashed_ptrs = {r.get('stashed_obj_ptr'): r for r in tx.stashed_objects}
+                self.assertIn(wrong_l_ptr, stashed_ptrs)
+                self.assertIn(wrong_r_ptr, stashed_ptrs)
+                self.assertEqual(stashed_ptrs[wrong_l_ptr].get('stashed_data_ptr'), type_a_ptr)
+                self.assertEqual(stashed_ptrs[wrong_r_ptr].get('stashed_data_ptr'), unauth_ctrl_ptr)
+        finally:
+            arm_ik._clear_test_fault_injection_hook()
+
+        # Phase 2.C: Commit & physical deletion verification
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+        self.assertEqual(len(arm_ik.get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertEqual(len(arm_ik._PENDING_ARM_RIG_CLEANUPS), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+
+        self.assertEqual(observed_pre_remove_users, [(type_a_ptr, 0, type_a_name)])
+        self.assertFalse(any(int(o.as_pointer()) == wrong_l_ptr for o in bpy.data.objects))
+        self.assertFalse(any(int(o.as_pointer()) == wrong_r_ptr for o in bpy.data.objects))
+        self.assertEqual(bpy.data.objects['HandIK.L'].type, 'EMPTY')
+        self.assertEqual(bpy.data.objects['HandIK.R'].type, 'EMPTY')
+
+        live_mesh_ptrs = {int(m.as_pointer()) for m in bpy.data.meshes}
+        self.assertNotIn(type_a_ptr, live_mesh_ptrs)
+        self.assertNotIn(type_a_name, bpy.data.meshes)
+        self.assertEqual(stashed_ptrs[wrong_l_ptr].get('obj_cleaned'), True)
+        self.assertEqual(stashed_ptrs[wrong_l_ptr].get('data_cleaned'), True)
+        self.assertEqual(stashed_ptrs[wrong_l_ptr].get('data_cleanup_status'), 'PHYSICALLY_DELETED')
+
+        type_a_outcomes = [o for o in tx.datablock_cleanup_outcomes if o.get('resource_pointer') == type_a_ptr]
+        self.assertEqual(len(type_a_outcomes), 1)
+        out_a = type_a_outcomes[0]
+        self.assertEqual(out_a['action'], 'DELETED')
+        self.assertEqual(out_a['status'], 'PHYSICALLY_DELETED')
+        self.assertEqual(out_a['reason'], 'AUTHORIZED_CLEANUP')
+        self.assertEqual(out_a['resource_kind'], 'Mesh')
+        self.assertEqual(out_a['resource_name'], type_a_name)
+        self.assertEqual(out_a['resource_pointer'], type_a_ptr)
+        self.assertEqual(out_a['tx_id'], tx.tx_id)
+        print('TYPE_A_COMMITTED_OUTCOME:', out_a, 'pre_remove_users=', observed_pre_remove_users)
+
+        # Phase 2.D: Protection of unauthorized resources & exact-name decoy + cleanup idempotency
+        self.assertIn(ext_pre_ptr, live_mesh_ptrs)
+        self.assertEqual(bpy.data.meshes['Fix6_ExtUnauthorized_Pre'].as_pointer(), ext_pre_ptr)
+        self.assertEqual(int(ext_pre_mesh.users), 0)
+
+        self.assertIn(ext_same_base_ptr, live_mesh_ptrs)
+        self.assertEqual(bpy.data.meshes['Fix6_TypeA_Target'].as_pointer(), ext_same_base_ptr)
+        self.assertEqual(int(ext_same_base_mesh.users), 0)
+
+        self.assertIn(unauth_ctrl_ptr, live_mesh_ptrs)
+        self.assertEqual(bpy.data.meshes['Fix6_Unauth_HandIK_R'].as_pointer(), unauth_ctrl_ptr)
+        self.assertEqual(int(unauth_ctrl_mesh.users), 0)
+
+        unauth_outcomes = [o for o in tx.datablock_cleanup_outcomes if o.get('resource_pointer') == unauth_ctrl_ptr]
+        self.assertEqual(len(unauth_outcomes), 1)
+        self.assertEqual(unauth_outcomes[0]['status'], 'PRESERVED_NO_DELETE_AUTHORITY')
+        self.assertEqual(unauth_outcomes[0]['action'], 'PRESERVED')
+        self.assertEqual(unauth_outcomes[0]['tx_id'], tx.tx_id)
+        print('UNAUTH_CTRL_OUTCOME:', unauth_outcomes[0])
+
+        # Create a brand-new unauthorized Mesh claiming the exact freed Type-A Mesh name before retrying cleanup
+        decoy_same_name = bpy.data.meshes.new(type_a_name)
+        decoy_ptr = int(decoy_same_name.as_pointer())
+        self.assertEqual(decoy_same_name.name, type_a_name)
+        self.assertEqual(int(decoy_same_name.users), 0)
+
+        res1 = tx.retry_cleanup()
+        res2 = tx.retry_cleanup()
+        self.assertEqual(res1.outcome, arm_ik._CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(res2.outcome, arm_ik._CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+        self.assertEqual(len(arm_ik.get_pending_arm_rig_cleanup_ids()), 0)
+
+        self.assertEqual(len([o for o in tx.datablock_cleanup_outcomes if o.get('resource_pointer') == type_a_ptr]), 1)
+        self.assertEqual(len([o for o in tx.datablock_cleanup_outcomes if o.get('resource_pointer') == unauth_ctrl_ptr]), 1)
+
+        post_retry_ptrs = {int(m.as_pointer()) for m in bpy.data.meshes}
+        self.assertIn(decoy_ptr, post_retry_ptrs)
+        self.assertEqual(bpy.data.meshes[type_a_name], decoy_same_name)
+        self.assertEqual(bpy.data.meshes[type_a_name].as_pointer(), decoy_ptr)
+        self.assertIn(ext_pre_ptr, post_retry_ptrs)
+        self.assertIn(ext_same_base_ptr, post_retry_ptrs)
+        self.assertIn(unauth_ctrl_ptr, post_retry_ptrs)
+        print('PASS Test01_FullPositiveLifecycleAndIdempotency:', 'tx_state=', tx.state.value, 'ext_pre_ptr=', ext_pre_ptr, 'ext_same_base_ptr=', ext_same_base_ptr, 'unauth_ctrl_ptr=', unauth_ctrl_ptr, 'decoy_preserved_ptr=', decoy_ptr)
+
+    def test_02_no_cross_transaction_type_a_authority_borrowing(self):
+        # Transaction 1 creates genuine Type A mesh and replaces HandIK.L -> physically deleted on commit
+        with arm_ik._arm_rig_transaction(self.armature) as tx1:
+            m1 = arm_ik._authorized_create_type_a_mesh('Fix6_Tx1_TypeA', tx1)
+            m1_ptr = int(m1.as_pointer())
+            r1 = tx1._type_a_datablock_receipts[m1_ptr]
+            a1 = dict([a for a in tx1.datablock_authorizations if a.get('original_pointer') == m1_ptr][0])
+            wo1 = bpy.data.objects.new('HandIK.L', m1)
+            tx1.register_created_controller(wo1)
+            arm_ik._authorized_link_object_to_collection(bpy.context.scene.collection, wo1, active_tx=tx1)
+            arm_ik.setup_arm_ik(self.armature)
+
+        self.assertEqual(tx1.state, arm_ik._ArmRigTransactionState.COMMITTED)
+        self.assertFalse(any(int(m.as_pointer()) == m1_ptr for m in bpy.data.meshes))
+
+        # Build a clean second scene/armature where HandIK.L is unoccupied so tx2 starts legitimately;
+        # tx1 context/receipt/seal remains isolated in memory and cannot be borrowed by tx2.
+        arm2 = _build_clean_armature_fixture()
+        self.assertNotIn('HandIK.L', bpy.data.objects)
+        unauth_tx2_mesh = bpy.data.meshes.new('Fix6_Tx1_TypeA')
+        unauth_tx2_ptr = int(unauth_tx2_mesh.as_pointer())
+        with arm_ik._arm_rig_transaction(arm2) as tx2:
+            self.assertNotEqual(tx2.tx_id, tx1.tx_id)
+            self.assertNotIn(unauth_tx2_ptr, tx2._type_a_datablock_receipts)
+            self.assertEqual(a1['authorized_transaction'], tx1.tx_id)
+            self.assertIsNot(r1[3], tx2._type_a_datablock_receipt_seal)
+            wo2 = bpy.data.objects.new('HandIK.L', unauth_tx2_mesh)
+            tx2.register_created_controller(wo2)
+            arm_ik._authorized_link_object_to_collection(bpy.context.scene.collection, wo2, active_tx=tx2)
+            arm_ik.setup_arm_ik(arm2)
+
+        self.assertEqual(tx2.state, arm_ik._ArmRigTransactionState.COMMITTED)
+        self.assertTrue(any(int(m.as_pointer()) == unauth_tx2_ptr for m in bpy.data.meshes))
+        self.assertEqual(int(unauth_tx2_mesh.users), 0)
+        tx2_outcomes = [o for o in tx2.datablock_cleanup_outcomes if o.get('resource_pointer') == unauth_tx2_ptr]
+        self.assertEqual(len(tx2_outcomes), 1)
+        self.assertEqual(tx2_outcomes[0]['status'], 'PRESERVED_NO_DELETE_AUTHORITY')
+        print('PASS Test02_CrossTransactionIsolation:', 'tx1=', tx1.tx_id, 'm1_ptr=', m1_ptr, 'tx2=', tx2.tx_id, 'tx2_preserved_ptr=', unauth_tx2_ptr)
+
+suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestFix6Bug1TypeAPositiveLifecycle)
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+sys.exit(0 if result.wasSuccessful() and result.testsRun == 2 else 1)
+OUTPUT:
+test_01_type_a_full_positive_lifecycle_and_idempotency (__main__.TestFix6Bug1TypeAPositiveLifecycle.test_01_type_a_full_positive_lifecycle_and_idempotency) ... ok
+test_02_no_cross_transaction_type_a_authority_borrowing (__main__.TestFix6Bug1TypeAPositiveLifecycle.test_02_no_cross_transaction_type_a_authority_borrowing) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.353s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+TYPE_A_CREATED: ptr= 2572049072392 name= Fix6_TypeA_Target.001 tx_id= 558ef5b0 session_id= 6f139419-54f4-4c09-be92-82827e2105ba users= 0 before_count= 16 receipt_len= 4 auth_source= TX_CREATE_RECEIPT
+TYPE_A_COMMITTED_OUTCOME: {'action': 'DELETED', 'status': 'PHYSICALLY_DELETED', 'reason': 'AUTHORIZED_CLEANUP', 'resource_kind': 'Mesh', 'resource_name': 'Fix6_TypeA_Target.001', 'resource_pointer': 2572049072392, 'tx_id': '558ef5b0'} pre_remove_users= [(2572049072392, 0, 'Fix6_TypeA_Target.001')]
+UNAUTH_CTRL_OUTCOME: {'action': 'PRESERVED', 'status': 'PRESERVED_NO_DELETE_AUTHORITY', 'reason': 'NO_DELETE_AUTHORITY', 'resource_kind': 'Mesh', 'resource_name': 'Fix6_Unauth_HandIK_R', 'resource_pointer': 2572049080456, 'original_reference': bpy.data.meshes['Fix6_Unauth_HandIK_R'], 'tx_id': '558ef5b0'}
+PASS Test01_FullPositiveLifecycleAndIdempotency: tx_state= COMMITTED ext_pre_ptr= 2572049470984 ext_same_base_ptr= 2572049473672 unauth_ctrl_ptr= 2572049080456 decoy_preserved_ptr= 2572048864776
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Test02_CrossTransactionIsolation: tx1= e03a5e83 m1_ptr= 2572118393096 tx2= 590b87c6 tx2_preserved_ptr= 2572118540552
+
+--- POST-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: 62909875359b44ad065aaa48e3ca32d6db3d592b
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? docs/evidence/fix-6/
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0
