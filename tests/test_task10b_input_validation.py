@@ -667,8 +667,8 @@ class TestArmIKInputValidationContract(unittest.TestCase):
 
         Preconditions:
         - Character and Armature built, leg IK setup.
-        - Manually create a valid HandIK.L empty.
-        - Confirm ElbowPole.L, HandIK.R, ElbowPole.R are missing.
+        - Pre-existing valid HandIK.L empty with a genuine IK constraint binding on forearm.L.
+        - ElbowPole.L, HandIK.R, ElbowPole.R remain uninitialized.
         Setup:
         - Set initialization parent (root_obj) scale to reflection (-1.0, 1.0, 1.0).
         - Update dependency graph.
@@ -678,16 +678,22 @@ class TestArmIKInputValidationContract(unittest.TestCase):
         Assertions:
         - Raises ValueError from reflection rejection (det(A) < 0).
         - Post-call snapshot equals pre-call snapshot exactly.
-        - ElbowPole.L is NOT created.
-        - HandIK.R and ElbowPole.R are NOT created.
-        - No constraints created on any pose bones.
-        - Existing HandIK.L remains 100% unchanged.
+        - ElbowPole.L, HandIK.R, and ElbowPole.R are NOT created.
+        - Existing forearm.L IK binding, HandIK.L controller, and scene snapshot remain 100% unchanged.
         """
         hand_l = bpy.data.objects.new("HandIK.L", None)
         hand_l.empty_display_size = 0.08
         hand_l.empty_display_type = "SPHERE"
         hand_l.location = (0.35, -0.1, 1.1)
         bpy.context.scene.collection.objects.link(hand_l)
+
+        # [2026-11-18] TEST-26: Establish genuine Armature ownership for the
+        # existing partial-init HandIK.L before checking reflection rejection.
+        forearm_l = self.armature.pose.bones["forearm.L"]
+        existing_ik = forearm_l.constraints.new(type="IK")
+        existing_ik.name = ARM_IK_CONSTRAINT_NAMES["L"]
+        existing_ik.target = hand_l
+        existing_ik_ptr = int(existing_ik.as_pointer())
 
         for ctrl_name in ("HandIK.R", "ElbowPole.L", "ElbowPole.R"):
             self.assertNotIn(ctrl_name, bpy.data.objects)
@@ -720,8 +726,27 @@ class TestArmIKInputValidationContract(unittest.TestCase):
         for side in ("L", "R"):
             p_fore = self.armature.pose.bones[f"forearm.{side}"]
             p_hand = self.armature.pose.bones[f"hand.{side}"]
-            self.assertNotIn(ARM_IK_CONSTRAINT_NAMES[side], p_fore.constraints)
-            self.assertNotIn(HAND_ROT_CONSTRAINT_NAMES[side], p_hand.constraints)
+
+            if side == "L":
+                self.assertIn(ARM_IK_CONSTRAINT_NAMES["L"], p_fore.constraints)
+
+                restored_ik = p_fore.constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
+
+                self.assertEqual(
+                    int(restored_ik.as_pointer()),
+                    existing_ik_ptr
+                )
+                self.assertEqual(restored_ik.target, hand_l)
+            else:
+                self.assertNotIn(
+                    ARM_IK_CONSTRAINT_NAMES[side],
+                    p_fore.constraints
+                )
+
+            self.assertNotIn(
+                HAND_ROT_CONSTRAINT_NAMES[side],
+                p_hand.constraints
+            )
 
     def test_27_valid_parent_first_time_auto_init_succeeds(self) -> None:
         """TEST-27: First-time auto-initialization succeeds under valid conformal parent transforms.

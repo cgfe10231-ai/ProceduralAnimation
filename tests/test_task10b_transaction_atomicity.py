@@ -1492,69 +1492,155 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(called, ["test_stage_dummy"])
 
     def test_64_commit_cleanup_failure_and_datablock_lifecycle(self) -> None:
-        """TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, and reports cleanup errors.
+        """TEST-64: Combined Mesh/Curve cleanup failure preserves both DataBlocks."""
 
-        Note: TEST-64 focuses specifically on data block reference counting and cleanup
-        error reporting. Complementary test TEST-66 verifies transaction state transitions
-        (COMMITTED / CLEANUP_PENDING) and retry_cleanup() idempotency.
-        """
-        # 1. Create DataBlocks before transaction
+        # [2026-11-18] TEST-64: Verify the unique combined Mesh + shared Curve
+        # cleanup boundary without repeating the single-resource TEST-66 path.
+
         mesh_data = bpy.data.meshes.new("DoomedMesh")
-        mesh_data_ptr = mesh_data.as_pointer()
+        mesh_ptr = int(mesh_data.as_pointer())
+
         curve_data = bpy.data.curves.new("SharedCurve", type="CURVE")
+        curve_ptr = int(curve_data.as_pointer())
+
         sharing_obj = bpy.data.objects.new("SharingCurveObj", curve_data)
         bpy.context.scene.collection.objects.link(sharing_obj)
 
         self.assertGreater(curve_data.users, 0)
 
-        # 2 & 3: Successful transaction commit with transaction-created wrong-type controllers
-        with _arm_rig_transaction(self.armature) as tx:
-            wrong_mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-            tx.register_created_controller(wrong_mesh_obj)
-            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_mesh_obj, tx)
+        captured_cleanup = []
 
-            wrong_curve_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
-            tx.register_created_controller(wrong_curve_obj)
-            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_curve_obj, tx)
-
-            self.assertGreater(curve_data.users, 1)
-
-            setup_arm_ik(self.armature)
-
-        # Wrong-type controller HandIK.L is replaced with an EMPTY
-        self.assertEqual(bpy.data.objects["HandIK.L"].type, "EMPTY")
-
-        # Doomed mesh data block has NO delete authority -> MUST be preserved
-        self.assertIn("DoomedMesh", bpy.data.meshes)
-        preserved_mesh = bpy.data.meshes["DoomedMesh"]
-        self.assertEqual(preserved_mesh.as_pointer(), mesh_data_ptr)
-        self.assertEqual(preserved_mesh.users, 0)
-
-        # Unauthorized preservation does NOT trigger cleanup pending
-        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
-
-        # Shared curve object replaced with an EMPTY, but shared curve data block preserved!
-        self.assertEqual(bpy.data.objects["ElbowPole.L"].type, "EMPTY")
-        self.assertIn("SharedCurve", bpy.data.curves)
-        self.assertIs(sharing_obj.data, curve_data)
-
-        # 4. Injected commit cleanup failure reports explicit RuntimeError
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
+                captured_cleanup.append(ctx["tx"])
                 raise RuntimeError("Simulated commit cleanup failure")
 
         _set_test_fault_injection_hook(fault_hook)
 
-        # Add another wrong-type object to trigger commit cleanup
-        mesh_data_2 = bpy.data.meshes.new("DoomedMesh2")
+        try:
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Simulated commit cleanup failure"
+            ):
+                with _arm_rig_transaction(self.armature) as tx:
 
-        with self.assertRaises(RuntimeError) as cm:
-            with _arm_rig_transaction(self.armature) as tx2:
-                wrong_obj_2 = bpy.data.objects.new("HandIK.R", mesh_data_2)
-                tx2.register_created_controller(wrong_obj_2)
-                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj_2, tx2)
-                setup_arm_ik(self.armature)
-        self.assertIn("Simulated commit cleanup failure", str(cm.exception))
+                    wrong_mesh_obj = bpy.data.objects.new(
+                        "HandIK.L",
+                        mesh_data
+                    )
+                    tx.register_created_controller(wrong_mesh_obj)
+
+                    _authorized_link_object_to_collection(
+                        bpy.context.scene.collection,
+                        wrong_mesh_obj,
+                        tx
+                    )
+
+                    wrong_curve_obj = bpy.data.objects.new(
+                        "ElbowPole.L",
+                        curve_data
+                    )
+                    tx.register_created_controller(wrong_curve_obj)
+
+                    _authorized_link_object_to_collection(
+                        bpy.context.scene.collection,
+                        wrong_curve_obj,
+                        tx
+                    )
+
+                    self.assertGreater(curve_data.users, 1)
+
+                    setup_arm_ik(self.armature)
+
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_cleanup), 1)
+        self.assertIs(captured_cleanup[0], tx)
+
+        self.assertEqual(
+            tx.state,
+            _ArmRigTransactionState.CLEANUP_PENDING
+        )
+
+        self.assertIn(
+            tx.tx_id,
+            get_pending_arm_rig_cleanup_ids()
+        )
+
+        self.assertGreaterEqual(
+            len(tx.uncleaned_stashed_objects),
+            2
+        )
+
+        # Both active controllers have already been replaced.
+        self.assertEqual(
+            bpy.data.objects["HandIK.L"].type,
+            "EMPTY"
+        )
+        self.assertEqual(
+            bpy.data.objects["ElbowPole.L"].type,
+            "EMPTY"
+        )
+
+        # The failed cleanup must not destroy either original DataBlock.
+        self.assertIn("DoomedMesh", bpy.data.meshes)
+        self.assertEqual(
+            int(bpy.data.meshes["DoomedMesh"].as_pointer()),
+            mesh_ptr
+        )
+
+        self.assertIn("SharedCurve", bpy.data.curves)
+        self.assertEqual(
+            int(bpy.data.curves["SharedCurve"].as_pointer()),
+            curve_ptr
+        )
+        self.assertEqual(sharing_obj.data, curve_data)
+
+        # Retry the real Coordinator-owned cleanup.
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+
+        self.assertEqual(
+            tx.state,
+            _ArmRigTransactionState.COMMITTED
+        )
+
+        self.assertNotIn(
+            tx.tx_id,
+            get_pending_arm_rig_cleanup_ids()
+        )
+
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+
+        # Neither DataBlock has deletion authority.
+        self.assertIn("DoomedMesh", bpy.data.meshes)
+        self.assertEqual(
+            int(bpy.data.meshes["DoomedMesh"].as_pointer()),
+            mesh_ptr
+        )
+        self.assertEqual(bpy.data.meshes["DoomedMesh"].users, 0)
+
+        self.assertIn("SharedCurve", bpy.data.curves)
+        self.assertEqual(
+            int(bpy.data.curves["SharedCurve"].as_pointer()),
+            curve_ptr
+        )
+        self.assertEqual(sharing_obj.data, curve_data)
+        self.assertGreaterEqual(curve_data.users, 1)
+
+        outcomes = [
+            item for item in tx.datablock_cleanup_outcomes
+            if item.get("resource_name") == "DoomedMesh"
+        ]
+
+        self.assertTrue(
+            any(
+                item.get("status") == "PRESERVED_NO_DELETE_AUTHORITY"
+                for item in outcomes
+            )
+        )
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
     def test_65_reversible_commit_preparation_failure_rolls_back(self) -> None:
         """TEST-65: Reversible commit preparation failure (Phase 1) rolls back without destroying stashed resources."""
