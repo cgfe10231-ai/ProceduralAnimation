@@ -1,0 +1,22 @@
+test_01_a_is_cleanup_owner_b_protected (__main__.TestFix6Bug3Round1.test_01_a_is_cleanup_owner_b_protected) ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+FIX6_BUG3_R1_DIRECTION_PASS A_TO_B owner_tx 96ed1536 foreign_tx 284ce3af owner_deleted_pointer 2526162507272 foreign_preserved_pointer 2526199526792 external_preserved_pointer 2526161646984 owner_outcome {'action': 'DELETED', 'status': 'PHYSICALLY_DELETED', 'reason': 'AUTHORIZED_CLEANUP', 'resource_kind': 'Mesh', 'resource_name': 'Fix6Bug3R1_Shared_A_TO_B', 'resource_pointer': 2526162507272, 'tx_id': '96ed1536'}
+ok
+test_02_b_is_cleanup_owner_a_protected (__main__.TestFix6Bug3Round1.test_02_b_is_cleanup_owner_a_protected) ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+FIX6_BUG3_R1_DIRECTION_PASS B_TO_A owner_tx dd51a2ac foreign_tx cffa4c9a owner_deleted_pointer 2526086927880 foreign_preserved_pointer 2526161016328 external_preserved_pointer 2526199182728 owner_outcome {'action': 'DELETED', 'status': 'PHYSICALLY_DELETED', 'reason': 'AUTHORIZED_CLEANUP', 'resource_kind': 'Mesh', 'resource_name': 'Fix6Bug3R1_Shared_B_TO_A', 'resource_pointer': 2526086927880, 'tx_id': 'dd51a2ac'}
+ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.638s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+FIX6_BUG3_R1_TESTS_RUN 2
+FIX6_BUG3_R1_SUCCESS True
