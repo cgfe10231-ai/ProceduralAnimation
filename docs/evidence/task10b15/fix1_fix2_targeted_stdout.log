@@ -1,0 +1,36 @@
+test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation (fix1_fix2_targeted.TestArmIKTransactionAtomicity.test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation)
+TEST-127: FAILED-C post-rollback verification failure or RECOVERY_UNCERTAIN isolates Armature. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c (fix1_fix2_targeted.TestArmIKTransactionAtomicity.test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c)
+TEST-149: Relationship undo exception transitions operation to RECOVERY_UNCERTAIN and isolates session as FAILED-C. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_147_coordinator_grant_binding_and_single_use_enforcement (fix1_fix2_targeted.TestArmIKTransactionAtomicity.test_147_coordinator_grant_binding_and_single_use_enforcement)
+TEST-147: Coordinator grant enforces cross-session rejection, cross-action rejection, and single-use consumption. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_155_verified_recovery_issues_grant_and_single_use_consumed (fix1_fix2_targeted.TestArmIKTransactionAtomicity.test_155_verified_recovery_issues_grant_and_single_use_consumed)
+TEST-155: Verified recovery successfully issues Coordinator grant, Layer 2 consumes it, and replay fails. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.521s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+FIX1_FIX2_TEST_COUNT 4
+FIX1_FIX2_PASS True
