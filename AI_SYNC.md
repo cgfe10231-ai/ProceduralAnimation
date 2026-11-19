@@ -1,91 +1,29 @@
-# AI_SYNC：当前工程状态与跨 AI 交接卡片
+# AI_SYNC — 当前跨会话状态卡片
 
-<!-- TASK10B15_R6_EXECUTION_STATE -->
-> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 6/6 (F-06 / CONTRACT-10 / 十二项合同证据收束) 已完成。
-> - **执行状态标定**：`ROUND_6_VERIFICATION_COMPLETED_WITH_OPEN_DEFECTS`（专项验证与证据收束完成，如实保留真实缺陷与遗留项，不伪报成功，严禁声明最终验收）。
-> - **生产代码冻结**：`src/rig/arm_ik.py` 等 6 份核心代码严格保持 0 行修改（完全冻结）。
-> - **测试更新与新增**：
->   - `tests/test_task10b_transaction_atomicity.py`：追加历史 F-06 专项测试用例 TEST-246～TEST-253（共 8 项），覆盖双臂与跨 Armature 在 CLEANUP_PENDING 下的准入隔离，测试集扩增至 223 项（223/223 PASS）。
->   - `tests/test_task10b_wbc_failure_contract.py`：新建 CONTRACT-10 专项测试套件（共 6 项），实测 WholeBodyController 与 Arm IK 单帧交互边界（CONTRACT10-01, CONTRACT10-05 PASS；CONTRACT10-02, CONTRACT10-03, CONTRACT10-04, CONTRACT10-06 触发真实断言失败 TRUE FAIL，证实 WBC 缺少单帧事务机制导致的场景残留缺陷）。
-> - **测试与回归结果**：Atomicity 223/223 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；WBC Failure Contract 2 PASS / 4 FAIL (真实缺陷)；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
-> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `56fcf62630b331b3e6c7233351d7ddc263be9919`。
-> - **证据归档**：`docs/evidence/task10b15/round6/`（包含 `verification.json`、`implementation_evidence.md`、`contract_status_delta.md`、`deferred_observations.md` 以及全部 8 份原始 `.log` 与测试报告）。
-> - **遗留缺陷与后续**：11 项历史技术遗留项（R1-TAIL-01～03、R2-TAIL-01～02、R3-TAIL-01、R4-TAIL-01～05）与 4 项 CONTRACT-10 真实单帧撕裂缺陷严格维持 OPEN；等待独立审计验收；严禁擅自修复或放宽断言。
+> 核验日期：2026-11-19；核验分支：`audit/task-10-b-9`；代码/文档更新前基线：`ace328d9a9af2684cebefe9890e1081b18128c9d`。
+> 此文件只记录**当前**状态，不复刻旧轮次长篇报告；历史过程请见 `CHANGELOG.md`、冻结账本与证据目录。
 
-<!-- TASK10B15_R5_EXECUTION_STATE -->
-> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 5/6 (F14-04: CleanupOutcome 与 Coordinator 状态决策权) 已完成。
-> - **生产代码修改**：在 `src/rig/arm_ik.py` 引入不可变结果模型 `_CleanupOutcome` (CLEANUP_SUCCESS, CLEANUP_INCOMPLETE, CLEANUP_FAILED) 与 `_CleanupResult` (frozen dataclass)；纯化 Layer 6 清理执行器 `_ArmRigTransactionContext 方法 retry_cleanup()`，彻底移除内部状态修改及直接操作 `_PENDING_ARM_RIG_CLEANUPS`，改为只读幂等执行并返回结构化结果；实现 Coordinator 独占状态决策函数 `_coordinator_apply_cleanup_result(tx, result, phase)`，强制执行 10 项前置校验、独占状态转移（COMMITTED / CLEANUP_PENDING）、注册表维护及底层异常链传播；改造 `_arm_rig_transaction` Phase 3 与 `retry_pending_arm_rig_cleanup` 入口。
-> - **测试更新与新增**：`tests/test_task10b_transaction_atomicity.py` 适配 6 处历史测试调用点（TEST-66, 67, 88, 97, 192, 208），并新增专项测试 TEST-234～TEST-245（共 12 项），总测试集扩增至 215 项。
-> - **测试结果**：Atomicity 215/215 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
-> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `b03fe2f48b5fe1ac70116334af9e6d77ca5ad232`。
-> - **证据归档**：`docs/evidence/task10b15/round5/`（含 `verification.json`、`implementation_evidence.md`、`test_change_audit.md` 及全部 8 份原始 `.log` 与测试报告）。
-> - **遗留项与后续**：11 项历史遗留项（R1-TAIL-01～03、R2-TAIL-01～02、R3-TAIL-01、R4-TAIL-01～05）维持 OPEN（留至 6/6 集中处理）；等待 ChatGPT 独立验收；禁止擅自开始 6/6。
+## 当前节点
+- 10-A：`COMPLETED — ARCHIVED`。
+- 10-B：fix-7 自动化回归已完成，**最终验收待裁决（FINAL ACCEPTANCE PENDING）**。
+- 10-C、10-D：`BLOCKED — NOT STARTED`。
+- Task 11：`FIND-R3-03` / `FIND-R3-04` 仍 OPEN。Task 12 未启动；Phase 7B 未获授权。
 
-<!-- TASK10B15_R4_EXECUTION_STATE -->
-> **最新执行状态（覆盖下方历史状态，不修改历史记录）**：TASK 10-B-15 Round 4/6 (F14-02: Object Parent 与 Collection Parent/Child 关系授权闭环) 已完成。
-> - **生产代码修改**：在 `src/rig/arm_ik.py` 实现 Layer 3 辅助与关系授权函数 `_matrix_equals()`、`_is_child_collection_linked_by_identity()`、`_is_collection_descendant_of()`、`_authorized_assign_object_parent()`、`_authorized_link_child_collection()`、`_authorized_unlink_child_collection()` 及 `_authorized_restore_relationship()`；收敛 `_get_or_create_empty()` 中的父级与矩阵逆赋值、`_ensure_character_collection()` 中的集合挂载至 Layer 3；升级快照 `_capture_snapshot()` 包含集合父子指针及控制器父级指针；升级回滚时序在 Step 0.5 优先恢复 Object Parent 关系，在 Step 1 跳过已恢复父级，在 Step 3.0 倒序恢复集合挂载/解绑关系，并在 Step 3.1 严格实施第 9.2 节外部依赖隔离检查（无外部成员、外部子集合、外部父级方可安全删除）。
-> - **测试更新与新增**：`tests/test_task10b_transaction_atomicity.py` 适配 TEST-116 关系日志数量，并新增 TEST-217～TEST-233（共 17 项），总测试集扩增至 203 项。
-> - **测试结果**：Atomicity 203/203 PASS、Input Validation 30/30 PASS、Lifecycle 30/30 PASS；四级回归 Quick 19/19、Physics 27/27、Motion 12/12、Full 42/42 全部通过；架构文档符号门禁 6/6 PASS。
-> - **分支与基线**：分支 `audit/task-10-b-9`，基线 HEAD `4d1091ccafa52ac8be2dd261a258a76017282c5e`。
-> - **证据归档**：`docs/evidence/task10b15/round4/`（含 `verification.json`、`implementation_evidence.md` 及全部 8 份原始 `.log` 与测试报告）。
-> - **遗留项与后续**：8 项历史遗留项（R1-TAIL-01～03、R2-TAIL-01～02、R3-TAIL-01～03）维持 OPEN（留至 6/6 集中处理）；等待 ChatGPT 独立验收；禁止擅自开始 5/6。
+## 最新源码事实
+- `src/rig/arm_ik.py` 包含事务协调、授权/关系状态、提交后清理及门禁实现。
+- `src/motion/whole_body_controller.py` 包含准入检查、单帧状态快照恢复与共享 Arm IK 事务实现。
+- 这些实现不能代替当前 HEAD 的 `CONTRACT10-01..06` 专项通过证据。
 
+## 最新可用测试证据
+- Input Validation：30/30 PASS（历史有效专项）。
+- Atomicity：223/223 跨批次去重有效 PASS（历史180 + fix-7 TEST-57～99 的43；**非一次同HEAD运行**）。
+- BUG11：8/8 PASS；BUG12：4/4 PASS；Collection TEST-225～233：9/9 PASS（与 Atomicity 编号有重叠）。
+- FULL：42/42 自动化通过（33 PASSED + 9 AUTOMATED_PASS）。九项视觉验收仍为 PENDING。
+- WBC CONTRACT10：历史01/05 PASS、02/03/04/06 FAIL；修复后**尚未取得当前代码对应六项完整运行证据**，不得写当前PASS或当前FAIL。
+- 证据：`docs/evidence/fix-7/remaining_regression/round2/fix7_report.md`，`docs/evidence/fix-7/remaining_regression/round2/full/test_report.json`。
 
-> **项目**：ProceduralAnimation | **分支**：`audit/task-10-b-9`
-> **最新完成节点**：TASK 10-B-9（架构驱动事务统一模型与全系统审计）
-> **前序基线 SHA**：`6d9fd089c4a42600c397889e4e5449f9034975d9`（来自 `origin/audit/task-10-b-8`）
-> **工作区分支状态**：当前开发分支 `audit/task-10-b-9`（待安全推送至远程对应审计分支，严禁合入 master）
-> **工作区现场**：保留未跟踪受保护文件 `P2_R1_recovery.patch`（除保护文件外工作区干净）
-> **证据归档**：`docs/evidence/PKG5_10B_REVISION_9/`
-
----
-
-## 1. Task 10 当前状态与交付
-
-- **Task 10-A**：`COMPLETED — ARCHIVED`。10-A-1 至 10-A-4 归档验收，30/30 回归通过。
-- **Task 10-B 当前状态**：
-  - **Task 10-B-8 生产实现**：`READY FOR INDEPENDENT REVIEW`（102 项专项测试全部通过，四级回归全部通过）。
-  - **Task 10-B-9 架构模型**：`ARCHITECTURE PROPOSAL — PENDING REVIEW`（架构提案就绪，待独立审查批准；生产代码保持 0 行修改；严禁未经审核直接重构）。
-  - **10-B-1**：输入预验证、Influence 边界与基础零副作用合同 (`IMPLEMENTED — TESTED — ARCHIVED`)。
-  - **10-B-2**：自动初始化有效父级矩阵预检 (`IMPLEMENTED — TESTED — ARCHIVED`)。
-  - **10-B-3**：控制器类型校验（仅 EMPTY 有效）、Case C 预期矩阵一致性与证据归档 (`IMPLEMENTED — TESTED — ARCHIVED`)。
-  - **Task 10-B / Revision 4**：生产级事务快照、失败回滚与异常安全初版（包含 12 项独立审计修正 TEST-53 至 TEST-64）。
-  - **Task 10-B-5**：三阶段安全提交协议、快照不可变深拷贝契约、集合所有权隔离、调用边界解耦与全字段恢复验证器（TEST-65 至 TEST-76）。
-  - **TASK 10-B-6**：约束指针严格身份比对、禁止生成补丁替代物、集合所有权与成员保护隔离、运行时注册表 `_PENDING_ARM_RIG_CLEANUPS` 与幂等重试（TEST-77 至 TEST-84）。
-  - **TASK 10-B-7**：同 Armature 待清理事务准入门禁、暂存约束指针清理、Character 集合身份级恢复、验证器子集匹配（TEST-85 至 TEST-92）。
-  - **TASK 10-B-8**：统一事务控制器所有权登记、活体指针身份严格解析、剔除按名删除控制器逻辑、命名冲突保护、暂存约束双重身份校验、逻辑提交后异常清理挂起重试（TEST-93 至 TEST-102）。
-  - **TASK 10-B-9（Architecture-First Transaction Consolidation）**：
-    - **真实架构提取**：完成对 `src/rig/arm_ik.py`（2414 行）及其调用者的逐行只读扫描，全面确认所有公开 API、内部事务入口、Blender 资源 CRUD/Link/Unlink/Rename 定位、快照与验证点、异常出口及 Cleanup 挂起路径。
-    - **六大职责解耦**：Transaction Coordinator、State & Ownership Registry、Resource Operations、Arm IK Business Operations、Snapshot & Verification、Commit & Cleanup。
-    - **资源所有权合同**：建立 Resource Identity 与 Relationship Mutation 物理模型；确立所有权非推断原则；划分 5 类资源所有权模型。
-    - **事务生命周期合同**：建模 9 个显式状态的进入条件、下一迁移、操作权限与不可逆提交红线；深度审计 10 项重点边缘与故障场景。
-    - **架构驱动影响矩阵**：建立全系统真实依赖拓扑；细化直接、间接、共享状态、生命周期 4 类依赖；明确每一依赖路径的合同、失败传播、恢复责任方及测试证据。
-    - **受控架构迁移方案**：确立接口冻结与数学行为零退化原则；对比单文件分节重排（首选）与多模块拆分方案；制定 4 阶段平滑迁移顺序、独立回退门禁与对应测试覆盖。
-    - **测试映射与验证设计**：将现有 TEST-01 至 TEST-102 完整映射至架构职责；深度审计重复测试、未触发路径、无测试删除、孤儿状态修改等 7 大重点问题。
-  - **历史记法说明**：旧规划编号 `10-B-4` 作为 Task 10-B 第四轮修订的历史记法，其实际成果已在后续修订与受控修正中吸收覆盖。
-- **下一执行节点**：Task 10-C（Arm IK 与 WBC 解耦验证，`BLOCKED — NOT STARTED`，尚未准入）。
-- **Task 10-D**：`BLOCKED — NOT STARTED`。
-
-## 2. 验证与回归基准
-
-- **专项测试**：
-  - `test_task10b_input_validation.py`：30/30 PASS (2.36s)
-  - `test_task10b_transaction_atomicity.py`：72/72 PASS (6.13s)
-  - Task 10-B 专项测试总计：102/102 PASS (100%)
-  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS (4.17s)
-- **分层回归**：
-  - Quick：19/19 (51.32s)
-  - Physics：27/27 (106.63s)
-  - Motion：12/12 (51.01s)
-  - Full：42/42 (163.61s)
-  - 四级全 0 缺陷通过（退出码 0，AUTOMATED_PASS 仍须 GUI 目视验收）。
-- **回归与专项套件总计**：238 项自动化测试全部 100% PASS (0 FAIL, 0 ERROR)。
-- **门禁审计**：`audit_c2_final_inspector.py --verify-docs` 6 项自测与文档符号检查 PASS (1.80s)。
-
-## 3. PKG-5 后续边界与准入
-
-- **Finding**：FIND-R3-01 已修复；FIND-R3-03、FIND-R3-04 保持 OPEN（归属 Task 11）。全仓 14 项关闭，2 项开放。
-- **PKG-5 顺序**：09-B-4 (已验收) $\to$ 10-A (已验收) $\to$ 10-B-8 (READY FOR INDEPENDENT REVIEW) $\to$ 10-B-9 (ARCHITECTURE PROPOSAL — PENDING REVIEW) $\to$ 10-C (BLOCKED) $\to$ 10-D $\to$ 11 $\to$ 12。
-- **Task 11 / Task 12**：Task 11 `PLANNED — NOT STARTED`；Task 12 `BLOCKED`。
-- **Phase 7B**：`NOT AUTHORIZED`。必须完成 Task 10/11/12 联合验收并获批后方可准入。
-- **保护文件**：`ARCHITECTURE.md` 与 `DECISIONS.md` 严格受保护。
+## 不得越权
+- 未完成 Task 10-B 独立结项；不得启动10-C、10-D，不得合并 master。
+- 21 项冻结账本定义、12 项架构合同和16项历史 Finding ID 均不得被执行端重编号或擅自关闭。
+- Antigravity 不得创建、修改、追加、覆盖、删除任何 Markdown；文档内容由 ChatGPT 依据源码与证据准备，用户为最终裁决人。
+- 后续任务一轮内完成允许范围的修改、检查、Git commit/push 与远端 HEAD 核验；主干合并另须用户授权。

@@ -1,28 +1,15 @@
 # ARCHITECTURE_SYNC：工程动态架构与模块调用同步
 
-> **文档定位**：动态工程架构同步文档。记录当前已经实现、已经核实的真实调用关系、模块职责、状态所有权、审计进度与后续准入边界。
->
-> **总架构保护**：`ARCHITECTURE.md` 是全项目总架构蓝图，本文件不得替代、复制、重构或擅自修改总架构。
->
-> **09-B-4 生产修复基准**：`52d66dfd529627a9fbc8bae6ffcf6f4fee6c64d8`
->
-> **TEST-24 断言补充基准**：`3881aaadd58f76ffce18faf5d9e880bc49b82f97`
->
-> **完整测试证据基准**：`0b42cb1d7dc685d1be7210bc1280519658f85809`
->
-> **最近完成节点**：PKG-5 / Task 10-A（10-A-1 至 10-A-4 归档验收）；PKG-5 / Task 10-B-8（生产级事务阶段性修复）；PKG-5 / Task 10-B-9（Architecture-First Transaction Consolidation 全量架构一致性审计与收敛完成，批准基准 SHA：`124747e900a1db5790ed5f4159f561dba19890ff`）。
->
-> **最近完成状态**：
-> - `10-A`：`COMPLETED — ARCHIVED`（已归档验收）
-> - `10-B-9`：`APPROVED TARGET ARCHITECTURE` / `IMPLEMENTATION IN PROGRESS` / `NOT YET VERIFIED`（目标架构设计已通过静态架构审计并正式批准；生产代码按原子阶段逐步落地中）
-> - `10-C`：`BLOCKED — NOT STARTED`（未准入）
-> - `10-D`：`BLOCKED — NOT STARTED`（未准入）
->
-> **当前执行节点**：`10-b-10 → 10-b-11`（`10-B-10` 正式固化已批准目标架构；`10-B-11` 依据正式架构实施第一项 `Collection ↔ Object` 关系所有权原子化生产修复）。
->
-> **后续节点状态**：Task 10-C 与 Task 10-D 保持 `BLOCKED — NOT STARTED`。
->
-> **当前工程核心事实**：19 骨骼角色运动学执行管线与 6-DOF 数值质心动力学管线保持独立；二者未来的合流属于 Phase 7C，不是当前 PKG-5 的待修缺陷。
+> **核验日期**：2026-11-19
+> **核验源码基线**：`ace328d9a9af2684cebefe9890e1081b18128c9d`（审计分支，文档更新前参考值）。
+> **文档职责**：记录真实存在的模块、调用链、职责和当前任务进度；不修改 `ARCHITECTURE.md` 的永久规则。
+> **10-A**：`COMPLETED — ARCHIVED`。
+> **10-B**：fix-7 自动化回归完成，`FINAL ACCEPTANCE PENDING`；不再将 `10-b-10 → 10-b-11` 视为当前正在执行的节点。
+> **10-C / 10-D**：`BLOCKED — NOT STARTED`，未准入。
+> **Task 11 / Task 12**：未完成；Phase 7B `NOT AUTHORIZED`。
+> **现行实现核对**：`arm_ik.py` 包含统一事务、授权与清理；`whole_body_controller.py` 包含帧级快照/恢复与双臂事务协调。存在代码不等于每项合同已获当前版本运行验收。
+> **证据边界**：Atomicity 223/223 为跨批次去重覆盖；FULL 42/42 为自动化通过，9项视觉待验收；`CONTRACT10-01..06` 当前 HEAD 六项专项尚无新运行结论。
+> **跨管线状态**：19骨骼运动学生产管线与独立6-DOF数值动力学管线仍分离，未来合流不得写成当前已完成。
 
 ---
 
@@ -310,7 +297,7 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 | 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | 分阶段状态：`10-A` 已归档验收 (`COMPLETED — ARCHIVED`)；`10-B` 正在实施，目标架构已批准 (`APPROVED TARGET ARCHITECTURE / IMPLEMENTATION IN PROGRESS`)；`10-C` 未准入 (`BLOCKED — NOT STARTED`)；`10-D` 未准入 (`BLOCKED — NOT STARTED`) |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` fix-7 自动化回归完成、`FINAL ACCEPTANCE PENDING`；`10-C` 与 `10-D` 均 `BLOCKED — NOT STARTED` |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | 待修复 |
 | 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 10、11 完成后执行 |
 
@@ -418,6 +405,8 @@ M_{\mathrm{parent\_inverse}}
 09-B-4 已经完成，不得继续标记为 `IN PROGRESS — NOT ACCEPTED`。
 
 ### 4.2 节点 10：Upper-Limb IK/FK
+
+> **版本边界**：本节包含历史任务设计与实现过程；涉及旧节点“当前”措辞时，均以本文件顶部和第8节的2026-11-19状态为准；合同正文不作追认或重写。
 
 状态（分阶段精确状态）：
 
@@ -1104,7 +1093,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 8. 当前架构同步状态规则
 
 - PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- Task 10-A 已归档验收（`COMPLETED — ARCHIVED`）；Task 10-B 目标架构已在 `124747e900a1db5790ed5f4159f561dba19890ff` 正式批准（`APPROVED TARGET ARCHITECTURE`），当前处于 `IMPLEMENTATION IN PROGRESS`（执行节点 `10-b-10 → 10-b-11`）；Task 10-C 与 Task 10-D 仍严格处于 `BLOCKED — NOT STARTED`（未准入）。
+- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B 已完成 fix-7 自动化回归但最终合同验收 `FINAL ACCEPTANCE PENDING`，批准的12项合同定义不变；Task 10-C / 10-D 仍 `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
 - Task 11 负责 FIND-R3-03、FIND-R3-04。
 - Task 12 负责 PKG-5 跨模块联合审计与验收。
 - 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。
@@ -1488,6 +1477,8 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
 ---
 
 ### 10.10 验证与后续实施 (Planned Target Architecture)
+
+> **历史计划说明**：第10.10节第3项描述的是设计批准时的旧实施路线，不是2026-11-19的当前施工状态；当前10-B仅待最终验收裁决，10-C/10-D未准入。原12项合同和14条影响矩阵原样保留。
 
 1. **十二项合同验证要求**：
    - `CONTRACT-01` 至 `CONTRACT-12` 的正向场景、故障场景、外部共享状态影响、待核验不变量及通过/失败判据已在批准架构 JSON（`f3_verification_requirements`）与本节 10.8.1 表中完整固化。

@@ -2,6 +2,15 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-19] Task 10-B / fix-7：剩余自动化回归证据完成（结项未裁决）
+
+- **代码/测试核验基线**：`b079af341aa032ac1f272fc354cdc5ab51a73a60`（fix-7 剩余回归测试前冻结 HEAD）；测试后源码 Blob 保持一致。文档整理由 `ace328d9a9af2684cebefe9890e1081b18128c9d` 开始，不代表重新跑过全部测试。
+- **Atomicity**：`TEST-31～253` 有效联合去重 `223/223 PASS`，由历史180项和本轮43项构成；非一次同HEAD执行；早先 `TEST-57` 的失败保留在历史原始日志，修复后的43项含 TEST-57 全部通过。
+- **BUG11**：8/8 PASS；**BUG12**：4/4 PASS；**Collection TEST-225～233**：9/9 PASS（与 Atomicity 有部分编号重叠，不能重复相加）。
+- **FULL**：42/42个唯一注册套件自动化通过，其中33 PASSED、9 AUTOMATED_PASS（视觉待人工验收）；FAIL=ERROR=SKIPPED=NOT_RUN=0，退出码0；未重复运行 QUICK、PHYSICS、MOTION。证据详见 `docs/evidence/fix-7/remaining_regression/round2/fix7_report.md` 与 `docs/evidence/fix-7/remaining_regression/round2/full/test_report.json`。
+- **合同状态边界**：历史 WBC `CONTRACT10-02/03/04/06` 有真实 FAIL 记录；新 WBC 代码已有相关逻辑，但当前代码对应的六项合同专项未重新完整运行，不能据此自动判定当前PASS或FAIL。Task 10-B 仍处于最终验收待裁决状态。
+- **禁令**：只追加此日期事实，原有历史条目原样保存，不据最新结果覆盖历史失败或更改永久架构合同。
+
 ### [2026-11-06] PKG-5 / Task 10-B-9：架构驱动事务统一模型与全系统审计 (Architecture-First Transaction Consolidation)
 
 * **任务性质**：架构审计与方案设计（TASK 10-B-9），停止针对单一故障点的局部打补丁，基于真实代码与全调用拓扑建立统一架构模型、资源所有权模型、影响关系和可验证迁移方案。

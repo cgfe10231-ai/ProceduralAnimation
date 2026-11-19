@@ -4,6 +4,16 @@
 此账与执行 Agent 自动生成的 `deferred_observations.md` 分离，禁止执行 Agent 改写编号、定义、所属模块、严重程度或关闭状态。
 **21 为遗留/测试记录数量，不是 21 个独立代码 Bug。**
 
+## 当前证据状态（2026-11-19；不改写以下21项冻结原定义）
+
+- 本账中的 **21项** 为历史遗留、测试缺口及合同失败观察的冻结编号，**不是21个独立代码BUG**；原编号、严重程度与原始观察正文不可修改。
+- fix-1～7 后 `arm_ik.py` 与 `whole_body_controller.py` 已存在针对历史遗留的生产实现；代码存在并不自动宣告每个旧观察已消失。
+- `TEST-31..253` 跨批次去重有效 `223/223 PASS`；BUG11 `8/8 PASS`；BUG12 `4/4 PASS`；FULL `42/42` 自动化通过且9项视觉待验收。
+- 本账 `CONTRACT10-02/03/04/06` 行写的是**历史实测FAIL**，不是新HEAD的实时FAIL；当前代码对应 `CONTRACT10-01..06` 六项专项尚无完整新运行结论，不得改成已验证PASS或继续声称当前实测FAIL。
+- BUG12 的4项测试证明所构造真实资源场景的隔离与清理，不能单独证明所有自然生成路径的端到端覆盖。
+- 当前主状态由 `PROJECT_STATE.md`、`ARCHITECTURE_SYNC.md`、`OPEN_FINDINGS.md` 共同维护；冻结清单与历史故障窗口继续保留供后续验收映射。
+- 证据：`docs/evidence/fix-7/remaining_regression/round2/fix7_report.md`。
+
 ## 双轴排序法
 
 - **影响范围 S**：5 = 全身/WBC/Bridge 单帧；4 = 全部 Arm IK 事务与准入；3 = 通用资源所有权与回滚；2 = 单一资源类型；1 = 仅测试或证据。
@@ -49,7 +59,7 @@
 | CONTRACT10-04 | 01 | **实测 FAIL** | Arm IK 局部回滚后 WBC Root/其他先序写入未恢复。 |
 | CONTRACT10-06 | 01 | **实测 FAIL** | 左手独立提交、右手失败，整帧半提交。 |
 
-## 本轮已由 ChatGPT 编写的生产修复
+## 历史时点记录：当时已编写的生产修复（后续已有更多实现）
 
 - `10B_CORE_WBC_01_apply.py`：仅精确修改 `src/motion/whole_body_controller.py`，增加构造和帧执行的 **Armature admission fail-fast gate**。
 - 修复目标：在 Leg IK/Root/Pelvis/FK/Hand IK 任意场景写入前，发现当前 Armature 的 `CLEANUP_PENDING` / FAILED / identity-invalid 并抛出明确异常。
