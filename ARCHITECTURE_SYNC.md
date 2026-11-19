@@ -411,7 +411,7 @@ M_{\mathrm{parent\_inverse}}
 状态（分阶段精确状态）：
 
 - **10-A**：已归档验收（`COMPLETED — ARCHIVED`）。
-- **10-B**：正在实施，目标架构已批准（`APPROVED TARGET ARCHITECTURE` / `IMPLEMENTATION IN PROGRESS` / `NOT YET VERIFIED`，批准架构基准 SHA：`124747e900a1db5790ed5f4159f561dba19890ff`）。
+- **10-B**：目标架构已批准（批准基准 `124747e900a1db5790ed5f4159f561dba19890ff`）；fix-7 自动化回归完成，`FINAL ACCEPTANCE PENDING`。12项批准合同保持不变；当前版本仍需独立合同验收，不得把旧实施阶段视为正在执行。
 - **10-C**：未准入（`BLOCKED — NOT STARTED`）。
 - **10-D**：未准入（`BLOCKED — NOT STARTED`）。
 
@@ -995,9 +995,9 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 当前执行节点：
 
-`10-b-10 → 10-b-11`
+`Task 10-B — FINAL ACCEPTANCE PENDING`
 
-（其中 `10-a-1` 至 `10-a-4` 已完成归档验收；`10-b-10` 负责正式固化已批准的目标事务架构；`10-b-11` 负责依据已批准目标架构执行首轮 `Collection ↔ Object` 关系所有权原子化生产修复；`10-C` 与 `10-D` 继续保持 `BLOCKED — NOT STARTED`。）
+（10-A 已归档；10-B 的 fix-7 自动化回归已完成，剩余当前专项合同核验及独立结项裁决；`10-b-10 → 10-b-11` 是历史实施编号，不再代表当前执行；10-C 与 10-D 均 `BLOCKED — NOT STARTED`。）
 
 ## 5. 后续 Phase 阶段门禁
 
@@ -1111,7 +1111,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 > **历史版本说明（重要）**：
 > - 本第 9 节保留自 Task 10-B-9 早期架构提取与初版迁移提案快照（对应 `docs/evidence/PKG5_10B_REVISION_9/01...07.md`）。
 > - 本节中的初版提案描述（例如将 `DataBlock` 的 `users == 0` 单独列为物理身份删除条件、3 状态关系日志、以及当时尚未接入事务包装的 `reset_arm_ik` 早期计划）属于**历史提案记录**，**不得覆盖第 10 节已正式批准的目标架构合同**。
-> - **唯一权威目标架构来源**：所有后续 Task 10-B 生产修复（自 `10-B-11` 起）必须严格以 **第 10 节（`## 10. Task 10-B-9 Approved Target Architecture`）** 为唯一批准的目标事务架构合同。
+> - **已批准目标架构来源**：第 10 节（`## 10. Task 10-B-9 Approved Target Architecture`）保留 Task 10-B 的批准设计约束；“自 `10-B-11` 起”仅为当时实施计划，不能据此认定当前仍处于首轮实施，更不能推定合同已验证。
 >
 > **归档位置**：`docs/evidence/PKG5_10B_REVISION_9/`
 > **架构状态标记**：
@@ -1166,7 +1166,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 ### 9.4 架构迁移方案与演进建议 `[PROPOSED — HISTORICAL SNAPSHOT]`
 
-- **建议 1（reset_arm_ik 事务化）** `[PROPOSED — 历史记录说明]`：早期提案建议将 `reset_arm_ik` 纳入 `with _arm_rig_transaction(arm):` 保护。**当前源码状态核实**：当前 `src/rig/arm_ik.py` 中的 `reset_arm_ik()` 已经包含 `with _arm_rig_transaction(arm):` 事务上下文包装及部分前置校验/故障边界，因此后续实施不得重复添加已存在的事务包装，而应按第 10.9 节批准的双臂复位事务合同完成剩余细节对齐。
+- **建议 1（reset_arm_ik 事务化）** `[PROPOSED — 历史记录说明]`：早期提案建议将 `reset_arm_ik` 纳入 `with _arm_rig_transaction(arm):` 保护。**2026-11-19 源码核实**：事务上下文包装及前置检查已存在；该建议不得再被当作未开始的编码任务。第 10.9 节是批准合同，其余细节是否通过仍以当前实际专项结果为准。
 - **建议 2（单文件分节重整首选）** `[PROPOSED]`：保持单一 `src/rig/arm_ik.py`，但在内部划分为 6 个显式职责 Section，避免多文件拆分引入循环依赖或打断 Git 追溯历史。
 - **建议 3（清理非事务历史死代码）** `[PROPOSED]`：安全移除 `_get_or_create_empty` 和 `setup_arm_ik` 中 `else: bpy.data.objects.remove` 等已不可达分支。
 - **建议 4（资源记录结构归一化）** `[PROPOSED]`：将分散的 `created_controller_objects`、`created_collections` 统一映射为 `created_resources`，保留原有属性作为 `@property` 兼容层。
@@ -1177,11 +1177,12 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 10. Task 10-B-9 Approved Target Architecture
 
 ```text
-APPROVED TARGET ARCHITECTURE
+APPROVED TARGET ARCHITECTURE (DESIGN CONTRACT PRESERVED)
 ARCHITECTURE: APPROVED TARGET
-IMPLEMENTATION: IN PROGRESS
-VERIFICATION: NOT YET COMPLETED
-NOT YET VERIFIED
+DESIGN-APPROVAL-TIME STATUS: HISTORICAL IMPLEMENTATION PLAN
+AS-OF-2026-11-19 IMPLEMENTATION: FIX-7 AUTOMATED REGRESSION COMPLETE
+AS-OF-2026-11-19 ACCEPTANCE: FINAL ACCEPTANCE PENDING
+CONTRACT10-01..06: CURRENT-RUN VERIFICATION NOT YET ESTABLISHED
 ```
 
 ### 10.1 架构地位及版本 (Planned Target Architecture)
@@ -1191,8 +1192,8 @@ NOT YET VERIFIED
 - **架构设计范围**：`src/rig/arm_ik.py` 上肢 IK 事务协调、状态与所有权注册表、受权资源与关系操作、业务数值写入、快照恢复与全字段核验、提交后清理、双臂原子复位及与上层 `WholeBodyController` 的接口边界。
 - **状态严格分离声明**：
   - `ARCHITECTURE: APPROVED TARGET`（目标架构设计已通过静态架构审计并获得正式批准）。
-  - `IMPLEMENTATION: IN PROGRESS`（生产代码尚未完整实现本节全部目标合同，自 Task 10-B-11 起按原子任务逐步落地）。
-  - `VERIFICATION: NOT YET COMPLETED` / `NOT YET VERIFIED`（静态设计获批不等同于生产代码已验证；严禁将本节尚未实现的接口、日志状态或隔离机制描述为 `CURRENT IMPLEMENTATION`）。
+  - **历史实施状态**：设计批准时处于分阶段落地，`10-B-11` 曾是下一步计划。**2026-11-19 当前状态**：相关生产逻辑已有后续实现并完成 fix-7 自动化回归；不得继续把历史实施计划标记为当前节点。
+  - **当前验收状态**：`FINAL ACCEPTANCE PENDING`；FULL 42/42 为自动化通过，9项仍需人工视觉验收；WBC `CONTRACT10-01..06` 当前代码对应完整专项证据尚未核实。不得将历史 `NOT YET VERIFIED` 直接套用为当前所有代码不存在，也不得凭代码存在推断合同已通过。
 - **与 `ARCHITECTURE.md` 及历史材料的优先级关系（Source Precedence）**：
   1. **Level 1 — 权威总架构与门禁约束**：`ARCHITECTURE.md`、`docs/ARCHITECTURE_CHANGE_GATE.md`（定义全系统主执行链 `MotionPlanner -> Bridge -> WBC -> Rig/IK/FK` 与十步防漂移清规，本节严格服从总架构，不改变上层管线拓扑）。
   2. **Level 2 — 当前代码与已核实实现事实**：`ARCHITECTURE_SYNC.md` 第 1～8 节、`src/rig/arm_ik.py`、`src/motion/whole_body_controller.py`（代表当前磁盘已实现事实）。
@@ -1472,13 +1473,13 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
 - **提交后清理门禁**：逻辑提交后若必选清理项失败，由 Layer 6 返回 `CLEANUP_INCOMPLETE`/`CLEANUP_FAILED`，Layer 1 Coordinator 将状态置为 `CLEANUP_PENDING` 并登记门禁。
 - **当前代码与批准目标合同的准确区分**：
   - **当前已实现部分**：当前 `src/rig/arm_ik.py` 中的 `reset_arm_ik()` 已经接入 `with _arm_rig_transaction(arm):` 包装、具备前置父级矩阵预检及故障注入边界（`reset_arm_ik_after_influence_l`、`reset_arm_ik_after_influence_r`、`reset_arm_ik_during_depsgraph_update`）。
-  - **尚未完成的目标架构对齐项**：其内部依赖的底层关系恢复、7 状态关系日志、DataBlock 显式清理授权（`CanDelete(D,t)`）、`CleanupOutcome` 单向汇报及 `FAILED-A/B/C/D` 会话身份隔离机制属于本第 10 节批准的目标架构，正通过后续受控原子任务逐步落地。
+  - **当前合同核验边界**：底层关系恢复、关系日志、DataBlock 受权清理、`CleanupOutcome` 结果汇报及失败会话隔离均已有后续生产实现，不能继续标记为“尚未开始落地”；其与第10节全部批准合同的符合程度必须以对应源码审计及专项测试独立核验，不能仅凭存在性宣布 PASS。
 
 ---
 
 ### 10.10 验证与后续实施 (Planned Target Architecture)
 
-> **历史计划说明**：第10.10节第3项描述的是设计批准时的旧实施路线，不是2026-11-19的当前施工状态；当前10-B仅待最终验收裁决，10-C/10-D未准入。原12项合同和14条影响矩阵原样保留。
+> **状态与合同边界**：第10节批准的目标合同及14条影响关系原样保留；第3项同步为2026-11-19的实际进度。旧实施节点只属于历史，不得重新被当成当前任务准入。
 
 1. **十二项合同验证要求**：
    - `CONTRACT-01` 至 `CONTRACT-12` 的正向场景、故障场景、外部共享状态影响、待核验不变量及通过/失败判据已在批准架构 JSON（`f3_verification_requirements`）与本节 10.8.1 表中完整固化。
@@ -1488,6 +1489,6 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
    - 严禁用历史提交（如 10-B-8 的 `102/102 PASS`）代替新生产修复的真实回归运行结果。
    - 严禁以自动化测试（`Automated Pass`）代替 Blender GUI 视口真实目视验收。
 3. **后续受控原子实施路线与准入边界**：
-   - **Task 10-B 生产修复尚未全部完成**：必须依据本第 10 节批准的目标架构，按最小原子范围分阶段实施并逐轮独立验收。
-   - **Task 10-B-11（首轮原子生产修复）**：聚焦收敛 **`Collection ↔ Object` 关系的创建、7 状态日志登记（`PREPARE -> APPLY -> CONFIRM`）与经由 Layer 3 的回滚恢复**（不混改 Constraint Target、Object Parent 或全部 Cleanup）。
+   - **Task 10-B**：fix-7 自动化回归已经完成；当前仍待合同专项证据核验与负责人独立结项，禁止把历史“继续按原子阶段实施”解释为新修复授权。
+   - **历史计划：Task 10-B-11**：当时聚焦 `Collection ↔ Object` 关系所有权；该轮已不再是当前执行节点。当前不因该旧计划自行新增代码或重复修复；是否有遗留仅以本版本合同核验结论裁决。
    - **Task 10-C 与 Task 10-D 状态**：继续保持 **`BLOCKED — NOT STARTED`**，在 Task 10-B 全部完成并获独立验收批准前严禁提前进入。

@@ -555,7 +555,7 @@
 
 ## 7. 集中修复建议与维护包划分 (Remediation Roadmap)
 
-> **历史路线图快照（非当前任务状态）**：本节保留原 R1–R4 审计后形成的维护包划分、依赖拓扑和早期任务建议，用于追溯历史规划。正文中的“待处理 09-B”仅代表该规划形成时的状态，不代表当前任务仍未完成。当前 PKG-5 状态以文件顶部摘要及第 8 节节点表为准：09-B-4 已验收，下一节点为 Task 10，FIND-R3-03 与 FIND-R3-04 仍归属 Task 11。不得使用本节历史规划文字覆盖当前验收状态。
+> **历史路线图快照（非当前任务状态）**：本节保留原 R1–R4 审计后形成的维护包划分、依赖拓扑和早期任务建议，用于追溯历史规划。正文中的“待处理 09-B”仅代表该规划形成时的状态，不代表当前任务仍未完成。当前 PKG-5 状态以文件顶部摘要及第 8 节节点表为准：09-B-4 已验收，10-A 已归档，10-B fix-7 自动化回归完成但最终验收待裁决；10-C/10-D 未准入；FIND-R3-03 与 FIND-R3-04 仍归属 Task 11。不得使用本节历史规划文字覆盖当前验收状态。
 
 > **权威修复方案与详细回归规划**：详见独立维护包文档 [`docs/audit/production_interface/REPAIR_GROUPING.md`](REPAIR_GROUPING.md)。
 
@@ -588,7 +588,7 @@ flowchart TD
      - `08 Rig`：刚体平移与世界空间隔离回归已完成；
      - `09-A`：Ground × Reach 三维约束求解器已完成并验证；
      - `09-B`：世界旋转、有效父级变换、状态完整性及解锁事务补强已完成，最近节点 09-B-4 为 `ACCEPTED — VERIFIED`；
-     - `10 Upper-Limb IK/FK`：下一执行节点，等待正式任务卡；
+     - `10 Upper-Limb IK/FK`：10-A 已归档；10-B fix-7 自动化回归完成、独立结项待裁决；10-C/10-D 未准入；
      - `11 FootLock`：仍需处理 FIND-R3-03 与 FIND-R3-04；
      - `12 联合验收`：等待 Task 10、11 完成。
 
@@ -605,7 +605,7 @@ flowchart TD
 | 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | `COMPLETED / VERIFIED` |
 | 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | FIND-R3-01 | 世界旋转、有效父级矩阵、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | `ROUTE FROZEN — IMPLEMENTATION NOT STARTED` |
+| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 10-A `COMPLETED — ARCHIVED`；10-B `FINAL ACCEPTANCE PENDING`（fix-7自动化回归完成）；10-C/10-D `BLOCKED — NOT STARTED` |
 | 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | `OPEN / PENDING REPAIR` |
 | 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | `PENDING` |
 
@@ -948,7 +948,7 @@ flowchart TD
 - 08 Rig：已完成。
 - 09-A：Lower-Limb Ground × Reach，已完成。
 - 09-B：Lower-Limb World Rotation 与控制器生命周期合同，已完成；最近补强节点为 `09-B-4`。
-- 10：Upper-Limb IK/FK，下一节点。
+- 10：Upper-Limb IK/FK，10-A 已归档；10-B fix-7 自动化回归完成、最终结项待裁决；10-C/10-D 未准入。
 - 11：FootLock，处理 FIND-R3-03、FIND-R3-04。
 - 12：PKG-5 综合闭环与联合验收。
 
