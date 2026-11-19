@@ -1,0 +1,82 @@
+FIX7_BLENDER_VERSION 5.1.1
+FIX7_COLLECTION_SELECTED [225, 226, 227, 228, 229, 230, 231, 232, 233]
+FIX7_TEST_METHOD 225 test_225_character_collection_scene_link_has_tx_added_and_confirms
+FIX7_TEST_METHOD 226 test_226_pre_existing_collection_child_link_transitions_to_no_effect
+FIX7_TEST_METHOD 227 test_227_collection_child_link_fault_before_c_api_no_effect
+FIX7_TEST_METHOD 228 test_228_collection_child_link_fault_before_confirm_reverts
+FIX7_TEST_METHOD 229 test_229_authorized_unlinked_child_collection_restored_on_rollback
+FIX7_TEST_METHOD 230 test_230_external_second_parent_preserved_on_rollback
+FIX7_TEST_METHOD 231 test_231_renamed_collection_with_same_name_replacement_preserved
+FIX7_TEST_METHOD 232 test_232_created_collection_with_external_members_refuses_deletion
+FIX7_TEST_METHOD 233 test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets
+test_225_character_collection_scene_link_has_tx_added_and_confirms (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_225_character_collection_scene_link_has_tx_added_and_confirms)
+TEST-225: Character collection scene link has TX_ADDED 7-state log and confirms. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_226_pre_existing_collection_child_link_transitions_to_no_effect (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_226_pre_existing_collection_child_link_transitions_to_no_effect)
+TEST-226: Pre-existing collection child link -> NO_EFFECT. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_227_collection_child_link_fault_before_c_api_no_effect (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_227_collection_child_link_fault_before_c_api_no_effect)
+TEST-227: Collection child link fault before C-API -> NO_EFFECT. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_228_collection_child_link_fault_before_confirm_reverts (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_228_collection_child_link_fault_before_confirm_reverts)
+TEST-228: Collection child link fault before confirm -> APPLIED_VERIFIED, rollback to REVERTED. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_229_authorized_unlinked_child_collection_restored_on_rollback (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_229_authorized_unlinked_child_collection_restored_on_rollback)
+TEST-229: Authorized unlinked child collection restored during reverse-order rollback before final cleanup. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_230_external_second_parent_preserved_on_rollback (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_230_external_second_parent_preserved_on_rollback)
+TEST-230: External script added second collection parent preserved on rollback. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_231_renamed_collection_with_same_name_replacement_preserved (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_231_renamed_collection_with_same_name_replacement_preserved)
+TEST-231: Renamed collection with same-name external replacement preserved. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_232_created_collection_with_external_members_refuses_deletion (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_232_created_collection_with_external_members_refuses_deletion)
+TEST-232: Created collection with external members/children/parents refuses deletion. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets (fix7_collection_targeted.TestArmIKTransactionAtomicity.test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets)
+TEST-233: Joint bilateral rollback of parent, collection child, constraint targets with 100% snapshot fidelity. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.720s
+
+OK
+FIX7_COLLECTION_EXECUTED 9
+FIX7_COLLECTION_PASS True
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
