@@ -7515,35 +7515,150 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertTrue(any(o.get("status") == "PRESERVED_NO_DELETE_AUTHORITY" for o in tx.datablock_cleanup_outcomes))
 
     def test_197_pre_existing_object_added_to_created_controller_objects_rejected(self) -> None:
-        """TEST-197: Pre-existing object erroneously added to created_controller_objects denied replacement."""
+        """TEST-197: Pre-existing controller cannot obtain transaction-created authority, even through a forged legacy registry entry."""
+
+        # [2026-11-19] TEST-197:
+        # PURPOSE: Verify both registration-time rejection and resistance
+        # to forged created_controller_objects entries.
+        # REASON: fix-7 Round 2 exposed an outdated test expectation;
+        # production now rejects pre-existing objects at registration.
+
         pre_mesh = bpy.data.meshes.new("PreMesh197")
         pre_obj = bpy.data.objects.new("HandIK.L", pre_mesh)
         bpy.context.scene.collection.objects.link(pre_obj)
-        orig_ptr = pre_obj.as_pointer()
+
+        orig_ptr = int(pre_obj.as_pointer())
+        orig_mesh_ptr = int(pre_mesh.as_pointer())
+        orig_collections = tuple(pre_obj.users_collection)
 
         with _arm_rig_transaction(self.armature) as tx:
-            # Mistakenly registering pre-existing object into created_controller_objects
-            tx.register_created_controller(pre_obj)
 
-            # Verify ownership verification returns False due to Condition 6 (in entry_object_ptrs)
-            from src.rig.arm_ik import _verify_transaction_wrong_type_object_ownership
-            self.assertFalse(_verify_transaction_wrong_type_object_ownership(pre_obj, tx, self.armature))
+            # 1. Prove this object existed before transaction entry.
+            self.assertIn(orig_ptr, tx.entry_object_ptrs)
 
-            # setup_arm_ik rejects replacement with EXTERNAL_CONTROLLER_NAME_CONFLICT
-            with self.assertRaises(RuntimeError) as ctx:
-                setup_arm_ik(self.armature)
-            self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
+            # 2. Registration must reject it immediately.
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Cannot register a pre-existing object as transaction-created"
+            ):
+                tx.register_created_controller(pre_obj)
 
-            # Remove the erroneously added record before transaction exit so rollback does not destroy external object
-            tx.created_controller_objects = [
-                r for r in tx.created_controller_objects if r["obj_ptr"] != orig_ptr
-            ]
+            # 3. Rejected registration must create neither a registry
+            # record nor an independent authorization receipt.
+            self.assertFalse(
+                any(
+                    isinstance(record, dict)
+                    and record.get("obj_ptr") == orig_ptr
+                    for record in tx.created_controller_objects
+                )
+            )
 
-        # Object was not replaced
+            self.assertNotIn(
+                orig_ptr,
+                tx._controller_creation_receipts
+            )
+
+            # 4. Simulate a forged legacy registry entry.
+            # This does not represent a legitimate registration.
+            tx.created_controller_objects.append({
+                "obj_ref": pre_obj,
+                "obj_ptr": orig_ptr,
+                "created_name": pre_obj.name,
+            })
+
+            try:
+                self.assertTrue(
+                    any(
+                        isinstance(record, dict)
+                        and record.get("obj_ptr") == orig_ptr
+                        for record in tx.created_controller_objects
+                    )
+                )
+
+                # 5. A forged mutable entry cannot supply ownership.
+                from src.rig.arm_ik import (
+                    _verify_transaction_wrong_type_object_ownership
+                )
+
+                self.assertFalse(
+                    _verify_transaction_wrong_type_object_ownership(
+                        pre_obj,
+                        tx,
+                        self.armature,
+                    )
+                )
+
+                # 6. Actual Arm IK setup must still refuse replacement.
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "EXTERNAL_CONTROLLER_NAME_CONFLICT"
+                ):
+                    setup_arm_ik(self.armature)
+
+                # 7. Refusal must not replace or mutate the original object.
+                live_obj = bpy.data.objects.get("HandIK.L")
+
+                self.assertIsNotNone(live_obj)
+                self.assertEqual(
+                    int(live_obj.as_pointer()),
+                    orig_ptr
+                )
+                self.assertEqual(live_obj.type, "MESH")
+                self.assertEqual(
+                    int(live_obj.data.as_pointer()),
+                    orig_mesh_ptr
+                )
+                self.assertEqual(
+                    tuple(live_obj.users_collection),
+                    orig_collections
+                )
+
+                self.assertNotIn(
+                    orig_ptr,
+                    tx._controller_creation_receipts
+                )
+
+            finally:
+                # Restore the legacy registry before transaction exit.
+                # Never leave a forged entry available to commit/rollback.
+                tx.created_controller_objects = [
+                    record
+                    for record in tx.created_controller_objects
+                    if not (
+                        isinstance(record, dict)
+                        and record.get("obj_ptr") == orig_ptr
+                    )
+                ]
+
+        # 8. Verify the original Object and Mesh survived transaction exit.
         live_obj = bpy.data.objects.get("HandIK.L")
+
         self.assertIsNotNone(live_obj)
-        self.assertEqual(live_obj.as_pointer(), orig_ptr)
-        self.assertEqual(live_obj.type, "MESH")
+
+        self.assertEqual(
+            int(live_obj.as_pointer()),
+            orig_ptr
+        )
+
+        self.assertEqual(
+            live_obj.type,
+            "MESH"
+        )
+
+        self.assertEqual(
+            int(live_obj.data.as_pointer()),
+            orig_mesh_ptr
+        )
+
+        self.assertEqual(
+            tuple(live_obj.users_collection),
+            orig_collections
+        )
+
+        self.assertEqual(
+            len(_ACTIVE_TRANSACTION_STACK),
+            0
+        )
 
     def test_198_collection_creation_fault_before_registration_no_orphan(self) -> None:
         """TEST-198: Collection creation failure before registration leaves zero orphan collections."""
