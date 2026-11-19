@@ -1,0 +1,7 @@
+test_verify_locked_foot_elevation_preservation (__main__.TestContactElevationGapRepro.test_verify_locked_foot_elevation_preservation)
+Verify that locked foot contact targets preserve authentic 3D mesh surface elevation. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.194s
+
+OK

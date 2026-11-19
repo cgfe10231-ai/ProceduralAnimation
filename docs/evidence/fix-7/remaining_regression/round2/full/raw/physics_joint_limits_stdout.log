@@ -1,0 +1,80 @@
+==========================================================================
+VERIFYING TASK 6F-C: JOINT DOF AND RANGE OF MOTION (ROM) CONSTRAINT SYSTEM
+==========================================================================
+
+[Test 1] Verifying neutral standing rest pose compliance...
+  All 17 anatomical joints validated in neutral rest pose (0 violations). (PASSED)
+
+[Test 2] Verifying within-ROM legal boundary poses across all major joint types...
+  Legal poses on 17 joints passed with 0 modifications. (PASSED)
+
+[Test 3] Verifying explicit out-of-bounds detection with quantifiable metrics...
+  Detected violations:
+    - forearm.L    Axis X: req=-25.0 deg | ROM=[-2.0, +145.0] | excess=23.0 deg
+    - shin.R       Axis X: req=+35.0 deg | ROM=[-145.0, +2.0] | excess=33.0 deg
+    - spine        Axis X: req=+85.0 deg | ROM=[-30.0, +60.0] | excess=25.0 deg
+    - upper_arm.L  Axis Z: req=+170.0 deg | ROM=[-30.0, +150.0] | excess=20.0 deg
+  -> PASSED: All violations detected with exact quantifiable bounds and excess amounts.
+
+[Test 4] Verifying projection/clamping precision and modification reporting...
+  Applied clamping modifications:
+    - forearm.L    Axis X: -25.0 deg -> -2.0 deg (delta=+23.0 deg)
+    - shin.R       Axis X: +35.0 deg -> +2.0 deg (delta=-33.0 deg)
+    - spine        Axis X: +85.0 deg -> +60.0 deg (delta=-25.0 deg)
+    - upper_arm.L  Axis Z: +170.0 deg -> +150.0 deg (delta=-20.0 deg)
+  -> PASSED: Clamping projects exactly onto ROM boundaries; re-validation is 100% valid.
+
+[Test 5] Verifying lateral symmetry and bilateral mirroring behavior...
+  upper_arm.L Z range: [-30.0, +150.0] deg (abduction is +Z)
+  upper_arm.R Z range: [-150.0, +30.0] deg (abduction is -Z)
+  thigh.L Z range    : [-25.0, +50.0] deg (abduction is +Z)
+  thigh.R Z range    : [-50.0, +25.0] deg (abduction is -Z)
+  -> PASSED: Bilateral lateral symmetry verified with exact contralateral sign mirroring.
+
+[Test 6] Verifying anatomical hinge protection (elbow and knee reverse bend)...
+  shin.L: +45.0 deg -> clamped to +2.0 deg (forward lock <= +2 deg)
+  shin.R: +10.0 deg -> clamped to +2.0 deg (forward lock <= +2 deg)
+  forearm.L: -50.0 deg -> clamped to -2.0 deg (backward lock >= -2 deg)
+  forearm.R: -15.0 deg -> clamped to -2.0 deg (backward lock >= -2 deg)
+  -> PASSED: Elbow and knee hinge locks prevent unnatural reverse joint flexion.
+
+[Test 7] Verifying compound multi-axis rotation limits (shoulder and hip elliptical cone)...
+  upper_arm.L simultaneous (Pitch=140 deg, Abduction=130 deg):
+    Raw swing magnitude = 191.0 deg
+    Compound excess     = 35.9 deg
+    Clamped result      = (113.7, 0.0, 105.6) deg
+    Compound adjusted   = True
+  -> PASSED: Multi-axis compound cone limits successfully restrict excessive simultaneous swing.
+
+[Test 8] Verifying angle wrap-around and +/-180 deg stability...
+  365 deg -> norm 10.0 deg (legal, 0 violations)
+  270 deg -> norm -90.0 deg (violates -50 deg min limit, detected correctly)
+  -> PASSED: Angle wrap-around protection is robust.
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+
+[Test 9] Verifying that pose bone clamping preserves all bone lengths...
+  Clamped 3 bones; verified 19/19 bone lengths remain 100% constant. (PASSED)
+
+[Test 10] Evaluating active Leg IK and active Arm IK poses with Joint Model...
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  10A: Active Leg IK Standing Rest Pose -> is_valid=True
+       All leg joints within anatomical ROM limits (PASSED)
+  10B: Left Leg Raised (Foot Z=+0.27m, Y=+0.25m):
+       thigh.L evaluated rotation: (56.36, -0.0, 0.0) deg (ROM Pitch=[-25, +120])
+       shin.L  evaluated rotation: (-70.79, -0.0, -0.0) deg (ROM Flexion=[-145, +2])
+       -> Normal walking/lifting leg IK target is 100% within ROM limits. (PASSED)
+  10C: Left Arm Forward Reach (Hand Z=1.30m, Y=+0.30m):
+       upper_arm.L evaluated rotation: (9.6, 8.14, 10.3) deg (ROM Pitch=[-50, +160])
+       forearm.L   evaluated rotation: (93.67, -0.0, 0.0) deg (ROM Flexion=[-2, +145])
+       Arm IK reach -> is_valid=True
+       -> Normal forward reach Arm IK target is 100% within ROM limits. (PASSED)
+
+==========================================================================
+ALL TASK 6F-C JOINT DOF AND ROM VERIFICATION TESTS PASSED SUCCESSFULLY!
+==========================================================================
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit

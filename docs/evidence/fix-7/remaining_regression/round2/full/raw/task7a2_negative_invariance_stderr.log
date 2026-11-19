@@ -1,0 +1,13 @@
+test_01_surface_renaming_invariance (__main__.TestTerrainWalkNegativeAndInvariance.test_01_surface_renaming_invariance)
+Proves planner kinematics are 100% independent of surface naming strings. ... ok
+test_02_dynamic_elevation_perturbation_adaptation (__main__.TestTerrainWalkNegativeAndInvariance.test_02_dynamic_elevation_perturbation_adaptation)
+Proves planner dynamically adapts footfall Z and clearance to vertical perturbations. ... ok
+test_03_unreachable_cliff_drop_rejection (__main__.TestTerrainWalkNegativeAndInvariance.test_03_unreachable_cliff_drop_rejection)
+Proves planner rejects physiologically impossible drops (> 0.35m vertical reach limit). ... ok
+test_04_unsupported_surface_rejection (__main__.TestTerrainWalkNegativeAndInvariance.test_04_unsupported_surface_rejection)
+Proves planner rejects landing on hazard/non-support surfaces. ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+OK

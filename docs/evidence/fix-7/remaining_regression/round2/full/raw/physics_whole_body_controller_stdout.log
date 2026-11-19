@@ -1,0 +1,72 @@
+==========================================================================
+VERIFYING TASK 6F-D: UNIFIED WHOLE-BODY CONTROLLER AND COORDINATOR
+==========================================================================
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+[Test 1] Testing simultaneous bilateral Hand IK control with distinct targets...
+  Hand L error: 0.041 mm, rot_err: 0.000 deg
+  Hand R error: 0.020 mm, rot_err: 0.000 deg
+  -> PASSED: Both hands simultaneously and accurately reached distinct positions and 3D orientations.
+
+[Test 2] Testing simultaneous bilateral Foot IK control with distinct targets...
+  Foot L error: 0.003 mm (ground rest)
+  Foot R error: 0.029 mm (aerial raised)
+  -> PASSED: Both feet simultaneously reached distinct ground and aerial targets.
+
+[Test 3] Testing quad-effector simultaneous control (hand_L, hand_R, foot_L, foot_R)...
+  - hand_L  : err=0.045 mm | reachable=True
+  - hand_R  : err=0.015 mm | reachable=True
+  - foot_L  : err=0.003 mm | reachable=True
+  - foot_R  : err=0.025 mm | reachable=True
+  -> PASSED: All 4 effectors active, tracking and compliant in a single frame.
+
+[Test 4] Testing selective disabling (disabling Hand L leaves it in FK without crosstalk)...
+  Hand L disabled -> enabled=False; Hand R err = 0.015 mm (PASSED)
+
+[Test 5] Testing base/pelvis motion with world-space target preservation...
+  Pelvis world Z: 0.8300 m (crouched)
+  Hand L world error: 0.030 mm
+  Foot L world error: 0.017 mm
+  -> PASSED: World targets preserved accurately regardless of pelvis translation/crouching.
+
+[Test 6] Testing decoupled hand position and 3D orientation...
+  Target rot (20.0, 10.0, -5.0): pos_err = 0.0396 mm, rot_err = 0.0000 deg
+  Target rot (30.0, 5.0, -10.0): pos_err = 0.0396 mm, rot_err = 0.0000 deg
+  Target rot (10.0, 15.0, 0.0): pos_err = 0.0396 mm, rot_err = 0.0000 deg
+  -> PASSED: Hand 3D orientation independently commanded with zero wrist position drift.
+
+[Test 7] Testing ROM validation consistency between Controller and JointModel...
+  Controller spine excess: 20.00 deg == Independent: 20.00 deg (PASSED)
+
+[Test 8] Verifying unreachable targets and ROM conflicts are explicitly reported...
+  Impossible target requested: (-0.24, -6.5, 1.3)
+  Result success flag: False (must be False)
+  is_all_reachable flag: False (must be False)
+  Unmet constraints count: 2
+    - [REACHABILITY] hand_L: Hand L target exceeds maximum arm reach (1.519m > 0.560m) or tracking error 959.1mm > 5.0mm
+    - [ROM_VIOLATION] hand.L: Joint 'hand.L' (hand_L) violates anatomical ROM by max 16.82 deg
+  -> PASSED: Unreachable target accurately flagged with zero false-success reporting.
+
+[Test 9] Verifying Center of Mass consistency between Controller and rigid_link...
+  Controller CoM: (-0.0010, -7.9678, 1.0645)
+  Independent CoM: (-0.0010, -7.9678, 1.0645)
+  CoM Discrepancy: 0.0000000000 m
+  -> PASSED: Controller CoM is mathematically identical to rigid_link calculation.
+
+[Test 10] Testing clean integration within a subclassed MotionAction...
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  Executed 8 frames via WholeBodyDemoAction(MotionAction)
+  Final frame hand_L err: 0.0137 mm
+  Final frame CoM: (-0.0007262042490765452, -7.9943156242370605, 1.0510605573654175)
+  -> PASSED: WholeBodyController seamlessly drives procedural frames within a MotionAction.
+
+==========================================================================
+ALL TASK 6F-D WHOLE-BODY CONTROLLER VERIFICATION TESTS PASSED SUCCESSFULLY!
+==========================================================================
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit

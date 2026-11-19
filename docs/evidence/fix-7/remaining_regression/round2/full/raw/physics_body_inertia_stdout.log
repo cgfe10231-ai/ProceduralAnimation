@@ -1,0 +1,175 @@
+================================================================================
+Task 6G-B Verification: Rigid Link Inertia Tensor & Whole-Body Angular Momentum
+================================================================================
+
+--- Test 1: Segment Local Inertia Symmetric & Positive Definite ---
+Segment ID      | Mass (kg) | I_xx     | I_yy     | I_zz     | Symm  | PosDef | Principal Moments (kg*m^2)
+---------------------------------------------------------------------------------------------------------
+head            |    5.6700 |  0.02291 |  0.01644 |  0.02098 | True  | True   | (0.01644, 0.02098, 0.02291)
+torso           |   24.8500 |  0.55229 |  0.21495 |  0.61690 | True  | True   | (0.21495, 0.55229, 0.61690)
+pelvis          |    9.9400 |  0.06262 |  0.09940 |  0.09045 | True  | True   | (0.06262, 0.09045, 0.09940)
+upper_arm_L     |    1.9600 |  0.01569 |  0.00198 |  0.01569 | True  | True   | (0.00198, 0.01569, 0.01569)
+upper_arm_R     |    1.9600 |  0.01569 |  0.00198 |  0.01569 | True  | True   | (0.00198, 0.01569, 0.01569)
+forearm_L       |    1.1200 |  0.00665 |  0.00069 |  0.00665 | True  | True   | (0.00069, 0.00665, 0.00665)
+forearm_R       |    1.1200 |  0.00665 |  0.00069 |  0.00665 | True  | True   | (0.00069, 0.00665, 0.00665)
+hand_L          |    0.4200 |  0.00037 |  0.00025 |  0.00057 | True  | True   | (0.00025, 0.00037, 0.00057)
+hand_R          |    0.4200 |  0.00037 |  0.00025 |  0.00057 | True  | True   | (0.00025, 0.00037, 0.00057)
+thigh_L         |    7.0000 |  0.11274 |  0.01969 |  0.11274 | True  | True   | (0.01969, 0.11274, 0.11274)
+thigh_R         |    7.0000 |  0.11274 |  0.01969 |  0.11274 | True  | True   | (0.01969, 0.11274, 0.11274)
+shin_L          |    3.2550 |  0.04543 |  0.00407 |  0.04543 | True  | True   | (0.00407, 0.04543, 0.04543)
+shin_R          |    3.2550 |  0.04543 |  0.00407 |  0.04543 | True  | True   | (0.00407, 0.04543, 0.04543)
+foot_L          |    1.0150 |  0.00222 |  0.00075 |  0.00255 | True  | True   | (0.00075, 0.00222, 0.00255)
+foot_R          |    1.0150 |  0.00222 |  0.00075 |  0.00255 | True  | True   | (0.00075, 0.00222, 0.00255)
+
+--- Test 2: Geometric Solid Formulas Match Analytical References ---
+Cylinder I_yy: 0.00250000 vs 0.00250000 (err: 0.00e+00)
+Cylinder I_xx: 0.02791667 vs 0.02791667 (err: 0.00e+00)
+Ellipsoid I_xx: 0.02020000 vs 0.02020000 (err: 0.00e+00)
+Ellipsoid I_yy: 0.01450000 vs 0.01450000 (err: 1.73e-18)
+Ellipsoid I_zz: 0.01850000 vs 0.01850000 (err: 0.00e+00)
+Elliptic Cylinder I_yy: 0.08650000 vs 0.08650000 (err: 0.00e+00)
+Elliptic Cylinder I_xx: 0.22225000 vs 0.22225000 (err: 2.78e-17)
+Elliptic Cylinder I_zz: 0.24825000 vs 0.24825000 (err: 2.78e-17)
+Box I_xx: 0.00218467 vs 0.00218467 (err: 0.00e+00)
+Max geometric formula discrepancy: 2.78e-17
+
+--- Test 3: Parallel Axis Theorem Numerical Correctness ---
+Shifted I_xx: 2.640000 vs 2.640000 (err: 1.91e-08)
+Shifted I_yy: 3.360000 vs 3.360000 (err: 2.86e-08)
+Shifted I_zz: 4.000000 vs 4.000000 (err: 4.77e-08)
+Shifted I_xy: 0.480000 vs 0.480000 (err: 2.62e-08)
+Shifted I_xz: -0.600000 vs -0.600000 (err: 2.38e-08)
+Shifted I_yz: 0.800000 vs 0.800000 (err: 1.19e-08)
+Max parallel axis theorem error: 4.77e-08
+
+--- Test 4: Whole-Body Translation Invariance Relative to CoM ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+CoM before translation: (0.0000, -7.9964, 1.0479) m
+CoM after translation:  (12.5000, -44.9964, 4.2479) m
+Inertia tensor Frobenius difference: 8.96e-06 kg*m^2
+
+--- Test 5: Whole-Body Rotation Tensor Transformation Covariance ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Base I_xx: 13.45983, I_yy: 14.21120, I_zz: 1.07772 kg*m^2
+Rotated I_xx: 10.98882, I_yy: 12.85933, I_zz: 4.90059 kg*m^2
+Expected I_xx: 10.98882, I_yy: 12.85933, I_zz: 4.90059 kg*m^2
+Tensor transformation difference Frobenius norm: 7.06e-06 kg*m^2
+
+--- Test 6: Neutral Stance Bilateral Symmetry & Physical Magnitudes ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Total Body Mass: 70.00 kg
+Whole-Body CoM: (0.0000, -7.9964, 1.0479) m
+Whole-Body Inertia Tensor relative to CoM (kg*m^2):
+  [  13.45983,    0.00000,    0.00000]
+  [   0.00000,   14.21120,    0.14518]
+  [   0.00000,    0.14518,    1.07772]
+Principal Moments (kg*m^2): I1=1.07612, I2=13.45983, I3=14.21280
+Bilateral symmetry off-diagonals: I_xy=0.00000, I_xz=0.00000 (Pass: True)
+Anthropometric magnitudes sanity: I_xx=13.46, I_yy=14.21, I_zz=1.08 (Pass: True)
+
+--- Test 7: Single-Arm Raised Asymmetric Inertia Response ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Neutral I_zz: 1.07772 kg*m^2 | Raised I_zz: 1.73214 kg*m^2 (delta: +0.65442 kg*m^2)
+Neutral I_xy: 0.00000 kg*m^2 | Raised I_xy: 0.10313 kg*m^2 (asymmetry introduced)
+Single arm raise physical response: PASSED
+
+--- Test 8: Tucked vs Extended Posture Rotational Inertia Difference ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Extended Pose I_zz (T-Pose): 2.40271 kg*m^2
+Tucked Pose I_zz (Folded):   0.94590 kg*m^2
+Ratio (Extended / Tucked):   2.540x (+1.45682 kg*m^2)
+Tuck vs Extend inertia differentiation: PASSED
+
+--- Test 9: Static Body Zero Angular Momentum ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Angular momentum vector: (0.00000000, 0.00000000, 0.00000000) kg*m^2/s
+H magnitude: 0.00000000 kg*m^2/s | H_spin: 0.00000000 | H_orbital: 0.00000000
+Static body zero angular momentum: PASSED
+
+--- Test 10: Rigid Rotation Angular Momentum Consistency with I_body * omega ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Rigid Omega: (0.40, 0.80, -0.60) rad/s
+Evaluated Multi-Link H:    (5.383932, 11.281852, -0.530490) kg*m^2/s
+Analytical Expected I * w: (5.383931, 11.281853, -0.530490) kg*m^2/s
+Discrepancy: absolute=1.07e-06 kg*m^2/s, relative=8.54e-08
+Rigid rotation angular momentum consistency: PASSED
+
+--- Test 11: Independent Limb Motion Spin & Orbital Decomposition ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_RBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Spin Angular Momentum:    ( 0.09087, -0.00000,  0.00000) kg*m^2/s (norm=0.09087)
+Orbital Angular Momentum: (-1.11721, -0.16800,  1.26000) kg*m^2/s (norm=1.69233)
+Total Angular Momentum:   (-1.02634, -0.16800,  1.26000) kg*m^2/s (norm=1.63377)
+Limb motion decomposition: PASSED
+
+--- Test 12: Consistency with CoM, Tracker, and MotionState Integration ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+CoM position consistency error: 0.00e+00 m
+Armature vs Snapshot inertia Frobenius difference: 7.33e-07 kg*m^2
+MotionState.params contains inertia_tensor_com: True
+MotionState.params contains angular_momentum_com: True
+CoM and tracker integration: PASSED
+
+--- Test 13: Core Regression Verification Suite ---
+
+Running regression: verify_task6ga_body_kinematics.py...
+PASSED: verify_task6ga_body_kinematics.py (exit code 0)
+
+Running regression: verify_task6fd_whole_body_controller.py...
+PASSED: verify_task6fd_whole_body_controller.py (exit code 0)
+
+Running regression: verify_task6fc_joint_limits.py...
+PASSED: verify_task6fc_joint_limits.py (exit code 0)
+
+Running regression: verify_task6fb_rigid_link.py...
+PASSED: verify_task6fb_rigid_link.py (exit code 0)
+
+Running regression: verify_task6fa_arm_ik.py...
+PASSED: verify_task6fa_arm_ik.py (exit code 0)
+
+================================================================================
+Task 6G-B Verification Summary
+================================================================================
+[PASSED] Test 01: Segment Local Inertia Symmetric & Positive Definite
+[PASSED] Test 02: Geometric Solid Formulas Match Analytical References
+[PASSED] Test 03: Parallel Axis Theorem Numerical Correctness
+[PASSED] Test 04: Whole-Body Translation Invariance Relative to CoM
+[PASSED] Test 05: Whole-Body Rotation Tensor Transformation Covariance
+[PASSED] Test 06: Neutral Stance Bilateral Symmetry & Physical Magnitudes
+[PASSED] Test 07: Single-Arm Raised Asymmetric Inertia Response
+[PASSED] Test 08: Tucked vs Extended Posture Rotational Inertia Difference
+[PASSED] Test 09: Static Body Zero Angular Momentum
+[PASSED] Test 10: Rigid Rotation Angular Momentum Consistency with I*w
+[PASSED] Test 11: Independent Limb Motion Spin & Orbital Decomposition
+[PASSED] Test 12: Consistency with CoM, Tracker, and MotionState Integration
+[PASSED] Test 13: Core Regression Verification Suite
+
+Result: 13/13 tests passed.
+ALL TASK 6G-B TESTS PASSED!

@@ -1,0 +1,11 @@
+[TEST] 1. Testing seed determinism (seed=42)...
+    [PASS] Seed determinism verified: identical coordinates generated.
+[TEST] 2. Testing seed variability (seed=42 vs seed=99)...
+    [PASS] Seed variability verified: different seeds produce different layouts.
+[TEST] 3. Testing corridor clearance preservation...
+    [PASS] Corridor clearance verified across multiple random seeds.
+
+ALL TASK 3 SPATIAL & DETERMINISM UNIT TESTS PASSED!
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit

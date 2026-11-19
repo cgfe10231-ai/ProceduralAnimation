@@ -1,0 +1,35 @@
+test_01_deep_scene_and_historical_asset_preservation (__main__.TestTask7A1CharacterPlaygroundIntegration.test_01_deep_scene_and_historical_asset_preservation)
+Verify all 4 Playground collections, 101 protected objects, 16 surfaces, materials, and 73f S1..S5 trajectories. ... ok
+test_02_character_19_bones_13_meshes_8_controllers_inventory (__main__.TestTask7A1CharacterPlaygroundIntegration.test_02_character_19_bones_13_meshes_8_controllers_inventory)
+Verify 1 Armature, 19 bones, 13 bound mesh parts, and 8 IK/Pole controllers. ... ok
+test_03_minimal_control_stages_a_b_c_d_and_math_consistency (__main__.TestTask7A1CharacterPlaygroundIntegration.test_03_minimal_control_stages_a_b_c_d_and_math_consistency)
+Verify Stages A-D and 5 coordinate spaces, 15-segment CoM, geometric contact, and constraint truthfulness. ... ok
+test_04_reopened_204_frame_root_and_rotation_continuity (__main__.TestTask7A1CharacterPlaygroundIntegration.test_04_reopened_204_frame_root_and_rotation_continuity)
+Verify 204-frame root translation continuity and quaternion geodesic bone rotation continuity from reopened blend. ... ok
+test_05_reopened_204_frame_support_foot_and_contact_lifecycle (__main__.TestTask7A1CharacterPlaygroundIntegration.test_05_reopened_204_frame_support_foot_and_contact_lifecycle)
+Verify stance controller drift AND actual ankle bone drift across all 9 stance intervals & 8 transitions. ... ok
+test_06_reopened_204_frame_com_and_rigid_body_geometry (__main__.TestTask7A1CharacterPlaygroundIntegration.test_06_reopened_204_frame_com_and_rigid_body_geometry)
+Verify 204-frame CoM trajectory, 70.0 kg mass invariance, zero bone stretch, and zero ROM violations. ... ok
+test_07_continuous_204_frame_gif_and_visual_evidence (__main__.TestTask7A1CharacterPlaygroundIntegration.test_07_continuous_204_frame_gif_and_visual_evidence)
+Verify `task7a1_walk_preview.gif` contains all 204 continuous frames at 24 FPS and PNGs exist. ... ok
+test_08_contact_state_persistence_contract_reopen_verification (__main__.TestTask7A1CharacterPlaygroundIntegration.test_08_contact_state_persistence_contract_reopen_verification)
+Verify Contact State Persistence Contract (Section 六): ... ok
+test_09_negative_mesh_internal_vertex_mutation (__main__.TestTask7A1CharacterPlaygroundIntegration.test_09_negative_mesh_internal_vertex_mutation)
+Negative Verification 1: Mutating an internal mesh vertex without altering bounding box ... ok
+test_10_negative_fcurve_keyframe_value_mutation (__main__.TestTask7A1CharacterPlaygroundIntegration.test_10_negative_fcurve_keyframe_value_mutation)
+Negative Verification 2: Mutating an F-Curve keyframe value without altering keyframe count ... ok
+test_11_negative_station_trajectory_interframe_mutation (__main__.TestTask7A1CharacterPlaygroundIntegration.test_11_negative_station_trajectory_interframe_mutation)
+Negative Verification 3: Mutating dynamics station pose at inter-frame 37 (between previous ... ok
+test_12_negative_contact_missing_frame_record (__main__.TestTask7A1CharacterPlaygroundIntegration.test_12_negative_contact_missing_frame_record)
+Negative Verification 4: Deleting a frame record (e.g. frame 50) MUST trigger ... ok
+test_13_negative_contact_tampered_anchor (__main__.TestTask7A1CharacterPlaygroundIntegration.test_13_negative_contact_tampered_anchor)
+Negative Verification 5: Tampering with a stance anchor (e.g. None or corrupted coords) ... ok
+test_14_negative_contact_mismatched_version (__main__.TestTask7A1CharacterPlaygroundIntegration.test_14_negative_contact_mismatched_version)
+Negative Verification 6: Tampering with blend_asset_version MUST trigger ... ok
+test_15_readonly_verification_never_modified_artifacts (__main__.TestTask7A1CharacterPlaygroundIntegration.test_15_readonly_verification_never_modified_artifacts)
+Prove that running the test suite did not overwrite or touch any `.blend`, `.json`, or `.gif` artifact. ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 1.037s
+
+OK

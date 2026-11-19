@@ -1,0 +1,6 @@
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+[PASS] Test 1: Surface renaming invariance verified (zero string-matching dependency).
+[PASS] Test 2: Dynamic elevation perturbation adaptation verified.
+[PASS] Test 3: Unreachable cliff drop (>0.35m) correctly rejected: Footstep at (-0.11, 1.70) requires vertical reach -0.750m, exceeding physical stepping limit (0.35m)
+[PASS] Test 4: Unsupported surface landing correctly rejected: Footfall at (-0.11, 1.12) straddles unsupported surface boundary, encountered query failure, or violated step reach, and no valid support shift was found in corridor [0.00, 4.00]

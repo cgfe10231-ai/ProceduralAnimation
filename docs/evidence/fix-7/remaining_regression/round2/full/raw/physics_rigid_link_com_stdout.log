@@ -1,0 +1,53 @@
+==========================================================================
+VERIFYING TASK 6F-B: RIGID LINK BODY MASS DISTRIBUTION & WHOLE-BODY CoM
+==========================================================================
+
+[Test 1] Verifying mass distribution integrity and mass conservation...
+  DempsterWinter15    : 15 segments, ratio_sum=1.000000, total_mass=70.00kg (PASSED)
+  Dempster13Combined  : 13 segments, ratio_sum=1.000000, total_mass=70.00kg (PASSED)
+
+[Test 2] Testing custom total mass scaling and segment ratio overrides...
+  Scaled mass 85.0kg: segment mass sum = 85.0000kg (PASSED)
+  Override model 'HeavyTorso': normalized sum=1.000000 (PASSED)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+[Test 3] Quantitative evaluation of neutral standing rest pose CoM...
+  Neutral Standing CoM (World)   : X=+0.000000 m, Y=-7.997891 m, Z=+1.047881 m
+  Neutral Standing CoM (Armature): X=+0.000000 m, Y=+0.002109 m, Z=+1.047881 m
+  CoM Height Ratio: 1.0479m / 1.82m = 57.58% (anatomical benchmark: 55%~58%)
+  -> PASSED: Rest CoM matches human anatomical benchmarks.
+
+[Test 4] Independent numerical verification against raw segment coordinates...
+  Numerical discrepancy between API CoM and raw weighted sum: 0.0000000000 m
+  -> PASSED: Weighted CoM mathematically exact.
+
+[Test 5] Testing directional CoM shifts under single-arm raising (FK mode)...
+  Left Arm Forward +90 deg: dX=+0.000mm, dY=+13.915mm, dZ=+13.915mm
+  -> PASSED: Forward arm pitch shifts CoM forward (+Y) and upward (+Z).
+  Left Arm Lateral Outward: dX=-13.915mm, dZ=+13.915mm
+  -> PASSED: Lateral arm abduction shifts CoM outward (-X) and upward (+Z).
+
+[Test 6] Testing dual-arm asymmetric poses and non-destructive return to rest...
+  Dual Arm Asymmetric: CoM=(0.0000, -7.9979, 1.0560)
+  -> PASSED: CoM returns to rest with zero drift (drift = 0.0000000000m).
+
+[Test 7] Testing CoM calculation under active IK poses (leg + arm IK)...
+  Active IK Pose CoM: X=+0.0036m, Y=-7.9724m, Z=+1.0770m
+  IK Pose dZ vs Rest: +29.07 mm (PASSED)
+
+[Test 8] Testing Pelvis motion and Armature world-transform invariance...
+  Pelvis drop -80mm -> CoM dZ = -80.00 mm
+  Root Translation (+2.5, +5.0, +0.3)m -> World CoM discrepancy: 0.0000007907 m
+  Armature-space CoM invariance check: diff = 0.0000000000 m
+  -> PASSED: Armature and World coordinate transformations exact with zero double-transform.
+
+==========================================================================
+ALL TASK 6F-B RIGID LINK AND CoM VERIFICATION TESTS PASSED SUCCESSFULLY!
+==========================================================================
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit

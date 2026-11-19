@@ -1,0 +1,99 @@
+test_01_read_only_playground_blend_geometry (__main__.TestMeshEnvironmentQuery.test_01_read_only_playground_blend_geometry)
+Verify queries against real evaluated geometry in output/dynamics_playground.blend. ... ok
+test_02_dynamic_mesh_translation (__main__.TestMeshEnvironmentQuery.test_02_dynamic_mesh_translation)
+Verify that moving an object in the scene dynamically updates query results upon refresh. ... ok
+test_03_dynamic_mesh_rotation (__main__.TestMeshEnvironmentQuery.test_03_dynamic_mesh_rotation)
+Verify that rotating an object dynamically updates outward surface normals. ... ok
+test_04_vertex_level_mesh_editing (__main__.TestMeshEnvironmentQuery.test_04_vertex_level_mesh_editing)
+Verify that editing raw mesh vertex coordinates in memory updates the query geometry. ... ok
+test_05_object_removal_returns_miss (__main__.TestMeshEnvironmentQuery.test_05_object_removal_returns_miss)
+Verify that deleting or unlinking an object causes queries to return miss. ... ok
+test_06_non_support_surface_discrimination (__main__.TestMeshEnvironmentQuery.test_06_non_support_surface_discrimination)
+Verify that vertical walls and ceilings strictly report allows_regular_support=False. ... ok
+test_07_friction_metadata_differentiation (__main__.TestMeshEnvironmentQuery.test_07_friction_metadata_differentiation)
+Verify that custom scene friction properties are distinguished from defaults. ... ok
+test_08_dynamics_environment_query_integration (__main__.TestMeshEnvironmentQuery.test_08_dynamics_environment_query_integration)
+Verify DynamicsEnvironmentQuery delegating to live mesh adapter. ... ok
+test_09_a03_1_collection_does_not_exist (__main__.TestMeshEnvironmentQuery.test_09_a03_1_collection_does_not_exist)
+A03-1: Non-existent collection must NOT fall back to scene meshes. ... ok
+test_10_a03_2_collection_empty (__main__.TestMeshEnvironmentQuery.test_10_a03_2_collection_empty)
+A03-2: Empty collection must NOT fall back to other collections in scene. ... ok
+test_11_a03_3_collection_isolation (__main__.TestMeshEnvironmentQuery.test_11_a03_3_collection_isolation)
+A03-3: Query must strictly isolate allowed collection from forbidden collection. ... ok
+test_12_a03_4_explicit_all_scene_mode (__main__.TestMeshEnvironmentQuery.test_12_a03_4_explicit_all_scene_mode)
+A03-4: Explicit all-scene mode (collection_names=None, object_names=None) queries all scene meshes. ... ok
+test_13_a01_1_ray_unfiltered_nearest (__main__.TestMeshEnvironmentQuery.test_13_a01_1_ray_unfiltered_nearest)
+A01-1: Unfiltered ray returns nearest physical hit (Front surface at Z=5.0). ... ok
+test_14_a01_2_ray_filtered_finds_second_surface (__main__.TestMeshEnvironmentQuery.test_14_a01_2_ray_filtered_finds_second_surface)
+A01-2: Filtered ray skips front surface to find matching back surface at Z=2.0. ... ok
+test_15_a01_3_ray_filtered_nonexistent_type (__main__.TestMeshEnvironmentQuery.test_15_a01_3_ray_filtered_nonexistent_type)
+A01-3: Filter for non-existent type returns success=False. ... ok
+test_16_a01_4_ray_filtered_insufficient_distance (__main__.TestMeshEnvironmentQuery.test_16_a01_4_ray_filtered_insufficient_distance)
+A01-4: Filtered ray fails when max_distance reaches front (3m) but cannot reach back (6m). ... ok
+test_17_a01_5_ray_direction_scale_invariance (__main__.TestMeshEnvironmentQuery.test_17_a01_5_ray_direction_scale_invariance)
+A01-5: Ray direction scaling (0,0,-1) vs (0,0,-5) yields identical Euclidean hit distance. ... ok
+test_18_a01_6_ray_origin_on_surface (__main__.TestMeshEnvironmentQuery.test_18_a01_6_ray_origin_on_surface)
+A01-6: Ray origin on surface terminates correctly without infinite loop. ... ok
+test_19_a02_1_nearest_unfiltered_nearest (__main__.TestMeshEnvironmentQuery.test_19_a02_1_nearest_unfiltered_nearest)
+A02-1: Unfiltered find_nearest returns closest surface A (dist 0.2m). ... ok
+test_20_a02_2_nearest_filtered_finds_target_surface (__main__.TestMeshEnvironmentQuery.test_20_a02_2_nearest_filtered_finds_target_surface)
+A02-2: Filtered find_nearest finds closest matching surface B (dist 0.8m). ... ok
+test_21_a02_3_nearest_filtered_insufficient_radius (__main__.TestMeshEnvironmentQuery.test_21_a02_3_nearest_filtered_insufficient_radius)
+A02-3: Filtered find_nearest fails when max_distance (0.5m) cannot reach target B (0.8m). ... ok
+test_22_a02_4_nearest_filtered_moved_query_point (__main__.TestMeshEnvironmentQuery.test_22_a02_4_nearest_filtered_moved_query_point)
+A02-4: Moving query point closer to B updates distance and contact point. ... ok
+test_23_a02_5_nearest_filtered_rotated_surface_normal (__main__.TestMeshEnvironmentQuery.test_23_a02_5_nearest_filtered_rotated_surface_normal)
+A02-5: Rotating target surface updates outward world normal upon refresh. ... ok
+test_24_non_axis_aligned_rotated_scene (__main__.TestMeshEnvironmentQuery.test_24_non_axis_aligned_rotated_scene)
+T01: Non-axis-aligned rotated 3D mesh scene verified against exact independent analytical math. ... ok
+test_25_t03_single_surface_query (__main__.TestMeshEnvironmentQuery.test_25_t03_single_surface_query)
+T03-1: Single surface ray query hits on initial step 0 without looping. ... ok
+test_26_t03_multi_surface_query (__main__.TestMeshEnvironmentQuery.test_26_t03_multi_surface_query)
+T03-2: Multi-surface scene query correctly filters through 3 stacked surfaces. ... ok
+test_27_t03_consecutive_filters (__main__.TestMeshEnvironmentQuery.test_27_t03_consecutive_filters)
+T03-3: Consecutive ray queries with different filters execute cleanly against same adapter cache. ... ok
+test_28_t03_exact_budget_reach (__main__.TestMeshEnvironmentQuery.test_28_t03_exact_budget_reach)
+T03-4: Ray query succeeds when target is hit exactly on the final budgeted step. ... ok
+test_29_t03_budget_exhaustion (__main__.TestMeshEnvironmentQuery.test_29_t03_budget_exhaustion)
+T03-5: Ray query reports SEARCH_LIMIT_REACHED when step budget is exhausted before match. ... ok
+test_30_t03_ultra_thin_layer (__main__.TestMeshEnvironmentQuery.test_30_t03_ultra_thin_layer)
+T03-6: Ultra-thin 50-micrometer obstacle layer is cleanly resolved using step_epsilon=1e-6. ... ok
+test_31_t03_ray_origin_on_surface_boundary (__main__.TestMeshEnvironmentQuery.test_31_t03_ray_origin_on_surface_boundary)
+T03-7: Ray origin positioned directly on obstacle boundary cleanly advances past it. ... ok
+test_32_t03_distance_almost_exhausted (__main__.TestMeshEnvironmentQuery.test_32_t03_distance_almost_exhausted)
+T03-8: Ray query correctly discriminates boundary when remaining distance is barely sufficient vs insufficient. ... ok
+test_33_c01_empty_environment_cache_reuse_and_addition (__main__.TestMeshEnvironmentQuery.test_33_c01_empty_environment_cache_reuse_and_addition)
+C01: Empty collection builds once into VALID_EMPTY, reuses cache across 100 queries, then updates upon mesh addition. ... ok
+test_34_c02_object_and_parent_transform_detection (__main__.TestMeshEnvironmentQuery.test_34_c02_object_and_parent_transform_detection)
+C02: Detect translation, rotation, non-uniform scale, and parent hierarchy transform propagation. ... ok
+test_35_c03_1_vertex_coordinate_movement (__main__.TestMeshEnvironmentQuery.test_35_c03_1_vertex_coordinate_movement)
+C03-1: Path A automatic detection of vertex coordinate movements without calling invalidate(). ... ok
+test_36_c03_2_topology_addition (__main__.TestMeshEnvironmentQuery.test_36_c03_2_topology_addition)
+C03-2: Path A automatic detection of added polygon faces. ... ok
+test_37_c03_3_geometry_deletion (__main__.TestMeshEnvironmentQuery.test_37_c03_3_geometry_deletion)
+C03-3: Path A automatic detection of deleted polygon faces returning miss. ... ok
+test_38_c03_4_same_vertex_count_modification (__main__.TestMeshEnvironmentQuery.test_38_c03_4_same_vertex_count_modification)
+C03-4: Detect coordinate change when vertex and polygon counts remain strictly identical. ... ok
+test_39_c03_5_explicit_invalidation_path_b (__main__.TestMeshEnvironmentQuery.test_39_c03_5_explicit_invalidation_path_b)
+C03-5: Path B explicit adapter.invalidate() triggers rebuild on subsequent query. ... ok
+test_40_c04_modifier_evaluated_mesh_consistency (__main__.TestMeshEnvironmentQuery.test_40_c04_modifier_evaluated_mesh_consistency)
+C04: Detect modifier additions, property adjustments, viewport toggles, and verify atomic rollback. ... ok
+test_41_c05_collection_membership_lifecycle (__main__.TestMeshEnvironmentQuery.test_41_c05_collection_membership_lifecycle)
+C05: Collection membership lifecycle, isolation of forbidden collection, and rename without BVH rebuild. ... ok
+test_42_c06_cache_reuse_under_unchanged_scene (__main__.TestMeshEnvironmentQuery.test_42_c06_cache_reuse_under_unchanged_scene)
+C06: Guarantee 300 unchanged queries (100 same ray, 100 diff ray, 100 nearest) execute with rebuild_count=1. ... ok
+test_43_c05_1_collection_member_unlinked (__main__.TestMeshEnvironmentQuery.test_43_c05_1_collection_member_unlinked)
+C05-1: Unlinking an object from an allowed collection removes it from query results with 1 rebuild. ... ok
+test_44_c05_2_real_object_deletion (__main__.TestMeshEnvironmentQuery.test_44_c05_2_real_object_deletion)
+C05-2: Real object deletion via bpy.data.objects.remove removes object from cache without dangling state. ... ok
+test_45_c05_3_non_empty_to_empty_transition_and_reuse (__main__.TestMeshEnvironmentQuery.test_45_c05_3_non_empty_to_empty_transition_and_reuse)
+C05-3: Non-empty collection transitioning to empty sets VALID_EMPTY, reuses across 100 queries, then recovers. ... ok
+test_46_c05_4_recursive_collection_membership (__main__.TestMeshEnvironmentQuery.test_46_c05_4_recursive_collection_membership)
+C05-4: Recursive collection membership change detection and sibling isolation. ... ok
+test_47_c06_rebuild_exception_safety (__main__.TestMeshEnvironmentQuery.test_47_c06_rebuild_exception_safety)
+C06: Verify rebuild exception safety across gather, snapshot, and BVH compilation with self-healing recovery. ... ok
+
+----------------------------------------------------------------------
+Ran 47 tests in 2.192s
+
+OK

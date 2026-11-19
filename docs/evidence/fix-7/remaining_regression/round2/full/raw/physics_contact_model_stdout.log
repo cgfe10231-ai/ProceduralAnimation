@@ -1,0 +1,215 @@
+00:21.625  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\contact_walk_integration.blend"
+00:21.640  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\contact_obstacle_integration.blend"
+================================================================================
+Task 6G-C Verification: Multi-Limb Contact Geometry & Support State System
+================================================================================
+
+--- Test 1: World to Local Body Anchor Transformations ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+Bone local anchor: (0.0, 0.015906, -0.068169) m
+Derived world anchor: (-0.1100, -8.0000, -0.0000) m
+Direct matrix multiplication: (-0.1100, -8.0000, -0.0000) m
+Transformation discrepancy: 0.00e+00 m
+Local-to-world anchor mapping: PASSED
+
+--- Test 2: Normal Unitization and Outward Convention ---
+Raw normal: (0.0, 3.0, 4.0)
+Normalized normal: (0.000000, 0.600000, 0.800000) | Length = 1.00000000
+Unit length error: 0.00e+00
+Normal convention & unit length: PASSED
+
+--- Test 3: Unilateral vs Grasp Constraint Types ---
+Unilateral pull (+50mm gap): is_valid=False, reason=EXCESSIVE_GAP: 50.00 mm > 15.0 mm
+Unilateral contact (+2mm gap): is_valid=True
+Unilateral penetration (-30mm): is_valid=False, reason=EXCESSIVE_PENETRATION: 30.00 mm > 10.0 mm
+Grasp compliant (5mm offset): is_valid=True
+Grasp displaced (35mm offset): is_valid=False, reason=GRASP_DISPLACEMENT: 35.00 mm > 20.0 mm
+Constraint distinction: PASSED
+
+--- Test 4: Double Stance Simultaneous Ground Contacts ---
+Active contact count: 2
+Supporting limbs: ['foot_L', 'foot_R']
+Classified support type: double_stance
+Is flight: False
+Coplanar support polygon (is_coplanar=True): [(-0.11, -8.0), (0.11, -8.0)]
+Double stance validation: PASSED
+
+--- Test 5: Single Stance with Released Swing Foot ---
+Active contact count: 1
+Supporting limbs: ['foot_L']
+Classified support type: single_stance_l
+Is flight: False
+Single stance validation: PASSED
+
+--- Test 6: Single Hand Support on Obstacle Top ---
+Active contacts: ['foot_L', 'hand_R']
+Support type: multi_surface
+Coplanar check: is_coplanar=False, polygon=None
+Hand support on obstacle: PASSED
+
+--- Test 7: Ground + Vertical Wall Multi-Normal Contacts ---
+Ground normal: (0.0, 0.0, 1.0)
+Wall normal:   (0.0, -1.0, 0.0)
+Support type:  wall_foot_stance
+Coplanar polygon check: is_coplanar=False
+Ground + wall multi-normal: PASSED
+
+--- Test 8: Double Hand Grasp Ledge Hang ---
+Active limbs: ['hand_L', 'hand_R']
+Support type: ledge_hang
+Is flight:    False
+Double hand grasp ledge hang: PASSED
+
+--- Test 9: Flight Phase Zero Active Contacts ---
+Active contact count: 0
+Is flight:            True
+Support type:         flight
+Polygon on flight: []
+Flight phase validation: PASSED
+
+--- Test 10: Contact Lifecycle State Transitions ---
+Initial: candidate (is_lifecycle_active=False, is_active=False)
+Engaged: established (is_lifecycle_active=True, is_active=False)
+Broken:  broken (is_lifecycle_active=False, is_active=False)
+Released: released (is_lifecycle_active=False, is_active=False)
+Lifecycle state transitions: PASSED
+
+--- Test 11: Quantitative Error Reporting (Gap, Penetration, Slip) ---
+Penetration depth: 0.0200 m (expected 0.0200 m, err=4.47e-10)
+Tangential slip:   0.0500 m (expected 0.0500 m, err=4.77e-08)
+Total error:       0.0539 m (expected 0.0539 m, err=4.44e-08)
+Violation report:  EXCESSIVE_PENETRATION: 20.00 mm > 10.0 mm
+Quantitative error evaluation: PASSED
+
+--- Test 12: Environment Transform Covariance for Anchors & Normals ---
+Updated world position: (2.0000, -3.5000, 0.4000) m
+Updated world normal:   (0.0000, 0.0000, 1.0000)
+Position discrepancy: 0.00e+00 m | Normal discrepancy: 0.00e+00
+Environment transform covariance: PASSED
+
+--- Test 13: WholeBodyController Evaluated Pose Compatibility ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Limb foot_L: valid=True, pos_err=0.003 mm
+Limb foot_R: valid=True, pos_err=0.003 mm
+Limb hand_R: valid=True, pos_err=0.014 mm
+WholeBodyController contact integration: PASSED
+
+--- Test 14: MotionState Legacy Adapter Compatibility ---
+MotionState.contacts has ContactPointState: foot_L=True, foot_R=True
+MotionState.params support_type: double_stance
+MotionState.params supporting_limbs: ['foot_L', 'foot_R']
+MotionState.params support_polygon_2d present: True
+MotionState bidirectional adapter: PASSED
+
+--- Test 15: Core Regression Verification Suite ---
+
+Running regression: verify_task6gb_body_inertia.py...
+PASSED: verify_task6gb_body_inertia.py (exit code 0)
+
+Running regression: verify_task6ga_body_kinematics.py...
+PASSED: verify_task6ga_body_kinematics.py (exit code 0)
+
+Running regression: verify_task6fd_whole_body_controller.py...
+PASSED: verify_task6fd_whole_body_controller.py (exit code 0)
+
+Running regression: verify_task6fc_joint_limits.py...
+PASSED: verify_task6fc_joint_limits.py (exit code 0)
+
+Running regression: verify_task6fb_rigid_link.py...
+PASSED: verify_task6fb_rigid_link.py (exit code 0)
+
+Running regression: verify_task6fa_arm_ik.py...
+PASSED: verify_task6fa_arm_ik.py (exit code 0)
+
+--- Test 16: Scene A - Continuous Walking Integration Acceptance ---
+Inspecting Scene A walk blend (206.8 KB): C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\contact_walk_integration.blend
+[Check 1] Timeline frame range: 1..204 (204 frames)
+[Check 2] Root displacement: Y=-8.0000m -> Y=-6.7400m (disp=1.2600m)
+
+[Check 3] Alternating leg swing and lift clearance
+  F001 (Start Stand): L ankle Z=0.0700m, R ankle Z=0.0700m (expected ~0.07m)
+  F028 (R Swing Step 0): L ankle Z=0.0700m (stance), R ankle Z=0.1700m (lift=100.0mm)
+  F054 (L Swing Step 1): L ankle Z=0.1977m (lift=127.7mm), R ankle Z=0.0700m (stance)
+  F078 (R Swing Step 2): L ankle Z=0.0700m (stance), R ankle Z=0.2076m (lift=137.6mm)
+
+[Check 4] Stance foot stability (drift < 0.05 mm)
+  Left stance ankle drift across 20 frames (F15->F35): 0.0012 mm (expected < 0.05 mm)
+  Right stance ankle drift across 15 frames (F45->F60): 0.0047 mm (expected < 0.05 mm)
+
+[Check 5] Contralateral arm swing coordination
+  F028 Arm angle difference (L - R): 26.00 deg
+  F054 Arm angle difference (L - R): -51.56 deg
+
+[Check 6] Visual contact markers dynamic visibility
+  F001 (Double Stance): L_scale=1.00, R_scale=1.00 (expected 1.0, 1.0)
+  F028 (L Stance / R Swing): L_scale=1.00, R_scale=0.00 (expected 1.0, 0.0)
+  F054 (R Stance / L Swing): L_scale=0.00, R_scale=1.00 (expected 0.0, 1.0)
+  F078 (L Stance / R Swing): L_scale=1.00, R_scale=0.00 (expected 1.0, 0.0)
+
+Scene A Walk Integration Acceptance: PASSED
+
+--- Test 17: Scene B - Multi-Limb Obstacle Contact Acceptance ---
+Inspecting Scene B obstacle blend (165.3 KB): C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\contact_obstacle_integration.blend
+
+[Check 1: Facing alignment with obstacles (+Y)]
+  Clip Double Stance   (F 15): Facing=(0.000, 1.000, 0.000) | dot=1.0000 | angle=0.00 deg -> OK
+  Clip Vault Touch     (F 45): Facing=(0.000, 1.000, 0.000) | dot=1.0000 | angle=0.00 deg -> OK
+  Clip Foot on Wall    (F 75): Facing=(0.000, 1.000, 0.000) | dot=1.0000 | angle=0.00 deg -> OK
+  Clip Ledge Hang      (F105): Facing=(0.000, 1.000, 0.000) | dot=1.0000 | angle=0.00 deg -> OK
+  Clip Flight Phase    (F135): Facing=(0.000, 1.000, 0.000) | dot=1.0000 | angle=0.00 deg -> OK
+
+[Check 2: Natural standing hand drop in double stance]
+  Double Stance: L drop=0.560m, R drop=0.560m, L_wrist_x=-0.24, R_wrist_x=0.24 -> OK
+
+[Check 3: Morphological joint angle differentiation across 5 clips]
+  Minimum pairwise joint angle difference across 5 clips: 70.06 deg (expected >= 20.0 deg)
+
+[Check 4: Obstacle contact precision (< 10 mm error)]Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+  Double Stance ground ankles: L_err=0.00mm, R_err=0.00mm
+  Vault Touch right wrist on box top: err=0.02mm (target Z=1.05m, Y=-5.75m)
+  Foot on Wall right ankle against wall: err=0.04mm (target Y=-4.07m, Z=0.45m)
+  Ledge Hang wrists grasping bar: err=0.01mm (target Z=1.95m)
+
+[Check 5] Station hold stability within clips (drift < 0.1 mm)
+  Double Stance L foot   (F10->F25): Drift = 0.0000 mm -> OK
+  Vault Touch R hand     (F40->F55): Drift = 0.0000 mm -> OK
+  Wall Touch R foot      (F70->F85): Drift = 0.0000 mm -> OK
+  Ledge Hang L hand      (F100->F115): Drift = 0.0000 mm -> OK
+
+[Check 6] Contact marker activation matching clip requirements
+  Vault Touch active markers (hand_R, foot_L): OK
+  Flight Phase zero markers (all 4 hidden): OK
+
+Scene B Obstacle Integration Acceptance: PASSED
+
+================================================================================
+Task 6G-C Verification Summary
+================================================================================
+[PASSED] Test 01: World to Local Anchor Transforms
+[PASSED] Test 02: Normal Unit Length & Direction Convention
+[PASSED] Test 03: Unilateral vs Grasp Constraint Types
+[PASSED] Test 04: Double Stance Simultaneous Ground Contacts
+[PASSED] Test 05: Single Stance & Swing Foot Release
+[PASSED] Test 06: Single Hand Support on Obstacle Top
+[PASSED] Test 07: Ground + Vertical Wall Multi-Normal Contacts
+[PASSED] Test 08: Double Hand Grasp Ledge Hang Suspension
+[PASSED] Test 09: Flight Phase Zero False Contacts
+[PASSED] Test 10: Lifecycle State Transitions
+[PASSED] Test 11: Quantitative Error Reporting (Gap, Penetration, Slip)
+[PASSED] Test 12: Environment Transform Covariance
+[PASSED] Test 13: WholeBodyController Evaluated Pose Compatibility
+[PASSED] Test 14: MotionState Legacy Adapter Compatibility
+[PASSED] Test 15: Core Regression Verification Suite
+[PASSED] Test 16: Scene A - Continuous Walking Integration Acceptance
+[PASSED] Test 17: Scene B - Multi-Limb Obstacle Contact Acceptance
+
+Result: 17/17 tests passed.
+ALL TASK 6G-C TESTS PASSED!

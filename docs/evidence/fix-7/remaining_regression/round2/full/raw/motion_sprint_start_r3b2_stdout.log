@@ -1,0 +1,34 @@
+================================================================================
+VERIFYING SPRINTSTARTACTION MIGRATION TO KINEMATICBRIDGEEXECUTOR
+================================================================================
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Executing SprintStartAction via MotionPlanner...
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['sprint_start']): frames 1..114 (@ 24 FPS), root Y -8.0000m -> -1.4167m (disp=6.5833m, peak_speed=2.0000m/s, unreachable=0)
+  [OK] Root displacement: -8.0000m -> -1.4167m (disp=6.5833m)
+  [OK] Speed profile: start=0.0m/s -> peak=2.0000m/s -> final=2.0000m/s
+  [OK] Airborne flight frames: 49 / 114
+  [OK] Telemetry verification: planned=(-0.0, 2.0, 0.0), derived=(0.0, 2.0000038146972656, 0.0), com=(0.10365953296422958, 2.0585174560546875, -0.14836978912353516)
+
+Testing sequential action chaining: WalkAction -> SprintStartAction...
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'sprint_start']): frames 1..318 (@ 24 FPS), root Y -8.0000m -> -0.1567m (disp=7.8433m, peak_speed=2.0000m/s, unreachable=0)
+  [OK] Chained 2-action execution: 318 frames, 0 unreachable events
+
+================================================================================
+ALL SPRINTSTARTACTION MIGRATION CHECKS PASSED SUCCESSFULLY!
+================================================================================
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit
