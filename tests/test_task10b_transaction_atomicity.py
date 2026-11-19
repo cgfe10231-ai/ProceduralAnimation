@@ -1280,29 +1280,124 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.context.view_layer.update()
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
-        # Inside transaction: create a new collection, reparent Character, and inject error
-        with self.assertRaises(RuntimeError):
+        # [2026-11-19] TEST-57
+        # PURPOSE: Verify authorized Collection creation/link and
+        # rollback cleanup without weakening original hierarchy checks.
+        # REASON: The legacy fixture linked RogueCol before registration,
+        # causing the ownership admission gate to reject it early.
+
+        rogue_ptr = None
+        rogue_link_op = None
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Fault inside transaction with modified collections",
+        ):
             with _arm_rig_transaction(self.armature) as tx:
+
+                # 1. Create after transaction entry.
                 rogue_col = bpy.data.collections.new("RogueCol")
-                bpy.context.scene.collection.children.link(rogue_col)
-                tx.register_created_collection(rogue_col, initial_parent=bpy.context.scene.collection)
+                rogue_ptr = int(rogue_col.as_pointer())
+
+                # 2. Register BEFORE any Collection link.
+                tx.register_created_collection(
+                    rogue_col,
+                    initial_parent=bpy.context.scene.collection,
+                )
+
+                # 3. Use the authorized relationship interface.
+                rogue_link_op = _authorized_link_child_collection(
+                    parent_collection=bpy.context.scene.collection,
+                    child_collection=rogue_col,
+                    active_tx=tx,
+                )
+
+                # 4. Prove the relationship was actually established.
+                self.assertIsNotNone(rogue_link_op)
+                self.assertEqual(
+                    rogue_link_op["intended_mutation"],
+                    "COLLECTION_CHILD_LINK",
+                )
+                self.assertEqual(
+                    rogue_link_op["operation_state"],
+                    _RelationshipOperationState.CONFIRMED,
+                )
+                self.assertIn(
+                    "RogueCol",
+                    bpy.context.scene.collection.children,
+                )
+
+                # 5. Preserve the original Arm IK integration step.
                 setup_arm_ik(self.armature)
-                raise RuntimeError("Fault inside transaction with modified collections")
 
-        # Verify:
-        # 1. RogueCol removed
-        self.assertNotIn("RogueCol", bpy.data.collections)
+                # 6. Inject the ORIGINAL intended failure.
+                raise RuntimeError(
+                    "Fault inside transaction with modified collections"
+                )
 
-        # 2. Character still child of InnerCol and NOT in scene root
-        self.assertIn(char_col.name, inner_col.children)
-        self.assertNotIn(char_col.name, bpy.context.scene.collection.children)
+        # 7. Prove the transaction completed rollback.
+        self.assertEqual(
+            tx.state,
+            _ArmRigTransactionState.ROLLED_BACK,
+        )
 
-        # 3. OuterCol and InnerCol hierarchy preserved
-        self.assertIn(outer_col.name, bpy.context.scene.collection.children)
-        self.assertIn(inner_col.name, outer_col.children)
+        self.assertIsNotNone(rogue_ptr)
+        self.assertIsNotNone(rogue_link_op)
 
-        # 4. _verify_arm_rig_state_restored succeeds
-        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(
+            rogue_link_op["operation_state"],
+            _RelationshipOperationState.REVERTED,
+        )
+
+        # 8. Verify the transaction-created Collection was removed.
+        self.assertNotIn(
+            "RogueCol",
+            bpy.data.collections,
+        )
+
+        self.assertFalse(
+            any(
+                int(col.as_pointer()) == rogue_ptr
+                for col in bpy.data.collections
+            )
+        )
+
+        self.assertNotIn(
+            "RogueCol",
+            bpy.context.scene.collection.children,
+        )
+
+        # 9. Preserve original hierarchy assertions.
+        self.assertIn(
+            char_col.name,
+            inner_col.children,
+        )
+
+        self.assertNotIn(
+            char_col.name,
+            bpy.context.scene.collection.children,
+        )
+
+        self.assertIn(
+            outer_col.name,
+            bpy.context.scene.collection.children,
+        )
+
+        self.assertIn(
+            inner_col.name,
+            outer_col.children,
+        )
+
+        # 10. Full snapshot verification.
+        _verify_arm_rig_state_restored(
+            self.armature,
+            snap_initial,
+        )
+
+        self.assertEqual(
+            len(_ACTIVE_TRANSACTION_STACK),
+            0,
+        )
 
     def test_58_snapshot_failure_clears_active_transaction_stack(self) -> None:
         """TEST-58: Fault during _snapshot_arm_rig_state() completely cleans up transaction stack allowing subsequent calls."""
