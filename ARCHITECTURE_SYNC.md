@@ -535,7 +535,7 @@ Influence 合同：
 
 #### 4.2.4 10-C：PlannedHandTarget、Bridge 与 WBC 无损接口合同
 
-> **10-C当前执行边界：本轮仅审计PlannedHandTarget、KinematicPlannedPose及convert_planned_pose_to_wbc_targets()的上肢目标字段与转换语义。现有下游消费接口只读冻结，禁止修改whole_body_controller.py、arm_ik.py及其他非上肢目标转换模块。此约束限定当前获准执行的工作范围，不删除原批准架构合同。**
+> **10-C当前执行边界：**`10-c-child1`独立源码审计已经完成。当前进入`10-c-child2`准备阶段，仅计划对`src/motion/kinematic_bridge.py`中的`PlannedHandTarget`增加两项既定字段；生产代码尚未修改，编码须另行批准。现有下游消费接口只读冻结，禁止修改`whole_body_controller.py`、`arm_ik.py`及其他非上肢目标转换模块。`10-c-child3`与`10-c-child4`尚未准入。本边界不修改原批准架构合同。
 
 ### Task 10-C正式子节点划分（2026-11-20项目负责人批准）
 
