@@ -1,9 +1,9 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **核验日期**：2026-11-20；本轮进入前基线：`64b2e7978644dc6f144c8ae3511ddf0900b0969f`（`task/10-c-child3`，自 `task/10-c-child2` 分出）。
+> **核验日期**：2026-11-20；本轮进入前基线：`9f7ad1af04c4a542df0e73843be49eb5f8c55136`（`task/10-c-child4`，自 `task/10-c-child3` 分出）。
 > **登记口径**：统一历史 Finding **16项**，14项已关闭、2项仍 OPEN；不增删、不重编号。
 > **未关闭**：`FIND-R3-03`、`FIND-R3-04`，归属 Task 11 FootLock；其他14项历史结论保持不变。10-B 验收不得自动解释为关闭 Task 11 的 Finding。
-> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 已于 2026-11-20 通过项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`，大型实现保留于 `waiting-split`，未合入 `master`）；10-C：`10-c-child1 COMPLETED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT；10-c-child4 BLOCKED`；10-D 未准入。
+> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 已于 2026-11-20 通过项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`，大型实现保留于 `waiting-split`，未合入 `master`）；10-C：`10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED`（Task 10-C 整体尚未完成最终验收）；10-D 未准入。
 > **独立问题域**：10-B 的 `CORE_REPAIR_LEDGER.md` 21项冻结记录（含证据与专项合同）**不属于**本16项 Finding 的新增条目，不能合并编号或机械改写历史 Finding 状态。
 > **Phase 7B**：`NOT AUTHORIZED`；须完成 Task 10/11/12 联合验收并由负责人准入。
 
@@ -21,7 +21,7 @@
 | 09-B-4 | `ACCEPTED — VERIFIED` | 不得重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
 | Task 10-B | `COMPLETED — OWNER ACCEPTED` | 2026-11-20 负责人正式验收；大型实现暂存 `waiting-split`，未合入 `master`；不自动关闭 Task 11 的 Finding |
-| Task 10-C | `10-c-child1 COMPLETED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT；10-c-child4 BLOCKED` | `10-c-child2` 已通过 10/10 专项并获负责人验收；当前授权 `10-c-child3` 修改 `convert_planned_pose_to_wbc_targets()`；`10-c-child4` 未准入 |
+| Task 10-C | `10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED` | `10-c-child3` 已通过 15/15 专项并获负责人验收；当前仅授权 `10-c-child4` 最终接口验证与证据归档，不允许生产代码修改；10-C 整体尚未完成最终验收 |
 | Task 10-D | `BLOCKED — NOT STARTED` | 未准入 |
 | Task 11 / Task 12 | 尚未完成 | Task 11 归属两个OPEN Finding |
 | Phase 7B | `NOT AUTHORIZED` | 不得越级开启 |
@@ -556,7 +556,7 @@
 
 ## 7. 集中修复建议与维护包划分 (Remediation Roadmap)
 
-> **历史路线图快照（非当前任务状态）**：本节保留原 R1–R4 审计后形成的维护包划分、依赖拓扑和早期任务建议，用于追溯历史规划。正文中的“待处理 09-B”仅代表该规划形成时的状态，不代表当前任务仍未完成。当前 PKG-5 状态以文件顶部摘要及第 8 节节点表为准：09-B-4 已验收，10-A 已归档，10-B 已于 2026-11-20 通过项目负责人正式验收（大型实现暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT；10-c-child4 BLOCKED；10-D 未准入；FIND-R3-03 与 FIND-R3-04 仍归属 Task 11。不得使用本节历史规划文字覆盖当前验收状态。
+> **历史路线图快照（非当前任务状态）**：本节保留原 R1–R4 审计后形成的维护包划分、依赖拓扑和早期任务建议，用于追溯历史规划。正文中的“待处理 09-B”仅代表该规划形成时的状态，不代表当前任务仍未完成。当前 PKG-5 状态以文件顶部摘要及第 8 节节点表为准：09-B-4 已验收，10-A 已归档，10-B 已于 2026-11-20 通过项目负责人正式验收（大型实现暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED；10-D 未准入；FIND-R3-03 与 FIND-R3-04 仍归属 Task 11。不得使用本节历史规划文字覆盖当前验收状态。
 
 > **权威修复方案与详细回归规划**：详见独立维护包文档 [`docs/audit/production_interface/REPAIR_GROUPING.md`](REPAIR_GROUPING.md)。
 
@@ -589,7 +589,7 @@ flowchart TD
      - `08 Rig`：刚体平移与世界空间隔离回归已完成；
      - `09-A`：Ground × Reach 三维约束求解器已完成并验证；
      - `09-B`：世界旋转、有效父级变换、状态完整性及解锁事务补强已完成，最近节点 09-B-4 为 `ACCEPTED — VERIFIED`；
-     - `10 Upper-Limb IK/FK`：10-A 已归档；10-B 已通过项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`，大型实现暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT；10-c-child4 BLOCKED；10-D 未准入；
+     - `10 Upper-Limb IK/FK`：10-A 已归档；10-B 已通过项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`，大型实现暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED；10-D 未准入；
      - `11 FootLock`：仍需处理 FIND-R3-03 与 FIND-R3-04；
      - `12 联合验收`：等待 Task 10、11 完成。
 
@@ -606,7 +606,7 @@ flowchart TD
 | 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | `COMPLETED / VERIFIED` |
 | 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | FIND-R3-01 | 世界旋转、有效父级矩阵、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 10-A `COMPLETED — ARCHIVED`；10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT；10-c-child4 BLOCKED；10-D `BLOCKED — NOT STARTED` |
+| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 10-A `COMPLETED — ARCHIVED`；10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED；10-D `BLOCKED — NOT STARTED` |
 | 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | `OPEN / PENDING REPAIR` |
 | 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | `PENDING` |
 
@@ -949,7 +949,7 @@ flowchart TD
 - 08 Rig：已完成。
 - 09-A：Lower-Limb Ground × Reach，已完成。
 - 09-B：Lower-Limb World Rotation 与控制器生命周期合同，已完成；最近补强节点为 `09-B-4`。
-- 10：Upper-Limb IK/FK，10-A 已归档；10-B 已通过项目负责人正式验收（暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT；10-c-child4 BLOCKED；10-D 未准入。
+- 10：Upper-Limb IK/FK，10-A 已归档；10-B 已通过项目负责人正式验收（暂存 `waiting-split`）；10-C：10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED；10-D 未准入。
 - 11：FootLock，处理 FIND-R3-03、FIND-R3-04。
 - 12：PKG-5 综合闭环与联合验收。
 

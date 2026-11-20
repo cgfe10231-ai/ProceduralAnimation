@@ -2,6 +2,14 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-20] Task 10-c-child3验收与child4准入
+
+- `10-c-child3` 通过 15/15 专项验证（C3-T01～T15，Blender 5.1.1，实际退出码 0，生产文件 `src/motion/kinematic_bridge.py` Blob `9bda0a3f82d679a74b3358e9ebfbc92349e52593` 测试前后一致；原始证据归档于 `docs/evidence/10-c-child3/`）。
+- 项目负责人批准 `10-c-child3` 验收通过，正式准入 `10-c-child4`。
+- `10-c-child4` 仅负责最终接口测试（C4-T01～C4-T06）及原始证据归档，不授权任何生产代码修改。
+- 本准入条目不表示 Task 10-C 整体已经通过最终验收。
+- 不允许修改 WBC、Arm IK、10-B 事务或其他生产模块。
+
 ### [2026-11-20] Task 10-c-child2验收及10-c-child3准入
 
 - 10-c-child2完成PlannedHandTarget两项字段扩展。

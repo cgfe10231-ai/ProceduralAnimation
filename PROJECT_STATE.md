@@ -1,8 +1,8 @@
 # PROJECT_STATE — 当前项目事实与准入状态
 
 > 状态核验日期：2026-11-20
-> 核验源码基线：`64b2e7978644dc6f144c8ae3511ddf0900b0969f`（`task/10-c-child3`，自 `task/10-c-child2` 分出）。此 SHA 是本轮进入前基线，不代表后续文档提交 HEAD。
-> **当前任务：Task 10-C / 10-c-child3。** `10-c-child1`独立审计完成；`10-c-child2`已通过10/10专项并获负责人验收；当前授权`10-c-child3`实施双手目标无损转换。`10-c-child4`尚未准入。
+> 核验源码基线：`9f7ad1af04c4a542df0e73843be49eb5f8c55136`（`task/10-c-child4`，自 `task/10-c-child3` 分出；生产文件 `src/motion/kinematic_bridge.py` Blob：`9bda0a3f82d679a74b3358e9ebfbc92349e52593`）。此 SHA 是本轮进入前基线，不代表后续文档提交 HEAD。
+> **当前任务：Task 10-C / 10-c-child4。** 当前仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。
 
 ## 1. 阶段状态
 | 节点 | 当前状态 | 准入 |
@@ -10,7 +10,7 @@
 | PKG-5 / 09-A、09-B（含09-B-4） | 历史已验收 | 保持已完成，不重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
 | Task 10-B | `COMPLETED — OWNER ACCEPTED` | 2026-11-20 负责人正式验收；大型实现暂存 `waiting-split`，未合入 `master` |
-| Task 10-C | `10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT — IMPLEMENTATION AUTHORIZED；10-c-child4 BLOCKED` | 当前授权 `10-c-child3` 仅修改 `src/motion/kinematic_bridge.py` 中 `convert_planned_pose_to_wbc_targets()`；`10-c-child4` 未准入 |
+| Task 10-C | `10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED` | 当前仅授权 `10-c-child4` 最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收 |
 | Task 10-D | `BLOCKED — NOT STARTED` | 禁止提前启动 |
 | Task 11 FootLock | 未开始 | 仍有两个历史 Finding |
 | Task 12 联合接口闭环 | 未开始 | 待前序验收 |
@@ -19,8 +19,8 @@
 ### Task 10-C 子节点职责摘要
 - `10-c-child1`：接口及合同审计，已完成（`COMPLETED — AUDITED`）。
 - `10-c-child2`：PlannedHandTarget新增两项字段，已通过 10/10 专项并获负责人验收（`COMPLETED — OWNER ACCEPTED`；证据：`docs/evidence/10-c-child2/`，原始文件未独立记录退出码、不补造）。
-- `10-c-child3`：左右手无损转换及FK/IK仲裁，当前执行并已授权实施（`CURRENT — IMPLEMENTATION AUTHORIZED`）。
-- `10-c-child4`：专项测试及最终验收，尚未准入（`BLOCKED`）。
+- `10-c-child3`：左右手无损转换及FK/IK仲裁与权重校验，已通过 15/15 专项（Blender 5.1.1，退出码 0）并获负责人验收（`COMPLETED — OWNER ACCEPTED`；证据：`docs/evidence/10-c-child3/`）。
+- `10-c-child4`：专项测试及最终验收，当前已授权执行最终接口验证与证据归档，不允许生产代码修改（`CURRENT — VERIFICATION AUTHORIZED`；尚未完成）。
 
 ## 2. 源码确认事实
 - `src/rig/arm_ik.py`：包含事务协调、资源身份/所有权控制、关系恢复、清理挂起、会话准入与双臂复位相关实现。
@@ -50,7 +50,7 @@
 - 重构、模块拆分、外层防御壳迁移等后续工程性整理保持冻结，10-B 大型实现暂存 `waiting-split` 等待后续独立拆分，不带入 10-C。
 
 ## 5. Git / 文档边界
-- Task 10-B已由项目负责人正式验收。大型事务实现及其依赖测试保留于waiting-split；目前未合入master。10-C已完成`10-c-child1`独立源码审计与`10-c-child2`字段扩展及10/10专项验收，当前授权进入`10-c-child3`实施双手目标无损转换（仅限`convert_planned_pose_to_wbc_targets()`），`10-c-child4`尚未准入。本次节点变更不代表10-C功能已经完成。
+- Task 10-B已由项目负责人正式验收。大型事务实现及其依赖测试保留于waiting-split；目前未合入master。10-C已完成`10-c-child1`独立源码审计、`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码0）并均获负责人验收，当前进入`10-c-child4`仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C整体尚未完成最终验收。
 - `master` 核验基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`；尚未合并本轮审计分支或 `waiting-split`。
 - 当前事实优先级：真实源码与对应版本测试证据 → 本文件 / `ARCHITECTURE_SYNC.md` / `OPEN_FINDINGS.md` 相互核对 → `AI_SYNC.md`、`HANDOFF.md` 摘要。
 - 历史细节由既有 `CHANGELOG.md`、冻结账本及 `docs/evidence/` 保存；本状态文件不复制旧轮次日志与历史过程。

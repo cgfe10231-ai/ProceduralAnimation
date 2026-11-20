@@ -1,25 +1,24 @@
 # HANDOFF — 当前项目交接卡片
 
-> 核验日期：2026-11-20；工作分支：`task/10-c-child3`（来源基线：`task/10-c-child2` `64b2e7978644dc6f144c8ae3511ddf0900b0969f`）；`waiting-split` 基线：`a72fff3738eb358ba6e9e4e66452abab6f6c6526`；`master` 基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`（未合入）。
+> 核验日期：2026-11-20；工作分支：`task/10-c-child4`（来源基线：`task/10-c-child3` `9f7ad1af04c4a542df0e73843be49eb5f8c55136`）；`waiting-split` 基线：`a72fff3738eb358ba6e9e4e66452abab6f6c6526`；`master` 基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`（未合入）。
 > 本文件是摘要，不授予任务准入；须以 `PROJECT_STATE.md`、`ARCHITECTURE_SYNC.md`、`OPEN_FINDINGS.md` 及 Git 实况核对。
 
 ## 当前交接状态
-- **当前节点：10-c-child3**
-- **当前生产修改范围**：仅`src/motion/kinematic_bridge.py`中的`convert_planned_pose_to_wbc_targets()`，其他生产定义均为只读。
-- 10-A：`COMPLETED — ARCHIVED`；10-B：`COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收）；10-C：`10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 CURRENT — IMPLEMENTATION AUTHORIZED；10-c-child4 BLOCKED`；10-D：`BLOCKED — NOT STARTED`。
+- **当前节点：10-c-child4**
+- **当前执行权限**：仅授权执行 C4-T01～C4-T06 最终接口验证与原始证据归档，**不允许任何生产代码或测试源码修改**；`10-c-child4` 尚未完成，Task 10-C 整体尚未完成最终验收。
+- 10-A：`COMPLETED — ARCHIVED`；10-B：`COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收）；10-C：`10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED`；10-D：`BLOCKED — NOT STARTED`。
 - Task 11：`FIND-R3-03` / `FIND-R3-04` 仍 OPEN；Task 12 与 Phase 7B 未准入。
 - 10-B已正式验收；大型事务代码暂存waiting-split，等待独立拆分任务，不得带入10-C开发。
-- `10-c-child2` 已完成 `PlannedHandTarget` 字段扩展并通过 10/10 专项验证（证据：`docs/evidence/10-c-child2/`，原始文件未独立记录退出码、不补造），已获负责人批准进入 `10-c-child3`。
-- 后续任何编码任务必须先经过ChatGPT独立源码审计和项目负责人批准。
-- 不允许修改whole_body_controller.py、arm_ik.py、下肢及接触模块。
+- `10-c-child2`（10/10 PASS，证据：`docs/evidence/10-c-child2/`）与 `10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0，证据：`docs/evidence/10-c-child3/`）均已获负责人验收通过，已批准进入 `10-c-child4`。
+- 不允许修改 `kinematic_bridge.py`、`whole_body_controller.py`、`arm_ik.py`、下肢及接触模块或任何测试源码。
 - 不允许将10-B代码重构、全身事务或其他节点的缺陷加入10-C。
 
 | 编号 | 工作 | 状态 |
 |---|---|---|
 | 10-c-child1 | 独立审计 | `COMPLETED — AUDITED` |
 | 10-c-child2 | 两项规划字段 | `COMPLETED — OWNER ACCEPTED` |
-| 10-c-child3 | 双手目标转换及仲裁 | `CURRENT — IMPLEMENTATION AUTHORIZED` |
-| 10-c-child4 | 专项测试及验收 | `BLOCKED` |
+| 10-c-child3 | 双手目标转换及仲裁 | `COMPLETED — OWNER ACCEPTED` |
+| 10-c-child4 | 专项测试及验收 | `CURRENT — VERIFICATION AUTHORIZED` |
 
 ## 10-B 已归档验证证据
 | 范围 | 记录 | 边界 |

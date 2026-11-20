@@ -1,11 +1,11 @@
 # ARCHITECTURE_SYNC：工程动态架构与模块调用同步
 
 > **核验日期**：2026-11-20
-> **核验源码基线**：`64b2e7978644dc6f144c8ae3511ddf0900b0969f`（`task/10-c-child3`，自 `task/10-c-child2` 分出）。
+> **核验源码基线**：`9f7ad1af04c4a542df0e73843be49eb5f8c55136`（`task/10-c-child4`，自 `task/10-c-child3` 分出）。
 > **文档职责**：记录真实存在的模块、调用链、职责和当前任务进度；不修改 `ARCHITECTURE.md` 的永久规则。
 > **10-A**：`COMPLETED — ARCHIVED`。
 > **10-B**：`COMPLETED — OWNER ACCEPTED`（2026-11-20 由项目负责人正式验收通过；大型事务实现保留于 `waiting-split`，未合入 `master`；不再将 `10-b-10 → 10-b-11` 视为当前正在执行的节点）。
-> **10-C**：`10-c-child1`审计完成；`10-c-child2`经10/10专项验证并获负责人验收；当前节点为`10-c-child3`，唯一候选生产修改位置为`src/motion/kinematic_bridge.py`中的`convert_planned_pose_to_wbc_targets()`。`10-c-child4`尚未准入。WBC、Arm IK及其他模块保持只读。
+> **10-C**：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。
 > **10-D**：`BLOCKED — NOT STARTED`，未准入。
 > **Task 11 / Task 12**：未完成；Phase 7B `NOT AUTHORIZED`。
 > **现行实现核对**：`arm_ik.py` 包含统一事务、授权与清理；`whole_body_controller.py` 包含帧级快照/恢复与双臂事务协调。WBC 全身帧级合同不重新计为 10-B 未完成任务。
@@ -298,7 +298,7 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 | 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；`10-C`：`10-c-child1` `COMPLETED — AUDITED`、`10-c-child2` `COMPLETED — OWNER ACCEPTED`、`10-c-child3` `CURRENT — IMPLEMENTATION AUTHORIZED`、`10-c-child4` `BLOCKED`；`10-D` `BLOCKED — NOT STARTED` |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；`10-C`：`10-c-child1` `COMPLETED — AUDITED`、`10-c-child2` `COMPLETED — OWNER ACCEPTED`、`10-c-child3` `COMPLETED — OWNER ACCEPTED`、`10-c-child4` `CURRENT — VERIFICATION AUTHORIZED`；`10-D` `BLOCKED — NOT STARTED` |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | 待修复 |
 | 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 10、11 完成后执行 |
 
@@ -413,7 +413,7 @@ M_{\mathrm{parent\_inverse}}
 
 - **10-A**：已归档验收（`COMPLETED — ARCHIVED`）。
 - **10-B**：`COMPLETED — OWNER ACCEPTED`（批准基准 `124747e900a1db5790ed5f4159f561dba19890ff`；2026-11-20 项目负责人正式验收通过，fix-7 自动化回归证据保留，大型事务实现暂存 `waiting-split` 未合入 `master`；12 项批准合同正文不变，WBC 全身帧级合同不重新计为 10-B 未完成任务）。
-- **10-C**：`10-c-child1`审计完成；`10-c-child2`经10/10专项验证并获负责人验收；当前节点为`10-c-child3`，唯一候选生产修改位置为`src/motion/kinematic_bridge.py`中的`convert_planned_pose_to_wbc_targets()`。`10-c-child4`尚未准入。WBC、Arm IK及其他模块保持只读。
+- **10-C**：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。
 - **10-D**：未准入（`BLOCKED — NOT STARTED`）。
 
 正式范围：
@@ -535,7 +535,7 @@ Influence 合同：
 
 #### 4.2.4 10-C：PlannedHandTarget、Bridge 与 WBC 无损接口合同
 
-> **10-C当前执行边界：**Task 10-C：`10-c-child1`审计完成；`10-c-child2`经10/10专项验证并获负责人验收；当前节点为`10-c-child3`，唯一候选生产修改位置为`src/motion/kinematic_bridge.py`中的`convert_planned_pose_to_wbc_targets()`。`10-c-child4`尚未准入。WBC、Arm IK及其他模块保持只读。本边界不修改原批准架构合同。
+> **10-C当前执行边界：**Task 10-C：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权 C4-T01～C4-T06 最终接口验证与原始证据归档，不允许任何生产代码或测试源码修改；Task 10-C 整体尚未完成最终验收。本边界不修改原批准架构合同。
 
 ### Task 10-C正式子节点划分（2026-11-20项目负责人批准）
 
@@ -551,8 +551,8 @@ Task 10-C采用独立子节点编号：
 |---|---|---|---|
 | `10-c-child1` | 现有上肢目标数据结构、转换链、FK/IK仲裁、坐标语义及历史兼容性独立审计 | 只读 | `COMPLETED — AUDITED` |
 | `10-c-child2` | 补足PlannedHandTarget的Pole Hint与Reach Clamp表达能力 | `src/motion/kinematic_bridge.py`中的PlannedHandTarget定义 | `COMPLETED — OWNER ACCEPTED` |
-| `10-c-child3` | 补齐左右手目标转换及FK/IK仲裁语义，保持接触意图独立 | `src/motion/kinematic_bridge.py`中的convert_planned_pose_to_wbc_targets() | `CURRENT — IMPLEMENTATION AUTHORIZED` |
-| `10-c-child4` | 10-C专项验证、历史兼容回归和最终独立验收 | 测试范围须另行冻结；原则上不修改生产代码 | `BLOCKED` |
+| `10-c-child3` | 补齐左右手目标转换及FK/IK仲裁语义，保持接触意图独立 | `src/motion/kinematic_bridge.py`中的convert_planned_pose_to_wbc_targets() | `COMPLETED — OWNER ACCEPTED` |
+| `10-c-child4` | 10-C专项验证、历史兼容回归和最终独立验收 | 只读验收与原始证据归档；禁止修改生产代码 | `CURRENT — VERIFICATION AUTHORIZED` |
 
 #### 10-c-child1：已完成审计
 
@@ -589,7 +589,9 @@ clamp_reach: bool = True
 
 禁止新增函数、模块、状态机或控制器。
 
-#### 10-c-child3：当前执行节点（目标转换）
+#### 10-c-child3：已完成并获负责人验收（目标转换）
+
+历史实现目标（已于 `task/10-c-child3` 完成 `convert_planned_pose_to_wbc_targets()` 左右手字段转发与启用侧权重有限性/范围校验，通过 C3-T01～T15 全部 15/15 专项验证，Blender 5.1.1，退出码 0，证据归档于 `docs/evidence/10-c-child3/`，已获项目负责人验收通过）：
 
 唯一候选函数：
 
@@ -606,7 +608,7 @@ clamp_reach: bool = True
 
 不得新增第二套转换器。
 
-#### 10-c-child4：专项验证及验收
+#### 10-c-child4：当前执行节点（专项验证及验收）
 
 必须覆盖六组：
 
@@ -1101,9 +1103,9 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 当前执行节点：
 
-`10-c-child3 — HAND TARGET LOSSLESS CONVERSION`
+`10-c-child4 — FINAL INTERFACE VERIFICATION`
 
-> Task 10-C：`10-c-child1`审计完成；`10-c-child2`经10/10专项验证并获负责人验收；当前节点为`10-c-child3`，唯一候选生产修改位置为`src/motion/kinematic_bridge.py`中的`convert_planned_pose_to_wbc_targets()`。`10-c-child4`尚未准入。WBC、Arm IK及其他模块保持只读。（10-B已由项目负责人验收并进入waiting-split隔离保存；历史10-B实施编号不再作为当前任务。）
+> Task 10-C：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。（10-B已由项目负责人验收并进入waiting-split隔离保存；历史10-B实施编号不再作为当前任务。）
 
 ## 5. 后续 Phase 阶段门禁
 
@@ -1199,7 +1201,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 8. 当前架构同步状态规则
 
 - PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型实现保留于 `waiting-split` 未合入 `master`，批准的 12 项合同定义不变）；Task 10-C：`10-c-child1`审计完成；`10-c-child2`经10/10专项验证并获负责人验收；当前节点为`10-c-child3`，唯一候选生产修改位置为`src/motion/kinematic_bridge.py`中的`convert_planned_pose_to_wbc_targets()`。`10-c-child4`尚未准入。WBC、Arm IK及其他模块保持只读；Task 10-D `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
+- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型实现保留于 `waiting-split` 未合入 `master`，批准的 12 项合同定义不变）；Task 10-C：`10-c-child1`审计完成；`10-c-child2`与`10-c-child3`均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改，Task 10-C 整体尚未完成最终验收；Task 10-D `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
 - Task 11 负责 FIND-R3-03、FIND-R3-04。
 - Task 12 负责 PKG-5 跨模块联合审计与验收。
 - 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。
@@ -1597,4 +1599,4 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
 3. **后续受控原子实施路线与准入边界**：
    - **Task 10-B**：已于 2026-11-20 获项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`），大型事务实现暂存 `waiting-split` 等待后续独立拆分，未合入 `master`；禁止把历史“继续按原子阶段实施”解释为新修复授权。
    - **历史计划：Task 10-B-11**：当时聚焦 `Collection ↔ Object` 关系所有权；该轮已不再是当前执行节点。当前不因该旧计划自行新增代码或重复修复。
-   - **Task 10-C 与 Task 10-D 状态**：Task 10-C：`10-c-child1`审计完成；`10-c-child2`经10/10专项验证并获负责人验收；当前节点为`10-c-child3`，唯一候选生产修改位置为`src/motion/kinematic_bridge.py`中的`convert_planned_pose_to_wbc_targets()`。`10-c-child4`尚未准入。WBC、Arm IK及其他模块保持只读。Task 10-D 继续保持 **`BLOCKED — NOT STARTED`**，未准入。
+   - **Task 10-C 与 Task 10-D 状态**：Task 10-C：`10-c-child1`审计完成；`10-c-child2`与`10-c-child3`均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。Task 10-D 继续保持 **`BLOCKED — NOT STARTED`**，未准入。
