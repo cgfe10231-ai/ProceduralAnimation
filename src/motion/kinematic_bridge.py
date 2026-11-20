@@ -178,8 +178,11 @@ def convert_planned_pose_to_wbc_targets(
                 raise TypeError(
                     f"{_hand_field}.weight must be a finite int or float, got {type(_hand_weight).__name__}"
                 )
-            _hand_weight_f = float(_hand_weight)
-            if not math.isfinite(_hand_weight_f) or _hand_weight_f < 0.0 or _hand_weight_f > 1.0:
+            if (
+                _hand_weight < 0.0
+                or _hand_weight > 1.0
+                or not math.isfinite(float(_hand_weight))
+            ):
                 raise ValueError(
                     f"{_hand_field}.weight must be finite and within [0.0, 1.0], got {_hand_weight!r}"
                 )
