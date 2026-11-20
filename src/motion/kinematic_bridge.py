@@ -109,6 +109,9 @@ class PlannedHandTarget:
     surface_id: Optional[str] = None  # Targeted surface ID (e.g. "vault_box", "bar", "wall")
     contact_type: ContactType = ContactType.FREE  # UNILATERAL, GRASP, or FREE
     normal_world: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    # [2026-11-20T14:51:00+08:00] NODE: 10-c-child2 | FIELDS: pole_hint_world_xyz, clamp_reach | PURPOSE: Expose existing hand target Pole Hint and Reach Clamp capabilities while preserving legacy construction semantics.
+    pole_hint_world_xyz: Optional[Tuple[float, float, float]] = None
+    clamp_reach: bool = True
 
 
 @dataclass
