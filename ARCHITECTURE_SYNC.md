@@ -1,14 +1,15 @@
 # ARCHITECTURE_SYNC：工程动态架构与模块调用同步
 
-> **核验日期**：2026-11-19
-> **核验源码基线**：`ace328d9a9af2684cebefe9890e1081b18128c9d`（审计分支，文档更新前参考值）。
+> **核验日期**：2026-11-20
+> **核验源码基线**：`f1c5fa231d3f27a9588c5fca6008116c44eafda0`（`waiting-split` 创建基线，自 `audit/task-10-b-9` 分出）。
 > **文档职责**：记录真实存在的模块、调用链、职责和当前任务进度；不修改 `ARCHITECTURE.md` 的永久规则。
 > **10-A**：`COMPLETED — ARCHIVED`。
-> **10-B**：fix-7 自动化回归完成，`FINAL ACCEPTANCE PENDING`；不再将 `10-b-10 → 10-b-11` 视为当前正在执行的节点。
-> **10-C / 10-D**：`BLOCKED — NOT STARTED`，未准入。
+> **10-B**：`COMPLETED — OWNER ACCEPTED`（2026-11-20 由项目负责人正式验收通过；大型事务实现保留于 `waiting-split`，未合入 `master`；不再将 `10-b-10 → 10-b-11` 视为当前正在执行的节点）。
+> **10-C**：`AUDIT IN PROGRESS — CODE FROZEN`（仅准入 `10-c-1` 只读接口审计，生产写入范围为 0，尚未准入编码）。
+> **10-D**：`BLOCKED — NOT STARTED`，未准入。
 > **Task 11 / Task 12**：未完成；Phase 7B `NOT AUTHORIZED`。
-> **现行实现核对**：`arm_ik.py` 包含统一事务、授权与清理；`whole_body_controller.py` 包含帧级快照/恢复与双臂事务协调。存在代码不等于每项合同已获当前版本运行验收。
-> **证据边界**：Atomicity 223/223 为跨批次去重覆盖；FULL 42/42 为自动化通过，9项视觉待验收；`CONTRACT10-01..06` 当前 HEAD 六项专项尚无新运行结论。
+> **现行实现核对**：`arm_ik.py` 包含统一事务、授权与清理；`whole_body_controller.py` 包含帧级快照/恢复与双臂事务协调。WBC 全身帧级合同不重新计为 10-B 未完成任务。
+> **证据边界**：Atomicity 223/223 为跨批次去重覆盖；FULL 42/42 为自动化通过，9 项人工视觉检查仍作为独立待办；`CONTRACT10-01..06` 当前 HEAD 六项专项仍独立追踪，不因 10-B 结项自动宣称通过。
 > **跨管线状态**：19骨骼运动学生产管线与独立6-DOF数值动力学管线仍分离，未来合流不得写成当前已完成。
 
 ---
@@ -297,7 +298,7 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 | 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` fix-7 自动化回归完成、`FINAL ACCEPTANCE PENDING`；`10-C` 与 `10-D` 均 `BLOCKED — NOT STARTED` |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；`10-C` `AUDIT IN PROGRESS — CODE FROZEN`；`10-D` `BLOCKED — NOT STARTED` |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | 待修复 |
 | 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 10、11 完成后执行 |
 
@@ -406,13 +407,13 @@ M_{\mathrm{parent\_inverse}}
 
 ### 4.2 节点 10：Upper-Limb IK/FK
 
-> **版本边界**：本节包含历史任务设计与实现过程；涉及旧节点“当前”措辞时，均以本文件顶部和第8节的2026-11-19状态为准；合同正文不作追认或重写。
+> **版本边界**：本节包含历史任务设计与实现过程；涉及旧节点“当前”措辞时，均以本文件顶部和第8节的2026-11-20状态为准；合同正文不作追认或重写。
 
 状态（分阶段精确状态）：
 
 - **10-A**：已归档验收（`COMPLETED — ARCHIVED`）。
-- **10-B**：目标架构已批准（批准基准 `124747e900a1db5790ed5f4159f561dba19890ff`）；fix-7 自动化回归完成，`FINAL ACCEPTANCE PENDING`。12项批准合同保持不变；当前版本仍需独立合同验收，不得把旧实施阶段视为正在执行。
-- **10-C**：未准入（`BLOCKED — NOT STARTED`）。
+- **10-B**：`COMPLETED — OWNER ACCEPTED`（批准基准 `124747e900a1db5790ed5f4159f561dba19890ff`；2026-11-20 项目负责人正式验收通过，fix-7 自动化回归证据保留，大型事务实现暂存 `waiting-split` 未合入 `master`；12 项批准合同正文不变，WBC 全身帧级合同不重新计为 10-B 未完成任务）。
+- **10-C**：`AUDIT IN PROGRESS — CODE FROZEN`（仅准入 `10-c-1` 上肢目标接口只读审计，生产写入范围为 0，未准入编码）。
 - **10-D**：未准入（`BLOCKED — NOT STARTED`）。
 
 正式范围：
@@ -533,6 +534,8 @@ Influence 合同：
 以上属于 Task 10 的目标合同，不代表当前源码已经完成。
 
 #### 4.2.4 10-C：PlannedHandTarget、Bridge 与 WBC 无损接口合同
+
+> **10-C当前执行边界：本轮仅审计PlannedHandTarget、KinematicPlannedPose及convert_planned_pose_to_wbc_targets()的上肢目标字段与转换语义。现有下游消费接口只读冻结，禁止修改whole_body_controller.py、arm_ik.py及其他非上肢目标转换模块。此约束限定当前获准执行的工作范围，不删除原批准架构合同。**
 
 负责范围：
 
@@ -995,9 +998,9 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 当前执行节点：
 
-`Task 10-B — FINAL ACCEPTANCE PENDING`
+`10-c-1 — INTERFACE AUDIT ONLY`
 
-（10-A 已归档；10-B 的 fix-7 自动化回归已完成，剩余当前专项合同核验及独立结项裁决；`10-b-10 → 10-b-11` 是历史实施编号，不再代表当前执行；10-C 与 10-D 均 `BLOCKED — NOT STARTED`。）
+> 10-B已由项目负责人验收并进入waiting-split隔离保存；10-C目前仅开展上肢规划目标与现有消费接口的只读审计，尚未授权任何生产代码修改。历史10-B实施编号不再作为当前任务。
 
 ## 5. 后续 Phase 阶段门禁
 
@@ -1093,7 +1096,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 8. 当前架构同步状态规则
 
 - PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B 已完成 fix-7 自动化回归但最终合同验收 `FINAL ACCEPTANCE PENDING`，批准的12项合同定义不变；Task 10-C / 10-D 仍 `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
+- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型实现保留于 `waiting-split` 未合入 `master`，批准的 12 项合同定义不变）；Task 10-C `AUDIT IN PROGRESS — CODE FROZEN`（仅准入 `10-c-1` 只读接口审计，生产写入范围为 0）；Task 10-D `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
 - Task 11 负责 FIND-R3-03、FIND-R3-04。
 - Task 12 负责 PKG-5 跨模块联合审计与验收。
 - 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。
@@ -1180,9 +1183,9 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 APPROVED TARGET ARCHITECTURE (DESIGN CONTRACT PRESERVED)
 ARCHITECTURE: APPROVED TARGET
 DESIGN-APPROVAL-TIME STATUS: HISTORICAL IMPLEMENTATION PLAN
-AS-OF-2026-11-19 IMPLEMENTATION: FIX-7 AUTOMATED REGRESSION COMPLETE
-AS-OF-2026-11-19 ACCEPTANCE: FINAL ACCEPTANCE PENDING
-CONTRACT10-01..06: CURRENT-RUN VERIFICATION NOT YET ESTABLISHED
+AS-OF-2026-11-20 IMPLEMENTATION: FIX-7 AUTOMATED REGRESSION COMPLETE (ARCHIVED IN waiting-split)
+AS-OF-2026-11-20 ACCEPTANCE: COMPLETED — OWNER ACCEPTED (2026-11-20)
+WBC CONTRACT10-01..06: NOT RECOUNTED AS UNFINISHED 10-B WORK (SEPARATELY TRACKED)
 ```
 
 ### 10.1 架构地位及版本 (Planned Target Architecture)
@@ -1192,8 +1195,8 @@ CONTRACT10-01..06: CURRENT-RUN VERIFICATION NOT YET ESTABLISHED
 - **架构设计范围**：`src/rig/arm_ik.py` 上肢 IK 事务协调、状态与所有权注册表、受权资源与关系操作、业务数值写入、快照恢复与全字段核验、提交后清理、双臂原子复位及与上层 `WholeBodyController` 的接口边界。
 - **状态严格分离声明**：
   - `ARCHITECTURE: APPROVED TARGET`（目标架构设计已通过静态架构审计并获得正式批准）。
-  - **历史实施状态**：设计批准时处于分阶段落地，`10-B-11` 曾是下一步计划。**2026-11-19 当前状态**：相关生产逻辑已有后续实现并完成 fix-7 自动化回归；不得继续把历史实施计划标记为当前节点。
-  - **当前验收状态**：`FINAL ACCEPTANCE PENDING`；FULL 42/42 为自动化通过，9项仍需人工视觉验收；WBC `CONTRACT10-01..06` 当前代码对应完整专项证据尚未核实。不得将历史 `NOT YET VERIFIED` 直接套用为当前所有代码不存在，也不得凭代码存在推断合同已通过。
+  - **历史实施状态**：设计批准时处于分阶段落地，`10-B-11` 曾是下一步计划。**2026-11-20 当前状态**：相关生产逻辑已完成 fix-7 自动化回归并归档于 `waiting-split`；不得继续把历史实施计划标记为当前节点。
+  - **当前验收状态**：`COMPLETED — OWNER ACCEPTED`（2026-11-20 项目负责人已对 Task 10-B 在批准专项范围内正式验收通过，大型实现暂存 `waiting-split` 未合入 `master`）；FULL 42/42 为自动化通过，9 项人工视觉检查仍作为独立待办；WBC `CONTRACT10-01..06` 不重新计为 10-B 未完成任务，且不因 10-B 结项自动宣称通过。
 - **与 `ARCHITECTURE.md` 及历史材料的优先级关系（Source Precedence）**：
   1. **Level 1 — 权威总架构与门禁约束**：`ARCHITECTURE.md`、`docs/ARCHITECTURE_CHANGE_GATE.md`（定义全系统主执行链 `MotionPlanner -> Bridge -> WBC -> Rig/IK/FK` 与十步防漂移清规，本节严格服从总架构，不改变上层管线拓扑）。
   2. **Level 2 — 当前代码与已核实实现事实**：`ARCHITECTURE_SYNC.md` 第 1～8 节、`src/rig/arm_ik.py`、`src/motion/whole_body_controller.py`（代表当前磁盘已实现事实）。
@@ -1479,7 +1482,7 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
 
 ### 10.10 验证与后续实施 (Planned Target Architecture)
 
-> **状态与合同边界**：第10节批准的目标合同及14条影响关系原样保留；第3项同步为2026-11-19的实际进度。旧实施节点只属于历史，不得重新被当成当前任务准入。
+> **状态与合同边界**：第10节批准的目标合同及14条影响关系原样保留；第3项同步为2026-11-20的实际进度。旧实施节点只属于历史，不得重新被当成当前任务准入。
 
 1. **十二项合同验证要求**：
    - `CONTRACT-01` 至 `CONTRACT-12` 的正向场景、故障场景、外部共享状态影响、待核验不变量及通过/失败判据已在批准架构 JSON（`f3_verification_requirements`）与本节 10.8.1 表中完整固化。
@@ -1489,6 +1492,6 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
    - 严禁用历史提交（如 10-B-8 的 `102/102 PASS`）代替新生产修复的真实回归运行结果。
    - 严禁以自动化测试（`Automated Pass`）代替 Blender GUI 视口真实目视验收。
 3. **后续受控原子实施路线与准入边界**：
-   - **Task 10-B**：fix-7 自动化回归已经完成；当前仍待合同专项证据核验与负责人独立结项，禁止把历史“继续按原子阶段实施”解释为新修复授权。
-   - **历史计划：Task 10-B-11**：当时聚焦 `Collection ↔ Object` 关系所有权；该轮已不再是当前执行节点。当前不因该旧计划自行新增代码或重复修复；是否有遗留仅以本版本合同核验结论裁决。
-   - **Task 10-C 与 Task 10-D 状态**：继续保持 **`BLOCKED — NOT STARTED`**，在 Task 10-B 全部完成并获独立验收批准前严禁提前进入。
+   - **Task 10-B**：已于 2026-11-20 获项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`），大型事务实现暂存 `waiting-split` 等待后续独立拆分，未合入 `master`；禁止把历史“继续按原子阶段实施”解释为新修复授权。
+   - **历史计划：Task 10-B-11**：当时聚焦 `Collection ↔ Object` 关系所有权；该轮已不再是当前执行节点。当前不因该旧计划自行新增代码或重复修复。
+   - **Task 10-C 与 Task 10-D 状态**：Task 10-C 已获准进入 **`AUDIT IN PROGRESS — CODE FROZEN`**（当前节点 `10-c-1`，仅限只读接口审计，生产写入范围为 0）；Task 10-D 继续保持 **`BLOCKED — NOT STARTED`**，未准入。

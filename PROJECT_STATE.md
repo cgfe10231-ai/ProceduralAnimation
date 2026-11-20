@@ -1,16 +1,16 @@
 # PROJECT_STATE — 当前项目事实与准入状态
 
-> 状态核验日期：2026-11-19
-> 核验源码基线：`ace328d9a9af2684cebefe9890e1081b18128c9d`（`audit/task-10-b-9`）。此 SHA 是核验来源，不代表后续文档提交 HEAD。
-> 当前任务：`Task 10-B — FINAL ACCEPTANCE PENDING`，未经负责人裁决不得改写为完成。
+> 状态核验日期：2026-11-20
+> 核验源码基线：`f1c5fa231d3f27a9588c5fca6008116c44eafda0`（`waiting-split`，自 `audit/task-10-b-9` 创建）。此 SHA 是本轮进入前基线，不代表后续文档提交 HEAD。
+> 当前任务：`Task 10-C / 10-c-1 — AUDIT IN PROGRESS — CODE FROZEN`（Task 10-B 已于 2026-11-20 获项目负责人正式验收；10-C 生产写入范围目前为零）。
 
 ## 1. 阶段状态
 | 节点 | 当前状态 | 准入 |
 |---|---|---|
 | PKG-5 / 09-A、09-B（含09-B-4） | 历史已验收 | 保持已完成，不重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
-| Task 10-B | fix-7 自动化回归完成；最终合同核验、独立结项待裁决 | 当前唯一收尾节点 |
-| Task 10-C | `BLOCKED — NOT STARTED` | 禁止提前启动 |
+| Task 10-B | `COMPLETED — OWNER ACCEPTED` | 2026-11-20 负责人正式验收；大型实现暂存 `waiting-split`，未合入 `master` |
+| Task 10-C | `AUDIT IN PROGRESS — CODE FROZEN` | 仅准入 `10-c-1` 只读接口审计，尚未准入编码 |
 | Task 10-D | `BLOCKED — NOT STARTED` | 禁止提前启动 |
 | Task 11 FootLock | 未开始 | 仍有两个历史 Finding |
 | Task 12 联合接口闭环 | 未开始 | 待前序验收 |
@@ -40,10 +40,11 @@
 - `OPEN_FINDINGS.md` 历史统一登记 **16 项**：14 项历史已关闭，2 项 `FIND-R3-03`、`FIND-R3-04` 仍 OPEN，归属 Task 11。不得据 10-B 测试推断其已经关闭。
 - `CORE_REPAIR_LEDGER.md` 的 **21 条冻结记录**为 10-B 专项遗留/合同/证据条目，**不是新增21个独立生产代码BUG**，不得混入16项历史 Finding 编号。
 - `ARCHITECTURE_SYNC.md` 第10节的 `CONTRACT-01..12` 是批准的架构合同，不能擅自修改定义或重新分配归属。
-- Task 10-B 结项尚需对齐合同实际证据，并取得负责人最终裁决；不得用 FULL 自动通过代替合同专项或人工视觉验收。
-- 重构、模块拆分、外层防御壳迁移等后续工程性整理保持冻结，按原负责人的整体 Task 10 路线与独立授权执行。
+- Task 10-B 已于 2026-11-20 由项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`）；WBC 全身帧级合同不重新算作 10-B 未完成任务，FULL 中九项人工视觉检查仍作为独立待办保留，不因 10-B 结项自动宣称视觉通过。
+- 重构、模块拆分、外层防御壳迁移等后续工程性整理保持冻结，10-B 大型实现暂存 `waiting-split` 等待后续独立拆分，不带入 10-C。
 
 ## 5. Git / 文档边界
-- `master` 核验基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`；尚未合并本轮审计分支。
+- Task 10-B已由项目负责人正式验收。大型事务实现及其依赖测试保留于waiting-split；目前未合入master。10-C已获准进入只读接口审计阶段，尚未批准生产代码修改。本次节点变更不代表10-C功能已经完成。
+- `master` 核验基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`；尚未合并本轮审计分支或 `waiting-split`。
 - 当前事实优先级：真实源码与对应版本测试证据 → 本文件 / `ARCHITECTURE_SYNC.md` / `OPEN_FINDINGS.md` 相互核对 → `AI_SYNC.md`、`HANDOFF.md` 摘要。
 - 历史细节由既有 `CHANGELOG.md`、冻结账本及 `docs/evidence/` 保存；本状态文件不复制旧轮次日志与历史过程。
