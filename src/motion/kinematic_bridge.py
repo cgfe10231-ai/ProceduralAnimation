@@ -166,6 +166,24 @@ def convert_planned_pose_to_wbc_targets(
     - Explicit foot support lock flag forwarding: `is_locked` is propagated so
       WholeBodyController will not attempt to unlock or overwrite a stance foot.
     """
+    # [INTRODUCED 2026-11-20T23:32:30+08:00]
+    # NODE: Task 10-C / 10-c-child3 (C3-03)
+    # FUNCTION: Inline enabled-hand IK weight pre-validation block inside convert_planned_pose_to_wbc_targets()
+    # PURPOSE: Validate that enabled hand_L.weight and hand_R.weight are finite real numbers in [0.0, 1.0] (rejecting bool/None/str with TypeError and NaN/Inf/out-of-range with ValueError) before target conversion while preserving disabled-side and zero-weight semantics.
+    # REASON: Downstream checks (hand_tgt.weight > 0.0) cannot reliably reject NaN, negative, or invalid weights; approved inline pre-check avoids adding any new function or dependency.
+    for _hand_field, _hand_target in (("hand_L", planned.hand_L), ("hand_R", planned.hand_R)):
+        if _hand_target is not None and _hand_target.enabled:
+            _hand_weight = _hand_target.weight
+            if isinstance(_hand_weight, bool) or not isinstance(_hand_weight, (int, float)):
+                raise TypeError(
+                    f"{_hand_field}.weight must be a finite int or float, got {type(_hand_weight).__name__}"
+                )
+            _hand_weight_f = float(_hand_weight)
+            if not math.isfinite(_hand_weight_f) or _hand_weight_f < 0.0 or _hand_weight_f > 1.0:
+                raise ValueError(
+                    f"{_hand_field}.weight must be finite and within [0.0, 1.0], got {_hand_weight!r}"
+                )
+
     targets = WholeBodyControlTargets()
 
     # Floating base
@@ -210,8 +228,10 @@ def convert_planned_pose_to_wbc_targets(
             effector_id="hand_L",
             target_world_xyz=planned.hand_L.world_xyz,
             target_rotation_deg=planned.hand_L.rotation_deg,
+            pole_hint_world_xyz=planned.hand_L.pole_hint_world_xyz,
             enabled=True,
             weight=planned.hand_L.weight,
+            clamp_reach=planned.hand_L.clamp_reach,
         )
     else:
         # Explicitly disabled hand IK: left in FK mode driven by fk_joint_rotations_deg
@@ -227,8 +247,10 @@ def convert_planned_pose_to_wbc_targets(
             effector_id="hand_R",
             target_world_xyz=planned.hand_R.world_xyz,
             target_rotation_deg=planned.hand_R.rotation_deg,
+            pole_hint_world_xyz=planned.hand_R.pole_hint_world_xyz,
             enabled=True,
             weight=planned.hand_R.weight,
+            clamp_reach=planned.hand_R.clamp_reach,
         )
     else:
         targets.hand_R = EndEffectorTarget(
