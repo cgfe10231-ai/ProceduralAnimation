@@ -1,19 +1,25 @@
 # HANDOFF — 当前项目交接卡片
 
-> 核验日期：2026-11-20；工作分支：`waiting-split`（自 `audit/task-10-b-9` 基线 `f1c5fa231d3f27a9588c5fca6008116c44eafda0` 创建）；`master` 基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`（未合入）。
+> 核验日期：2026-11-20；工作分支：`waiting-split`（本轮文档同步前冻结基线：`9bb8fdf3aeabbe5d7162618dbcc0831de2499247`）；`master` 基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`（未合入）。
 > 本文件是摘要，不授予任务准入；须以 `PROJECT_STATE.md`、`ARCHITECTURE_SYNC.md`、`OPEN_FINDINGS.md` 及 Git 实况核对。
 
 ## 当前交接状态
-- **当前节点：10-c-1**
-- **工作性质：上肢目标接口审计，禁止编码。**
-- 10-A：`COMPLETED — ARCHIVED`；10-B：`COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收）；10-C：`AUDIT IN PROGRESS — CODE FROZEN`；10-D：`BLOCKED — NOT STARTED`。
+- **当前节点：10-c-child2**
+- **工作性质**：当前处于10-c-child2准备阶段。10-c-child1独立源码审计已完成；后续只允许在明确批准的编码TASK中修改PlannedHandTarget的两项字段。
+- 10-A：`COMPLETED — ARCHIVED`；10-B：`COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收）；10-C：`10-c-child1 COMPLETED；10-c-child2 CURRENT；10-c-child3/4 BLOCKED`；10-D：`BLOCKED — NOT STARTED`。
 - Task 11：`FIND-R3-03` / `FIND-R3-04` 仍 OPEN；Task 12 与 Phase 7B 未准入。
 - 10-B已正式验收；大型事务代码暂存waiting-split，等待独立拆分任务，不得带入10-C开发。
-- 10-C审计重点：PlannedHandTarget缺失的Pole Hint与Reach Clamp表达、左右手无损转换、FK/IK启停和权重语义。
-- 当前准入的生产修改文件数量：0。
+- 当前准入的生产修改文件数量：0（本轮仅文档同步，10-c-child2编码须另行批准精确TASK）。
 - 后续任何编码任务必须先经过ChatGPT独立源码审计和项目负责人批准。
 - 不允许修改whole_body_controller.py、arm_ik.py、下肢及接触模块。
 - 不允许将10-B代码重构、全身事务或其他节点的缺陷加入10-C。
+
+| 编号 | 工作 | 状态 |
+|---|---|---|
+| 10-c-child1 | 独立审计 | COMPLETED |
+| 10-c-child2 | 两项规划字段 | CURRENT |
+| 10-c-child3 | 双手目标转换及仲裁 | BLOCKED |
+| 10-c-child4 | 专项测试及验收 | BLOCKED |
 
 ## 10-B 已归档验证证据
 | 范围 | 记录 | 边界 |

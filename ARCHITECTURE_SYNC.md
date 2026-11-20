@@ -1,11 +1,11 @@
 # ARCHITECTURE_SYNC：工程动态架构与模块调用同步
 
 > **核验日期**：2026-11-20
-> **核验源码基线**：`f1c5fa231d3f27a9588c5fca6008116c44eafda0`（`waiting-split` 创建基线，自 `audit/task-10-b-9` 分出）。
+> **核验源码基线**：`9bb8fdf3aeabbe5d7162618dbcc0831de2499247`（`waiting-split`，本轮文档同步前冻结基线）。
 > **文档职责**：记录真实存在的模块、调用链、职责和当前任务进度；不修改 `ARCHITECTURE.md` 的永久规则。
 > **10-A**：`COMPLETED — ARCHIVED`。
 > **10-B**：`COMPLETED — OWNER ACCEPTED`（2026-11-20 由项目负责人正式验收通过；大型事务实现保留于 `waiting-split`，未合入 `master`；不再将 `10-b-10 → 10-b-11` 视为当前正在执行的节点）。
-> **10-C**：`AUDIT IN PROGRESS — CODE FROZEN`（仅准入 `10-c-1` 只读接口审计，生产写入范围为 0，尚未准入编码）。
+> **10-C**：`10-c-child1`已完成独立源码审计；当前进入`10-c-child2`，负责PlannedHandTarget两项字段收敛。`10-c-child3`和`10-c-child4`尚未准入。当前文档同步任务不修改生产代码。
 > **10-D**：`BLOCKED — NOT STARTED`，未准入。
 > **Task 11 / Task 12**：未完成；Phase 7B `NOT AUTHORIZED`。
 > **现行实现核对**：`arm_ik.py` 包含统一事务、授权与清理；`whole_body_controller.py` 包含帧级快照/恢复与双臂事务协调。WBC 全身帧级合同不重新计为 10-B 未完成任务。
@@ -298,7 +298,7 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 | 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；`10-C` `AUDIT IN PROGRESS — CODE FROZEN`；`10-D` `BLOCKED — NOT STARTED` |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；`10-C`：`10-c-child1` COMPLETED、`10-c-child2` CURRENT、`10-c-child3/4` BLOCKED；`10-D` `BLOCKED — NOT STARTED` |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | 待修复 |
 | 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 10、11 完成后执行 |
 
@@ -413,7 +413,7 @@ M_{\mathrm{parent\_inverse}}
 
 - **10-A**：已归档验收（`COMPLETED — ARCHIVED`）。
 - **10-B**：`COMPLETED — OWNER ACCEPTED`（批准基准 `124747e900a1db5790ed5f4159f561dba19890ff`；2026-11-20 项目负责人正式验收通过，fix-7 自动化回归证据保留，大型事务实现暂存 `waiting-split` 未合入 `master`；12 项批准合同正文不变，WBC 全身帧级合同不重新计为 10-B 未完成任务）。
-- **10-C**：`AUDIT IN PROGRESS — CODE FROZEN`（仅准入 `10-c-1` 上肢目标接口只读审计，生产写入范围为 0，未准入编码）。
+- **10-C**：`10-c-child1`已完成独立源码审计；当前进入`10-c-child2`，负责PlannedHandTarget两项字段收敛。`10-c-child3`和`10-c-child4`尚未准入。当前文档同步任务不修改生产代码。
 - **10-D**：未准入（`BLOCKED — NOT STARTED`）。
 
 正式范围：
@@ -536,6 +536,109 @@ Influence 合同：
 #### 4.2.4 10-C：PlannedHandTarget、Bridge 与 WBC 无损接口合同
 
 > **10-C当前执行边界：本轮仅审计PlannedHandTarget、KinematicPlannedPose及convert_planned_pose_to_wbc_targets()的上肢目标字段与转换语义。现有下游消费接口只读冻结，禁止修改whole_body_controller.py、arm_ik.py及其他非上肢目标转换模块。此约束限定当前获准执行的工作范围，不删除原批准架构合同。**
+
+### Task 10-C正式子节点划分（2026-11-20项目负责人批准）
+
+Task 10-C采用独立子节点编号：
+
+`10-c-childN`
+
+`child`仅表示子节点序号，不表示修复轮次、测试轮次或Git提交次数。
+
+本节点严格负责上肢规划目标与现有接口合同收敛。
+
+| 子节点 | 唯一职责 | 修改范围 | 状态 |
+|---|---|---|---|
+| `10-c-child1` | 现有上肢目标数据结构、转换链、FK/IK仲裁、坐标语义及历史兼容性独立审计 | 只读 | `COMPLETED — AUDITED` |
+| `10-c-child2` | 补足PlannedHandTarget的Pole Hint与Reach Clamp表达能力 | `src/motion/kinematic_bridge.py`中的PlannedHandTarget定义 | `CURRENT — IMPLEMENTATION PENDING` |
+| `10-c-child3` | 补齐左右手目标转换及FK/IK仲裁语义，保持接触意图独立 | `src/motion/kinematic_bridge.py`中的convert_planned_pose_to_wbc_targets() | `BLOCKED` |
+| `10-c-child4` | 10-C专项验证、历史兼容回归和最终独立验收 | 测试范围须另行冻结；原则上不修改生产代码 | `BLOCKED` |
+
+#### 10-c-child1：已完成审计
+
+ChatGPT已独立核查：
+
+- PlannedHandTarget现有字段。
+- KinematicPlannedPose左右手目标容器。
+- convert_planned_pose_to_wbc_targets()转换逻辑。
+- 既有下游消费接口。
+- FK/IK启用及权重语义。
+- 手腕世界坐标和手部世界朝向合同。
+- 接触意图与IK有效权重的独立性。
+- 现有专项测试覆盖情况。
+
+确认两个规划字段缺口：
+
+1. `pole_hint_world_xyz`
+2. `clamp_reach`
+
+审计不代表上述缺口已修复。
+
+#### 10-c-child2：当前执行节点
+
+唯一目标：
+
+在PlannedHandTarget末尾增加：
+
+```python
+pole_hint_world_xyz: Optional[Tuple[float, float, float]] = None
+clamp_reach: bool = True
+```
+
+必须保持全部既有字段顺序、默认值和位置参数构造兼容性。
+
+禁止新增函数、模块、状态机或控制器。
+
+本轮文档任务不执行上述代码修改。
+
+#### 10-c-child3：目标转换
+
+唯一候选函数：
+
+`convert_planned_pose_to_wbc_targets()`
+
+必须保证：
+
+- 左右手Pole Hint分别传递。
+- 左右手Clamp Reach分别传递。
+- 位置、旋转、权重及enabled语义保持正确。
+- FK/IK仲裁不发生左右串扰。
+- 合法零权重与接触意图不被错误合并。
+- 不修改Root、Pelvis、下肢及其他非上肢目标转换逻辑。
+
+不得新增第二套转换器。
+
+#### 10-c-child4：专项验证及验收
+
+必须覆盖六组：
+
+1. 数据结构及历史构造兼容。
+2. 左右手目标字段无损传递。
+3. 左右独立性与FK/IK切换。
+4. 零权重、无效权重及输入边界。
+5. 接触意图与IK独立语义。
+6. 手腕位置、姿态及现有可达性反馈合同。
+
+测试方案和允许修改的测试文件必须经过ChatGPT独立审计后冻结。
+
+测试失败不得由Antigravity自行修改生产代码。
+
+### 10-C跨模块禁止事项
+
+Task 10-C禁止：
+
+- 修改`src/motion/whole_body_controller.py`。
+- 修改`src/rig/arm_ik.py`。
+- 修改下肢IK和FootLock。
+- 开发全身帧级事务。
+- 修改ContactModel。
+- 开发10-D独立上肢运动轨迹。
+- 拆分10-B大型事务代码。
+- 创建新控制器或第二条姿态写入管线。
+
+已有下游接口仅允许只读核对。
+
+若验证发现下游问题，必须停止并交回ChatGPT独立审计，不得将其自行加入10-C开发。
 
 负责范围：
 
@@ -971,7 +1074,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 - `10-a-1`
 - `10-a-2`
 - `10-b-1`
-- `10-c-1`
+- `10-c-child1`
 - `10-d-1`
 - `11-a-1`
 - `11-b-1`
@@ -996,11 +1099,13 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 只有项目负责人明确确认后，才允许改变上述模块划分。
 
+> 项目负责人已明确批准：Task 10-C采用`10-c-childN`作为正式子节点编号。此处child表示子节点序号，不使用原有数字修复轮次含义；其他任务的既有命名规范保持不变。
+
 当前执行节点：
 
-`10-c-1 — INTERFACE AUDIT ONLY`
+`10-c-child2 — PLANNED HAND TARGET FIELD CONTRACT`
 
-> 10-B已由项目负责人验收并进入waiting-split隔离保存；10-C目前仅开展上肢规划目标与现有消费接口的只读审计，尚未授权任何生产代码修改。历史10-B实施编号不再作为当前任务。
+> Task 10-C：`10-c-child1`已完成独立源码审计；当前进入`10-c-child2`，负责PlannedHandTarget两项字段收敛。`10-c-child3`和`10-c-child4`尚未准入。当前文档同步任务不修改生产代码。（10-B已由项目负责人验收并进入waiting-split隔离保存；历史10-B实施编号不再作为当前任务。）
 
 ## 5. 后续 Phase 阶段门禁
 
@@ -1096,7 +1201,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 8. 当前架构同步状态规则
 
 - PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型实现保留于 `waiting-split` 未合入 `master`，批准的 12 项合同定义不变）；Task 10-C `AUDIT IN PROGRESS — CODE FROZEN`（仅准入 `10-c-1` 只读接口审计，生产写入范围为 0）；Task 10-D `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
+- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型实现保留于 `waiting-split` 未合入 `master`，批准的 12 项合同定义不变）；Task 10-C：`10-c-child1`已完成独立源码审计；当前进入`10-c-child2`，负责PlannedHandTarget两项字段收敛。`10-c-child3`和`10-c-child4`尚未准入。当前文档同步任务不修改生产代码；Task 10-D `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
 - Task 11 负责 FIND-R3-03、FIND-R3-04。
 - Task 12 负责 PKG-5 跨模块联合审计与验收。
 - 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。
@@ -1494,4 +1599,4 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
 3. **后续受控原子实施路线与准入边界**：
    - **Task 10-B**：已于 2026-11-20 获项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`），大型事务实现暂存 `waiting-split` 等待后续独立拆分，未合入 `master`；禁止把历史“继续按原子阶段实施”解释为新修复授权。
    - **历史计划：Task 10-B-11**：当时聚焦 `Collection ↔ Object` 关系所有权；该轮已不再是当前执行节点。当前不因该旧计划自行新增代码或重复修复。
-   - **Task 10-C 与 Task 10-D 状态**：Task 10-C 已获准进入 **`AUDIT IN PROGRESS — CODE FROZEN`**（当前节点 `10-c-1`，仅限只读接口审计，生产写入范围为 0）；Task 10-D 继续保持 **`BLOCKED — NOT STARTED`**，未准入。
+   - **Task 10-C 与 Task 10-D 状态**：Task 10-C：`10-c-child1`已完成独立源码审计；当前进入`10-c-child2`，负责PlannedHandTarget两项字段收敛。`10-c-child3`和`10-c-child4`尚未准入。当前文档同步任务不修改生产代码。Task 10-D 继续保持 **`BLOCKED — NOT STARTED`**，未准入。

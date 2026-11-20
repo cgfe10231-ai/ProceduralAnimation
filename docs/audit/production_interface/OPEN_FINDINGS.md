@@ -1,9 +1,9 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **核验日期**：2026-11-20；本轮进入前基线：`f1c5fa231d3f27a9588c5fca6008116c44eafda0`（`waiting-split`，自 `audit/task-10-b-9` 创建）。
+> **核验日期**：2026-11-20；本轮进入前基线：`9bb8fdf3aeabbe5d7162618dbcc0831de2499247`（`waiting-split`）。
 > **登记口径**：统一历史 Finding **16项**，14项已关闭、2项仍 OPEN；不增删、不重编号。
 > **未关闭**：`FIND-R3-03`、`FIND-R3-04`，归属 Task 11 FootLock；其他14项历史结论保持不变。10-B 验收不得自动解释为关闭 Task 11 的 Finding。
-> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 已于 2026-11-20 通过项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`，大型实现保留于 `waiting-split`，未合入 `master`）；10-C 只读审计进行中（`AUDIT IN PROGRESS — CODE FROZEN`，当前节点 `10-c-1`，生产写入范围为 0）；10-D 未准入。
+> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 已于 2026-11-20 通过项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`，大型实现保留于 `waiting-split`，未合入 `master`）；10-C：`10-c-child1`已完成独立审计，当前节点为`10-c-child2`；`10-c-child3`、`10-c-child4`尚未准入。10-C尚未进行本阶段生产代码修改；10-D 未准入。
 > **独立问题域**：10-B 的 `CORE_REPAIR_LEDGER.md` 21项冻结记录（含证据与专项合同）**不属于**本16项 Finding 的新增条目，不能合并编号或机械改写历史 Finding 状态。
 > **Phase 7B**：`NOT AUTHORIZED`；须完成 Task 10/11/12 联合验收并由负责人准入。
 
@@ -21,7 +21,7 @@
 | 09-B-4 | `ACCEPTED — VERIFIED` | 不得重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
 | Task 10-B | `COMPLETED — OWNER ACCEPTED` | 2026-11-20 负责人正式验收；大型实现暂存 `waiting-split`，未合入 `master`；不自动关闭 Task 11 的 Finding |
-| Task 10-C | `AUDIT IN PROGRESS — CODE FROZEN` | 仅准入 `10-c-1` 只读接口审计，未准入编码 |
+| Task 10-C | `10-c-child1 COMPLETED；10-c-child2 CURRENT；10-c-child3/4 BLOCKED` | `10-c-child1`已完成独立审计，当前节点为`10-c-child2`；`10-c-child3`、`10-c-child4`尚未准入；尚未进行本阶段生产代码修改 |
 | Task 10-D | `BLOCKED — NOT STARTED` | 未准入 |
 | Task 11 / Task 12 | 尚未完成 | Task 11 归属两个OPEN Finding |
 | Phase 7B | `NOT AUTHORIZED` | 不得越级开启 |

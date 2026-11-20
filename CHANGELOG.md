@@ -2,6 +2,16 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-20] Task 10-C子节点命名与规划冻结
+
+- 项目负责人正式指定Task 10-C使用`10-c-childN`编号，其中child表示第几个子节点。
+- `10-c-child1`已由ChatGPT完成独立源码审计。
+- 10-C固定划分为四个子节点：接口审计、规划字段收敛、双手目标转换、专项验证与结项。
+- 当前进入`10-c-child2`，唯一目标为补足PlannedHandTarget的pole_hint_world_xyz与clamp_reach字段。
+- `10-c-child3`和`10-c-child4`尚未准入。
+- 本轮仅进行Markdown状态同步，没有修改生产代码或执行Blender测试。
+- WBC、Arm IK、下肢、ContactModel和10-B大型代码拆分均不属于10-C的授权修改范围。
+
 ### [2026-11-20] Task 10-B负责人验收与Task 10-C审计准入
 
 - Task 10-B经独立源码与测试证据审查，获项目负责人正式验收。

@@ -1,8 +1,8 @@
 # PROJECT_STATE — 当前项目事实与准入状态
 
 > 状态核验日期：2026-11-20
-> 核验源码基线：`f1c5fa231d3f27a9588c5fca6008116c44eafda0`（`waiting-split`，自 `audit/task-10-b-9` 创建）。此 SHA 是本轮进入前基线，不代表后续文档提交 HEAD。
-> 当前任务：`Task 10-C / 10-c-1 — AUDIT IN PROGRESS — CODE FROZEN`（Task 10-B 已于 2026-11-20 获项目负责人正式验收；10-C 生产写入范围目前为零）。
+> 核验源码基线：`9bb8fdf3aeabbe5d7162618dbcc0831de2499247`（`waiting-split`，本轮文档同步前冻结基线）。此 SHA 是本轮进入前基线，不代表后续文档提交 HEAD。
+> **当前任务：Task 10-C / 10-c-child2。** `10-c-child1`源码审计已完成；`10-c-child2`为当前字段收敛子节点，尚未产生生产代码修改。
 
 ## 1. 阶段状态
 | 节点 | 当前状态 | 准入 |
@@ -10,11 +10,17 @@
 | PKG-5 / 09-A、09-B（含09-B-4） | 历史已验收 | 保持已完成，不重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
 | Task 10-B | `COMPLETED — OWNER ACCEPTED` | 2026-11-20 负责人正式验收；大型实现暂存 `waiting-split`，未合入 `master` |
-| Task 10-C | `AUDIT IN PROGRESS — CODE FROZEN` | 仅准入 `10-c-1` 只读接口审计，尚未准入编码 |
+| Task 10-C | `10-c-child1 COMPLETED；10-c-child2 CURRENT；10-c-child3/4 BLOCKED` | 当前进入 `10-c-child2` 准备阶段；本轮文档任务未修改生产代码，`10-c-child3/4` 未准入 |
 | Task 10-D | `BLOCKED — NOT STARTED` | 禁止提前启动 |
 | Task 11 FootLock | 未开始 | 仍有两个历史 Finding |
 | Task 12 联合接口闭环 | 未开始 | 待前序验收 |
 | Phase 7B | `NOT AUTHORIZED` | 不得越级开启 |
+
+### Task 10-C 子节点职责摘要
+- `10-c-child1`：接口及合同审计，已完成。
+- `10-c-child2`：PlannedHandTarget新增两项字段。
+- `10-c-child3`：左右手无损转换及FK/IK仲裁。
+- `10-c-child4`：专项测试及最终验收。
 
 ## 2. 源码确认事实
 - `src/rig/arm_ik.py`：包含事务协调、资源身份/所有权控制、关系恢复、清理挂起、会话准入与双臂复位相关实现。
@@ -44,7 +50,7 @@
 - 重构、模块拆分、外层防御壳迁移等后续工程性整理保持冻结，10-B 大型实现暂存 `waiting-split` 等待后续独立拆分，不带入 10-C。
 
 ## 5. Git / 文档边界
-- Task 10-B已由项目负责人正式验收。大型事务实现及其依赖测试保留于waiting-split；目前未合入master。10-C已获准进入只读接口审计阶段，尚未批准生产代码修改。本次节点变更不代表10-C功能已经完成。
+- Task 10-B已由项目负责人正式验收。大型事务实现及其依赖测试保留于waiting-split；目前未合入master。10-C已完成`10-c-child1`独立源码审计，当前进入`10-c-child2`（本轮文档任务尚未产生生产代码修改），`10-c-child3`/`10-c-child4`尚未准入。本次节点变更不代表10-C功能已经完成。
 - `master` 核验基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`；尚未合并本轮审计分支或 `waiting-split`。
 - 当前事实优先级：真实源码与对应版本测试证据 → 本文件 / `ARCHITECTURE_SYNC.md` / `OPEN_FINDINGS.md` 相互核对 → `AI_SYNC.md`、`HANDOFF.md` 摘要。
 - 历史细节由既有 `CHANGELOG.md`、冻结账本及 `docs/evidence/` 保存；本状态文件不复制旧轮次日志与历史过程。
