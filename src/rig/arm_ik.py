@@ -51,7 +51,15 @@ from src.rig.transform_utils import (
     world_to_local_rotation,
     world_to_local_rotation_quaternion,
 )
+from src.scene_transaction_integrity.layer1 import (
+    _identity_failure_is_uncertain,
+    _safe_object_name,
+)
+from src.scene_transaction_integrity.layer2 import (
+    _safe_object_pointer,
+)
 from src.scene_transaction_integrity.layer3 import (
+    _find_collection_by_name,
     _is_child_collection_linked_by_identity,
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
@@ -248,16 +256,6 @@ def _ensure_character_collection() -> bpy.types.Collection:
     return col
 
 
-def _find_collection_by_name(col_name: str) -> Optional[bpy.types.Collection]:
-    """Resolve a collection by name across scene master collections and user collections."""
-    if bpy.context.scene and bpy.context.scene.collection.name == col_name:
-        return bpy.context.scene.collection
-    for scene in bpy.data.scenes:
-        if scene.collection.name == col_name:
-            return scene.collection
-    return bpy.data.collections.get(col_name)
-
-
 class ExternalControllerNameConflictError(RuntimeError, ValueError):
     """Raised when a controller name is occupied by an external/pre-existing non-EMPTY object (F14-05)."""
     pass
@@ -435,26 +433,6 @@ _ISOLATED_FAILED_ARMATURES: Dict[str, Dict[str, Any]] = {}
 _ARCHIVED_FAILED_D_TOMBSTONES: Dict[str, Dict[str, Any]] = {}
 _FAILED_A_AUDIT_RECORDS: List[Dict[str, Any]] = []
 _DEISOLATION_AUDIT_LOG: List[Dict[str, Any]] = []
-
-
-def _safe_object_name(obj: Any, fallback: str = "<invalid_or_destroyed_object>") -> str:
-    """Safely read a Blender object's name without raising ReferenceError."""
-    if obj is None:
-        return fallback
-    try:
-        return str(obj.name)
-    except BaseException:
-        return fallback
-
-
-def _safe_object_pointer(obj: Any, fallback: int = 0) -> int:
-    """Safely read a Blender object's RNA pointer without raising ReferenceError."""
-    if obj is None:
-        return fallback
-    try:
-        return int(obj.as_pointer())
-    except BaseException:
-        return fallback
 
 
 def _check_original_object_liveness(record: ArmatureSessionIdentityRecord) -> Dict[str, Any]:
@@ -8209,14 +8187,6 @@ def retire_dead_armature_tombstone(
         "evidence": evidence,
         "audit_entry": audit_entry,
     }
-
-
-def _identity_failure_is_uncertain(verification: Dict[str, Any]) -> bool:
-    """Keep indeterminate Blender reads separate from confirmed session invalidation."""
-    return bool(
-        verification.get("object_liveness_status", "UNKNOWN") == "UNKNOWN"
-        or verification.get("identity_verification_uncertain", False)
-    )
 
 
 @contextmanager

@@ -82,3 +82,13 @@ def _is_collection_descendant_of(
         if _is_collection_descendant_of(candidate_child, sub, visited):
             return True
     return False
+
+
+def _find_collection_by_name(col_name: str) -> Optional[bpy.types.Collection]:
+    """Resolve a collection by name across scene master collections and user collections."""
+    if bpy.context.scene and bpy.context.scene.collection.name == col_name:
+        return bpy.context.scene.collection
+    for scene in bpy.data.scenes:
+        if scene.collection.name == col_name:
+            return scene.collection
+    return bpy.data.collections.get(col_name)
