@@ -59,10 +59,12 @@ from src.scene_transaction_integrity.layer2 import (
     _safe_object_pointer,
 )
 from src.scene_transaction_integrity.layer3 import (
+    ExternalControllerNameConflictError,
     _find_collection_by_name,
     _is_child_collection_linked_by_identity,
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
+    _matrix_equals,
 )
 from src.scene_transaction_integrity.layer4 import (
     _apply_arm_ik_prebend_hint,
@@ -254,11 +256,6 @@ def _ensure_character_collection() -> bpy.types.Collection:
     _trigger_fault_injection("character_collection_after_link", {"col": col, "col_ptr": new_col_ptr, "scene": scene})
 
     return col
-
-
-class ExternalControllerNameConflictError(RuntimeError, ValueError):
-    """Raised when a controller name is occupied by an external/pre-existing non-EMPTY object (F14-05)."""
-    pass
 
 
 # =============================================================================
@@ -2147,20 +2144,6 @@ def _authorized_unlink_object_from_collection(
         _RelationshipOperationState.CONFIRMED,
     )
     return op_record
-
-
-def _matrix_equals(m1: Any, m2: Any, tol: float = 1e-5) -> bool:
-    """Check element-wise matrix equality within specified tolerance."""
-    if m1 is None or m2 is None:
-        return m1 is m2
-    try:
-        for r in range(4):
-            for c in range(4):
-                if abs(float(m1[r][c]) - float(m2[r][c])) > tol:
-                    return False
-        return True
-    except (IndexError, TypeError, ValueError):
-        return False
 
 
 def _controller_role_for_name(name: str) -> tuple[str, str] | None:
