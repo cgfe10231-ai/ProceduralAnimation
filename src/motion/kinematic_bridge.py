@@ -19,7 +19,7 @@ Architectural Principles Enforced:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import math
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -61,18 +61,26 @@ from src.motion.framework import (
 from src.motion.joint_limits import JointModel
 from src.motion.rigid_link import compute_whole_body_com
 from src.motion.whole_body_controller import (
+    EndEffectorFeedback,
     EndEffectorTarget,
     UnmetConstraint,
     WholeBodyControlResult,
     WholeBodyControlTargets,
     WholeBodyController,
 )
+from src.rig.arm_ik import MAX_ARM_REACH, MIN_ARM_REACH, get_arm_ik_state
 from src.rig.foot_contact import (
     evaluate_foot_support,
     lock_foot_contact,
     unlock_foot_contact,
 )
-from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET, IK_TARGET_NAMES
+from src.rig.ik import (
+    ANKLE_REST_Z,
+    HIP_X_OFFSET,
+    IK_TARGET_NAMES,
+    MAX_LEG_REACH,
+    get_leg_ik_state,
+)
 
 
 # =============================================================================
@@ -384,6 +392,375 @@ class KinematicBridgeExecutor:
         )
 
         # ---------------------------------------------------------------------
+        # Final Scene Evaluation & Post-ROM Feedback Reconciliation
+        # ---------------------------------------------------------------------
+        bpy.context.view_layer.update()
+
+        # [INTRODUCED 2026-11-21T16:45:34+08:00]
+        # NODE: Task 10-C / 10-c-child4
+        # FUNCTION: Inline post-ROM final frame feedback reconciliation block inside KinematicBridgeExecutor.execute_frame()
+        # PURPOSE: Reconcile final post-ROM EndEffectorFeedback (foot_L, foot_R, hand_L, hand_R), max_end_effector_error_m, is_all_reachable, and unmet_constraints from read-only rig state queries on the evaluated final scene before Phase 4/5/6 derivation, publishing atomically via dataclasses.replace.
+        # REASON: WholeBodyController.execute_frame() populates EndEffectorFeedback prior to ROM clamping when enforce_rom_clamping=True and has_rom_violation=True; approved single-point inline reconciliation closes the Bridge feedback timing gap without modifying WBC/ROM/IK modules or introducing new functions.
+        if enforce_rom_clamping is True and wbc_res.has_rom_violation is True:
+            _tol_pos_m = 0.005
+            _tol_rot_deg = 1.0
+            _reconciled_effectors: Dict[str, EndEffectorFeedback] = dict(wbc_res.end_effectors)
+            _reconciled_unmet: List[UnmetConstraint] = list(wbc_res.unmet_constraints)
+            _reconciled_max_error = 0.0
+            _reconciled_all_reachable = True
+
+            # Read-only final foot sampling (foot_L, foot_R)
+            for _side, _foot_tgt in (("L", wbc_targets.foot_L), ("R", wbc_targets.foot_R)):
+                _eff_id = f"foot_{_side}"
+                _orig_fb = wbc_res.end_effectors.get(_eff_id)
+                _foot_disabled = (
+                    _foot_tgt is None
+                    or not _foot_tgt.enabled
+                    or _foot_tgt.weight <= 0.0
+                    or (_orig_fb is not None and not _orig_fb.enabled)
+                )
+                _leg_state = get_leg_ik_state(arm, _side)
+                _ankle_vec = _leg_state["ankle_world"]
+                _actual_pos = (float(_ankle_vec.x), float(_ankle_vec.y), float(_ankle_vec.z))
+                if not all(math.isfinite(_c) for _c in _actual_pos):
+                    raise ValueError(f"Non-finite final ankle_world sampled for {_eff_id}: {_actual_pos!r}")
+
+                if _foot_disabled:
+                    if _orig_fb is not None:
+                        _reconciled_effectors[_eff_id] = replace(
+                            _orig_fb,
+                            enabled=False,
+                            weight=0.0,
+                            actual_world_xyz=_actual_pos,
+                            position_error_m=0.0,
+                            is_reachable=True,
+                            strictly_in_reach=True,
+                            reach_distance_m=0.0,
+                        )
+                    else:
+                        _reconciled_effectors[_eff_id] = EndEffectorFeedback(
+                            effector_id=_eff_id,
+                            enabled=False,
+                            weight=0.0,
+                            requested_world_xyz=(0.0, 0.0, 0.0),
+                            actual_world_xyz=_actual_pos,
+                            position_error_m=0.0,
+                            is_reachable=True,
+                            strictly_in_reach=True,
+                            reach_distance_m=0.0,
+                            max_reach_m=MAX_LEG_REACH,
+                        )
+                    continue
+
+                _hip_vec = _leg_state["hip_world"]
+                _hip_pos = (float(_hip_vec.x), float(_hip_vec.y), float(_hip_vec.z))
+                if not all(math.isfinite(_c) for _c in _hip_pos):
+                    raise ValueError(f"Non-finite final hip_world sampled for {_eff_id}: {_hip_pos!r}")
+
+                _req_pos = (
+                    _orig_fb.requested_world_xyz
+                    if _orig_fb is not None
+                    else _foot_tgt.target_world_xyz
+                )
+                _pos_err = math.sqrt(
+                    (_actual_pos[0] - float(_req_pos[0])) ** 2
+                    + (_actual_pos[1] - float(_req_pos[1])) ** 2
+                    + (_actual_pos[2] - float(_req_pos[2])) ** 2
+                )
+                _req_dist = math.sqrt(
+                    (float(_req_pos[0]) - _hip_pos[0]) ** 2
+                    + (float(_req_pos[1]) - _hip_pos[1]) ** 2
+                    + (float(_req_pos[2]) - _hip_pos[2]) ** 2
+                )
+                _actual_dist = math.sqrt(
+                    (_actual_pos[0] - _hip_pos[0]) ** 2
+                    + (_actual_pos[1] - _hip_pos[1]) ** 2
+                    + (_actual_pos[2] - _hip_pos[2]) ** 2
+                )
+                if not (math.isfinite(_pos_err) and math.isfinite(_req_dist) and math.isfinite(_actual_dist)):
+                    raise ValueError(
+                        f"Non-finite reconciled foot metrics for {_eff_id}: "
+                        f"pos_err={_pos_err!r}, req_dist={_req_dist!r}, actual_dist={_actual_dist!r}"
+                    )
+
+                _is_reach = (_req_dist <= MAX_LEG_REACH + 1e-4)
+                _strictly_in_reach = (_req_dist <= MAX_LEG_REACH + 1e-4)
+                _reconciled_max_error = max(_reconciled_max_error, _pos_err)
+
+                if not _is_reach or _pos_err > _tol_pos_m:
+                    _reconciled_all_reachable = False
+                    if not any(
+                        _uc.category == "REACHABILITY" and _uc.target_name == _eff_id
+                        for _uc in _reconciled_unmet
+                    ):
+                        _reconciled_unmet.append(
+                            UnmetConstraint(
+                                category="REACHABILITY",
+                                target_name=_eff_id,
+                                description=(
+                                    f"Foot {_side} target exceeds maximum leg reach "
+                                    f"({_req_dist:.3f}m > {MAX_LEG_REACH:.3f}m) or post-ROM tracking error "
+                                    f"{_pos_err * 1000:.1f}mm > {_tol_pos_m * 1000:.1f}mm"
+                                ),
+                                error_amount=_pos_err,
+                                details={
+                                    "requested_reach": _req_dist,
+                                    "applied_reach": _actual_dist,
+                                    "max_reach": MAX_LEG_REACH,
+                                },
+                            )
+                        )
+                    if not any(
+                        _uc.category == "ROM_CONFLICT" and _uc.target_name == _eff_id
+                        for _uc in _reconciled_unmet
+                    ):
+                        _reconciled_unmet.append(
+                            UnmetConstraint(
+                                category="ROM_CONFLICT",
+                                target_name=_eff_id,
+                                description=(
+                                    f"End effector '{_eff_id}' cannot satisfy requested target after ROM clamping "
+                                    f"(final requested error = {_pos_err * 1000:.2f} mm)"
+                                ),
+                                error_amount=_pos_err,
+                                details={
+                                    "requested_reach": _req_dist,
+                                    "applied_reach": _actual_dist,
+                                    "max_reach": MAX_LEG_REACH,
+                                },
+                            )
+                        )
+
+                if _orig_fb is not None:
+                    _reconciled_effectors[_eff_id] = replace(
+                        _orig_fb,
+                        actual_world_xyz=_actual_pos,
+                        position_error_m=_pos_err,
+                        is_reachable=_is_reach,
+                        strictly_in_reach=_strictly_in_reach,
+                        reach_distance_m=_actual_dist,
+                    )
+                else:
+                    _reconciled_effectors[_eff_id] = EndEffectorFeedback(
+                        effector_id=_eff_id,
+                        enabled=True,
+                        weight=_foot_tgt.weight,
+                        requested_world_xyz=_req_pos,
+                        actual_world_xyz=_actual_pos,
+                        position_error_m=_pos_err,
+                        requested_rotation_deg=_foot_tgt.target_rotation_deg,
+                        is_reachable=_is_reach,
+                        strictly_in_reach=_strictly_in_reach,
+                        reach_distance_m=_actual_dist,
+                        max_reach_m=MAX_LEG_REACH,
+                    )
+
+            # Read-only final hand sampling (hand_L, hand_R)
+            for _side, _hand_tgt in (("L", wbc_targets.hand_L), ("R", wbc_targets.hand_R)):
+                _eff_id = f"hand_{_side}"
+                _orig_fb = wbc_res.end_effectors.get(_eff_id)
+                _hand_disabled = (
+                    _hand_tgt is None
+                    or not _hand_tgt.enabled
+                    or _hand_tgt.weight <= 0.0
+                    or (_orig_fb is not None and not _orig_fb.enabled)
+                )
+                _arm_state = get_arm_ik_state(arm, _side)
+                _wrist_vec = _arm_state["wrist_world"]
+                _actual_pos = (float(_wrist_vec.x), float(_wrist_vec.y), float(_wrist_vec.z))
+                if not all(math.isfinite(_c) for _c in _actual_pos):
+                    raise ValueError(f"Non-finite final wrist_world sampled for {_eff_id}: {_actual_pos!r}")
+
+                if _hand_disabled:
+                    if _orig_fb is not None:
+                        _reconciled_effectors[_eff_id] = replace(
+                            _orig_fb,
+                            enabled=False,
+                            weight=0.0,
+                            actual_world_xyz=_actual_pos,
+                            position_error_m=0.0,
+                            actual_rotation_deg=None,
+                            orientation_error_deg=None,
+                            is_reachable=True,
+                            strictly_in_reach=True,
+                            reach_distance_m=0.0,
+                        )
+                    else:
+                        _reconciled_effectors[_eff_id] = EndEffectorFeedback(
+                            effector_id=_eff_id,
+                            enabled=False,
+                            weight=0.0,
+                            requested_world_xyz=(0.0, 0.0, 0.0),
+                            actual_world_xyz=_actual_pos,
+                            position_error_m=0.0,
+                            is_reachable=True,
+                            strictly_in_reach=True,
+                            reach_distance_m=0.0,
+                            max_reach_m=MAX_ARM_REACH,
+                        )
+                    continue
+
+                _shoulder_vec = _arm_state["shoulder_world"]
+                _shoulder_pos = (float(_shoulder_vec.x), float(_shoulder_vec.y), float(_shoulder_vec.z))
+                if not all(math.isfinite(_c) for _c in _shoulder_pos):
+                    raise ValueError(f"Non-finite final shoulder_world sampled for {_eff_id}: {_shoulder_pos!r}")
+
+                _req_pos = (
+                    _orig_fb.requested_world_xyz
+                    if _orig_fb is not None
+                    else _hand_tgt.target_world_xyz
+                )
+                _req_rot = (
+                    _orig_fb.requested_rotation_deg
+                    if _orig_fb is not None
+                    else _hand_tgt.target_rotation_deg
+                )
+                _pos_err = math.sqrt(
+                    (_actual_pos[0] - float(_req_pos[0])) ** 2
+                    + (_actual_pos[1] - float(_req_pos[1])) ** 2
+                    + (_actual_pos[2] - float(_req_pos[2])) ** 2
+                )
+                _req_dist = math.sqrt(
+                    (float(_req_pos[0]) - _shoulder_pos[0]) ** 2
+                    + (float(_req_pos[1]) - _shoulder_pos[1]) ** 2
+                    + (float(_req_pos[2]) - _shoulder_pos[2]) ** 2
+                )
+                _actual_dist = math.sqrt(
+                    (_actual_pos[0] - _shoulder_pos[0]) ** 2
+                    + (_actual_pos[1] - _shoulder_pos[1]) ** 2
+                    + (_actual_pos[2] - _shoulder_pos[2]) ** 2
+                )
+                _raw_hand_euler = _arm_state.get("hand_world_euler_deg")
+                _actual_rot_deg = (
+                    tuple(float(_v) for _v in _raw_hand_euler)
+                    if _raw_hand_euler is not None
+                    else None
+                )
+                _rot_err = (
+                    float(_arm_state["rotation_error_deg"])
+                    if _req_rot is not None
+                    else None
+                )
+                if not (math.isfinite(_pos_err) and math.isfinite(_req_dist) and math.isfinite(_actual_dist)):
+                    raise ValueError(
+                        f"Non-finite reconciled hand metrics for {_eff_id}: "
+                        f"pos_err={_pos_err!r}, req_dist={_req_dist!r}, actual_dist={_actual_dist!r}"
+                    )
+                if _actual_rot_deg is not None and not all(math.isfinite(_v) for _v in _actual_rot_deg):
+                    raise ValueError(f"Non-finite final hand_world_euler_deg for {_eff_id}: {_actual_rot_deg!r}")
+                if _rot_err is not None and not math.isfinite(_rot_err):
+                    raise ValueError(f"Non-finite final rotation_error_deg for {_eff_id}: {_rot_err!r}")
+
+                _is_reach = (MIN_ARM_REACH <= _req_dist <= MAX_ARM_REACH + 1e-4)
+                _strictly_in_reach = (_req_dist < MAX_ARM_REACH - 1e-4)
+                _reconciled_max_error = max(_reconciled_max_error, _pos_err)
+
+                if not _is_reach or _pos_err > _tol_pos_m:
+                    _reconciled_all_reachable = False
+                    if not any(
+                        _uc.category == "REACHABILITY" and _uc.target_name == _eff_id
+                        for _uc in _reconciled_unmet
+                    ):
+                        _reconciled_unmet.append(
+                            UnmetConstraint(
+                                category="REACHABILITY",
+                                target_name=_eff_id,
+                                description=(
+                                    f"Hand {_side} target exceeds maximum arm reach "
+                                    f"({_req_dist:.3f}m > {MAX_ARM_REACH:.3f}m) or post-ROM tracking error "
+                                    f"{_pos_err * 1000:.1f}mm > {_tol_pos_m * 1000:.1f}mm"
+                                ),
+                                error_amount=_pos_err,
+                                details={
+                                    "requested_reach": _req_dist,
+                                    "applied_reach": _actual_dist,
+                                    "max_reach": MAX_ARM_REACH,
+                                },
+                            )
+                        )
+                    if not any(
+                        _uc.category == "ROM_CONFLICT" and _uc.target_name == _eff_id
+                        for _uc in _reconciled_unmet
+                    ):
+                        _reconciled_unmet.append(
+                            UnmetConstraint(
+                                category="ROM_CONFLICT",
+                                target_name=_eff_id,
+                                description=(
+                                    f"End effector '{_eff_id}' cannot satisfy requested target after ROM clamping "
+                                    f"(final requested error = {_pos_err * 1000:.2f} mm)"
+                                ),
+                                error_amount=_pos_err,
+                                details={
+                                    "requested_reach": _req_dist,
+                                    "applied_reach": _actual_dist,
+                                    "max_reach": MAX_ARM_REACH,
+                                },
+                            )
+                        )
+
+                if _rot_err is not None and _rot_err > _tol_rot_deg:
+                    if not any(
+                        _uc.category == "ORIENTATION_ERROR" and _uc.target_name == _eff_id
+                        for _uc in _reconciled_unmet
+                    ):
+                        _reconciled_unmet.append(
+                            UnmetConstraint(
+                                category="ORIENTATION_ERROR",
+                                target_name=_eff_id,
+                                description=(
+                                    f"Hand {_side} 3D orientation alignment error {_rot_err:.2f} deg "
+                                    f"> tolerance {_tol_rot_deg:.1f} deg after ROM clamping"
+                                ),
+                                error_amount=_rot_err,
+                            )
+                        )
+
+                if _orig_fb is not None:
+                    _reconciled_effectors[_eff_id] = replace(
+                        _orig_fb,
+                        actual_world_xyz=_actual_pos,
+                        position_error_m=_pos_err,
+                        actual_rotation_deg=_actual_rot_deg,
+                        orientation_error_deg=_rot_err,
+                        is_reachable=_is_reach,
+                        strictly_in_reach=_strictly_in_reach,
+                        reach_distance_m=_actual_dist,
+                    )
+                else:
+                    _reconciled_effectors[_eff_id] = EndEffectorFeedback(
+                        effector_id=_eff_id,
+                        enabled=True,
+                        weight=_hand_tgt.weight,
+                        requested_world_xyz=_req_pos,
+                        actual_world_xyz=_actual_pos,
+                        position_error_m=_pos_err,
+                        requested_rotation_deg=_req_rot,
+                        actual_rotation_deg=_actual_rot_deg,
+                        orientation_error_deg=_rot_err,
+                        is_reachable=_is_reach,
+                        strictly_in_reach=_strictly_in_reach,
+                        reach_distance_m=_actual_dist,
+                        max_reach_m=MAX_ARM_REACH,
+                    )
+
+            # Atomic publication of reconciled WholeBodyControlResult
+            _reconciled_success = (
+                bool(wbc_res.success)
+                and (len(_reconciled_unmet) == 0)
+                and _reconciled_all_reachable
+                and (not wbc_res.has_rom_violation)
+            )
+            wbc_res = replace(
+                wbc_res,
+                success=_reconciled_success,
+                end_effectors=_reconciled_effectors,
+                unmet_constraints=_reconciled_unmet,
+                max_end_effector_error_m=_reconciled_max_error,
+                is_all_reachable=_reconciled_all_reachable,
+            )
+
+        # ---------------------------------------------------------------------
         # Phase 4: Truthful Validation (ROM, Reach, Contacts)
         # ---------------------------------------------------------------------
         unmet = list(wbc_res.unmet_constraints)
@@ -391,9 +768,8 @@ class KinematicBridgeExecutor:
         rom_viols = wbc_res.rom_validation.violations
 
         # ---------------------------------------------------------------------
-        # Phase 5: Blender Scene Evaluation & Read-Only Physics Telemetry
+        # Phase 5: Read-Only Physics Telemetry (Final Scene Evaluated Above)
         # ---------------------------------------------------------------------
-        bpy.context.view_layer.update()
 
         # Telemetry A: Center of Mass (CoM)
         com_res = compute_whole_body_com(arm, self.controller.mass_distribution, update_scene=False)
