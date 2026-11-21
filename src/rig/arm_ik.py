@@ -52,6 +52,9 @@ from src.rig.transform_utils import (
     world_to_local_rotation_quaternion,
 )
 from src.scene_transaction_integrity.layer4 import (
+    _apply_arm_ik_prebend_hint,
+    _apply_arm_ik_prebend_hint_side,
+    _resolve_armature,
     _validate_bool,
     _validate_influence,
     _validate_side,
@@ -84,15 +87,6 @@ MIN_ARM_REACH: float = 0.08  # Minimum distance avoiding degenerate zero-length 
 
 DEFAULT_POLE_BACKWARD_OFFSET: float = 0.40  # Meters backward (-Y) from arm plane
 DEFAULT_POLE_OUTWARD_OFFSET: float = 0.08   # Meters outward (X) from arm plane
-
-
-def _resolve_armature(armature_obj: Optional[bpy.types.Object] = None) -> bpy.types.Object:
-    """Resolve and validate the CharacterArmature object."""
-    if armature_obj is None:
-        armature_obj = bpy.data.objects.get("CharacterArmature")
-    if armature_obj is None or armature_obj.type != "ARMATURE":
-        raise RuntimeError("Valid CharacterArmature object not found")
-    return armature_obj
 
 
 def _cleanup_failed_character_collection_registration(
@@ -8709,31 +8703,6 @@ def _get_or_create_empty(
     obj.empty_display_type = display_type
     obj.empty_display_size = display_size
     return obj, False
-
-
-def _apply_arm_ik_prebend_hint_side(arm: bpy.types.Object, side: str) -> None:
-    """Apply a small sagittal pre-bend hint to a single arm side if currently unbent."""
-    p_up = arm.pose.bones[f"upper_arm.{side}"]
-    p_fore = arm.pose.bones[f"forearm.{side}"]
-    p_hand = arm.pose.bones[f"hand.{side}"]
-
-    p_up.rotation_mode = "XYZ"
-    p_fore.rotation_mode = "XYZ"
-    p_hand.rotation_mode = "XYZ"
-
-    # Apply slight pre-bend only if currently zero
-    euler_mag = p_up.rotation_euler.to_matrix().to_quaternion().angle
-    if euler_mag < 1e-4:
-        p_up.rotation_euler = Euler((math.radians(2.0), 0.0, 0.0), "XYZ")
-    euler_mag_fore = p_fore.rotation_euler.to_matrix().to_quaternion().angle
-    if euler_mag_fore < 1e-4:
-        p_fore.rotation_euler = Euler((math.radians(4.0), 0.0, 0.0), "XYZ")
-
-
-def _apply_arm_ik_prebend_hint(arm: bpy.types.Object) -> None:
-    """Apply a small sagittal pre-bend hint to upper arm and forearm across both sides."""
-    for side in ("L", "R"):
-        _apply_arm_ik_prebend_hint_side(arm, side)
 
 
 def setup_arm_ik(
