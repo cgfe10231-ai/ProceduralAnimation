@@ -2,6 +2,23 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-21] Task 10-C四子节点完成及负责人正式验收
+
+- Task 10-C全部四个子节点完成，项目负责人批准结项。
+- `10-c-child1`完成独立审计。
+- `10-c-child2`完成PlannedHandTarget字段扩展，10/10专项通过。
+- `10-c-child3`完成左右手无损转换及启用侧权重校验，15/15专项通过。
+- `10-c-child4`完成原定最终接口验证，C4-T01～T06共6/6专项通过。
+- 经负责人额外明确授权，Bridge新增`_reconcile_post_rom_feedback()`，修复Bridge路径ROM截断后的最终帧反馈一致性；C4-T07～T13共7/7专项通过。
+- 本轮ROM反馈修复没有修改WBC、JointModel ROM或Arm IK生产源码。
+- 测试运行于Blender 5.1.1，相关原始证据保留。
+- 四阶段共38项测试记录通过，包含复用历史用例，不代表38个完全独立场景。
+- 10-C验收HEAD：`f94ce0517373be61fe26edbae9936ec34c07446d`。
+- 10-C生产修改尚未合入master。
+- 下一工程执行顺序：10-B独立拆分、10-B/10-C受控主干集成、10-D独立上肢运动、Blender GUI视觉验收、Task 10整体结项。
+- 10-D仍未准入；Blender GUI视觉验收尚未完成。
+- 本轮仅同步Markdown，不修改生产代码，不执行测试，不合并master。
+
 ### [2026-11-20] Task 10-c-child3验收与child4准入
 
 - `10-c-child3` 通过 15/15 专项验证（C3-T01～T15，Blender 5.1.1，实际退出码 0，生产文件 `src/motion/kinematic_bridge.py` Blob `9bda0a3f82d679a74b3358e9ebfbc92349e52593` 测试前后一致；原始证据归档于 `docs/evidence/10-c-child3/`）。

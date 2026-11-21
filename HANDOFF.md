@@ -1,24 +1,23 @@
 # HANDOFF — 当前项目交接卡片
 
-> 核验日期：2026-11-20；工作分支：`task/10-c-child4`（来源基线：`task/10-c-child3` `9f7ad1af04c4a542df0e73843be49eb5f8c55136`）；`waiting-split` 基线：`a72fff3738eb358ba6e9e4e66452abab6f6c6526`；`master` 基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`（未合入）。
+> 核验日期：2026-11-21；10-C 验收分支：`task/10-c-child4`（验收 HEAD：`f94ce0517373be61fe26edbae9936ec34c07446d`，生产文件 `src/motion/kinematic_bridge.py` Blob：`abdc74455075b83f7188c3dffabc64e456258326`）；`waiting-split` 基线：`a72fff3738eb358ba6e9e4e66452abab6f6c6526`；`master` 基线：`a2c9b383b71fb2e84bc453cf4cd7926141d61dd9`（均未合入）。
 > 本文件是摘要，不授予任务准入；须以 `PROJECT_STATE.md`、`ARCHITECTURE_SYNC.md`、`OPEN_FINDINGS.md` 及 Git 实况核对。
 
 ## 当前交接状态
-- **当前节点：10-c-child4**
-- **当前执行权限**：仅授权执行 C4-T01～C4-T06 最终接口验证与原始证据归档，**不允许任何生产代码或测试源码修改**；`10-c-child4` 尚未完成，Task 10-C 整体尚未完成最终验收。
-- 10-A：`COMPLETED — ARCHIVED`；10-B：`COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收）；10-C：`10-c-child1 COMPLETED — AUDITED；10-c-child2 COMPLETED — OWNER ACCEPTED；10-c-child3 COMPLETED — OWNER ACCEPTED；10-c-child4 CURRENT — VERIFICATION AUTHORIZED`；10-D：`BLOCKED — NOT STARTED`。
+- **当前工作：Task 10-C文档结项。**
+- **Task 10-C：`COMPLETED — OWNER ACCEPTED`**（四个 child 节点全部完成，合计 38 项分阶段测试记录通过，Blender 5.1.1，非 Blender GUI 视觉验收；实现保留于 `task/10-c-child4`，尚未合入 `master`）。
+- **下一工程步骤**：10-B 大型代码拆分（**尚未执行**，尚未授权）。
+- **后续批准顺序**：受控集成 `master` → Task 10-D → Blender GUI 视觉验收 → Task 10 整体验收（当前仅批准文档结项，不批准代码拆分、`master` 合并或 10-D 开发）。
+- 10-A：`COMPLETED — ARCHIVED`；10-B：`COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型事务代码暂存 `waiting-split`，尚未拆分）；10-C：`COMPLETED — OWNER ACCEPTED`；10-D：`BLOCKED — NOT STARTED`。
 - Task 11：`FIND-R3-03` / `FIND-R3-04` 仍 OPEN；Task 12 与 Phase 7B 未准入。
-- 10-B已正式验收；大型事务代码暂存waiting-split，等待独立拆分任务，不得带入10-C开发。
-- `10-c-child2`（10/10 PASS，证据：`docs/evidence/10-c-child2/`）与 `10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0，证据：`docs/evidence/10-c-child3/`）均已获负责人验收通过，已批准进入 `10-c-child4`。
-- 不允许修改 `kinematic_bridge.py`、`whole_body_controller.py`、`arm_ik.py`、下肢及接触模块或任何测试源码。
-- 不允许将10-B代码重构、全身事务或其他节点的缺陷加入10-C。
+- 10-C 证据路径：`docs/evidence/10-c-child2/`（10/10 PASS，原始证据未独立记录退出码）、`docs/evidence/10-c-child3/`（15/15 PASS，退出码 0）、`docs/evidence/10-c-child4/`（C4-T01～T06，6/6 PASS，退出码 0）、`docs/evidence/10-c-child4/post_rom_reconcile/`（C4-T07～T13，7/7 PASS，退出码 0）。
 
 | 编号 | 工作 | 状态 |
 |---|---|---|
 | 10-c-child1 | 独立审计 | `COMPLETED — AUDITED` |
 | 10-c-child2 | 两项规划字段 | `COMPLETED — OWNER ACCEPTED` |
 | 10-c-child3 | 双手目标转换及仲裁 | `COMPLETED — OWNER ACCEPTED` |
-| 10-c-child4 | 专项测试及验收 | `CURRENT — VERIFICATION AUTHORIZED` |
+| 10-c-child4 | 专项测试、ROM后Bridge反馈协调及验收 | `COMPLETED — OWNER ACCEPTED` |
 
 ## 10-B 已归档验证证据
 | 范围 | 记录 | 边界 |

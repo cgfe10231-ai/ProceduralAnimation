@@ -1,11 +1,11 @@
 # ARCHITECTURE_SYNC：工程动态架构与模块调用同步
 
-> **核验日期**：2026-11-20
-> **核验源码基线**：`9f7ad1af04c4a542df0e73843be49eb5f8c55136`（`task/10-c-child4`，自 `task/10-c-child3` 分出）。
+> **核验日期**：2026-11-21
+> **核验源码基线**：`f94ce0517373be61fe26edbae9936ec34c07446d`（`task/10-c-child4`，未合入 `master`；生产文件 `src/motion/kinematic_bridge.py` Blob：`abdc74455075b83f7188c3dffabc64e456258326`）。
 > **文档职责**：记录真实存在的模块、调用链、职责和当前任务进度；不修改 `ARCHITECTURE.md` 的永久规则。
 > **10-A**：`COMPLETED — ARCHIVED`。
 > **10-B**：`COMPLETED — OWNER ACCEPTED`（2026-11-20 由项目负责人正式验收通过；大型事务实现保留于 `waiting-split`，未合入 `master`；不再将 `10-b-10 → 10-b-11` 视为当前正在执行的节点）。
-> **10-C**：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。
+> **10-C**：`COMPLETED — OWNER ACCEPTED`（2026-11-21 全部四个子节点 `10-c-child1`～`10-c-child4` 完成并获项目负责人验收；合计 38 项分阶段测试记录通过，Blender 5.1.1；实现保留于 `task/10-c-child4`，尚未合入 `master`；不代表 Task 10-D 或 Blender GUI 视觉验收已完成）。
 > **10-D**：`BLOCKED — NOT STARTED`，未准入。
 > **Task 11 / Task 12**：未完成；Phase 7B `NOT AUTHORIZED`。
 > **现行实现核对**：`arm_ik.py` 包含统一事务、授权与清理；`whole_body_controller.py` 包含帧级快照/恢复与双臂事务协调。WBC 全身帧级合同不重新计为 10-B 未完成任务。
@@ -298,7 +298,7 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 | 08 Rig | 刚体平移与世界空间隔离回归 | `COMPLETED / VERIFIED` |
 | 09-A | Lower-Limb Ground × Reach：三维地面高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；`10-C`：`10-c-child1` `COMPLETED — AUDITED`、`10-c-child2` `COMPLETED — OWNER ACCEPTED`、`10-c-child3` `COMPLETED — OWNER ACCEPTED`、`10-c-child4` `CURRENT — VERIFICATION AUTHORIZED`；`10-D` `BLOCKED — NOT STARTED` |
+| 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人验收，暂存 `waiting-split`）；`10-C` `COMPLETED — OWNER ACCEPTED`（2026-11-21 负责人验收：`10-c-child1` `COMPLETED — AUDITED`、`10-c-child2` `COMPLETED — OWNER ACCEPTED`、`10-c-child3` `COMPLETED — OWNER ACCEPTED`、`10-c-child4` `COMPLETED — OWNER ACCEPTED`，暂存 `task/10-c-child4` 未合入 `master`）；`10-D` `BLOCKED — NOT STARTED` |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | 待修复 |
 | 12 | PKG-5 综合接口闭环和全仓联合验收 | 待 10、11 完成后执行 |
 
@@ -407,13 +407,13 @@ M_{\mathrm{parent\_inverse}}
 
 ### 4.2 节点 10：Upper-Limb IK/FK
 
-> **版本边界**：本节包含历史任务设计与实现过程；涉及旧节点“当前”措辞时，均以本文件顶部和第8节的2026-11-20状态为准；合同正文不作追认或重写。
+> **版本边界**：本节包含历史任务设计与实现过程；涉及旧节点“当前”措辞时，均以本文件顶部和第8节的2026-11-21状态为准；合同正文不作追认或重写。
 
 状态（分阶段精确状态）：
 
 - **10-A**：已归档验收（`COMPLETED — ARCHIVED`）。
 - **10-B**：`COMPLETED — OWNER ACCEPTED`（批准基准 `124747e900a1db5790ed5f4159f561dba19890ff`；2026-11-20 项目负责人正式验收通过，fix-7 自动化回归证据保留，大型事务实现暂存 `waiting-split` 未合入 `master`；12 项批准合同正文不变，WBC 全身帧级合同不重新计为 10-B 未完成任务）。
-- **10-C**：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。
+- **10-C**：`COMPLETED — OWNER ACCEPTED`（2026-11-21 `10-c-child1`～`10-c-child4` 全部完成并获项目负责人验收，38 项分阶段测试记录通过，Blender 5.1.1；生产实现保留于 `task/10-c-child4`，尚未合入 `master`；不代表 Task 10-D 或 Blender GUI 视觉验收已完成）。
 - **10-D**：未准入（`BLOCKED — NOT STARTED`）。
 
 正式范围：
@@ -535,7 +535,7 @@ Influence 合同：
 
 #### 4.2.4 10-C：PlannedHandTarget、Bridge 与 WBC 无损接口合同
 
-> **10-C当前执行边界：**Task 10-C：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权 C4-T01～C4-T06 最终接口验证与原始证据归档，不允许任何生产代码或测试源码修改；Task 10-C 整体尚未完成最终验收。本边界不修改原批准架构合同。
+> **10-C当前状态：**Task 10-C 已于 2026-11-21 全部完成并获项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`）；四个子节点 `10-c-child1`～`10-c-child4` 全部完成，合计 38 项分阶段测试记录通过（Blender 5.1.1），相关实现保留于 `task/10-c-child4`，尚未合入 `master`。本状态同步不修改原批准架构合同，不代表 Task 10-D 或 Blender GUI 视觉验收已完成。
 
 ### Task 10-C正式子节点划分（2026-11-20项目负责人批准）
 
@@ -552,7 +552,7 @@ Task 10-C采用独立子节点编号：
 | `10-c-child1` | 现有上肢目标数据结构、转换链、FK/IK仲裁、坐标语义及历史兼容性独立审计 | 只读 | `COMPLETED — AUDITED` |
 | `10-c-child2` | 补足PlannedHandTarget的Pole Hint与Reach Clamp表达能力 | `src/motion/kinematic_bridge.py`中的PlannedHandTarget定义 | `COMPLETED — OWNER ACCEPTED` |
 | `10-c-child3` | 补齐左右手目标转换及FK/IK仲裁语义，保持接触意图独立 | `src/motion/kinematic_bridge.py`中的convert_planned_pose_to_wbc_targets() | `COMPLETED — OWNER ACCEPTED` |
-| `10-c-child4` | 10-C专项验证、历史兼容回归和最终独立验收 | 只读验收与原始证据归档；禁止修改生产代码 | `CURRENT — VERIFICATION AUTHORIZED` |
+| `10-c-child4` | 10-C专项验证、历史兼容回归和最终独立验收 | 只读验收与原始证据归档；另获负责人批准于 `src/motion/kinematic_bridge.py` 新增 `_reconcile_post_rom_feedback()` 修复 Bridge ROM 后反馈一致性 | `COMPLETED — OWNER ACCEPTED` |
 
 #### 10-c-child1：已完成审计
 
@@ -608,7 +608,7 @@ clamp_reach: bool = True
 
 不得新增第二套转换器。
 
-#### 10-c-child4：当前执行节点（专项验证及验收）
+#### 10-c-child4：已完成并获负责人验收（专项验证及验收）
 
 必须覆盖六组：
 
@@ -622,6 +622,22 @@ clamp_reach: bool = True
 测试方案和允许修改的测试文件必须经过ChatGPT独立审计后冻结。
 
 测试失败不得由Antigravity自行修改生产代码。
+
+### Task 10-C最终验收记录（2026-11-21）
+
+Task 10-C的四个子节点已经完成并获项目负责人验收。
+
+PlannedHandTarget已补齐Pole Hint与Reach Clamp字段；Bridge已完成左右手无损目标传递及启用侧权重校验。
+
+child4完成手腕位置、手骨姿态、FK/IK仲裁、可达性、ROM反馈及历史兼容性专项验证。
+
+项目负责人另行批准的ROM后反馈一致性修复，仅修改`src/motion/kinematic_bridge.py`，通过新增的`_reconcile_post_rom_feedback()`协调Bridge路径的最终帧反馈，不修改WBC、JointModel ROM或Arm IK生产实现。
+
+验收记录为10/10、15/15、6/6及7/7，合计38项分阶段测试记录通过。
+
+Task 10-C状态为`COMPLETED — OWNER ACCEPTED`。
+
+本结论不代表代码已合入master，也不代表Task 10-D独立运动功能或Blender GUI视觉验收已经完成。
 
 ### 10-C跨模块禁止事项
 
@@ -1103,9 +1119,9 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 当前执行节点：
 
-`10-c-child4 — FINAL INTERFACE VERIFICATION`
+`Task 10-C — COMPLETED — OWNER ACCEPTED（10-c-child4 已完成；当前仅文档结项，下一工程步骤 10-B 大型代码拆分尚未授权执行）`
 
-> Task 10-C：`10-c-child1`审计完成；`10-c-child2`（10/10 PASS）与`10-c-child3`（15/15 PASS，Blender 5.1.1，退出码 0）均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。（10-B已由项目负责人验收并进入waiting-split隔离保存；历史10-B实施编号不再作为当前任务。）
+> Task 10-C：`10-c-child1`审计完成，`10-c-child2`（10/10 PASS）、`10-c-child3`（15/15 PASS）与`10-c-child4`（C4-T01～T06 6/6 PASS、C4-T07～T13 7/7 PASS，合计 38 项分阶段测试记录通过，Blender 5.1.1）全部获负责人验收（`COMPLETED — OWNER ACCEPTED`，实现保留于 `task/10-c-child4`，未合入 `master`）；Task 10-D 继续保持 `BLOCKED — NOT STARTED`。（10-B已由项目负责人验收并进入`waiting-split`隔离保存；历史10-B实施编号不再作为当前任务。）
 
 ## 5. 后续 Phase 阶段门禁
 
@@ -1201,7 +1217,7 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 ## 8. 当前架构同步状态规则
 
 - PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型实现保留于 `waiting-split` 未合入 `master`，批准的 12 项合同定义不变）；Task 10-C：`10-c-child1`审计完成；`10-c-child2`与`10-c-child3`均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改，Task 10-C 整体尚未完成最终验收；Task 10-D `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
+- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED`（2026-11-20 负责人正式验收，大型实现保留于 `waiting-split` 未合入 `master`，批准的 12 项合同定义不变）；Task 10-C `COMPLETED — OWNER ACCEPTED`（2026-11-21 `10-c-child1`～`10-c-child4` 全部完成并获负责人验收，38 项分阶段测试记录通过，保留于 `task/10-c-child4` 未合入 `master`）；Task 10-D `BLOCKED — NOT STARTED`。历史 `10-b-10 → 10-b-11` 和后续原子修复计划不得冒充当前执行节点。
 - Task 11 负责 FIND-R3-03、FIND-R3-04。
 - Task 12 负责 PKG-5 跨模块联合审计与验收。
 - 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B。
@@ -1587,7 +1603,7 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
 
 ### 10.10 验证与后续实施 (Planned Target Architecture)
 
-> **状态与合同边界**：第10节批准的目标合同及14条影响关系原样保留；第3项同步为2026-11-20的实际进度。旧实施节点只属于历史，不得重新被当成当前任务准入。
+> **状态与合同边界**：第10节批准的目标合同及14条影响关系原样保留；第3项同步为2026-11-21的实际进度。旧实施节点只属于历史，不得重新被当成当前任务准入。
 
 1. **十二项合同验证要求**：
    - `CONTRACT-01` 至 `CONTRACT-12` 的正向场景、故障场景、外部共享状态影响、待核验不变量及通过/失败判据已在批准架构 JSON（`f3_verification_requirements`）与本节 10.8.1 表中完整固化。
@@ -1597,6 +1613,6 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
    - 严禁用历史提交（如 10-B-8 的 `102/102 PASS`）代替新生产修复的真实回归运行结果。
    - 严禁以自动化测试（`Automated Pass`）代替 Blender GUI 视口真实目视验收。
 3. **后续受控原子实施路线与准入边界**：
-   - **Task 10-B**：已于 2026-11-20 获项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`），大型事务实现暂存 `waiting-split` 等待后续独立拆分，未合入 `master`；禁止把历史“继续按原子阶段实施”解释为新修复授权。
+   - **Task 10-B**：已于 2026-11-20 获项目负责人正式验收（`COMPLETED — OWNER ACCEPTED`），大型事务实现暂存 `waiting-split` 等待后续独立拆分（尚未执行），未合入 `master`；禁止把历史“继续按原子阶段实施”解释为新修复授权。
    - **历史计划：Task 10-B-11**：当时聚焦 `Collection ↔ Object` 关系所有权；该轮已不再是当前执行节点。当前不因该旧计划自行新增代码或重复修复。
-   - **Task 10-C 与 Task 10-D 状态**：Task 10-C：`10-c-child1`审计完成；`10-c-child2`与`10-c-child3`均获负责人验收；当前节点为`10-c-child4`（`CURRENT — VERIFICATION AUTHORIZED`），仅授权最终接口验证与证据归档，不允许生产代码修改；Task 10-C 整体尚未完成最终验收。Task 10-D 继续保持 **`BLOCKED — NOT STARTED`**，未准入。
+   - **Task 10-C 与 Task 10-D 状态**：Task 10-C 已于 2026-11-21 全部四个子节点（`10-c-child1`～`10-c-child4`）完成并获负责人正式验收（**`COMPLETED — OWNER ACCEPTED`**，38 项分阶段测试记录通过，实现暂存 `task/10-c-child4`，尚未合入 `master`）；后续工作顺序为 10-B 独立拆分 → 10-B/10-C 受控主干集成 → Task 10-D → Blender GUI 视觉验收 → Task 10 整体结项（当前仅批准文档结项）。Task 10-D 继续保持 **`BLOCKED — NOT STARTED`**，未准入。
