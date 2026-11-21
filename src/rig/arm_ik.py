@@ -51,6 +51,11 @@ from src.rig.transform_utils import (
     world_to_local_rotation,
     world_to_local_rotation_quaternion,
 )
+from src.scene_transaction_integrity.layer3 import (
+    _is_child_collection_linked_by_identity,
+    _is_collection_descendant_of,
+    _is_object_linked_to_collection_by_identity,
+)
 from src.scene_transaction_integrity.layer4 import (
     _apply_arm_ik_prebend_hint,
     _apply_arm_ik_prebend_hint_side,
@@ -1913,43 +1918,6 @@ def _find_live_collection_by_identity(
     return None
 
 
-def _is_object_linked_to_collection_by_identity(
-    collection: bpy.types.Collection,
-    obj_ref: Optional[bpy.types.Object],
-    expected_obj_ptr: Optional[int],
-) -> bool:
-    """Check whether an object is currently linked to a collection by reference and pointer identity."""
-    if collection is None:
-        return False
-    if obj_ref is None and expected_obj_ptr is None:
-        return False
-
-    if obj_ref is not None:
-        try:
-            ref_ptr = obj_ref.as_pointer()
-        except ReferenceError:
-            return False
-        if expected_obj_ptr is not None and ref_ptr != expected_obj_ptr:
-            return False
-        target_ptr = expected_obj_ptr if expected_obj_ptr is not None else ref_ptr
-    else:
-        target_ptr = expected_obj_ptr
-
-    try:
-        for candidate in collection.objects:
-            try:
-                if candidate.as_pointer() != target_ptr:
-                    continue
-                if obj_ref is None or candidate == obj_ref:
-                    return True
-            except ReferenceError:
-                continue
-    except ReferenceError:
-        return False
-
-    return False
-
-
 def _authorized_link_object_to_collection(
     collection: bpy.types.Collection,
     obj: bpy.types.Object,
@@ -2215,48 +2183,6 @@ def _matrix_equals(m1: Any, m2: Any, tol: float = 1e-5) -> bool:
         return True
     except (IndexError, TypeError, ValueError):
         return False
-
-
-def _is_child_collection_linked_by_identity(
-    parent: bpy.types.Collection,
-    child: bpy.types.Collection,
-    child_ptr: Optional[int] = None,
-) -> bool:
-    """Verify whether child is linked under parent by identity pointer and reference."""
-    try:
-        if child_ptr is None and hasattr(child, "as_pointer"):
-            child_ptr = child.as_pointer()
-        for c in parent.children:
-            try:
-                if c == child or (child_ptr is not None and c.as_pointer() == child_ptr):
-                    return True
-            except ReferenceError:
-                continue
-    except (ReferenceError, Exception):
-        return False
-    return False
-
-
-def _is_collection_descendant_of(
-    candidate_child: bpy.types.Collection,
-    candidate_ancestor: bpy.types.Collection,
-    visited: Optional[Set[int]] = None,
-) -> bool:
-    """Check if candidate_ancestor is equal to or an ancestor of candidate_child."""
-    if visited is None:
-        visited = set()
-    anc_ptr = candidate_ancestor.as_pointer() if hasattr(candidate_ancestor, "as_pointer") else None
-    ch_ptr = candidate_child.as_pointer() if hasattr(candidate_child, "as_pointer") else None
-    if anc_ptr is not None and ch_ptr is not None and anc_ptr == ch_ptr:
-        return True
-    if anc_ptr in visited:
-        return False
-    if anc_ptr is not None:
-        visited.add(anc_ptr)
-    for sub in candidate_ancestor.children:
-        if _is_collection_descendant_of(candidate_child, sub, visited):
-            return True
-    return False
 
 
 def _controller_role_for_name(name: str) -> tuple[str, str] | None:
