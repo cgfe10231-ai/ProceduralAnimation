@@ -65,8 +65,10 @@ from src.scene_transaction_integrity.layer2 import (
     _safe_object_pointer,
 )
 from src.scene_transaction_integrity.layer3 import (
+    ARM_IK_CONSTRAINT_NAMES,
     ExternalControllerNameConflictError,
     _TARGET_UNSET,
+    _controller_constraint_binding_proven,
     _find_collection_by_name,
     _is_child_collection_linked_by_identity,
     _is_collection_descendant_of,
@@ -94,7 +96,6 @@ from src.scene_transaction_integrity.layer6 import (
 
 ARM_IK_TARGET_NAMES: Dict[str, str] = {"L": "HandIK.L", "R": "HandIK.R"}
 ARM_POLE_TARGET_NAMES: Dict[str, str] = {"L": "ElbowPole.L", "R": "ElbowPole.R"}
-ARM_IK_CONSTRAINT_NAMES: Dict[str, str] = {"L": "ArmIK.L", "R": "ArmIK.R"}
 HAND_ROT_CONSTRAINT_NAMES: Dict[str, str] = {"L": "HandRotation.L", "R": "HandRotation.R"}
 
 # Segment geometry matching Task 4B specifications (meters)
@@ -2002,45 +2003,6 @@ def _controller_role_for_name(name: str) -> tuple[str, str] | None:
         if name == ARM_POLE_TARGET_NAMES[side]:
             return (side, 'pole_target')
     return None
-
-
-def _controller_constraint_binding_proven(
-    arm: bpy.types.Object,
-    obj: bpy.types.Object,
-    role: tuple[str, str],
-    snapshot: Optional[Dict[str, Any]] = None,
-) -> bool:
-    """Prove the target Armature owns the original IK relationship by identity.
-
-    The transaction snapshot is read for rollback-time provenance, because the
-    live constraint target may already have been changed by the transaction.
-    An existing object with a familiar name or parent is not proof of a binding.
-    """
-    side, field = role
-    try:
-        pbone = arm.pose.bones.get(f'forearm.{side}')
-        if pbone is None:
-            return False
-        constraint = pbone.constraints.get(ARM_IK_CONSTRAINT_NAMES[side])
-        if constraint is None or constraint.type != 'IK':
-            return False
-        if snapshot is None:
-            bound = getattr(constraint, field, None)
-            return bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj
-        saved_bone = snapshot.get('pose_bones', {}).get(f'forearm.{side}', {})
-        for saved in saved_bone.get('constraints', ()):
-            if (saved.get('name') != ARM_IK_CONSTRAINT_NAMES[side]
-                    or saved.get('type') != 'IK'):
-                continue
-            if saved.get('con_ptr') != int(constraint.as_pointer()):
-                continue
-            if saved.get('con_ref') != constraint:
-                continue
-            bound = saved.get(field)
-            return bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj
-    except (AttributeError, KeyError, ReferenceError, TypeError, ValueError):
-        return False
-    return False
 
 
 def _controller_is_borrowed_by_other_armature(

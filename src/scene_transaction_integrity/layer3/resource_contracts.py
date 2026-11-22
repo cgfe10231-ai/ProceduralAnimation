@@ -1,6 +1,8 @@
 """Resource contract exception and matrix equality helper migrated from `src/rig/arm_ik.py` (Task 10-B Layer 3)."""
 
-from typing import Any
+from typing import Any, Dict, Optional
+
+import bpy
 
 
 class ExternalControllerNameConflictError(RuntimeError, ValueError):
@@ -23,3 +25,44 @@ def _matrix_equals(m1: Any, m2: Any, tol: float = 1e-5) -> bool:
 
 
 _TARGET_UNSET = object()
+
+ARM_IK_CONSTRAINT_NAMES: Dict[str, str] = {"L": "ArmIK.L", "R": "ArmIK.R"}
+
+
+def _controller_constraint_binding_proven(
+    arm: bpy.types.Object,
+    obj: bpy.types.Object,
+    role: tuple[str, str],
+    snapshot: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Prove the target Armature owns the original IK relationship by identity.
+
+    The transaction snapshot is read for rollback-time provenance, because the
+    live constraint target may already have been changed by the transaction.
+    An existing object with a familiar name or parent is not proof of a binding.
+    """
+    side, field = role
+    try:
+        pbone = arm.pose.bones.get(f'forearm.{side}')
+        if pbone is None:
+            return False
+        constraint = pbone.constraints.get(ARM_IK_CONSTRAINT_NAMES[side])
+        if constraint is None or constraint.type != 'IK':
+            return False
+        if snapshot is None:
+            bound = getattr(constraint, field, None)
+            return bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj
+        saved_bone = snapshot.get('pose_bones', {}).get(f'forearm.{side}', {})
+        for saved in saved_bone.get('constraints', ()):
+            if (saved.get('name') != ARM_IK_CONSTRAINT_NAMES[side]
+                    or saved.get('type') != 'IK'):
+                continue
+            if saved.get('con_ptr') != int(constraint.as_pointer()):
+                continue
+            if saved.get('con_ref') != constraint:
+                continue
+            bound = saved.get(field)
+            return bound is not None and int(bound.as_pointer()) == int(obj.as_pointer()) and bound == obj
+    except (AttributeError, KeyError, ReferenceError, TypeError, ValueError):
+        return False
+    return False
