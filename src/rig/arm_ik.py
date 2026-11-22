@@ -36,7 +36,6 @@ import math
 import time
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
@@ -57,8 +56,10 @@ from src.scene_transaction_integrity.layer1 import (
 )
 from src.scene_transaction_integrity.layer2 import (
     ArmatureSessionIdentityRecord,
+    _ArmRigTransactionState,
     _ArmatureIsolationState,
     _ArmatureLivenessStatus,
+    _FailedTransactionClass,
     _safe_object_pointer,
 )
 from src.scene_transaction_integrity.layer3 import (
@@ -82,6 +83,10 @@ from src.scene_transaction_integrity.layer5 import (
     _clone_snapshot_property_value,
     _freeze_fingerprint_property_value,
     _has_nan_or_inf,
+)
+from src.scene_transaction_integrity.layer6 import (
+    _CleanupOutcome,
+    _CleanupResult,
 )
 
 ARM_IK_TARGET_NAMES: Dict[str, str] = {"L": "HandIK.L", "R": "HandIK.R"}
@@ -265,35 +270,6 @@ def _ensure_character_collection() -> bpy.types.Collection:
 # Production Transaction Snapshot, Rollback, and Verification Infrastructure
 # =============================================================================
 
-class _ArmRigTransactionState(str, Enum):
-    """Explicit lifecycle state machine for Arm IK rig transactions."""
-    CREATED = "CREATED"
-    SNAPSHOTTING = "SNAPSHOTTING"
-    ACTIVE = "ACTIVE"
-    ROLLING_BACK = "ROLLING_BACK"
-    ROLLED_BACK = "ROLLED_BACK"
-    COMMITTING = "COMMITTING"
-    COMMITTED = "COMMITTED"
-    CLEANUP_PENDING = "CLEANUP_PENDING"
-    FAILED = "FAILED"
-
-
-class _CleanupOutcome(str, Enum):
-    CLEANUP_SUCCESS = "CLEANUP_SUCCESS"
-    CLEANUP_INCOMPLETE = "CLEANUP_INCOMPLETE"
-    CLEANUP_FAILED = "CLEANUP_FAILED"
-
-
-@dataclass(frozen=True)
-class _CleanupResult:
-    transaction_id: str
-    outcome: _CleanupOutcome
-    errors: Tuple[str, ...]
-    remaining_objects: int
-    remaining_constraints: int
-    cause: Optional[BaseException] = None
-
-
 class _RelationshipOperationState(str, Enum):
     """Explicit 7-state machine for relationship mutation log entries (Task 10-B-11)."""
     PREPARED = "PREPARED"
@@ -319,14 +295,6 @@ _LEGAL_RELATIONSHIP_LOG_TRANSITIONS: Dict[
     (_RelationshipOperationState.CONFIRMED, _RelationshipOperationState.REVERTED): "CONFIRMED -> REVERTED",
     (_RelationshipOperationState.CONFIRMED, _RelationshipOperationState.RECOVERY_UNCERTAIN): "CONFIRMED -> RECOVERY_UNCERTAIN",
 }
-
-
-class _FailedTransactionClass(str, Enum):
-    """Explicit four-class taxonomy for FAILED transactions (Task 10-B-13)."""
-    FAILED_A = "FAILED-A"
-    FAILED_B = "FAILED-B"
-    FAILED_C = "FAILED-C"
-    FAILED_D = "FAILED-D"
 
 
 _MANAGED_ARMATURE_IDENTITIES: Dict[str, ArmatureSessionIdentityRecord] = {}
