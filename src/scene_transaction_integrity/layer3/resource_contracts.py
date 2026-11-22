@@ -66,3 +66,32 @@ def _controller_constraint_binding_proven(
     except (AttributeError, KeyError, ReferenceError, TypeError, ValueError):
         return False
     return False
+
+
+def _find_live_object_by_identity(
+    obj_ref: bpy.types.Object,
+    expected_ptr: int,
+) -> Optional[bpy.types.Object]:
+    """Resolve the original live Blender object.
+
+    A matching name alone never proves identity.
+    """
+    try:
+        ref_ptr = obj_ref.as_pointer()
+    except ReferenceError:
+        return None
+
+    if ref_ptr != expected_ptr:
+        return None
+
+    for candidate in bpy.data.objects:
+        if candidate.as_pointer() != expected_ptr:
+            continue
+
+        try:
+            if candidate == obj_ref:
+                return candidate
+        except ReferenceError:
+            return None
+
+    return None

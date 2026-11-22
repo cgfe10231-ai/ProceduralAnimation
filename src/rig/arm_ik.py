@@ -77,6 +77,7 @@ from src.scene_transaction_integrity.layer3 import (
     _TARGET_UNSET,
     _controller_constraint_binding_proven,
     _find_collection_by_name,
+    _find_live_object_by_identity,
     _is_child_collection_linked_by_identity,
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
@@ -1652,35 +1653,6 @@ def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:
         "controllers": controllers_data,
         "pose_bones": pose_bones_data,
     }
-
-
-def _find_live_object_by_identity(
-    obj_ref: bpy.types.Object,
-    expected_ptr: int,
-) -> Optional[bpy.types.Object]:
-    """Resolve the original live Blender object.
-
-    A matching name alone never proves identity.
-    """
-    try:
-        ref_ptr = obj_ref.as_pointer()
-    except ReferenceError:
-        return None
-
-    if ref_ptr != expected_ptr:
-        return None
-
-    for candidate in bpy.data.objects:
-        if candidate.as_pointer() != expected_ptr:
-            continue
-
-        try:
-            if candidate == obj_ref:
-                return candidate
-        except ReferenceError:
-            return None
-
-    return None
 
 
 def _find_live_collection_by_identity(
