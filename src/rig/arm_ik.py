@@ -64,6 +64,8 @@ from src.scene_transaction_integrity.layer2 import (
     _FailedTransactionClass,
     _LEGAL_RELATIONSHIP_LOG_TRANSITIONS,
     _RelationshipOperationState,
+    _append_deisolation_audit,
+    _record_failed_a_audit,
     _safe_object_pointer,
 )
 from src.scene_transaction_integrity.layer3 import (
@@ -697,19 +699,12 @@ def _record_armature_failure_isolation_by_coordinator(
     tx.failure_class = f_class.value
 
     if f_class == _FailedTransactionClass.FAILED_A:
-        session_rec.isolation_state = _ArmatureIsolationState.NONE
-        if session_rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED:
-            session_rec.lifecycle_stage = "NORMAL_TERMINAL"
-        audit_rec = {
-            "transaction_id": tx.tx_id,
-            "registry_session_id": session_rec.registry_session_id,
-            "failure_class": f_class.value,
-            "isolation_state": _ArmatureIsolationState.NONE.value,
-            "primary_exception": f"{type(primary_exception).__name__}: {primary_exception}" if primary_exception else None,
-            "evidence_status": "PRE_WRITE_ZERO_MUTATION_VERIFIED",
-        }
-        _FAILED_A_AUDIT_RECORDS.append(audit_rec)
-        return audit_rec
+        return _record_failed_a_audit(
+            session_rec=session_rec,
+            tx_id=tx.tx_id,
+            f_class=f_class,
+            primary_exception=primary_exception,
+        )
 
     if f_class == _FailedTransactionClass.FAILED_B:
         iso_state = _ArmatureIsolationState.ISOLATED_FAILED_B
@@ -7778,7 +7773,7 @@ def request_armature_deisolation(
             "verification_status": "INVALID_REASON",
             "verification_reasons": [reason_err],
         }
-        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        _append_deisolation_audit(audit_entry)
         if raise_on_reject:
             raise ValueError(reason_err)
         return {
@@ -7825,7 +7820,7 @@ def request_armature_deisolation(
             "verification_status": evidence.get("status"),
             "verification_reasons": list(evidence.get("reasons", [])),
         }
-        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        _append_deisolation_audit(audit_entry)
         return {
             "approved": True,
             "action": "DEISOLATED",
@@ -7850,7 +7845,7 @@ def request_armature_deisolation(
         "verification_status": evidence.get("status"),
         "verification_reasons": list(evidence.get("reasons", [])),
     }
-    _DEISOLATION_AUDIT_LOG.append(audit_entry)
+    _append_deisolation_audit(audit_entry)
 
     if raise_on_reject:
         raise RuntimeError(
@@ -7892,7 +7887,7 @@ def retire_dead_armature_tombstone(
             "verification_status": "INVALID_REASON",
             "verification_reasons": [reason_err],
         }
-        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        _append_deisolation_audit(audit_entry)
         if raise_on_reject:
             raise ValueError(reason_err)
         return {
@@ -7933,7 +7928,7 @@ def retire_dead_armature_tombstone(
             "verification_status": evidence.get("status"),
             "verification_reasons": list(evidence.get("reasons", [])),
         }
-        _DEISOLATION_AUDIT_LOG.append(audit_entry)
+        _append_deisolation_audit(audit_entry)
         return {
             "approved": True,
             "action": "ARCHIVED_RETIRED",
@@ -7958,7 +7953,7 @@ def retire_dead_armature_tombstone(
         "verification_status": evidence.get("status"),
         "verification_reasons": list(evidence.get("reasons", [])),
     }
-    _DEISOLATION_AUDIT_LOG.append(audit_entry)
+    _append_deisolation_audit(audit_entry)
 
     if raise_on_reject:
         raise RuntimeError(
