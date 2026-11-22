@@ -12,6 +12,9 @@ from src.scene_transaction_integrity.layer4.validation import (
 from src.scene_transaction_integrity.layer4.state_query import (
     get_arm_ik_state,
 )
+from src.scene_transaction_integrity.layer4.influence import (
+    set_arm_ik_influence,
+)
 
 __all__ = (
     "_apply_arm_ik_prebend_hint",
@@ -22,4 +25,5 @@ __all__ = (
     "_validate_side",
     "_validate_vec3",
     "get_arm_ik_state",
+    "set_arm_ik_influence",
 )

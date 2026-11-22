@@ -92,6 +92,7 @@ from src.scene_transaction_integrity.layer4 import (
     _validate_side,
     _validate_vec3,
     get_arm_ik_state as _layer4_get_arm_ik_state,
+    set_arm_ik_influence as _layer4_set_arm_ik_influence,
 )
 from src.scene_transaction_integrity.layer5 import (
     _clone_snapshot_property_value,
@@ -8636,25 +8637,17 @@ def set_arm_ik_influence(
         side: 'L', 'R', or 'BOTH'.
         influence: Influence value in [0.0, 1.0].
     """
-    valid_side = _validate_side(side, allow_both=True, param_name="side")
-    valid_influence = _validate_influence(influence, param_name="influence")
-    arm = _resolve_armature(armature_obj)
-    sides = ("L", "R") if valid_side == "BOTH" else (valid_side,)
-    _require_existing_arm_ik_controller_ownership(arm, scope='set_arm_ik_influence')
-
-    with _arm_rig_transaction(arm):
-        for s in sides:
-            p_fore = arm.pose.bones.get(f"forearm.{s}")
-            p_hand = arm.pose.bones.get(f"hand.{s}")
-            if p_fore and ARM_IK_CONSTRAINT_NAMES[s] in p_fore.constraints:
-                p_fore.constraints[ARM_IK_CONSTRAINT_NAMES[s]].influence = valid_influence
-            _trigger_fault_injection("set_arm_ik_influence_between_influences", {"side": s})
-            if p_hand and HAND_ROT_CONSTRAINT_NAMES[s] in p_hand.constraints:
-                p_hand.constraints[HAND_ROT_CONSTRAINT_NAMES[s]].influence = valid_influence
-            if valid_side == "BOTH" and s == "L":
-                _trigger_fault_injection("set_arm_ik_influence_between_sides", {"side": s})
-
-        _depsgraph_update()
+    return _layer4_set_arm_ik_influence(
+        armature_obj,
+        side,
+        influence,
+        require_existing_arm_ik_controller_ownership=_require_existing_arm_ik_controller_ownership,
+        arm_rig_transaction=_arm_rig_transaction,
+        trigger_fault_injection=_trigger_fault_injection,
+        depsgraph_update=_depsgraph_update,
+        arm_ik_constraint_names=ARM_IK_CONSTRAINT_NAMES,
+        hand_rot_constraint_names=HAND_ROT_CONSTRAINT_NAMES,
+    )
 
 
 def reset_arm_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
