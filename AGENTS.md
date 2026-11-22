@@ -3,7 +3,7 @@
 此文件只负责锁定执行规则，不记录阶段进度、单个 BUG、特定模块修改或测试成绩。
 
 1. 开始前必须阅读 WORKFLOW_GOVERNANCE.md、ARCHITECTURE.md、PROJECT_SPEC.md、docs/ARCHITECTURE_CHANGE_GATE.md；读取失败或规则冲突立即停止。
-2. 当前状态必须核实 PROJECT_STATE.md、ARCHITECTURE_SYNC.md、docs/audit/production_interface/OPEN_FINDINGS.md 和 Git HEAD，不得从历史交接或旧证据自行取得权限。
+2. 当前状态必须核实 PROJECT_STATE.md、ARCHITECTURE_SYNC.md、docs/audit/production_interface/OPEN_FINDINGS.md 和 Git HEAD，不得从历史交接或旧证据自行取得权限。任何代码物理拆分任务开始前，还必须重新读取 ARCHITECTURE_SYNC.md 中该节点的正常执行链及拆分顺序，核对真实调用边界，在终端记录对应顺序、层级和 HEAD；若未找到相关条款或与源码冲突，必须停止并交由 ChatGPT 独立审计。
 3. **Antigravity 对仓库全部 .md 默认只读；未经项目负责人主动、明确且限定文件范围的授权，禁止创建、修改、追加、覆盖、移动、重命名、删除或自动同步 Markdown。获得授权时，仅允许逐字执行 ChatGPT 已审定的指定内容及相应 Git 收尾，禁止自主编写或扩展；授权任务结束后恢复默认只读。**
 4. Agent 只能执行已经冻结并明确批准的机械代码/测试任务；不得自行审计、定性漏洞、增加新函数或模块、扩充范围、改断言或变更架构。
 5. 编码和测试必须分离；代码变更经 ChatGPT 独立审查后才能执行测试；测试失败立即停止保留现场，不得就地修改。
