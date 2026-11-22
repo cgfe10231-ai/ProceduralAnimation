@@ -20,3 +20,6 @@ def _matrix_equals(m1: Any, m2: Any, tol: float = 1e-5) -> bool:
         return True
     except (IndexError, TypeError, ValueError):
         return False
+
+
+_TARGET_UNSET = object()

@@ -60,10 +60,13 @@ from src.scene_transaction_integrity.layer2 import (
     _ArmatureIsolationState,
     _ArmatureLivenessStatus,
     _FailedTransactionClass,
+    _LEGAL_RELATIONSHIP_LOG_TRANSITIONS,
+    _RelationshipOperationState,
     _safe_object_pointer,
 )
 from src.scene_transaction_integrity.layer3 import (
     ExternalControllerNameConflictError,
+    _TARGET_UNSET,
     _find_collection_by_name,
     _is_child_collection_linked_by_identity,
     _is_collection_descendant_of,
@@ -269,33 +272,6 @@ def _ensure_character_collection() -> bpy.types.Collection:
 # =============================================================================
 # Production Transaction Snapshot, Rollback, and Verification Infrastructure
 # =============================================================================
-
-class _RelationshipOperationState(str, Enum):
-    """Explicit 7-state machine for relationship mutation log entries (Task 10-B-11)."""
-    PREPARED = "PREPARED"
-    APPLYING = "APPLYING"
-    APPLIED_VERIFIED = "APPLIED_VERIFIED"
-    CONFIRMED = "CONFIRMED"
-    NO_EFFECT = "NO_EFFECT"
-    REVERTED = "REVERTED"
-    RECOVERY_UNCERTAIN = "RECOVERY_UNCERTAIN"
-
-
-_LEGAL_RELATIONSHIP_LOG_TRANSITIONS: Dict[
-    Tuple[_RelationshipOperationState, _RelationshipOperationState], str
-] = {
-    (_RelationshipOperationState.PREPARED, _RelationshipOperationState.NO_EFFECT): "PREPARED -> NO_EFFECT",
-    (_RelationshipOperationState.PREPARED, _RelationshipOperationState.APPLYING): "PREPARED -> APPLYING",
-    (_RelationshipOperationState.APPLYING, _RelationshipOperationState.APPLIED_VERIFIED): "APPLYING -> APPLIED_VERIFIED",
-    (_RelationshipOperationState.APPLYING, _RelationshipOperationState.NO_EFFECT): "APPLYING -> NO_EFFECT",
-    (_RelationshipOperationState.APPLYING, _RelationshipOperationState.RECOVERY_UNCERTAIN): "APPLYING -> RECOVERY_UNCERTAIN",
-    (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.CONFIRMED): "APPLIED_VERIFIED -> CONFIRMED",
-    (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.REVERTED): "APPLIED_VERIFIED -> REVERTED",
-    (_RelationshipOperationState.APPLIED_VERIFIED, _RelationshipOperationState.RECOVERY_UNCERTAIN): "APPLIED_VERIFIED -> RECOVERY_UNCERTAIN",
-    (_RelationshipOperationState.CONFIRMED, _RelationshipOperationState.REVERTED): "CONFIRMED -> REVERTED",
-    (_RelationshipOperationState.CONFIRMED, _RelationshipOperationState.RECOVERY_UNCERTAIN): "CONFIRMED -> RECOVERY_UNCERTAIN",
-}
-
 
 _MANAGED_ARMATURE_IDENTITIES: Dict[str, ArmatureSessionIdentityRecord] = {}
 _ISOLATED_FAILED_ARMATURES: Dict[str, Dict[str, Any]] = {}
@@ -2794,10 +2770,6 @@ def _authorized_restore_relationship(
     for op_record in reversed(list(getattr(active_tx, "prepared_relationship_mutations", []))):
         if mutation_type is None or op_record.get("intended_mutation") == mutation_type:
             _authorized_revert_relationship_record(op_record, active_tx, restoration_errors)
-
-
-_TARGET_UNSET = object()
-
 
 
 def _cleanup_failed_constraint_creation(

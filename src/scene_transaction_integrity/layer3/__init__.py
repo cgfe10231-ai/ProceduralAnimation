@@ -6,11 +6,13 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
 )
 from src.scene_transaction_integrity.layer3.resource_contracts import (
     ExternalControllerNameConflictError,
+    _TARGET_UNSET,
     _matrix_equals,
 )
 
 __all__ = (
     "ExternalControllerNameConflictError",
+    "_TARGET_UNSET",
     "_find_collection_by_name",
     "_is_child_collection_linked_by_identity",
     "_is_collection_descendant_of",

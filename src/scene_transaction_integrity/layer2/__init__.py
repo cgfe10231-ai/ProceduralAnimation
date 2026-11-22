@@ -1,6 +1,10 @@
 from src.scene_transaction_integrity.layer2.identity_helpers import (
     _safe_object_pointer,
 )
+from src.scene_transaction_integrity.layer2.relationship_states import (
+    _LEGAL_RELATIONSHIP_LOG_TRANSITIONS,
+    _RelationshipOperationState,
+)
 from src.scene_transaction_integrity.layer2.session_records import (
     ArmatureSessionIdentityRecord,
     _ArmatureIsolationState,
@@ -17,5 +21,7 @@ __all__ = (
     "_ArmatureIsolationState",
     "_ArmatureLivenessStatus",
     "_FailedTransactionClass",
+    "_LEGAL_RELATIONSHIP_LOG_TRANSITIONS",
+    "_RelationshipOperationState",
     "_safe_object_pointer",
 )
