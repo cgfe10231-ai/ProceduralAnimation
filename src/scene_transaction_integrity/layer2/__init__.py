@@ -20,9 +20,13 @@ from src.scene_transaction_integrity.layer2.audit_registries import (
     _append_deisolation_audit,
     _record_failed_a_audit,
 )
+from src.scene_transaction_integrity.layer2.tombstone_registry import (
+    _ARCHIVED_FAILED_D_TOMBSTONES,
+)
 
 __all__ = (
     "ArmatureSessionIdentityRecord",
+    "_ARCHIVED_FAILED_D_TOMBSTONES",
     "_ArmRigTransactionState",
     "_ArmatureIsolationState",
     "_ArmatureLivenessStatus",

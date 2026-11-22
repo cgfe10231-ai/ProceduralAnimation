@@ -56,6 +56,7 @@ from src.scene_transaction_integrity.layer1 import (
 )
 from src.scene_transaction_integrity.layer2 import (
     ArmatureSessionIdentityRecord,
+    _ARCHIVED_FAILED_D_TOMBSTONES,
     _ArmRigTransactionState,
     _ArmatureIsolationState,
     _ArmatureLivenessStatus,
@@ -280,7 +281,6 @@ def _ensure_character_collection() -> bpy.types.Collection:
 
 _MANAGED_ARMATURE_IDENTITIES: Dict[str, ArmatureSessionIdentityRecord] = {}
 _ISOLATED_FAILED_ARMATURES: Dict[str, Dict[str, Any]] = {}
-_ARCHIVED_FAILED_D_TOMBSTONES: Dict[str, Dict[str, Any]] = {}
 
 
 def _check_original_object_liveness(record: ArmatureSessionIdentityRecord) -> Dict[str, Any]:
