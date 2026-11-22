@@ -86,6 +86,7 @@ from src.scene_transaction_integrity.layer3 import (
 from src.scene_transaction_integrity.layer4 import (
     _apply_arm_ik_prebend_hint,
     _apply_arm_ik_prebend_hint_side,
+    _preflight_arm_ik_parent_transforms as _layer4_preflight_arm_ik_parent_transforms,
     _resolve_armature,
     _validate_bool,
     _validate_influence,
@@ -8771,65 +8772,18 @@ def _preflight_arm_ik_parent_transforms(
     Returns:
         (needs_auto_init, eff_ik_mat, eff_pole_mat)
     """
-    _require_existing_arm_ik_controller_ownership(arm, scope='_preflight_arm_ik_parent_transforms')
-    ik_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES[valid_side])
-    pole_obj = bpy.data.objects.get(ARM_POLE_TARGET_NAMES[valid_side])
-    ik_valid = (ik_obj is not None and ik_obj.type == "EMPTY")
-    pole_valid = (pole_obj is not None and pole_obj.type == "EMPTY")
-    needs_auto_init = not (ik_valid and pole_valid)
-
-    expected_new_eff_mat = (
-        root_obj.matrix_world @ Matrix.Identity(4)
-        if root_obj is not None
-        else Matrix.Identity(4)
+    return _layer4_preflight_arm_ik_parent_transforms(
+        arm,
+        valid_side,
+        root_obj,
+        require_existing_arm_ik_controller_ownership=_require_existing_arm_ik_controller_ownership,
+        verify_transaction_wrong_type_object_ownership=_verify_transaction_wrong_type_object_ownership,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        arm_ik_target_names=ARM_IK_TARGET_NAMES,
+        arm_pole_target_names=ARM_POLE_TARGET_NAMES,
+        compute_effective_parent_matrix=compute_effective_parent_matrix,
+        validate_effective_parent_transform=validate_effective_parent_transform,
     )
-
-    if needs_auto_init:
-        # setup_arm_ik() processes all four controllers (L and R);
-        # validate effective parent transforms for existing valid controls and anticipated new controls.
-        active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-        other_side = "R" if valid_side == "L" else "L"
-        all_ctrl_names = (
-            ARM_IK_TARGET_NAMES[valid_side],
-            ARM_POLE_TARGET_NAMES[valid_side],
-            ARM_IK_TARGET_NAMES[other_side],
-            ARM_POLE_TARGET_NAMES[other_side],
-        )
-        for ctrl_name in all_ctrl_names:
-            existing_obj = bpy.data.objects.get(ctrl_name)
-            if existing_obj is not None and existing_obj.type != "EMPTY":
-                if not _verify_transaction_wrong_type_object_ownership(existing_obj, active_tx, arm):
-                    raise ExternalControllerNameConflictError(
-                        f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{ctrl_name}' matches pre-existing or external "
-                        f"non-EMPTY object '{existing_obj.name}' (type='{existing_obj.type}') not owned by active transaction."
-                    )
-            if existing_obj is not None and existing_obj.type == "EMPTY":
-                # Case A: Existing valid EMPTY controller
-                ctrl_eff_mat = compute_effective_parent_matrix(existing_obj)
-            else:
-                # Case B (missing) or verified transaction-created replacement:
-                # Use expected effective parent matrix for the new Empty
-                ctrl_eff_mat = expected_new_eff_mat
-            validate_effective_parent_transform(ctrl_eff_mat, ctrl_name)
-
-        eff_ik_mat = (
-            compute_effective_parent_matrix(ik_obj)
-            if ik_valid
-            else expected_new_eff_mat
-        )
-        eff_pole_mat = (
-            compute_effective_parent_matrix(pole_obj)
-            if pole_valid
-            else expected_new_eff_mat
-        )
-    else:
-        # Both target controllers exist and are valid EMPTY objects; validate their transforms directly
-        eff_ik_mat = compute_effective_parent_matrix(ik_obj)
-        eff_pole_mat = compute_effective_parent_matrix(pole_obj)
-        validate_effective_parent_transform(eff_ik_mat, ik_obj.name)
-        validate_effective_parent_transform(eff_pole_mat, pole_obj.name)
-
-    return needs_auto_init, eff_ik_mat, eff_pole_mat
 
 
 def set_hand_ik_target(

@@ -15,10 +15,14 @@ from src.scene_transaction_integrity.layer4.state_query import (
 from src.scene_transaction_integrity.layer4.influence import (
     set_arm_ik_influence,
 )
+from src.scene_transaction_integrity.layer4.preflight import (
+    _preflight_arm_ik_parent_transforms,
+)
 
 __all__ = (
     "_apply_arm_ik_prebend_hint",
     "_apply_arm_ik_prebend_hint_side",
+    "_preflight_arm_ik_parent_transforms",
     "_resolve_armature",
     "_validate_bool",
     "_validate_influence",
