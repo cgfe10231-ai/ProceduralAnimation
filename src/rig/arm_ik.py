@@ -64,6 +64,7 @@ from src.scene_transaction_integrity.layer2 import (
     _FAILED_A_AUDIT_RECORDS,
     _FailedTransactionClass,
     _LEGAL_RELATIONSHIP_LOG_TRANSITIONS,
+    _MANAGED_ARMATURE_IDENTITIES,
     _RelationshipOperationState,
     _append_deisolation_audit,
     _record_failed_a_audit,
@@ -279,7 +280,6 @@ def _ensure_character_collection() -> bpy.types.Collection:
 # Production Transaction Snapshot, Rollback, and Verification Infrastructure
 # =============================================================================
 
-_MANAGED_ARMATURE_IDENTITIES: Dict[str, ArmatureSessionIdentityRecord] = {}
 _ISOLATED_FAILED_ARMATURES: Dict[str, Dict[str, Any]] = {}
 
 
