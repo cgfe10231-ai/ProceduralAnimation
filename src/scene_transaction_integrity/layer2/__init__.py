@@ -24,6 +24,7 @@ from src.scene_transaction_integrity.layer2.tombstone_registry import (
     _ARCHIVED_FAILED_D_TOMBSTONES,
 )
 from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
     _MANAGED_ARMATURE_IDENTITIES,
 )
 
@@ -36,6 +37,7 @@ __all__ = (
     "_DEISOLATION_AUDIT_LOG",
     "_FAILED_A_AUDIT_RECORDS",
     "_FailedTransactionClass",
+    "_ISOLATED_FAILED_ARMATURES",
     "_LEGAL_RELATIONSHIP_LOG_TRANSITIONS",
     "_MANAGED_ARMATURE_IDENTITIES",
     "_RelationshipOperationState",

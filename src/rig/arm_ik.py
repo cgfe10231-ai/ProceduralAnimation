@@ -63,6 +63,7 @@ from src.scene_transaction_integrity.layer2 import (
     _DEISOLATION_AUDIT_LOG,
     _FAILED_A_AUDIT_RECORDS,
     _FailedTransactionClass,
+    _ISOLATED_FAILED_ARMATURES,
     _LEGAL_RELATIONSHIP_LOG_TRANSITIONS,
     _MANAGED_ARMATURE_IDENTITIES,
     _RelationshipOperationState,
@@ -279,9 +280,6 @@ def _ensure_character_collection() -> bpy.types.Collection:
 # =============================================================================
 # Production Transaction Snapshot, Rollback, and Verification Infrastructure
 # =============================================================================
-
-_ISOLATED_FAILED_ARMATURES: Dict[str, Dict[str, Any]] = {}
-
 
 def _check_original_object_liveness(record: ArmatureSessionIdentityRecord) -> Dict[str, Any]:
     """Evaluate physical Blender Object existence (Eo) independently from data block identity (Ed)."""
