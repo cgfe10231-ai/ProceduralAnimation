@@ -95,6 +95,7 @@ from src.scene_transaction_integrity.layer4 import (
     get_arm_ik_state as _layer4_get_arm_ik_state,
     reset_arm_ik as _layer4_reset_arm_ik,
     set_arm_ik_influence as _layer4_set_arm_ik_influence,
+    setup_arm_ik as _layer4_setup_arm_ik,
 )
 from src.scene_transaction_integrity.layer5 import (
     _clone_snapshot_property_value,
@@ -8380,251 +8381,35 @@ def setup_arm_ik(
         Dict mapping controller names ('HandIK.L', 'HandIK.R', 'ElbowPole.L', 'ElbowPole.R')
         to their Empty objects.
     """
-    valid_influence = _validate_influence(initial_influence, param_name="initial_influence")
-    arm = _resolve_armature(armature_obj)
-
-    # [INTRODUCED 2026-11-12T00:01:12+08:00]
-    # FUNCTION: setup_arm_ik
-    # PURPOSE: Enforce existing cleanup and FAILED isolation gates before controller ownership object enumeration
-    # REASON: Task 10-B fix-3, TEST-163
-    for rec in _MANAGED_ARMATURE_IDENTITIES.values():
-        if rec.original_blender_ref is arm:
-            if (
-                rec.isolation_state != _ArmatureIsolationState.NONE
-                or rec.registry_session_id in _ISOLATED_FAILED_ARMATURES
-            ):
-                _assert_arm_rig_cleanup_gate(arm, rec)
-                _assert_arm_rig_failed_isolation_gate(arm, rec)
-            break
-
-    # Full role ownership admission, including same-name external EMPTY
-    # objects. This runs before creating collections or modifying controllers.
-    _require_existing_arm_ik_controller_ownership(arm, scope='setup_arm_ik')
-
-    # Preflight check 4 controller names for external wrong-type conflicts before entering transaction (F14-05 Entrance A)
-    active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-    for c_name in (
-        ARM_IK_TARGET_NAMES["L"],
-        ARM_IK_TARGET_NAMES["R"],
-        ARM_POLE_TARGET_NAMES["L"],
-        ARM_POLE_TARGET_NAMES["R"],
-    ):
-        c_obj = bpy.data.objects.get(c_name)
-        if c_obj is not None and c_obj.type != "EMPTY":
-            if not _verify_transaction_wrong_type_object_ownership(c_obj, active_tx, arm):
-                raise ExternalControllerNameConflictError(
-                    f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{c_name}' matches pre-existing or external "
-                    f"non-EMPTY object '{c_obj.name}' (type='{c_obj.type}') not owned by active transaction."
-                )
-
-    with _arm_rig_transaction(arm):
-        root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
-        collection = _ensure_character_collection()
-
-        controls: Dict[str, bpy.types.Object] = {}
-
-        for side, sign in (("L", -1.0), ("R", 1.0)):
-            ik_name = ARM_IK_TARGET_NAMES[side]
-            pole_name = ARM_POLE_TARGET_NAMES[side]
-
-            ik_obj, ik_is_new = _get_or_create_empty(
-                name=ik_name,
-                display_type="CUBE",
-                display_size=0.04,
-                parent=root_obj,
-                collection=collection,
-            )
-            if ik_is_new and side == "L":
-                _trigger_fault_injection("setup_arm_ik_after_first_controller", {"ik_obj": ik_obj})
-                _trigger_fault_injection("set_hand_ik_target_during_auto_init", {"ik_obj": ik_obj})
-
-            pole_obj, pole_is_new = _get_or_create_empty(
-                name=pole_name,
-                display_type="SPHERE",
-                display_size=0.035,
-                parent=root_obj,
-                collection=collection,
-            )
-
-            # Set neutral rest positions only for newly created controllers
-            if ik_is_new:
-                ik_obj.location = Vector((sign * SHOULDER_X_OFFSET, 0.0, WRIST_REST_Z))
-                ik_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
-
-            if pole_is_new:
-                pole_obj.location = Vector((
-                    sign * (SHOULDER_X_OFFSET + DEFAULT_POLE_OUTWARD_OFFSET),
-                    -DEFAULT_POLE_BACKWARD_OFFSET,
-                    ELBOW_REST_Z,
-                ))
-                pole_obj.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
-
-            controls[ik_name] = ik_obj
-            controls[pole_name] = pole_obj
-
-            p_up = arm.pose.bones[f"upper_arm.{side}"]
-            p_fore = arm.pose.bones[f"forearm.{side}"]
-            p_hand = arm.pose.bones[f"hand.{side}"]
-
-            # Shoulder ball joint: unconstrained 3D rotation during IK
-            p_up.lock_ik_x = False
-            p_up.lock_ik_y = False
-            p_up.lock_ik_z = False
-
-            # Elbow hinge joint: flex on sagittal local X (positive is forward flexion)
-            # Lock Y (axial twist) and Z (lateral adduction/abduction)
-            p_fore.lock_ik_x = False
-            p_fore.lock_ik_y = True
-            p_fore.lock_ik_z = True
-            p_fore.use_ik_limit_x = True
-            p_fore.ik_min_x = math.radians(0.0)      # Fully extended (straight)
-            p_fore.ik_max_x = math.radians(150.0)    # Maximum anatomical elbow flexion
-
-            # Resolve or configure existing ArmIK constraint
-            ik_con = None
-            con_name_ik = ARM_IK_CONSTRAINT_NAMES[side]
-            for idx, con in enumerate(list(p_fore.constraints)):
-                if con.name == con_name_ik:
-                    if con.type == "IK":
-                        ik_con = con
-                    else:
-                        if _ACTIVE_TRANSACTION_STACK:
-                            tx = _ACTIVE_TRANSACTION_STACK[-1]
-                            orig_name = con.name
-                            orig_mute = con.mute
-                            orig_idx = idx
-                            stashed_name = f"__stashed_con_{orig_name}_{uuid.uuid4().hex[:6]}"
-                            con.name = stashed_name
-                            con.mute = True
-                            tx.stashed_constraints.append({
-                                "pbone": p_fore,
-                                "con": con,
-                                "con_ptr": con.as_pointer(),
-                                "orig_name": orig_name,
-                                "orig_mute": orig_mute,
-                                "orig_idx": orig_idx,
-                            })
-                        else:
-                            raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
-                elif con.type == "IK" and con.name.startswith("ArmIK"):
-                    if _ACTIVE_TRANSACTION_STACK:
-                        tx = _ACTIVE_TRANSACTION_STACK[-1]
-                        orig_name = con.name
-                        orig_mute = con.mute
-                        orig_idx = idx
-                        stashed_name = f"__stashed_con_{orig_name}_{uuid.uuid4().hex[:6]}"
-                        con.name = stashed_name
-                        con.mute = True
-                        tx.stashed_constraints.append({
-                            "pbone": p_fore,
-                            "con": con,
-                            "con_ptr": con.as_pointer(),
-                            "orig_name": orig_name,
-                            "orig_mute": orig_mute,
-                            "orig_idx": orig_idx,
-                        })
-                    else:
-                        raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
-
-            newly_created_ik_con = False
-            tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-            if ik_con is None:
-                ik_con = _authorized_create_constraint(
-                    pbone=p_fore,
-                    con_type="IK",
-                    con_name=con_name_ik,
-                    active_tx=tx,
-                    arm=arm,
-                )
-                ik_con.influence = valid_influence
-                newly_created_ik_con = True
-
-            _authorized_assign_constraint_targets(
-                pbone=p_fore,
-                con=ik_con,
-                target=ik_obj,
-                pole_target=pole_obj,
-                active_tx=tx,
-            )
-            ik_con.chain_count = 2
-            ik_con.use_tail = True
-            ik_con.use_stretch = False
-            ik_con.pole_angle = math.radians(-90.0)
-
-            # Resolve or configure existing HandRotation constraint
-            rot_con = None
-            con_name_rot = HAND_ROT_CONSTRAINT_NAMES[side]
-            for idx, con in enumerate(list(p_hand.constraints)):
-                if con.name == con_name_rot:
-                    if con.type == "COPY_ROTATION":
-                        rot_con = con
-                    else:
-                        if _ACTIVE_TRANSACTION_STACK:
-                            tx = _ACTIVE_TRANSACTION_STACK[-1]
-                            orig_name = con.name
-                            orig_mute = con.mute
-                            orig_idx = idx
-                            stashed_name = f"__stashed_con_{orig_name}_{uuid.uuid4().hex[:6]}"
-                            con.name = stashed_name
-                            con.mute = True
-                            tx.stashed_constraints.append({
-                                "pbone": p_hand,
-                                "con": con,
-                                "con_ptr": con.as_pointer(),
-                                "orig_name": orig_name,
-                                "orig_mute": orig_mute,
-                                "orig_idx": orig_idx,
-                            })
-                        else:
-                            raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
-                elif con.type == "COPY_ROTATION" and con.name.startswith("HandRotation"):
-                    if _ACTIVE_TRANSACTION_STACK:
-                        tx = _ACTIVE_TRANSACTION_STACK[-1]
-                        orig_name = con.name
-                        orig_mute = con.mute
-                        orig_idx = idx
-                        stashed_name = f"__stashed_con_{orig_name}_{uuid.uuid4().hex[:6]}"
-                        con.name = stashed_name
-                        con.mute = True
-                        tx.stashed_constraints.append({
-                            "pbone": p_hand,
-                            "con": con,
-                            "con_ptr": con.as_pointer(),
-                            "orig_name": orig_name,
-                            "orig_mute": orig_mute,
-                            "orig_idx": orig_idx,
-                        })
-                    else:
-                        raise RuntimeError("Cannot stash or remove wrong-type constraint without active transaction")
-
-            if rot_con is None:
-                rot_con = _authorized_create_constraint(
-                    pbone=p_hand,
-                    con_type="COPY_ROTATION",
-                    con_name=con_name_rot,
-                    active_tx=tx,
-                    arm=arm,
-                )
-                rot_con.influence = valid_influence
-
-            _authorized_assign_constraint_targets(
-                pbone=p_hand,
-                con=rot_con,
-                target=ik_obj,
-                active_tx=tx,
-            )
-            rot_con.target_space = "WORLD"
-            rot_con.owner_space = "WORLD"
-            rot_con.mix_mode = "REPLACE"
-
-            # Apply pre-bend hint only when establishing an IK chain for the first time
-            if newly_created_ik_con:
-                _apply_arm_ik_prebend_hint_side(arm, side)
-
-            _trigger_fault_injection("setup_arm_ik_after_constraints_or_prebend", {"side": side, "arm": arm})
-
-        _depsgraph_update()
-        return controls
+    return _layer4_setup_arm_ik(
+        armature_obj,
+        initial_influence,
+        arm_rig_transaction=_arm_rig_transaction,
+        assert_arm_rig_cleanup_gate=_assert_arm_rig_cleanup_gate,
+        assert_arm_rig_failed_isolation_gate=_assert_arm_rig_failed_isolation_gate,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        armature_isolation_state=_ArmatureIsolationState,
+        require_existing_arm_ik_controller_ownership=_require_existing_arm_ik_controller_ownership,
+        verify_transaction_wrong_type_object_ownership=_verify_transaction_wrong_type_object_ownership,
+        ensure_character_collection=_ensure_character_collection,
+        get_or_create_empty=_get_or_create_empty,
+        authorized_create_constraint=_authorized_create_constraint,
+        authorized_assign_constraint_targets=_authorized_assign_constraint_targets,
+        trigger_fault_injection=_trigger_fault_injection,
+        depsgraph_update=_depsgraph_update,
+        uuid4=uuid.uuid4,
+        arm_ik_target_names=ARM_IK_TARGET_NAMES,
+        arm_pole_target_names=ARM_POLE_TARGET_NAMES,
+        arm_ik_constraint_names=ARM_IK_CONSTRAINT_NAMES,
+        hand_rot_constraint_names=HAND_ROT_CONSTRAINT_NAMES,
+        shoulder_x_offset=SHOULDER_X_OFFSET,
+        wrist_rest_z=WRIST_REST_Z,
+        elbow_rest_z=ELBOW_REST_Z,
+        default_pole_outward_offset=DEFAULT_POLE_OUTWARD_OFFSET,
+        default_pole_backward_offset=DEFAULT_POLE_BACKWARD_OFFSET,
+    )
 
 
 def set_arm_ik_influence(
