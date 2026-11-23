@@ -88,6 +88,7 @@ from src.scene_transaction_integrity.layer3 import (
     _authorized_create_constraint as _layer3_authorized_create_constraint,
     _authorized_link_child_collection as _layer3_authorized_link_child_collection,
     _authorized_link_object_to_collection as _layer3_authorized_link_object_to_collection,
+    _classify_constraint_target_pair_effect as _layer3_classify_constraint_target_pair_effect,
     _controller_constraint_binding_proven,
     _controller_is_borrowed_by_other_armature as _layer3_controller_is_borrowed_by_other_armature,
     _controller_role_for_name as _layer3_controller_role_for_name,
@@ -1772,30 +1773,18 @@ def _classify_constraint_target_pair_effect(
     A recognized partial or complete write must stay reversible (APPLIED_VERIFIED).
     A third-party value or unreadable identity is RECOVERY_UNCERTAIN.
     """
-    def matches_target(ref: Any, expected: Any, expected_ptr: Optional[int]) -> bool:
-        if expected is None:
-            return ref is None and expected_ptr is None
-        if ref is None or expected_ptr is None:
-            return False
-        try:
-            return (
-                ref == expected
-                and int(ref.as_pointer()) == expected_ptr
-                and _find_live_object_by_identity(expected, expected_ptr) is not None
-            )
-        except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
-            return False
-
-    is_orig_target = matches_target(current_target, orig_target, orig_target_ptr)
-    is_dest_target = matches_target(current_target, dest_target, dest_target_ptr)
-    is_orig_sub = current_subtarget == orig_subtarget
-    is_dest_sub = current_subtarget == dest_subtarget
-
-    if is_orig_target and is_orig_sub:
-        return _RelationshipOperationState.NO_EFFECT
-    if (is_orig_target or is_dest_target) and (is_orig_sub or is_dest_sub):
-        return _RelationshipOperationState.APPLIED_VERIFIED
-    return _RelationshipOperationState.RECOVERY_UNCERTAIN
+    return _layer3_classify_constraint_target_pair_effect(
+        current_target,
+        current_subtarget,
+        orig_target,
+        orig_target_ptr,
+        orig_subtarget,
+        dest_target,
+        dest_target_ptr,
+        dest_subtarget,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        find_live_object_by_identity=_find_live_object_by_identity,
+    )
 
 
 def _apply_single_constraint_target_unit(

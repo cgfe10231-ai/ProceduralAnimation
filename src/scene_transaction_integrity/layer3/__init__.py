@@ -18,6 +18,9 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
 from src.scene_transaction_integrity.layer3.constraint_creation import (
     _authorized_create_constraint,
 )
+from src.scene_transaction_integrity.layer3.constraint_target_pair_classifier import (
+    _classify_constraint_target_pair_effect,
+)
 from src.scene_transaction_integrity.layer3.controller_creation import (
     _get_or_create_empty,
 )
@@ -48,6 +51,7 @@ __all__ = (
     "_authorized_create_constraint",
     "_authorized_link_child_collection",
     "_authorized_link_object_to_collection",
+    "_classify_constraint_target_pair_effect",
     "_controller_constraint_binding_proven",
     "_controller_is_borrowed_by_other_armature",
     "_controller_role_for_name",
