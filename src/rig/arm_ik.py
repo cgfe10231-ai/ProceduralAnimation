@@ -73,6 +73,7 @@ from src.scene_transaction_integrity.layer2 import (
     _initialize_arm_rig_transaction_context as _layer2_initialize_arm_rig_transaction_context,
     _record_failed_a_audit,
     _register_created_collection as _layer2_register_created_collection,
+    _register_created_controller as _layer2_register_created_controller,
     _safe_object_pointer,
     _verify_armature_session_identity_record as _layer2_verify_armature_session_identity_record,
     ensure_armature_session_identity as _layer2_ensure_armature_session_identity,
@@ -5143,45 +5144,15 @@ class _ArmRigTransactionContext:
         automatically inferred permission from a controller name or a mutable
         created_controller_objects entry alone.
         """
-        if self.state != _ArmRigTransactionState.ACTIVE:
-            raise RuntimeError('Cannot register created controller outside ACTIVE transaction')
-        if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not self:
-            raise RuntimeError('Created controller registration requires its owning transaction')
-        if not isinstance(self.entry_object_ptrs, (frozenset, set)):
-            raise RuntimeError('Created controller registration has no trusted entry object baseline')
-        if (self.session_record is None
-                or _MANAGED_ARMATURE_IDENTITIES.get(self.session_id) is not self.session_record
-                or self.session_record.original_blender_ref is not self.arm):
-            raise RuntimeError('Created controller registration has no original Armature session identity')
-        try:
-            obj_ptr = int(obj.as_pointer())
-            live = _find_live_object_by_identity(obj, obj_ptr)
-        except (ReferenceError, AttributeError, TypeError, ValueError) as exc:
-            raise RuntimeError('Created controller identity could not be verified') from exc
-        if obj_ptr <= 0 or live is None:
-            raise RuntimeError('Created controller is not a live Blender Object')
-        if obj_ptr in self.entry_object_ptrs:
-            raise RuntimeError('Cannot register a pre-existing object as transaction-created')
-        # A transaction-created Controller must be registered immediately, before
-        # ANY Collection link. An arbitrary scene Object cannot be adopted through
-        # the legacy registration API merely because it was created after entry.
-        if _controller_role_for_name(str(obj.name)) is None:
-            raise RuntimeError('Created controller registration requires an Arm IK controller role')
-        if obj.users_collection:
-            raise RuntimeError('Created controller must be registered before Collection links')
-        if obj.parent is not None:
-            raise RuntimeError('Created controller must be registered before parent assignment')
-        if obj_ptr in self._controller_creation_receipts:
-            raise RuntimeError('Duplicate controller creation receipt')
-        for registered in self.created_controller_objects:
-            if not isinstance(registered, dict) or registered.get('obj_ptr') == obj_ptr:
-                raise RuntimeError('Duplicate or malformed transaction controller registration')
-        self.created_controller_objects.append({
-            'obj_ref': obj, 'obj_ptr': obj_ptr, 'created_name': obj.name,
-        })
-        # Receipt is independent of the mutable public legacy registry list.
-        self._controller_creation_receipts[obj_ptr] = (
-            obj, self.session_id, self.tx_id, self._controller_receipt_seal,
+        return _layer2_register_created_controller(
+            self,
+            obj,
+            find_live_object_by_identity=(
+                _find_live_object_by_identity
+            ),
+            controller_role_for_name=(
+                _controller_role_for_name
+            ),
         )
 
 
