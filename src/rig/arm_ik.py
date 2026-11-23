@@ -85,6 +85,7 @@ from src.scene_transaction_integrity.layer3 import (
     ExternalControllerNameConflictError,
     _TARGET_UNSET,
     _apply_single_constraint_target_unit as _layer3_apply_single_constraint_target_unit,
+    _authorized_assign_constraint_targets as _layer3_authorized_assign_constraint_targets,
     _authorized_assign_object_parent as _layer3_authorized_assign_object_parent,
     _authorized_create_constraint as _layer3_authorized_create_constraint,
     _authorized_link_child_collection as _layer3_authorized_link_child_collection,
@@ -1828,49 +1829,19 @@ def _authorized_assign_constraint_targets(
     Applies the 7-state relation machine (PREPARE -> APPLY -> VERIFY -> CONFIRM)
     for each target/subtarget relationship mutation unit.
     """
-    global _ACTIVE_TRANSACTION_STACK
-    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
-        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
-
-    # Pose bone and constraint identity checks
-    try:
-        pbone_ptr = pbone.as_pointer()
-    except ReferenceError as re:
-        raise RuntimeError(f"PoseBone reference is dead: {re}") from re
-
-    try:
-        con_ptr = con.as_pointer()
-    except ReferenceError as re:
-        raise RuntimeError(f"Constraint reference is dead: {re}") from re
-
-    if con not in pbone.constraints.values():
-        raise RuntimeError(f"Constraint '{con.name}' does not belong to bone '{pbone.name}'")
-
-    # Process Target unit if specified
-    if target is not _TARGET_UNSET:
-        _apply_single_constraint_target_unit(
-            pbone=pbone,
-            con=con,
-            field="target",
-            subtarget_field="subtarget",
-            target_obj=target,
-            target_subtarget=subtarget if subtarget is not _TARGET_UNSET else getattr(con, "subtarget", ""),
-            intended_mutation="CONSTRAINT_TARGET_ASSIGN",
-            active_tx=active_tx,
-        )
-
-    # Process Pole Target unit if specified
-    if pole_target is not _TARGET_UNSET:
-        _apply_single_constraint_target_unit(
-            pbone=pbone,
-            con=con,
-            field="pole_target",
-            subtarget_field="pole_subtarget",
-            target_obj=pole_target,
-            target_subtarget=pole_subtarget if pole_subtarget is not _TARGET_UNSET else getattr(con, "pole_subtarget", ""),
-            intended_mutation="CONSTRAINT_POLE_TARGET_ASSIGN",
-            active_tx=active_tx,
-        )
+    return _layer3_authorized_assign_constraint_targets(
+        pbone,
+        con,
+        target=target,
+        subtarget=subtarget,
+        pole_target=pole_target,
+        pole_subtarget=pole_subtarget,
+        active_tx=active_tx,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        trigger_fault_injection=_trigger_fault_injection,
+    )
 
 
 def _authorized_revert_relationship_record(

@@ -18,6 +18,9 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
 from src.scene_transaction_integrity.layer3.constraint_creation import (
     _authorized_create_constraint,
 )
+from src.scene_transaction_integrity.layer3.constraint_target_assignment import (
+    _authorized_assign_constraint_targets,
+)
 from src.scene_transaction_integrity.layer3.constraint_target_pair_classifier import (
     _classify_constraint_target_pair_effect,
 )
@@ -51,6 +54,7 @@ __all__ = (
     "ExternalControllerNameConflictError",
     "_TARGET_UNSET",
     "_apply_single_constraint_target_unit",
+    "_authorized_assign_constraint_targets",
     "_authorized_assign_object_parent",
     "_authorized_create_constraint",
     "_authorized_link_child_collection",
