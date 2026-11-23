@@ -40,6 +40,9 @@ from src.scene_transaction_integrity.layer2.collection_link_registry import (
 from src.scene_transaction_integrity.layer2.collection_receipts import (
     _register_created_collection,
 )
+from src.scene_transaction_integrity.layer2.constraint_registration import (
+    _register_created_constraint,
+)
 from src.scene_transaction_integrity.layer2.controller_receipts import (
     _register_created_controller,
 )
@@ -70,6 +73,7 @@ __all__ = (
     "_record_failed_a_audit",
     "_register_created_collection",
     "_register_created_collection_link",
+    "_register_created_constraint",
     "_register_created_controller",
     "_safe_object_pointer",
     "_verify_armature_session_identity_record",
