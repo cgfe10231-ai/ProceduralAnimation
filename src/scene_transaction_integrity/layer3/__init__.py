@@ -12,6 +12,9 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
 )
+from src.scene_transaction_integrity.layer3.controller_creation import (
+    _get_or_create_empty,
+)
 from src.scene_transaction_integrity.layer3.controller_ownership import (
     _controller_is_borrowed_by_other_armature,
     _controller_role_for_name,
@@ -40,6 +43,7 @@ __all__ = (
     "_find_collection_by_name",
     "_find_live_collection_by_identity",
     "_find_live_object_by_identity",
+    "_get_or_create_empty",
     "_is_child_collection_linked_by_identity",
     "_is_collection_descendant_of",
     "_is_object_linked_to_collection_by_identity",

@@ -89,6 +89,7 @@ from src.scene_transaction_integrity.layer3 import (
     _find_collection_by_name,
     _find_live_collection_by_identity as _layer3_find_live_collection_by_identity,
     _find_live_object_by_identity,
+    _get_or_create_empty as _layer3_get_or_create_empty,
     _is_child_collection_linked_by_identity,
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
@@ -7126,83 +7127,21 @@ def _get_or_create_empty(
     Returns:
         Tuple (obj, is_new): obj is the Empty object, is_new indicates whether it was created fresh.
     """
-    global _ACTIVE_TRANSACTION_STACK
-    obj = bpy.data.objects.get(name)
-    # Do not adopt an existing EMPTY simply because its global name matches.
-    if obj is not None:
-        tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-        if tx is None:
-            raise RuntimeError('Controller lookup requires an active Arm IK transaction')
-        _require_existing_arm_ik_controller_ownership(tx.arm, scope='_get_or_create_empty')
-    replaced_wrong_type = False
-
-    if obj is not None and obj.type != "EMPTY":
-        active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-        target_arm = active_tx.arm if active_tx is not None else None
-        if not _verify_transaction_wrong_type_object_ownership(obj, active_tx, target_arm):
-            raise ExternalControllerNameConflictError(
-                f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{name}' matches an existing non-EMPTY "
-                f"object '{obj.name}' (type='{obj.type}', ptr={obj.as_pointer() if hasattr(obj, 'as_pointer') else 'None'}) "
-                f"that is not owned by the active transaction."
-            )
-
-        tx = active_tx
-        stashed_record = {
-            "original_name": name,
-            "stashed_obj": obj,
-            "stashed_obj_ptr": obj.as_pointer() if hasattr(obj, "as_pointer") else None,
-            "stashed_data": getattr(obj, "data", None),
-            "stashed_data_ptr": getattr(obj, "data", None).as_pointer() if (getattr(obj, "data", None) and hasattr(getattr(obj, "data", None), "as_pointer")) else None,
-            "stashed_data_name": getattr(obj, "data", None).name if getattr(obj, "data", None) else None,
-            "collections": [c.name for c in obj.users_collection],
-            "collection_refs": list(obj.users_collection),
-            "collection_ptrs": [
-                c.as_pointer()
-                for c in obj.users_collection
-                if hasattr(c, "as_pointer")
-            ],
-            "obj_cleaned": False,
-            "data_cleaned": False,
-        }
-        tx.stashed_objects.append(stashed_record)
-        obj.name = f"__stashed_doomed_{name}__"
-        for c in list(obj.users_collection):
-            _authorized_unlink_object_from_collection(
-                c,
-                obj,
-                active_tx=tx,
-                category="TX_UNLINKED_ORIGINAL",
-            )
-        obj = None
-        replaced_wrong_type = True
-
-    if obj is None:
-        obj = bpy.data.objects.new(name, None)
-        active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-        if active_tx is not None:
-            active_tx.register_created_controller(obj)
-        _trigger_fault_injection("get_or_create_empty_after_register", {"obj": obj, "name": name})
-        _authorized_link_object_to_collection(collection, obj, active_tx=active_tx)
-        obj.empty_display_type = display_type
-        obj.empty_display_size = display_size
-        obj.rotation_mode = "XYZ"
-        if parent is not None:
-            _authorized_assign_object_parent(
-                obj=obj,
-                parent=parent,
-                matrix_parent_inverse=Matrix.Identity(4),
-                active_tx=active_tx,
-            )
-        if replaced_wrong_type:
-            _trigger_fault_injection("setup_arm_ik_after_controller_replaced", {"obj": obj, "name": name})
-        return obj, True
-
-    # Existing valid Empty: ensure linked to collection via Layer 3 and update display properties
-    active_tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-    _authorized_link_object_to_collection(collection, obj, active_tx=active_tx)
-    obj.empty_display_type = display_type
-    obj.empty_display_size = display_size
-    return obj, False
+    return _layer3_get_or_create_empty(
+        name,
+        display_type,
+        display_size,
+        parent,
+        collection,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        require_existing_arm_ik_controller_ownership=_require_existing_arm_ik_controller_ownership,
+        verify_transaction_wrong_type_object_ownership=_verify_transaction_wrong_type_object_ownership,
+        authorized_unlink_object_from_collection=_authorized_unlink_object_from_collection,
+        authorized_link_object_to_collection=_authorized_link_object_to_collection,
+        authorized_assign_object_parent=_authorized_assign_object_parent,
+        trigger_fault_injection=_trigger_fault_injection,
+        matrix_cls=Matrix,
+    )
 
 
 def setup_arm_ik(
