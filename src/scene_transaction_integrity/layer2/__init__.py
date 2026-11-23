@@ -37,9 +37,13 @@ from src.scene_transaction_integrity.layer2.session_identity import (
 from src.scene_transaction_integrity.layer2.transaction_context_init import (
     _initialize_arm_rig_transaction_context,
 )
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
 
 __all__ = (
     "ArmatureSessionIdentityRecord",
+    "_ACTIVE_TRANSACTION_STACK",
     "_ARCHIVED_FAILED_D_TOMBSTONES",
     "_ArmRigTransactionState",
     "_ArmatureIsolationState",

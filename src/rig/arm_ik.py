@@ -56,6 +56,7 @@ from src.scene_transaction_integrity.layer1 import (
 )
 from src.scene_transaction_integrity.layer2 import (
     ArmatureSessionIdentityRecord,
+    _ACTIVE_TRANSACTION_STACK,
     _ARCHIVED_FAILED_D_TOMBSTONES,
     _ArmRigTransactionState,
     _ArmatureIsolationState,
@@ -6471,8 +6472,6 @@ class _ArmRigTransactionContext:
             cause=first_cause,
         )
 
-
-_ACTIVE_TRANSACTION_STACK: List[_ArmRigTransactionContext] = []
 
 # Task 10-B-6
 # Runtime registry for committed transactions
