@@ -15,6 +15,9 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
 )
+from src.scene_transaction_integrity.layer3.constraint_creation import (
+    _authorized_create_constraint,
+)
 from src.scene_transaction_integrity.layer3.controller_creation import (
     _get_or_create_empty,
 )
@@ -42,6 +45,7 @@ __all__ = (
     "ExternalControllerNameConflictError",
     "_TARGET_UNSET",
     "_authorized_assign_object_parent",
+    "_authorized_create_constraint",
     "_authorized_link_child_collection",
     "_authorized_link_object_to_collection",
     "_controller_constraint_binding_proven",
