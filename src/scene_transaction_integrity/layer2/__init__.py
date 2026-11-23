@@ -1,4 +1,5 @@
 from src.scene_transaction_integrity.layer2.identity_helpers import (
+    _check_original_object_liveness,
     _safe_object_pointer,
 )
 from src.scene_transaction_integrity.layer2.relationship_states import (
@@ -42,6 +43,7 @@ __all__ = (
     "_MANAGED_ARMATURE_IDENTITIES",
     "_RelationshipOperationState",
     "_append_deisolation_audit",
+    "_check_original_object_liveness",
     "_record_failed_a_audit",
     "_safe_object_pointer",
 )

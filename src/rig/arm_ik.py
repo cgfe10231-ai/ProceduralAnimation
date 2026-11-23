@@ -68,6 +68,7 @@ from src.scene_transaction_integrity.layer2 import (
     _MANAGED_ARMATURE_IDENTITIES,
     _RelationshipOperationState,
     _append_deisolation_audit,
+    _check_original_object_liveness as _layer2_check_original_object_liveness,
     _record_failed_a_audit,
     _safe_object_pointer,
 )
@@ -291,82 +292,7 @@ def _ensure_character_collection() -> bpy.types.Collection:
 
 def _check_original_object_liveness(record: ArmatureSessionIdentityRecord) -> Dict[str, Any]:
     """Evaluate physical Blender Object existence (Eo) independently from data block identity (Ed)."""
-    if record is None:
-        return {
-            "status": "UNKNOWN",
-            "object_exists": None,
-            "reason": "ArmatureSessionIdentityRecord is None",
-        }
-    ref = record.original_blender_ref
-    if ref is None:
-        return {
-            "status": "UNKNOWN",
-            "object_exists": None,
-            "reason": "original_blender_ref is None",
-        }
-
-    ref_dead = False
-    ref_ptr: Optional[int] = None
-    ref_type: Optional[str] = None
-    ref_name: Optional[str] = None
-    try:
-        ref_ptr = int(ref.as_pointer())
-        ref_type = str(ref.type)
-        ref_name = str(ref.name)
-    except ReferenceError as re_err:
-        ref_dead = True
-    except BaseException as exc:
-        return {
-            "status": "UNKNOWN",
-            "object_exists": None,
-            "reason": f"Controlled reference access failure: original_blender_ref access error ({exc})",
-        }
-
-    if not ref_dead:
-        if ref_ptr != record.registration_pointer:
-            return {
-                "status": "UNKNOWN",
-                "object_exists": None,
-                "reason": f"Pointer mismatch: {ref_ptr} != {record.registration_pointer}",
-            }
-
-    in_live_objects = False
-    try:
-        for live_obj in bpy.data.objects.values():
-            try:
-                if not ref_dead and live_obj.as_pointer() == ref_ptr and live_obj == ref:
-                    in_live_objects = True
-                    break
-            except ReferenceError:
-                continue
-    except BaseException as exc:
-        return {
-            "status": "UNKNOWN",
-            "object_exists": None,
-            "reason": f"bpy.data.objects enumeration failure ({exc})",
-        }
-
-    if in_live_objects:
-        return {
-            "status": "ALIVE",
-            "object_exists": True,
-            "pointer": ref_ptr,
-            "type": ref_type,
-            "name": ref_name,
-        }
-
-    if ref_dead:
-        return {
-            "status": "ABSENT",
-            "object_exists": False,
-            "reason": "original_blender_ref destroyed (ReferenceError) and absent from live bpy.data.objects",
-        }
-
-    return {
-        "status": "UNKNOWN",
-        "object_exists": None,
-        "reason": "original_blender_ref is absent from live bpy.data.objects.values() without ReferenceError proof",
-    }
+    return _layer2_check_original_object_liveness(record)
 
 
 def _verify_armature_session_identity_record(
