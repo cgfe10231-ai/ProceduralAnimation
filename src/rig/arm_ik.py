@@ -73,6 +73,7 @@ from src.scene_transaction_integrity.layer2 import (
     _initialize_arm_rig_transaction_context as _layer2_initialize_arm_rig_transaction_context,
     _record_failed_a_audit,
     _register_created_collection as _layer2_register_created_collection,
+    _register_created_collection_link as _layer2_register_created_collection_link,
     _register_created_controller as _layer2_register_created_controller,
     _safe_object_pointer,
     _verify_armature_session_identity_record as _layer2_verify_armature_session_identity_record,
@@ -5200,21 +5201,11 @@ class _ArmRigTransactionContext:
         obj: bpy.types.Object,
     ) -> None:
         """Register an object-to-collection link mutation created by this transaction."""
-        col_ptr = col.as_pointer() if hasattr(col, "as_pointer") else None
-        obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
-
-        for record in self.created_collection_links:
-            if record["col_ptr"] == col_ptr and record["obj_ptr"] == obj_ptr:
-                return
-
-        self.created_collection_links.append({
-            "col_ref": col,
-            "col_ptr": col_ptr,
-            "col_name": col.name,
-            "obj_ref": obj,
-            "obj_ptr": obj_ptr,
-            "obj_name": obj.name,
-        })
+        return _layer2_register_created_collection_link(
+            self,
+            col,
+            obj,
+        )
 
     def register_created_collection(
         self,
