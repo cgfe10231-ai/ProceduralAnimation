@@ -83,6 +83,7 @@ from src.scene_transaction_integrity.layer3 import (
     ExternalControllerNameConflictError,
     _TARGET_UNSET,
     _authorized_link_child_collection as _layer3_authorized_link_child_collection,
+    _authorized_link_object_to_collection as _layer3_authorized_link_object_to_collection,
     _controller_constraint_binding_proven,
     _controller_is_borrowed_by_other_armature as _layer3_controller_is_borrowed_by_other_armature,
     _controller_role_for_name as _layer3_controller_role_for_name,
@@ -975,126 +976,17 @@ def _authorized_link_object_to_collection(
     active_tx: Optional[Any] = None,
 ) -> Optional[Dict[str, Any]]:
     """Layer 3 authorized Collection <-> Object link executing 3-step PREPARE -> APPLY -> CONFIRM protocol."""
-    global _ACTIVE_TRANSACTION_STACK
-    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
-        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
-
-    if active_tx is None:
-        obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
-        if not _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
-            collection.objects.link(obj)
-        return None
-
-    col_ptr = collection.as_pointer() if hasattr(collection, "as_pointer") else None
-    obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
-    obj_name = getattr(obj, "name", "<unknown>")
-
-    # 1. PREPARE: Register relationship mutation before executing any Blender C-API write
-    already_linked = _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr)
-    category = "PRE_EXISTING_ORIGINAL" if already_linked else "TX_ADDED"
-    op_record = active_tx.prepare_relationship_mutation(
-        source_reference=collection,
-        target_reference=obj,
-        original_relationship_state={
-            "linked": already_linked,
-            "category": category,
-            "col_ptr": col_ptr,
-            "obj_ptr": obj_ptr,
-        },
-        intended_mutation="COLLECTION_OBJECT_LINK",
+    return _layer3_authorized_link_object_to_collection(
+        collection,
+        obj,
+        active_tx=active_tx,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        find_live_collection_by_identity=_find_live_collection_by_identity,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        is_object_linked_to_collection_by_identity=_is_object_linked_to_collection_by_identity,
+        trigger_fault_injection=_trigger_fault_injection,
     )
-
-    _trigger_fault_injection(
-        "relationship_link_after_prepare",
-        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-    )
-
-    # Duplicate link on pre-existing relationship: transition PREPARED -> NO_EFFECT with zero revocation rights
-    if already_linked:
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.NO_EFFECT,
-        )
-        return op_record
-
-    # 2. APPLY: Transition PREPARED -> APPLYING and execute C-API link with exception-window inspection
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLYING,
-    )
-    try:
-        _trigger_fault_injection(
-            "relationship_link_during_apply_before_c_api",
-            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-        )
-        live_col = _find_live_collection_by_identity(collection, col_ptr)
-        live_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
-        if live_col is None or live_obj is None:
-            raise RuntimeError("Target object or collection identity invalid during link apply")
-
-        live_col.objects.link(live_obj)
-
-        _trigger_fault_injection(
-            "relationship_link_during_apply_after_c_api",
-            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-        )
-    except BaseException:
-        check_col = _find_live_collection_by_identity(collection, col_ptr)
-        check_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
-        if check_col is None or check_obj is None:
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-        elif _is_object_linked_to_collection_by_identity(check_col, check_obj, obj_ptr):
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.APPLIED_VERIFIED,
-            )
-            active_tx.register_created_collection_link(check_col, check_obj)
-        else:
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.NO_EFFECT,
-            )
-        raise
-
-    if not _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.RECOVERY_UNCERTAIN,
-        )
-        raise RuntimeError(f"Collection link apply did not take effect in RNA for '{obj_name}'")
-
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLIED_VERIFIED,
-    )
-    active_tx.register_created_collection_link(collection, obj)
-
-    # 3. CONFIRM: Verify live RNA state and transition APPLIED_VERIFIED -> CONFIRMED
-    _trigger_fault_injection(
-        "relationship_link_before_confirm",
-        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-    )
-    confirm_col = _find_live_collection_by_identity(collection, col_ptr)
-    confirm_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
-    if (
-        confirm_col is None
-        or confirm_obj is None
-        or not _is_object_linked_to_collection_by_identity(confirm_col, confirm_obj, obj_ptr)
-    ):
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.RECOVERY_UNCERTAIN,
-        )
-        raise RuntimeError(f"Collection link verification failed at CONFIRM stage for '{obj_name}'")
-
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.CONFIRMED,
-    )
-    return op_record
 
 
 def _authorized_unlink_object_from_collection(
