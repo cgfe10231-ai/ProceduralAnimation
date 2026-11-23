@@ -95,6 +95,7 @@ from src.scene_transaction_integrity.layer4 import (
     get_arm_ik_state as _layer4_get_arm_ik_state,
     reset_arm_ik as _layer4_reset_arm_ik,
     set_arm_ik_influence as _layer4_set_arm_ik_influence,
+    set_hand_ik_target as _layer4_set_hand_ik_target,
     setup_arm_ik as _layer4_setup_arm_ik,
 )
 from src.scene_transaction_integrity.layer5 import (
@@ -8556,129 +8557,31 @@ def set_hand_ik_target(
         dict containing state information including requested/applied positions, target error,
         rotation error, reachability flag, and clamping status.
     """
-    # Phase A: User input pre-validation (all inputs validated before scene mutation or auto-init)
-    valid_side = _validate_side(side, allow_both=False, param_name="side")
-    valid_world_xyz = _validate_vec3(world_xyz, param_name="world_xyz", allow_none=False)
-    valid_hand_rot = _validate_vec3(hand_rotation_deg, param_name="hand_rotation_deg", allow_none=True)
-    valid_pole_world = _validate_vec3(pole_world_xyz, param_name="pole_world_xyz", allow_none=True)
-    valid_clamp_reach = _validate_bool(clamp_reach, param_name="clamp_reach")
-    valid_influence = _validate_influence(influence, param_name="influence")
-
-    # Phase B: Zero-mutation controller and environment preflight
-    arm = _resolve_armature(armature_obj)
-    _require_existing_arm_ik_controller_ownership(arm, scope='set_hand_ik_target')
-    _depsgraph_update()
-    root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
-
-    needs_auto_init, eff_ik_mat, eff_pole_mat = _preflight_arm_ik_parent_transforms(
-        arm, valid_side, root_obj
+    return _layer4_set_hand_ik_target(
+        armature_obj,
+        side,
+        world_xyz,
+        hand_rotation_deg,
+        pole_world_xyz,
+        clamp_reach,
+        influence,
+        preflight_arm_ik_parent_transforms=_preflight_arm_ik_parent_transforms,
+        setup_arm_ik=setup_arm_ik,
+        get_arm_ik_state=get_arm_ik_state,
+        arm_rig_transaction=_arm_rig_transaction,
+        require_existing_arm_ik_controller_ownership=_require_existing_arm_ik_controller_ownership,
+        trigger_fault_injection=_trigger_fault_injection,
+        depsgraph_update=_depsgraph_update,
+        update_arm_ik_depsgraph=_update_arm_ik_depsgraph,
+        world_to_local_position=world_to_local_position,
+        world_to_local_rotation_quaternion=world_to_local_rotation_quaternion,
+        apply_target_rotation=apply_target_rotation,
+        arm_ik_target_names=ARM_IK_TARGET_NAMES,
+        arm_pole_target_names=ARM_POLE_TARGET_NAMES,
+        arm_ik_constraint_names=ARM_IK_CONSTRAINT_NAMES,
+        hand_rot_constraint_names=HAND_ROT_CONSTRAINT_NAMES,
+        min_arm_reach=MIN_ARM_REACH,
+        max_arm_reach=MAX_ARM_REACH,
+        default_pole_outward_offset=DEFAULT_POLE_OUTWARD_OFFSET,
+        default_pole_backward_offset=DEFAULT_POLE_BACKWARD_OFFSET,
     )
-
-    # Phase B2: Zero-mutation derived spatial coordinate and orientation preflight
-    p_up = arm.pose.bones[f"upper_arm.{valid_side}"]
-    p_fore = arm.pose.bones[f"forearm.{valid_side}"]
-    p_hand = arm.pose.bones[f"hand.{valid_side}"]
-
-    shoulder_world = arm.matrix_world @ p_up.head
-
-    requested = Vector(valid_world_xyz)
-    applied = requested.copy()
-    clamped_reach = False
-
-    vec_from_shoulder = applied - shoulder_world
-    dist = vec_from_shoulder.length
-    is_reachable = (MIN_ARM_REACH <= dist <= MAX_ARM_REACH)
-
-    # Reach clamping relative to shoulder joint
-    if valid_clamp_reach:
-        if dist > MAX_ARM_REACH:
-            clamped_reach = True
-            if dist > 1e-6:
-                applied = shoulder_world + vec_from_shoulder.normalized() * MAX_ARM_REACH
-            else:
-                applied = shoulder_world + Vector((0.0, 0.0, -1.0)) * MAX_ARM_REACH
-        elif dist < MIN_ARM_REACH:
-            clamped_reach = True
-            direction = vec_from_shoulder.normalized() if dist > 1e-6 else Vector((0.0, 0.0, -1.0))
-            applied = shoulder_world + direction * MIN_ARM_REACH
-
-    # Elbow pole target positioning in world space
-    sign = -1.0 if valid_side == "L" else 1.0
-    if valid_pole_world is not None:
-        pole_world = Vector(valid_pole_world)
-    else:
-        # Default pole placement: behind (-Y) and slightly outward (X)
-        mid_pt = 0.5 * (shoulder_world + applied)
-        pole_world = Vector((
-            mid_pt.x + sign * DEFAULT_POLE_OUTWARD_OFFSET,
-            min(shoulder_world.y, applied.y) - DEFAULT_POLE_BACKWARD_OFFSET,
-            mid_pt.z,
-        ))
-
-    # Hand 3D orientation target in world coordinates
-    if valid_hand_rot is not None:
-        target_world_rot_quat = Euler((math.radians(v) for v in valid_hand_rot), "XYZ").to_quaternion()
-    else:
-        # Neutral level orientation matching CharacterRoot
-        if root_obj is not None:
-            target_world_rot_quat = root_obj.matrix_world.to_quaternion()
-        else:
-            target_world_rot_quat = Quaternion()
-
-    ik_local_pos = world_to_local_position(applied, eff_ik_mat)
-    pole_local_pos = world_to_local_position(pole_world, eff_pole_mat)
-    ik_local_rot_quat = world_to_local_rotation_quaternion(target_world_rot_quat, eff_ik_mat)
-
-    # Phase B3: Verify all derived spatial coordinates and orientations are strictly finite
-    for v in (applied, pole_world, ik_local_pos, pole_local_pos):
-        for coord in v:
-            if not math.isfinite(coord):
-                raise ValueError(f"Derived coordinate {coord!r} in target computation is not finite")
-    for q_comp in target_world_rot_quat:
-        if not math.isfinite(q_comp):
-            raise ValueError(f"Derived orientation component {q_comp!r} is not finite")
-    for q_comp in ik_local_rot_quat:
-        if not math.isfinite(q_comp):
-            raise ValueError(f"Derived local orientation component {q_comp!r} is not finite")
-
-    # Phase C & Phase D: Transaction snapshot & atomic commit
-    with _arm_rig_transaction(arm):
-        if needs_auto_init:
-            setup_arm_ik(arm, initial_influence=valid_influence)
-
-        ik_obj = bpy.data.objects[ARM_IK_TARGET_NAMES[valid_side]]
-        pole_obj = bpy.data.objects[ARM_POLE_TARGET_NAMES[valid_side]]
-
-        _apply_arm_ik_prebend_hint_side(arm, valid_side)
-
-        # Convert applied world targets to controller local spaces preserving rotation_mode
-        ik_obj.location = ik_local_pos
-        _trigger_fault_injection("set_hand_ik_target_after_hand_location", {"ik_obj": ik_obj})
-
-        apply_target_rotation(ik_obj, target_world_rot_quat, eff_ik_mat)
-        _trigger_fault_injection("set_hand_ik_target_after_hand_rotation", {"ik_obj": ik_obj})
-
-        pole_obj.location = pole_local_pos
-        _trigger_fault_injection("set_hand_ik_target_after_pole_location", {"pole_obj": pole_obj})
-
-        # Update constraint influence
-        ik_con = p_fore.constraints.get(ARM_IK_CONSTRAINT_NAMES[valid_side])
-        if ik_con:
-            ik_con.influence = valid_influence
-        _trigger_fault_injection("set_hand_ik_target_between_influences", {"ik_con": ik_con})
-
-        rot_con = p_hand.constraints.get(HAND_ROT_CONSTRAINT_NAMES[valid_side])
-        if rot_con:
-            rot_con.influence = valid_influence
-        _trigger_fault_injection("set_hand_ik_target_after_rot_influence", {"rot_con": rot_con})
-
-        _update_arm_ik_depsgraph()
-
-        _trigger_fault_injection("set_hand_ik_target_during_state_read", {"arm": arm})
-        state = get_arm_ik_state(arm, valid_side)
-        state["requested_world"] = requested
-        state["applied_world"] = applied
-        state["is_reachable"] = is_reachable
-        state["clamped_reach"] = clamped_reach
-
-    return state

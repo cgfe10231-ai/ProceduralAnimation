@@ -24,6 +24,9 @@ from src.scene_transaction_integrity.layer4.reset import (
 from src.scene_transaction_integrity.layer4.setup import (
     setup_arm_ik,
 )
+from src.scene_transaction_integrity.layer4.hand_target import (
+    set_hand_ik_target,
+)
 
 __all__ = (
     "_apply_arm_ik_prebend_hint",
@@ -37,5 +40,6 @@ __all__ = (
     "get_arm_ik_state",
     "reset_arm_ik",
     "set_arm_ik_influence",
+    "set_hand_ik_target",
     "setup_arm_ik",
 )
