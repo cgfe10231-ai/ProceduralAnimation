@@ -49,6 +49,9 @@ from src.scene_transaction_integrity.layer2.controller_receipts import (
 from src.scene_transaction_integrity.layer2.relationship_mutation_prepare import (
     _prepare_relationship_mutation,
 )
+from src.scene_transaction_integrity.layer2.relationship_mutation_state_update import (
+    _update_relationship_mutation_state,
+)
 from src.scene_transaction_integrity.layer2.transaction_context_init import (
     _initialize_arm_rig_transaction_context,
 )
@@ -80,6 +83,7 @@ __all__ = (
     "_register_created_constraint",
     "_register_created_controller",
     "_safe_object_pointer",
+    "_update_relationship_mutation_state",
     "_verify_armature_session_identity_record",
     "ensure_armature_session_identity",
 )
