@@ -71,6 +71,7 @@ from src.scene_transaction_integrity.layer2 import (
     _append_deisolation_audit,
     _check_original_object_liveness as _layer2_check_original_object_liveness,
     _initialize_arm_rig_transaction_context as _layer2_initialize_arm_rig_transaction_context,
+    _prepare_relationship_mutation as _layer2_prepare_relationship_mutation,
     _record_failed_a_audit,
     _register_created_collection as _layer2_register_created_collection,
     _register_created_collection_link as _layer2_register_created_collection_link,
@@ -4419,34 +4420,13 @@ class _ArmRigTransactionContext:
         intended_mutation: str,
     ) -> Dict[str, Any]:
         """PREPARE stage: create and register a 7-state relationship operation log record before mutation."""
-        src_ptr = source_reference.as_pointer() if hasattr(source_reference, "as_pointer") else None
-        tgt_ptr = target_reference.as_pointer() if hasattr(target_reference, "as_pointer") else None
-        src_name = getattr(source_reference, "name", None)
-        tgt_name = getattr(target_reference, "name", None)
-
-        op_record: Dict[str, Any] = {
-            "operation_id": f"rel_{self.tx_id}_{len(self.prepared_relationship_mutations) + 1:04d}_{uuid.uuid4().hex[:6]}",
-            "transaction_id": self.tx_id,
-            "source_reference": source_reference,
-            "target_reference": target_reference,
-            "source_identity": {
-                "ref": source_reference,
-                "ptr": src_ptr,
-                "name": src_name,
-                "kind": type(source_reference).__name__,
-            },
-            "target_identity": {
-                "ref": target_reference,
-                "ptr": tgt_ptr,
-                "name": tgt_name,
-                "kind": type(target_reference).__name__,
-            },
-            "original_relationship_state": dict(original_relationship_state),
-            "intended_mutation": intended_mutation,
-            "operation_state": _RelationshipOperationState.PREPARED,
-        }
-        self.prepared_relationship_mutations.append(op_record)
-        return op_record
+        return _layer2_prepare_relationship_mutation(
+            self,
+            source_reference,
+            target_reference,
+            original_relationship_state,
+            intended_mutation,
+        )
 
     def update_relationship_mutation_state(
         self,

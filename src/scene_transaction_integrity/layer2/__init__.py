@@ -46,6 +46,9 @@ from src.scene_transaction_integrity.layer2.constraint_registration import (
 from src.scene_transaction_integrity.layer2.controller_receipts import (
     _register_created_controller,
 )
+from src.scene_transaction_integrity.layer2.relationship_mutation_prepare import (
+    _prepare_relationship_mutation,
+)
 from src.scene_transaction_integrity.layer2.transaction_context_init import (
     _initialize_arm_rig_transaction_context,
 )
@@ -70,6 +73,7 @@ __all__ = (
     "_append_deisolation_audit",
     "_check_original_object_liveness",
     "_initialize_arm_rig_transaction_context",
+    "_prepare_relationship_mutation",
     "_record_failed_a_audit",
     "_register_created_collection",
     "_register_created_collection_link",
