@@ -51,6 +51,7 @@ from src.rig.transform_utils import (
     world_to_local_rotation_quaternion,
 )
 from src.scene_transaction_integrity.layer1 import (
+    _admit_outermost_arm_rig_transaction as _layer1_admit_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
     _safe_object_name,
 )
@@ -5971,16 +5972,15 @@ def _arm_rig_transaction(arm: bpy.types.Object):
     # Unified Admission Gate (Section 7):
     # 1. Cleanup Pending Gate -> 2. FAILED Isolation Gate -> 3. Armature Identity Check
     # -----------------------------------------------------------------
-    session_rec = ensure_armature_session_identity(arm)
-
-    # Gate 1: Reject a new outermost transaction when previous committed cleanup is unresolved
-    _assert_arm_rig_cleanup_gate(arm, session_rec)
-
-    # Gate 2: Reject a new outermost transaction when Armature session is isolated due to FAILED
-    _assert_arm_rig_failed_isolation_gate(arm, session_rec)
-
-    # Gate 3: Verify 7-condition Armature Session Identity
-    admission_id_check = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
+    session_rec, admission_id_check = (
+        _layer1_admit_outermost_arm_rig_transaction(
+            arm,
+            ensure_armature_session_identity=ensure_armature_session_identity,
+            assert_arm_rig_cleanup_gate=_assert_arm_rig_cleanup_gate,
+            assert_arm_rig_failed_isolation_gate=_assert_arm_rig_failed_isolation_gate,
+            verify_armature_session_identity_record=_verify_armature_session_identity_record,
+        )
+    )
     if not admission_id_check["is_valid"]:
         if _identity_failure_is_uncertain(admission_id_check):
             # Admission is before snapshot/business writes. An indeterminate read
