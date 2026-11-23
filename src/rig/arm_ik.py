@@ -88,6 +88,7 @@ from src.scene_transaction_integrity.layer4 import (
     _apply_arm_ik_prebend_hint_side,
     _preflight_arm_ik_parent_transforms as _layer4_preflight_arm_ik_parent_transforms,
     _resolve_armature,
+    _update_arm_ik_depsgraph as _layer4_update_arm_ik_depsgraph,
     _validate_bool,
     _validate_influence,
     _validate_side,
@@ -1197,8 +1198,10 @@ def _depsgraph_update() -> None:
 
 def _update_arm_ik_depsgraph() -> None:
     """Synchronize the dependency graph for Arm IK calculations within mutations."""
-    _trigger_fault_injection("set_hand_ik_target_during_depsgraph_update")
-    _depsgraph_update()
+    return _layer4_update_arm_ik_depsgraph(
+        trigger_fault_injection=_trigger_fault_injection,
+        depsgraph_update=_depsgraph_update,
+    )
 
 
 _REQUIRED_ARM_IK_BONE_NAMES: Tuple[str, ...] = (

@@ -27,12 +27,16 @@ from src.scene_transaction_integrity.layer4.setup import (
 from src.scene_transaction_integrity.layer4.hand_target import (
     set_hand_ik_target,
 )
+from src.scene_transaction_integrity.layer4.depsgraph import (
+    _update_arm_ik_depsgraph,
+)
 
 __all__ = (
     "_apply_arm_ik_prebend_hint",
     "_apply_arm_ik_prebend_hint_side",
     "_preflight_arm_ik_parent_transforms",
     "_resolve_armature",
+    "_update_arm_ik_depsgraph",
     "_validate_bool",
     "_validate_influence",
     "_validate_side",
