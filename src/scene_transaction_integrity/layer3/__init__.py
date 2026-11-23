@@ -25,6 +25,9 @@ from src.scene_transaction_integrity.layer3.controller_ownership import (
     _verify_controller_object_transaction_authority,
     _verify_transaction_wrong_type_object_ownership,
 )
+from src.scene_transaction_integrity.layer3.object_parent_assignment import (
+    _authorized_assign_object_parent,
+)
 from src.scene_transaction_integrity.layer3.resource_contracts import (
     ARM_IK_CONSTRAINT_NAMES,
     ExternalControllerNameConflictError,
@@ -38,6 +41,7 @@ __all__ = (
     "ARM_IK_CONSTRAINT_NAMES",
     "ExternalControllerNameConflictError",
     "_TARGET_UNSET",
+    "_authorized_assign_object_parent",
     "_authorized_link_child_collection",
     "_authorized_link_object_to_collection",
     "_controller_constraint_binding_proven",
