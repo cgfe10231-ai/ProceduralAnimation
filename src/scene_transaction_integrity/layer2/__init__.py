@@ -28,6 +28,9 @@ from src.scene_transaction_integrity.layer2.session_registries import (
     _ISOLATED_FAILED_ARMATURES,
     _MANAGED_ARMATURE_IDENTITIES,
 )
+from src.scene_transaction_integrity.layer2.session_verification import (
+    _verify_armature_session_identity_record,
+)
 
 __all__ = (
     "ArmatureSessionIdentityRecord",
@@ -46,4 +49,5 @@ __all__ = (
     "_check_original_object_liveness",
     "_record_failed_a_audit",
     "_safe_object_pointer",
+    "_verify_armature_session_identity_record",
 )
