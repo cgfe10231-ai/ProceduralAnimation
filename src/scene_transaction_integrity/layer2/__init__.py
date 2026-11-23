@@ -34,6 +34,9 @@ from src.scene_transaction_integrity.layer2.session_verification import (
 from src.scene_transaction_integrity.layer2.session_identity import (
     ensure_armature_session_identity,
 )
+from src.scene_transaction_integrity.layer2.collection_receipts import (
+    _register_created_collection,
+)
 from src.scene_transaction_integrity.layer2.transaction_context_init import (
     _initialize_arm_rig_transaction_context,
 )
@@ -59,6 +62,7 @@ __all__ = (
     "_check_original_object_liveness",
     "_initialize_arm_rig_transaction_context",
     "_record_failed_a_audit",
+    "_register_created_collection",
     "_safe_object_pointer",
     "_verify_armature_session_identity_record",
     "ensure_armature_session_identity",
