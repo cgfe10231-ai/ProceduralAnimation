@@ -1,3 +1,7 @@
+from src.scene_transaction_integrity.layer3.character_collection_creation import (
+    _ensure_character_collection,
+    _find_live_collection_by_identity,
+)
 from src.scene_transaction_integrity.layer3.collection_queries import (
     _find_collection_by_name,
     _is_child_collection_linked_by_identity,
@@ -18,7 +22,9 @@ __all__ = (
     "ExternalControllerNameConflictError",
     "_TARGET_UNSET",
     "_controller_constraint_binding_proven",
+    "_ensure_character_collection",
     "_find_collection_by_name",
+    "_find_live_collection_by_identity",
     "_find_live_object_by_identity",
     "_is_child_collection_linked_by_identity",
     "_is_collection_descendant_of",
