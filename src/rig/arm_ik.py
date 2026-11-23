@@ -82,6 +82,8 @@ from src.scene_transaction_integrity.layer3 import (
     ExternalControllerNameConflictError,
     _TARGET_UNSET,
     _controller_constraint_binding_proven,
+    _controller_is_borrowed_by_other_armature as _layer3_controller_is_borrowed_by_other_armature,
+    _controller_role_for_name as _layer3_controller_role_for_name,
     _ensure_character_collection as _layer3_ensure_character_collection,
     _find_collection_by_name,
     _find_live_collection_by_identity as _layer3_find_live_collection_by_identity,
@@ -90,6 +92,9 @@ from src.scene_transaction_integrity.layer3 import (
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
     _matrix_equals,
+    _require_existing_arm_ik_controller_ownership as _layer3_require_existing_arm_ik_controller_ownership,
+    _verify_controller_object_transaction_authority as _layer3_verify_controller_object_transaction_authority,
+    _verify_transaction_wrong_type_object_ownership as _layer3_verify_transaction_wrong_type_object_ownership,
 )
 from src.scene_transaction_integrity.layer4 import (
     _apply_arm_ik_prebend_hint,
@@ -1215,12 +1220,11 @@ def _authorized_unlink_object_from_collection(
 
 def _controller_role_for_name(name: str) -> tuple[str, str] | None:
     """Resolve one of four Arm IK roles, never grant authority on its own."""
-    for side in ('L', 'R'):
-        if name == ARM_IK_TARGET_NAMES[side]:
-            return (side, 'target')
-        if name == ARM_POLE_TARGET_NAMES[side]:
-            return (side, 'pole_target')
-    return None
+    return _layer3_controller_role_for_name(
+        name,
+        arm_ik_target_names=ARM_IK_TARGET_NAMES,
+        arm_pole_target_names=ARM_POLE_TARGET_NAMES,
+    )
 
 
 def _controller_is_borrowed_by_other_armature(
@@ -1234,30 +1238,13 @@ def _controller_is_borrowed_by_other_armature(
     permission path. Inspect all foreign Armature pose-bone and object
     constraints, not just a same-named IK constraint on forearm.L/R.
     """
-    try:
-        obj_ptr = int(obj.as_pointer())
-        if obj_ptr <= 0 or _find_live_object_by_identity(obj, obj_ptr) is None:
-            return True
-        for other in bpy.data.objects:
-            if other == arm or other.type != 'ARMATURE':
-                continue
-            # Object-level constraints on the foreign Armature may also borrow
-            # the controller. A matching target in any pose-bone constraint
-            # independently proves that ownership is shared or ambiguous.
-            constraints = list(other.constraints)
-            if other.pose is not None:
-                for bone in other.pose.bones:
-                    constraints.extend(bone.constraints)
-            for con in constraints:
-                for field in ('target', 'pole_target'):
-                    bound = getattr(con, field, None)
-                    if (bound is not None and bound == obj
-                            and int(bound.as_pointer()) == obj_ptr):
-                        return True
-    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError):
-        # A failed inspection cannot certify exclusive controller ownership.
-        return True
-    return False
+    return _layer3_controller_is_borrowed_by_other_armature(
+        arm,
+        obj,
+        role,
+        find_live_object_by_identity=_find_live_object_by_identity,
+    )
+
 
 def _verify_controller_object_transaction_authority(
     obj: bpy.types.Object,
@@ -1271,71 +1258,18 @@ def _verify_controller_object_transaction_authority(
     from the entry pointer baseline. SNAPSHOT_ORIGINAL additionally needs a
     real original IK constraint binding, not merely a name-based snapshot.
     """
-    if not isinstance(tx, _ArmRigTransactionContext):
-        return None
-    if tx.state not in (_ArmRigTransactionState.ACTIVE, _ArmRigTransactionState.ROLLING_BACK):
-        return None
-    if not isinstance(tx.entry_object_ptrs, (frozenset, set)):
-        return None
-    session_id, record = tx.session_id, tx.session_record
-    if not isinstance(session_id, str) or not session_id or record is None:
-        return None
-    if _MANAGED_ARMATURE_IDENTITIES.get(session_id) is not record:
-        return None
-    if record.registry_session_id != session_id or record.original_blender_ref is not tx.arm:
-        return None
-    try:
-        if int(tx.arm.as_pointer()) != tx.arm_ptr or tx.arm_ptr != record.registration_pointer:
-            return None
-        ptr = int(obj.as_pointer())
-        name = str(obj.name)
-        if ptr <= 0 or _find_live_object_by_identity(obj, ptr) is None:
-            return None
-    except (AttributeError, ReferenceError, TypeError, ValueError):
-        return None
-    role = _controller_role_for_name(name)
-    # Renaming a controller during a transaction does not erase its creation
-    # provenance; it does, however, bar new relationship authorizations by name.
-    created_regs = [r for r in tx.created_controller_objects
-                    if isinstance(r, dict) and r.get('obj_ptr') == ptr]
-    receipts = getattr(tx, '_controller_creation_receipts', None)
-    receipt = receipts.get(ptr) if isinstance(receipts, dict) else None
-    created = (
-        len(created_regs) == 1
-        and created_regs[0].get('obj_ref') == obj
-        and isinstance(receipt, tuple) and len(receipt) == 4
-        and receipt[0] == obj and receipt[1] == session_id
-        and receipt[2] == tx.tx_id and receipt[3] is tx._controller_receipt_seal
-        and ptr not in tx.entry_object_ptrs
+    return _layer3_verify_controller_object_transaction_authority(
+        obj,
+        tx,
+        created_only=created_only,
+        transaction_context_cls=_ArmRigTransactionContext,
+        transaction_state_cls=_ArmRigTransactionState,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        controller_role_for_name=_controller_role_for_name,
+        controller_constraint_binding_proven=_controller_constraint_binding_proven,
+        controller_is_borrowed_by_other_armature=_controller_is_borrowed_by_other_armature,
     )
-    if created:
-        return 'TX_CREATED'
-    if created_only or ptr not in tx.entry_object_ptrs or created_regs:
-        return None
-    snapshot = tx.snapshot
-    if not isinstance(snapshot, dict):
-        return None
-    # Resolve the ORIGINAL name and role by snapshot pointer/reference, so a
-    # renamed live object can still be safely restored without trusting its
-    # current name or borrowing another same-name replacement.
-    saved = None
-    for original_name, original_rec in snapshot.get('controllers', {}).items():
-        if not isinstance(original_rec, dict):
-            continue
-        if original_rec.get('obj_ptr') == ptr and original_rec.get('obj_ref') == obj:
-            if saved is not None:
-                return None
-            saved = original_rec
-            role = _controller_role_for_name(original_name)
-    if (role is None or not isinstance(saved, dict)
-            or saved.get('exists') is not True
-            or saved.get('type') != 'EMPTY' or obj.type != 'EMPTY'):
-        return None
-    if not _controller_constraint_binding_proven(tx.arm, obj, role, snapshot):
-        return None
-    if _controller_is_borrowed_by_other_armature(tx.arm, obj, role):
-        return None
-    return 'SNAPSHOT_ORIGINAL'
 
 
 def _require_existing_arm_ik_controller_ownership(
@@ -1352,40 +1286,18 @@ def _require_existing_arm_ik_controller_ownership(
     live Arm IK bindings remain the backwards-compatible proof of ownership.
     Unbound pre-existing Empties fail closed: their ownership is unknowable.
     """
-    tx = _ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None
-    for side in ('L', 'R'):
-        for name in (ARM_IK_TARGET_NAMES[side], ARM_POLE_TARGET_NAMES[side]):
-            obj = bpy.data.objects.get(name)
-            if obj is None:
-                continue
-            try:
-                ptr = int(obj.as_pointer())
-                if ptr <= 0 or _find_live_object_by_identity(obj, ptr) is None:
-                    raise RuntimeError('invalid Blender object identity')
-            except (ReferenceError, AttributeError, ValueError, TypeError) as exc:
-                raise RuntimeError(f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: {name} identity unreadable') from exc
-            if tx is not None:
-                if tx.arm is arm:
-                    if _verify_controller_object_transaction_authority(obj, tx, created_only=True) == 'TX_CREATED':
-                        continue
-                    if _verify_controller_object_transaction_authority(obj, tx) == 'SNAPSHOT_ORIGINAL':
-                        continue
-                # Important: no live-binding fallback inside a transaction.
-                # Live constraints may have been modified since its snapshot;
-                # they do not confer ownership on an entry-time external Empty.
-                raise ExternalControllerNameConflictError(
-                    f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: controller {name!r} '
-                    'has no proven ownership in the active transaction'
-                )
-            role = _controller_role_for_name(name)
-            if (obj.type == 'EMPTY' and role is not None
-                    and _controller_constraint_binding_proven(arm, obj, role)
-                    and not _controller_is_borrowed_by_other_armature(arm, obj, role)):
-                continue
-            raise ExternalControllerNameConflictError(
-                f'EXTERNAL_CONTROLLER_NAME_CONFLICT: {scope}: controller {name!r} '
-                'is present without a verified owning Armature/transaction binding'
-            )
+    return _layer3_require_existing_arm_ik_controller_ownership(
+        arm,
+        scope=scope,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        arm_ik_target_names=ARM_IK_TARGET_NAMES,
+        arm_pole_target_names=ARM_POLE_TARGET_NAMES,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        verify_controller_object_transaction_authority=_verify_controller_object_transaction_authority,
+        controller_role_for_name=_controller_role_for_name,
+        controller_constraint_binding_proven=_controller_constraint_binding_proven,
+        controller_is_borrowed_by_other_armature=_controller_is_borrowed_by_other_armature,
+    )
 
 def _authorized_assign_object_parent(
     obj: bpy.types.Object,
@@ -7342,15 +7254,14 @@ def _verify_transaction_wrong_type_object_ownership(
     arm: Optional[bpy.types.Object] = None,
 ) -> bool:
     """Only current transaction-created objects may be replaced by controller name."""
-    if tx is None or tx.state != _ArmRigTransactionState.ACTIVE:
-        return False
-    if not _ACTIVE_TRANSACTION_STACK or _ACTIVE_TRANSACTION_STACK[-1] is not tx:
-        return False
-    if arm is not None and tx.arm is not arm:
-        return False
-    return _verify_controller_object_transaction_authority(
-        obj, tx, created_only=True,
-    ) == 'TX_CREATED'
+    return _layer3_verify_transaction_wrong_type_object_ownership(
+        obj,
+        tx,
+        arm,
+        transaction_state_cls=_ArmRigTransactionState,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        verify_controller_object_transaction_authority=_verify_controller_object_transaction_authority,
+    )
 
 
 def _get_or_create_empty(

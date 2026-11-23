@@ -8,6 +8,13 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
 )
+from src.scene_transaction_integrity.layer3.controller_ownership import (
+    _controller_is_borrowed_by_other_armature,
+    _controller_role_for_name,
+    _require_existing_arm_ik_controller_ownership,
+    _verify_controller_object_transaction_authority,
+    _verify_transaction_wrong_type_object_ownership,
+)
 from src.scene_transaction_integrity.layer3.resource_contracts import (
     ARM_IK_CONSTRAINT_NAMES,
     ExternalControllerNameConflictError,
@@ -22,6 +29,8 @@ __all__ = (
     "ExternalControllerNameConflictError",
     "_TARGET_UNSET",
     "_controller_constraint_binding_proven",
+    "_controller_is_borrowed_by_other_armature",
+    "_controller_role_for_name",
     "_ensure_character_collection",
     "_find_collection_by_name",
     "_find_live_collection_by_identity",
@@ -30,4 +39,7 @@ __all__ = (
     "_is_collection_descendant_of",
     "_is_object_linked_to_collection_by_identity",
     "_matrix_equals",
+    "_require_existing_arm_ik_controller_ownership",
+    "_verify_controller_object_transaction_authority",
+    "_verify_transaction_wrong_type_object_ownership",
 )
