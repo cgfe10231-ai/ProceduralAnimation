@@ -84,6 +84,7 @@ from src.scene_transaction_integrity.layer3 import (
     ARM_IK_CONSTRAINT_NAMES,
     ExternalControllerNameConflictError,
     _TARGET_UNSET,
+    _apply_single_constraint_target_unit as _layer3_apply_single_constraint_target_unit,
     _authorized_assign_object_parent as _layer3_authorized_assign_object_parent,
     _authorized_create_constraint as _layer3_authorized_create_constraint,
     _authorized_link_child_collection as _layer3_authorized_link_child_collection,
@@ -1798,198 +1799,19 @@ def _apply_single_constraint_target_unit(
     active_tx: Optional[Any],
 ) -> Optional[Dict[str, Any]]:
     """Execute a single constraint target or pole target assignment unit under 7-state protocol."""
-    if not hasattr(con, field):
-        raise AttributeError(f"Constraint '{con.name}' ({con.type}) does not have property '{field}'")
-
-    # Identity validation of target_obj
-    dest_ptr: Optional[int] = None
-    if target_obj is not None:
-        if not isinstance(target_obj, bpy.types.Object):
-            raise TypeError(f"Target must be a Blender Object, got {type(target_obj)}")
-        try:
-            dest_ptr = target_obj.as_pointer()
-        except ReferenceError as re:
-            raise RuntimeError(f"Target object reference is dead: {re}") from re
-        live_obj = _find_live_object_by_identity(target_obj, dest_ptr)
-        if live_obj is None or live_obj != target_obj:
-            raise RuntimeError(f"Target object identity verification failed for '{target_obj.name}'")
-
-    orig_target = getattr(con, field, None)
-    orig_subtarget = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
-    orig_ptr: Optional[int] = None
-    if orig_target is not None:
-        try:
-            orig_ptr = orig_target.as_pointer()
-        except ReferenceError:
-            orig_ptr = None
-
-    # If active_tx is None (backward-compatible restoration without transaction):
-    if active_tx is None:
-        setattr(con, field, target_obj)
-        if hasattr(con, subtarget_field):
-            setattr(con, subtarget_field, target_subtarget)
-        return None
-
-    # Check if unchanged
-    orig_matches_dest = False
-    if target_obj is None and orig_target is None and orig_subtarget == target_subtarget:
-        orig_matches_dest = True
-    elif target_obj is not None and orig_target is not None:
-        if orig_target == target_obj and orig_ptr == dest_ptr and orig_subtarget == target_subtarget:
-            orig_matches_dest = True
-
-    category = "PRE_EXISTING" if orig_target is not None else "UNASSIGNED"
-
-    # 1. PREPARE: register mutation log record
-    op_record = active_tx.prepare_relationship_mutation(
-        source_reference=con,
-        target_reference=target_obj,
-        original_relationship_state={
-            "field": field,
-            "subtarget_field": subtarget_field,
-            "category": category,
-            "pbone_ref": pbone,
-            "pbone_ptr": pbone.as_pointer(),
-            "bone_name": pbone.name,
-            "con_ref": con,
-            "con_ptr": con.as_pointer(),
-            "con_name": con.name,
-            "orig_target_ref": orig_target,
-            "orig_target_ptr": orig_ptr,
-            "orig_subtarget": orig_subtarget,
-            "dest_target_ref": target_obj,
-            "dest_target_ptr": dest_ptr,
-            "dest_subtarget": target_subtarget,
-        },
-        intended_mutation=intended_mutation,
+    return _layer3_apply_single_constraint_target_unit(
+        pbone,
+        con,
+        field,
+        subtarget_field,
+        target_obj,
+        target_subtarget,
+        intended_mutation,
+        active_tx,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        trigger_fault_injection=_trigger_fault_injection,
     )
-    # Populate top-level fields for convenience
-    op_record["pbone_ref"] = pbone
-    op_record["pbone_ptr"] = pbone.as_pointer()
-    op_record["bone_name"] = pbone.name
-    op_record["con_ref"] = con
-    op_record["con_ptr"] = con.as_pointer()
-    op_record["con_name"] = con.name
-    op_record["field"] = field
-    op_record["subtarget_field"] = subtarget_field
-    op_record["orig_target_ref"] = orig_target
-    op_record["orig_target_ptr"] = orig_ptr
-    op_record["orig_subtarget"] = orig_subtarget
-    op_record["dest_target_ref"] = target_obj
-    op_record["dest_target_ptr"] = dest_ptr
-    op_record["dest_subtarget"] = target_subtarget
-    op_record["category"] = category
-
-    _trigger_fault_injection(
-        "relationship_constraint_target_after_prepare",
-        {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
-    )
-
-    # If unchanged, transition to NO_EFFECT without calling Blender C-API write
-    if orig_matches_dest:
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.NO_EFFECT,
-        )
-        return op_record
-
-    # 2. APPLY: transition PREPARED -> APPLYING
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLYING,
-    )
-    try:
-        _trigger_fault_injection(
-            "during_constraint_target_apply_before_write",
-            {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
-        )
-
-        setattr(con, field, target_obj)
-        # Distinct C-API setters: expose the genuinely partial write window.
-        _trigger_fault_injection(
-            "during_constraint_target_apply_between_fields",
-            {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
-        )
-        if hasattr(con, subtarget_field):
-            setattr(con, subtarget_field, target_subtarget)
-
-        _trigger_fault_injection(
-            "during_constraint_target_apply_after_write",
-            {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
-        )
-    except BaseException:
-        # The two RNA setters are separate. After the first succeeds, the
-        # second can fail: TARGET=destination + SUBTARGET=original is NOT
-        # NO_EFFECT. Keep it undoable when both values have known provenance.
-        try:
-            curr_target = getattr(con, field, None)
-            curr_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
-            classification = _classify_constraint_target_pair_effect(
-                curr_target, curr_sub,
-                orig_target, orig_ptr, orig_subtarget,
-                target_obj, dest_ptr, target_subtarget,
-            )
-        except Exception:
-            classification = _RelationshipOperationState.RECOVERY_UNCERTAIN
-        active_tx.update_relationship_mutation_state(op_record, classification)
-        raise
-
-    # Verify RNA write
-    curr_target = getattr(con, field, None)
-    curr_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
-    curr_target_ptr = curr_target.as_pointer() if (curr_target and hasattr(curr_target, "as_pointer")) else None
-    target_ok = (curr_target == target_obj if target_obj is not None else curr_target is None)
-    ptr_ok = (curr_target_ptr == dest_ptr)
-    sub_ok = (curr_sub == target_subtarget)
-
-    if not (target_ok and ptr_ok and sub_ok):
-        # RNA returned without raising, but at least one property differs.
-        # A recognizable partial write is still undoable; it is never NO_EFFECT.
-        classification = _classify_constraint_target_pair_effect(
-            curr_target, curr_sub,
-            orig_target, orig_ptr, orig_subtarget,
-            target_obj, dest_ptr, target_subtarget,
-        )
-        active_tx.update_relationship_mutation_state(op_record, classification)
-        raise RuntimeError(f"Constraint {field} assignment did not take effect in RNA")
-
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLIED_VERIFIED,
-    )
-
-    # 3. CONFIRM
-    _trigger_fault_injection(
-        "constraint_target_before_confirm",
-        {"op": op_record, "pbone": pbone, "con": con, "target": target_obj, "tx": active_tx},
-    )
-
-    confirm_target = getattr(con, field, None)
-    confirm_sub = getattr(con, subtarget_field, "") if hasattr(con, subtarget_field) else ""
-    confirm_ptr = confirm_target.as_pointer() if (confirm_target is not None and hasattr(confirm_target, "as_pointer")) else None
-    c_tgt_ok = (confirm_target == target_obj if target_obj is not None else confirm_target is None)
-    c_ptr_ok = (confirm_ptr == dest_ptr)
-    if c_tgt_ok and c_ptr_ok and confirm_sub == target_subtarget:
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.CONFIRMED,
-        )
-    else:
-        classification = _classify_constraint_target_pair_effect(
-            confirm_target, confirm_sub,
-            orig_target, orig_ptr, orig_subtarget,
-            target_obj, dest_ptr, target_subtarget,
-        )
-        if classification == _RelationshipOperationState.RECOVERY_UNCERTAIN:
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-        # An already APPLIED_VERIFIED operation stays there for reversal if
-        # values are still within this transaction's original/destination pair.
-        raise RuntimeError(f"Constraint {field}/{subtarget_field} verification failed at CONFIRM stage")
-
-    return op_record
 
 
 def _authorized_assign_constraint_targets(
