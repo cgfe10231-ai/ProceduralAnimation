@@ -51,6 +51,8 @@ from src.scene_transaction_integrity.layer2.controller_receipts import (
 )
 from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
     _PENDING_ARM_RIG_CLEANUPS,
+    _register_pending_arm_rig_cleanup,
+    get_pending_arm_rig_cleanup_ids,
 )
 from src.scene_transaction_integrity.layer2.relationship_mutation_prepare import (
     _prepare_relationship_mutation,
@@ -89,9 +91,11 @@ __all__ = (
     "_register_created_collection_link",
     "_register_created_constraint",
     "_register_created_controller",
+    "_register_pending_arm_rig_cleanup",
     "_safe_object_pointer",
     "_update_relationship_mutation_state",
     "_verify_armature_session_identity_record",
     "ensure_armature_session_identity",
+    "get_pending_arm_rig_cleanup_ids",
     "query_admission_gate_status",
 )

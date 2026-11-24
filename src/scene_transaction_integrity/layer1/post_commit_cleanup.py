@@ -1,6 +1,6 @@
 """Post-commit irreversible cleanup coordination and success confirmation migrated from `src/rig/arm_ik.py` (Task 10-B Layer 1 L1-06)."""
 
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List
 
 
 # [INTRODUCED 2026-11-24T13:44:00+08:00]
@@ -81,3 +81,125 @@ def _confirm_cleanup_success(
 
     if phase == "PENDING_RETRY":
         pending_arm_rig_cleanups.pop(tx.tx_id)
+
+
+# [INTRODUCED 2026-11-24T15:31:00+08:00]
+# NODE: 10-B / L1-07
+# FUNCTION: _coordinator_apply_cleanup_result
+# PURPOSE: 依次校验清理结果合同、空活动栈、原会话与骨架身份、Pending 归属及 FAILED 隔离并完成最终成功确认或非成功挂起
+# REASON: 将清理结果裁决从 arm_ik.py 迁入 Layer 1，复用已有结果验证、成功确认与挂起保留入口
+def _coordinator_apply_cleanup_result(
+    tx: Any,
+    result: Any,
+    phase: str,
+    *,
+    coordinator_validate_cleanup_result_contract: Callable[..., None],
+    active_transaction_stack: List[Any],
+    managed_armature_identities: Dict[str, Any],
+    pending_arm_rig_cleanups: Dict[str, Any],
+    isolated_failed_armatures: Dict[str, Any],
+    armature_isolation_state_cls: Any,
+    transaction_state_cls: Any,
+    cleanup_outcome_cls: Any,
+    verify_armature_session_identity_record: Callable[..., Dict[str, Any]],
+    confirm_cleanup_success: Callable[..., None],
+    coordinator_preserve_cleanup_pending: Callable[..., None],
+) -> None:
+    """Exclusively decide cleanup state after full result/identity validation.
+
+    No malformed result, uncertain Armature, or FAILED isolation may be treated
+    as success; rejection is reported, not swallowed or coerced to NO_EFFECT.
+    """
+    coordinator_validate_cleanup_result_contract(tx, result, phase)
+
+    if active_transaction_stack:
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: active transaction stack must be empty"
+        )
+    # Verify original registry provenance, not a newly generated replacement
+    # session from ensure_armature_session_identity().
+    session_id = tx.session_id
+    record = tx.session_record
+    if (not isinstance(session_id, str) or not session_id
+            or record is None
+            or managed_armature_identities.get(session_id) is not record
+            or record.registry_session_id != session_id):
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: session_id mismatch or original session record unavailable"
+        )
+    if record.original_blender_ref is not tx.arm:
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: original Armature reference mismatch"
+        )
+    try:
+        pointer = int(tx.arm.as_pointer())
+    except BaseException as exc:
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: original Armature identity unreadable"
+        ) from exc
+    if pointer != tx.arm_ptr or pointer != record.registration_pointer:
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: original Armature pointer mismatch"
+        )
+    try:
+        identity_check = verify_armature_session_identity_record(record, candidate_arm=tx.arm)
+    except BaseException as exc:
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: Armature identity verification raised"
+        ) from exc
+    if identity_check.get("is_valid") is not True:
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: Armature identity unverified: "
+            f"{identity_check.get('reasons', [])}"
+        )
+
+    registered = pending_arm_rig_cleanups.get(tx.tx_id)
+    if phase == "PENDING_RETRY":
+        if registered is not tx:
+            raise RuntimeError(
+                "Coordinator rejected cleanup result: transaction "
+                f"{tx.tx_id} identity mismatch or absent in _PENDING_ARM_RIG_CLEANUPS"
+            )
+    elif registered is not None:
+        raise RuntimeError(
+            "Coordinator rejected cleanup result: unexpected pending registry entry "
+            f"for initial cleanup {tx.tx_id}"
+        )
+
+    # Any FAILED isolation of this Armature blocks a cleanup-result decision.
+    # ALSO reject an isolation record under a corrupted/mis-keyed session entry.
+    # No try/except here: an identity or isolation read error MUST propagate.
+    if (record.isolation_state != armature_isolation_state_cls.NONE
+            or session_id in isolated_failed_armatures):
+        raise RuntimeError(
+            f"Coordinator rejected cleanup result: active FAILED isolation for session {session_id}"
+        )
+    for isolated in isolated_failed_armatures.values():
+        if isolated.get("transaction_id") == tx.tx_id:
+            raise RuntimeError(
+                "Coordinator rejected cleanup result: transaction "
+                f"{tx.tx_id} associated with FAILED isolation under another key"
+            )
+
+    if result.outcome is cleanup_outcome_cls.CLEANUP_SUCCESS:
+        confirm_cleanup_success(
+            tx,
+            phase,
+            pending_arm_rig_cleanups=pending_arm_rig_cleanups,
+            transaction_state_cls=transaction_state_cls,
+        )
+        return
+
+    # Non-success outcome: keep gate, preserve original traceback in __cause__.
+    err_msg = (
+        f"Arm rig transaction commit cleanup {result.outcome.value}: "
+        f"transaction={tx.tx_id}; phase={phase}; "
+        f"remaining_objects={result.remaining_objects}; "
+        f"remaining_constraints={result.remaining_constraints}; "
+        f"errors={'; '.join(result.errors)}"
+    )
+    coordinator_preserve_cleanup_pending(tx, RuntimeError(err_msg))
+    tx.cleanup_error = "; ".join(result.errors) if result.errors else "Cleanup incomplete or failed"
+    if result.cause is not None:
+        raise RuntimeError(err_msg) from result.cause
+    raise RuntimeError(err_msg)

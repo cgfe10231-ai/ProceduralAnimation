@@ -59,6 +59,10 @@ from src.scene_transaction_integrity.layer1 import (
     _capture_transaction_entry_fingerprint as _layer1_capture_transaction_entry_fingerprint,
     _commit_arm_rig_transaction as _layer1_commit_arm_rig_transaction,
     _confirm_cleanup_success as _layer1_confirm_cleanup_success,
+    _coordinator_apply_cleanup_result as _layer1_coordinator_apply_cleanup_result,
+    _coordinator_preserve_cleanup_pending as _layer1_coordinator_preserve_cleanup_pending,
+    _coordinator_validate_cleanup_preflight as _layer1_coordinator_validate_cleanup_preflight,
+    _coordinator_validate_cleanup_result_contract as _layer1_coordinator_validate_cleanup_result_contract,
     _dispatch_initial_post_commit_cleanup as _layer1_dispatch_initial_post_commit_cleanup,
     _establish_outermost_arm_rig_transaction as _layer1_establish_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
@@ -66,6 +70,7 @@ from src.scene_transaction_integrity.layer1 import (
     _safe_object_name,
     _snapshot_and_activate_transaction as _layer1_snapshot_and_activate_transaction,
     _sweep_dead_managed_armature_identities as _layer1_sweep_dead_managed_armature_identities,
+    retry_pending_arm_rig_cleanup as _layer1_retry_pending_arm_rig_cleanup,
 )
 from src.scene_transaction_integrity.layer2 import (
     ArmatureSessionIdentityRecord,
@@ -91,10 +96,12 @@ from src.scene_transaction_integrity.layer2 import (
     _register_created_collection_link as _layer2_register_created_collection_link,
     _register_created_constraint as _layer2_register_created_constraint,
     _register_created_controller as _layer2_register_created_controller,
+    _register_pending_arm_rig_cleanup as _layer2_register_pending_arm_rig_cleanup,
     _safe_object_pointer,
     _update_relationship_mutation_state as _layer2_update_relationship_mutation_state,
     _verify_armature_session_identity_record as _layer2_verify_armature_session_identity_record,
     ensure_armature_session_identity as _layer2_ensure_armature_session_identity,
+    get_pending_arm_rig_cleanup_ids as _layer2_get_pending_arm_rig_cleanup_ids,
     query_admission_gate_status as _layer2_query_admission_gate_status,
 )
 from src.scene_transaction_integrity.layer3 import (
@@ -4830,108 +4837,18 @@ def _coordinator_validate_cleanup_preflight(
     relationship mutation, gate clearing, or transaction-state transition.
     An unknown live identity or an isolation mismatch must fail closed.
     """
-    if phase not in ("INITIAL_CLEANUP", "PENDING_RETRY"):
-        raise ValueError(f"Invalid cleanup preflight phase: {phase!r}")
-    if not isinstance(tx, _ArmRigTransactionContext):
-        raise RuntimeError("CLEANUP_PREFLIGHT_REJECTED: transaction context type is invalid")
-    if not isinstance(tx.tx_id, str) or not tx.tx_id:
-        raise RuntimeError("CLEANUP_PREFLIGHT_REJECTED: missing transaction ID")
-
-    expected_state = (
-        _ArmRigTransactionState.COMMITTED
-        if phase == "INITIAL_CLEANUP"
-        else _ArmRigTransactionState.CLEANUP_PENDING
+    return _layer1_coordinator_validate_cleanup_preflight(
+        tx,
+        phase,
+        transaction_context_cls=_ArmRigTransactionContext,
+        transaction_state_cls=_ArmRigTransactionState,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        verify_armature_session_identity_record=_verify_armature_session_identity_record,
     )
-    if tx.state != expected_state:
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: transaction {tx.tx_id} "
-            f"is {tx.state}, expected {expected_state}"
-        )
-
-    if _ACTIVE_TRANSACTION_STACK:
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: active transaction stack is nonempty "
-            f"during {phase}"
-        )
-
-    registered_pending = _PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id)
-    if phase == "PENDING_RETRY":
-        if registered_pending is not tx:
-            raise RuntimeError(
-                "CLEANUP_PREFLIGHT_REJECTED: pending registry transaction "
-                f"identity mismatch for {tx.tx_id}"
-            )
-    elif registered_pending is not None:
-        raise RuntimeError(
-            "CLEANUP_PREFLIGHT_REJECTED: initial cleanup transaction "
-            f"{tx.tx_id} already exists in the pending registry"
-        )
-
-    # Check both registry provenance and Blender's current object identity.
-    # Never call ensure_armature_session_identity() here: it can register a new
-    # session, which is not a valid substitute for the transaction's original.
-    record = tx.session_record
-    session_id = tx.session_id
-    if not isinstance(session_id, str) or not session_id:
-        raise RuntimeError("CLEANUP_PREFLIGHT_REJECTED: missing original session ID")
-    if record is None or _MANAGED_ARMATURE_IDENTITIES.get(session_id) is not record:
-        raise RuntimeError(
-            "CLEANUP_PREFLIGHT_REJECTED: original session registry record "
-            f"not found or substituted for {tx.tx_id}"
-        )
-    if record.registry_session_id != session_id or record.original_blender_ref is not tx.arm:
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: session and original Armature provenance "
-            f"mismatch for {tx.tx_id}"
-        )
-    try:
-        live_ptr = int(tx.arm.as_pointer())
-    except BaseException as exc:
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: cannot read original Armature identity "
-            f"for {tx.tx_id}: {exc}"
-        ) from exc
-    if live_ptr != tx.arm_ptr or live_ptr != record.registration_pointer:
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: original Armature pointer mismatch "
-            f"for {tx.tx_id}"
-        )
-    try:
-        identity_check = _verify_armature_session_identity_record(record, candidate_arm=tx.arm)
-    except BaseException as exc:
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: Armature identity verification raised "
-            f"for {tx.tx_id}: {exc}"
-        ) from exc
-    if identity_check.get("is_valid") is not True:
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: original Armature session not verified "
-            f"for {tx.tx_id}: {identity_check.get('reasons', [])}"
-        )
-
-    if (record.isolation_state != _ArmatureIsolationState.NONE
-            or session_id in _ISOLATED_FAILED_ARMATURES):
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: transaction {tx.tx_id} "
-            f"is associated with active FAILED isolation"
-        )
-    # Also defend against a malformed isolation registry record whose key is
-    # different from the transaction's session ID, but whose tx_id matches.
-    for isolation in _ISOLATED_FAILED_ARMATURES.values():
-        if isolation.get("transaction_id") == tx.tx_id:
-            raise RuntimeError(
-                f"CLEANUP_PREFLIGHT_REJECTED: transaction {tx.tx_id} "
-                "is referenced by FAILED isolation under another registry key"
-            )
-
-    if (not isinstance(tx.uncleaned_stashed_objects, list)
-            or not isinstance(tx.uncleaned_stashed_constraints, list)
-            or any(not isinstance(entry, dict) for entry in tx.uncleaned_stashed_objects)
-            or any(not isinstance(entry, dict) for entry in tx.uncleaned_stashed_constraints)):
-        raise RuntimeError(
-            f"CLEANUP_PREFLIGHT_REJECTED: cleanup resource queue is malformed "
-            f"for {tx.tx_id}"
-        )
 
 
 def _coordinator_validate_cleanup_result_contract(
@@ -4944,95 +4861,15 @@ def _coordinator_validate_cleanup_result_contract(
     This routine does not repair a malformed result, infer a missing outcome,
     mutate the registry, or translate an invalid result into CLEANUP_SUCCESS.
     """
-    if phase not in ("INITIAL_CLEANUP", "PENDING_RETRY"):
-        raise ValueError(f"Invalid cleanup decision phase: {phase!r}")
-    if not isinstance(tx, _ArmRigTransactionContext):
-        raise RuntimeError("Coordinator rejected cleanup result: invalid transaction context")
-    if not isinstance(result, _CleanupResult):
-        raise RuntimeError(
-            f"Coordinator rejected cleanup result: expected _CleanupResult instance, got {type(result)}"
-        )
-    if not isinstance(tx.tx_id, str) or not tx.tx_id:
-        raise RuntimeError("Coordinator rejected cleanup result: missing transaction_id")
-    if not isinstance(result.transaction_id, str) or result.transaction_id != tx.tx_id:
-        raise RuntimeError(
-            f"Coordinator rejected cleanup result: transaction_id mismatch "
-            f"({result.transaction_id!r} != {tx.tx_id!r})"
-        )
-    expected_state = (
-        _ArmRigTransactionState.COMMITTED
-        if phase == "INITIAL_CLEANUP"
-        else _ArmRigTransactionState.CLEANUP_PENDING
+    return _layer1_coordinator_validate_cleanup_result_contract(
+        tx,
+        result,
+        phase,
+        transaction_context_cls=_ArmRigTransactionContext,
+        transaction_state_cls=_ArmRigTransactionState,
+        cleanup_result_cls=_CleanupResult,
+        cleanup_outcome_cls=_CleanupOutcome,
     )
-    if tx.state != expected_state:
-        raise RuntimeError(
-            f"Coordinator rejected cleanup result: phase {phase} requires "
-            f"state {expected_state.value}, got {tx.state}"
-        )
-    if type(result.outcome) is not _CleanupOutcome:
-        raise RuntimeError(
-            f"Coordinator rejected cleanup result: invalid CleanupOutcome {result.outcome!r}"
-        )
-    for label, count in (
-        ("remaining_objects", result.remaining_objects),
-        ("remaining_constraints", result.remaining_constraints),
-    ):
-        if type(count) is not int or count < 0:
-            raise RuntimeError(
-                f"Coordinator rejected cleanup result: {label} must be a nonnegative int, got {count!r}"
-            )
-    if not isinstance(result.errors, tuple) or any(
-        not isinstance(message, str) or not message.strip()
-        for message in result.errors
-    ):
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: errors must be a tuple of nonempty strings"
-        )
-    if result.cause is not None and not isinstance(result.cause, BaseException):
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: cause must be BaseException or None"
-        )
-    if not isinstance(tx.uncleaned_stashed_objects, list) or not isinstance(
-        tx.uncleaned_stashed_constraints, list
-    ):
-        raise RuntimeError("Coordinator rejected cleanup result: malformed cleanup queues")
-    actual_rem_objs = len(tx.uncleaned_stashed_objects)
-    actual_rem_cons = len(tx.uncleaned_stashed_constraints)
-    if (result.remaining_objects != actual_rem_objs
-            or result.remaining_constraints != actual_rem_cons):
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: remaining resource count mismatch "
-            f"(reported: objs={result.remaining_objects}, cons={result.remaining_constraints}; "
-            f"actual: objs={actual_rem_objs}, cons={actual_rem_cons})"
-        )
-    remaining = result.remaining_objects + result.remaining_constraints
-    if result.outcome == _CleanupOutcome.CLEANUP_SUCCESS:
-        if result.errors:
-            raise RuntimeError(
-                f"Coordinator rejected cleanup result: CLEANUP_SUCCESS cannot carry errors: {result.errors}"
-            )
-        if remaining:
-            raise RuntimeError(
-                "Coordinator rejected cleanup result: CLEANUP_SUCCESS cannot have remaining resources "
-                f"(objs={result.remaining_objects}, cons={result.remaining_constraints})"
-            )
-        if result.cause is not None:
-            raise RuntimeError(
-                "Coordinator rejected cleanup result: CLEANUP_SUCCESS cannot carry a cause"
-            )
-    elif result.outcome == _CleanupOutcome.CLEANUP_INCOMPLETE:
-        if remaining == 0:
-            raise RuntimeError(
-                "Coordinator rejected cleanup result: CLEANUP_INCOMPLETE requires remaining resources"
-            )
-    elif result.outcome == _CleanupOutcome.CLEANUP_FAILED:
-        if remaining != 0 or not result.errors:
-            raise RuntimeError(
-                "Coordinator rejected cleanup result: CLEANUP_FAILED requires "
-                "zero remaining resources and at least one error"
-            )
-    else:
-        raise RuntimeError("Coordinator rejected cleanup result: unsupported outcome")
 
 
 def _coordinator_preserve_cleanup_pending(
@@ -5045,34 +4882,14 @@ def _coordinator_preserve_cleanup_pending(
     COMMITTED/PENDING, never removes a FAILED isolation, and never pops a gate.
     In an impossible registry-key collision, raise rather than overwrite it.
     """
-    if not isinstance(tx, _ArmRigTransactionContext):
-        raise RuntimeError("CLEANUP_PENDING_REGISTRATION_FAILED: invalid context") from error
-    if tx.state not in (
-        _ArmRigTransactionState.COMMITTED,
-        _ArmRigTransactionState.CLEANUP_PENDING,
-    ):
-        raise RuntimeError(
-            f"CLEANUP_PENDING_REGISTRATION_FAILED: transaction {tx.tx_id} "
-            f"cannot move from {tx.state} into CLEANUP_PENDING"
-        ) from error
-    if not isinstance(tx.tx_id, str) or not tx.tx_id:
-        raise RuntimeError("CLEANUP_PENDING_REGISTRATION_FAILED: invalid transaction ID") from error
-    existing = _PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id)
-    if existing is not None and existing is not tx:
-        raise RuntimeError(
-            f"CLEANUP_PENDING_REGISTRATION_FAILED: registry collision for {tx.tx_id}; "
-            "foreign transaction preserved"
-        ) from error
-    if existing is tx and tx.state == _ArmRigTransactionState.CLEANUP_PENDING:
-        return
-    tx.state = _ArmRigTransactionState.CLEANUP_PENDING
-    tx.cleanup_error = f"{type(error).__name__}: {error}"
-    if existing is None:
-        _register_pending_arm_rig_cleanup(tx)
-    if _PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id) is not tx:
-        raise RuntimeError(
-            f"CLEANUP_PENDING_REGISTRATION_FAILED: transaction {tx.tx_id} not registered"
-        ) from error
+    return _layer1_coordinator_preserve_cleanup_pending(
+        tx,
+        error,
+        transaction_context_cls=_ArmRigTransactionContext,
+        transaction_state_cls=_ArmRigTransactionState,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        register_pending_arm_rig_cleanup=_register_pending_arm_rig_cleanup,
+    )
 
 
 def _coordinator_apply_cleanup_result(
@@ -5085,153 +4902,53 @@ def _coordinator_apply_cleanup_result(
     No malformed result, uncertain Armature, or FAILED isolation may be treated
     as success; rejection is reported, not swallowed or coerced to NO_EFFECT.
     """
-    _coordinator_validate_cleanup_result_contract(tx, result, phase)
-
-    if _ACTIVE_TRANSACTION_STACK:
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: active transaction stack must be empty"
-        )
-    # Verify original registry provenance, not a newly generated replacement
-    # session from ensure_armature_session_identity().
-    session_id = tx.session_id
-    record = tx.session_record
-    if (not isinstance(session_id, str) or not session_id
-            or record is None
-            or _MANAGED_ARMATURE_IDENTITIES.get(session_id) is not record
-            or record.registry_session_id != session_id):
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: session_id mismatch or original session record unavailable"
-        )
-    if record.original_blender_ref is not tx.arm:
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: original Armature reference mismatch"
-        )
-    try:
-        pointer = int(tx.arm.as_pointer())
-    except BaseException as exc:
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: original Armature identity unreadable"
-        ) from exc
-    if pointer != tx.arm_ptr or pointer != record.registration_pointer:
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: original Armature pointer mismatch"
-        )
-    try:
-        identity_check = _verify_armature_session_identity_record(record, candidate_arm=tx.arm)
-    except BaseException as exc:
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: Armature identity verification raised"
-        ) from exc
-    if identity_check.get("is_valid") is not True:
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: Armature identity unverified: "
-            f"{identity_check.get('reasons', [])}"
-        )
-
-    registered = _PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id)
-    if phase == "PENDING_RETRY":
-        if registered is not tx:
-            raise RuntimeError(
-                "Coordinator rejected cleanup result: transaction "
-                f"{tx.tx_id} identity mismatch or absent in _PENDING_ARM_RIG_CLEANUPS"
-            )
-    elif registered is not None:
-        raise RuntimeError(
-            "Coordinator rejected cleanup result: unexpected pending registry entry "
-            f"for initial cleanup {tx.tx_id}"
-        )
-
-    # Any FAILED isolation of this Armature blocks a cleanup-result decision.
-    # ALSO reject an isolation record under a corrupted/mis-keyed session entry.
-    # No try/except here: an identity or isolation read error MUST propagate.
-    if (record.isolation_state != _ArmatureIsolationState.NONE
-            or session_id in _ISOLATED_FAILED_ARMATURES):
-        raise RuntimeError(
-            f"Coordinator rejected cleanup result: active FAILED isolation for session {session_id}"
-        )
-    for isolated in _ISOLATED_FAILED_ARMATURES.values():
-        if isolated.get("transaction_id") == tx.tx_id:
-            raise RuntimeError(
-                "Coordinator rejected cleanup result: transaction "
-                f"{tx.tx_id} associated with FAILED isolation under another key"
-            )
-
-    if result.outcome is _CleanupOutcome.CLEANUP_SUCCESS:
-        _layer1_confirm_cleanup_success(
-            tx,
-            phase,
-            pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
-            transaction_state_cls=_ArmRigTransactionState,
-        )
-        return
-
-    # Non-success outcome: keep gate, preserve original traceback in __cause__.
-    err_msg = (
-        f"Arm rig transaction commit cleanup {result.outcome.value}: "
-        f"transaction={tx.tx_id}; phase={phase}; "
-        f"remaining_objects={result.remaining_objects}; "
-        f"remaining_constraints={result.remaining_constraints}; "
-        f"errors={'; '.join(result.errors)}"
+    return _layer1_coordinator_apply_cleanup_result(
+        tx,
+        result,
+        phase,
+        coordinator_validate_cleanup_result_contract=(
+            _coordinator_validate_cleanup_result_contract
+        ),
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        transaction_state_cls=_ArmRigTransactionState,
+        cleanup_outcome_cls=_CleanupOutcome,
+        verify_armature_session_identity_record=_verify_armature_session_identity_record,
+        confirm_cleanup_success=_layer1_confirm_cleanup_success,
+        coordinator_preserve_cleanup_pending=_coordinator_preserve_cleanup_pending,
     )
-    _coordinator_preserve_cleanup_pending(tx, RuntimeError(err_msg))
-    tx.cleanup_error = "; ".join(result.errors) if result.errors else "Cleanup incomplete or failed"
-    if result.cause is not None:
-        raise RuntimeError(err_msg) from result.cause
-    raise RuntimeError(err_msg)
 
 
 def _register_pending_arm_rig_cleanup(
     tx: "_ArmRigTransactionContext",
 ) -> None:
-
-    if tx.state != _ArmRigTransactionState.CLEANUP_PENDING:
-        raise RuntimeError(
-            "Cannot register cleanup for "
-            "a non-pending transaction"
-        )
-
-    _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+    return _layer2_register_pending_arm_rig_cleanup(
+        tx,
+        transaction_state_cls=_ArmRigTransactionState,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+    )
 
 
 def get_pending_arm_rig_cleanup_ids() -> Tuple[str, ...]:
     """Return pending cleanup transaction IDs."""
-
-    return tuple(
-        sorted(_PENDING_ARM_RIG_CLEANUPS)
+    return _layer2_get_pending_arm_rig_cleanup_ids(
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
     )
 
 
 def retry_pending_arm_rig_cleanup(tx_id: str) -> None:
     """Retry cleanup of one pending transaction."""
-
-    tx = _PENDING_ARM_RIG_CLEANUPS.get(tx_id)
-
-    if tx is None:
-        for iso_rec in _ISOLATED_FAILED_ARMATURES.values():
-            if iso_rec.get("transaction_id") == tx_id:
-                raise RuntimeError(
-                    f"Cannot retry cleanup for FAILED transaction {tx_id}: "
-                    "FAILED transactions cannot be recovered via retry_pending_arm_rig_cleanup "
-                    "or transition FAILED -> COMMITTED"
-                )
-        raise KeyError(
-            f"Pending cleanup transaction not found: {tx_id}"
-        )
-
-    if tx.state == _ArmRigTransactionState.FAILED:
-        raise RuntimeError(
-            f"Transaction {tx_id} is in FAILED state; "
-            "FAILED -> COMMITTED transition is strictly forbidden"
-        )
-
-    if tx.state != _ArmRigTransactionState.CLEANUP_PENDING:
-        raise RuntimeError(
-            f"Transaction {tx_id} is in state {tx.state}, expected CLEANUP_PENDING for pending cleanup retry"
-        )
-
-    _coordinator_validate_cleanup_preflight(tx, phase="PENDING_RETRY")
-    cleanup_result = tx.retry_cleanup()
-    _coordinator_apply_cleanup_result(tx, cleanup_result, phase="PENDING_RETRY")
+    return _layer1_retry_pending_arm_rig_cleanup(
+        tx_id,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        transaction_state_cls=_ArmRigTransactionState,
+        coordinator_validate_cleanup_preflight=_coordinator_validate_cleanup_preflight,
+        coordinator_apply_cleanup_result=_coordinator_apply_cleanup_result,
+    )
 
 
 def _assert_arm_rig_cleanup_gate(
