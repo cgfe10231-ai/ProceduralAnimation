@@ -120,6 +120,8 @@ from src.scene_transaction_integrity.layer3 import (
     _authorized_link_object_to_collection as _layer3_authorized_link_object_to_collection,
     _authorized_remove_constraint as _layer3_authorized_remove_constraint,
     _classify_constraint_target_pair_effect as _layer3_classify_constraint_target_pair_effect,
+    _cleanup_failed_character_collection_registration as _layer3_cleanup_failed_character_collection_registration,
+    _cleanup_failed_constraint_creation as _layer3_cleanup_failed_constraint_creation,
     _controller_constraint_binding_proven,
     _controller_is_borrowed_by_other_armature as _layer3_controller_is_borrowed_by_other_armature,
     _controller_role_for_name as _layer3_controller_role_for_name,
@@ -206,77 +208,18 @@ def _cleanup_failed_character_collection_registration(
     deletion and will perform its authorized rollback. Never remove that
     Collection here or leave a stale receipt pointing at a destroyed ID.
     """
-    if (not _ACTIVE_TRANSACTION_STACK
-            or _ACTIVE_TRANSACTION_STACK[-1] is not active_tx
-            or active_tx.state != _ArmRigTransactionState.ACTIVE):
-        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: transaction not ACTIVE")
-    if (type(expected_ptr) is not int or expected_ptr <= 0
-            or not isinstance(active_tx.entry_collection_ptrs, (set, frozenset))
-            or expected_ptr in active_tx.entry_collection_ptrs):
-        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation baseline invalid")
-    registry = active_tx.created_collections
-    receipts = active_tx._collection_creation_receipts
-    if (not isinstance(registry, list) or not isinstance(receipts, dict)
-            or any(not isinstance(rec, dict) for rec in registry)):
-        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registry malformed")
-    try:
-        ptr = int(col.as_pointer())
-        parent_ptr = int(initial_parent.as_pointer())
-    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
-        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: identity unreadable") from exc
-    if (ptr != expected_ptr or parent_ptr <= 0
-            or _find_live_collection_by_identity(col, expected_ptr) is None
-            or _find_live_collection_by_identity(initial_parent, parent_ptr) is None):
-        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: original identity lost")
-
-    records = [rec for rec in registry if rec.get("col_ptr") == expected_ptr]
-    receipt = receipts.get(expected_ptr)
-    if records or receipt is not None:
-        # The receipt+registry pair is authoritative after successful
-        # registration. Let the enclosing transaction remove it exactly once.
-        if (len(records) != 1 or not isinstance(receipt, tuple) or len(receipt) != 5
-                or records[0].get("col_ref") != col
-                or records[0].get("initial_parent") != initial_parent
-                or records[0].get("initial_parent_ptr") != parent_ptr
-                or receipt[0] != col or receipt[1] != initial_parent
-                or receipt[2] != active_tx.session_id
-                or receipt[3] != active_tx.tx_id
-                or receipt[4] is not active_tx._collection_receipt_seal):
-            raise RuntimeError(
-                "COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: partial or mismatched registration"
-            )
-        return
-
-    # This is the small gap between bpy.data.collections.new() and successful
-    # registration. Only the exact unlinked newly returned ID may be removed.
-    if (not any(c == col and int(c.as_pointer()) == expected_ptr
-                for c in bpy.data.collections)
-            or int(col.users) != 0
-            or len(col.objects) != 0
-            or len(col.children) != 0):
-        raise RuntimeError(
-            "COLLECTION_CREATION_CLEANUP_REFUSED: unregistered Collection has external dependencies"
-        )
-    # Avoid removing a Collection that became a child of some other parent,
-    # even if a mocked/inconsistent Blender user counter erroneously says zero.
-    for parent in bpy.data.collections:
-        if parent != col and _is_child_collection_linked_by_identity(parent, col, expected_ptr):
-            raise RuntimeError("COLLECTION_CREATION_CLEANUP_REFUSED: Collection gained a parent")
-    for scene in bpy.data.scenes:
-        if _is_child_collection_linked_by_identity(scene.collection, col, expected_ptr):
-            raise RuntimeError("COLLECTION_CREATION_CLEANUP_REFUSED: Collection gained a scene parent")
-
-    try:
-        bpy.data.collections.remove(col)
-    except BaseException as exc:
-        raise RuntimeError(
-            f"COLLECTION_CREATION_CLEANUP_REMOVE_FAILED: ptr={expected_ptr}: "
-            f"{type(exc).__name__}: {exc}"
-        ) from exc
-    if _find_live_collection_by_identity(col, expected_ptr) is not None:
-        raise RuntimeError(
-            f"COLLECTION_CREATION_CLEANUP_REMOVE_UNVERIFIED: ptr={expected_ptr} still live"
-        )
+    return _layer3_cleanup_failed_character_collection_registration(
+        col,
+        expected_ptr,
+        initial_parent,
+        active_tx,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        transaction_state_cls=_ArmRigTransactionState,
+        find_live_collection_by_identity=_find_live_collection_by_identity,
+        is_child_collection_linked_by_identity=(
+            _is_child_collection_linked_by_identity
+        ),
+    )
 
 
 def _ensure_character_collection() -> bpy.types.Collection:
@@ -1430,89 +1373,16 @@ def _cleanup_failed_constraint_creation(
     Never use a constraint name to select an object for destructive cleanup.
     An ambiguous partial registration is NOT permission to delete.
     """
-    if (not _ACTIVE_TRANSACTION_STACK
-            or _ACTIVE_TRANSACTION_STACK[-1] is not active_tx
-            or active_tx.state != _ArmRigTransactionState.ACTIVE):
-        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: transaction not ACTIVE")
-    if (type(expected_ptr) is not int or expected_ptr <= 0
-            or type(pbone_ptr) is not int or pbone_ptr <= 0
-            or not isinstance(before_ptrs, frozenset)
-            or expected_ptr in before_ptrs):
-        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation baseline invalid")
-    try:
-        live_arm = active_tx.arm
-        if (live_arm is None or live_arm.pose is None
-                or live_arm.pose.bones.get(pbone.name) != pbone
-                or int(pbone.as_pointer()) != pbone_ptr
-                or int(con.as_pointer()) != expected_ptr):
-            raise RuntimeError("original PoseBone/Constraint identity changed")
-    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
-        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: identity mismatch") from exc
-
-    registry = active_tx.created_constraints
-    if (not isinstance(registry, list)
-            or any(not isinstance(rec, dict) for rec in registry)):
-        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registry malformed")
-    related = [rec for rec in registry
-               if rec.get("con_ptr") == expected_ptr or rec.get("con_ref") == con]
-
-    # [INTRODUCED 2026-11-16T18:15:00+08:00]
-    # FUNCTION: _cleanup_failed_constraint_creation
-    # PURPOSE: Enforce strict 8-tuple receipt validation on registered resources and revoke unregistered receipts upon verified compensation
-    # REASON: Task 10-B fix-4, handle Window 1 and Window 2 creation failure compensation safely without phantom receipts
-    receipts = getattr(active_tx, "_constraint_creation_receipts", {})
-    if not isinstance(receipts, dict):
-        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: receipt ledger malformed")
-
-    if related:
-        # Once a complete registration exists, the enclosing transaction's
-        # existing Layer-3 rollback exclusively owns destruction.
-        if (len(related) != 1
-                or related[0].get("con_ref") != con
-                or related[0].get("con_ptr") != expected_ptr
-                or related[0].get("pbone") != pbone
-                or related[0].get("bone_name") != pbone.name):
-            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: partial/mismatched registration")
-        if expected_ptr not in receipts:
-            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registered constraint missing creation receipt")
-        rc = receipts[expected_ptr]
-        if not isinstance(rc, tuple) or len(rc) != 8:
-            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation receipt length must be exactly 8")
-        rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = rc
-        if (rc_con != con or rc_con_ptr != expected_ptr
-                or rc_pbone != pbone or type(rc_pbone_ptr) is not int or rc_pbone_ptr <= 0
-                or rc_pbone_ptr != pbone_ptr or int(pbone.as_pointer()) != rc_pbone_ptr
-                or rc_session_id != active_tx.session_id or rc_tx_id != active_tx.tx_id
-                or rc_seal is not getattr(active_tx, "_constraint_receipt_seal", None)
-                or not isinstance(rc_before_ptrs, frozenset)
-                or expected_ptr in rc_before_ptrs):
-            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registration and receipt mismatch")
-        return
-
-    # Only the exact instance returned by this invocation's constraints.new()
-    # may be removed before it becomes registered. No name-based fallback.
-    try:
-        live = [candidate for candidate in pbone.constraints
-                if int(candidate.as_pointer()) == expected_ptr]
-        if len(live) != 1 or live[0] != con:
-            raise RuntimeError("fresh Constraint no longer uniquely live on owning PoseBone")
-        pbone.constraints.remove(live[0])
-    except BaseException as exc:
-        raise RuntimeError(
-            f"CONSTRAINT_CREATION_CLEANUP_REMOVE_FAILED: ptr={expected_ptr}; "
-            f"{type(exc).__name__}: {exc}"
-        ) from exc
-    try:
-        if any(int(candidate.as_pointer()) == expected_ptr for candidate in pbone.constraints):
-            raise RuntimeError("original Constraint still live after C-API removal")
-    except BaseException as exc:
-        raise RuntimeError(
-            f"CONSTRAINT_CREATION_CLEANUP_REMOVE_UNVERIFIED: ptr={expected_ptr}; "
-            f"{type(exc).__name__}: {exc}"
-        ) from exc
-
-    if hasattr(active_tx, "_constraint_creation_receipts") and isinstance(active_tx._constraint_creation_receipts, dict):
-        active_tx._constraint_creation_receipts.pop(expected_ptr, None)
+    return _layer3_cleanup_failed_constraint_creation(
+        pbone,
+        con,
+        expected_ptr,
+        pbone_ptr,
+        before_ptrs,
+        active_tx,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        transaction_state_cls=_ArmRigTransactionState,
+    )
 
 
 def _authorized_create_constraint(

@@ -136,3 +136,98 @@ def _ensure_character_collection(
     trigger_fault_injection("character_collection_after_link", {"col": col, "col_ptr": new_col_ptr, "scene": scene})
 
     return col
+
+
+# [INTRODUCED 2026-11-24T20:21:00+08:00]
+# NODE: 10-B / L3-12
+# FUNCTION: _cleanup_failed_character_collection_registration
+# PURPOSE: 在 ACTIVE 事务下对尚未完成可信登记且无外部依赖的新建 Character Collection 执行局部删除补偿与删后核验，若已完整登记则提前返回交由事务回滚
+# REASON: 将 Collection 局部创建失败补偿从 arm_ik.py 归入既有 Layer 3 Collection 创建模块，保留原兼容入口及所有外部依赖与凭证边界
+def _cleanup_failed_character_collection_registration(
+    col: bpy.types.Collection,
+    expected_ptr: int,
+    initial_parent: bpy.types.Collection,
+    active_tx: Any,
+    *,
+    active_transaction_stack: List[Any],
+    transaction_state_cls: Any,
+    find_live_collection_by_identity: Callable[..., Any],
+    is_child_collection_linked_by_identity: Callable[..., bool],
+) -> None:
+    """Compensate only an unregistered, proven-fresh Collection.
+
+    Once a valid creation receipt exists, the enclosing transaction owns the
+    deletion and will perform its authorized rollback. Never remove that
+    Collection here or leave a stale receipt pointing at a destroyed ID.
+    """
+    if (not active_transaction_stack
+            or active_transaction_stack[-1] is not active_tx
+            or active_tx.state != transaction_state_cls.ACTIVE):
+        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: transaction not ACTIVE")
+    if (type(expected_ptr) is not int or expected_ptr <= 0
+            or not isinstance(active_tx.entry_collection_ptrs, (set, frozenset))
+            or expected_ptr in active_tx.entry_collection_ptrs):
+        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation baseline invalid")
+    registry = active_tx.created_collections
+    receipts = active_tx._collection_creation_receipts
+    if (not isinstance(registry, list) or not isinstance(receipts, dict)
+            or any(not isinstance(rec, dict) for rec in registry)):
+        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registry malformed")
+    try:
+        ptr = int(col.as_pointer())
+        parent_ptr = int(initial_parent.as_pointer())
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: identity unreadable") from exc
+    if (ptr != expected_ptr or parent_ptr <= 0
+            or find_live_collection_by_identity(col, expected_ptr) is None
+            or find_live_collection_by_identity(initial_parent, parent_ptr) is None):
+        raise RuntimeError("COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: original identity lost")
+
+    records = [rec for rec in registry if rec.get("col_ptr") == expected_ptr]
+    receipt = receipts.get(expected_ptr)
+    if records or receipt is not None:
+        # The receipt+registry pair is authoritative after successful
+        # registration. Let the enclosing transaction remove it exactly once.
+        if (len(records) != 1 or not isinstance(receipt, tuple) or len(receipt) != 5
+                or records[0].get("col_ref") != col
+                or records[0].get("initial_parent") != initial_parent
+                or records[0].get("initial_parent_ptr") != parent_ptr
+                or receipt[0] != col or receipt[1] != initial_parent
+                or receipt[2] != active_tx.session_id
+                or receipt[3] != active_tx.tx_id
+                or receipt[4] is not active_tx._collection_receipt_seal):
+            raise RuntimeError(
+                "COLLECTION_CREATION_CLEANUP_AUTHORITY_UNPROVEN: partial or mismatched registration"
+            )
+        return
+
+    # This is the small gap between bpy.data.collections.new() and successful
+    # registration. Only the exact unlinked newly returned ID may be removed.
+    if (not any(c == col and int(c.as_pointer()) == expected_ptr
+                for c in bpy.data.collections)
+            or int(col.users) != 0
+            or len(col.objects) != 0
+            or len(col.children) != 0):
+        raise RuntimeError(
+            "COLLECTION_CREATION_CLEANUP_REFUSED: unregistered Collection has external dependencies"
+        )
+    # Avoid removing a Collection that became a child of some other parent,
+    # even if a mocked/inconsistent Blender user counter erroneously says zero.
+    for parent in bpy.data.collections:
+        if parent != col and is_child_collection_linked_by_identity(parent, col, expected_ptr):
+            raise RuntimeError("COLLECTION_CREATION_CLEANUP_REFUSED: Collection gained a parent")
+    for scene in bpy.data.scenes:
+        if is_child_collection_linked_by_identity(scene.collection, col, expected_ptr):
+            raise RuntimeError("COLLECTION_CREATION_CLEANUP_REFUSED: Collection gained a scene parent")
+
+    try:
+        bpy.data.collections.remove(col)
+    except BaseException as exc:
+        raise RuntimeError(
+            f"COLLECTION_CREATION_CLEANUP_REMOVE_FAILED: ptr={expected_ptr}: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    if find_live_collection_by_identity(col, expected_ptr) is not None:
+        raise RuntimeError(
+            f"COLLECTION_CREATION_CLEANUP_REMOVE_UNVERIFIED: ptr={expected_ptr} still live"
+        )

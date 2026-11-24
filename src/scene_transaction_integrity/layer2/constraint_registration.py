@@ -154,3 +154,22 @@ def _register_created_constraint(
         "created_name": con.name,
         "bone_name": pbone.name,
     })
+
+
+# [INTRODUCED 2026-11-24T20:21:00+08:00]
+# NODE: 10-B / L3-12
+# FUNCTION: _revoke_compensated_constraint_creation_receipt
+# PURPOSE: 在 Layer 3 完成未登记失败 Constraint 的物理删除及删后缺席核验后，被动从当前事务私有凭证表撤销原八元组创建凭证
+# REASON: 将局部创建失败补偿成功后的原 Receipt 撤销归入 Layer 2 被动登记模块，避免 Layer 3 直接写入凭证字典同时严禁作为外部撤销 API
+def _revoke_compensated_constraint_creation_receipt(
+    active_tx: Any,
+    expected_ptr: int,
+) -> None:
+    """Revoke the original receipt after verified local compensation."""
+    if hasattr(active_tx, "_constraint_creation_receipts") and isinstance(
+        active_tx._constraint_creation_receipts, dict
+    ):
+        active_tx._constraint_creation_receipts.pop(
+            expected_ptr,
+            None,
+        )

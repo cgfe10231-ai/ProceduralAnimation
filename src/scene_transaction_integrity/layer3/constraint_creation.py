@@ -4,6 +4,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 import bpy
 
+from src.scene_transaction_integrity.layer2.constraint_registration import (
+    _revoke_compensated_constraint_creation_receipt,
+)
+
 
 # [INTRODUCED 2026-11-23T21:38:30+08:00]
 # NODE: 10-B / L3-07
@@ -182,3 +186,111 @@ def _authorized_create_constraint(
                     f"cleanup={type(cleanup_exc).__name__}: {cleanup_exc}"
                 ) from cleanup_exc
         raise
+
+
+# [INTRODUCED 2026-11-24T20:21:00+08:00]
+# NODE: 10-B / L3-12
+# FUNCTION: _cleanup_failed_constraint_creation
+# PURPOSE: 在 ACTIVE 事务下对尚未完整登记的失败 Constraint 执行唯一实例删除、删后缺席核验并触发 Layer 2 凭证撤销，若已完整登记则提前返回交由事务回滚
+# REASON: 将 Constraint 局部创建失败补偿从 arm_ik.py 归入既有 Layer 3 Constraint 创建模块，保留原兼容入口与 Task 10-B fix-4 双窗口补偿及撤销顺序
+def _cleanup_failed_constraint_creation(
+    pbone: bpy.types.PoseBone,
+    con: bpy.types.Constraint,
+    expected_ptr: int,
+    pbone_ptr: int,
+    before_ptrs: frozenset[int],
+    active_tx: Any,
+    *,
+    active_transaction_stack: List[Any],
+    transaction_state_cls: Any,
+) -> None:
+    """Compensate an unregistered C-API creation; leave registered IDs to rollback.
+
+    Never use a constraint name to select an object for destructive cleanup.
+    An ambiguous partial registration is NOT permission to delete.
+    """
+    if (not active_transaction_stack
+            or active_transaction_stack[-1] is not active_tx
+            or active_tx.state != transaction_state_cls.ACTIVE):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: transaction not ACTIVE")
+    if (type(expected_ptr) is not int or expected_ptr <= 0
+            or type(pbone_ptr) is not int or pbone_ptr <= 0
+            or not isinstance(before_ptrs, frozenset)
+            or expected_ptr in before_ptrs):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation baseline invalid")
+    try:
+        live_arm = active_tx.arm
+        if (live_arm is None or live_arm.pose is None
+                or live_arm.pose.bones.get(pbone.name) != pbone
+                or int(pbone.as_pointer()) != pbone_ptr
+                or int(con.as_pointer()) != expected_ptr):
+            raise RuntimeError("original PoseBone/Constraint identity changed")
+    except (AttributeError, ReferenceError, RuntimeError, TypeError, ValueError) as exc:
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: identity mismatch") from exc
+
+    registry = active_tx.created_constraints
+    if (not isinstance(registry, list)
+            or any(not isinstance(rec, dict) for rec in registry)):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registry malformed")
+    related = [rec for rec in registry
+               if rec.get("con_ptr") == expected_ptr or rec.get("con_ref") == con]
+
+    # [INTRODUCED 2026-11-16T18:15:00+08:00]
+    # FUNCTION: _cleanup_failed_constraint_creation
+    # PURPOSE: Enforce strict 8-tuple receipt validation on registered resources and revoke unregistered receipts upon verified compensation
+    # REASON: Task 10-B fix-4, handle Window 1 and Window 2 creation failure compensation safely without phantom receipts
+    receipts = getattr(active_tx, "_constraint_creation_receipts", {})
+    if not isinstance(receipts, dict):
+        raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: receipt ledger malformed")
+
+    if related:
+        # Once a complete registration exists, the enclosing transaction's
+        # existing Layer-3 rollback exclusively owns destruction.
+        if (len(related) != 1
+                or related[0].get("con_ref") != con
+                or related[0].get("con_ptr") != expected_ptr
+                or related[0].get("pbone") != pbone
+                or related[0].get("bone_name") != pbone.name):
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: partial/mismatched registration")
+        if expected_ptr not in receipts:
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registered constraint missing creation receipt")
+        rc = receipts[expected_ptr]
+        if not isinstance(rc, tuple) or len(rc) != 8:
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: creation receipt length must be exactly 8")
+        rc_con, rc_con_ptr, rc_pbone, rc_pbone_ptr, rc_session_id, rc_tx_id, rc_seal, rc_before_ptrs = rc
+        if (rc_con != con or rc_con_ptr != expected_ptr
+                or rc_pbone != pbone or type(rc_pbone_ptr) is not int or rc_pbone_ptr <= 0
+                or rc_pbone_ptr != pbone_ptr or int(pbone.as_pointer()) != rc_pbone_ptr
+                or rc_session_id != active_tx.session_id or rc_tx_id != active_tx.tx_id
+                or rc_seal is not getattr(active_tx, "_constraint_receipt_seal", None)
+                or not isinstance(rc_before_ptrs, frozenset)
+                or expected_ptr in rc_before_ptrs):
+            raise RuntimeError("CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: registration and receipt mismatch")
+        return
+
+    # Only the exact instance returned by this invocation's constraints.new()
+    # may be removed before it becomes registered. No name-based fallback.
+    try:
+        live = [candidate for candidate in pbone.constraints
+                if int(candidate.as_pointer()) == expected_ptr]
+        if len(live) != 1 or live[0] != con:
+            raise RuntimeError("fresh Constraint no longer uniquely live on owning PoseBone")
+        pbone.constraints.remove(live[0])
+    except BaseException as exc:
+        raise RuntimeError(
+            f"CONSTRAINT_CREATION_CLEANUP_REMOVE_FAILED: ptr={expected_ptr}; "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    try:
+        if any(int(candidate.as_pointer()) == expected_ptr for candidate in pbone.constraints):
+            raise RuntimeError("original Constraint still live after C-API removal")
+    except BaseException as exc:
+        raise RuntimeError(
+            f"CONSTRAINT_CREATION_CLEANUP_REMOVE_UNVERIFIED: ptr={expected_ptr}; "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+
+    _revoke_compensated_constraint_creation_receipt(
+        active_tx,
+        expected_ptr,
+    )

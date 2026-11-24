@@ -1,4 +1,5 @@
 from src.scene_transaction_integrity.layer3.character_collection_creation import (
+    _cleanup_failed_character_collection_registration,
     _ensure_character_collection,
     _find_live_collection_by_identity,
 )
@@ -17,6 +18,7 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
 )
 from src.scene_transaction_integrity.layer3.constraint_creation import (
     _authorized_create_constraint,
+    _cleanup_failed_constraint_creation,
 )
 from src.scene_transaction_integrity.layer3.constraint_removal import (
     _authorized_remove_constraint,
@@ -76,6 +78,8 @@ __all__ = (
     "_authorized_link_object_to_collection",
     "_authorized_remove_constraint",
     "_classify_constraint_target_pair_effect",
+    "_cleanup_failed_character_collection_registration",
+    "_cleanup_failed_constraint_creation",
     "_controller_constraint_binding_proven",
     "_controller_is_borrowed_by_other_armature",
     "_controller_role_for_name",
