@@ -7,6 +7,10 @@ from src.scene_transaction_integrity.layer1.outermost_admission import (
     _assert_arm_rig_cleanup_gate,
     _assert_arm_rig_failed_isolation_gate,
 )
+from src.scene_transaction_integrity.layer1.post_commit_cleanup import (
+    _confirm_cleanup_success,
+    _dispatch_initial_post_commit_cleanup,
+)
 from src.scene_transaction_integrity.layer1.transaction_commit import (
     _commit_arm_rig_transaction,
     _release_active_arm_rig_transaction,
@@ -23,6 +27,8 @@ __all__ = (
     "_assert_arm_rig_failed_isolation_gate",
     "_capture_transaction_entry_fingerprint",
     "_commit_arm_rig_transaction",
+    "_confirm_cleanup_success",
+    "_dispatch_initial_post_commit_cleanup",
     "_establish_outermost_arm_rig_transaction",
     "_identity_failure_is_uncertain",
     "_release_active_arm_rig_transaction",

@@ -56,6 +56,8 @@ from src.scene_transaction_integrity.layer1 import (
     _assert_arm_rig_failed_isolation_gate as _layer1_assert_arm_rig_failed_isolation_gate,
     _capture_transaction_entry_fingerprint as _layer1_capture_transaction_entry_fingerprint,
     _commit_arm_rig_transaction as _layer1_commit_arm_rig_transaction,
+    _confirm_cleanup_success as _layer1_confirm_cleanup_success,
+    _dispatch_initial_post_commit_cleanup as _layer1_dispatch_initial_post_commit_cleanup,
     _establish_outermost_arm_rig_transaction as _layer1_establish_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
     _release_active_arm_rig_transaction as _layer1_release_active_arm_rig_transaction,
@@ -145,6 +147,7 @@ from src.scene_transaction_integrity.layer5 import (
 from src.scene_transaction_integrity.layer6 import (
     _CleanupOutcome,
     _CleanupResult,
+    _build_cleanup_result as _layer6_build_cleanup_result,
 )
 
 ARM_IK_TARGET_NAMES: Dict[str, str] = {"L": "HandIK.L", "R": "HandIK.R"}
@@ -4832,27 +4835,12 @@ class _ArmRigTransactionContext:
                 if stashed in self.uncleaned_stashed_objects:
                     self.uncleaned_stashed_objects.remove(stashed)
 
-        rem_objs = len(self.uncleaned_stashed_objects)
-        rem_cons = len(self.uncleaned_stashed_constraints)
-        err_tuple = tuple(cleanup_failures)
-
-        if not err_tuple and rem_objs == 0 and rem_cons == 0:
-            outcome = _CleanupOutcome.CLEANUP_SUCCESS
-            self.cleanup_error = None
-        elif rem_objs > 0 or rem_cons > 0:
-            outcome = _CleanupOutcome.CLEANUP_INCOMPLETE
-            self.cleanup_error = "; ".join(err_tuple) if err_tuple else "Cleanup incomplete: remaining stashed resources"
-        else:
-            outcome = _CleanupOutcome.CLEANUP_FAILED
-            self.cleanup_error = "; ".join(err_tuple) if err_tuple else "Cleanup result unprovable or failed"
-
-        return _CleanupResult(
-            transaction_id=self.tx_id,
-            outcome=outcome,
-            errors=err_tuple,
-            remaining_objects=rem_objs,
-            remaining_constraints=rem_cons,
-            cause=first_cause,
+        return _layer6_build_cleanup_result(
+            self,
+            cleanup_failures,
+            first_cause,
+            cleanup_outcome_cls=_CleanupOutcome,
+            cleanup_result_cls=_CleanupResult,
         )
 
 
@@ -5194,15 +5182,12 @@ def _coordinator_apply_cleanup_result(
             )
 
     if result.outcome is _CleanupOutcome.CLEANUP_SUCCESS:
-        # Recheck the exact registry entry BEFORE any lifecycle mutation.
-        if phase == "PENDING_RETRY" and _PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id) is not tx:
-            raise RuntimeError(
-                "Coordinator rejected cleanup result: pending registry changed before release"
-            )
-        tx.cleanup_error = None
-        tx.state = _ArmRigTransactionState.COMMITTED
-        if phase == "PENDING_RETRY":
-            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id)
+        _layer1_confirm_cleanup_success(
+            tx,
+            phase,
+            pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+            transaction_state_cls=_ArmRigTransactionState,
+        )
         return
 
     # Non-success outcome: keep gate, preserve original traceback in __cause__.
@@ -6155,35 +6140,20 @@ def _arm_rig_transaction(arm: bpy.types.Object):
     # -----------------------------------------------------------------
     # Phase 3: Irreversible Resource Cleanup (runs only after logical commit)
     # -----------------------------------------------------------------
-    if tx.state == _ArmRigTransactionState.COMMITTED:
-        tx.uncleaned_stashed_constraints = list(tx.stashed_constraints)
-        tx.uncleaned_stashed_objects = list(tx.stashed_objects)
-        try:
-            _trigger_fault_injection(
-                "after_logical_commit",
-                {"tx": tx}
-            )
-            _trigger_fault_injection(
-                "during_commit_cleanup",
-                {"tx": tx}
-            )
-            _coordinator_validate_cleanup_preflight(tx, phase="INITIAL_CLEANUP")
-            cleanup_result = tx.retry_cleanup()
-        except BaseException as exc:
-            _coordinator_preserve_cleanup_pending(tx, exc)
-            raise RuntimeError(
-                "Arm rig transaction committed, "
-                "but post-commit cleanup failed (irreversible cleanup failed): "
-                f"{exc}"
-            ) from exc
-
-        try:
-            _coordinator_apply_cleanup_result(tx, cleanup_result, phase="INITIAL_CLEANUP")
-        except BaseException as exc:
-            # The resource cleanup has already run. A forged/invalid result or
-            # post-cleanup identity failure MUST retain its Pending gate.
-            _coordinator_preserve_cleanup_pending(tx, exc)
-            raise
+    _layer1_dispatch_initial_post_commit_cleanup(
+        tx,
+        transaction_state_cls=_ArmRigTransactionState,
+        trigger_fault_injection=_trigger_fault_injection,
+        coordinator_validate_cleanup_preflight=(
+            _coordinator_validate_cleanup_preflight
+        ),
+        coordinator_preserve_cleanup_pending=(
+            _coordinator_preserve_cleanup_pending
+        ),
+        coordinator_apply_cleanup_result=(
+            _coordinator_apply_cleanup_result
+        ),
+    )
 
 
 def _verify_transaction_wrong_type_object_ownership(
