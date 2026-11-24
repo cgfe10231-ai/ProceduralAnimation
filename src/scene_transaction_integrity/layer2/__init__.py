@@ -15,6 +15,9 @@ from src.scene_transaction_integrity.layer2.transaction_states import (
     _ArmRigTransactionState,
     _FailedTransactionClass,
 )
+from src.scene_transaction_integrity.layer2.admission_query import (
+    query_admission_gate_status,
+)
 from src.scene_transaction_integrity.layer2.audit_registries import (
     _DEISOLATION_AUDIT_LOG,
     _FAILED_A_AUDIT_RECORDS,
@@ -90,4 +93,5 @@ __all__ = (
     "_update_relationship_mutation_state",
     "_verify_armature_session_identity_record",
     "ensure_armature_session_identity",
+    "query_admission_gate_status",
 )

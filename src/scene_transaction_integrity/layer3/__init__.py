@@ -33,6 +33,7 @@ from src.scene_transaction_integrity.layer3.controller_creation import (
 from src.scene_transaction_integrity.layer3.controller_ownership import (
     _controller_is_borrowed_by_other_armature,
     _controller_role_for_name,
+    _preflight_wrong_type_controller_conflicts,
     _require_existing_arm_ik_controller_ownership,
     _verify_controller_object_transaction_authority,
     _verify_transaction_wrong_type_object_ownership,
@@ -72,6 +73,7 @@ __all__ = (
     "_is_collection_descendant_of",
     "_is_object_linked_to_collection_by_identity",
     "_matrix_equals",
+    "_preflight_wrong_type_controller_conflicts",
     "_require_collection_child_relationship_ownership",
     "_require_existing_arm_ik_controller_ownership",
     "_verify_controller_object_transaction_authority",

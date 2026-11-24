@@ -241,3 +241,33 @@ def _verify_transaction_wrong_type_object_ownership(
     return verify_controller_object_transaction_authority(
         obj, tx, created_only=True,
     ) == 'TX_CREATED'
+
+
+# [INTRODUCED 2026-11-24T15:08:00+08:00]
+# NODE: 10-B / L1-08
+# FUNCTION: _preflight_wrong_type_controller_conflicts
+# PURPOSE: 在进入 setup_arm_ik 事务前预检四名核心控制器的同名非 EMPTY 外部对象冲突
+# REASON: 将 Layer 4 内联 Wrong-type 控制器名称冲突预检迁入 Layer 3，保持与已有角色归属核验的原有顺序及独立合同
+def _preflight_wrong_type_controller_conflicts(
+    arm: bpy.types.Object,
+    *,
+    active_transaction_stack: List[Any],
+    arm_ik_target_names: Dict[str, str],
+    arm_pole_target_names: Dict[str, str],
+    verify_transaction_wrong_type_object_ownership: Callable[..., bool],
+) -> None:
+    """Preflight check 4 controller names for external wrong-type conflicts before entering transaction (F14-05 Entrance A)."""
+    active_tx = active_transaction_stack[-1] if active_transaction_stack else None
+    for c_name in (
+        arm_ik_target_names["L"],
+        arm_ik_target_names["R"],
+        arm_pole_target_names["L"],
+        arm_pole_target_names["R"],
+    ):
+        c_obj = bpy.data.objects.get(c_name)
+        if c_obj is not None and c_obj.type != "EMPTY":
+            if not verify_transaction_wrong_type_object_ownership(c_obj, active_tx, arm):
+                raise ExternalControllerNameConflictError(
+                    f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{c_name}' matches pre-existing or external "
+                    f"non-EMPTY object '{c_obj.name}' (type='{c_obj.type}') not owned by active transaction."
+                )

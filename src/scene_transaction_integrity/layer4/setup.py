@@ -6,7 +6,12 @@ from typing import Any, Callable, Dict, List, Optional
 import bpy
 from mathutils import Euler, Vector
 
-from src.scene_transaction_integrity.layer3 import ExternalControllerNameConflictError
+from src.scene_transaction_integrity.layer1 import (
+    _assert_existing_session_admission,
+)
+from src.scene_transaction_integrity.layer3 import (
+    _preflight_wrong_type_controller_conflicts,
+)
 from src.scene_transaction_integrity.layer4.armature_ops import (
     _apply_arm_ik_prebend_hint_side,
     _resolve_armature,
@@ -64,39 +69,28 @@ def setup_arm_ik(
     valid_influence = _validate_influence(initial_influence, param_name="initial_influence")
     arm = _resolve_armature(armature_obj)
 
-    # [INTRODUCED 2026-11-12T00:01:12+08:00]
-    # FUNCTION: setup_arm_ik
-    # PURPOSE: Enforce existing cleanup and FAILED isolation gates before controller ownership object enumeration
-    # REASON: Task 10-B fix-3, TEST-163
-    for rec in managed_armature_identities.values():
-        if rec.original_blender_ref is arm:
-            if (
-                rec.isolation_state != armature_isolation_state.NONE
-                or rec.registry_session_id in isolated_failed_armatures
-            ):
-                assert_arm_rig_cleanup_gate(arm, rec)
-                assert_arm_rig_failed_isolation_gate(arm, rec)
-            break
+    _assert_existing_session_admission(
+        arm,
+        managed_armature_identities=managed_armature_identities,
+        isolated_failed_armatures=isolated_failed_armatures,
+        armature_isolation_state_cls=armature_isolation_state,
+        assert_arm_rig_cleanup_gate=assert_arm_rig_cleanup_gate,
+        assert_arm_rig_failed_isolation_gate=assert_arm_rig_failed_isolation_gate,
+    )
 
     # Full role ownership admission, including same-name external EMPTY
     # objects. This runs before creating collections or modifying controllers.
     require_existing_arm_ik_controller_ownership(arm, scope='setup_arm_ik')
 
-    # Preflight check 4 controller names for external wrong-type conflicts before entering transaction (F14-05 Entrance A)
-    active_tx = active_transaction_stack[-1] if active_transaction_stack else None
-    for c_name in (
-        arm_ik_target_names["L"],
-        arm_ik_target_names["R"],
-        arm_pole_target_names["L"],
-        arm_pole_target_names["R"],
-    ):
-        c_obj = bpy.data.objects.get(c_name)
-        if c_obj is not None and c_obj.type != "EMPTY":
-            if not verify_transaction_wrong_type_object_ownership(c_obj, active_tx, arm):
-                raise ExternalControllerNameConflictError(
-                    f"EXTERNAL_CONTROLLER_NAME_CONFLICT: Controller '{c_name}' matches pre-existing or external "
-                    f"non-EMPTY object '{c_obj.name}' (type='{c_obj.type}') not owned by active transaction."
-                )
+    _preflight_wrong_type_controller_conflicts(
+        arm,
+        active_transaction_stack=active_transaction_stack,
+        arm_ik_target_names=arm_ik_target_names,
+        arm_pole_target_names=arm_pole_target_names,
+        verify_transaction_wrong_type_object_ownership=(
+            verify_transaction_wrong_type_object_ownership
+        ),
+    )
 
     with arm_rig_transaction(arm):
         root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")

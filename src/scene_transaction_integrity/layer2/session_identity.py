@@ -1,7 +1,6 @@
 """Armature session identity resolution and registration migrated from `src/rig/arm_ik.py` (Task 10-B Layer 2 L2-03)."""
 
 import uuid
-from typing import Callable
 
 import bpy
 
@@ -20,12 +19,8 @@ from src.scene_transaction_integrity.layer2.session_verification import (
 
 def ensure_armature_session_identity(
     arm: bpy.types.Object,
-    *,
-    sweep_dead_managed_armature_identities: Callable[[], None],
 ) -> ArmatureSessionIdentityRecord:
     """Layer 2: Resolve existing verified ArmatureSessionIdentityRecord or register a new session identity."""
-    sweep_dead_managed_armature_identities()
-
     if arm is None:
         raise RuntimeError("Cannot resolve ArmatureSessionIdentityRecord: armature object is None")
 

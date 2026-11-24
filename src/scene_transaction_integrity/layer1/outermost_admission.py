@@ -123,3 +123,73 @@ def _assert_arm_rig_failed_isolation_gate(
             f"(failure_class={failure_class}, isolation_state={iso_state}, "
             f"transaction_id={tx_id}, registry_session_id={session_id})"
         )
+
+
+# [INTRODUCED 2026-11-24T15:08:00+08:00]
+# NODE: 10-B / L1-08
+# FUNCTION: _assert_existing_session_admission
+# PURPOSE: 在控制器枚举前对已匹配隔离条件的历史 Session 执行既有 Cleanup Gate 与 FAILED Isolation Gate 预检
+# REASON: 将 Layer 4 setup_arm_ik 内联 Session 门禁预检迁入 Layer 1，保持条件门禁触发语义和 break 顺序
+def _assert_existing_session_admission(
+    arm: Any,
+    *,
+    managed_armature_identities: Dict[str, Any],
+    isolated_failed_armatures: Dict[str, Any],
+    armature_isolation_state_cls: Any,
+    assert_arm_rig_cleanup_gate: Callable[..., None],
+    assert_arm_rig_failed_isolation_gate: Callable[..., None],
+) -> None:
+    """Enforce existing cleanup and FAILED isolation gates before controller ownership object enumeration."""
+    for rec in managed_armature_identities.values():
+        if rec.original_blender_ref is arm:
+            if (
+                rec.isolation_state != armature_isolation_state_cls.NONE
+                or rec.registry_session_id in isolated_failed_armatures
+            ):
+                assert_arm_rig_cleanup_gate(arm, rec)
+                assert_arm_rig_failed_isolation_gate(arm, rec)
+            break
+
+
+# [INTRODUCED 2026-11-24T15:08:00+08:00]
+# NODE: 10-B / L1-08
+# FUNCTION: _assert_admission_identity_valid
+# PURPOSE: 在外层事务准入身份验证失败时区分不确定读与确定无效身份并触发既有 FAILED-D 隔离及拒绝异常
+# REASON: 将外层事务身份无效拒绝分支迁入 Layer 1，维持原有异常处理及 FAILED-D 隔离调用顺序而不修改隔离实现
+def _assert_admission_identity_valid(
+    arm: Any,
+    session_rec: Any,
+    admission_id_check: Dict[str, Any],
+    *,
+    identity_failure_is_uncertain: Callable[[Dict[str, Any]], bool],
+    transaction_context_cls: Callable[..., Any],
+    transaction_state_cls: Any,
+    failed_transaction_class_cls: Any,
+    record_armature_failure_isolation_by_coordinator: Callable[..., Any],
+) -> None:
+    """Reject outermost transaction admission when session identity verification fails."""
+    if not admission_id_check["is_valid"]:
+        if identity_failure_is_uncertain(admission_id_check):
+            # Admission is before snapshot/business writes. An indeterminate read
+            # denies this attempt but does not permanently isolate a healthy rig.
+            raise RuntimeError(
+                "Arm IK write blocked: ARMATURE_IDENTITY_UNVERIFIED_AT_ADMISSION "
+                f"(registry_session_id={session_rec.registry_session_id}): "
+                + "; ".join(admission_id_check["reasons"])
+            )
+        dead_tx = transaction_context_cls(arm, session_record=session_rec)
+        dead_tx.state = transaction_state_cls.FAILED
+        record_armature_failure_isolation_by_coordinator(
+            session_rec=session_rec,
+            tx=dead_tx,
+            failure_class=failed_transaction_class_cls.FAILED_D,
+            primary_exception=RuntimeError("; ".join(admission_id_check["reasons"])),
+            evidence_status="ARMATURE_IDENTITY_INVALID_AT_ADMISSION",
+            missing_evidence_reasons=admission_id_check["reasons"],
+        )
+        raise RuntimeError(
+            "Arm IK write blocked: Armature session identity invalid at admission "
+            f"(failure_class=FAILED-D, transaction_id={dead_tx.tx_id}, "
+            f"registry_session_id={session_rec.registry_session_id}): "
+            + "; ".join(admission_id_check["reasons"])
+        )

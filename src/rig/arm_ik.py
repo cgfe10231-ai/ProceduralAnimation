@@ -52,8 +52,10 @@ from src.rig.transform_utils import (
 )
 from src.scene_transaction_integrity.layer1 import (
     _admit_outermost_arm_rig_transaction as _layer1_admit_outermost_arm_rig_transaction,
+    _assert_admission_identity_valid as _layer1_assert_admission_identity_valid,
     _assert_arm_rig_cleanup_gate as _layer1_assert_arm_rig_cleanup_gate,
     _assert_arm_rig_failed_isolation_gate as _layer1_assert_arm_rig_failed_isolation_gate,
+    _assert_nested_transaction_admission as _layer1_assert_nested_transaction_admission,
     _capture_transaction_entry_fingerprint as _layer1_capture_transaction_entry_fingerprint,
     _commit_arm_rig_transaction as _layer1_commit_arm_rig_transaction,
     _confirm_cleanup_success as _layer1_confirm_cleanup_success,
@@ -63,6 +65,7 @@ from src.scene_transaction_integrity.layer1 import (
     _release_active_arm_rig_transaction as _layer1_release_active_arm_rig_transaction,
     _safe_object_name,
     _snapshot_and_activate_transaction as _layer1_snapshot_and_activate_transaction,
+    _sweep_dead_managed_armature_identities as _layer1_sweep_dead_managed_armature_identities,
 )
 from src.scene_transaction_integrity.layer2 import (
     ArmatureSessionIdentityRecord,
@@ -92,6 +95,7 @@ from src.scene_transaction_integrity.layer2 import (
     _update_relationship_mutation_state as _layer2_update_relationship_mutation_state,
     _verify_armature_session_identity_record as _layer2_verify_armature_session_identity_record,
     ensure_armature_session_identity as _layer2_ensure_armature_session_identity,
+    query_admission_gate_status as _layer2_query_admission_gate_status,
 )
 from src.scene_transaction_integrity.layer3 import (
     ARM_IK_CONSTRAINT_NAMES,
@@ -290,49 +294,20 @@ def _verify_armature_session_identity_record(
 
 def _sweep_dead_managed_armature_identities() -> None:
     """Refresh liveness of all registered ArmatureSessionIdentityRecords and escalate dead isolated armatures."""
-    for session_id, rec in list(_MANAGED_ARMATURE_IDENTITIES.items()):
-        if rec.isolation_state == _ArmatureIsolationState.ARCHIVED_RETIRED:
-            continue
-        obj_liveness = _check_original_object_liveness(rec)
-        if obj_liveness["status"] == "UNKNOWN":
-            # Cannot prove death or liveness; preserve existing isolation state without escalation
-            continue
-        ver = _verify_armature_session_identity_record(rec, candidate_arm=None)
-        # Only escalate to TOMBSTONED_FAILED_D if object is genuinely ABSENT
-        # or if object is ALIVE but data block identity has been invalidated/replaced (Condition 7 failed).
-        is_dead = (obj_liveness["status"] == "ABSENT")
-        is_data_invalidated = (
-            obj_liveness["status"] == "ALIVE"
-            and not ver.get("identity_verification_uncertain", False)
-            and not ver["checks"].get("c7_data_valid_and_pointer_matches", False)
-        )
-        if is_dead or is_data_invalidated:
-            iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
-            if iso_rec is not None and rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D:
-                rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
-                rec.lifecycle_stage = "TOMBSTONED_FAILED_D"
-                tombstone = {
-                    "registry_session_id": session_id,
-                    "registration_pointer": rec.registration_pointer,
-                    "original_data_pointer": rec.original_data_pointer,
-                    "registered_name_snapshot": rec.registered_name_snapshot,
-                    "failure_class": _FailedTransactionClass.FAILED_D.value,
-                    "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
-                    "retirement_state": "ACTIVE_TOMBSTONE",
-                    "reasons": ver["reasons"],
-                }
-                rec.tombstone_record = tombstone
-                iso_rec["failure_class"] = _FailedTransactionClass.FAILED_D.value
-                iso_rec["isolation_state"] = _ArmatureIsolationState.TOMBSTONED_FAILED_D.value
-                iso_rec["tombstone_record"] = tombstone
+    return _layer1_sweep_dead_managed_armature_identities(
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        failed_transaction_class_cls=_FailedTransactionClass,
+        check_original_object_liveness=_check_original_object_liveness,
+        verify_armature_session_identity_record=_verify_armature_session_identity_record,
+    )
 
 
 def ensure_armature_session_identity(arm: bpy.types.Object) -> ArmatureSessionIdentityRecord:
     """Layer 2: Resolve existing verified ArmatureSessionIdentityRecord or register a new session identity."""
-    return _layer2_ensure_armature_session_identity(
-        arm,
-        sweep_dead_managed_armature_identities=_sweep_dead_managed_armature_identities,
-    )
+    _sweep_dead_managed_armature_identities()
+    return _layer2_ensure_armature_session_identity(arm)
 
 
 def _record_armature_failure_isolation_by_coordinator(
@@ -5299,76 +5274,18 @@ def query_admission_gate_status(
 ) -> Dict[str, Any]:
     """Layer 2: Read-only query of unified admission gate status for an Armature or session_id."""
     _sweep_dead_managed_armature_identities()
-
-    session_rec: Optional[ArmatureSessionIdentityRecord] = None
-    if session_id is not None:
-        session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
-    elif arm is not None:
-        for rec in _MANAGED_ARMATURE_IDENTITIES.values():
-            if rec.original_blender_ref is arm:
-                session_rec = rec
-                break
-            if rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED:
-                ver = _verify_armature_session_identity_record(rec, candidate_arm=arm)
-                if ver["is_valid"]:
-                    session_rec = rec
-                    break
-
-    resolved_session_id = session_rec.registry_session_id if session_rec is not None else session_id
-    arm_ptr = _safe_object_pointer(
+    return _layer2_query_admission_gate_status(
         arm,
-        fallback=(session_rec.registration_pointer if session_rec is not None else 0),
+        session_id,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        archived_failed_d_tombstones=_ARCHIVED_FAILED_D_TOMBSTONES,
+        armature_liveness_status_cls=_ArmatureLivenessStatus,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        safe_object_pointer=_safe_object_pointer,
+        verify_armature_session_identity_record=_verify_armature_session_identity_record,
     )
-
-    pending_cleanup_txs = [
-        tx_id
-        for tx_id, tx in _PENDING_ARM_RIG_CLEANUPS.items()
-        if (arm_ptr and tx.arm_ptr == arm_ptr)
-        or (resolved_session_id is not None and getattr(tx, "session_id", None) == resolved_session_id)
-    ]
-    iso_rec = _ISOLATED_FAILED_ARMATURES.get(resolved_session_id) if resolved_session_id else None
-    archived_rec = _ARCHIVED_FAILED_D_TOMBSTONES.get(resolved_session_id) if resolved_session_id else None
-
-    id_check = (
-        _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
-        if session_rec is not None
-        else {"is_valid": False, "reasons": ["Session record not registered"]}
-    )
-
-    cleanup_blocked = len(pending_cleanup_txs) > 0
-    failed_isolated = bool(
-        iso_rec is not None
-        or (
-            session_rec is not None
-            and session_rec.isolation_state != _ArmatureIsolationState.NONE
-        )
-    )
-    identity_valid = bool(id_check["is_valid"])
-
-    return {
-        "registry_session_id": resolved_session_id,
-        "cleanup_pending_blocked": cleanup_blocked,
-        "pending_cleanup_transaction_ids": sorted(pending_cleanup_txs),
-        "failed_isolation_blocked": failed_isolated,
-        "failure_class": (
-            iso_rec.get("failure_class")
-            if iso_rec is not None
-            else (archived_rec.get("failure_class") if archived_rec is not None else None)
-        ),
-        "isolation_state": (
-            session_rec.isolation_state.value
-            if session_rec is not None
-            else None
-        ),
-        "liveness_status": (
-            session_rec.liveness_status.value
-            if session_rec is not None
-            else None
-        ),
-        "identity_valid": identity_valid,
-        "identity_reasons": id_check.get("reasons", []),
-        "can_admit": (not cleanup_blocked and not failed_isolated and identity_valid),
-    }
 
 
 def verify_armature_deisolation_evidence(
@@ -5883,23 +5800,12 @@ def _arm_rig_transaction(arm: bpy.types.Object):
     global _ACTIVE_TRANSACTION_STACK
     if _ACTIVE_TRANSACTION_STACK:
         outer_tx = _ACTIVE_TRANSACTION_STACK[-1]
-        if outer_tx.arm != arm:
-            outer_name = _safe_object_name(outer_tx.arm)
-            req_name = _safe_object_name(arm)
-            raise RuntimeError(
-                f"Cross-armature nested transaction rejected: active transaction owns armature "
-                f"'{outer_name}', but requested transaction is for armature '{req_name}'."
-            )
-        if outer_tx.state != _ArmRigTransactionState.ACTIVE:
-            raise RuntimeError(
-                f"Nested transaction rejected: outer transaction {outer_tx.tx_id} is in state "
-                f"{outer_tx.state}, expected ACTIVE."
-            )
-        if outer_tx.rollback_only:
-            raise RuntimeError(
-                f"Nested transaction rejected: outer transaction {outer_tx.tx_id} is already marked "
-                f"rollback_only ({outer_tx.rollback_only_reason})."
-            )
+        _layer1_assert_nested_transaction_admission(
+            arm,
+            outer_tx,
+            transaction_state_cls=_ArmRigTransactionState,
+            safe_object_name=_safe_object_name,
+        )
         # Re-entrant invocation on same armature: outer transaction retains exclusive ownership
         try:
             yield outer_tx
@@ -5921,31 +5827,18 @@ def _arm_rig_transaction(arm: bpy.types.Object):
             verify_armature_session_identity_record=_verify_armature_session_identity_record,
         )
     )
-    if not admission_id_check["is_valid"]:
-        if _identity_failure_is_uncertain(admission_id_check):
-            # Admission is before snapshot/business writes. An indeterminate read
-            # denies this attempt but does not permanently isolate a healthy rig.
-            raise RuntimeError(
-                "Arm IK write blocked: ARMATURE_IDENTITY_UNVERIFIED_AT_ADMISSION "
-                f"(registry_session_id={session_rec.registry_session_id}): "
-                + "; ".join(admission_id_check["reasons"])
-            )
-        dead_tx = _ArmRigTransactionContext(arm, session_record=session_rec)
-        dead_tx.state = _ArmRigTransactionState.FAILED
-        _record_armature_failure_isolation_by_coordinator(
-            session_rec=session_rec,
-            tx=dead_tx,
-            failure_class=_FailedTransactionClass.FAILED_D,
-            primary_exception=RuntimeError("; ".join(admission_id_check["reasons"])),
-            evidence_status="ARMATURE_IDENTITY_INVALID_AT_ADMISSION",
-            missing_evidence_reasons=admission_id_check["reasons"],
-        )
-        raise RuntimeError(
-            "Arm IK write blocked: Armature session identity invalid at admission "
-            f"(failure_class=FAILED-D, transaction_id={dead_tx.tx_id}, "
-            f"registry_session_id={session_rec.registry_session_id}): "
-            + "; ".join(admission_id_check["reasons"])
-        )
+    _layer1_assert_admission_identity_valid(
+        arm,
+        session_rec,
+        admission_id_check,
+        identity_failure_is_uncertain=_identity_failure_is_uncertain,
+        transaction_context_cls=_ArmRigTransactionContext,
+        transaction_state_cls=_ArmRigTransactionState,
+        failed_transaction_class_cls=_FailedTransactionClass,
+        record_armature_failure_isolation_by_coordinator=(
+            _record_armature_failure_isolation_by_coordinator
+        ),
+    )
 
     tx = _layer1_establish_outermost_arm_rig_transaction(
         arm,
