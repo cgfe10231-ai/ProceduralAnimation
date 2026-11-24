@@ -127,6 +127,7 @@ from src.scene_transaction_integrity.layer3 import (
     _is_collection_descendant_of,
     _is_object_linked_to_collection_by_identity,
     _matrix_equals,
+    _remove_stashed_object_and_verify as _layer3_remove_stashed_object_and_verify,
     _require_collection_child_relationship_ownership as _layer3_require_collection_child_relationship_ownership,
     _require_existing_arm_ik_controller_ownership as _layer3_require_existing_arm_ik_controller_ownership,
     _verify_controller_object_transaction_authority as _layer3_verify_controller_object_transaction_authority,
@@ -159,6 +160,8 @@ from src.scene_transaction_integrity.layer6 import (
     _CleanupOutcome,
     _CleanupResult,
     _build_cleanup_result as _layer6_build_cleanup_result,
+    _cleanup_stashed_constraints as _layer6_cleanup_stashed_constraints,
+    _cleanup_stashed_object as _layer6_cleanup_stashed_object,
 )
 
 ARM_IK_TARGET_NAMES: Dict[str, str] = {"L": "HandIK.L", "R": "HandIK.R"}
@@ -4525,63 +4528,25 @@ class _ArmRigTransactionContext:
         # Identity-safe cleanup of stashed constraints
         # ------------------------------------------------------
 
-        for stashed_con in list(self.uncleaned_stashed_constraints):
-            try:
-                pbone = stashed_con.get("pbone")
-                _authorized_remove_constraint(
-                    pbone=pbone,
-                    con_record_or_ref=stashed_con,
-                    phase="POST_COMMIT_CLEANUP",
-                    active_tx=self,
-                )
-                self.uncleaned_stashed_constraints.remove(stashed_con)
-            except Exception as exc:
-                if first_cause is None:
-                    first_cause = exc
-                cleanup_failures.append(
-                    "Failed to clean up stashed constraint "
-                    f"{stashed_con.get('orig_name')}: {exc}"
-                )
+        first_cause = _layer6_cleanup_stashed_constraints(
+            self,
+            cleanup_failures,
+            first_cause,
+            authorized_remove_constraint=_authorized_remove_constraint,
+        )
 
         # 2. Clean up stashed doomed objects and unreferenced datablocks
         for stashed in list(self.uncleaned_stashed_objects):
             # Step 2.1: Object cleanup
-            if not stashed.get("obj_cleaned", False):
-                try:
-                    _trigger_fault_injection("during_cleanup_object_removal", {"stashed": stashed})
-                    obj_ref = stashed.get("stashed_obj")
-                    obj_ptr = stashed.get("stashed_obj_ptr")
-
-                    target_obj = None
-                    for o in bpy.data.objects:
-                        try:
-                            if obj_ptr and o.as_pointer() == obj_ptr:
-                                target_obj = o
-                                break
-                            elif obj_ref is not None and o == obj_ref:
-                                target_obj = o
-                                break
-                        except ReferenceError:
-                            continue
-
-                    if target_obj is not None:
-                        bpy.data.objects.remove(target_obj, do_unlink=True)
-                        still_exists = any(
-                            (obj_ptr and o.as_pointer() == obj_ptr)
-                            for o in bpy.data.objects
-                        )
-                        if still_exists:
-                            cleanup_failures.append(
-                                f"Failed to delete doomed object {stashed.get('original_name')}: still exists in bpy.data.objects"
-                            )
-                        else:
-                            stashed["obj_cleaned"] = True
-                    else:
-                        stashed["obj_cleaned"] = True
-                except Exception as oe:
-                    if first_cause is None:
-                        first_cause = oe
-                    cleanup_failures.append(f"Failed to clean up stashed object {stashed.get('original_name')}: {oe}")
+            first_cause = _layer6_cleanup_stashed_object(
+                stashed,
+                cleanup_failures,
+                first_cause,
+                trigger_fault_injection=_trigger_fault_injection,
+                remove_stashed_object_and_verify=(
+                    _layer3_remove_stashed_object_and_verify
+                ),
+            )
 
             # Step 2.2: DataBlock cleanup (runs only if object cleanup has succeeded)
             if stashed.get("obj_cleaned", False) and not stashed.get("data_cleaned", False):

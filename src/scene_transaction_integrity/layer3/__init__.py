@@ -49,6 +49,9 @@ from src.scene_transaction_integrity.layer3.resource_contracts import (
     _find_live_object_by_identity,
     _matrix_equals,
 )
+from src.scene_transaction_integrity.layer3.stashed_object_removal import (
+    _remove_stashed_object_and_verify,
+)
 
 __all__ = (
     "ARM_IK_CONSTRAINT_NAMES",
@@ -74,6 +77,7 @@ __all__ = (
     "_is_object_linked_to_collection_by_identity",
     "_matrix_equals",
     "_preflight_wrong_type_controller_conflicts",
+    "_remove_stashed_object_and_verify",
     "_require_collection_child_relationship_ownership",
     "_require_existing_arm_ik_controller_ownership",
     "_verify_controller_object_transaction_authority",
