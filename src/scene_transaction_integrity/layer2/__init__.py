@@ -49,6 +49,11 @@ from src.scene_transaction_integrity.layer2.constraint_registration import (
 from src.scene_transaction_integrity.layer2.controller_receipts import (
     _register_created_controller,
 )
+from src.scene_transaction_integrity.layer2.datablock_cleanup_records import (
+    _find_datablock_cleanup_authorization,
+    _record_deleted_datablock_cleanup,
+    _record_preserved_datablock_cleanup,
+)
 from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
     _PENDING_ARM_RIG_CLEANUPS,
     _register_pending_arm_rig_cleanup,
@@ -84,9 +89,12 @@ __all__ = (
     "_RelationshipOperationState",
     "_append_deisolation_audit",
     "_check_original_object_liveness",
+    "_find_datablock_cleanup_authorization",
     "_initialize_arm_rig_transaction_context",
     "_prepare_relationship_mutation",
+    "_record_deleted_datablock_cleanup",
     "_record_failed_a_audit",
+    "_record_preserved_datablock_cleanup",
     "_register_created_collection",
     "_register_created_collection_link",
     "_register_created_constraint",

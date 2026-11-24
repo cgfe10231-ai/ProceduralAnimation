@@ -6,6 +6,7 @@ from src.scene_transaction_integrity.layer6.cleanup_results import (
 from src.scene_transaction_integrity.layer6.stashed_cleanup import (
     _cleanup_stashed_constraints,
     _cleanup_stashed_object,
+    _execute_stashed_cleanup_pass,
 )
 
 __all__ = (
@@ -14,4 +15,5 @@ __all__ = (
     "_build_cleanup_result",
     "_cleanup_stashed_constraints",
     "_cleanup_stashed_object",
+    "_execute_stashed_cleanup_pass",
 )

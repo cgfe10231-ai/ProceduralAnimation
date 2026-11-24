@@ -74,3 +74,196 @@ def _cleanup_stashed_object(
             )
 
     return first_cause
+
+
+# [INTRODUCED 2026-11-24T19:31:00+08:00]
+# NODE: 10-B / L6-02
+# FUNCTION: _cleanup_stashed_datablock
+# PURPOSE: 按 obj_cleaned and not data_cleaned 前置条件调度单个 DataBlock 的故障注入、查找、授权匹配、删除或保留记录
+# REASON: 将单个 DataBlock 清理调度迁入 Layer 6，保持四种路径状态标记、first_cause 及 Exception 收集语义不变
+def _cleanup_stashed_datablock(
+    tx: Any,
+    stashed: Dict[str, Any],
+    cleanup_failures: List[str],
+    first_cause: Optional[BaseException],
+    *,
+    trigger_fault_injection: Callable[..., None],
+    find_stashed_datablock: Callable[..., Any],
+    find_datablock_cleanup_authorization: Callable[..., Any],
+    remove_authorized_stashed_datablock: Callable[..., None],
+    record_preserved_datablock_cleanup: Callable[..., None],
+    record_deleted_datablock_cleanup: Callable[..., None],
+) -> Optional[BaseException]:
+    """Execute one stashed DataBlock cleanup unit."""
+    if stashed.get("obj_cleaned", False) and not stashed.get(
+        "data_cleaned", False
+    ):
+        try:
+            trigger_fault_injection(
+                "during_cleanup_datablock_removal",
+                {"stashed": stashed},
+            )
+
+            data_ref = stashed.get("stashed_data")
+            data_ptr = stashed.get("stashed_data_ptr")
+            data_name = stashed.get("stashed_data_name")
+
+            if data_ptr is None and data_ref is None:
+                stashed["data_cleaned"] = True
+            else:
+                target_data, target_coll = find_stashed_datablock(
+                    data_ref,
+                    data_ptr,
+                )
+
+                if target_data is None:
+                    stashed["data_cleaned"] = True
+                    stashed["data_cleanup_status"] = "DATA_ALREADY_ABSENT"
+                else:
+                    matching_auth = find_datablock_cleanup_authorization(
+                        tx,
+                        data_ptr,
+                        target_data,
+                    )
+
+                    if matching_auth is None:
+                        stashed["data_cleanup_status"] = (
+                            "PRESERVED_NO_DELETE_AUTHORITY"
+                        )
+                        stashed["data_cleaned"] = True
+
+                        record_preserved_datablock_cleanup(
+                            tx,
+                            data_ref,
+                            data_ptr,
+                            data_name,
+                            target_data,
+                            target_coll,
+                        )
+                    else:
+                        remove_authorized_stashed_datablock(
+                            tx,
+                            stashed,
+                            matching_auth,
+                            data_ptr,
+                            data_name,
+                            target_data,
+                            target_coll,
+                            trigger_fault_injection=trigger_fault_injection,
+                        )
+
+                        stashed["data_cleaned"] = True
+                        stashed["data_cleanup_status"] = "PHYSICALLY_DELETED"
+
+                        record_deleted_datablock_cleanup(
+                            tx,
+                            data_ref,
+                            data_ptr,
+                            data_name,
+                            target_data,
+                            target_coll,
+                        )
+
+        except Exception as de:
+            if first_cause is None:
+                first_cause = de
+
+            cleanup_failures.append(
+                f"Failed to clean up datablock for {stashed.get('original_name')}: {de}"
+            )
+
+    return first_cause
+
+
+# [INTRODUCED 2026-11-24T19:31:00+08:00]
+# NODE: 10-B / L6-02
+# FUNCTION: _execute_stashed_cleanup_pass
+# PURPOSE: 执行完整提交后清理流水线：状态禁用拒绝、Constraint 清理、Object 清理与 DataBlock 清理顺序调度、双完成条目移出及结果构造
+# REASON: 将 retry_cleanup() 整体执行器迁入 Layer 6，保持幂等队列与单套清理机制同时保留 arm_ik.py 纯兼容代理
+def _execute_stashed_cleanup_pass(
+    tx: Any,
+    *,
+    transaction_state_cls: Any,
+    authorized_remove_constraint: Callable[..., Any],
+    cleanup_stashed_constraints: Callable[..., Any],
+    cleanup_stashed_object: Callable[..., Any],
+    trigger_fault_injection: Callable[..., None],
+    remove_stashed_object_and_verify: Callable[..., bool],
+    find_stashed_datablock: Callable[..., Any],
+    find_datablock_cleanup_authorization: Callable[..., Any],
+    remove_authorized_stashed_datablock: Callable[..., None],
+    record_preserved_datablock_cleanup: Callable[..., None],
+    record_deleted_datablock_cleanup: Callable[..., None],
+    build_cleanup_result: Callable[..., Any],
+    cleanup_outcome_cls: Any,
+    cleanup_result_cls: Any,
+) -> Any:
+    """Execute the existing post-commit stashed resource cleanup pass."""
+    if tx.state in (
+        transaction_state_cls.FAILED,
+        transaction_state_cls.ROLLING_BACK,
+        transaction_state_cls.ROLLED_BACK,
+        transaction_state_cls.ACTIVE,
+        transaction_state_cls.SNAPSHOTTING,
+        transaction_state_cls.CREATED,
+    ):
+        raise RuntimeError(
+            f"Cannot execute retry_cleanup on transaction {tx.tx_id} in state {tx.state}: "
+            f"FAILED -> COMMITTED transition is strictly forbidden"
+        )
+
+    cleanup_failures: List[str] = []
+    first_cause: Optional[BaseException] = None
+
+    first_cause = cleanup_stashed_constraints(
+        tx,
+        cleanup_failures,
+        first_cause,
+        authorized_remove_constraint=authorized_remove_constraint,
+    )
+
+    for stashed in list(tx.uncleaned_stashed_objects):
+        first_cause = cleanup_stashed_object(
+            stashed,
+            cleanup_failures,
+            first_cause,
+            trigger_fault_injection=trigger_fault_injection,
+            remove_stashed_object_and_verify=(
+                remove_stashed_object_and_verify
+            ),
+        )
+
+        first_cause = _cleanup_stashed_datablock(
+            tx,
+            stashed,
+            cleanup_failures,
+            first_cause,
+            trigger_fault_injection=trigger_fault_injection,
+            find_stashed_datablock=find_stashed_datablock,
+            find_datablock_cleanup_authorization=(
+                find_datablock_cleanup_authorization
+            ),
+            remove_authorized_stashed_datablock=(
+                remove_authorized_stashed_datablock
+            ),
+            record_preserved_datablock_cleanup=(
+                record_preserved_datablock_cleanup
+            ),
+            record_deleted_datablock_cleanup=(
+                record_deleted_datablock_cleanup
+            ),
+        )
+
+        if stashed.get("obj_cleaned", False) and stashed.get(
+            "data_cleaned", False
+        ):
+            if stashed in tx.uncleaned_stashed_objects:
+                tx.uncleaned_stashed_objects.remove(stashed)
+
+    return build_cleanup_result(
+        tx,
+        cleanup_failures,
+        first_cause,
+        cleanup_outcome_cls=cleanup_outcome_cls,
+        cleanup_result_cls=cleanup_result_cls,
+    )

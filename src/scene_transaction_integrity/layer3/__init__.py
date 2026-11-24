@@ -38,6 +38,10 @@ from src.scene_transaction_integrity.layer3.controller_ownership import (
     _verify_controller_object_transaction_authority,
     _verify_transaction_wrong_type_object_ownership,
 )
+from src.scene_transaction_integrity.layer3.datablock_removal import (
+    _find_stashed_datablock,
+    _remove_authorized_stashed_datablock,
+)
 from src.scene_transaction_integrity.layer3.object_parent_assignment import (
     _authorized_assign_object_parent,
 )
@@ -71,12 +75,14 @@ __all__ = (
     "_find_collection_by_name",
     "_find_live_collection_by_identity",
     "_find_live_object_by_identity",
+    "_find_stashed_datablock",
     "_get_or_create_empty",
     "_is_child_collection_linked_by_identity",
     "_is_collection_descendant_of",
     "_is_object_linked_to_collection_by_identity",
     "_matrix_equals",
     "_preflight_wrong_type_controller_conflicts",
+    "_remove_authorized_stashed_datablock",
     "_remove_stashed_object_and_verify",
     "_require_collection_child_relationship_ownership",
     "_require_existing_arm_ik_controller_ownership",
