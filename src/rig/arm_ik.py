@@ -147,8 +147,11 @@ from src.scene_transaction_integrity.layer3 import (
 from src.scene_transaction_integrity.layer4 import (
     _apply_arm_ik_prebend_hint,
     _apply_arm_ik_prebend_hint_side,
+    _clear_test_depsgraph_updater as _layer4_clear_test_depsgraph_updater,
+    _depsgraph_update as _layer4_depsgraph_update,
     _preflight_arm_ik_parent_transforms as _layer4_preflight_arm_ik_parent_transforms,
     _resolve_armature,
+    _set_test_depsgraph_updater as _layer4_set_test_depsgraph_updater,
     _update_arm_ik_depsgraph as _layer4_update_arm_ik_depsgraph,
     _validate_bool,
     _validate_influence,
@@ -759,27 +762,19 @@ def _trigger_fault_injection(stage: str, context: Optional[Dict[str, Any]] = Non
         _FAULT_INJECTION_HOOK(stage, context or {})
 
 
-_DEPSGRAPH_UPDATER: Callable[[], None] = lambda: bpy.context.view_layer.update() if (bpy.context and bpy.context.view_layer) else None
-
-
 def _set_test_depsgraph_updater(updater: Optional[Callable[[], None]]) -> None:
     """Private test hook to replace or wrap depsgraph update execution at the boundary."""
-    global _DEPSGRAPH_UPDATER
-    if updater is None:
-        _DEPSGRAPH_UPDATER = lambda: bpy.context.view_layer.update() if (bpy.context and bpy.context.view_layer) else None
-    else:
-        _DEPSGRAPH_UPDATER = updater
+    return _layer4_set_test_depsgraph_updater(updater)
 
 
 def _clear_test_depsgraph_updater() -> None:
     """Clear private test depsgraph updater hook."""
-    global _DEPSGRAPH_UPDATER
-    _DEPSGRAPH_UPDATER = lambda: bpy.context.view_layer.update() if (bpy.context and bpy.context.view_layer) else None
+    return _layer4_clear_test_depsgraph_updater()
 
 
 def _depsgraph_update() -> None:
     """Internal unified dependency graph update boundary."""
-    _DEPSGRAPH_UPDATER()
+    return _layer4_depsgraph_update()
 
 
 def _update_arm_ik_depsgraph() -> None:
