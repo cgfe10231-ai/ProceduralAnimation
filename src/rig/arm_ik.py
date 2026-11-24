@@ -55,8 +55,10 @@ from src.scene_transaction_integrity.layer1 import (
     _assert_arm_rig_cleanup_gate as _layer1_assert_arm_rig_cleanup_gate,
     _assert_arm_rig_failed_isolation_gate as _layer1_assert_arm_rig_failed_isolation_gate,
     _capture_transaction_entry_fingerprint as _layer1_capture_transaction_entry_fingerprint,
+    _commit_arm_rig_transaction as _layer1_commit_arm_rig_transaction,
     _establish_outermost_arm_rig_transaction as _layer1_establish_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
+    _release_active_arm_rig_transaction as _layer1_release_active_arm_rig_transaction,
     _safe_object_name,
     _snapshot_and_activate_transaction as _layer1_snapshot_and_activate_transaction,
 )
@@ -5988,34 +5990,17 @@ def _arm_rig_transaction(arm: bpy.types.Object):
 
         yield tx
 
-        if tx.rollback_only:
-            raise RuntimeError(
-                f"Arm rig transaction commit rejected: transaction {tx.tx_id} is marked rollback_only "
-                f"(first failure reason: {tx.rollback_only_reason})"
-            )
-
-        # -------------------------------------------------------------
-        # Phase 1: Reversible Commit Preparation
-        # -------------------------------------------------------------
-        tx.state = _ArmRigTransactionState.COMMITTING
-        _trigger_fault_injection("before_commit_prepare", {"tx": tx})
-
-        _depsgraph_update()
-        _trigger_fault_injection("during_commit_prepare", {"tx": tx})
-
-        # Verify Armature identity remained valid before Logical Commit Confirmation
-        commit_id_check = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
-        if not commit_id_check["is_valid"]:
-            raise RuntimeError(
-                "Armature session identity invalidated during COMMITTING: "
-                + "; ".join(commit_id_check["reasons"])
-            )
-
-        # -------------------------------------------------------------
-        # Phase 2: Logical Commit Confirmation
-        # -------------------------------------------------------------
-        tx.state = _ArmRigTransactionState.COMMITTED
-        session_rec.lifecycle_stage = "NORMAL_TERMINAL"
+        _layer1_commit_arm_rig_transaction(
+            arm,
+            tx,
+            session_rec,
+            transaction_state_cls=_ArmRigTransactionState,
+            trigger_fault_injection=_trigger_fault_injection,
+            depsgraph_update=_depsgraph_update,
+            verify_armature_session_identity_record=(
+                _verify_armature_session_identity_record
+            ),
+        )
 
     except BaseException as orig_exc:
         # If failure occurred before Phase 2 (Logical Commit), execute classification & rollback!
@@ -6162,8 +6147,10 @@ def _arm_rig_transaction(arm: bpy.types.Object):
         else:
             raise
     finally:
-        if tx in _ACTIVE_TRANSACTION_STACK:
-            _ACTIVE_TRANSACTION_STACK.remove(tx)
+        _layer1_release_active_arm_rig_transaction(
+            tx,
+            active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        )
 
     # -----------------------------------------------------------------
     # Phase 3: Irreversible Resource Cleanup (runs only after logical commit)
