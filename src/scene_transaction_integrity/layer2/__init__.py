@@ -46,6 +46,9 @@ from src.scene_transaction_integrity.layer2.constraint_registration import (
 from src.scene_transaction_integrity.layer2.controller_receipts import (
     _register_created_controller,
 )
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+)
 from src.scene_transaction_integrity.layer2.relationship_mutation_prepare import (
     _prepare_relationship_mutation,
 )
@@ -72,6 +75,7 @@ __all__ = (
     "_ISOLATED_FAILED_ARMATURES",
     "_LEGAL_RELATIONSHIP_LOG_TRANSITIONS",
     "_MANAGED_ARMATURE_IDENTITIES",
+    "_PENDING_ARM_RIG_CLEANUPS",
     "_RelationshipOperationState",
     "_append_deisolation_audit",
     "_check_original_object_liveness",

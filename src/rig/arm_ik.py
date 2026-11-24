@@ -52,6 +52,8 @@ from src.rig.transform_utils import (
 )
 from src.scene_transaction_integrity.layer1 import (
     _admit_outermost_arm_rig_transaction as _layer1_admit_outermost_arm_rig_transaction,
+    _assert_arm_rig_cleanup_gate as _layer1_assert_arm_rig_cleanup_gate,
+    _assert_arm_rig_failed_isolation_gate as _layer1_assert_arm_rig_failed_isolation_gate,
     _establish_outermost_arm_rig_transaction as _layer1_establish_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
     _safe_object_name,
@@ -69,6 +71,7 @@ from src.scene_transaction_integrity.layer2 import (
     _ISOLATED_FAILED_ARMATURES,
     _LEGAL_RELATIONSHIP_LOG_TRANSITIONS,
     _MANAGED_ARMATURE_IDENTITIES,
+    _PENDING_ARM_RIG_CLEANUPS,
     _RelationshipOperationState,
     _append_deisolation_audit,
     _check_original_object_liveness as _layer2_check_original_object_liveness,
@@ -4849,16 +4852,6 @@ class _ArmRigTransactionContext:
         )
 
 
-# Task 10-B-6
-# Runtime registry for committed transactions
-# with unfinished resource cleanup.
-
-_PENDING_ARM_RIG_CLEANUPS: Dict[
-    str,
-    "_ArmRigTransactionContext"
-] = {}
-
-
 def _coordinator_validate_cleanup_preflight(
     tx: "_ArmRigTransactionContext",
     phase: str,
@@ -5285,37 +5278,13 @@ def _assert_arm_rig_cleanup_gate(
     Reject new independent writes while the same Armature
     owns an unresolved committed cleanup transaction.
     """
-
-    arm_ptr = _safe_object_pointer(
+    return _layer1_assert_arm_rig_cleanup_gate(
         arm,
-        fallback=(session_record.registration_pointer if session_record is not None else 0),
+        session_record,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        safe_object_pointer=_safe_object_pointer,
+        transaction_state_cls=_ArmRigTransactionState,
     )
-    session_id = session_record.registry_session_id if session_record is not None else None
-
-    blocking_transactions = []
-
-    for tx_id, tx in tuple(
-        _PENDING_ARM_RIG_CLEANUPS.items()
-    ):
-
-        if tx.state != _ArmRigTransactionState.CLEANUP_PENDING:
-            raise RuntimeError(
-                "Arm IK cleanup registry invariant violated: "
-                f"transaction {tx_id} is registered with "
-                f"state {tx.state}"
-            )
-
-        if (arm_ptr and tx.arm_ptr == arm_ptr) or (
-            session_id is not None and getattr(tx, "session_id", None) == session_id
-        ):
-            blocking_transactions.append(tx_id)
-
-    if blocking_transactions:
-        raise RuntimeError(
-            "Arm IK write blocked: unresolved cleanup "
-            "for the same Armature; pending transactions="
-            + ",".join(sorted(blocking_transactions))
-        )
 
 
 def _assert_arm_rig_failed_isolation_gate(
@@ -5326,32 +5295,13 @@ def _assert_arm_rig_failed_isolation_gate(
     Reject new independent writes while the same Armature session identity
     is isolated in _ISOLATED_FAILED_ARMATURES (FAILED-B / FAILED-C / FAILED-D).
     """
-    session_id = session_record.registry_session_id
-    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
-    if iso_rec is not None or session_record.isolation_state != _ArmatureIsolationState.NONE:
-        failure_class = (
-            iso_rec.get("failure_class")
-            if iso_rec is not None
-            else (
-                _FailedTransactionClass.FAILED_D.value
-                if session_record.isolation_state in (
-                    _ArmatureIsolationState.TOMBSTONED_FAILED_D,
-                    _ArmatureIsolationState.ARCHIVED_RETIRED,
-                )
-                else session_record.isolation_state.value
-            )
-        )
-        tx_id = iso_rec.get("transaction_id", "<unknown>") if iso_rec is not None else "<unknown>"
-        iso_state = (
-            iso_rec.get("isolation_state")
-            if iso_rec is not None
-            else session_record.isolation_state.value
-        )
-        raise RuntimeError(
-            "Arm IK write blocked: Armature session is isolated due to prior FAILED transaction "
-            f"(failure_class={failure_class}, isolation_state={iso_state}, "
-            f"transaction_id={tx_id}, registry_session_id={session_id})"
-        )
+    return _layer1_assert_arm_rig_failed_isolation_gate(
+        arm,
+        session_record,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        failed_transaction_class_cls=_FailedTransactionClass,
+    )
 
 
 def query_admission_gate_status(
