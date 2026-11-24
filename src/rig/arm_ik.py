@@ -170,6 +170,7 @@ from src.scene_transaction_integrity.layer5 import (
     _freeze_fingerprint_property_value,
     _has_nan_or_inf,
     _snapshot_arm_rig_state as _layer5_snapshot_arm_rig_state,
+    _verify_pre_write_zero_mutation_and_integrity as _layer5_verify_pre_write_zero_mutation_and_integrity,
 )
 from src.scene_transaction_integrity.layer6 import (
     _CleanupOutcome,
@@ -722,90 +723,17 @@ def _verify_pre_write_zero_mutation_and_integrity(
     tx: "_ArmRigTransactionContext",
 ) -> Dict[str, Any]:
     """Layer 5: Verify zero mutations and structural integrity when a transaction aborts before ACTIVE."""
-    reasons: List[str] = []
-
-    # 1. Verification of Transaction Execution Phase
-    if getattr(tx, "pre_write_integrity_compromised", False):
-        extra = getattr(tx, "pre_write_integrity_reasons", [])
-        reasons.extend(extra if extra else ["Transaction pre-write integrity explicitly marked compromised"])
-
-    if tx.snapshot is not None:
-        reasons.append("Transaction captured full snapshot; cannot be verified via pre-snapshot zero-mutation path")
-
-    if tx.state not in (
-        _ArmRigTransactionState.CREATED,
-        _ArmRigTransactionState.SNAPSHOTTING,
-        _ArmRigTransactionState.FAILED,
-    ):
-        reasons.append(
-            f"Transaction reached post-snapshot execution state '{tx.state.value}'; "
-            "cannot be verified as FAILED-A pre-write abort"
-        )
-
-    if (
-        tx.created_controller_objects
-        or tx.created_constraints
-        or tx.created_collection_links
-        or tx.prepared_relationship_mutations
-        or tx.stashed_objects
-        or tx.stashed_constraints
-        or tx.created_collections
-    ):
-        reasons.append("Transaction recorded resource or relationship mutations before reaching ACTIVE")
-
-    if pre_fp is None:
-        reasons.append("Pre-snapshot structural fingerprint is missing")
-        return {"is_verified": False, "reasons": reasons}
-
-    try:
-        post_fp = _capture_pre_snapshot_structural_fingerprint(arm)
-    except BaseException as exc:
-        reasons.append(f"Failed to capture post-exception structural fingerprint: {exc}")
-        return {"is_verified": False, "reasons": reasons}
-
-    # 2. A failed finiteness check is untrusted evidence, not a verified clean state.
-    try:
-        nonfinite = _has_nan_or_inf(pre_fp) or _has_nan_or_inf(post_fp)
-    except BaseException as scan_exc:
-        reasons.append(
-            f"Pre-write fingerprint finiteness could not be verified: "
-            f"{type(scan_exc).__name__}: {scan_exc}"
-        )
-    else:
-        if nonfinite:
-            reasons.append("Pre-write structural fingerprint contains NaN or Infinite floating point values")
-
-    # 3. Check for missing bones
-    if post_fp.get("total_pose_bone_count", 0) > 0:
-        missing_bones = [
-            b for b in _REQUIRED_ARM_IK_BONE_NAMES
-            if b not in post_fp.get("present_arm_bones", ())
-        ]
-        if missing_bones:
-            reasons.append(f"Required upper-limb pose bones missing: {missing_bones}")
-
-    # 4. Compare every key in fingerprint for exact unrounded equality
-    for key in (
-        "arm_ptr",
-        "arm_name",
-        "data_ptr",
-        "total_pose_bone_count",
-        "present_arm_bones",
-        "character_collection",
-        "controllers",
-        "pose_bones",
-        "all_object_ptrs",
-        "all_collection_ptrs",
-    ):
-        pre_val = pre_fp.get(key)
-        post_val = post_fp.get(key)
-        if pre_val != post_val:
-            reasons.append(f"Pre-write state mutated during SNAPSHOTTING in field '{key}'")
-
-    return {
-        "is_verified": len(reasons) == 0,
-        "reasons": reasons,
-    }
+    return _layer5_verify_pre_write_zero_mutation_and_integrity(
+        arm=arm,
+        pre_fp=pre_fp,
+        tx=tx,
+        transaction_state_cls=_ArmRigTransactionState,
+        capture_pre_snapshot_structural_fingerprint=(
+            _capture_pre_snapshot_structural_fingerprint
+        ),
+        has_nan_or_inf=_has_nan_or_inf,
+        required_arm_ik_bone_names=_REQUIRED_ARM_IK_BONE_NAMES,
+    )
 
 
 def _snapshot_arm_rig_state(arm: bpy.types.Object) -> Dict[str, Any]:

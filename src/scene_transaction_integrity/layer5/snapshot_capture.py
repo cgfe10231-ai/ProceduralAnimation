@@ -379,3 +379,105 @@ def _snapshot_arm_rig_state(
         "controllers": controllers_data,
         "pose_bones": pose_bones_data,
     }
+
+
+# [INTRODUCED 2026-11-25T00:14:00+08:00]
+# NODE: 10-B / L5-02
+# FUNCTION: _verify_pre_write_zero_mutation_and_integrity
+# PURPOSE: 验证完整快照建立前的事务零写入及结构完整性，向 Coordinator 返回原有证据报告
+# REASON: 将快照阶段首次触发的异常完整性验证主节点归入 Layer 5，保持失败分类与状态决策权归属于 Layer 1
+def _verify_pre_write_zero_mutation_and_integrity(
+    arm: bpy.types.Object,
+    pre_fp: Optional[Dict[str, Any]],
+    tx: Any,
+    *,
+    transaction_state_cls: Any,
+    capture_pre_snapshot_structural_fingerprint: Callable[..., Dict[str, Any]],
+    has_nan_or_inf: Callable[[Any], bool],
+    required_arm_ik_bone_names: Tuple[str, ...],
+) -> Dict[str, Any]:
+    """Layer 5: Verify zero mutations and structural integrity when a transaction aborts before ACTIVE."""
+    reasons: List[str] = []
+
+    # 1. Verification of Transaction Execution Phase
+    if getattr(tx, "pre_write_integrity_compromised", False):
+        extra = getattr(tx, "pre_write_integrity_reasons", [])
+        reasons.extend(extra if extra else ["Transaction pre-write integrity explicitly marked compromised"])
+
+    if tx.snapshot is not None:
+        reasons.append("Transaction captured full snapshot; cannot be verified via pre-snapshot zero-mutation path")
+
+    if tx.state not in (
+        transaction_state_cls.CREATED,
+        transaction_state_cls.SNAPSHOTTING,
+        transaction_state_cls.FAILED,
+    ):
+        reasons.append(
+            f"Transaction reached post-snapshot execution state '{tx.state.value}'; "
+            "cannot be verified as FAILED-A pre-write abort"
+        )
+
+    if (
+        tx.created_controller_objects
+        or tx.created_constraints
+        or tx.created_collection_links
+        or tx.prepared_relationship_mutations
+        or tx.stashed_objects
+        or tx.stashed_constraints
+        or tx.created_collections
+    ):
+        reasons.append("Transaction recorded resource or relationship mutations before reaching ACTIVE")
+
+    if pre_fp is None:
+        reasons.append("Pre-snapshot structural fingerprint is missing")
+        return {"is_verified": False, "reasons": reasons}
+
+    try:
+        post_fp = capture_pre_snapshot_structural_fingerprint(arm)
+    except BaseException as exc:
+        reasons.append(f"Failed to capture post-exception structural fingerprint: {exc}")
+        return {"is_verified": False, "reasons": reasons}
+
+    # 2. A failed finiteness check is untrusted evidence, not a verified clean state.
+    try:
+        nonfinite = has_nan_or_inf(pre_fp) or has_nan_or_inf(post_fp)
+    except BaseException as scan_exc:
+        reasons.append(
+            f"Pre-write fingerprint finiteness could not be verified: "
+            f"{type(scan_exc).__name__}: {scan_exc}"
+        )
+    else:
+        if nonfinite:
+            reasons.append("Pre-write structural fingerprint contains NaN or Infinite floating point values")
+
+    # 3. Check for missing bones
+    if post_fp.get("total_pose_bone_count", 0) > 0:
+        missing_bones = [
+            b for b in required_arm_ik_bone_names
+            if b not in post_fp.get("present_arm_bones", ())
+        ]
+        if missing_bones:
+            reasons.append(f"Required upper-limb pose bones missing: {missing_bones}")
+
+    # 4. Compare every key in fingerprint for exact unrounded equality
+    for key in (
+        "arm_ptr",
+        "arm_name",
+        "data_ptr",
+        "total_pose_bone_count",
+        "present_arm_bones",
+        "character_collection",
+        "controllers",
+        "pose_bones",
+        "all_object_ptrs",
+        "all_collection_ptrs",
+    ):
+        pre_val = pre_fp.get(key)
+        post_val = post_fp.get(key)
+        if pre_val != post_val:
+            reasons.append(f"Pre-write state mutated during SNAPSHOTTING in field '{key}'")
+
+    return {
+        "is_verified": len(reasons) == 0,
+        "reasons": reasons,
+    }
