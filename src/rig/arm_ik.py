@@ -52,6 +52,7 @@ from src.rig.transform_utils import (
 )
 from src.scene_transaction_integrity.layer1 import (
     _admit_outermost_arm_rig_transaction as _layer1_admit_outermost_arm_rig_transaction,
+    _establish_outermost_arm_rig_transaction as _layer1_establish_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
     _safe_object_name,
 )
@@ -6007,9 +6008,12 @@ def _arm_rig_transaction(arm: bpy.types.Object):
             + "; ".join(admission_id_check["reasons"])
         )
 
-    tx = _ArmRigTransactionContext(arm, session_record=session_rec)
-    session_rec.lifecycle_stage = "ACTIVE_TRANSACTION"
-    _ACTIVE_TRANSACTION_STACK.append(tx)
+    tx = _layer1_establish_outermost_arm_rig_transaction(
+        arm,
+        session_rec,
+        transaction_context_cls=_ArmRigTransactionContext,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+    )
     pre_snap_fp = None
 
     try:
