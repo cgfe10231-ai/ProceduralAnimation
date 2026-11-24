@@ -30,6 +30,9 @@ from src.scene_transaction_integrity.layer1.transaction_commit import (
     _commit_arm_rig_transaction,
     _release_active_arm_rig_transaction,
 )
+from src.scene_transaction_integrity.layer1.transaction_coordinator import (
+    _arm_rig_transaction,
+)
 from src.scene_transaction_integrity.layer1.transaction_establishment import (
     _capture_transaction_entry_fingerprint,
     _establish_outermost_arm_rig_transaction,
@@ -38,6 +41,7 @@ from src.scene_transaction_integrity.layer1.transaction_establishment import (
 
 __all__ = (
     "_admit_outermost_arm_rig_transaction",
+    "_arm_rig_transaction",
     "_assert_admission_identity_valid",
     "_assert_arm_rig_cleanup_gate",
     "_assert_arm_rig_failed_isolation_gate",

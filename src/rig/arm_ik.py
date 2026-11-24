@@ -52,6 +52,7 @@ from src.rig.transform_utils import (
 )
 from src.scene_transaction_integrity.layer1 import (
     _admit_outermost_arm_rig_transaction as _layer1_admit_outermost_arm_rig_transaction,
+    _arm_rig_transaction as _layer1_arm_rig_transaction,
     _assert_admission_identity_valid as _layer1_assert_admission_identity_valid,
     _assert_arm_rig_cleanup_gate as _layer1_assert_arm_rig_cleanup_gate,
     _assert_arm_rig_failed_isolation_gate as _layer1_assert_arm_rig_failed_isolation_gate,
@@ -4850,246 +4851,33 @@ def retire_dead_armature_tombstone(
 @contextmanager
 def _arm_rig_transaction(arm: bpy.types.Object):
     """Context manager executing Arm IK mutations under atomic transaction protection."""
-    global _ACTIVE_TRANSACTION_STACK
-    if _ACTIVE_TRANSACTION_STACK:
-        outer_tx = _ACTIVE_TRANSACTION_STACK[-1]
-        _layer1_assert_nested_transaction_admission(
-            arm,
-            outer_tx,
-            transaction_state_cls=_ArmRigTransactionState,
-            safe_object_name=_safe_object_name,
-        )
-        # Re-entrant invocation on same armature: outer transaction retains exclusive ownership
-        try:
-            yield outer_tx
-        except BaseException as nested_exc:
-            outer_tx.mark_rollback_only(f"{type(nested_exc).__name__}: {nested_exc}")
-            raise
-        return
-
-    # -----------------------------------------------------------------
-    # Unified Admission Gate (Section 7):
-    # 1. Cleanup Pending Gate -> 2. FAILED Isolation Gate -> 3. Armature Identity Check
-    # -----------------------------------------------------------------
-    session_rec, admission_id_check = (
-        _layer1_admit_outermost_arm_rig_transaction(
-            arm,
-            ensure_armature_session_identity=ensure_armature_session_identity,
-            assert_arm_rig_cleanup_gate=_assert_arm_rig_cleanup_gate,
-            assert_arm_rig_failed_isolation_gate=_assert_arm_rig_failed_isolation_gate,
-            verify_armature_session_identity_record=_verify_armature_session_identity_record,
-        )
-    )
-    _layer1_assert_admission_identity_valid(
+    yield from _layer1_arm_rig_transaction(
         arm,
-        session_rec,
-        admission_id_check,
-        identity_failure_is_uncertain=_identity_failure_is_uncertain,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
         transaction_context_cls=_ArmRigTransactionContext,
         transaction_state_cls=_ArmRigTransactionState,
         failed_transaction_class_cls=_FailedTransactionClass,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        ensure_armature_session_identity=ensure_armature_session_identity,
+        assert_arm_rig_cleanup_gate=_assert_arm_rig_cleanup_gate,
+        assert_arm_rig_failed_isolation_gate=_assert_arm_rig_failed_isolation_gate,
+        verify_armature_session_identity_record=(
+            _verify_armature_session_identity_record
+        ),
         record_armature_failure_isolation_by_coordinator=(
             _record_armature_failure_isolation_by_coordinator
         ),
-    )
-
-    tx = _layer1_establish_outermost_arm_rig_transaction(
-        arm,
-        session_rec,
-        transaction_context_cls=_ArmRigTransactionContext,
-        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
-    )
-    pre_snap_fp = None
-
-    try:
-        pre_snap_fp = _layer1_capture_transaction_entry_fingerprint(
-            arm,
-            tx,
-            trigger_fault_injection=_trigger_fault_injection,
-            capture_pre_snapshot_structural_fingerprint=(
-                _capture_pre_snapshot_structural_fingerprint
-            ),
-        )
-
-        _layer1_snapshot_and_activate_transaction(
-            arm,
-            tx,
-            pre_snap_fp,
-            transaction_state_cls=_ArmRigTransactionState,
-            snapshot_arm_rig_state=_snapshot_arm_rig_state,
-        )
-
-        yield tx
-
-        _layer1_commit_arm_rig_transaction(
-            arm,
-            tx,
-            session_rec,
-            transaction_state_cls=_ArmRigTransactionState,
-            trigger_fault_injection=_trigger_fault_injection,
-            depsgraph_update=_depsgraph_update,
-            verify_armature_session_identity_record=(
-                _verify_armature_session_identity_record
-            ),
-        )
-
-    except BaseException as orig_exc:
-        # If failure occurred before Phase 2 (Logical Commit), execute classification & rollback!
-        if tx.state != _ArmRigTransactionState.COMMITTED:
-            if tx.snapshot is not None:
-                tx.state = _ArmRigTransactionState.ROLLING_BACK
-                rollback_err: Optional[BaseException] = None
-                pre_rb_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
-
-                if not pre_rb_id["is_valid"]:
-                    # An unverified identity is not a proven-dead Armature.
-                    # Never roll back through an uncertain or substituted RNA reference.
-                    uncertain = _identity_failure_is_uncertain(pre_rb_id)
-                    tx.state = _ArmRigTransactionState.FAILED
-                    rollback_err = RuntimeError(
-                        "Armature session identity invalidated before rollback "
-                        f"(registry_session_id={session_rec.registry_session_id}): "
-                        + "; ".join(pre_rb_id["reasons"])
-                    )
-                    _record_armature_failure_isolation_by_coordinator(
-                        session_rec=session_rec,
-                        tx=tx,
-                        failure_class=(_FailedTransactionClass.FAILED_C if uncertain
-                                       else _FailedTransactionClass.FAILED_D),
-                        primary_exception=orig_exc,
-                        secondary_exception=rollback_err,
-                        evidence_status=("ARMATURE_IDENTITY_UNVERIFIED_BEFORE_ROLLBACK" if uncertain
-                                         else "ARMATURE_DESTROYED_DURING_TRANSACTION"),
-                        missing_evidence_reasons=pre_rb_id["reasons"],
-                    )
-                else:
-                    rollback_execution_completed = False
-                    try:
-                        _rollback_arm_rig_state(arm, tx.snapshot, tx)
-                        _depsgraph_update()
-                        rollback_execution_completed = True
-                        _trigger_fault_injection("during_rollback_verification", {"arm": arm, "tx": tx})
-                        _verify_arm_rig_state_restored(arm, tx.snapshot, active_tx=tx)
-                        tx.state = _ArmRigTransactionState.ROLLED_BACK
-                        session_rec.lifecycle_stage = "NORMAL_TERMINAL"
-                    except BaseException as rb_exc:
-                        tx.state = _ArmRigTransactionState.FAILED
-                        rollback_err = rb_exc
-                        post_rb_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
-                        if not post_rb_id["is_valid"]:
-                            uncertain = _identity_failure_is_uncertain(post_rb_id)
-                            f_class = (_FailedTransactionClass.FAILED_C if uncertain
-                                       else _FailedTransactionClass.FAILED_D)
-                            ev_status = ("ARMATURE_IDENTITY_UNVERIFIED_DURING_ROLLBACK" if uncertain
-                                         else "ARMATURE_DESTROYED_DURING_ROLLBACK")
-                            ev_reasons = post_rb_id["reasons"]
-                        # [INTRODUCED 2026-11-11T22:38:48+08:00]
-                        # FUNCTION: _arm_rig_transaction
-                        # PURPOSE: Propagate RECOVERY_UNCERTAIN evidence or classify FAILED-C from verified relationship state
-                        # REASON: Task 10-B fix-2, TEST-127 / TEST-149
-                        elif any(
-                            r.get("operation_state") == _RelationshipOperationState.RECOVERY_UNCERTAIN
-                            for r in getattr(tx, "prepared_relationship_mutations", [])
-                        ):
-                            f_class = _FailedTransactionClass.FAILED_C
-                            ev_status = "SNAPSHOT_AVAILABLE"
-                            ev_reasons = []
-                        elif not rollback_execution_completed:
-                            f_class = _FailedTransactionClass.FAILED_B
-                            ev_status = "SNAPSHOT_AVAILABLE"
-                            ev_reasons = []
-                        else:
-                            f_class = _FailedTransactionClass.FAILED_C
-                            ev_status = "SNAPSHOT_AVAILABLE"
-                            ev_reasons = []
-                        _record_armature_failure_isolation_by_coordinator(
-                            session_rec=session_rec,
-                            tx=tx,
-                            failure_class=f_class,
-                            primary_exception=orig_exc,
-                            secondary_exception=rb_exc,
-                            evidence_status=ev_status,
-                            missing_evidence_reasons=ev_reasons,
-                        )
-
-                if rollback_err is not None:
-                    raise RuntimeError(
-                        f"Arm rig transaction failed with {type(orig_exc).__name__}: {orig_exc}, "
-                        f"AND rollback verification failed with {type(rollback_err).__name__}: {rollback_err}"
-                    ) from orig_exc
-                else:
-                    raise
-            else:
-                # Pre-ACTIVE failure (during CREATED or SNAPSHOTTING before snapshot completion)
-                tx.state = _ArmRigTransactionState.FAILED
-                pre_active_id = _verify_armature_session_identity_record(session_rec, candidate_arm=arm)
-                if not pre_active_id["is_valid"]:
-                    uncertain = _identity_failure_is_uncertain(pre_active_id)
-                    f_class = (_FailedTransactionClass.FAILED_C if uncertain
-                               else _FailedTransactionClass.FAILED_D)
-                    _record_armature_failure_isolation_by_coordinator(
-                        session_rec=session_rec,
-                        tx=tx,
-                        failure_class=f_class,
-                        primary_exception=orig_exc,
-                        evidence_status=("RECOVERY_EVIDENCE_INSUFFICIENT" if uncertain
-                                         else "ARMATURE_DESTROYED_DURING_SNAPSHOTTING"),
-                        missing_evidence_reasons=pre_active_id["reasons"],
-                    )
-                    raise RuntimeError(
-                        f"Arm rig transaction failed during SNAPSHOTTING with {type(orig_exc).__name__}: {orig_exc}, "
-                        f"AND Armature session identity was invalidated ({f_class.value}, "
-                        f"registry_session_id={session_rec.registry_session_id})"
-                    ) from orig_exc
-
-                integrity_check = _verify_pre_write_zero_mutation_and_integrity(
-                    arm=arm,
-                    pre_fp=pre_snap_fp,
-                    tx=tx,
-                )
-                if integrity_check["is_verified"]:
-                    # FAILED-A: Pre-write abort with 100% verified zero mutation and intact structure.
-                    # Do NOT isolate the healthy Armature!
-                    _record_armature_failure_isolation_by_coordinator(
-                        session_rec=session_rec,
-                        tx=tx,
-                        failure_class=_FailedTransactionClass.FAILED_A,
-                        primary_exception=orig_exc,
-                        evidence_status="PRE_WRITE_ZERO_MUTATION_VERIFIED",
-                    )
-                    raise
-                else:
-                    # Insufficient evidence to prove zero mutation without a trusted snapshot ->
-                    # escalate and isolate as FAILED-C (Section 5.1 & Section 8.2 Case 2).
-                    _record_armature_failure_isolation_by_coordinator(
-                        session_rec=session_rec,
-                        tx=tx,
-                        failure_class=_FailedTransactionClass.FAILED_C,
-                        primary_exception=orig_exc,
-                        evidence_status="RECOVERY_EVIDENCE_INSUFFICIENT",
-                        missing_evidence_reasons=integrity_check["reasons"],
-                    )
-                    raise RuntimeError(
-                        f"Arm rig transaction failed before ACTIVE with {type(orig_exc).__name__}: {orig_exc}, "
-                        "AND pre-write zero-mutation verification failed without a trusted snapshot "
-                        f"(classified as FAILED-C, registry_session_id={session_rec.registry_session_id}): "
-                        + "; ".join(integrity_check["reasons"])
-                    ) from orig_exc
-        else:
-            raise
-    finally:
-        _layer1_release_active_arm_rig_transaction(
-            tx,
-            active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
-        )
-
-    # -----------------------------------------------------------------
-    # Phase 3: Irreversible Resource Cleanup (runs only after logical commit)
-    # -----------------------------------------------------------------
-    _layer1_dispatch_initial_post_commit_cleanup(
-        tx,
-        transaction_state_cls=_ArmRigTransactionState,
         trigger_fault_injection=_trigger_fault_injection,
+        capture_pre_snapshot_structural_fingerprint=(
+            _capture_pre_snapshot_structural_fingerprint
+        ),
+        snapshot_arm_rig_state=_snapshot_arm_rig_state,
+        depsgraph_update=_depsgraph_update,
+        rollback_arm_rig_state=_rollback_arm_rig_state,
+        verify_arm_rig_state_restored=_verify_arm_rig_state_restored,
+        verify_pre_write_zero_mutation_and_integrity=(
+            _verify_pre_write_zero_mutation_and_integrity
+        ),
         coordinator_validate_cleanup_preflight=(
             _coordinator_validate_cleanup_preflight
         ),
