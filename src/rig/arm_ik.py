@@ -54,9 +54,11 @@ from src.scene_transaction_integrity.layer1 import (
     _admit_outermost_arm_rig_transaction as _layer1_admit_outermost_arm_rig_transaction,
     _assert_arm_rig_cleanup_gate as _layer1_assert_arm_rig_cleanup_gate,
     _assert_arm_rig_failed_isolation_gate as _layer1_assert_arm_rig_failed_isolation_gate,
+    _capture_transaction_entry_fingerprint as _layer1_capture_transaction_entry_fingerprint,
     _establish_outermost_arm_rig_transaction as _layer1_establish_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
     _safe_object_name,
+    _snapshot_and_activate_transaction as _layer1_snapshot_and_activate_transaction,
 )
 from src.scene_transaction_integrity.layer2 import (
     ArmatureSessionIdentityRecord,
@@ -5967,19 +5969,22 @@ def _arm_rig_transaction(arm: bpy.types.Object):
     pre_snap_fp = None
 
     try:
-        _trigger_fault_injection("during_pre_snapshot_fingerprint", {"arm": arm, "tx": tx})
-        try:
-            pre_snap_fp = _capture_pre_snapshot_structural_fingerprint(arm)
-        except BaseException as fp_exc:
-            tx.pre_write_integrity_compromised = True
-            tx.pre_write_integrity_reasons = [f"Pre-snapshot fingerprint capture failed: {fp_exc}"]
-            raise
+        pre_snap_fp = _layer1_capture_transaction_entry_fingerprint(
+            arm,
+            tx,
+            trigger_fault_injection=_trigger_fault_injection,
+            capture_pre_snapshot_structural_fingerprint=(
+                _capture_pre_snapshot_structural_fingerprint
+            ),
+        )
 
-        tx.entry_object_ptrs = pre_snap_fp.get("all_object_ptrs") if isinstance(pre_snap_fp, dict) else None
-        tx.entry_collection_ptrs = pre_snap_fp.get("all_collection_ptrs") if isinstance(pre_snap_fp, dict) else None
-        tx.state = _ArmRigTransactionState.SNAPSHOTTING
-        tx.snapshot = _snapshot_arm_rig_state(arm)
-        tx.state = _ArmRigTransactionState.ACTIVE
+        _layer1_snapshot_and_activate_transaction(
+            arm,
+            tx,
+            pre_snap_fp,
+            transaction_state_cls=_ArmRigTransactionState,
+            snapshot_arm_rig_state=_snapshot_arm_rig_state,
+        )
 
         yield tx
 
