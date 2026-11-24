@@ -70,6 +70,9 @@ from src.scene_transaction_integrity.layer2.relationship_mutation_prepare import
 from src.scene_transaction_integrity.layer2.relationship_mutation_state_update import (
     _update_relationship_mutation_state,
 )
+from src.scene_transaction_integrity.layer2.transaction_context import (
+    _ArmRigTransactionContext,
+)
 from src.scene_transaction_integrity.layer2.transaction_context_init import (
     _initialize_arm_rig_transaction_context,
 )
@@ -81,6 +84,7 @@ __all__ = (
     "ArmatureSessionIdentityRecord",
     "_ACTIVE_TRANSACTION_STACK",
     "_ARCHIVED_FAILED_D_TOMBSTONES",
+    "_ArmRigTransactionContext",
     "_ArmRigTransactionState",
     "_ArmatureIsolationState",
     "_ArmatureLivenessStatus",

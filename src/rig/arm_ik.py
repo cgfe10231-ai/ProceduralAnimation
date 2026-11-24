@@ -77,6 +77,7 @@ from src.scene_transaction_integrity.layer2 import (
     ArmatureSessionIdentityRecord,
     _ACTIVE_TRANSACTION_STACK,
     _ARCHIVED_FAILED_D_TOMBSTONES,
+    _ArmRigTransactionContext as _Layer2ArmRigTransactionContext,
     _ArmRigTransactionState,
     _ArmatureIsolationState,
     _ArmatureLivenessStatus,
@@ -3998,7 +3999,7 @@ def _authorized_create_type_a_mesh(name: str, active_tx: Any) -> bpy.types.Mesh:
         managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
     )
 
-class _ArmRigTransactionContext:
+class _ArmRigTransactionContext(_Layer2ArmRigTransactionContext):
     """Active transaction execution state tracking."""
 
     def __init__(
@@ -4006,62 +4007,10 @@ class _ArmRigTransactionContext:
         arm: bpy.types.Object,
         session_record: Optional[ArmatureSessionIdentityRecord] = None,
     ):
-        _layer2_initialize_arm_rig_transaction_context(
-            self,
+        super().__init__(
             arm,
             session_record=session_record,
             ensure_armature_session_identity=ensure_armature_session_identity,
-        )
-
-    @property
-    def committed(self) -> bool:
-        """Backward-compatibility property reflecting logical commit status."""
-        return self.state in (_ArmRigTransactionState.COMMITTED, _ArmRigTransactionState.CLEANUP_PENDING)
-
-    def mark_pre_write_evidence_insufficient(self, reason: str) -> None:
-        """Explicitly mark pre-write recovery evidence as insufficient before snapshot completion."""
-        self.pre_write_integrity_compromised = True
-        norm = str(reason).strip() if reason is not None else "Pre-write recovery evidence insufficient"
-        if norm not in self.pre_write_integrity_reasons:
-            self.pre_write_integrity_reasons.append(norm)
-
-    def mark_rollback_only(self, reason: str) -> None:
-        """Monotonically mark this transaction context as rollback-only preserving the first failure reason."""
-        normalized_reason = str(reason).strip() if reason is not None else ""
-        if not normalized_reason:
-            normalized_reason = "Unspecified nested transaction failure"
-        if not self.rollback_only:
-            self.rollback_only = True
-            self.rollback_only_reason = normalized_reason
-        elif not self.rollback_only_reason:
-            self.rollback_only_reason = normalized_reason
-
-    def prepare_relationship_mutation(
-        self,
-        source_reference: Any,
-        target_reference: Any,
-        original_relationship_state: Dict[str, Any],
-        intended_mutation: str,
-    ) -> Dict[str, Any]:
-        """PREPARE stage: create and register a 7-state relationship operation log record before mutation."""
-        return _layer2_prepare_relationship_mutation(
-            self,
-            source_reference,
-            target_reference,
-            original_relationship_state,
-            intended_mutation,
-        )
-
-    def update_relationship_mutation_state(
-        self,
-        op_record: Dict[str, Any],
-        new_state: _RelationshipOperationState,
-    ) -> None:
-        """Transition a relationship operation record across the approved 7-state machine."""
-        return _layer2_update_relationship_mutation_state(
-            self,
-            op_record,
-            new_state,
         )
 
     def register_created_controller(
@@ -4074,8 +4023,7 @@ class _ArmRigTransactionContext:
         automatically inferred permission from a controller name or a mutable
         created_controller_objects entry alone.
         """
-        return _layer2_register_created_controller(
-            self,
+        return super().register_created_controller(
             obj,
             find_live_object_by_identity=(
                 _find_live_object_by_identity
@@ -4085,36 +4033,16 @@ class _ArmRigTransactionContext:
             ),
         )
 
-
-    # [INTRODUCED 2026-11-16T17:18:48+08:00]
-    # FUNCTION: _ArmRigTransactionContext.register_created_constraint
-    # PURPOSE: Enforce receipt verification and active transaction ownership before registering created constraints
-    # REASON: Task 10-B fix-4, prevent unauthorized direct registration without independent creation receipt
     def register_created_constraint(
         self,
         pbone: bpy.types.PoseBone,
         con: bpy.types.Constraint,
     ) -> None:
         """Register a constraint created by this transaction for identity-based ownership."""
-        return _layer2_register_created_constraint(
-            self,
+        return super().register_created_constraint(
             pbone,
             con,
-            active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
-            transaction_state_cls=_ArmRigTransactionState,
             ensure_armature_session_identity=ensure_armature_session_identity,
-        )
-
-    def register_created_collection_link(
-        self,
-        col: bpy.types.Collection,
-        obj: bpy.types.Object,
-    ) -> None:
-        """Register an object-to-collection link mutation created by this transaction."""
-        return _layer2_register_created_collection_link(
-            self,
-            col,
-            obj,
         )
 
     def register_created_collection(
@@ -4123,8 +4051,7 @@ class _ArmRigTransactionContext:
         initial_parent: Optional[bpy.types.Collection] = None,
     ) -> None:
         """Attest a newly created, not-yet-linked Collection and intended parent."""
-        return _layer2_register_created_collection(
-            self,
+        return super().register_created_collection(
             col,
             initial_parent=initial_parent,
             find_live_collection_by_identity=(
@@ -4134,9 +4061,8 @@ class _ArmRigTransactionContext:
 
     def retry_cleanup(self) -> _CleanupResult:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
-        return _layer6_execute_stashed_cleanup_pass(
-            self,
-            transaction_state_cls=_ArmRigTransactionState,
+        return super().retry_cleanup(
+            execute_stashed_cleanup_pass=_layer6_execute_stashed_cleanup_pass,
             authorized_remove_constraint=_authorized_remove_constraint,
             cleanup_stashed_constraints=_layer6_cleanup_stashed_constraints,
             cleanup_stashed_object=_layer6_cleanup_stashed_object,
@@ -4145,17 +4071,8 @@ class _ArmRigTransactionContext:
                 _layer3_remove_stashed_object_and_verify
             ),
             find_stashed_datablock=_layer3_find_stashed_datablock,
-            find_datablock_cleanup_authorization=(
-                _layer2_find_datablock_cleanup_authorization
-            ),
             remove_authorized_stashed_datablock=(
                 _layer3_remove_authorized_stashed_datablock
-            ),
-            record_preserved_datablock_cleanup=(
-                _layer2_record_preserved_datablock_cleanup
-            ),
-            record_deleted_datablock_cleanup=(
-                _layer2_record_deleted_datablock_cleanup
             ),
             build_cleanup_result=_layer6_build_cleanup_result,
             cleanup_outcome_cls=_CleanupOutcome,
