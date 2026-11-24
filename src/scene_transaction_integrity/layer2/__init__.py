@@ -54,6 +54,11 @@ from src.scene_transaction_integrity.layer2.datablock_cleanup_records import (
     _record_deleted_datablock_cleanup,
     _record_preserved_datablock_cleanup,
 )
+from src.scene_transaction_integrity.layer2.datablock_creation_receipts import (
+    _register_type_a_datablock_authorization,
+    _register_type_a_datablock_receipt,
+    _revoke_type_a_datablock_creation_records,
+)
 from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
     _PENDING_ARM_RIG_CLEANUPS,
     _register_pending_arm_rig_cleanup,
@@ -100,6 +105,9 @@ __all__ = (
     "_register_created_constraint",
     "_register_created_controller",
     "_register_pending_arm_rig_cleanup",
+    "_register_type_a_datablock_authorization",
+    "_register_type_a_datablock_receipt",
+    "_revoke_type_a_datablock_creation_records",
     "_safe_object_pointer",
     "_update_relationship_mutation_state",
     "_verify_armature_session_identity_record",

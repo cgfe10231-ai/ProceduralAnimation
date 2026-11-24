@@ -18,6 +18,9 @@ from src.scene_transaction_integrity.layer3.collection_queries import (
 from src.scene_transaction_integrity.layer3.constraint_creation import (
     _authorized_create_constraint,
 )
+from src.scene_transaction_integrity.layer3.constraint_removal import (
+    _authorized_remove_constraint,
+)
 from src.scene_transaction_integrity.layer3.constraint_target_assignment import (
     _authorized_assign_constraint_targets,
 )
@@ -37,6 +40,9 @@ from src.scene_transaction_integrity.layer3.controller_ownership import (
     _require_existing_arm_ik_controller_ownership,
     _verify_controller_object_transaction_authority,
     _verify_transaction_wrong_type_object_ownership,
+)
+from src.scene_transaction_integrity.layer3.datablock_creation import (
+    _authorized_create_type_a_mesh,
 )
 from src.scene_transaction_integrity.layer3.datablock_removal import (
     _find_stashed_datablock,
@@ -65,8 +71,10 @@ __all__ = (
     "_authorized_assign_constraint_targets",
     "_authorized_assign_object_parent",
     "_authorized_create_constraint",
+    "_authorized_create_type_a_mesh",
     "_authorized_link_child_collection",
     "_authorized_link_object_to_collection",
+    "_authorized_remove_constraint",
     "_classify_constraint_target_pair_effect",
     "_controller_constraint_binding_proven",
     "_controller_is_borrowed_by_other_armature",
