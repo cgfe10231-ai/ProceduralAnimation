@@ -94,6 +94,7 @@ from src.scene_transaction_integrity.layer2 import (
     _find_datablock_cleanup_authorization as _layer2_find_datablock_cleanup_authorization,
     _initialize_arm_rig_transaction_context as _layer2_initialize_arm_rig_transaction_context,
     _prepare_relationship_mutation as _layer2_prepare_relationship_mutation,
+    _record_armature_failure_isolation_by_coordinator as _layer2_record_armature_failure_isolation_by_coordinator,
     _record_deleted_datablock_cleanup as _layer2_record_deleted_datablock_cleanup,
     _record_failed_a_audit,
     _record_preserved_datablock_cleanup as _layer2_record_preserved_datablock_cleanup,
@@ -286,112 +287,22 @@ def _record_armature_failure_isolation_by_coordinator(
     missing_evidence_reasons: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Layer 2: Record FAILED-B / FAILED-C / FAILED-D isolation or tombstone under Layer 1 Coordinator authority."""
-    f_class = (
-        failure_class
-        if isinstance(failure_class, _FailedTransactionClass)
-        else _FailedTransactionClass(failure_class)
+    return _layer2_record_armature_failure_isolation_by_coordinator(
+        session_rec=session_rec,
+        tx=tx,
+        failure_class=failure_class,
+        primary_exception=primary_exception,
+        secondary_exception=secondary_exception,
+        evidence_status=evidence_status,
+        missing_evidence_reasons=missing_evidence_reasons,
+        failed_transaction_class_cls=_FailedTransactionClass,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        armature_liveness_status_cls=_ArmatureLivenessStatus,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        record_failed_a_audit=_record_failed_a_audit,
+        check_original_object_liveness=_check_original_object_liveness,
     )
-    tx.failure_class = f_class.value
-
-    if f_class == _FailedTransactionClass.FAILED_A:
-        return _record_failed_a_audit(
-            session_rec=session_rec,
-            tx_id=tx.tx_id,
-            f_class=f_class,
-            primary_exception=primary_exception,
-        )
-
-    if f_class == _FailedTransactionClass.FAILED_B:
-        iso_state = _ArmatureIsolationState.ISOLATED_FAILED_B
-    elif f_class == _FailedTransactionClass.FAILED_C:
-        iso_state = _ArmatureIsolationState.ISOLATED_FAILED_C
-    elif f_class == _FailedTransactionClass.FAILED_D:
-        iso_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
-    else:
-        raise RuntimeError(f"Unsupported failure class for isolation: {f_class}")
-
-    session_rec.isolation_state = iso_state
-    if f_class == _FailedTransactionClass.FAILED_D:
-        session_rec.liveness_status = _ArmatureLivenessStatus.INVALIDATED_DEAD
-        obj_liveness = _check_original_object_liveness(session_rec)
-        if obj_liveness["status"] == "ALIVE":
-            session_rec.in_live_blender_collection = True
-        elif obj_liveness["status"] == "ABSENT":
-            session_rec.in_live_blender_collection = False
-        session_rec.lifecycle_stage = "TOMBSTONED_FAILED_D"
-
-    snapshot_trusted = bool(
-        tx.snapshot is not None
-        and f_class in (_FailedTransactionClass.FAILED_B, _FailedTransactionClass.FAILED_C)
-        and evidence_status != "RECOVERY_EVIDENCE_INSUFFICIENT"
-    )
-
-    uncertain_ops = [
-        {
-            "operation_id": r.get("operation_id"),
-            "intended_mutation": r.get("intended_mutation"),
-            "operation_state": (
-                r.get("operation_state").value
-                if isinstance(r.get("operation_state"), Enum)
-                else str(r.get("operation_state"))
-            ),
-        }
-        for r in getattr(tx, "prepared_relationship_mutations", [])
-        if r.get("operation_state") == _RelationshipOperationState.RECOVERY_UNCERTAIN
-    ]
-
-    tombstone_rec: Optional[Dict[str, Any]] = None
-    if f_class == _FailedTransactionClass.FAILED_D:
-        tombstone_rec = {
-            "registry_session_id": session_rec.registry_session_id,
-            "transaction_id": tx.tx_id,
-            "registration_pointer": session_rec.registration_pointer,
-            "original_data_pointer": session_rec.original_data_pointer,
-            "registered_name_snapshot": session_rec.registered_name_snapshot,
-            "failure_class": f_class.value,
-            "isolation_state": iso_state.value,
-            "retirement_state": "ACTIVE_TOMBSTONE",
-            "created_controller_objects": list(getattr(tx, "created_controller_objects", [])),
-            "created_collections": list(getattr(tx, "created_collections", [])),
-            "primary_exception": f"{type(primary_exception).__name__}: {primary_exception}" if primary_exception else None,
-            "secondary_exception": f"{type(secondary_exception).__name__}: {secondary_exception}" if secondary_exception else None,
-        }
-        session_rec.tombstone_record = tombstone_rec
-
-    iso_record: Dict[str, Any] = {
-        "registry_session_id": session_rec.registry_session_id,
-        "transaction_id": tx.tx_id,
-        "failure_class": f_class.value,
-        "isolation_state": iso_state.value,
-        "liveness_status": session_rec.liveness_status.value,
-        "registration_pointer": session_rec.registration_pointer,
-        "original_data_pointer": session_rec.original_data_pointer,
-        "registered_name_snapshot": session_rec.registered_name_snapshot,
-        "primary_exception": (
-            f"{type(primary_exception).__name__}: {primary_exception}"
-            if primary_exception is not None
-            else None
-        ),
-        "secondary_exception": (
-            f"{type(secondary_exception).__name__}: {secondary_exception}"
-            if secondary_exception is not None
-            else None
-        ),
-        "snapshot_reference": tx.snapshot if snapshot_trusted else None,
-        "snapshot_trusted": snapshot_trusted,
-        "evidence_status": evidence_status,
-        "missing_evidence_reasons": list(missing_evidence_reasons or []),
-        "transaction_context": tx,
-        "created_controller_objects": list(getattr(tx, "created_controller_objects", [])),
-        "created_constraints": list(getattr(tx, "created_constraints", [])),
-        "created_collections": list(getattr(tx, "created_collections", [])),
-        "prepared_relationship_mutations": list(getattr(tx, "prepared_relationship_mutations", [])),
-        "recovery_uncertain_operations": uncertain_ops,
-        "tombstone_record": tombstone_rec,
-    }
-    _ISOLATED_FAILED_ARMATURES[session_rec.registry_session_id] = iso_record
-    tx.isolation_record = iso_record
-    return iso_record
 
 
 _COORDINATOR_AUTHORIZATION_GRANTS: Dict[str, Dict[str, Any]] = {}

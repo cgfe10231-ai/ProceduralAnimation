@@ -30,6 +30,7 @@ from src.scene_transaction_integrity.layer2.tombstone_registry import (
 from src.scene_transaction_integrity.layer2.session_registries import (
     _ISOLATED_FAILED_ARMATURES,
     _MANAGED_ARMATURE_IDENTITIES,
+    _record_armature_failure_isolation_by_coordinator,
 )
 from src.scene_transaction_integrity.layer2.session_verification import (
     _verify_armature_session_identity_record,
@@ -101,6 +102,7 @@ __all__ = (
     "_find_datablock_cleanup_authorization",
     "_initialize_arm_rig_transaction_context",
     "_prepare_relationship_mutation",
+    "_record_armature_failure_isolation_by_coordinator",
     "_record_deleted_datablock_cleanup",
     "_record_failed_a_audit",
     "_record_preserved_datablock_cleanup",
