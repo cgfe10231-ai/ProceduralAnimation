@@ -7,8 +7,14 @@ from src.scene_transaction_integrity.layer3.collection_child_link import (
     _authorized_link_child_collection,
     _require_collection_child_relationship_ownership,
 )
+from src.scene_transaction_integrity.layer3.collection_child_unlink import (
+    _authorized_unlink_child_collection,
+)
 from src.scene_transaction_integrity.layer3.collection_object_link import (
     _authorized_link_object_to_collection,
+)
+from src.scene_transaction_integrity.layer3.collection_object_unlink import (
+    _authorized_unlink_object_from_collection,
 )
 from src.scene_transaction_integrity.layer3.collection_queries import (
     _find_collection_by_name,
@@ -80,6 +86,8 @@ __all__ = (
     "_authorized_link_child_collection",
     "_authorized_link_object_to_collection",
     "_authorized_remove_constraint",
+    "_authorized_unlink_child_collection",
+    "_authorized_unlink_object_from_collection",
     "_classify_constraint_target_pair_effect",
     "_cleanup_failed_character_collection_registration",
     "_cleanup_failed_constraint_creation",

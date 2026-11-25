@@ -129,6 +129,8 @@ from src.scene_transaction_integrity.layer3 import (
     _authorized_link_child_collection as _layer3_authorized_link_child_collection,
     _authorized_link_object_to_collection as _layer3_authorized_link_object_to_collection,
     _authorized_remove_constraint as _layer3_authorized_remove_constraint,
+    _authorized_unlink_child_collection as _layer3_authorized_unlink_child_collection,
+    _authorized_unlink_object_from_collection as _layer3_authorized_unlink_object_from_collection,
     _classify_constraint_target_pair_effect as _layer3_classify_constraint_target_pair_effect,
     _cleanup_failed_character_collection_registration as _layer3_cleanup_failed_character_collection_registration,
     _cleanup_failed_constraint_creation as _layer3_cleanup_failed_constraint_creation,
@@ -540,122 +542,18 @@ def _authorized_unlink_object_from_collection(
     category: str = "TX_UNLINKED_ORIGINAL",
 ) -> Optional[Dict[str, Any]]:
     """Layer 3 authorized Collection <-> Object unlink executing 3-step PREPARE -> APPLY -> CONFIRM protocol."""
-    global _ACTIVE_TRANSACTION_STACK
-    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
-        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
-
-    if active_tx is None:
-        obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
-        if _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
-            collection.objects.unlink(obj)
-        return None
-
-    col_ptr = collection.as_pointer() if hasattr(collection, "as_pointer") else None
-    obj_ptr = obj.as_pointer() if hasattr(obj, "as_pointer") else None
-    obj_name = getattr(obj, "name", "<unknown>")
-
-    # 1. PREPARE
-    already_linked = _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr)
-    op_record = active_tx.prepare_relationship_mutation(
-        source_reference=collection,
-        target_reference=obj,
-        original_relationship_state={
-            "linked": already_linked,
-            "category": category,
-            "col_ptr": col_ptr,
-            "obj_ptr": obj_ptr,
-        },
-        intended_mutation="COLLECTION_OBJECT_UNLINK",
+    return _layer3_authorized_unlink_object_from_collection(
+        collection,
+        obj,
+        active_tx=active_tx,
+        category=category,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        is_object_linked_to_collection_by_identity=_is_object_linked_to_collection_by_identity,
+        find_live_collection_by_identity=_find_live_collection_by_identity,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        trigger_fault_injection=_trigger_fault_injection,
     )
-
-    _trigger_fault_injection(
-        "relationship_unlink_after_prepare",
-        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-    )
-
-    if not already_linked:
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.NO_EFFECT,
-        )
-        return op_record
-
-    # 2. APPLY
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLYING,
-    )
-    try:
-        _trigger_fault_injection(
-            "relationship_unlink_during_apply_before_c_api",
-            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-        )
-        live_col = _find_live_collection_by_identity(collection, col_ptr)
-        live_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
-        if live_col is None or live_obj is None:
-            raise RuntimeError("Target object or collection identity invalid during unlink apply")
-
-        live_col.objects.unlink(live_obj)
-
-        _trigger_fault_injection(
-            "relationship_unlink_during_apply_after_c_api",
-            {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-        )
-    except BaseException:
-        check_col = _find_live_collection_by_identity(collection, col_ptr)
-        check_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
-        if check_col is None or check_obj is None:
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.RECOVERY_UNCERTAIN,
-            )
-        elif not _is_object_linked_to_collection_by_identity(check_col, check_obj, obj_ptr):
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.APPLIED_VERIFIED,
-            )
-        else:
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.NO_EFFECT,
-            )
-        raise
-
-    if _is_object_linked_to_collection_by_identity(collection, obj, obj_ptr):
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.RECOVERY_UNCERTAIN,
-        )
-        raise RuntimeError(f"Collection unlink apply did not take effect in RNA for '{obj_name}'")
-
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLIED_VERIFIED,
-    )
-
-    # 3. CONFIRM
-    _trigger_fault_injection(
-        "relationship_unlink_before_confirm",
-        {"op": op_record, "collection": collection, "obj": obj, "name": obj_name, "tx": active_tx},
-    )
-    confirm_col = _find_live_collection_by_identity(collection, col_ptr)
-    confirm_obj = _find_live_object_by_identity(obj, obj_ptr) if obj_ptr is not None else None
-    if (
-        confirm_col is None
-        or confirm_obj is None
-        or _is_object_linked_to_collection_by_identity(confirm_col, confirm_obj, obj_ptr)
-    ):
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.RECOVERY_UNCERTAIN,
-        )
-        raise RuntimeError(f"Collection unlink verification failed at CONFIRM stage for '{obj_name}'")
-
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.CONFIRMED,
-    )
-    return op_record
 
 
 def _controller_role_for_name(name: str) -> tuple[str, str] | None:
@@ -819,118 +717,19 @@ def _authorized_unlink_child_collection(
     category: str = "TX_UNLINKED_ORIGINAL",
 ) -> Optional[Dict[str, Any]]:
     """Layer 3 authorized Collection child unlinking executing 3-step PREPARE -> APPLY -> CONFIRM protocol."""
-    global _ACTIVE_TRANSACTION_STACK
-    if active_tx is None and _ACTIVE_TRANSACTION_STACK:
-        active_tx = _ACTIVE_TRANSACTION_STACK[-1]
-
-    if active_tx is None or active_tx.state != _ArmRigTransactionState.ACTIVE:
-        raise RuntimeError("Collection child unlink requires an active transaction in ACTIVE state")
-
-    p_ptr = parent_collection.as_pointer() if hasattr(parent_collection, "as_pointer") else None
-    c_ptr = child_collection.as_pointer() if hasattr(child_collection, "as_pointer") else None
-
-    live_parent = _find_live_collection_by_identity(parent_collection, p_ptr)
-    live_child = _find_live_collection_by_identity(child_collection, c_ptr)
-    if live_parent is None or live_child is None:
-        raise RuntimeError("Parent or child collection identity invalid during child unlink")
-
-    already_linked = _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr)
-    child_name = getattr(child_collection, "name", "<unknown>")
-    if already_linked:
-        _require_collection_child_relationship_ownership(
-            parent_collection, child_collection, active_tx, unlink=True,
-        )
-
-    # 1. PREPARE
-    op_record = active_tx.prepare_relationship_mutation(
-        source_reference=parent_collection,
-        target_reference=child_collection,
-        original_relationship_state={
-            "linked": already_linked,
-            "category": category,
-            "parent_col_ref": parent_collection,
-            "parent_col_ptr": p_ptr,
-            "parent_col_name": parent_collection.name,
-            "child_col_ref": child_collection,
-            "child_col_ptr": c_ptr,
-            "child_col_name": child_name,
-        },
-        intended_mutation="COLLECTION_CHILD_UNLINK",
+    return _layer3_authorized_unlink_child_collection(
+        parent_collection,
+        child_collection,
+        active_tx=active_tx,
+        category=category,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        transaction_state_cls=_ArmRigTransactionState,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        find_live_collection_by_identity=_find_live_collection_by_identity,
+        is_child_collection_linked_by_identity=_is_child_collection_linked_by_identity,
+        require_collection_child_relationship_ownership=_require_collection_child_relationship_ownership,
+        trigger_fault_injection=_trigger_fault_injection,
     )
-    op_record["parent_col_ref"] = parent_collection
-    op_record["parent_col_ptr"] = p_ptr
-    op_record["parent_col_name"] = parent_collection.name
-    op_record["child_col_ref"] = child_collection
-    op_record["child_col_ptr"] = c_ptr
-    op_record["child_col_name"] = child_name
-    op_record["category"] = category
-
-    _trigger_fault_injection(
-        "collection_child_unlink_after_prepare",
-        {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
-    )
-
-    if not already_linked:
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.NO_EFFECT,
-        )
-        return op_record
-
-    # 2. APPLY
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLYING,
-    )
-
-    try:
-        _trigger_fault_injection(
-            "collection_child_unlink_during_apply_before_c_api",
-            {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
-        )
-
-        parent_collection.children.unlink(child_collection)
-
-        _trigger_fault_injection(
-            "collection_child_unlink_during_apply_after_c_api",
-            {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
-        )
-    except BaseException:
-        if not _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr):
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.APPLIED_VERIFIED,
-            )
-        else:
-            active_tx.update_relationship_mutation_state(
-                op_record,
-                _RelationshipOperationState.NO_EFFECT,
-            )
-        raise
-
-    if _is_child_collection_linked_by_identity(parent_collection, child_collection, c_ptr):
-        active_tx.update_relationship_mutation_state(
-            op_record,
-            _RelationshipOperationState.RECOVERY_UNCERTAIN,
-        )
-        raise RuntimeError(f"Collection child unlink did not take effect in RNA for '{child_name}'")
-
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.APPLIED_VERIFIED,
-    )
-
-    # 3. CONFIRM
-    _trigger_fault_injection(
-        "collection_child_unlink_before_confirm",
-        {"op": op_record, "parent": parent_collection, "child": child_collection, "tx": active_tx},
-    )
-
-    active_tx.update_relationship_mutation_state(
-        op_record,
-        _RelationshipOperationState.CONFIRMED,
-    )
-    return op_record
 
 
 def _authorized_restore_relationship(
