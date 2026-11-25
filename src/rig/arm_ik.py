@@ -51,6 +51,8 @@ from src.rig.transform_utils import (
     world_to_local_rotation_quaternion,
 )
 from src.scene_transaction_integrity.layer1 import (
+    _COORDINATOR_AUTHORIZATION_GRANTS,
+    _COORDINATOR_GRANT_TTL_SECONDS,
     _admit_outermost_arm_rig_transaction as _layer1_admit_outermost_arm_rig_transaction,
     _arm_rig_transaction as _layer1_arm_rig_transaction,
     _assert_admission_identity_valid as _layer1_assert_admission_identity_valid,
@@ -325,14 +327,6 @@ def _record_armature_failure_isolation_by_coordinator(
         record_failed_a_audit=_record_failed_a_audit,
         check_original_object_liveness=_check_original_object_liveness,
     )
-
-
-_COORDINATOR_AUTHORIZATION_GRANTS: Dict[str, Dict[str, Any]] = {}
-
-# Coordinator grants are process-local, ephemeral capabilities, not long-lived
-# isolation records. Expiration is evaluated lazily at issuance/consumption;
-# expired or superseded capabilities can never be used to clear isolation.
-_COORDINATOR_GRANT_TTL_SECONDS: float = 60.0
 
 
 def _coordinator_reap_stale_authorization_grants() -> None:

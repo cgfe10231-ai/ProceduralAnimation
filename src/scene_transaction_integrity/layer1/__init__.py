@@ -9,6 +9,10 @@ from src.scene_transaction_integrity.layer1.authorization_grants import (
     _coordinator_revoke_session_authorization_grants,
     _issue_coordinator_authorization_grant,
 )
+from src.scene_transaction_integrity.layer1.authorization_registry import (
+    _COORDINATOR_AUTHORIZATION_GRANTS,
+    _COORDINATOR_GRANT_TTL_SECONDS,
+)
 from src.scene_transaction_integrity.layer1.cleanup_validation import (
     _coordinator_validate_cleanup_preflight,
     _coordinator_validate_cleanup_result_contract,
@@ -50,6 +54,8 @@ from src.scene_transaction_integrity.layer1.transaction_establishment import (
 )
 
 __all__ = (
+    "_COORDINATOR_AUTHORIZATION_GRANTS",
+    "_COORDINATOR_GRANT_TTL_SECONDS",
     "_admit_outermost_arm_rig_transaction",
     "_arm_rig_transaction",
     "_assert_admission_identity_valid",
