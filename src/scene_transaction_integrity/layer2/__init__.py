@@ -24,6 +24,9 @@ from src.scene_transaction_integrity.layer2.audit_registries import (
     _append_deisolation_audit,
     _record_failed_a_audit,
 )
+from src.scene_transaction_integrity.layer2.isolation_transition import (
+    _clear_or_retire_failure_isolation_by_coordinator,
+)
 from src.scene_transaction_integrity.layer2.tombstone_registry import (
     _ARCHIVED_FAILED_D_TOMBSTONES,
 )
@@ -99,6 +102,7 @@ __all__ = (
     "_RelationshipOperationState",
     "_append_deisolation_audit",
     "_check_original_object_liveness",
+    "_clear_or_retire_failure_isolation_by_coordinator",
     "_find_datablock_cleanup_authorization",
     "_initialize_arm_rig_transaction_context",
     "_prepare_relationship_mutation",

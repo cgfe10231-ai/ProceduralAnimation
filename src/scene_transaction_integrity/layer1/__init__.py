@@ -3,6 +3,12 @@ from src.scene_transaction_integrity.layer1.admission_helpers import (
     _identity_failure_is_uncertain,
     _safe_object_name,
 )
+from src.scene_transaction_integrity.layer1.authorization_grants import (
+    _clear_coordinator_authorization_grants,
+    _coordinator_reap_stale_authorization_grants,
+    _coordinator_revoke_session_authorization_grants,
+    _issue_coordinator_authorization_grant,
+)
 from src.scene_transaction_integrity.layer1.cleanup_validation import (
     _coordinator_validate_cleanup_preflight,
     _coordinator_validate_cleanup_result_contract,
@@ -52,15 +58,19 @@ __all__ = (
     "_assert_existing_session_admission",
     "_assert_nested_transaction_admission",
     "_capture_transaction_entry_fingerprint",
+    "_clear_coordinator_authorization_grants",
     "_commit_arm_rig_transaction",
     "_confirm_cleanup_success",
     "_coordinator_apply_cleanup_result",
     "_coordinator_preserve_cleanup_pending",
+    "_coordinator_reap_stale_authorization_grants",
+    "_coordinator_revoke_session_authorization_grants",
     "_coordinator_validate_cleanup_preflight",
     "_coordinator_validate_cleanup_result_contract",
     "_dispatch_initial_post_commit_cleanup",
     "_establish_outermost_arm_rig_transaction",
     "_identity_failure_is_uncertain",
+    "_issue_coordinator_authorization_grant",
     "_release_active_arm_rig_transaction",
     "_safe_object_name",
     "_snapshot_and_activate_transaction",

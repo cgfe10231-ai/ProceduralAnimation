@@ -58,15 +58,19 @@ from src.scene_transaction_integrity.layer1 import (
     _assert_arm_rig_failed_isolation_gate as _layer1_assert_arm_rig_failed_isolation_gate,
     _assert_nested_transaction_admission as _layer1_assert_nested_transaction_admission,
     _capture_transaction_entry_fingerprint as _layer1_capture_transaction_entry_fingerprint,
+    _clear_coordinator_authorization_grants as _layer1_clear_coordinator_authorization_grants,
     _commit_arm_rig_transaction as _layer1_commit_arm_rig_transaction,
     _confirm_cleanup_success as _layer1_confirm_cleanup_success,
     _coordinator_apply_cleanup_result as _layer1_coordinator_apply_cleanup_result,
     _coordinator_preserve_cleanup_pending as _layer1_coordinator_preserve_cleanup_pending,
+    _coordinator_reap_stale_authorization_grants as _layer1_coordinator_reap_stale_authorization_grants,
+    _coordinator_revoke_session_authorization_grants as _layer1_coordinator_revoke_session_authorization_grants,
     _coordinator_validate_cleanup_preflight as _layer1_coordinator_validate_cleanup_preflight,
     _coordinator_validate_cleanup_result_contract as _layer1_coordinator_validate_cleanup_result_contract,
     _dispatch_initial_post_commit_cleanup as _layer1_dispatch_initial_post_commit_cleanup,
     _establish_outermost_arm_rig_transaction as _layer1_establish_outermost_arm_rig_transaction,
     _identity_failure_is_uncertain,
+    _issue_coordinator_authorization_grant as _layer1_issue_coordinator_authorization_grant,
     _release_active_arm_rig_transaction as _layer1_release_active_arm_rig_transaction,
     _safe_object_name,
     _snapshot_and_activate_transaction as _layer1_snapshot_and_activate_transaction,
@@ -93,6 +97,7 @@ from src.scene_transaction_integrity.layer2 import (
     _RelationshipOperationState,
     _append_deisolation_audit,
     _check_original_object_liveness as _layer2_check_original_object_liveness,
+    _clear_or_retire_failure_isolation_by_coordinator as _layer2_clear_or_retire_failure_isolation_by_coordinator,
     _find_datablock_cleanup_authorization as _layer2_find_datablock_cleanup_authorization,
     _initialize_arm_rig_transaction_context as _layer2_initialize_arm_rig_transaction_context,
     _prepare_relationship_mutation as _layer2_prepare_relationship_mutation,
@@ -322,48 +327,20 @@ _COORDINATOR_GRANT_TTL_SECONDS: float = 60.0
 
 def _coordinator_reap_stale_authorization_grants() -> None:
     """Revoke expired, malformed, or provenance-stale grants without touching FAILED isolation."""
-    now = time.monotonic()
-    for grant_id, grant in tuple(_COORDINATOR_AUTHORIZATION_GRANTS.items()):
-        if not isinstance(grant, dict):
-            _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
-            continue
-        issued = grant.get("issued_monotonic")
-        expires = grant.get("expires_monotonic")
-        session_id = grant.get("registry_session_id")
-        session = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
-        isolation = _ISOLATED_FAILED_ARMATURES.get(session_id)
-        invalid_time = (
-            type(issued) not in (float, int)
-            or type(expires) not in (float, int)
-            or not (math.isfinite(issued) and math.isfinite(expires))
-            or issued > now or expires <= now
-            or expires <= issued
-            or expires - issued > _COORDINATOR_GRANT_TTL_SECONDS + 1e-6
-        )
-        stale_binding = (
-            session is None or isolation is None
-            or session.registry_session_id != session_id
-            or isolation.get("registry_session_id") != session_id
-            or isolation.get("transaction_id") != grant.get("transaction_id")
-            or isolation.get("failure_class") != grant.get("failure_class")
-            or session.isolation_state.value != grant.get("current_isolation_state")
-            or isolation.get("isolation_state") != grant.get("current_isolation_state")
-        )
-        if (
-            invalid_time or stale_binding or grant.get("consumed") is not False
-            or grant.get("grant_id") != grant_id
-            or not isinstance(grant.get("capability_nonce"), str)
-            or not grant.get("capability_nonce")
-        ):
-            _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
+    _layer1_coordinator_reap_stale_authorization_grants(
+        coordinator_authorization_grants=_COORDINATOR_AUTHORIZATION_GRANTS,
+        coordinator_grant_ttl_seconds=_COORDINATOR_GRANT_TTL_SECONDS,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+    )
 
 
 def _coordinator_revoke_session_authorization_grants(session_id: str) -> None:
     """Invalidate all older grants for a session after a new issue or successful transition."""
-    for grant_id, grant in tuple(_COORDINATOR_AUTHORIZATION_GRANTS.items()):
-        if isinstance(grant, dict) and grant.get("registry_session_id") == session_id:
-            _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
-
+    _layer1_coordinator_revoke_session_authorization_grants(
+        session_id,
+        coordinator_authorization_grants=_COORDINATOR_AUTHORIZATION_GRANTS,
+    )
 
 
 def _issue_coordinator_authorization_grant(
@@ -372,101 +349,28 @@ def _issue_coordinator_authorization_grant(
     arm: Optional[bpy.types.Object] = None,
     **kwargs: Any,
 ) -> Dict[str, Any]:
-    """Layer 1 Coordinator: Issue a single-use internal authorization grant binding verified Layer 5 recovery evidence.
-
-    Execution order:
-    1. Read current session from _MANAGED_ARMATURE_IDENTITIES.
-    2. Read current isolation record from _ISOLATED_FAILED_ARMATURES.
-    3. Confirm both point to the same session.
-    4. Check requested transition_action in ("CLEAR_TO_NONE", "ARCHIVE_TOMBSTONE").
-    5. Call Layer 5 to execute real-time verification (verify_armature_deisolation_evidence or _verify_dead_armature_tombstone_retirement_evidence).
-    6. Verify that verification evidence matches registry fields strictly.
-    7. Generate single-use grant binding grant_id, session, tx_id, failure_class, isolation_state, action.
-    8. Register grant in _COORDINATOR_AUTHORIZATION_GRANTS.
-    9. Return grant.
-    """
-    session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
-    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
-    if session_rec is None:
-        raise RuntimeError(f"Cannot issue Coordinator authorization grant: session '{session_id}' not found in _MANAGED_ARMATURE_IDENTITIES")
-    if iso_rec is None:
-        raise RuntimeError(f"Cannot issue Coordinator authorization grant: session '{session_id}' not found in _ISOLATED_FAILED_ARMATURES")
-
-    if session_rec.registry_session_id != session_id or iso_rec.get("registry_session_id") != session_id:
-        raise RuntimeError(f"Cannot issue Coordinator authorization grant: registry session ID mismatch for '{session_id}'")
-
-    if transition_action not in ("CLEAR_TO_NONE", "ARCHIVE_TOMBSTONE"):
-        raise RuntimeError(f"Cannot issue Coordinator authorization grant: unsupported transition action {transition_action!r}")
-
-    tx_id = iso_rec.get("transaction_id")
-    failure_class = iso_rec.get("failure_class")
-    current_iso_state = session_rec.isolation_state.value
-
-    if transition_action == "CLEAR_TO_NONE":
-        target_arm = arm if arm is not None else session_rec.original_blender_ref
-        evidence = verify_armature_deisolation_evidence(arm=target_arm, session_id=session_id)
-
-        if not evidence.get("can_deisolate", False) or evidence.get("status") != "RECOVERY_VERIFIED":
-            err_reasons = "; ".join(evidence.get("reasons", [])) or f"status is {evidence.get('status')}"
-            raise RuntimeError(f"Cannot issue Coordinator authorization grant: recovery verification failed: {err_reasons}")
-
-        if evidence.get("registry_session_id") != session_id:
-            raise RuntimeError("Cannot issue Coordinator authorization grant: evidence registry_session_id mismatch")
-        if evidence.get("transaction_id") != tx_id:
-            raise RuntimeError("Cannot issue Coordinator authorization grant: evidence transaction_id mismatch")
-        if evidence.get("failure_class") != failure_class:
-            raise RuntimeError("Cannot issue Coordinator authorization grant: evidence failure_class mismatch")
-        if evidence.get("isolation_state") != current_iso_state:
-            raise RuntimeError("Cannot issue Coordinator authorization grant: evidence isolation_state mismatch")
-
-        evidence_status = evidence.get("status", "RECOVERY_VERIFIED")
-
-    elif transition_action == "ARCHIVE_TOMBSTONE":
-        evidence = _verify_dead_armature_tombstone_retirement_evidence(session_id=session_id)
-
-        if not evidence.get("can_retire", False) or evidence.get("status") != "TOMBSTONE_RETIREMENT_VERIFIED":
-            err_reasons = "; ".join(evidence.get("reasons", [])) or f"status is {evidence.get('status')}"
-            raise RuntimeError(f"Cannot issue Coordinator authorization grant: tombstone retirement verification failed: {err_reasons}")
-
-        if failure_class != _FailedTransactionClass.FAILED_D.value or current_iso_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D.value:
-            raise RuntimeError(f"Cannot issue Coordinator authorization grant: session '{session_id}' is not an active FAILED-D tombstone")
-
-        if evidence.get("registry_session_id") != session_id:
-            raise RuntimeError("Cannot issue Coordinator authorization grant: evidence registry_session_id mismatch")
-        if evidence.get("transaction_id") != tx_id:
-            raise RuntimeError("Cannot issue Coordinator authorization grant: evidence transaction_id mismatch")
-
-        evidence_status = evidence.get("status", "TOMBSTONE_RETIREMENT_VERIFIED")
-
-    # Only the latest verified capability for a session remains active.
-    # This does not clear any FAILED isolation or modify Blender resources.
-    _coordinator_reap_stale_authorization_grants()
-    _coordinator_revoke_session_authorization_grants(session_id)
-    issued_monotonic = time.monotonic()
-    grant_id = f"grant_{uuid.uuid4().hex}"
-    grant = {
-        "grant_id": grant_id,
-        "registry_session_id": session_id,
-        "transaction_id": tx_id,
-        "failure_class": failure_class,
-        "current_isolation_state": current_iso_state,
-        "transition_action": transition_action,
-        "evidence_status": evidence_status,
-        "capability_nonce": uuid.uuid4().hex,
-        "issued_monotonic": issued_monotonic,
-        "expires_monotonic": issued_monotonic + _COORDINATOR_GRANT_TTL_SECONDS,
-        "consumed": False,
-        "created_at": time.time(),
-    }
-    # A caller receives a separate dictionary; mutating the returned grant
-    # cannot rewrite the Coordinator's authoritative capability record.
-    _COORDINATOR_AUTHORIZATION_GRANTS[grant_id] = dict(grant)
-    return grant
+    """Layer 1 Coordinator: Issue a single-use internal authorization grant binding verified Layer 5 recovery evidence."""
+    return _layer1_issue_coordinator_authorization_grant(
+        session_id,
+        transition_action=transition_action,
+        arm=arm,
+        coordinator_authorization_grants=_COORDINATOR_AUTHORIZATION_GRANTS,
+        coordinator_grant_ttl_seconds=_COORDINATOR_GRANT_TTL_SECONDS,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        coordinator_reap_stale_authorization_grants=_coordinator_reap_stale_authorization_grants,
+        coordinator_revoke_session_authorization_grants=_coordinator_revoke_session_authorization_grants,
+        verify_deisolation_evidence=verify_armature_deisolation_evidence,
+        verify_dead_armature_tombstone_retirement_evidence=_verify_dead_armature_tombstone_retirement_evidence,
+        **kwargs,
+    )
 
 
 def _clear_coordinator_authorization_grants() -> None:
     """Clear active Coordinator authorization grants (test fixture cleanup)."""
-    _COORDINATOR_AUTHORIZATION_GRANTS.clear()
+    _layer1_clear_coordinator_authorization_grants(
+        coordinator_authorization_grants=_COORDINATOR_AUTHORIZATION_GRANTS,
+    )
 
 
 def _clear_or_retire_failure_isolation_by_coordinator(
@@ -477,185 +381,22 @@ def _clear_or_retire_failure_isolation_by_coordinator(
     verification_evidence: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Layer 2: Clear FAILED-B/C isolation or archive FAILED-D tombstone exclusively for Layer 1 Coordinator."""
-    if authorization_grant is None:
-        raise RuntimeError(
-            f"Layer 2 rejected {'de-isolation' if action == 'CLEAR_TO_NONE' else 'tombstone retirement'}: "
-            "authorization_grant is required; verification_evidence is not authorization"
-        )
-    grant_candidate = authorization_grant
-    session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
-    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
-    if session_rec is None or iso_rec is None:
-        raise RuntimeError(f"Cannot modify isolation state: session {session_id} not found in active isolation registry")
-
-    action_label = "de-isolation" if action == "CLEAR_TO_NONE" else "tombstone retirement"
-
-    # Audit & validate Coordinator single-use authorization grant
-    if not isinstance(grant_candidate, dict):
-        raise RuntimeError(f"Layer 2 rejected {action_label}: authorization_grant must be a valid dictionary")
-    if not isinstance(reason, str) or not reason.strip():
-        raise RuntimeError(f"Layer 2 rejected {action_label}: non-empty reason is required")
-    grant_id = grant_candidate.get("grant_id")
-    _coordinator_reap_stale_authorization_grants()
-    if not grant_id or grant_id not in _COORDINATOR_AUTHORIZATION_GRANTS:
-        raise RuntimeError(f"Layer 2 rejected {action_label}: invalid or missing Coordinator authorization grant")
-
-    registered_grant = _COORDINATOR_AUTHORIZATION_GRANTS[grant_id]
-    if registered_grant.get("consumed", False):
-        raise RuntimeError(f"Layer 2 rejected {action_label}: Coordinator authorization grant has already been consumed")
-    if registered_grant.get("registry_session_id") != session_id:
-        raise RuntimeError(
-            f"Layer 2 rejected {action_label}: grant session mismatch "
-            f"('{registered_grant.get('registry_session_id')}' != '{session_id}')"
-        )
-    if registered_grant.get("transition_action") != action:
-        raise RuntimeError(
-            f"Layer 2 rejected {action_label}: grant action mismatch "
-            f"('{registered_grant.get('transition_action')}' != '{action}')"
-        )
-    if registered_grant.get("transaction_id") != iso_rec.get("transaction_id"):
-        raise RuntimeError(
-            f"Layer 2 rejected {action_label}: grant transaction ID mismatch "
-            f"('{registered_grant.get('transaction_id')}' != '{iso_rec.get('transaction_id')}')"
-        )
-    if registered_grant.get("failure_class") != iso_rec.get("failure_class"):
-        raise RuntimeError(
-            f"Layer 2 rejected {action_label}: grant failure class mismatch "
-            f"('{registered_grant.get('failure_class')}' != '{iso_rec.get('failure_class')}')"
-        )
-    if registered_grant.get("current_isolation_state") != session_rec.isolation_state.value:
-        raise RuntimeError(
-            f"Layer 2 rejected {action_label}: grant isolation state mismatch "
-            f"('{registered_grant.get('current_isolation_state')}' != '{session_rec.isolation_state.value}')"
-        )
-
-    # Authenticate the *presented* capability against the independent
-    # Coordinator-owned record, not merely an attacker-supplied grant_id.
-    if grant_candidate is registered_grant:
-        raise RuntimeError(f"Layer 2 rejected {action_label}: grant registry record is not independently owned")
-    bound_fields = (
-        "grant_id", "registry_session_id", "transaction_id", "failure_class",
-        "current_isolation_state", "transition_action", "evidence_status",
-        "capability_nonce", "issued_monotonic", "expires_monotonic", "created_at",
+    return _layer2_clear_or_retire_failure_isolation_by_coordinator(
+        session_id,
+        action,
+        reason,
+        authorization_grant=authorization_grant,
+        verification_evidence=verification_evidence,
+        archived_failed_d_tombstones=_ARCHIVED_FAILED_D_TOMBSTONES,
+        coordinator_authorization_grants=_COORDINATOR_AUTHORIZATION_GRANTS,
+        coordinator_grant_ttl_seconds=_COORDINATOR_GRANT_TTL_SECONDS,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        coordinator_reap_stale_authorization_grants=_coordinator_reap_stale_authorization_grants,
+        coordinator_revoke_session_authorization_grants=_coordinator_revoke_session_authorization_grants,
+        verify_deisolation_evidence=verify_armature_deisolation_evidence,
+        verify_dead_armature_tombstone_retirement_evidence=_verify_dead_armature_tombstone_retirement_evidence,
     )
-    if any(grant_candidate.get(field) != registered_grant.get(field) for field in bound_fields):
-        raise RuntimeError(f"Layer 2 rejected {action_label}: presented grant binding mismatch")
-    if grant_candidate.get("consumed") is not False:
-        raise RuntimeError(f"Layer 2 rejected {action_label}: presented grant is already consumed")
-    issued = registered_grant.get("issued_monotonic")
-    expires = registered_grant.get("expires_monotonic")
-    now = time.monotonic()
-    if (
-        type(issued) not in (float, int)
-        or type(expires) not in (float, int)
-        or not (math.isfinite(issued) and math.isfinite(expires))
-        or now < issued or now >= expires
-        or expires <= issued
-        or expires - issued > _COORDINATOR_GRANT_TTL_SECONDS + 1e-6
-    ):
-        _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
-        raise RuntimeError(f"Layer 2 rejected {action_label}: authorization grant expired or invalid")
-
-    # Evidence is not a permanent permission. Re-evaluate it immediately
-    # before the FAILED-isolation state transition (TOCTOU defense).
-    if action == "CLEAR_TO_NONE":
-        latest_evidence = verify_armature_deisolation_evidence(
-            arm=session_rec.original_blender_ref, session_id=session_id,
-        )
-        evidence_ok = (
-            latest_evidence.get("can_deisolate") is True
-            and latest_evidence.get("status") == "RECOVERY_VERIFIED"
-        )
-    elif action == "ARCHIVE_TOMBSTONE":
-        latest_evidence = _verify_dead_armature_tombstone_retirement_evidence(session_id)
-        evidence_ok = (
-            latest_evidence.get("can_retire") is True
-            and latest_evidence.get("status") == "TOMBSTONE_RETIREMENT_VERIFIED"
-        )
-    else:
-        raise RuntimeError(f"Layer 2 rejected {action_label}: unsupported transition action")
-    evidence_ok = evidence_ok and (
-        latest_evidence.get("registry_session_id") == session_id
-        and latest_evidence.get("transaction_id") == registered_grant.get("transaction_id")
-        and latest_evidence.get("failure_class") == registered_grant.get("failure_class")
-        and latest_evidence.get("isolation_state") == registered_grant.get("current_isolation_state")
-        and latest_evidence.get("status") == registered_grant.get("evidence_status")
-    )
-    if not evidence_ok:
-        _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
-        raise RuntimeError(
-            f"Layer 2 rejected {action_label}: recovery evidence no longer verified "
-            f"({latest_evidence.get('status')}: {latest_evidence.get('reasons', [])})"
-        )
-    # Revalidation may update liveness records; check original isolation
-    # identity and state once more before consuming the capability.
-    if (
-        _MANAGED_ARMATURE_IDENTITIES.get(session_id) is not session_rec
-        or _ISOLATED_FAILED_ARMATURES.get(session_id) is not iso_rec
-        or iso_rec.get("registry_session_id") != session_id
-        or iso_rec.get("transaction_id") != registered_grant.get("transaction_id")
-        or iso_rec.get("failure_class") != registered_grant.get("failure_class")
-        or session_rec.isolation_state.value != registered_grant.get("current_isolation_state")
-        or iso_rec.get("isolation_state") != registered_grant.get("current_isolation_state")
-    ):
-        _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
-        raise RuntimeError(f"Layer 2 rejected {action_label}: isolation provenance changed during revalidation")
-
-    # Real-time verification can be slow. Recheck the deadline immediately
-    # before consumption rather than allowing a just-expired grant to pass.
-    if time.monotonic() >= expires:
-        _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
-        raise RuntimeError(f"Layer 2 rejected {action_label}: authorization grant expired during evidence verification")
-
-    # Atomic single-use consumption before irreversible isolation transition;
-    # replay cannot succeed even when the transition raises afterwards.
-    registered_grant["consumed"] = True
-    _COORDINATOR_AUTHORIZATION_GRANTS.pop(grant_id, None)
-    grant_candidate["consumed"] = True
-
-    if action == "CLEAR_TO_NONE":
-        if session_rec.isolation_state == _ArmatureIsolationState.TOMBSTONED_FAILED_D:
-            raise RuntimeError("Layer 2 rejected de-isolation: TOMBSTONED_FAILED_D cannot return to active status")
-        previous_state = session_rec.isolation_state.value
-        session_rec.isolation_state = _ArmatureIsolationState.NONE
-        session_rec.lifecycle_stage = "NORMAL_TERMINAL"
-        _ISOLATED_FAILED_ARMATURES.pop(session_id, None)
-        _coordinator_revoke_session_authorization_grants(session_id)
-        return {
-            "registry_session_id": session_id,
-            "previous_isolation_state": previous_state,
-            "new_isolation_state": _ArmatureIsolationState.NONE.value,
-            "action": "CLEAR_TO_NONE",
-            "reason": reason,
-            "grant_id": grant_id,
-        }
-    elif action == "ARCHIVE_TOMBSTONE":
-        if session_rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D:
-            raise RuntimeError(
-                f"Layer 2 rejected tombstone retirement: session {session_id} is in {session_rec.isolation_state}, "
-                "expected TOMBSTONED_FAILED_D"
-            )
-        previous_state = session_rec.isolation_state.value
-        session_rec.isolation_state = _ArmatureIsolationState.ARCHIVED_RETIRED
-        session_rec.lifecycle_stage = "ARCHIVED_RETIRED"
-        iso_rec["isolation_state"] = _ArmatureIsolationState.ARCHIVED_RETIRED.value
-        if session_rec.tombstone_record is not None:
-            session_rec.tombstone_record["isolation_state"] = _ArmatureIsolationState.ARCHIVED_RETIRED.value
-            session_rec.tombstone_record["retirement_state"] = "ARCHIVED_RETIRED"
-            session_rec.tombstone_record["retirement_reason"] = reason
-        _ISOLATED_FAILED_ARMATURES.pop(session_id, None)
-        _ARCHIVED_FAILED_D_TOMBSTONES[session_id] = iso_rec
-        _coordinator_revoke_session_authorization_grants(session_id)
-        return {
-            "registry_session_id": session_id,
-            "previous_isolation_state": previous_state,
-            "new_isolation_state": _ArmatureIsolationState.ARCHIVED_RETIRED.value,
-            "action": "ARCHIVE_TOMBSTONE",
-            "reason": reason,
-            "grant_id": grant_id,
-        }
-    else:
-        raise RuntimeError(f"Unsupported Layer 2 isolation transition action: {action!r}")
 
 
 _FAULT_INJECTION_HOOK: Optional[Callable[[str, Dict[str, Any]], None]] = None
