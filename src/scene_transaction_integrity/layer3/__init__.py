@@ -74,6 +74,13 @@ from src.scene_transaction_integrity.layer3.resource_contracts import (
     _find_live_object_by_identity,
     _matrix_equals,
 )
+from src.scene_transaction_integrity.layer3.snapshot_relationship_restoration import (
+    _authorized_ensure_snapshot_collection_link,
+    _authorized_restore_collection_object_relationships,
+    _authorized_restore_snapshot_collection_child,
+    _authorized_restore_snapshot_constraint_targets_without_tx,
+    _authorized_restore_snapshot_object_parent,
+)
 from src.scene_transaction_integrity.layer3.stashed_object_removal import (
     _remove_stashed_object_and_verify,
 )
@@ -87,10 +94,15 @@ __all__ = (
     "_authorized_assign_object_parent",
     "_authorized_create_constraint",
     "_authorized_create_type_a_mesh",
+    "_authorized_ensure_snapshot_collection_link",
     "_authorized_link_child_collection",
     "_authorized_link_object_to_collection",
     "_authorized_remove_constraint",
+    "_authorized_restore_collection_object_relationships",
     "_authorized_restore_relationship",
+    "_authorized_restore_snapshot_collection_child",
+    "_authorized_restore_snapshot_constraint_targets_without_tx",
+    "_authorized_restore_snapshot_object_parent",
     "_authorized_revert_relationship_record",
     "_authorized_unlink_child_collection",
     "_authorized_unlink_object_from_collection",
