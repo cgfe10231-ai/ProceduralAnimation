@@ -62,6 +62,10 @@ from src.scene_transaction_integrity.layer3.datablock_removal import (
 from src.scene_transaction_integrity.layer3.object_parent_assignment import (
     _authorized_assign_object_parent,
 )
+from src.scene_transaction_integrity.layer3.relationship_reversal import (
+    _authorized_restore_relationship,
+    _authorized_revert_relationship_record,
+)
 from src.scene_transaction_integrity.layer3.resource_contracts import (
     ARM_IK_CONSTRAINT_NAMES,
     ExternalControllerNameConflictError,
@@ -86,6 +90,8 @@ __all__ = (
     "_authorized_link_child_collection",
     "_authorized_link_object_to_collection",
     "_authorized_remove_constraint",
+    "_authorized_restore_relationship",
+    "_authorized_revert_relationship_record",
     "_authorized_unlink_child_collection",
     "_authorized_unlink_object_from_collection",
     "_classify_constraint_target_pair_effect",
