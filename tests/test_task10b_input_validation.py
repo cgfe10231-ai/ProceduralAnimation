@@ -52,12 +52,16 @@ from src.rig.arm_ik import (
     ARM_IK_TARGET_NAMES,
     ARM_POLE_TARGET_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
-    _ACTIVE_TRANSACTION_STACK,
     get_arm_ik_state,
-    get_pending_arm_rig_cleanup_ids,
     set_arm_ik_influence,
     set_hand_ik_target,
     setup_arm_ik,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    get_pending_arm_rig_cleanup_ids,
 )
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
