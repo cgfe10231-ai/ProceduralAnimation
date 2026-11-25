@@ -817,6 +817,51 @@ def retire_dead_armature_tombstone(
     )
 
 
+# [INTRODUCED 2026-11-25T21:28:00+08:00]
+# NODE: 10-B / OWNERSHIP-SEPARATION-fix-1
+# FUNCTION: _create_arm_rig_transaction_context
+# PURPOSE: 在公共接线边界显式装配 15 项跨层依赖并构造 Layer 2 唯一 _ArmRigTransactionContext 实例，保持构造入口与真实类对象分离
+# REASON: 移除 Layer 2 事务上下文隐式回调表与绕过 Layer 1 的备用路径，统一覆盖正常外层事务与 FAILED 准入证据事务构造接线
+def _create_arm_rig_transaction_context(
+    arm: bpy.types.Object,
+    session_record: Optional[Any] = None,
+) -> _ArmRigTransactionContext:
+    """Construct a Layer 2 _ArmRigTransactionContext with all 15 cross-layer dependencies wired explicitly."""
+    return _ArmRigTransactionContext(
+        arm,
+        session_record=session_record,
+        ensure_armature_session_identity=(
+            _layer1_session_liveness.ensure_armature_session_identity
+        ),
+        find_live_object_by_identity=(
+            _layer3_resource_contracts._find_live_object_by_identity
+        ),
+        controller_role_for_name=_layer3_ctrl_ownership._controller_role_for_name,
+        find_live_collection_by_identity=(
+            _layer3_char_col_creation._find_live_collection_by_identity
+        ),
+        execute_stashed_cleanup_pass=(
+            _layer6_stashed_cleanup._execute_stashed_cleanup_pass
+        ),
+        authorized_remove_constraint=_authorized_remove_constraint,
+        cleanup_stashed_constraints=(
+            _layer6_stashed_cleanup._cleanup_stashed_constraints
+        ),
+        cleanup_stashed_object=_layer6_stashed_cleanup._cleanup_stashed_object,
+        trigger_fault_injection=_fault_injection._trigger_fault_injection,
+        remove_stashed_object_and_verify=(
+            _layer3_stashed_obj_removal._remove_stashed_object_and_verify
+        ),
+        find_stashed_datablock=_layer3_datablock_removal._find_stashed_datablock,
+        remove_authorized_stashed_datablock=(
+            _layer3_datablock_removal._remove_authorized_stashed_datablock
+        ),
+        build_cleanup_result=_layer6_cleanup_results._build_cleanup_result,
+        cleanup_outcome_cls=_layer6_cleanup_results._CleanupOutcome,
+        cleanup_result_cls=_layer6_cleanup_results._CleanupResult,
+    )
+
+
 # [INTRODUCED 2026-11-25T20:42:00+08:00]
 # NODE: 10-B / OWNERSHIP-SEPARATION
 # FUNCTION: _arm_rig_transaction
@@ -829,6 +874,7 @@ def _arm_rig_transaction(arm: bpy.types.Object) -> Generator[_ArmRigTransactionC
         arm,
         active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
         transaction_context_cls=_ArmRigTransactionContext,
+        transaction_context_factory=_create_arm_rig_transaction_context,
         transaction_state_cls=_ArmRigTransactionState,
         failed_transaction_class_cls=_FailedTransactionClass,
         relationship_operation_state_cls=_RelationshipOperationState,
@@ -1067,40 +1113,6 @@ def set_hand_ik_target(
     )
 
 
-_ArmRigTransactionContext._DEFAULT_CROSS_LAYER_CALLBACKS.update(
-    {
-        "ensure_armature_session_identity": (
-            _layer1_session_liveness.ensure_armature_session_identity
-        ),
-        "find_live_object_by_identity": (
-            _layer3_resource_contracts._find_live_object_by_identity
-        ),
-        "controller_role_for_name": _layer3_ctrl_ownership._controller_role_for_name,
-        "find_live_collection_by_identity": (
-            _layer3_char_col_creation._find_live_collection_by_identity
-        ),
-        "execute_stashed_cleanup_pass": (
-            _layer6_stashed_cleanup._execute_stashed_cleanup_pass
-        ),
-        "authorized_remove_constraint": _authorized_remove_constraint,
-        "cleanup_stashed_constraints": (
-            _layer6_stashed_cleanup._cleanup_stashed_constraints
-        ),
-        "cleanup_stashed_object": _layer6_stashed_cleanup._cleanup_stashed_object,
-        "trigger_fault_injection": _fault_injection._trigger_fault_injection,
-        "remove_stashed_object_and_verify": (
-            _layer3_stashed_obj_removal._remove_stashed_object_and_verify
-        ),
-        "find_stashed_datablock": _layer3_datablock_removal._find_stashed_datablock,
-        "remove_authorized_stashed_datablock": (
-            _layer3_datablock_removal._remove_authorized_stashed_datablock
-        ),
-        "build_cleanup_result": _layer6_cleanup_results._build_cleanup_result,
-        "cleanup_outcome_cls": _layer6_cleanup_results._CleanupOutcome,
-        "cleanup_result_cls": _layer6_cleanup_results._CleanupResult,
-    }
-)
-
 __all__ = (
     "_apply_single_constraint_target_unit",
     "_arm_rig_transaction",
@@ -1116,6 +1128,7 @@ __all__ = (
     "_authorized_unlink_child_collection",
     "_authorized_unlink_object_from_collection",
     "_clear_or_retire_failure_isolation_by_coordinator",
+    "_create_arm_rig_transaction_context",
     "_ensure_character_collection",
     "_get_or_create_empty",
     "_issue_coordinator_authorization_grant",

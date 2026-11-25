@@ -12,14 +12,19 @@ def _establish_outermost_arm_rig_transaction(
     arm: Any,
     session_rec: Any,
     *,
-    transaction_context_cls: Callable[..., Any],
+    transaction_context_cls: type,
+    transaction_context_factory: Callable[..., Any],
     active_transaction_stack: List[Any],
 ) -> Any:
     """Establish and register the outermost transaction in original order."""
-    tx = transaction_context_cls(
+    tx = transaction_context_factory(
         arm,
         session_record=session_rec,
     )
+    if not isinstance(tx, transaction_context_cls):
+        raise RuntimeError(
+            "Transaction context factory did not return an _ArmRigTransactionContext instance"
+        )
     session_rec.lifecycle_stage = "ACTIVE_TRANSACTION"
     active_transaction_stack.append(tx)
     return tx

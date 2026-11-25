@@ -185,7 +185,8 @@ def _assert_admission_identity_valid(
     admission_id_check: Dict[str, Any],
     *,
     identity_failure_is_uncertain: Callable[[Dict[str, Any]], bool],
-    transaction_context_cls: Callable[..., Any],
+    transaction_context_cls: type,
+    transaction_context_factory: Callable[..., Any],
     transaction_state_cls: Any,
     failed_transaction_class_cls: Any,
     record_armature_failure_isolation_by_coordinator: Callable[..., Any],
@@ -200,7 +201,11 @@ def _assert_admission_identity_valid(
                 f"(registry_session_id={session_rec.registry_session_id}): "
                 + "; ".join(admission_id_check["reasons"])
             )
-        dead_tx = transaction_context_cls(arm, session_record=session_rec)
+        dead_tx = transaction_context_factory(arm, session_record=session_rec)
+        if not isinstance(dead_tx, transaction_context_cls):
+            raise RuntimeError(
+                "Transaction context factory did not return an _ArmRigTransactionContext instance"
+            )
         dead_tx.state = transaction_state_cls.FAILED
         record_armature_failure_isolation_by_coordinator(
             session_rec=session_rec,

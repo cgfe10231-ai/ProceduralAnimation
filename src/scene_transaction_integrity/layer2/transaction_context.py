@@ -30,9 +30,6 @@ from src.scene_transaction_integrity.layer2.relationship_mutation_state_update i
 from src.scene_transaction_integrity.layer2.relationship_states import (
     _RelationshipOperationState,
 )
-from src.scene_transaction_integrity.layer2 import (
-    session_identity as _session_identity,
-)
 from src.scene_transaction_integrity.layer2.session_records import (
     ArmatureSessionIdentityRecord,
 )
@@ -50,32 +47,82 @@ from src.scene_transaction_integrity.layer2.transaction_states import (
 # [INTRODUCED 2026-11-24T21:45:30+08:00]
 # NODE: 10-B / L2-12
 # FUNCTION: _ArmRigTransactionContext
-# PURPOSE: 持有完整事务上下文状态、单调状态标记、Layer 2 注册委托与显式回调驱动的 Cleanup 重试入口
+# PURPOSE: 持有完整事务上下文状态、单调状态标记、Layer 2 注册委托与显式构造注入依赖的 Cleanup 重试入口
 # REASON: 将 _ArmRigTransactionContext 核心状态类迁入 Layer 2，作为全仓唯一的事务上下文实现所有者
 class _ArmRigTransactionContext:
     """Active transaction execution state tracking."""
-
-    _DEFAULT_CROSS_LAYER_CALLBACKS: Dict[str, Any] = {}
 
     def __init__(
         self,
         arm: bpy.types.Object,
         session_record: Optional[ArmatureSessionIdentityRecord] = None,
         *,
-        ensure_armature_session_identity: Optional[
-            Callable[[bpy.types.Object], ArmatureSessionIdentityRecord]
-        ] = None,
+        ensure_armature_session_identity: Callable[[bpy.types.Object], ArmatureSessionIdentityRecord],
+        find_live_object_by_identity: Callable[..., Any],
+        controller_role_for_name: Callable[..., Any],
+        find_live_collection_by_identity: Callable[..., Any],
+        execute_stashed_cleanup_pass: Callable[..., Any],
+        authorized_remove_constraint: Callable[..., Any],
+        cleanup_stashed_constraints: Callable[..., Any],
+        cleanup_stashed_object: Callable[..., Any],
+        trigger_fault_injection: Callable[..., None],
+        remove_stashed_object_and_verify: Callable[..., Any],
+        find_stashed_datablock: Callable[..., Any],
+        remove_authorized_stashed_datablock: Callable[..., Any],
+        build_cleanup_result: Callable[..., Any],
+        cleanup_outcome_cls: Any,
+        cleanup_result_cls: Any,
     ) -> None:
-        if ensure_armature_session_identity is None:
-            ensure_armature_session_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS.get(
-                "ensure_armature_session_identity",
-                _session_identity.ensure_armature_session_identity,
-            )
+        callable_deps = (
+            ("ensure_armature_session_identity", ensure_armature_session_identity),
+            ("find_live_object_by_identity", find_live_object_by_identity),
+            ("controller_role_for_name", controller_role_for_name),
+            ("find_live_collection_by_identity", find_live_collection_by_identity),
+            ("execute_stashed_cleanup_pass", execute_stashed_cleanup_pass),
+            ("authorized_remove_constraint", authorized_remove_constraint),
+            ("cleanup_stashed_constraints", cleanup_stashed_constraints),
+            ("cleanup_stashed_object", cleanup_stashed_object),
+            ("trigger_fault_injection", trigger_fault_injection),
+            ("remove_stashed_object_and_verify", remove_stashed_object_and_verify),
+            ("find_stashed_datablock", find_stashed_datablock),
+            ("remove_authorized_stashed_datablock", remove_authorized_stashed_datablock),
+            ("build_cleanup_result", build_cleanup_result),
+        )
+        for dep_name, dep_val in callable_deps:
+            if dep_val is None or not callable(dep_val):
+                raise RuntimeError(
+                    f"Missing or non-callable required transaction context dependency: {dep_name}"
+                )
+        for cls_name, cls_val in (
+            ("cleanup_outcome_cls", cleanup_outcome_cls),
+            ("cleanup_result_cls", cleanup_result_cls),
+        ):
+            if not isinstance(cls_val, type):
+                raise RuntimeError(
+                    f"Missing or invalid required transaction context type dependency: {cls_name}"
+                )
+
+        self._ensure_armature_session_identity = ensure_armature_session_identity
+        self._find_live_object_by_identity = find_live_object_by_identity
+        self._controller_role_for_name = controller_role_for_name
+        self._find_live_collection_by_identity = find_live_collection_by_identity
+        self._execute_stashed_cleanup_pass = execute_stashed_cleanup_pass
+        self._authorized_remove_constraint = authorized_remove_constraint
+        self._cleanup_stashed_constraints = cleanup_stashed_constraints
+        self._cleanup_stashed_object = cleanup_stashed_object
+        self._trigger_fault_injection = trigger_fault_injection
+        self._remove_stashed_object_and_verify = remove_stashed_object_and_verify
+        self._find_stashed_datablock = find_stashed_datablock
+        self._remove_authorized_stashed_datablock = remove_authorized_stashed_datablock
+        self._build_cleanup_result = build_cleanup_result
+        self._cleanup_outcome_cls = cleanup_outcome_cls
+        self._cleanup_result_cls = cleanup_result_cls
+
         _initialize_arm_rig_transaction_context(
             self,
             arm,
             session_record=session_record,
-            ensure_armature_session_identity=ensure_armature_session_identity,
+            ensure_armature_session_identity=self._ensure_armature_session_identity,
         )
 
     @property
@@ -143,9 +190,9 @@ class _ArmRigTransactionContext:
         created_controller_objects entry alone.
         """
         if find_live_object_by_identity is None:
-            find_live_object_by_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS["find_live_object_by_identity"]
+            find_live_object_by_identity = self._find_live_object_by_identity
         if controller_role_for_name is None:
-            controller_role_for_name = self._DEFAULT_CROSS_LAYER_CALLBACKS["controller_role_for_name"]
+            controller_role_for_name = self._controller_role_for_name
         return _register_created_controller(
             self,
             obj,
@@ -166,10 +213,7 @@ class _ArmRigTransactionContext:
     ) -> None:
         """Register a constraint created by this transaction for identity-based ownership."""
         if ensure_armature_session_identity is None:
-            ensure_armature_session_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS.get(
-                "ensure_armature_session_identity",
-                _session_identity.ensure_armature_session_identity,
-            )
+            ensure_armature_session_identity = self._ensure_armature_session_identity
         return _register_created_constraint(
             self,
             pbone,
@@ -200,7 +244,7 @@ class _ArmRigTransactionContext:
     ) -> None:
         """Attest a newly created, not-yet-linked Collection and intended parent."""
         if find_live_collection_by_identity is None:
-            find_live_collection_by_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS["find_live_collection_by_identity"]
+            find_live_collection_by_identity = self._find_live_collection_by_identity
         return _register_created_collection(
             self,
             col,
@@ -224,29 +268,28 @@ class _ArmRigTransactionContext:
         cleanup_result_cls: Any = None,
     ) -> Any:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
-        cbs = self._DEFAULT_CROSS_LAYER_CALLBACKS
         if execute_stashed_cleanup_pass is None:
-            execute_stashed_cleanup_pass = cbs["execute_stashed_cleanup_pass"]
+            execute_stashed_cleanup_pass = self._execute_stashed_cleanup_pass
         if authorized_remove_constraint is None:
-            authorized_remove_constraint = cbs["authorized_remove_constraint"]
+            authorized_remove_constraint = self._authorized_remove_constraint
         if cleanup_stashed_constraints is None:
-            cleanup_stashed_constraints = cbs["cleanup_stashed_constraints"]
+            cleanup_stashed_constraints = self._cleanup_stashed_constraints
         if cleanup_stashed_object is None:
-            cleanup_stashed_object = cbs["cleanup_stashed_object"]
+            cleanup_stashed_object = self._cleanup_stashed_object
         if trigger_fault_injection is None:
-            trigger_fault_injection = cbs["trigger_fault_injection"]
+            trigger_fault_injection = self._trigger_fault_injection
         if remove_stashed_object_and_verify is None:
-            remove_stashed_object_and_verify = cbs["remove_stashed_object_and_verify"]
+            remove_stashed_object_and_verify = self._remove_stashed_object_and_verify
         if find_stashed_datablock is None:
-            find_stashed_datablock = cbs["find_stashed_datablock"]
+            find_stashed_datablock = self._find_stashed_datablock
         if remove_authorized_stashed_datablock is None:
-            remove_authorized_stashed_datablock = cbs["remove_authorized_stashed_datablock"]
+            remove_authorized_stashed_datablock = self._remove_authorized_stashed_datablock
         if build_cleanup_result is None:
-            build_cleanup_result = cbs["build_cleanup_result"]
+            build_cleanup_result = self._build_cleanup_result
         if cleanup_outcome_cls is None:
-            cleanup_outcome_cls = cbs["cleanup_outcome_cls"]
+            cleanup_outcome_cls = self._cleanup_outcome_cls
         if cleanup_result_cls is None:
-            cleanup_result_cls = cbs["cleanup_result_cls"]
+            cleanup_result_cls = self._cleanup_result_cls
         return execute_stashed_cleanup_pass(
             self,
             transaction_state_cls=_ArmRigTransactionState,

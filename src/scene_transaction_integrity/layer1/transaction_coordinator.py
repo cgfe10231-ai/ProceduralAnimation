@@ -34,7 +34,8 @@ def _arm_rig_transaction(
     arm: Any,
     *,
     active_transaction_stack: List[Any],
-    transaction_context_cls: Any,
+    transaction_context_cls: type,
+    transaction_context_factory: Callable[..., Any],
     transaction_state_cls: Any,
     failed_transaction_class_cls: Any,
     relationship_operation_state_cls: Any,
@@ -90,6 +91,7 @@ def _arm_rig_transaction(
         admission_id_check,
         identity_failure_is_uncertain=_identity_failure_is_uncertain,
         transaction_context_cls=transaction_context_cls,
+        transaction_context_factory=transaction_context_factory,
         transaction_state_cls=transaction_state_cls,
         failed_transaction_class_cls=failed_transaction_class_cls,
         record_armature_failure_isolation_by_coordinator=(
@@ -101,6 +103,7 @@ def _arm_rig_transaction(
         arm,
         session_rec,
         transaction_context_cls=transaction_context_cls,
+        transaction_context_factory=transaction_context_factory,
         active_transaction_stack=active_transaction_stack,
     )
     pre_snap_fp = None
