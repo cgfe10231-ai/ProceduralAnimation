@@ -2,6 +2,23 @@
 
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from src.scene_transaction_integrity.layer2 import (
+    identity_helpers as _identity_helpers,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+)
+from src.scene_transaction_integrity.layer2.session_records import (
+    _ArmatureIsolationState,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+    _FailedTransactionClass,
+)
+
 
 # [INTRODUCED 2026-11-24T00:37:30+08:00]
 # NODE: 10-B / L1-01
@@ -39,14 +56,18 @@ def _assert_arm_rig_cleanup_gate(
     arm: Any,
     session_record: Optional[Any] = None,
     *,
-    pending_arm_rig_cleanups: Dict[str, Any],
-    safe_object_pointer: Callable[..., int],
-    transaction_state_cls: Any,
+    pending_arm_rig_cleanups: Optional[Dict[str, Any]] = None,
+    safe_object_pointer: Optional[Callable[..., int]] = None,
+    transaction_state_cls: Any = _ArmRigTransactionState,
 ) -> None:
     """
     Reject new independent writes while the same Armature
     owns an unresolved committed cleanup transaction.
     """
+    if pending_arm_rig_cleanups is None:
+        pending_arm_rig_cleanups = _PENDING_ARM_RIG_CLEANUPS
+    if safe_object_pointer is None:
+        safe_object_pointer = _identity_helpers._safe_object_pointer
 
     arm_ptr = safe_object_pointer(
         arm,
@@ -89,14 +110,16 @@ def _assert_arm_rig_failed_isolation_gate(
     arm: Any,
     session_record: Any,
     *,
-    isolated_failed_armatures: Dict[str, Any],
-    armature_isolation_state_cls: Any,
-    failed_transaction_class_cls: Any,
+    isolated_failed_armatures: Optional[Dict[str, Any]] = None,
+    armature_isolation_state_cls: Any = _ArmatureIsolationState,
+    failed_transaction_class_cls: Any = _FailedTransactionClass,
 ) -> None:
     """
     Reject new independent writes while the same Armature session identity
     is isolated in _ISOLATED_FAILED_ARMATURES (FAILED-B / FAILED-C / FAILED-D).
     """
+    if isolated_failed_armatures is None:
+        isolated_failed_armatures = _ISOLATED_FAILED_ARMATURES
     session_id = session_record.registry_session_id
     iso_rec = isolated_failed_armatures.get(session_id)
     if iso_rec is not None or session_record.isolation_state != armature_isolation_state_cls.NONE:

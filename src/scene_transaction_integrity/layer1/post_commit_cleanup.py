@@ -1,6 +1,32 @@
 """Post-commit irreversible cleanup coordination and success confirmation migrated from `src/rig/arm_ik.py` (Task 10-B Layer 1 L1-06)."""
 
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
+
+from src.scene_transaction_integrity.layer1 import (
+    cleanup_validation as _cleanup_validation,
+)
+from src.scene_transaction_integrity.layer2 import (
+    session_verification as _session_verification,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+)
+from src.scene_transaction_integrity.layer2.session_records import (
+    _ArmatureIsolationState,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
+from src.scene_transaction_integrity.layer6.cleanup_results import (
+    _CleanupOutcome,
+)
 
 
 # [INTRODUCED 2026-11-24T13:44:00+08:00]
@@ -93,23 +119,49 @@ def _coordinator_apply_cleanup_result(
     result: Any,
     phase: str,
     *,
-    coordinator_validate_cleanup_result_contract: Callable[..., None],
-    active_transaction_stack: List[Any],
-    managed_armature_identities: Dict[str, Any],
-    pending_arm_rig_cleanups: Dict[str, Any],
-    isolated_failed_armatures: Dict[str, Any],
-    armature_isolation_state_cls: Any,
-    transaction_state_cls: Any,
-    cleanup_outcome_cls: Any,
-    verify_armature_session_identity_record: Callable[..., Dict[str, Any]],
-    confirm_cleanup_success: Callable[..., None],
-    coordinator_preserve_cleanup_pending: Callable[..., None],
+    coordinator_validate_cleanup_result_contract: Optional[Callable[..., None]] = None,
+    active_transaction_stack: Optional[List[Any]] = None,
+    managed_armature_identities: Optional[Dict[str, Any]] = None,
+    pending_arm_rig_cleanups: Optional[Dict[str, Any]] = None,
+    isolated_failed_armatures: Optional[Dict[str, Any]] = None,
+    armature_isolation_state_cls: Any = _ArmatureIsolationState,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    cleanup_outcome_cls: Any = _CleanupOutcome,
+    verify_armature_session_identity_record: Optional[Callable[..., Dict[str, Any]]] = None,
+    confirm_cleanup_success: Optional[Callable[..., None]] = None,
+    coordinator_preserve_cleanup_pending: Optional[Callable[..., None]] = None,
 ) -> None:
     """Exclusively decide cleanup state after full result/identity validation.
 
     No malformed result, uncertain Armature, or FAILED isolation may be treated
     as success; rejection is reported, not swallowed or coerced to NO_EFFECT.
     """
+    if coordinator_validate_cleanup_result_contract is None:
+        coordinator_validate_cleanup_result_contract = (
+            _cleanup_validation._coordinator_validate_cleanup_result_contract
+        )
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
+    if managed_armature_identities is None:
+        managed_armature_identities = _MANAGED_ARMATURE_IDENTITIES
+    if pending_arm_rig_cleanups is None:
+        pending_arm_rig_cleanups = _PENDING_ARM_RIG_CLEANUPS
+    if isolated_failed_armatures is None:
+        isolated_failed_armatures = _ISOLATED_FAILED_ARMATURES
+    if verify_armature_session_identity_record is None:
+        verify_armature_session_identity_record = (
+            _session_verification._verify_armature_session_identity_record
+        )
+    if confirm_cleanup_success is None:
+        confirm_cleanup_success = _confirm_cleanup_success
+    if coordinator_preserve_cleanup_pending is None:
+        from src.scene_transaction_integrity.layer1 import (
+            pending_cleanup as _pending_cleanup,
+        )
+
+        coordinator_preserve_cleanup_pending = (
+            _pending_cleanup._coordinator_preserve_cleanup_pending
+        )
     coordinator_validate_cleanup_result_contract(tx, result, phase)
 
     if active_transaction_stack:

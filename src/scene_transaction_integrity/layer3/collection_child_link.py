@@ -4,6 +4,25 @@ from typing import Any, Callable, Dict, List, Optional
 
 import bpy
 
+from src.scene_transaction_integrity.layer2.relationship_states import (
+    _RelationshipOperationState,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.transaction_context import (
+    _ArmRigTransactionContext,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
+from src.scene_transaction_integrity.layer3.character_collection_creation import (
+    _find_live_collection_by_identity,
+)
+
 
 def _require_collection_child_relationship_ownership(
     parent_collection: bpy.types.Collection,
@@ -11,21 +30,25 @@ def _require_collection_child_relationship_ownership(
     active_tx: Any,
     *,
     unlink: bool,
-    transaction_context_cls: type,
-    transaction_state_cls: Any,
-    active_transaction_stack: List[Any],
-    managed_armature_identities: Dict[str, Any],
+    transaction_context_cls: type = _ArmRigTransactionContext,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    active_transaction_stack: Optional[List[Any]] = None,
+    managed_armature_identities: Optional[Dict[str, Any]] = None,
     find_live_collection_by_identity: Callable[
         [Optional[bpy.types.Collection], Optional[int]],
         Optional[bpy.types.Collection],
-    ],
-    relationship_operation_state_cls: Any,
+    ] = _find_live_collection_by_identity,
+    relationship_operation_state_cls: Any = _RelationshipOperationState,
 ) -> None:
     """Admit writes only to an original-parent edge of a proven TX-created child.
 
     A live reference, a Collection name, or an unsealed created_collections
     registry entry is not sufficient to establish mutation authority.
     """
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
+    if managed_armature_identities is None:
+        managed_armature_identities = _MANAGED_ARMATURE_IDENTITIES
     if (not isinstance(active_tx, transaction_context_cls)
             or active_tx.state != transaction_state_cls.ACTIVE
             or active_tx.rollback_only

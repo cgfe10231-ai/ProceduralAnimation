@@ -1,6 +1,6 @@
 """Authorized Type-A DataBlock creation and local failure compensation migrated from `src/rig/arm_ik.py` (Task 10-B Layer 3 L3-11)."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import bpy
 
@@ -8,6 +8,15 @@ from src.scene_transaction_integrity.layer2.datablock_creation_receipts import (
     _register_type_a_datablock_authorization,
     _register_type_a_datablock_receipt,
     _revoke_type_a_datablock_creation_records,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
 )
 
 
@@ -20,9 +29,9 @@ def _authorized_create_type_a_mesh(
     name: str,
     active_tx: Any,
     *,
-    active_transaction_stack: List[Any],
-    transaction_state_cls: Any,
-    managed_armature_identities: Dict[str, Any],
+    active_transaction_stack: Optional[List[Any]] = None,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    managed_armature_identities: Optional[Dict[str, Any]] = None,
 ) -> bpy.types.Mesh:
     """Create a transaction-owned Mesh with an identity-bound deletion receipt.
 
@@ -30,6 +39,10 @@ def _authorized_create_type_a_mesh(
     authority. Observing an existing ID or appending an authorization dict
     never proves transaction creation.
     """
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
+    if managed_armature_identities is None:
+        managed_armature_identities = _MANAGED_ARMATURE_IDENTITIES
     if type(name) is not str or not name.strip():
         raise ValueError("TYPE_A_CREATE_DENIED: Mesh name must be nonempty")
     if (active_tx is None or not active_transaction_stack

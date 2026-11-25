@@ -2,18 +2,25 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import bpy
 
-from src.scene_transaction_integrity.layer5.value_evidence import (
-    _clone_snapshot_property_value,
-    _freeze_fingerprint_property_value,
+from src.rig.arm_ik import (
+    ARM_IK_TARGET_NAMES,
+    ARM_POLE_TARGET_NAMES,
+    _REQUIRED_ARM_IK_BONE_NAMES,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
+from src.scene_transaction_integrity.layer5 import (
+    value_evidence as _value_evidence,
 )
 
 
 def _capture_pre_snapshot_structural_fingerprint(
     arm: bpy.types.Object,
     *,
-    arm_ik_target_names: Dict[str, str],
-    arm_pole_target_names: Dict[str, str],
-    required_arm_ik_bone_names: Tuple[str, ...],
+    arm_ik_target_names: Dict[str, str] = ARM_IK_TARGET_NAMES,
+    arm_pole_target_names: Dict[str, str] = ARM_POLE_TARGET_NAMES,
+    required_arm_ik_bone_names: Tuple[str, ...] = _REQUIRED_ARM_IK_BONE_NAMES,
 ) -> Dict[str, Any]:
     """Capture a comprehensive read-only unrounded structural and value fingerprint before SNAPSHOTTING."""
     char_col = bpy.data.collections.get("Character")
@@ -110,8 +117,8 @@ def _capture_pre_snapshot_structural_fingerprint(
                 if not p.is_readonly and p.identifier not in ("rna_type", "name", "mute", "influence"):
                     try:
                         val = getattr(con, p.identifier)
-                        cloned = _clone_snapshot_property_value(val)
-                        generic_props[p.identifier] = _freeze_fingerprint_property_value(cloned)
+                        cloned = _value_evidence._clone_snapshot_property_value(val)
+                        generic_props[p.identifier] = _value_evidence._freeze_fingerprint_property_value(cloned)
                     except BaseException as exc:
                         raise RuntimeError(
                             "FINGERPRINT_PROPERTY_CAPTURE_FAILED: "
@@ -164,8 +171,8 @@ def _capture_pre_snapshot_structural_fingerprint(
 def _snapshot_arm_rig_state(
     arm: bpy.types.Object,
     *,
-    arm_ik_target_names: Dict[str, str],
-    arm_pole_target_names: Dict[str, str],
+    arm_ik_target_names: Dict[str, str] = ARM_IK_TARGET_NAMES,
+    arm_pole_target_names: Dict[str, str] = ARM_POLE_TARGET_NAMES,
     active_transaction_stack: List[Any],
     trigger_fault_injection: Callable[[str, Dict[str, Any]], None],
     depsgraph_update: Callable[[], None],
@@ -345,7 +352,7 @@ def _snapshot_arm_rig_state(
                             f"Snapshot failed: cannot read property '{p.identifier}' (type {p.type}) "
                             f"on constraint '{con.name}' ({con.type}) on bone '{pbone.name}': {pe}"
                         ) from pe
-                    generic_props[p.identifier] = _clone_snapshot_property_value(val)
+                    generic_props[p.identifier] = _value_evidence._clone_snapshot_property_value(val)
 
             c_dict["generic_props"] = generic_props
             con_list.append(c_dict)
@@ -391,12 +398,16 @@ def _verify_pre_write_zero_mutation_and_integrity(
     pre_fp: Optional[Dict[str, Any]],
     tx: Any,
     *,
-    transaction_state_cls: Any,
-    capture_pre_snapshot_structural_fingerprint: Callable[..., Dict[str, Any]],
-    has_nan_or_inf: Callable[[Any], bool],
-    required_arm_ik_bone_names: Tuple[str, ...],
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    capture_pre_snapshot_structural_fingerprint: Optional[Callable[..., Dict[str, Any]]] = None,
+    has_nan_or_inf: Optional[Callable[[Any], bool]] = None,
+    required_arm_ik_bone_names: Tuple[str, ...] = _REQUIRED_ARM_IK_BONE_NAMES,
 ) -> Dict[str, Any]:
     """Layer 5: Verify zero mutations and structural integrity when a transaction aborts before ACTIVE."""
+    if capture_pre_snapshot_structural_fingerprint is None:
+        capture_pre_snapshot_structural_fingerprint = _capture_pre_snapshot_structural_fingerprint
+    if has_nan_or_inf is None:
+        has_nan_or_inf = _value_evidence._has_nan_or_inf
     reasons: List[str] = []
 
     # 1. Verification of Transaction Execution Phase

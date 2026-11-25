@@ -1,17 +1,20 @@
 """Armature session identity 7-condition verification migrated from `src/rig/arm_ik.py` (Task 10-B Layer 2 L2-02)."""
 
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
-import bpy
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.scene_transaction_integrity.layer2.identity_helpers import (
-    _check_original_object_liveness,
+from src.scene_transaction_integrity.layer2 import (
+    identity_helpers as _identity_helpers,
 )
 from src.scene_transaction_integrity.layer2.session_records import (
     ArmatureSessionIdentityRecord,
     _ArmatureIsolationState,
     _ArmatureLivenessStatus,
 )
+
+if TYPE_CHECKING:
+    import bpy
 
 
 def _verify_armature_session_identity_record(
@@ -32,9 +35,10 @@ def _verify_armature_session_identity_record(
     reasons: List[str] = []
     identity_uncertain = False
     ref = record.original_blender_ref
+    bpy_mod = _identity_helpers.bpy
 
     # Independent Object Liveness Evaluation (Eo)
-    obj_liveness = _check_original_object_liveness(record)
+    obj_liveness = _identity_helpers._check_original_object_liveness(record)
     object_liveness_status = obj_liveness.get("status", "UNKNOWN")
     object_exists = obj_liveness.get("object_exists")
 
@@ -118,7 +122,7 @@ def _verify_armature_session_identity_record(
             live_data_ptr = int(ref_data.as_pointer())
             in_armatures = any(
                 a.as_pointer() == live_data_ptr and a == ref_data
-                for a in bpy.data.armatures.values()
+                for a in bpy_mod.data.armatures.values()
             )
             orig_data_ok = True
             if record.original_data_ref is not None:

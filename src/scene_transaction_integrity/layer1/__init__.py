@@ -39,6 +39,8 @@ from src.scene_transaction_integrity.layer1.post_commit_cleanup import (
 )
 from src.scene_transaction_integrity.layer1.session_liveness import (
     _sweep_dead_managed_armature_identities,
+    ensure_armature_session_identity,
+    query_admission_gate_status,
 )
 from src.scene_transaction_integrity.layer1.transaction_commit import (
     _commit_arm_rig_transaction,
@@ -81,6 +83,8 @@ __all__ = (
     "_safe_object_name",
     "_snapshot_and_activate_transaction",
     "_sweep_dead_managed_armature_identities",
+    "ensure_armature_session_identity",
+    "query_admission_gate_status",
     "request_armature_deisolation",
     "retire_dead_armature_tombstone",
     "retry_pending_arm_rig_cleanup",

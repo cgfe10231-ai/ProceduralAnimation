@@ -41,16 +41,18 @@ from src.motion.rigid_link import (
 from src.rig.arm_ik import (
     MAX_ARM_REACH,
     MIN_ARM_REACH,
-    _ACTIVE_TRANSACTION_STACK,
-    _arm_rig_transaction,
-    _require_existing_arm_ik_controller_ownership,
     get_arm_ik_state,
-    ensure_armature_session_identity,
-    query_admission_gate_status,
     reset_arm_ik,
     set_arm_ik_influence,
     set_hand_ik_target,
     setup_arm_ik,
+)
+from src.scene_transaction_integrity import (
+    _ACTIVE_TRANSACTION_STACK,
+    _arm_rig_transaction,
+    _require_existing_arm_ik_controller_ownership,
+    ensure_armature_session_identity,
+    query_admission_gate_status,
 )
 from src.rig.foot_contact import (
     evaluate_foot_support,

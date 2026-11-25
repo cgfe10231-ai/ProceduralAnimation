@@ -1,6 +1,24 @@
 """Pending cleanup preservation and retry lifecycle migrated from `src/rig/arm_ik.py` (Task 10-B Layer 1 L1-07)."""
 
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
+
+from src.scene_transaction_integrity.layer1 import (
+    cleanup_validation as _cleanup_validation,
+    post_commit_cleanup as _post_commit_cleanup,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+    _register_pending_arm_rig_cleanup,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+)
+from src.scene_transaction_integrity.layer2.transaction_context import (
+    _ArmRigTransactionContext,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
 
 
 # [INTRODUCED 2026-11-24T15:31:00+08:00]
@@ -12,10 +30,10 @@ def _coordinator_preserve_cleanup_pending(
     tx: Any,
     error: BaseException,
     *,
-    transaction_context_cls: type,
-    transaction_state_cls: Any,
-    pending_arm_rig_cleanups: Dict[str, Any],
-    register_pending_arm_rig_cleanup: Callable[..., None],
+    transaction_context_cls: type = _ArmRigTransactionContext,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    pending_arm_rig_cleanups: Optional[Dict[str, Any]] = None,
+    register_pending_arm_rig_cleanup: Optional[Callable[..., None]] = None,
 ) -> None:
     """Fail closed after logical commit without clobbering another transaction.
 
@@ -23,6 +41,10 @@ def _coordinator_preserve_cleanup_pending(
     COMMITTED/PENDING, never removes a FAILED isolation, and never pops a gate.
     In an impossible registry-key collision, raise rather than overwrite it.
     """
+    if pending_arm_rig_cleanups is None:
+        pending_arm_rig_cleanups = _PENDING_ARM_RIG_CLEANUPS
+    if register_pending_arm_rig_cleanup is None:
+        register_pending_arm_rig_cleanup = _register_pending_arm_rig_cleanup
     if not isinstance(tx, transaction_context_cls):
         raise RuntimeError("CLEANUP_PENDING_REGISTRATION_FAILED: invalid context") from error
     if tx.state not in (
@@ -61,13 +83,25 @@ def _coordinator_preserve_cleanup_pending(
 def retry_pending_arm_rig_cleanup(
     tx_id: str,
     *,
-    pending_arm_rig_cleanups: Dict[str, Any],
-    isolated_failed_armatures: Dict[str, Any],
-    transaction_state_cls: Any,
-    coordinator_validate_cleanup_preflight: Callable[..., None],
-    coordinator_apply_cleanup_result: Callable[..., None],
+    pending_arm_rig_cleanups: Optional[Dict[str, Any]] = None,
+    isolated_failed_armatures: Optional[Dict[str, Any]] = None,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    coordinator_validate_cleanup_preflight: Optional[Callable[..., None]] = None,
+    coordinator_apply_cleanup_result: Optional[Callable[..., None]] = None,
 ) -> None:
     """Retry cleanup of one pending transaction."""
+    if pending_arm_rig_cleanups is None:
+        pending_arm_rig_cleanups = _PENDING_ARM_RIG_CLEANUPS
+    if isolated_failed_armatures is None:
+        isolated_failed_armatures = _ISOLATED_FAILED_ARMATURES
+    if coordinator_validate_cleanup_preflight is None:
+        coordinator_validate_cleanup_preflight = (
+            _cleanup_validation._coordinator_validate_cleanup_preflight
+        )
+    if coordinator_apply_cleanup_result is None:
+        coordinator_apply_cleanup_result = (
+            _post_commit_cleanup._coordinator_apply_cleanup_result
+        )
 
     tx = pending_arm_rig_cleanups.get(tx_id)
 

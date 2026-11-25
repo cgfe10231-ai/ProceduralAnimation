@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 
 import bpy
 
+from src.rig.arm_ik import ARM_IK_CONSTRAINT_NAMES
+
 
 class ExternalControllerNameConflictError(RuntimeError, ValueError):
     """Raised when a controller name is occupied by an external/pre-existing non-EMPTY object (F14-05)."""
@@ -25,8 +27,6 @@ def _matrix_equals(m1: Any, m2: Any, tol: float = 1e-5) -> bool:
 
 
 _TARGET_UNSET = object()
-
-ARM_IK_CONSTRAINT_NAMES: Dict[str, str] = {"L": "ArmIK.L", "R": "ArmIK.R"}
 
 
 def _controller_constraint_binding_proven(

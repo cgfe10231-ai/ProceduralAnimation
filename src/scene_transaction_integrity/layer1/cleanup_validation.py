@@ -1,6 +1,33 @@
 """Cleanup preflight and result contract validation migrated from `src/rig/arm_ik.py` (Task 10-B Layer 1 L1-07)."""
 
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
+
+from src.scene_transaction_integrity.layer2 import (
+    session_verification as _session_verification,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+)
+from src.scene_transaction_integrity.layer2.session_records import (
+    _ArmatureIsolationState,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.transaction_context import (
+    _ArmRigTransactionContext,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
+from src.scene_transaction_integrity.layer6.cleanup_results import (
+    _CleanupOutcome,
+    _CleanupResult,
+)
 
 
 # [INTRODUCED 2026-11-24T15:31:00+08:00]
@@ -12,14 +39,14 @@ def _coordinator_validate_cleanup_preflight(
     tx: Any,
     phase: str,
     *,
-    transaction_context_cls: type,
-    transaction_state_cls: Any,
-    active_transaction_stack: List[Any],
-    pending_arm_rig_cleanups: Dict[str, Any],
-    managed_armature_identities: Dict[str, Any],
-    isolated_failed_armatures: Dict[str, Any],
-    armature_isolation_state_cls: Any,
-    verify_armature_session_identity_record: Callable[..., Dict[str, Any]],
+    transaction_context_cls: type = _ArmRigTransactionContext,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    active_transaction_stack: Optional[List[Any]] = None,
+    pending_arm_rig_cleanups: Optional[Dict[str, Any]] = None,
+    managed_armature_identities: Optional[Dict[str, Any]] = None,
+    isolated_failed_armatures: Optional[Dict[str, Any]] = None,
+    armature_isolation_state_cls: Any = _ArmatureIsolationState,
+    verify_armature_session_identity_record: Optional[Callable[..., Dict[str, Any]]] = None,
 ) -> None:
     """Authorize cleanup BEFORE its first destructive resource operation.
 
@@ -28,6 +55,18 @@ def _coordinator_validate_cleanup_preflight(
     relationship mutation, gate clearing, or transaction-state transition.
     An unknown live identity or an isolation mismatch must fail closed.
     """
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
+    if pending_arm_rig_cleanups is None:
+        pending_arm_rig_cleanups = _PENDING_ARM_RIG_CLEANUPS
+    if managed_armature_identities is None:
+        managed_armature_identities = _MANAGED_ARMATURE_IDENTITIES
+    if isolated_failed_armatures is None:
+        isolated_failed_armatures = _ISOLATED_FAILED_ARMATURES
+    if verify_armature_session_identity_record is None:
+        verify_armature_session_identity_record = (
+            _session_verification._verify_armature_session_identity_record
+        )
     if phase not in ("INITIAL_CLEANUP", "PENDING_RETRY"):
         raise ValueError(f"Invalid cleanup preflight phase: {phase!r}")
     if not isinstance(tx, transaction_context_cls):
@@ -142,10 +181,10 @@ def _coordinator_validate_cleanup_result_contract(
     result: Any,
     phase: str,
     *,
-    transaction_context_cls: type,
-    transaction_state_cls: Any,
-    cleanup_result_cls: type,
-    cleanup_outcome_cls: Any,
+    transaction_context_cls: type = _ArmRigTransactionContext,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    cleanup_result_cls: type = _CleanupResult,
+    cleanup_outcome_cls: Any = _CleanupOutcome,
 ) -> None:
     """Validate the exact outcome contract BEFORE any lifecycle mutation.
 

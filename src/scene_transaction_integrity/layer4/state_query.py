@@ -5,7 +5,7 @@ from typing import Callable, Dict, Optional
 
 import bpy
 
-from src.scene_transaction_integrity.layer3 import ARM_IK_CONSTRAINT_NAMES
+from src.rig.arm_ik import ARM_IK_CONSTRAINT_NAMES
 from src.scene_transaction_integrity.layer4.armature_ops import _resolve_armature
 from src.scene_transaction_integrity.layer4.validation import _validate_side
 

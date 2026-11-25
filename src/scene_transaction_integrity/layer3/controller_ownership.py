@@ -4,16 +4,34 @@ from typing import Any, Callable, Dict, List, Optional
 
 import bpy
 
+from src.rig.arm_ik import (
+    ARM_IK_TARGET_NAMES,
+    ARM_POLE_TARGET_NAMES,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.transaction_context import (
+    _ArmRigTransactionContext,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
 from src.scene_transaction_integrity.layer3.resource_contracts import (
     ExternalControllerNameConflictError,
+    _controller_constraint_binding_proven,
+    _find_live_object_by_identity,
 )
 
 
 def _controller_role_for_name(
     name: str,
     *,
-    arm_ik_target_names: Dict[str, str],
-    arm_pole_target_names: Dict[str, str],
+    arm_ik_target_names: Dict[str, str] = ARM_IK_TARGET_NAMES,
+    arm_pole_target_names: Dict[str, str] = ARM_POLE_TARGET_NAMES,
 ) -> tuple[str, str] | None:
     """Resolve one of four Arm IK roles, never grant authority on its own."""
     for side in ('L', 'R'):
@@ -32,7 +50,7 @@ def _controller_is_borrowed_by_other_armature(
     find_live_object_by_identity: Callable[
         [Optional[bpy.types.Object], Optional[int]],
         Optional[bpy.types.Object],
-    ],
+    ] = _find_live_object_by_identity,
 ) -> bool:
     """Deny a controller referenced by ANY constraint on another Armature.
 
@@ -71,19 +89,19 @@ def _verify_controller_object_transaction_authority(
     tx: Any,
     *,
     created_only: bool = False,
-    transaction_context_cls: type,
-    transaction_state_cls: Any,
-    managed_armature_identities: Dict[str, Any],
+    transaction_context_cls: type = _ArmRigTransactionContext,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    managed_armature_identities: Optional[Dict[str, Any]] = None,
     find_live_object_by_identity: Callable[
         [Optional[bpy.types.Object], Optional[int]],
         Optional[bpy.types.Object],
-    ],
-    controller_role_for_name: Callable[[str], tuple[str, str] | None],
-    controller_constraint_binding_proven: Callable[..., bool],
+    ] = _find_live_object_by_identity,
+    controller_role_for_name: Callable[[str], tuple[str, str] | None] = _controller_role_for_name,
+    controller_constraint_binding_proven: Callable[..., bool] = _controller_constraint_binding_proven,
     controller_is_borrowed_by_other_armature: Callable[
         [bpy.types.Object, bpy.types.Object, tuple[str, str]],
         bool,
-    ],
+    ] = _controller_is_borrowed_by_other_armature,
 ) -> Optional[str]:
     """Check the existing transaction controller authorization boundary.
 
@@ -91,6 +109,8 @@ def _verify_controller_object_transaction_authority(
     from the entry pointer baseline. SNAPSHOT_ORIGINAL additionally needs a
     real original IK constraint binding, not merely a name-based snapshot.
     """
+    if managed_armature_identities is None:
+        managed_armature_identities = _MANAGED_ARMATURE_IDENTITIES
     if not isinstance(tx, transaction_context_cls):
         return None
     if tx.state not in (transaction_state_cls.ACTIVE, transaction_state_cls.ROLLING_BACK):
@@ -162,20 +182,22 @@ def _require_existing_arm_ik_controller_ownership(
     arm: bpy.types.Object,
     *,
     scope: str,
-    active_transaction_stack: List[Any],
-    arm_ik_target_names: Dict[str, str],
-    arm_pole_target_names: Dict[str, str],
+    active_transaction_stack: Optional[List[Any]] = None,
+    arm_ik_target_names: Dict[str, str] = ARM_IK_TARGET_NAMES,
+    arm_pole_target_names: Dict[str, str] = ARM_POLE_TARGET_NAMES,
     find_live_object_by_identity: Callable[
         [Optional[bpy.types.Object], Optional[int]],
         Optional[bpy.types.Object],
-    ],
-    verify_controller_object_transaction_authority: Callable[..., Optional[str]],
-    controller_role_for_name: Callable[[str], tuple[str, str] | None],
-    controller_constraint_binding_proven: Callable[..., bool],
+    ] = _find_live_object_by_identity,
+    verify_controller_object_transaction_authority: Callable[
+        ..., Optional[str]
+    ] = _verify_controller_object_transaction_authority,
+    controller_role_for_name: Callable[[str], tuple[str, str] | None] = _controller_role_for_name,
+    controller_constraint_binding_proven: Callable[..., bool] = _controller_constraint_binding_proven,
     controller_is_borrowed_by_other_armature: Callable[
         [bpy.types.Object, bpy.types.Object, tuple[str, str]],
         bool,
-    ],
+    ] = _controller_is_borrowed_by_other_armature,
 ) -> None:
     """Read-only Arm IK ownership admission; never upgrade an active transaction.
 
@@ -186,6 +208,8 @@ def _require_existing_arm_ik_controller_ownership(
     live Arm IK bindings remain the backwards-compatible proof of ownership.
     Unbound pre-existing Empties fail closed: their ownership is unknowable.
     """
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
     tx = active_transaction_stack[-1] if active_transaction_stack else None
     for side in ('L', 'R'):
         for name in (arm_ik_target_names[side], arm_pole_target_names[side]):
@@ -227,11 +251,15 @@ def _verify_transaction_wrong_type_object_ownership(
     tx: Optional[Any],
     arm: Optional[bpy.types.Object] = None,
     *,
-    transaction_state_cls: Any,
-    active_transaction_stack: List[Any],
-    verify_controller_object_transaction_authority: Callable[..., Optional[str]],
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    active_transaction_stack: Optional[List[Any]] = None,
+    verify_controller_object_transaction_authority: Callable[
+        ..., Optional[str]
+    ] = _verify_controller_object_transaction_authority,
 ) -> bool:
     """Only current transaction-created objects may be replaced by controller name."""
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
     if tx is None or tx.state != transaction_state_cls.ACTIVE:
         return False
     if not active_transaction_stack or active_transaction_stack[-1] is not tx:

@@ -7,6 +7,14 @@ from typing import Any, Callable, Dict, Optional
 
 import bpy
 
+from src.scene_transaction_integrity.layer1 import (
+    authorization_registry as _authorization_registry,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+
 
 # [INTRODUCED 2026-11-25T15:12:03+08:00]
 # NODE: 10-B / L1-11
@@ -15,12 +23,20 @@ import bpy
 # REASON: 将 Coordinator grant 生命周期管理从 arm_ik.py 物理迁入 Layer 1
 def _coordinator_reap_stale_authorization_grants(
     *,
-    coordinator_authorization_grants: Dict[str, Dict[str, Any]],
-    coordinator_grant_ttl_seconds: float,
-    isolated_failed_armatures: Dict[str, Dict[str, Any]],
-    managed_armature_identities: Dict[str, Any],
+    coordinator_authorization_grants: Optional[Dict[str, Dict[str, Any]]] = None,
+    coordinator_grant_ttl_seconds: Optional[float] = None,
+    isolated_failed_armatures: Optional[Dict[str, Dict[str, Any]]] = None,
+    managed_armature_identities: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Revoke expired, malformed, or provenance-stale grants without touching FAILED isolation."""
+    if coordinator_authorization_grants is None:
+        coordinator_authorization_grants = _authorization_registry._COORDINATOR_AUTHORIZATION_GRANTS
+    if coordinator_grant_ttl_seconds is None:
+        coordinator_grant_ttl_seconds = _authorization_registry._COORDINATOR_GRANT_TTL_SECONDS
+    if isolated_failed_armatures is None:
+        isolated_failed_armatures = _ISOLATED_FAILED_ARMATURES
+    if managed_armature_identities is None:
+        managed_armature_identities = _MANAGED_ARMATURE_IDENTITIES
     now = time.monotonic()
     for grant_id, grant in tuple(coordinator_authorization_grants.items()):
         if not isinstance(grant, dict):
@@ -65,9 +81,11 @@ def _coordinator_reap_stale_authorization_grants(
 def _coordinator_revoke_session_authorization_grants(
     session_id: str,
     *,
-    coordinator_authorization_grants: Dict[str, Dict[str, Any]],
+    coordinator_authorization_grants: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> None:
     """Invalidate all older grants for a session after a new issue or successful transition."""
+    if coordinator_authorization_grants is None:
+        coordinator_authorization_grants = _authorization_registry._COORDINATOR_AUTHORIZATION_GRANTS
     for grant_id, grant in tuple(coordinator_authorization_grants.items()):
         if isinstance(grant, dict) and grant.get("registry_session_id") == session_id:
             coordinator_authorization_grants.pop(grant_id, None)
@@ -194,7 +212,9 @@ def _issue_coordinator_authorization_grant(
 # REASON: 将 Coordinator grant 生命周期管理从 arm_ik.py 物理迁入 Layer 1
 def _clear_coordinator_authorization_grants(
     *,
-    coordinator_authorization_grants: Dict[str, Dict[str, Any]],
+    coordinator_authorization_grants: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> None:
     """Clear active Coordinator authorization grants (test fixture cleanup)."""
+    if coordinator_authorization_grants is None:
+        coordinator_authorization_grants = _authorization_registry._COORDINATOR_AUTHORIZATION_GRANTS
     coordinator_authorization_grants.clear()

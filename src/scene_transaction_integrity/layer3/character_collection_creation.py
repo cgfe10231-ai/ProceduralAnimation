@@ -2,6 +2,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 import bpy
 
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
 from src.scene_transaction_integrity.layer3.collection_queries import (
     _is_child_collection_linked_by_identity,
 )
@@ -149,10 +155,10 @@ def _cleanup_failed_character_collection_registration(
     initial_parent: bpy.types.Collection,
     active_tx: Any,
     *,
-    active_transaction_stack: List[Any],
-    transaction_state_cls: Any,
-    find_live_collection_by_identity: Callable[..., Any],
-    is_child_collection_linked_by_identity: Callable[..., bool],
+    active_transaction_stack: Optional[List[Any]] = None,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    find_live_collection_by_identity: Callable[..., Any] = _find_live_collection_by_identity,
+    is_child_collection_linked_by_identity: Callable[..., bool] = _is_child_collection_linked_by_identity,
 ) -> None:
     """Compensate only an unregistered, proven-fresh Collection.
 
@@ -160,6 +166,8 @@ def _cleanup_failed_character_collection_registration(
     deletion and will perform its authorized rollback. Never remove that
     Collection here or leave a stale receipt pointing at a destroyed ID.
     """
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
     if (not active_transaction_stack
             or active_transaction_stack[-1] is not active_tx
             or active_tx.state != transaction_state_cls.ACTIVE):

@@ -4,6 +4,13 @@ from typing import Any, Callable, Optional
 
 import bpy
 
+from src.scene_transaction_integrity.layer2.relationship_states import (
+    _RelationshipOperationState,
+)
+from src.scene_transaction_integrity.layer3.resource_contracts import (
+    _find_live_object_by_identity,
+)
+
 
 # [INTRODUCED 2026-11-23T23:07:30+08:00]
 # NODE: 10-B / L3-08
@@ -20,11 +27,11 @@ def _classify_constraint_target_pair_effect(
     dest_target_ptr: Optional[int],
     dest_subtarget: str,
     *,
-    relationship_operation_state_cls: Any,
+    relationship_operation_state_cls: Any = _RelationshipOperationState,
     find_live_object_by_identity: Callable[
         [Optional[bpy.types.Object], Optional[int]],
         Optional[bpy.types.Object],
-    ],
+    ] = _find_live_object_by_identity,
 ) -> Any:
     """Classify two-field RNA state conservatively after interrupted target writes.
 

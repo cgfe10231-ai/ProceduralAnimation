@@ -4,6 +4,33 @@ from typing import Any, Callable, Dict, Optional
 
 import bpy
 
+from src.scene_transaction_integrity.layer2 import (
+    session_verification as _session_verification,
+)
+from src.scene_transaction_integrity.layer2.session_records import (
+    _ArmatureIsolationState,
+    _ArmatureLivenessStatus,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.transaction_context import (
+    _ArmRigTransactionContext,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+    _FailedTransactionClass,
+)
+from src.scene_transaction_integrity.layer3.controller_ownership import (
+    _controller_is_borrowed_by_other_armature,
+    _controller_role_for_name,
+)
+from src.scene_transaction_integrity.layer3.resource_contracts import (
+    _controller_constraint_binding_proven,
+    _find_live_object_by_identity,
+)
+
 
 # [INTRODUCED 2026-11-25T15:59:57+08:00]
 # NODE: 10-B / L3-10
@@ -17,18 +44,18 @@ def _verify_failed_isolation_controller_recovery_authority(
     tx: Any,
     expected_role: Optional[tuple[str, str]],
     *,
-    transaction_context_cls: Any,
-    transaction_state_cls: Any,
-    managed_armature_identities: Dict[str, Any],
-    isolated_failed_armatures: Dict[str, Dict[str, Any]],
-    failed_transaction_class_cls: Any,
-    armature_isolation_state_cls: Any,
-    armature_liveness_status_cls: Any,
-    verify_armature_session_identity_record: Callable[..., Dict[str, Any]],
-    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]],
-    controller_role_for_name: Callable[[str], Optional[tuple[str, str]]],
-    controller_constraint_binding_proven: Callable[..., bool],
-    controller_is_borrowed_by_other_armature: Callable[..., bool],
+    transaction_context_cls: Any = _ArmRigTransactionContext,
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    managed_armature_identities: Optional[Dict[str, Any]] = None,
+    isolated_failed_armatures: Optional[Dict[str, Dict[str, Any]]] = None,
+    failed_transaction_class_cls: Any = _FailedTransactionClass,
+    armature_isolation_state_cls: Any = _ArmatureIsolationState,
+    armature_liveness_status_cls: Any = _ArmatureLivenessStatus,
+    verify_armature_session_identity_record: Optional[Callable[..., Dict[str, Any]]] = None,
+    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]] = _find_live_object_by_identity,
+    controller_role_for_name: Callable[[str], Optional[tuple[str, str]]] = _controller_role_for_name,
+    controller_constraint_binding_proven: Callable[..., bool] = _controller_constraint_binding_proven,
+    controller_is_borrowed_by_other_armature: Callable[..., bool] = _controller_is_borrowed_by_other_armature,
 ) -> tuple[bool, str]:
     """Verify that a FAILED-isolated transaction holds legal authority to restore original Controller state.
 
@@ -42,6 +69,14 @@ def _verify_failed_isolation_controller_recovery_authority(
     7. Absence of borrowing by any foreign Armature
     8. FAILED isolation class (FAILED-B or FAILED-C only; FAILED-D strictly denied)
     """
+    if managed_armature_identities is None:
+        managed_armature_identities = _MANAGED_ARMATURE_IDENTITIES
+    if isolated_failed_armatures is None:
+        isolated_failed_armatures = _ISOLATED_FAILED_ARMATURES
+    if verify_armature_session_identity_record is None:
+        verify_armature_session_identity_record = (
+            _session_verification._verify_armature_session_identity_record
+        )
     if not isinstance(tx, transaction_context_cls):
         return False, "Transaction is not an _ArmRigTransactionContext instance"
 

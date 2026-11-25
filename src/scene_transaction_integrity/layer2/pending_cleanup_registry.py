@@ -1,6 +1,10 @@
 """Pending committed cleanup transaction registry migrated from `src/rig/arm_ik.py` (Task 10-B Layer 2 L1-03)."""
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
+
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
 
 # [INTRODUCED 2026-11-24T13:16:00+08:00]
 # NODE: 10-B / L1-03
@@ -18,9 +22,11 @@ _PENDING_ARM_RIG_CLEANUPS: Dict[str, Any] = {}
 def _register_pending_arm_rig_cleanup(
     tx: Any,
     *,
-    transaction_state_cls: Any,
-    pending_arm_rig_cleanups: Dict[str, Any],
+    transaction_state_cls: Any = _ArmRigTransactionState,
+    pending_arm_rig_cleanups: Optional[Dict[str, Any]] = None,
 ) -> None:
+    if pending_arm_rig_cleanups is None:
+        pending_arm_rig_cleanups = _PENDING_ARM_RIG_CLEANUPS
     if tx.state != transaction_state_cls.CLEANUP_PENDING:
         raise RuntimeError(
             "Cannot register cleanup for "
@@ -37,9 +43,11 @@ def _register_pending_arm_rig_cleanup(
 # REASON: 将 Pending 注册表只读查询迁入 Layer 2，维持原始排序及 tuple 返回类型
 def get_pending_arm_rig_cleanup_ids(
     *,
-    pending_arm_rig_cleanups: Dict[str, Any],
+    pending_arm_rig_cleanups: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, ...]:
     """Return pending cleanup transaction IDs."""
+    if pending_arm_rig_cleanups is None:
+        pending_arm_rig_cleanups = _PENDING_ARM_RIG_CLEANUPS
     return tuple(
         sorted(pending_arm_rig_cleanups)
     )

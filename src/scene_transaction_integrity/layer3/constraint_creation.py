@@ -7,6 +7,12 @@ import bpy
 from src.scene_transaction_integrity.layer2.constraint_registration import (
     _revoke_compensated_constraint_creation_receipt,
 )
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+)
 
 
 # [INTRODUCED 2026-11-23T21:38:30+08:00]
@@ -201,14 +207,16 @@ def _cleanup_failed_constraint_creation(
     before_ptrs: frozenset[int],
     active_tx: Any,
     *,
-    active_transaction_stack: List[Any],
-    transaction_state_cls: Any,
+    active_transaction_stack: Optional[List[Any]] = None,
+    transaction_state_cls: Any = _ArmRigTransactionState,
 ) -> None:
     """Compensate an unregistered C-API creation; leave registered IDs to rollback.
 
     Never use a constraint name to select an object for destructive cleanup.
     An ambiguous partial registration is NOT permission to delete.
     """
+    if active_transaction_stack is None:
+        active_transaction_stack = _ACTIVE_TRANSACTION_STACK
     if (not active_transaction_stack
             or active_transaction_stack[-1] is not active_tx
             or active_tx.state != transaction_state_cls.ACTIVE):

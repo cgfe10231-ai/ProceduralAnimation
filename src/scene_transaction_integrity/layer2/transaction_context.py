@@ -30,6 +30,9 @@ from src.scene_transaction_integrity.layer2.relationship_mutation_state_update i
 from src.scene_transaction_integrity.layer2.relationship_states import (
     _RelationshipOperationState,
 )
+from src.scene_transaction_integrity.layer2 import (
+    session_identity as _session_identity,
+)
 from src.scene_transaction_integrity.layer2.session_records import (
     ArmatureSessionIdentityRecord,
 )
@@ -48,17 +51,26 @@ from src.scene_transaction_integrity.layer2.transaction_states import (
 # NODE: 10-B / L2-12
 # FUNCTION: _ArmRigTransactionContext
 # PURPOSE: 持有完整事务上下文状态、单调状态标记、Layer 2 注册委托与显式回调驱动的 Cleanup 重试入口
-# REASON: 将 _ArmRigTransactionContext 核心状态类迁入 Layer 2，保留 arm_ik.py 极薄跨层回调兼容子类及原有对象与寄存器身份
+# REASON: 将 _ArmRigTransactionContext 核心状态类迁入 Layer 2，作为全仓唯一的事务上下文实现所有者
 class _ArmRigTransactionContext:
     """Active transaction execution state tracking."""
+
+    _DEFAULT_CROSS_LAYER_CALLBACKS: Dict[str, Any] = {}
 
     def __init__(
         self,
         arm: bpy.types.Object,
         session_record: Optional[ArmatureSessionIdentityRecord] = None,
         *,
-        ensure_armature_session_identity: Callable[[bpy.types.Object], ArmatureSessionIdentityRecord],
+        ensure_armature_session_identity: Optional[
+            Callable[[bpy.types.Object], ArmatureSessionIdentityRecord]
+        ] = None,
     ) -> None:
+        if ensure_armature_session_identity is None:
+            ensure_armature_session_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS.get(
+                "ensure_armature_session_identity",
+                _session_identity.ensure_armature_session_identity,
+            )
         _initialize_arm_rig_transaction_context(
             self,
             arm,
@@ -121,8 +133,8 @@ class _ArmRigTransactionContext:
         self,
         obj: bpy.types.Object,
         *,
-        find_live_object_by_identity: Callable[..., Any],
-        controller_role_for_name: Callable[..., Any],
+        find_live_object_by_identity: Optional[Callable[..., Any]] = None,
+        controller_role_for_name: Optional[Callable[..., Any]] = None,
     ) -> None:
         """Preserve the legacy API; attest an explicit creation in this ACTIVE tx.
 
@@ -130,6 +142,10 @@ class _ArmRigTransactionContext:
         automatically inferred permission from a controller name or a mutable
         created_controller_objects entry alone.
         """
+        if find_live_object_by_identity is None:
+            find_live_object_by_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS["find_live_object_by_identity"]
+        if controller_role_for_name is None:
+            controller_role_for_name = self._DEFAULT_CROSS_LAYER_CALLBACKS["controller_role_for_name"]
         return _register_created_controller(
             self,
             obj,
@@ -146,9 +162,14 @@ class _ArmRigTransactionContext:
         pbone: bpy.types.PoseBone,
         con: bpy.types.Constraint,
         *,
-        ensure_armature_session_identity: Callable[[bpy.types.Object], Any],
+        ensure_armature_session_identity: Optional[Callable[[bpy.types.Object], Any]] = None,
     ) -> None:
         """Register a constraint created by this transaction for identity-based ownership."""
+        if ensure_armature_session_identity is None:
+            ensure_armature_session_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS.get(
+                "ensure_armature_session_identity",
+                _session_identity.ensure_armature_session_identity,
+            )
         return _register_created_constraint(
             self,
             pbone,
@@ -175,9 +196,11 @@ class _ArmRigTransactionContext:
         col: bpy.types.Collection,
         initial_parent: Optional[bpy.types.Collection] = None,
         *,
-        find_live_collection_by_identity: Callable[..., Any],
+        find_live_collection_by_identity: Optional[Callable[..., Any]] = None,
     ) -> None:
         """Attest a newly created, not-yet-linked Collection and intended parent."""
+        if find_live_collection_by_identity is None:
+            find_live_collection_by_identity = self._DEFAULT_CROSS_LAYER_CALLBACKS["find_live_collection_by_identity"]
         return _register_created_collection(
             self,
             col,
@@ -188,19 +211,42 @@ class _ArmRigTransactionContext:
     def retry_cleanup(
         self,
         *,
-        execute_stashed_cleanup_pass: Callable[..., Any],
-        authorized_remove_constraint: Callable[..., Any],
-        cleanup_stashed_constraints: Callable[..., Any],
-        cleanup_stashed_object: Callable[..., Any],
-        trigger_fault_injection: Callable[..., None],
-        remove_stashed_object_and_verify: Callable[..., Any],
-        find_stashed_datablock: Callable[..., Any],
-        remove_authorized_stashed_datablock: Callable[..., Any],
-        build_cleanup_result: Callable[..., Any],
-        cleanup_outcome_cls: Any,
-        cleanup_result_cls: Any,
+        execute_stashed_cleanup_pass: Optional[Callable[..., Any]] = None,
+        authorized_remove_constraint: Optional[Callable[..., Any]] = None,
+        cleanup_stashed_constraints: Optional[Callable[..., Any]] = None,
+        cleanup_stashed_object: Optional[Callable[..., Any]] = None,
+        trigger_fault_injection: Optional[Callable[..., None]] = None,
+        remove_stashed_object_and_verify: Optional[Callable[..., Any]] = None,
+        find_stashed_datablock: Optional[Callable[..., Any]] = None,
+        remove_authorized_stashed_datablock: Optional[Callable[..., Any]] = None,
+        build_cleanup_result: Optional[Callable[..., Any]] = None,
+        cleanup_outcome_cls: Any = None,
+        cleanup_result_cls: Any = None,
     ) -> Any:
         """Idempotently retry irreversible cleanup of pending stashed resources."""
+        cbs = self._DEFAULT_CROSS_LAYER_CALLBACKS
+        if execute_stashed_cleanup_pass is None:
+            execute_stashed_cleanup_pass = cbs["execute_stashed_cleanup_pass"]
+        if authorized_remove_constraint is None:
+            authorized_remove_constraint = cbs["authorized_remove_constraint"]
+        if cleanup_stashed_constraints is None:
+            cleanup_stashed_constraints = cbs["cleanup_stashed_constraints"]
+        if cleanup_stashed_object is None:
+            cleanup_stashed_object = cbs["cleanup_stashed_object"]
+        if trigger_fault_injection is None:
+            trigger_fault_injection = cbs["trigger_fault_injection"]
+        if remove_stashed_object_and_verify is None:
+            remove_stashed_object_and_verify = cbs["remove_stashed_object_and_verify"]
+        if find_stashed_datablock is None:
+            find_stashed_datablock = cbs["find_stashed_datablock"]
+        if remove_authorized_stashed_datablock is None:
+            remove_authorized_stashed_datablock = cbs["remove_authorized_stashed_datablock"]
+        if build_cleanup_result is None:
+            build_cleanup_result = cbs["build_cleanup_result"]
+        if cleanup_outcome_cls is None:
+            cleanup_outcome_cls = cbs["cleanup_outcome_cls"]
+        if cleanup_result_cls is None:
+            cleanup_result_cls = cbs["cleanup_result_cls"]
         return execute_stashed_cleanup_pass(
             self,
             transaction_state_cls=_ArmRigTransactionState,

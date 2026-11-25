@@ -4,6 +4,18 @@ from typing import Any, Callable, Dict, List, Optional
 
 import bpy
 
+from src.scene_transaction_integrity.layer3.character_collection_creation import (
+    _find_live_collection_by_identity,
+)
+from src.scene_transaction_integrity.layer3.collection_queries import (
+    _is_child_collection_linked_by_identity,
+    _is_object_linked_to_collection_by_identity,
+)
+from src.scene_transaction_integrity.layer3.resource_contracts import (
+    _find_live_object_by_identity,
+    _matrix_equals,
+)
+
 
 # [INTRODUCED 2026-11-25T17:15:39+08:00]
 # NODE: 10-B / L3-13
@@ -17,8 +29,8 @@ def _authorized_restore_snapshot_collection_child(
     child_ptr: int,
     restoration_errors: List[str],
     *,
-    find_live_collection_by_identity: Callable[..., Optional[bpy.types.Collection]],
-    is_child_collection_linked_by_identity: Callable[..., bool],
+    find_live_collection_by_identity: Callable[..., Optional[bpy.types.Collection]] = _find_live_collection_by_identity,
+    is_child_collection_linked_by_identity: Callable[..., bool] = _is_child_collection_linked_by_identity,
 ) -> None:
     """Restore a baseline Collection hierarchy edge by original live identity."""
     parent = find_live_collection_by_identity(parent_ref, parent_ptr)
@@ -54,9 +66,9 @@ def _authorized_ensure_snapshot_collection_link(
     obj_ptr: Optional[int],
     restoration_errors: List[str],
     *,
-    find_live_collection_by_identity: Callable[..., Optional[bpy.types.Collection]],
-    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]],
-    is_object_linked_to_collection_by_identity: Callable[..., bool],
+    find_live_collection_by_identity: Callable[..., Optional[bpy.types.Collection]] = _find_live_collection_by_identity,
+    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]] = _find_live_object_by_identity,
+    is_object_linked_to_collection_by_identity: Callable[..., bool] = _is_object_linked_to_collection_by_identity,
 ) -> None:
     """Layer 3 restoration of a pre-existing snapshot Collection <-> Object membership by verified identity."""
     if col is None:
@@ -224,8 +236,8 @@ def _authorized_restore_snapshot_object_parent(
     orig_inverse: Any,
     restoration_errors: List[str],
     *,
-    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]],
-    matrix_equals: Callable[..., bool],
+    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]] = _find_live_object_by_identity,
+    matrix_equals: Callable[..., bool] = _matrix_equals,
 ) -> None:
     """Restore a snapshot parent relationship only with proved live identities."""
     live_obj = find_live_object_by_identity(obj_ref, obj_ptr)
@@ -276,7 +288,7 @@ def _authorized_restore_snapshot_constraint_targets_without_tx(
     bone_name: str,
     restoration_errors: List[str],
     *,
-    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]],
+    find_live_object_by_identity: Callable[..., Optional[bpy.types.Object]] = _find_live_object_by_identity,
 ) -> None:
     """Restore snapshot Constraint target pairs, refusing unproved Blender identities.
 

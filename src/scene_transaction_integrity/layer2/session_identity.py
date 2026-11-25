@@ -1,9 +1,14 @@
 """Armature session identity resolution and registration migrated from `src/rig/arm_ik.py` (Task 10-B Layer 2 L2-03)."""
 
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
-import bpy
-
+from src.scene_transaction_integrity.layer2 import (
+    identity_helpers as _identity_helpers,
+    session_verification as _session_verification,
+)
 from src.scene_transaction_integrity.layer2.session_records import (
     ArmatureSessionIdentityRecord,
     _ArmatureIsolationState,
@@ -12,9 +17,9 @@ from src.scene_transaction_integrity.layer2.session_records import (
 from src.scene_transaction_integrity.layer2.session_registries import (
     _MANAGED_ARMATURE_IDENTITIES,
 )
-from src.scene_transaction_integrity.layer2.session_verification import (
-    _verify_armature_session_identity_record,
-)
+
+if TYPE_CHECKING:
+    import bpy
 
 
 def ensure_armature_session_identity(
@@ -24,13 +29,15 @@ def ensure_armature_session_identity(
     if arm is None:
         raise RuntimeError("Cannot resolve ArmatureSessionIdentityRecord: armature object is None")
 
+    bpy_mod = _identity_helpers.bpy
+
     # 1. Check if arm matches an existing live verified record
     for rec in _MANAGED_ARMATURE_IDENTITIES.values():
         if rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED and rec.isolation_state not in (
             _ArmatureIsolationState.TOMBSTONED_FAILED_D,
             _ArmatureIsolationState.ARCHIVED_RETIRED,
         ):
-            ver = _verify_armature_session_identity_record(rec, candidate_arm=arm)
+            ver = _session_verification._verify_armature_session_identity_record(rec, candidate_arm=arm)
             if ver["is_valid"]:
                 return rec
 
@@ -58,7 +65,7 @@ def ensure_armature_session_identity(
     try:
         in_live_objects = any(
             o.as_pointer() == arm_ptr and o == arm
-            for o in bpy.data.objects.values()
+            for o in bpy_mod.data.objects.values()
         )
     except BaseException as exc:
         raise RuntimeError(

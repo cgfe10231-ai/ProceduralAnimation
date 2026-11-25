@@ -3,8 +3,20 @@
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
+from src.scene_transaction_integrity.layer2 import (
+    audit_registries as _audit_registries,
+    identity_helpers as _identity_helpers,
+)
+from src.scene_transaction_integrity.layer2.relationship_states import (
+    _RelationshipOperationState,
+)
 from src.scene_transaction_integrity.layer2.session_records import (
     ArmatureSessionIdentityRecord,
+    _ArmatureIsolationState,
+    _ArmatureLivenessStatus,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _FailedTransactionClass,
 )
 
 _MANAGED_ARMATURE_IDENTITIES: Dict[str, ArmatureSessionIdentityRecord] = {}
@@ -25,15 +37,21 @@ def _record_armature_failure_isolation_by_coordinator(
     evidence_status: str = "SNAPSHOT_AVAILABLE",
     missing_evidence_reasons: Optional[List[str]] = None,
     *,
-    failed_transaction_class_cls: Any,
-    armature_isolation_state_cls: Any,
-    armature_liveness_status_cls: Any,
-    relationship_operation_state_cls: Any,
-    isolated_failed_armatures: Dict[str, Dict[str, Any]],
-    record_failed_a_audit: Callable[..., Dict[str, Any]],
-    check_original_object_liveness: Callable[..., Dict[str, Any]],
+    failed_transaction_class_cls: Any = _FailedTransactionClass,
+    armature_isolation_state_cls: Any = _ArmatureIsolationState,
+    armature_liveness_status_cls: Any = _ArmatureLivenessStatus,
+    relationship_operation_state_cls: Any = _RelationshipOperationState,
+    isolated_failed_armatures: Optional[Dict[str, Dict[str, Any]]] = None,
+    record_failed_a_audit: Optional[Callable[..., Dict[str, Any]]] = None,
+    check_original_object_liveness: Optional[Callable[..., Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Layer 2: Record FAILED-B / FAILED-C / FAILED-D isolation or tombstone under Layer 1 Coordinator authority."""
+    if isolated_failed_armatures is None:
+        isolated_failed_armatures = _ISOLATED_FAILED_ARMATURES
+    if record_failed_a_audit is None:
+        record_failed_a_audit = _audit_registries._record_failed_a_audit
+    if check_original_object_liveness is None:
+        check_original_object_liveness = _identity_helpers._check_original_object_liveness
     f_class = (
         failure_class
         if isinstance(failure_class, failed_transaction_class_cls)
