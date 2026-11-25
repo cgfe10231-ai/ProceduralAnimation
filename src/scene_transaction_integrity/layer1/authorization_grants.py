@@ -7,11 +7,6 @@ from typing import Any, Callable, Dict, Optional
 
 import bpy
 
-from src.scene_transaction_integrity.layer2.session_records import (
-    _ArmatureIsolationState,
-    _FailedTransactionClass,
-)
-
 
 # [INTRODUCED 2026-11-25T15:12:03+08:00]
 # NODE: 10-B / L1-11
@@ -96,7 +91,9 @@ def _issue_coordinator_authorization_grant(
     coordinator_revoke_session_authorization_grants: Callable[[str], None],
     verify_deisolation_evidence: Callable[..., Dict[str, Any]],
     verify_dead_armature_tombstone_retirement_evidence: Callable[..., Dict[str, Any]],
-    **kwargs: Any,
+    failed_transaction_class_cls: Any,
+    armature_isolation_state_cls: Any,
+    legacy_kwargs: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Layer 1 Coordinator: Issue a single-use internal authorization grant binding verified Layer 5 recovery evidence.
 
@@ -154,7 +151,7 @@ def _issue_coordinator_authorization_grant(
             err_reasons = "; ".join(evidence.get("reasons", [])) or f"status is {evidence.get('status')}"
             raise RuntimeError(f"Cannot issue Coordinator authorization grant: tombstone retirement verification failed: {err_reasons}")
 
-        if failure_class != _FailedTransactionClass.FAILED_D.value or current_iso_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D.value:
+        if failure_class != failed_transaction_class_cls.FAILED_D.value or current_iso_state != armature_isolation_state_cls.TOMBSTONED_FAILED_D.value:
             raise RuntimeError(f"Cannot issue Coordinator authorization grant: session '{session_id}' is not an active FAILED-D tombstone")
 
         if evidence.get("registry_session_id") != session_id:

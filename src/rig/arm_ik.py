@@ -362,7 +362,9 @@ def _issue_coordinator_authorization_grant(
         coordinator_revoke_session_authorization_grants=_coordinator_revoke_session_authorization_grants,
         verify_deisolation_evidence=verify_armature_deisolation_evidence,
         verify_dead_armature_tombstone_retirement_evidence=_verify_dead_armature_tombstone_retirement_evidence,
-        **kwargs,
+        failed_transaction_class_cls=_FailedTransactionClass,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        legacy_kwargs=kwargs,
     )
 
 
@@ -396,6 +398,7 @@ def _clear_or_retire_failure_isolation_by_coordinator(
         coordinator_revoke_session_authorization_grants=_coordinator_revoke_session_authorization_grants,
         verify_deisolation_evidence=verify_armature_deisolation_evidence,
         verify_dead_armature_tombstone_retirement_evidence=_verify_dead_armature_tombstone_retirement_evidence,
+        armature_isolation_state_cls=_ArmatureIsolationState,
     )
 
 

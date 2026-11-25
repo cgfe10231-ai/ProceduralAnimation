@@ -4,10 +4,6 @@ import math
 import time
 from typing import Any, Callable, Dict, Optional
 
-from src.scene_transaction_integrity.layer2.session_records import (
-    _ArmatureIsolationState,
-)
-
 
 # [INTRODUCED 2026-11-25T15:12:03+08:00]
 # NODE: 10-B / L1-11
@@ -30,6 +26,7 @@ def _clear_or_retire_failure_isolation_by_coordinator(
     coordinator_revoke_session_authorization_grants: Callable[[str], None],
     verify_deisolation_evidence: Callable[..., Dict[str, Any]],
     verify_dead_armature_tombstone_retirement_evidence: Callable[..., Dict[str, Any]],
+    armature_isolation_state_cls: Any,
 ) -> Dict[str, Any]:
     """Layer 2: Clear FAILED-B/C isolation or archive FAILED-D tombstone exclusively for Layer 1 Coordinator."""
     if authorization_grant is None:
@@ -169,33 +166,33 @@ def _clear_or_retire_failure_isolation_by_coordinator(
     grant_candidate["consumed"] = True
 
     if action == "CLEAR_TO_NONE":
-        if session_rec.isolation_state == _ArmatureIsolationState.TOMBSTONED_FAILED_D:
+        if session_rec.isolation_state == armature_isolation_state_cls.TOMBSTONED_FAILED_D:
             raise RuntimeError("Layer 2 rejected de-isolation: TOMBSTONED_FAILED_D cannot return to active status")
         previous_state = session_rec.isolation_state.value
-        session_rec.isolation_state = _ArmatureIsolationState.NONE
+        session_rec.isolation_state = armature_isolation_state_cls.NONE
         session_rec.lifecycle_stage = "NORMAL_TERMINAL"
         isolated_failed_armatures.pop(session_id, None)
         coordinator_revoke_session_authorization_grants(session_id)
         return {
             "registry_session_id": session_id,
             "previous_isolation_state": previous_state,
-            "new_isolation_state": _ArmatureIsolationState.NONE.value,
+            "new_isolation_state": armature_isolation_state_cls.NONE.value,
             "action": "CLEAR_TO_NONE",
             "reason": reason,
             "grant_id": grant_id,
         }
     elif action == "ARCHIVE_TOMBSTONE":
-        if session_rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D:
+        if session_rec.isolation_state != armature_isolation_state_cls.TOMBSTONED_FAILED_D:
             raise RuntimeError(
                 f"Layer 2 rejected tombstone retirement: session {session_id} is in {session_rec.isolation_state}, "
                 "expected TOMBSTONED_FAILED_D"
             )
         previous_state = session_rec.isolation_state.value
-        session_rec.isolation_state = _ArmatureIsolationState.ARCHIVED_RETIRED
+        session_rec.isolation_state = armature_isolation_state_cls.ARCHIVED_RETIRED
         session_rec.lifecycle_stage = "ARCHIVED_RETIRED"
-        iso_rec["isolation_state"] = _ArmatureIsolationState.ARCHIVED_RETIRED.value
+        iso_rec["isolation_state"] = armature_isolation_state_cls.ARCHIVED_RETIRED.value
         if session_rec.tombstone_record is not None:
-            session_rec.tombstone_record["isolation_state"] = _ArmatureIsolationState.ARCHIVED_RETIRED.value
+            session_rec.tombstone_record["isolation_state"] = armature_isolation_state_cls.ARCHIVED_RETIRED.value
             session_rec.tombstone_record["retirement_state"] = "ARCHIVED_RETIRED"
             session_rec.tombstone_record["retirement_reason"] = reason
         isolated_failed_armatures.pop(session_id, None)
@@ -204,7 +201,7 @@ def _clear_or_retire_failure_isolation_by_coordinator(
         return {
             "registry_session_id": session_id,
             "previous_isolation_state": previous_state,
-            "new_isolation_state": _ArmatureIsolationState.ARCHIVED_RETIRED.value,
+            "new_isolation_state": armature_isolation_state_cls.ARCHIVED_RETIRED.value,
             "action": "ARCHIVE_TOMBSTONE",
             "reason": reason,
             "grant_id": grant_id,
