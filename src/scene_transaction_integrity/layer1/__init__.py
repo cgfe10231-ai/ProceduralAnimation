@@ -7,6 +7,10 @@ from src.scene_transaction_integrity.layer1.cleanup_validation import (
     _coordinator_validate_cleanup_preflight,
     _coordinator_validate_cleanup_result_contract,
 )
+from src.scene_transaction_integrity.layer1.isolation_governance import (
+    request_armature_deisolation,
+    retire_dead_armature_tombstone,
+)
 from src.scene_transaction_integrity.layer1.outermost_admission import (
     _admit_outermost_arm_rig_transaction,
     _assert_admission_identity_valid,
@@ -61,5 +65,7 @@ __all__ = (
     "_safe_object_name",
     "_snapshot_and_activate_transaction",
     "_sweep_dead_managed_armature_identities",
+    "request_armature_deisolation",
+    "retire_dead_armature_tombstone",
     "retry_pending_arm_rig_cleanup",
 )

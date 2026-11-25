@@ -1,3 +1,7 @@
+from src.scene_transaction_integrity.layer5.isolation_evidence import (
+    _verify_dead_armature_tombstone_retirement_evidence,
+    verify_armature_deisolation_evidence,
+)
 from src.scene_transaction_integrity.layer5.rollback_execution import (
     _rollback_arm_rig_state,
 )
@@ -23,5 +27,7 @@ __all__ = (
     "_rollback_arm_rig_state",
     "_snapshot_arm_rig_state",
     "_verify_arm_rig_state_restored",
+    "_verify_dead_armature_tombstone_retirement_evidence",
     "_verify_pre_write_zero_mutation_and_integrity",
+    "verify_armature_deisolation_evidence",
 )

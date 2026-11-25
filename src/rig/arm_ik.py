@@ -71,6 +71,8 @@ from src.scene_transaction_integrity.layer1 import (
     _safe_object_name,
     _snapshot_and_activate_transaction as _layer1_snapshot_and_activate_transaction,
     _sweep_dead_managed_armature_identities as _layer1_sweep_dead_managed_armature_identities,
+    request_armature_deisolation as _layer1_request_armature_deisolation,
+    retire_dead_armature_tombstone as _layer1_retire_dead_armature_tombstone,
     retry_pending_arm_rig_cleanup as _layer1_retry_pending_arm_rig_cleanup,
 )
 from src.scene_transaction_integrity.layer2 import (
@@ -172,7 +174,9 @@ from src.scene_transaction_integrity.layer5 import (
     _rollback_arm_rig_state as _layer5_rollback_arm_rig_state,
     _snapshot_arm_rig_state as _layer5_snapshot_arm_rig_state,
     _verify_arm_rig_state_restored as _layer5_verify_arm_rig_state_restored,
+    _verify_dead_armature_tombstone_retirement_evidence as _layer5_verify_dead_armature_tombstone_retirement_evidence,
     _verify_pre_write_zero_mutation_and_integrity as _layer5_verify_pre_write_zero_mutation_and_integrity,
+    verify_armature_deisolation_evidence as _layer5_verify_armature_deisolation_evidence,
 )
 from src.scene_transaction_integrity.layer6 import (
     _CleanupOutcome,
@@ -2780,282 +2784,47 @@ def verify_armature_deisolation_evidence(
     session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Layer 5: Read-only verification of recovery evidence before de-isolating an Armature (Section 8.2)."""
-    _sweep_dead_managed_armature_identities()
-
-    session_rec: Optional[ArmatureSessionIdentityRecord] = None
-    if session_id is not None:
-        session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
-    elif arm is not None:
-        for rec in _MANAGED_ARMATURE_IDENTITIES.values():
-            if rec.original_blender_ref is arm:
-                session_rec = rec
-                break
-            if rec.liveness_status == _ArmatureLivenessStatus.ALIVE_VERIFIED:
-                ver = _verify_armature_session_identity_record(rec, candidate_arm=arm)
-                if ver["is_valid"]:
-                    session_rec = rec
-                    break
-
-    resolved_session_id = session_rec.registry_session_id if session_rec is not None else session_id
-    iso_rec = _ISOLATED_FAILED_ARMATURES.get(resolved_session_id) if resolved_session_id else None
-    archived_rec = _ARCHIVED_FAILED_D_TOMBSTONES.get(resolved_session_id) if resolved_session_id else None
-
-    if session_rec is None or (iso_rec is None and archived_rec is None):
-        return {
-            "can_deisolate": False,
-            "status": "NOT_ISOLATED",
-            "case": "NONE",
-            "registry_session_id": resolved_session_id,
-            "failure_class": None,
-            "isolation_state": (session_rec.isolation_state.value if session_rec is not None else None),
-            "reasons": ["Armature session is not present in _ISOLATED_FAILED_ARMATURES"],
-        }
-
-    if archived_rec is not None or session_rec.isolation_state == _ArmatureIsolationState.ARCHIVED_RETIRED:
-        return {
-            "can_deisolate": False,
-            "status": "REJECTED_ARCHIVED_TOMBSTONE",
-            "case": "CASE_3_DEAD_TOMBSTONE",
-            "registry_session_id": resolved_session_id,
-            "failure_class": _FailedTransactionClass.FAILED_D.value,
-            "isolation_state": _ArmatureIsolationState.ARCHIVED_RETIRED.value,
-            "reasons": ["FAILED-D tombstone is already ARCHIVED_RETIRED and cannot return to active status"],
-        }
-
-    failure_class = iso_rec.get("failure_class")
-    target_arm = arm if arm is not None else session_rec.original_blender_ref
-    id_ver = _verify_armature_session_identity_record(session_rec, candidate_arm=target_arm)
-
-    # Case 3: FAILED-D or dead Armature tombstone
-    if (
-        failure_class == _FailedTransactionClass.FAILED_D.value
-        or session_rec.isolation_state == _ArmatureIsolationState.TOMBSTONED_FAILED_D
-        or session_rec.liveness_status == _ArmatureLivenessStatus.INVALIDATED_DEAD
-    ):
-        reasons = [
-            "FAILED-D dead Armature tombstone cannot be restored to active status; "
-            "use retire_dead_armature_tombstone after verifying residual resources"
-        ]
-        if not id_ver["is_valid"]:
-            reasons.extend(id_ver["reasons"])
-        return {
-            "can_deisolate": False,
-            "status": "REJECTED_DEAD_ARMATURE_TOMBSTONE",
-            "case": "CASE_3_DEAD_TOMBSTONE",
-            "registry_session_id": resolved_session_id,
-            "failure_class": failure_class,
-            "isolation_state": session_rec.isolation_state.value,
-            "reasons": reasons,
-        }
-
-    # Case 2: No trusted pre-transaction snapshot available
-    snapshot = iso_rec.get("snapshot_reference")
-    snapshot_trusted = bool(iso_rec.get("snapshot_trusted", False) and snapshot is not None)
-    if not snapshot_trusted:
-        missing_reasons = list(
-            iso_rec.get("missing_evidence_reasons")
-            or ["Trusted pre-transaction snapshot is missing; recovery evidence is insufficient"]
-        )
-        return {
-            "can_deisolate": False,
-            "status": "RECOVERY_EVIDENCE_INSUFFICIENT",
-            "case": "CASE_2_NO_TRUSTED_SNAPSHOT",
-            "registry_session_id": resolved_session_id,
-            "failure_class": failure_class,
-            "isolation_state": session_rec.isolation_state.value,
-            "reasons": missing_reasons,
-        }
-
-    # Case 1: Trusted snapshot exists -> verify all 8 mandatory conditions simultaneously
-    reasons: List[str] = []
-
-    # Condition 1: 7-condition ArmatureSessionIdentityRecord verification
-    if not id_ver["is_valid"]:
-        reasons.extend(id_ver["reasons"])
-
-    # Condition 7 (checked before snapshot restore call because _verify_arm_rig_state_restored also checks stack):
-    # _ACTIVE_TRANSACTION_STACK is empty
-    if len(_ACTIVE_TRANSACTION_STACK) != 0:
-        reasons.append(
-            f"Active transaction stack is not empty (contains {len(_ACTIVE_TRANSACTION_STACK)} active transaction(s))"
-        )
-
-    # Condition 2: Current Armature, Controllers, PoseBones, Constraints, and Collections match snapshot 100%
-    if id_ver["is_valid"] and target_arm is not None:
-        try:
-            _verify_arm_rig_state_restored(target_arm, snapshot, active_tx=None)
-        except BaseException as ver_exc:
-            reasons.append(f"Snapshot state verification failed: {ver_exc}")
-
-    # Condition 3: No transaction-created Controllers remain in bpy.data.objects by identity
-    for ctrl_rec in iso_rec.get("created_controller_objects", []):
-        c_ref = ctrl_rec.get("obj_ref")
-        c_ptr = ctrl_rec.get("obj_ptr")
-        c_name = ctrl_rec.get("created_name", "<unknown>")
-        if c_ptr is not None and _find_live_object_by_identity(c_ref, c_ptr) is not None:
-            reasons.append(f"Transaction-created controller '{c_name}' (ptr={c_ptr}) still exists in bpy.data.objects")
-
-    # Condition 4: No transaction-created Constraints remain on any PoseBone by identity
-    if id_ver["is_valid"] and target_arm is not None and getattr(target_arm, "pose", None) is not None:
-        for con_rec in iso_rec.get("created_constraints", []):
-            b_name = con_rec.get("bone_name")
-            con_ptr = con_rec.get("con_ptr")
-            con_name = con_rec.get("created_name", "<unknown>")
-            pbone = target_arm.pose.bones.get(b_name) if b_name else None
-            if pbone is not None and con_ptr is not None:
-                for live_con in pbone.constraints:
-                    try:
-                        if live_con.as_pointer() == con_ptr:
-                            reasons.append(
-                                f"Transaction-created constraint '{con_name}' (ptr={con_ptr}) still exists on bone '{b_name}'"
-                            )
-                            break
-                    except ReferenceError:
-                        continue
-
-    # Condition 5: No transaction-created Collections remain in bpy.data.collections by identity
-    for col_rec in iso_rec.get("created_collections", []):
-        col_ref = col_rec.get("col_ref")
-        col_ptr = col_rec.get("col_ptr")
-        col_name = col_rec.get("created_name", "<unknown>")
-        if _find_live_collection_by_identity(col_ref, col_ptr) is not None:
-            reasons.append(
-                f"Transaction-created collection '{col_name}' (ptr={col_ptr}) still exists in bpy.data.collections"
-            )
-
-    # Condition 6: Relationship operation log contains no unverified RECOVERY_UNCERTAIN residual relationships
-    for op_rec in iso_rec.get("prepared_relationship_mutations", []):
-        op_id = op_rec.get("operation_id", "<unknown>")
-        op_state = op_rec.get("operation_state")
-        if op_state == _RelationshipOperationState.RECOVERY_UNCERTAIN:
-            reasons.append(
-                f"Relationship operation '{op_id}' remains in unverified RECOVERY_UNCERTAIN state"
-            )
-        elif op_state not in (
-            _RelationshipOperationState.NO_EFFECT,
-            _RelationshipOperationState.REVERTED,
-        ):
-            reasons.append(
-                f"Relationship operation '{op_id}' is in non-terminal rollback state '{op_state}'"
-            )
-
-    # Condition 8: No unresolved CLEANUP_PENDING records for this Armature
-    pending_cleanups = [
-        c_tx_id
-        for c_tx_id, c_tx in _PENDING_ARM_RIG_CLEANUPS.items()
-        if c_tx.arm_ptr == session_rec.registration_pointer
-        or getattr(c_tx, "session_id", None) == resolved_session_id
-    ]
-    if pending_cleanups:
-        reasons.append(
-            f"Unresolved CLEANUP_PENDING transaction(s) exist for this Armature: {sorted(pending_cleanups)}"
-        )
-
-    can_deisolate = len(reasons) == 0
-    return {
-        "can_deisolate": can_deisolate,
-        "status": "RECOVERY_VERIFIED" if can_deisolate else "RECOVERY_VERIFICATION_FAILED",
-        "case": "CASE_1_SNAPSHOT_VERIFIED",
-        "registry_session_id": resolved_session_id,
-        "transaction_id": iso_rec.get("transaction_id"),
-        "failure_class": failure_class,
-        "isolation_state": session_rec.isolation_state.value,
-        "reasons": reasons,
-    }
+    return _layer5_verify_armature_deisolation_evidence(
+        arm=arm,
+        session_id=session_id,
+        sweep_dead_managed_armature_identities=(
+            _sweep_dead_managed_armature_identities
+        ),
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        archived_failed_d_tombstones=_ARCHIVED_FAILED_D_TOMBSTONES,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+        armature_liveness_status_cls=_ArmatureLivenessStatus,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        failed_transaction_class_cls=_FailedTransactionClass,
+        relationship_operation_state_cls=_RelationshipOperationState,
+        verify_armature_session_identity_record=(
+            _verify_armature_session_identity_record
+        ),
+        verify_arm_rig_state_restored=_verify_arm_rig_state_restored,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        find_live_collection_by_identity=_find_live_collection_by_identity,
+    )
 
 
 def _verify_dead_armature_tombstone_retirement_evidence(session_id: str) -> Dict[str, Any]:
     """Layer 5: Read-only verification of dead Armature tombstone retirement conditions (Section 8.2 Case 3)."""
-    _sweep_dead_managed_armature_identities()
-
-    session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
-    iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id)
-
-    if session_rec is None or iso_rec is None:
-        return {
-            "can_retire": False,
-            "status": "TOMBSTONE_NOT_FOUND",
-            "registry_session_id": session_id,
-            "reasons": [f"Active FAILED-D tombstone for session '{session_id}' not found"],
-        }
-
-    reasons: List[str] = []
-
-    if (
-        iso_rec.get("failure_class") != _FailedTransactionClass.FAILED_D.value
-        or session_rec.isolation_state != _ArmatureIsolationState.TOMBSTONED_FAILED_D
-    ):
-        reasons.append(
-            f"Session '{session_id}' is not a FAILED-D tombstone "
-            f"(failure_class={iso_rec.get('failure_class')}, isolation_state={session_rec.isolation_state})"
-        )
-
-    # 1. Confirm original Armature is genuinely absent from live Blender objects
-    # (Never mistake a same-name replacement Armature for the original,
-    # and NEVER mistake data invalidation on an existing Armature for object death)
-    obj_liveness = _check_original_object_liveness(session_rec)
-    if obj_liveness["status"] != "ABSENT":
-        if obj_liveness["status"] == "UNKNOWN":
-            reasons.append(
-                f"OBJECT_EXISTENCE_UNVERIFIED: Cannot verify absence of original Armature "
-                f"(ptr={session_rec.registration_pointer}, status=UNKNOWN); cannot retire tombstone"
-            )
-        else:
-            reasons.append(
-                f"Original Armature object still exists in bpy.data.objects (ptr={session_rec.registration_pointer}); "
-                "cannot retire tombstone"
-            )
-    elif session_rec.in_live_blender_collection:
-        reasons.append(
-            f"Original Armature object still marked as present in live collection (ptr={session_rec.registration_pointer}); "
-            "cannot retire tombstone"
-        )
-
-    # 2. Confirm no transaction-created objects or collections from the failed transaction remain in bpy.data
-    for ctrl_rec in iso_rec.get("created_controller_objects", []):
-        c_ref = ctrl_rec.get("obj_ref")
-        c_ptr = ctrl_rec.get("obj_ptr")
-        c_name = ctrl_rec.get("created_name", "<unknown>")
-        if c_ptr is not None and _find_live_object_by_identity(c_ref, c_ptr) is not None:
-            reasons.append(
-                f"Residual transaction-created controller '{c_name}' (ptr={c_ptr}) still exists in bpy.data.objects"
-            )
-
-    for col_rec in iso_rec.get("created_collections", []):
-        col_ref = col_rec.get("col_ref")
-        col_ptr = col_rec.get("col_ptr")
-        col_name = col_rec.get("created_name", "<unknown>")
-        if _find_live_collection_by_identity(col_ref, col_ptr) is not None:
-            reasons.append(
-                f"Residual transaction-created collection '{col_name}' (ptr={col_ptr}) still exists in bpy.data.collections"
-            )
-
-    # 3. Confirm no unresolved CLEANUP_PENDING records remain for this session
-    pending_cleanups = [
-        c_tx_id
-        for c_tx_id, c_tx in _PENDING_ARM_RIG_CLEANUPS.items()
-        if getattr(c_tx, "session_id", None) == session_id
-        or c_tx.arm_ptr == session_rec.registration_pointer
-    ]
-    if pending_cleanups:
-        reasons.append(
-            f"Unresolved CLEANUP_PENDING transaction(s) remain for dead Armature session: {sorted(pending_cleanups)}"
-        )
-
-    # 4. Confirm _ACTIVE_TRANSACTION_STACK is empty
-    if len(_ACTIVE_TRANSACTION_STACK) != 0:
-        reasons.append("Active transaction stack is not empty")
-
-    can_retire = len(reasons) == 0
-    return {
-        "can_retire": can_retire,
-        "status": "TOMBSTONE_RETIREMENT_VERIFIED" if can_retire else "TOMBSTONE_RETIREMENT_REJECTED",
-        "registry_session_id": session_id,
-        "transaction_id": iso_rec.get("transaction_id"),
-        "failure_class": iso_rec.get("failure_class"),
-        "isolation_state": session_rec.isolation_state.value,
-        "reasons": reasons,
-    }
+    return _layer5_verify_dead_armature_tombstone_retirement_evidence(
+        session_id=session_id,
+        sweep_dead_managed_armature_identities=(
+            _sweep_dead_managed_armature_identities
+        ),
+        managed_armature_identities=_MANAGED_ARMATURE_IDENTITIES,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        failed_transaction_class_cls=_FailedTransactionClass,
+        armature_isolation_state_cls=_ArmatureIsolationState,
+        check_original_object_liveness=_check_original_object_liveness,
+        find_live_object_by_identity=_find_live_object_by_identity,
+        find_live_collection_by_identity=_find_live_collection_by_identity,
+        pending_arm_rig_cleanups=_PENDING_ARM_RIG_CLEANUPS,
+        active_transaction_stack=_ACTIVE_TRANSACTION_STACK,
+    )
 
 
 def request_armature_deisolation(
@@ -3065,112 +2834,21 @@ def request_armature_deisolation(
     raise_on_reject: bool = False,
 ) -> Dict[str, Any]:
     """Layer 1 Coordinator: Evaluate Layer 5 evidence and authorize or reject de-isolation (Section 8.1/8.3)."""
-    # Enforce non-empty string reason
-    if not isinstance(reason, str) or not reason.strip():
-        reason_err = "De-isolation rejected: reason must be a non-empty string"
-        audit_entry = {
-            "audit_id": f"deiso_{uuid.uuid4().hex[:8]}",
-            "operation": "REQUEST_DEISOLATION",
-            "decision": "REJECTED",
-            "registry_session_id": session_id,
-            "transaction_id": None,
-            "failure_class": None,
-            "previous_isolation_state": None,
-            "new_isolation_state": None,
-            "reason": reason,
-            "verification_status": "INVALID_REASON",
-            "verification_reasons": [reason_err],
-        }
-        _append_deisolation_audit(audit_entry)
-        if raise_on_reject:
-            raise ValueError(reason_err)
-        return {
-            "approved": False,
-            "action": "REJECTED",
-            "registry_session_id": session_id,
-            "reasons": [reason_err],
-            "audit_entry": audit_entry,
-        }
-
-    evidence = verify_armature_deisolation_evidence(arm=arm, session_id=session_id)
-    resolved_session_id = evidence.get("registry_session_id") or session_id
-    iso_rec = _ISOLATED_FAILED_ARMATURES.get(resolved_session_id) if resolved_session_id else None
-    tx_id = (
-        evidence.get("transaction_id")
-        or (iso_rec.get("transaction_id") if iso_rec is not None else None)
+    return _layer1_request_armature_deisolation(
+        arm=arm,
+        reason=reason,
+        session_id=session_id,
+        raise_on_reject=raise_on_reject,
+        isolated_failed_armatures=_ISOLATED_FAILED_ARMATURES,
+        verify_deisolation_evidence=verify_armature_deisolation_evidence,
+        issue_coordinator_authorization_grant=(
+            _issue_coordinator_authorization_grant
+        ),
+        clear_or_retire_failure_isolation_by_coordinator=(
+            _clear_or_retire_failure_isolation_by_coordinator
+        ),
+        append_deisolation_audit=_append_deisolation_audit,
     )
-    failure_class = evidence.get("failure_class")
-    previous_state = evidence.get("isolation_state")
-
-    if evidence.get("can_deisolate", False) and resolved_session_id is not None:
-        grant = _issue_coordinator_authorization_grant(
-            session_id=resolved_session_id,
-            transition_action="CLEAR_TO_NONE",
-            arm=arm,
-        )
-        transition = _clear_or_retire_failure_isolation_by_coordinator(
-            session_id=resolved_session_id,
-            action="CLEAR_TO_NONE",
-            reason=reason,
-            authorization_grant=grant,
-        )
-        audit_entry = {
-            "audit_id": f"deiso_{uuid.uuid4().hex[:8]}",
-            "operation": "REQUEST_DEISOLATION",
-            "decision": "APPROVED",
-            "registry_session_id": resolved_session_id,
-            "transaction_id": tx_id,
-            "failure_class": failure_class,
-            "previous_isolation_state": previous_state,
-            "new_isolation_state": transition["new_isolation_state"],
-            "grant_id": grant["grant_id"],
-            "reason": reason,
-            "verification_status": evidence.get("status"),
-            "verification_reasons": list(evidence.get("reasons", [])),
-        }
-        _append_deisolation_audit(audit_entry)
-        return {
-            "approved": True,
-            "action": "DEISOLATED",
-            "registry_session_id": resolved_session_id,
-            "transaction_id": tx_id,
-            "failure_class": failure_class,
-            "isolation_state": transition["new_isolation_state"],
-            "evidence": evidence,
-            "audit_entry": audit_entry,
-        }
-
-    audit_entry = {
-        "audit_id": f"deiso_{uuid.uuid4().hex[:8]}",
-        "operation": "REQUEST_DEISOLATION",
-        "decision": "REJECTED",
-        "registry_session_id": resolved_session_id,
-        "transaction_id": tx_id,
-        "failure_class": failure_class,
-        "previous_isolation_state": previous_state,
-        "new_isolation_state": previous_state,
-        "reason": reason,
-        "verification_status": evidence.get("status"),
-        "verification_reasons": list(evidence.get("reasons", [])),
-    }
-    _append_deisolation_audit(audit_entry)
-
-    if raise_on_reject:
-        raise RuntimeError(
-            f"Armature de-isolation rejected for session {resolved_session_id} "
-            f"(status={evidence.get('status')}): {'; '.join(evidence.get('reasons', []))}"
-        )
-
-    return {
-        "approved": False,
-        "action": "REJECTED",
-        "registry_session_id": resolved_session_id,
-        "transaction_id": tx_id,
-        "failure_class": failure_class,
-        "isolation_state": previous_state,
-        "evidence": evidence,
-        "audit_entry": audit_entry,
-    }
 
 
 def retire_dead_armature_tombstone(
@@ -3179,106 +2857,21 @@ def retire_dead_armature_tombstone(
     raise_on_reject: bool = False,
 ) -> Dict[str, Any]:
     """Layer 1 Coordinator: Verify dead Armature tombstone retirement evidence and transition to ARCHIVED_RETIRED."""
-    # Enforce non-empty string reason
-    if not isinstance(reason, str) or not reason.strip():
-        reason_err = "Tombstone retirement rejected: reason must be a non-empty string"
-        audit_entry = {
-            "audit_id": f"retire_{uuid.uuid4().hex[:8]}",
-            "operation": "RETIRE_DEAD_TOMBSTONE",
-            "decision": "REJECTED",
-            "registry_session_id": session_id,
-            "transaction_id": None,
-            "failure_class": None,
-            "previous_isolation_state": None,
-            "new_isolation_state": None,
-            "reason": reason,
-            "verification_status": "INVALID_REASON",
-            "verification_reasons": [reason_err],
-        }
-        _append_deisolation_audit(audit_entry)
-        if raise_on_reject:
-            raise ValueError(reason_err)
-        return {
-            "approved": False,
-            "action": "REJECTED",
-            "registry_session_id": session_id,
-            "reasons": [reason_err],
-            "audit_entry": audit_entry,
-        }
-
-    evidence = _verify_dead_armature_tombstone_retirement_evidence(session_id)
-    previous_state = evidence.get("isolation_state")
-    tx_id = evidence.get("transaction_id")
-    failure_class = evidence.get("failure_class")
-
-    if evidence.get("can_retire", False):
-        grant = _issue_coordinator_authorization_grant(
-            session_id=session_id,
-            transition_action="ARCHIVE_TOMBSTONE",
-        )
-        transition = _clear_or_retire_failure_isolation_by_coordinator(
-            session_id=session_id,
-            action="ARCHIVE_TOMBSTONE",
-            reason=reason,
-            authorization_grant=grant,
-        )
-        audit_entry = {
-            "audit_id": f"retire_{uuid.uuid4().hex[:8]}",
-            "operation": "RETIRE_DEAD_TOMBSTONE",
-            "decision": "APPROVED",
-            "registry_session_id": session_id,
-            "transaction_id": tx_id,
-            "failure_class": failure_class,
-            "previous_isolation_state": previous_state,
-            "new_isolation_state": transition["new_isolation_state"],
-            "grant_id": grant["grant_id"],
-            "reason": reason,
-            "verification_status": evidence.get("status"),
-            "verification_reasons": list(evidence.get("reasons", [])),
-        }
-        _append_deisolation_audit(audit_entry)
-        return {
-            "approved": True,
-            "action": "ARCHIVED_RETIRED",
-            "registry_session_id": session_id,
-            "transaction_id": tx_id,
-            "failure_class": failure_class,
-            "isolation_state": transition["new_isolation_state"],
-            "evidence": evidence,
-            "audit_entry": audit_entry,
-        }
-
-    audit_entry = {
-        "audit_id": f"retire_{uuid.uuid4().hex[:8]}",
-        "operation": "RETIRE_DEAD_TOMBSTONE",
-        "decision": "REJECTED",
-        "registry_session_id": session_id,
-        "transaction_id": tx_id,
-        "failure_class": failure_class,
-        "previous_isolation_state": previous_state,
-        "new_isolation_state": previous_state,
-        "reason": reason,
-        "verification_status": evidence.get("status"),
-        "verification_reasons": list(evidence.get("reasons", [])),
-    }
-    _append_deisolation_audit(audit_entry)
-
-    if raise_on_reject:
-        raise RuntimeError(
-            f"Dead Armature tombstone retirement rejected for session {session_id} "
-            f"(status={evidence.get('status')}): {'; '.join(evidence.get('reasons', []))}"
-        )
-
-    return {
-        "approved": False,
-        "action": "REJECTED",
-        "registry_session_id": session_id,
-        "transaction_id": tx_id,
-        "failure_class": failure_class,
-        "isolation_state": previous_state,
-        "evidence": evidence,
-        "audit_entry": audit_entry,
-    }
+    return _layer1_retire_dead_armature_tombstone(
+        session_id=session_id,
+        reason=reason,
+        raise_on_reject=raise_on_reject,
+        verify_dead_armature_tombstone_retirement_evidence=(
+            _verify_dead_armature_tombstone_retirement_evidence
+        ),
+        issue_coordinator_authorization_grant=(
+            _issue_coordinator_authorization_grant
+        ),
+        clear_or_retire_failure_isolation_by_coordinator=(
+            _clear_or_retire_failure_isolation_by_coordinator
+        ),
+        append_deisolation_audit=_append_deisolation_audit,
+    )
 
 
 @contextmanager
