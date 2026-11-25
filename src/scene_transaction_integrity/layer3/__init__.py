@@ -43,6 +43,9 @@ from src.scene_transaction_integrity.layer3.controller_ownership import (
     _verify_controller_object_transaction_authority,
     _verify_transaction_wrong_type_object_ownership,
 )
+from src.scene_transaction_integrity.layer3.controller_recovery_authority import (
+    _verify_failed_isolation_controller_recovery_authority,
+)
 from src.scene_transaction_integrity.layer3.datablock_creation import (
     _authorized_create_type_a_mesh,
 )
@@ -99,5 +102,6 @@ __all__ = (
     "_require_collection_child_relationship_ownership",
     "_require_existing_arm_ik_controller_ownership",
     "_verify_controller_object_transaction_authority",
+    "_verify_failed_isolation_controller_recovery_authority",
     "_verify_transaction_wrong_type_object_ownership",
 )
