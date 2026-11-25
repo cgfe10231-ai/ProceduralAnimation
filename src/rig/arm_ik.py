@@ -50,6 +50,11 @@ from src.rig.transform_utils import (
     world_to_local_rotation,
     world_to_local_rotation_quaternion,
 )
+from src.scene_transaction_integrity.fault_injection import (
+    _clear_test_fault_injection_hook as _shared_clear_test_fault_injection_hook,
+    _set_test_fault_injection_hook as _shared_set_test_fault_injection_hook,
+    _trigger_fault_injection as _shared_trigger_fault_injection,
+)
 from src.scene_transaction_integrity.layer1 import (
     _COORDINATOR_AUTHORIZATION_GRANTS,
     _COORDINATOR_GRANT_TTL_SECONDS,
@@ -406,26 +411,19 @@ def _clear_or_retire_failure_isolation_by_coordinator(
     )
 
 
-_FAULT_INJECTION_HOOK: Optional[Callable[[str, Dict[str, Any]], None]] = None
-
-
 def _set_test_fault_injection_hook(hook: Optional[Callable[[str, Dict[str, Any]], None]]) -> None:
     """Private test hook callback for deterministic fault injection during tests."""
-    global _FAULT_INJECTION_HOOK
-    _FAULT_INJECTION_HOOK = hook
+    return _shared_set_test_fault_injection_hook(hook)
 
 
 def _clear_test_fault_injection_hook() -> None:
     """Clear private internal test fault injection hook."""
-    global _FAULT_INJECTION_HOOK
-    _FAULT_INJECTION_HOOK = None
+    return _shared_clear_test_fault_injection_hook()
 
 
 def _trigger_fault_injection(stage: str, context: Optional[Dict[str, Any]] = None) -> None:
     """Trigger internal fault injection if a hook is active."""
-    global _FAULT_INJECTION_HOOK
-    if _FAULT_INJECTION_HOOK is not None:
-        _FAULT_INJECTION_HOOK(stage, context or {})
+    return _shared_trigger_fault_injection(stage, context)
 
 
 def _set_test_depsgraph_updater(updater: Optional[Callable[[], None]]) -> None:
