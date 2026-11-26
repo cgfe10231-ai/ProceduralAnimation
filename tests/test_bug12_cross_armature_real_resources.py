@@ -13,12 +13,26 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-import src.rig.arm_ik as arm_ik
 from src.character.builder import build_character
 from src.config import PipelineConfig
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
 from src.rig.pose import reset_pose
+from src.scene_transaction_integrity import fault_injection, wiring
+from src.scene_transaction_integrity.layer1 import (
+    authorization_grants,
+    pending_cleanup,
+    post_commit_cleanup,
+)
+from src.scene_transaction_integrity.layer2 import (
+    audit_registries,
+    pending_cleanup_registry,
+    session_registries,
+    tombstone_registry,
+    transaction_states,
+)
+from src.scene_transaction_integrity.layer4 import depsgraph
+from src.scene_transaction_integrity.layer6 import cleanup_results
 
 
 class TestBug12RealCrossArmaturePending(unittest.TestCase):
@@ -26,15 +40,18 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
 
     @staticmethod
     def _reset_state():
-        arm_ik._clear_test_fault_injection_hook()
-        arm_ik._clear_test_depsgraph_updater()
-        for attr in (
-            "_PENDING_ARM_RIG_CLEANUPS", "_ISOLATED_FAILED_ARMATURES",
-            "_MANAGED_ARMATURE_IDENTITIES", "_ARCHIVED_FAILED_D_TOMBSTONES",
-            "_FAILED_A_AUDIT_RECORDS", "_DEISOLATION_AUDIT_LOG",
+        fault_injection._clear_test_fault_injection_hook()
+        depsgraph._clear_test_depsgraph_updater()
+        for registry in (
+            pending_cleanup_registry._PENDING_ARM_RIG_CLEANUPS,
+            session_registries._ISOLATED_FAILED_ARMATURES,
+            session_registries._MANAGED_ARMATURE_IDENTITIES,
+            tombstone_registry._ARCHIVED_FAILED_D_TOMBSTONES,
+            audit_registries._FAILED_A_AUDIT_RECORDS,
+            audit_registries._DEISOLATION_AUDIT_LOG,
         ):
-            getattr(arm_ik, attr).clear()
-        arm_ik._clear_coordinator_authorization_grants()
+            registry.clear()
+        authorization_grants._clear_coordinator_authorization_grants()
 
     def setUp(self):
         bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -101,10 +118,10 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
                     and ctx.get("stashed", {}).get("stashed_obj_ptr") == obj_ptr):
                 raise RuntimeError(f"BUG12 blocked actual object cleanup {label}")
 
-        arm_ik._set_test_fault_injection_hook(inject)
+        fault_injection._set_test_fault_injection_hook(inject)
         try:
             with self.assertRaisesRegex(RuntimeError, "BUG12 blocked actual"):
-                with arm_ik._arm_rig_transaction(arm) as tx:
+                with wiring._arm_rig_transaction(arm) as tx:
                     captured.append(tx)
                     orig_mute = bool(con.mute)
                     orig_index = list(pbone.constraints).index(con)
@@ -127,7 +144,7 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
                         "obj_cleaned": False, "data_cleaned": False,
                     })
         finally:
-            arm_ik._clear_test_fault_injection_hook()
+            fault_injection._clear_test_fault_injection_hook()
         self.assertEqual(len(captured), 1)
         tx = captured[0]
         resource = {
@@ -139,8 +156,8 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
 
     def _assert_pending_live(self, resource):
         tx = resource["tx"]
-        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.CLEANUP_PENDING)
-        self.assertIs(arm_ik._PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id), tx)
+        self.assertEqual(tx.state, transaction_states._ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIs(pending_cleanup_registry._PENDING_ARM_RIG_CLEANUPS.get(tx.tx_id), tx)
         self.assertEqual(len(tx.uncleaned_stashed_constraints), 1)
         self.assertEqual(len(tx.uncleaned_stashed_objects), 1)
         self.assertTrue(self._object_present(resource["obj_ptr"]))
@@ -149,8 +166,8 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
 
     def _assert_cleaned_only(self, resource):
         tx = resource["tx"]
-        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.COMMITTED)
-        self.assertNotIn(tx.tx_id, arm_ik._PENDING_ARM_RIG_CLEANUPS)
+        self.assertEqual(tx.state, transaction_states._ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, pending_cleanup_registry._PENDING_ARM_RIG_CLEANUPS)
         self.assertFalse(self._object_present(resource["obj_ptr"]))
         self.assertFalse(self._constraint_present(resource["pbone"], resource["con_ptr"]))
         # No Type-A authorization exists for this external Mesh; physical ID
@@ -167,38 +184,38 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
         self.assertNotEqual(a["tx"].tx_id, b["tx"].tx_id)
         self.assertNotEqual(a["obj_ptr"], b["obj_ptr"])
         self.assertNotEqual(a["con_ptr"], b["con_ptr"])
-        self.assertEqual(len(arm_ik._PENDING_ARM_RIG_CLEANUPS), 2)
+        self.assertEqual(len(pending_cleanup_registry._PENDING_ARM_RIG_CLEANUPS), 2)
         return a, b
 
     def test_bug12_01_retry_a_deletes_only_a_real_resources(self):
         a, b = self._make_pair()
-        arm_ik.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
+        pending_cleanup.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
         self._assert_cleaned_only(a)
         self._assert_pending_live(b)
-        self.assertEqual(len(arm_ik._PENDING_ARM_RIG_CLEANUPS), 1)
-        arm_ik.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
+        self.assertEqual(len(pending_cleanup_registry._PENDING_ARM_RIG_CLEANUPS), 1)
+        pending_cleanup.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
         self._assert_cleaned_only(b)
-        self.assertEqual(len(arm_ik._PENDING_ARM_RIG_CLEANUPS), 0)
+        self.assertEqual(len(pending_cleanup_registry._PENDING_ARM_RIG_CLEANUPS), 0)
 
     def test_bug12_02_pending_both_gates_and_healthy_third_armature(self):
         a, b = self._make_pair()
         for pending in (a, b):
             with self.assertRaisesRegex(RuntimeError, "unresolved cleanup"):
-                with arm_ik._arm_rig_transaction(pending["arm"]):
+                with wiring._arm_rig_transaction(pending["arm"]):
                     self.fail("Pending Armature unexpectedly entered ACTIVE transaction")
             self._assert_pending_live(pending)
         data_c = bpy.data.armatures.new("BUG12_IndependentDataC")
         arm_c = bpy.data.objects.new("BUG12_IndependentArmatureC", data_c)
         bpy.context.scene.collection.objects.link(arm_c)
-        with arm_ik._arm_rig_transaction(arm_c) as healthy_tx:
-            self.assertEqual(healthy_tx.state, arm_ik._ArmRigTransactionState.ACTIVE)
-        self.assertEqual(healthy_tx.state, arm_ik._ArmRigTransactionState.COMMITTED)
+        with wiring._arm_rig_transaction(arm_c) as healthy_tx:
+            self.assertEqual(healthy_tx.state, transaction_states._ArmRigTransactionState.ACTIVE)
+        self.assertEqual(healthy_tx.state, transaction_states._ArmRigTransactionState.COMMITTED)
         self._assert_pending_live(a)
         self._assert_pending_live(b)
-        arm_ik.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
+        pending_cleanup.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
         self._assert_cleaned_only(b)
         self._assert_pending_live(a)
-        arm_ik.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
+        pending_cleanup.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
         self._assert_cleaned_only(a)
 
     def test_bug12_03_foreign_constraint_and_cleanup_result_cannot_be_borrowed(self):
@@ -206,26 +223,26 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
         # A's exact live Constraint record is NOT a deletion grant for B.
         alien_record = a["tx"].uncleaned_stashed_constraints[0]
         with self.assertRaisesRegex(RuntimeError, "Unauthorized constraint removal"):
-            arm_ik._authorized_remove_constraint(
+            wiring._authorized_remove_constraint(
                 pbone=b["pbone"], con_record_or_ref=alien_record,
                 phase="POST_COMMIT_CLEANUP", active_tx=b["tx"],
             )
         self._assert_pending_live(a)
         self._assert_pending_live(b)
         # Likewise a result bearing B's transaction ID cannot advance A.
-        foreign_result = arm_ik._CleanupResult(
+        foreign_result = cleanup_results._CleanupResult(
             transaction_id=b["tx"].tx_id,
-            outcome=arm_ik._CleanupOutcome.CLEANUP_SUCCESS,
+            outcome=cleanup_results._CleanupOutcome.CLEANUP_SUCCESS,
             errors=(), remaining_objects=0, remaining_constraints=0,
         )
         with self.assertRaisesRegex(RuntimeError, "transaction_id mismatch"):
-            arm_ik._coordinator_apply_cleanup_result(
+            post_commit_cleanup._coordinator_apply_cleanup_result(
                 a["tx"], foreign_result, phase="PENDING_RETRY",
             )
         self._assert_pending_live(a)
         self._assert_pending_live(b)
-        arm_ik.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
-        arm_ik.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
+        pending_cleanup.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
+        pending_cleanup.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
         self._assert_cleaned_only(a)
         self._assert_cleaned_only(b)
 
@@ -241,18 +258,18 @@ class TestBug12RealCrossArmaturePending(unittest.TestCase):
                     and ctx.get("stashed", {}).get("stashed_obj_ptr") == a["obj_ptr"]):
                 raise RuntimeError("BUG12 repeat object fault on A only")
 
-        arm_ik._set_test_fault_injection_hook(fail_a_only)
+        fault_injection._set_test_fault_injection_hook(fail_a_only)
         try:
             with self.assertRaisesRegex(RuntimeError, "BUG12 repeat"):
-                arm_ik.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
+                pending_cleanup.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
         finally:
-            arm_ik._clear_test_fault_injection_hook()
+            fault_injection._clear_test_fault_injection_hook()
         self._assert_pending_live(a)
         self._assert_pending_live(b)
-        arm_ik.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
+        pending_cleanup.retry_pending_arm_rig_cleanup(b["tx"].tx_id)
         self._assert_cleaned_only(b)
         self._assert_pending_live(a)
-        arm_ik.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
+        pending_cleanup.retry_pending_arm_rig_cleanup(a["tx"].tx_id)
         self._assert_cleaned_only(a)
 
 
