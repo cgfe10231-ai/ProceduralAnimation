@@ -1,0 +1,532 @@
+{
+  "task": "TASK 10-d-3 — T15 证据补全",
+  "command": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe -B docs/evidence/10-d/10-d-3/verify_t15_completion.py",
+  "exit_code": 0,
+  "source_baseline": {
+    "branch": "task/10-d",
+    "head": "0c581b1bc5b5c1f9cafe76a5139ff8bf8a9d00e5",
+    "file_blobs": {
+      "src/motion/contact_model.py": "f558f42af4769d3f0ec7e74c37bacd78d7ebabb2",
+      "src/motion/framework.py": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+      "src/motion/kinematic_bridge.py": "abdc74455075b83f7188c3dffabc64e456258326",
+      "src/motion/terrain_walk.py": "aeddb52443bd448081e52e4be7261d0ab105592f"
+    },
+    "extracted_definitions": [
+      {
+        "symbol": "ContactType",
+        "kind": "class",
+        "source_file": "src/motion/contact_model.py",
+        "source_blob": "f558f42af4769d3f0ec7e74c37bacd78d7ebabb2",
+        "lines": [
+          46,
+          50
+        ],
+        "sha256": "6ebf916a28c05a01bf01ae8d8e1f52bacc257449fc695f7f0ebb9ab5d607963d"
+      },
+      {
+        "symbol": "right_unit_vector_from_yaw",
+        "kind": "def",
+        "source_file": "src/motion/framework.py",
+        "source_blob": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+        "lines": [
+          80,
+          83
+        ],
+        "sha256": "e20447aa9fd7ada6b07ab3c6f22c14bae05fc5f9071ed4884ceb3b9b2cbb8f53"
+      },
+      {
+        "symbol": "forward_unit_vector_from_yaw",
+        "kind": "def",
+        "source_file": "src/motion/framework.py",
+        "source_blob": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+        "lines": [
+          70,
+          77
+        ],
+        "sha256": "3336428e088b151aec51221f8e36c48048e06acc11da10cd52e235c8f56f8550"
+      },
+      {
+        "symbol": "root_local_to_world_vector",
+        "kind": "def",
+        "source_file": "src/motion/framework.py",
+        "source_blob": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+        "lines": [
+          100,
+          111
+        ],
+        "sha256": "c13d98207e9c3baaaa91c2d268730f01536b9c5084c82cbacd1cc74460796109"
+      },
+      {
+        "symbol": "PlannedHandTarget",
+        "kind": "class",
+        "source_file": "src/motion/kinematic_bridge.py",
+        "source_blob": "abdc74455075b83f7188c3dffabc64e456258326",
+        "lines": [
+          104,
+          120
+        ],
+        "sha256": "e6d730e1f208402722ef9103010eb5a3e370c9b24b112dd0d00aad2aa425969f"
+      },
+      {
+        "symbol": "UpperLimbSegment",
+        "kind": "class",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          62,
+          83
+        ],
+        "sha256": "98461b3fbd0fa313843a7ab95b15f5fdbc3d8702842d40befda94f5005cf7ad4"
+      },
+      {
+        "symbol": "_evaluate_upper_limb_progress",
+        "kind": "def",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          107,
+          164
+        ],
+        "sha256": "e930519c622bcf406d09b2a427553ce463225047514127f2582aaa91e38f9b83"
+      },
+      {
+        "symbol": "_validate_upper_limb_vector",
+        "kind": "def",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          172,
+          197
+        ],
+        "sha256": "06a3a2fbd1a7f93374e1f4993100c16ef4949ab00c5d95acdd7491e9fcb9bba4"
+      },
+      {
+        "symbol": "_evaluate_upper_limb_segment",
+        "kind": "def",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          205,
+          406
+        ],
+        "sha256": "955cd911cd81820d95ca1367406cc1af3ecb4d948818b5288b1c1578de149627"
+      }
+    ]
+  },
+  "test": {
+    "id": "T15",
+    "title": "向量输入与 Root yaw 拒绝",
+    "status": "PASS",
+    "subcases_count": 68,
+    "subcases": [
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "list_not_tuple",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "len_2",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "len_4",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "bool_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "str_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "none_vec",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "nan_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "pos_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "neg_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "_validate_upper_limb_vector",
+        "case": "huge_int_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "list_not_tuple",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "list_not_tuple",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "list_not_tuple",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "list_not_tuple",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_position",
+        "case": "list_not_tuple",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "len_2",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "len_2",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "len_2",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "len_2",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_position",
+        "case": "len_2",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "len_4",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "len_4",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "len_4",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "len_4",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_position",
+        "case": "len_4",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "bool_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "bool_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "bool_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "bool_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_position",
+        "case": "bool_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "str_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "str_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "str_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "str_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_position",
+        "case": "str_comp",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "none_vec",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "none_vec",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "none_vec",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "none_vec",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_position",
+        "case": "none_vec",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "nan_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "nan_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "nan_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "nan_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_position",
+        "case": "nan_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "pos_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "pos_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "pos_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "pos_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_position",
+        "case": "pos_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "neg_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "neg_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "neg_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "neg_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_position",
+        "case": "neg_inf_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "wrist_start_xyz",
+        "case": "huge_int_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "rotation_start_deg",
+        "case": "huge_int_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "pole_end_xyz",
+        "case": "huge_int_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "fk_start_deg_0",
+        "case": "huge_int_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_position",
+        "case": "huge_int_comp",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_bool",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_str",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_none",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_list",
+        "expected": "TypeError",
+        "actual": "TypeError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_nan",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_pos_inf",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_neg_inf",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      },
+      {
+        "target": "root_yaw_deg",
+        "case": "yaw_huge_int",
+        "expected": "ValueError",
+        "actual": "ValueError"
+      }
+    ]
+  }
+}
