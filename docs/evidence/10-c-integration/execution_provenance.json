@@ -1,0 +1,107 @@
+{
+  "task": "TASK 10-C — FINAL MASTER INTEGRATION",
+  "integration_branch": "task/10-c-integration",
+  "pre_provenance_head": "485cf2218c8b406ec3f9361f5a412810eaab0a15",
+  "integration_test_baseline_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+  "kinematic_bridge_blob": "abdc74455075b83f7188c3dffabc64e456258326",
+  "blender_executable": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+  "blender_version": "5.1.1",
+  "historical_literal_vs_actual_load_path": {
+    "summary": "The four original 10-C verification scripts were preserved and executed verbatim without editing their source code. Consequently, fields such as source_head, frozen_source_head, stage1_docs_commit_head, and production_blob inside group_{a,b,c,d}_results.json are hardcoded historical constants authored in earlier child branches. At actual runtime, module imports (sys.path[0]) resolved exclusively to the integration baseline 2e65a9463ab88714cfb864b4d63f1547135c29ae.",
+    "groups_a_b_d_resolution": "Scripts read os.environ['TASK10C_REPO_ROOT'] (set to c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation at HEAD 2e65a9463ab88714cfb864b4d63f1547135c29ae) and inserted it at sys.path[0], writing results to os.environ['TASK10C_RESULT_JSON'].",
+    "group_c_resolution": "Script ignored TASK10C_* env vars and read os.getcwd(), which was set via ProcessStartInfo.WorkingDirectory to a detached git worktree checked out at 2e65a9463ab88714cfb864b4d63f1547135c29ae."
+  },
+  "groups": {
+    "Group A (10-c-child2)": {
+      "script_path": "docs/evidence/10-c-integration/scripts/group_a_task10c_child2_verify.py",
+      "script_sha256": "97fe6670bbb81fbb45634f2af90e9f747ffc31f3211d03f38ddd4a2e8b6671c8",
+      "blender_launch_command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python \"c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-c-integration\\scripts\\group_a_task10c_child2_verify.py\"",
+      "working_directory": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+      "TASK10C_REPO_ROOT": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+      "TASK10C_RESULT_JSON": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-c-integration\\group_a_results.json",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "actual_source_git_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+      "historical_head_literals_in_results_json": {
+        "source_head": "eeb1d740844210e7e2df321fab7638469c9f572a"
+      },
+      "process_exit_code": 0,
+      "tests_executed": 10,
+      "tests_passed": 10,
+      "tests_failed": 0
+    },
+    "Group B (10-c-child3)": {
+      "script_path": "docs/evidence/10-c-integration/scripts/group_b_task10c_child3_verify.py",
+      "script_sha256": "6fb387306067fa611f00fcbc46179dfc00a240d684abf825aee3d590ca912110",
+      "blender_launch_command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python \"c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-c-integration\\scripts\\group_b_task10c_child3_verify.py\"",
+      "working_directory": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+      "TASK10C_REPO_ROOT": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+      "TASK10C_RESULT_JSON": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-c-integration\\group_b_results.json",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "actual_source_git_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+      "historical_head_literals_in_results_json": {
+        "source_head": "8f640b0fdcee18de47250b3eaee0b9ee43a03304"
+      },
+      "process_exit_code": 0,
+      "tests_executed": 15,
+      "tests_passed": 15,
+      "tests_failed": 0
+    },
+    "Group C (10-c-child4)": {
+      "script_path": "docs/evidence/10-c-integration/scripts/group_c_task_10c_child4_verify.py",
+      "script_sha256": "3b4f01f86f5d37eb33faf232eb134463c5b3ab6ef1335438180a14f5e3d61b9d",
+      "blender_launch_command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python \"c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-c-integration\\scripts\\group_c_task_10c_child4_verify.py\"",
+      "working_directory": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\10c_group_c_wt",
+      "detached_worktree_base_commit": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+      "detached_worktree_git_setup": "git worktree add --detach C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\10c_group_c_wt 2e65a9463ab88714cfb864b4d63f1547135c29ae",
+      "TASK10C_REPO_ROOT": null,
+      "TASK10C_RESULT_JSON": null,
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "actual_source_git_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+      "historical_head_literals_in_results_json": {
+        "frozen_source_head": "9f7ad1af04c4a542df0e73843be49eb5f8c55136",
+        "stage1_docs_commit_head": "9e88ede441d589bf57274015adb639a1ffa03a7a",
+        "production_blob": "9bda0a3f82d679a74b3358e9ebfbc92349e52593"
+      },
+      "process_exit_code": 0,
+      "tests_executed": 6,
+      "tests_passed": 6,
+      "tests_failed": 0,
+      "tests_not_run": 0
+    },
+    "Group D (10-c-child4 post_rom_reconcile)": {
+      "script_path": "docs/evidence/10-c-integration/scripts/group_d_verify_10c_child4_rom_feedback.py",
+      "script_sha256": "54d0f23bca54577280f4006b04a54dff8ce0b95429b72a8eb7dd0708ad49b173",
+      "blender_launch_command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python \"c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-c-integration\\scripts\\group_d_verify_10c_child4_rom_feedback.py\"",
+      "working_directory": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+      "TASK10C_REPO_ROOT": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+      "TASK10C_RESULT_JSON": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-c-integration\\group_d_results.json",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "actual_source_git_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+      "historical_head_literals_in_results_json": {
+        "frozen_source_head": "3b86f037c1f28e0c6b84088c8a85fb5415578738"
+      },
+      "process_exit_code": 0,
+      "tests_executed": 7,
+      "tests_passed": 7,
+      "tests_failed": 0
+    }
+  },
+  "historical_bridge_compat_regression": {
+    "script_path": "tests/verify_task6gc_r3b1_bridge.py",
+    "blender_launch_command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python \"c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\verify_task6gc_r3b1_bridge.py\"",
+    "working_directory": "c:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+    "actual_source_git_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+    "process_exit_code": 0,
+    "tests_executed": 14,
+    "tests_passed": 14,
+    "tests_failed": 0
+  },
+  "totals": {
+    "ten_c_special_passed": 38,
+    "ten_c_special_executed": 38,
+    "historical_bridge_compat_passed": 14,
+    "historical_bridge_compat_executed": 14,
+    "combined_passed": 52,
+    "combined_executed": 52
+  }
+}
