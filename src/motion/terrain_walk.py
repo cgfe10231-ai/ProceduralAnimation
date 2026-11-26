@@ -42,10 +42,45 @@ from src.motion.framework import (
     WORLD_RIGHT_AXIS,
     WORLD_UP_AXIS,
     forward_unit_vector_from_yaw,
+    root_local_to_world_vector,
 )
-from src.motion.kinematic_bridge import KinematicBridgeExecutor, KinematicPlannedPose, PlannedFootTarget
+from src.motion.kinematic_bridge import (
+    KinematicBridgeExecutor,
+    KinematicPlannedPose,
+    PlannedFootTarget,
+    PlannedHandTarget,
+)
 from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET, MAX_LEG_REACH, MIN_LEG_REACH
 from src.scene.environment_query import DynamicsEnvironmentQuery, SurfaceGeometryType, SurfaceQueryResult
+
+
+# [INTRODUCED 2026-11-26T17:13:00+08:00]
+# TASK: TASK 10-d-3
+# CLASS: UpperLimbSegment
+# PURPOSE: Immutable trajectory segment descriptor carrying caller-supplied FK/IK endpoints, timing, space, and clamp policy for decoupled upper-limb motion.
+# REASON: Resolve TASK 10-d-3 where upper-limb motion lacked an immutable parametric segment representation independent of lower-limb gait; needed so callers provide arbitrary FK/IK targets without hardcoding action schedules or mutating shared state.
+@dataclass(frozen=True)
+class UpperLimbSegment:
+    """Immutable caller-supplied parametric motion segment for a single arm."""
+
+    mode: str
+    start_time_sec: float
+    duration_sec: float
+
+    fk_start_deg: Optional[Tuple[Tuple[float, float, float], ...]] = None
+    fk_end_deg: Optional[Tuple[Tuple[float, float, float], ...]] = None
+
+    wrist_start_xyz: Optional[Tuple[float, float, float]] = None
+    wrist_end_xyz: Optional[Tuple[float, float, float]] = None
+
+    rotation_start_deg: Optional[Tuple[float, float, float]] = None
+    rotation_end_deg: Optional[Tuple[float, float, float]] = None
+
+    pole_start_xyz: Optional[Tuple[float, float, float]] = None
+    pole_end_xyz: Optional[Tuple[float, float, float]] = None
+
+    position_space: str = "WORLD"
+    clamp_reach: bool = True
 
 
 # =============================================================================
@@ -127,6 +162,248 @@ def _evaluate_upper_limb_progress(
         h = 1.0 - v**3 * (10.0 + v * (-15.0 + 6.0 * v))
     h = max(0.0, min(1.0, h))
     return (u, h)
+
+
+# [INTRODUCED 2026-11-26T17:13:00+08:00]
+# TASK: TASK 10-d-3
+# FUNCTION: _validate_upper_limb_vector
+# PURPOSE: Validate and normalize a 3-tuple of finite non-bool numeric coordinates/angles into a new 3-float tuple without mutating input.
+# REASON: Resolve TASK 10-d-3 to uniformly enforce 3D vector type, length, finiteness, and overflow safety across FK rotations, IK wrist/pole positions, and Root position without duplicating checks.
+def _validate_upper_limb_vector(
+    value: Tuple[float, float, float],
+    name: str,
+) -> Tuple[float, float, float]:
+    """Validate a 3D numeric tuple and return a fresh tuple of finite floats."""
+    if not isinstance(value, tuple):
+        raise TypeError(f"{name} must be a tuple, got {type(value).__name__}")
+    if len(value) != 3:
+        raise ValueError(f"{name} must have length 3, got {len(value)}")
+
+    out: List[float] = []
+    for idx, comp in enumerate(value):
+        if isinstance(comp, bool) or not isinstance(comp, (int, float)):
+            raise TypeError(
+                f"{name}[{idx}] must be int or float, got {type(comp).__name__}"
+            )
+        try:
+            val = float(comp)
+        except OverflowError as exc:
+            raise ValueError(
+                f"{name}[{idx}] cannot be converted to a finite float"
+            ) from exc
+        if not math.isfinite(val):
+            raise ValueError(f"{name}[{idx}] must be finite, got {val!r}")
+        out.append(0.0 if val == 0.0 else val)
+    return (out[0], out[1], out[2])
+
+
+# [INTRODUCED 2026-11-26T17:13:00+08:00]
+# TASK: TASK 10-d-3
+# FUNCTION: _evaluate_upper_limb_segment
+# PURPOSE: Evaluate a single UpperLimbSegment for side 'L' or 'R' at action-local time_sec and current frame Root into a stateless (Optional[PlannedHandTarget], Dict[str, Tuple[float, float, float]]) pair ready for KinematicPlannedPose.
+# REASON: Resolve TASK 10-d-3 so independent FK/IK upper-limb targets can be computed via _evaluate_upper_limb_progress() and root_local_to_world_vector() without touching lower-limb gait, scene state, or TerrainWalkAction frame loop.
+def _evaluate_upper_limb_segment(
+    segment: UpperLimbSegment,
+    side: str,
+    time_sec: float,
+    root_position: Tuple[float, float, float],
+    root_yaw_deg: float,
+) -> Tuple[
+    Optional[PlannedHandTarget],
+    Dict[str, Tuple[float, float, float]],
+]:
+    """Evaluate one decoupled upper-limb segment into FK or IK bridge targets."""
+    if not isinstance(segment, UpperLimbSegment):
+        raise TypeError(
+            f"segment must be UpperLimbSegment, got {type(segment).__name__}"
+        )
+    if not isinstance(side, str):
+        raise TypeError(f"side must be str, got {type(side).__name__}")
+    if side not in ("L", "R"):
+        raise ValueError(f"side must be 'L' or 'R', got {side!r}")
+    if not isinstance(segment.mode, str):
+        raise TypeError(f"mode must be str, got {type(segment.mode).__name__}")
+    if segment.mode not in ("FK", "IK"):
+        raise ValueError(f"mode must be 'FK' or 'IK', got {segment.mode!r}")
+    if not isinstance(segment.position_space, str):
+        raise TypeError(
+            f"position_space must be str, got {type(segment.position_space).__name__}"
+        )
+    if segment.position_space not in ("WORLD", "ROOT_LOCAL"):
+        raise ValueError(
+            "position_space must be 'WORLD' or 'ROOT_LOCAL', got "
+            f"{segment.position_space!r}"
+        )
+    if not isinstance(segment.clamp_reach, bool):
+        raise TypeError(
+            f"clamp_reach must be bool, got {type(segment.clamp_reach).__name__}"
+        )
+
+    root_pos = _validate_upper_limb_vector(root_position, "root_position")
+    if isinstance(root_yaw_deg, bool) or not isinstance(root_yaw_deg, (int, float)):
+        raise TypeError(
+            f"root_yaw_deg must be int or float, got {type(root_yaw_deg).__name__}"
+        )
+    try:
+        root_yaw = float(root_yaw_deg)
+    except OverflowError as exc:
+        raise ValueError("root_yaw_deg cannot be converted to a finite float") from exc
+    if not math.isfinite(root_yaw):
+        raise ValueError(f"root_yaw_deg must be finite, got {root_yaw!r}")
+
+    if segment.mode == "FK":
+        if segment.position_space != "WORLD":
+            raise ValueError(
+                f"FK mode requires position_space='WORLD', got {segment.position_space!r}"
+            )
+        for forbidden_name in (
+            "wrist_start_xyz",
+            "wrist_end_xyz",
+            "rotation_start_deg",
+            "rotation_end_deg",
+            "pole_start_xyz",
+            "pole_end_xyz",
+        ):
+            if getattr(segment, forbidden_name) is not None:
+                raise ValueError(f"FK mode must not carry IK field {forbidden_name}")
+        if segment.fk_start_deg is None or segment.fk_end_deg is None:
+            raise ValueError("FK mode requires both fk_start_deg and fk_end_deg")
+        if not isinstance(segment.fk_start_deg, tuple):
+            raise TypeError(
+                f"fk_start_deg must be a tuple, got {type(segment.fk_start_deg).__name__}"
+            )
+        if not isinstance(segment.fk_end_deg, tuple):
+            raise TypeError(
+                f"fk_end_deg must be a tuple, got {type(segment.fk_end_deg).__name__}"
+            )
+        if len(segment.fk_start_deg) != 3 or len(segment.fk_end_deg) != 3:
+            raise ValueError("fk_start_deg and fk_end_deg must each have length 3")
+
+        fk_start_vecs = tuple(
+            _validate_upper_limb_vector(vec, f"fk_start_deg[{idx}]")
+            for idx, vec in enumerate(segment.fk_start_deg)
+        )
+        fk_end_vecs = tuple(
+            _validate_upper_limb_vector(vec, f"fk_end_deg[{idx}]")
+            for idx, vec in enumerate(segment.fk_end_deg)
+        )
+
+        _, h = _evaluate_upper_limb_progress(
+            time_sec, segment.start_time_sec, segment.duration_sec
+        )
+
+        fk_targets: Dict[str, Tuple[float, float, float]] = {}
+        for bone_name, s_vec, e_vec in zip(
+            ("upper_arm", "forearm", "hand"), fk_start_vecs, fk_end_vecs
+        ):
+            if h == 0.0:
+                interp = s_vec
+            elif h == 1.0:
+                interp = e_vec
+            else:
+                interp = (
+                    (1.0 - h) * s_vec[0] + h * e_vec[0],
+                    (1.0 - h) * s_vec[1] + h * e_vec[1],
+                    (1.0 - h) * s_vec[2] + h * e_vec[2],
+                )
+                if not all(math.isfinite(c) for c in interp):
+                    raise ValueError(
+                        f"Non-finite interpolated FK target for {bone_name}.{side}: {interp!r}"
+                    )
+            fk_targets[f"{bone_name}.{side}"] = interp
+        return (None, fk_targets)
+
+    # IK mode
+    if segment.fk_start_deg is not None or segment.fk_end_deg is not None:
+        raise ValueError("IK mode requires fk_start_deg and fk_end_deg to be None")
+    if segment.wrist_start_xyz is None or segment.wrist_end_xyz is None:
+        raise ValueError("IK mode requires both wrist_start_xyz and wrist_end_xyz")
+    if (segment.rotation_start_deg is None) != (segment.rotation_end_deg is None):
+        raise ValueError(
+            "IK rotation_start_deg and rotation_end_deg must both be set or both be None"
+        )
+    if (segment.pole_start_xyz is None) != (segment.pole_end_xyz is None):
+        raise ValueError(
+            "IK pole_start_xyz and pole_end_xyz must both be set or both be None"
+        )
+
+    wrist_s = _validate_upper_limb_vector(segment.wrist_start_xyz, "wrist_start_xyz")
+    wrist_e = _validate_upper_limb_vector(segment.wrist_end_xyz, "wrist_end_xyz")
+    rot_s = (
+        _validate_upper_limb_vector(segment.rotation_start_deg, "rotation_start_deg")
+        if segment.rotation_start_deg is not None
+        else None
+    )
+    rot_e = (
+        _validate_upper_limb_vector(segment.rotation_end_deg, "rotation_end_deg")
+        if segment.rotation_end_deg is not None
+        else None
+    )
+    pole_s = (
+        _validate_upper_limb_vector(segment.pole_start_xyz, "pole_start_xyz")
+        if segment.pole_start_xyz is not None
+        else None
+    )
+    pole_e = (
+        _validate_upper_limb_vector(segment.pole_end_xyz, "pole_end_xyz")
+        if segment.pole_end_xyz is not None
+        else None
+    )
+
+    _, h = _evaluate_upper_limb_progress(
+        time_sec, segment.start_time_sec, segment.duration_sec
+    )
+
+    ik_values: Dict[str, Optional[Tuple[float, float, float]]] = {}
+    for field_name, s_vec, e_vec in (
+        ("wrist", wrist_s, wrist_e),
+        ("rotation", rot_s, rot_e),
+        ("pole", pole_s, pole_e),
+    ):
+        if s_vec is None:
+            ik_values[field_name] = None
+            continue
+        assert e_vec is not None
+        if h == 0.0:
+            val_vec = s_vec
+        elif h == 1.0:
+            val_vec = e_vec
+        else:
+            val_vec = (
+                (1.0 - h) * s_vec[0] + h * e_vec[0],
+                (1.0 - h) * s_vec[1] + h * e_vec[1],
+                (1.0 - h) * s_vec[2] + h * e_vec[2],
+            )
+            if not all(math.isfinite(c) for c in val_vec):
+                raise ValueError(
+                    f"Non-finite interpolated IK {field_name}: {val_vec!r}"
+                )
+        if field_name in ("wrist", "pole") and segment.position_space == "ROOT_LOCAL":
+            wx, wy, wz = root_local_to_world_vector(val_vec, root_yaw)
+            world_vec = (root_pos[0] + wx, root_pos[1] + wy, root_pos[2] + wz)
+            if not all(math.isfinite(c) for c in world_vec):
+                raise ValueError(
+                    f"Non-finite world-space IK {field_name}: {world_vec!r}"
+                )
+            ik_values[field_name] = world_vec
+        else:
+            ik_values[field_name] = val_vec
+
+    wrist_world_xyz = ik_values["wrist"]
+    assert wrist_world_xyz is not None
+    return (
+        PlannedHandTarget(
+            world_xyz=wrist_world_xyz,
+            rotation_deg=ik_values["rotation"],
+            enabled=True,
+            weight=1.0,
+            contact_intent=False,
+            is_locked=False,
+            pole_hint_world_xyz=ik_values["pole"],
+            clamp_reach=segment.clamp_reach,
+        ),
+        {},
+    )
 
 
 def _compute_swing_clearance_z(
