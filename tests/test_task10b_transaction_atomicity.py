@@ -126,9 +126,6 @@ from src.scene_transaction_integrity.layer2.transaction_stack import (
 from src.scene_transaction_integrity.layer2.tombstone_registry import (
     _ARCHIVED_FAILED_D_TOMBSTONES,
 )
-from src.scene_transaction_integrity.layer2.transaction_context import (
-    _ArmRigTransactionContext,
-)
 from src.scene_transaction_integrity.layer2.transaction_states import (
     _ArmRigTransactionState,
     _FailedTransactionClass,
@@ -186,6 +183,7 @@ from src.scene_transaction_integrity.wiring import (
     _arm_rig_transaction,
     _authorized_link_object_to_collection,
     _clear_or_retire_failure_isolation_by_coordinator,
+    _create_arm_rig_transaction_context,
     _issue_coordinator_authorization_grant,
     _rollback_arm_rig_state,
     _snapshot_arm_rig_state,
@@ -195,7 +193,9 @@ from src.scene_transaction_integrity.wiring import (
     verify_armature_deisolation_evidence,
     _verify_dead_armature_tombstone_retirement_evidence,
 )
-import src.rig.arm_ik as arm_ik
+from src.scene_transaction_integrity import fault_injection, wiring
+from src.scene_transaction_integrity.layer2 import identity_helpers
+from src.scene_transaction_integrity.layer5 import snapshot_capture, value_evidence
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
 from src.rig.pose import reset_pose
@@ -273,12 +273,12 @@ class _FaultyObjectsCollectionProxy:
 
 
 class _ScopedBpyObjectsProxy:
-    """Context manager to temporarily override arm_ik.bpy with a proxy having a faulty objects collection."""
+    """Context manager to temporarily override identity_helpers.bpy with a proxy having a faulty objects collection."""
 
     def __init__(self, faulty_objects_proxy: Any) -> None:
         self._faulty_objects = faulty_objects_proxy
-        self._arm_ik_module = sys.modules["src.rig.arm_ik"]
-        self._orig_bpy = self._arm_ik_module.bpy
+        self._identity_module = identity_helpers
+        self._orig_bpy = self._identity_module.bpy
 
     def __enter__(self) -> "_ScopedBpyObjectsProxy":
         real_bpy = self._orig_bpy
@@ -298,11 +298,11 @@ class _ScopedBpyObjectsProxy:
             def __getattr__(self, name: str) -> Any:
                 return getattr(real_bpy, name)
 
-        self._arm_ik_module.bpy = _BpyProxy()
+        self._identity_module.bpy = _BpyProxy()
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        self._arm_ik_module.bpy = self._orig_bpy
+        self._identity_module.bpy = self._orig_bpy
 
 
 def _request_coordinator_grant_for_test(
@@ -1532,20 +1532,19 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         y_pos = self.root.location.y + 0.15
         target_pos = (-0.32, y_pos, 1.20)
 
-        # Monkeypatch get_arm_ik_state inside src.rig.arm_ik
-        import src.rig.arm_ik as arm_ik_mod
-        orig_getter = arm_ik_mod.get_arm_ik_state
+        # Monkeypatch get_arm_ik_state inside wiring
+        orig_getter = wiring.get_arm_ik_state
 
         def crashing_getter(arm, side):
             raise RuntimeError("Genuine internal getter error")
 
-        arm_ik_mod.get_arm_ik_state = crashing_getter
+        wiring.get_arm_ik_state = crashing_getter
         try:
             with self.assertRaises(RuntimeError) as cm:
                 set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.9)
             self.assertIn("Genuine internal getter error", str(cm.exception))
         finally:
-            arm_ik_mod.get_arm_ik_state = orig_getter
+            wiring.get_arm_ik_state = orig_getter
 
         # Verify complete rollback
         _verify_arm_rig_state_restored(self.armature, snap_initial)
@@ -1623,8 +1622,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertFalse(hasattr(arm_ik_mod, "clear_fault_injection_hook"))
 
         # Verify private test functions exist
-        self.assertTrue(hasattr(arm_ik_mod, "_set_test_fault_injection_hook"))
-        self.assertTrue(hasattr(arm_ik_mod, "_clear_test_fault_injection_hook"))
+        self.assertTrue(hasattr(fault_injection, "_set_test_fault_injection_hook"))
+        self.assertTrue(hasattr(fault_injection, "_clear_test_fault_injection_hook"))
+        self.assertFalse(hasattr(fault_injection, "set_fault_injection_hook"))
+        self.assertFalse(hasattr(fault_injection, "clear_fault_injection_hook"))
+        self.assertFalse(hasattr(arm_ik_mod, "_set_test_fault_injection_hook"))
+        self.assertFalse(hasattr(arm_ik_mod, "_clear_test_fault_injection_hook"))
+        self.assertFalse(hasattr(arm_ik_mod, "_trigger_fault_injection"))
 
         # Verify hook is cleared and does not leak
         called = []
@@ -1632,11 +1636,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             called.append(stage)
 
         _set_test_fault_injection_hook(test_hook)
-        arm_ik_mod._trigger_fault_injection("test_stage_dummy")
+        fault_injection._trigger_fault_injection("test_stage_dummy")
         self.assertEqual(called, ["test_stage_dummy"])
 
         _clear_test_fault_injection_hook()
-        arm_ik_mod._trigger_fault_injection("test_stage_dummy_2")
+        fault_injection._trigger_fault_injection("test_stage_dummy_2")
         self.assertEqual(called, ["test_stage_dummy"])
 
     def test_64_commit_cleanup_failure_and_datablock_lifecycle(self) -> None:
@@ -2769,7 +2773,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         setup_arm_ik(self.armature)
 
         # Manually register a mock Cleanup Pending transaction on Armature A
-        tx_a = _ArmRigTransactionContext(self.armature)
+        tx_a = _create_arm_rig_transaction_context(self.armature)
         tx_a.state = _ArmRigTransactionState.CLEANUP_PENDING
         tx_a.uncleaned_stashed_objects.append({"obj_cleaned": False, "original_name": "Mock86"})
         _PENDING_ARM_RIG_CLEANUPS[tx_a.tx_id] = tx_a
@@ -2831,7 +2835,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         original_ptr = original_con.as_pointer()
 
         # Create a transaction context and register a stashed constraint with an obsolete pointer
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         obsolete_ptr = original_ptr + 999999  # distinct pointer
         stashed_record = {
             "pbone": p_fore,
@@ -3196,7 +3200,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         dummy_con.name = "Stashed_Con_97"
         dummy_ptr = dummy_con.as_pointer()
 
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         stashed_record = {
             "pbone": p_fore,
             "con": dummy_con,
@@ -3880,7 +3884,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # 6. Verify CLEANUP_PENDING gate blocks reset_arm_ik and mutations
         snap_after_reset = _snapshot_arm_rig_state(self.armature)
-        fake_tx = _ArmRigTransactionContext(self.armature)
+        fake_tx = _create_arm_rig_transaction_context(self.armature)
         fake_tx.state = _ArmRigTransactionState.CLEANUP_PENDING
         fake_tx.uncleaned_stashed_objects.append({"original_name": "Ghost112", "obj_cleaned": False, "data_cleaned": False})
         from src.scene_transaction_integrity.layer2.pending_cleanup_registry import _register_pending_arm_rig_cleanup
@@ -4194,13 +4198,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-118: Normal same-Armature nested transaction shares outer context, snapshots once, and commits."""
         setup_arm_ik(self.armature, initial_influence=0.3)
         snapshot_calls = [0]
-        orig_snapshot_fn = sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state
+        orig_snapshot_fn = wiring._snapshot_arm_rig_state
 
         def counting_snapshot(arm):
             snapshot_calls[0] += 1
             return orig_snapshot_fn(arm)
 
-        sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = counting_snapshot
+        wiring._snapshot_arm_rig_state = counting_snapshot
         try:
             with _arm_rig_transaction(self.armature) as outer_tx:
                 self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
@@ -4216,7 +4220,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                 self.assertIsNone(outer_tx.rollback_only_reason)
                 self.assertEqual(outer_tx.state, _ArmRigTransactionState.ACTIVE)
         finally:
-            sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = orig_snapshot_fn
+            wiring._snapshot_arm_rig_state = orig_snapshot_fn
 
         self.assertEqual(snapshot_calls[0], 1)
         self.assertFalse(outer_tx.rollback_only)
@@ -4289,14 +4293,14 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         setup_arm_ik(self.armature, initial_influence=0.25)
         initial_snapshot = _snapshot_arm_rig_state(self.armature)
         tx_snapshot_calls = [0]
-        orig_snapshot_fn = sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state
+        orig_snapshot_fn = wiring._snapshot_arm_rig_state
 
         def counting_snapshot(arm):
             if _ACTIVE_TRANSACTION_STACK and _ACTIVE_TRANSACTION_STACK[-1].state == _ArmRigTransactionState.SNAPSHOTTING:
                 tx_snapshot_calls[0] += 1
             return orig_snapshot_fn(arm)
 
-        sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = counting_snapshot
+        wiring._snapshot_arm_rig_state = counting_snapshot
         outer_tx_ref = None
         try:
             with self.assertRaises(RuntimeError) as outer_cm:
@@ -4323,7 +4327,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                         self.assertTrue(outer_tx.rollback_only)
                         self.assertIn("Deep nested B failure in TEST-120", outer_tx.rollback_only_reason)
         finally:
-            sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = orig_snapshot_fn
+            wiring._snapshot_arm_rig_state = orig_snapshot_fn
 
         self.assertEqual(tx_snapshot_calls[0], 1)
         self.assertIsNotNone(outer_tx_ref)
@@ -4456,7 +4460,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         setup_arm_ik(self.armature, initial_influence=0.45)
         initial_snapshot = _snapshot_arm_rig_state(self.armature)
         rollback_calls = [0]
-        orig_rollback_fn = sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state
+        orig_rollback_fn = wiring._rollback_arm_rig_state
 
         def counting_rollback(arm, snapshot, tx=None):
             rollback_calls[0] += 1
@@ -4466,7 +4470,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             if stage == "set_arm_ik_influence_between_influences":
                 raise ValueError("Original uncaught inner ValueError in TEST-123")
 
-        sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = counting_rollback
+        wiring._rollback_arm_rig_state = counting_rollback
         _set_test_fault_injection_hook(fault_hook)
         outer_tx_ref = None
         try:
@@ -4476,7 +4480,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                     set_arm_ik_influence(self.armature, "L", 0.95)
         finally:
             _clear_test_fault_injection_hook()
-            sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = orig_rollback_fn
+            wiring._rollback_arm_rig_state = orig_rollback_fn
 
         self.assertEqual(str(cm.exception), "Original uncaught inner ValueError in TEST-123")
         self.assertIsNotNone(outer_tx_ref)
@@ -4739,13 +4743,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # Count snapshot invocations to prove rejection happens strictly BEFORE SNAPSHOTTING
         snapshot_calls = [0]
-        orig_snapshot_fn = sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state
+        orig_snapshot_fn = wiring._snapshot_arm_rig_state
 
         def counting_snapshot(arm):
             snapshot_calls[0] += 1
             return orig_snapshot_fn(arm)
 
-        sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = counting_snapshot
+        wiring._snapshot_arm_rig_state = counting_snapshot
         try:
             for write_fn in (
                 lambda: setup_arm_ik(self.armature),
@@ -4760,7 +4764,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                 self.assertIn(tx.tx_id, err)
                 self.assertIn(orig_session_id, err)
         finally:
-            sys.modules["src.rig.arm_ik"]._snapshot_arm_rig_state = orig_snapshot_fn
+            wiring._snapshot_arm_rig_state = orig_snapshot_fn
 
         self.assertEqual(snapshot_calls[0], 0)
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
@@ -4829,13 +4833,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         orig_data_ptr = session_orig.original_data_pointer
 
         rollback_calls = [0]
-        orig_rollback_fn = sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state
+        orig_rollback_fn = wiring._rollback_arm_rig_state
 
         def counting_rollback(arm, snapshot, tx=None):
             rollback_calls[0] += 1
             return orig_rollback_fn(arm, snapshot, tx)
 
-        sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = counting_rollback
+        wiring._rollback_arm_rig_state = counting_rollback
         captured_tx = []
         try:
             with self.assertRaises(RuntimeError) as cm:
@@ -4847,7 +4851,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             self.assertIn("Armature destroyed inside ACTIVE in TEST-130", err_msg)
             self.assertIn(orig_session_id, err_msg)
         finally:
-            sys.modules["src.rig.arm_ik"]._rollback_arm_rig_state = orig_rollback_fn
+            wiring._rollback_arm_rig_state = orig_rollback_fn
 
         # Must NOT have executed _rollback_arm_rig_state on the dead Armature
         self.assertEqual(rollback_calls[0], 0)
@@ -5238,7 +5242,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # 3. Legitimate FAILED-C de-isolation and subsequent write recovery after Pending registry is cleared by Coordinator
         snap_after_cleanup_a = _snapshot_arm_rig_state(self.armature)
-        isolated_failed_c_tx = _ArmRigTransactionContext(self.armature, session_record=session_rec)
+        isolated_failed_c_tx = _create_arm_rig_transaction_context(self.armature, session_record=session_rec)
         isolated_failed_c_tx.state = _ArmRigTransactionState.FAILED
         isolated_failed_c_tx.snapshot = snap_after_cleanup_a
         from src.scene_transaction_integrity.layer2.session_registries import _record_armature_failure_isolation_by_coordinator
@@ -5311,7 +5315,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # Also record a FAILED-C isolation on the same Armature (simulating coexistence of CLEANUP_PENDING and FAILED)
         snap_current = _snapshot_arm_rig_state(self.armature)
-        coexisting_failed_tx = _ArmRigTransactionContext(self.armature, session_record=session_rec)
+        coexisting_failed_tx = _create_arm_rig_transaction_context(self.armature, session_record=session_rec)
         coexisting_failed_tx.state = _ArmRigTransactionState.FAILED
         coexisting_failed_tx.snapshot = snap_current
         _record_armature_failure_isolation_by_coordinator(
@@ -6669,7 +6673,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                 raise RuntimeError("TEST-165 getter failure")
             return orig_getattr(obj, name, *args)
 
-        with _ScopedModuleAttributeProxy(arm_ik, "getattr", faulty_getattr):
+        with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", faulty_getattr):
             with self.assertRaises(RuntimeError) as cm:
                 _capture_pre_snapshot_structural_fingerprint(self.armature)
 
@@ -6704,14 +6708,14 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                 return _CloneFaultMarker()
             return orig_getattr(obj, name, *args)
 
-        orig_clone = arm_ik._clone_snapshot_property_value
+        orig_clone = value_evidence._clone_snapshot_property_value
         def faulty_clone(val: Any) -> Any:
             if isinstance(val, _CloneFaultMarker):
                 raise RuntimeError("TEST-166 clone failure")
             return orig_clone(val)
 
-        with _ScopedModuleAttributeProxy(arm_ik, "getattr", faulty_getattr):
-            with _ScopedModuleAttributeProxy(arm_ik, "_clone_snapshot_property_value", faulty_clone):
+        with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", faulty_getattr):
+            with _ScopedModuleAttributeProxy(value_evidence, "_clone_snapshot_property_value", faulty_clone):
                 with self.assertRaises(RuntimeError) as cm:
                     _capture_pre_snapshot_structural_fingerprint(self.armature)
 
@@ -6754,7 +6758,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         _set_test_fault_injection_hook(fault_hook)
         try:
-            with _ScopedModuleAttributeProxy(arm_ik, "getattr", faulty_getattr):
+            with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", faulty_getattr):
                 with self.assertRaises(RuntimeError) as cm:
                     set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
                 err_msg = str(cm.exception)
@@ -6811,7 +6815,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         _set_test_fault_injection_hook(fault_hook)
         try:
-            with _ScopedModuleAttributeProxy(arm_ik, "getattr", selective_getattr):
+            with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", selective_getattr):
                 with self.assertRaises(RuntimeError) as cm:
                     set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
                 err_msg = str(cm.exception)
@@ -6980,9 +6984,9 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_172_fingerprint_freeze_does_not_alias_mutable_mathutils(self) -> None:
         """TEST-172: _freeze_fingerprint_property_value produces immutable frozen values that do not alias mutable Mathutils."""
-        freeze_fn = getattr(arm_ik, "_freeze_fingerprint_property_value", None)
+        freeze_fn = getattr(value_evidence, "_freeze_fingerprint_property_value", None)
         if freeze_fn is None:
-            self.fail("_freeze_fingerprint_property_value is not implemented in arm_ik")
+            self.fail("_freeze_fingerprint_property_value is not implemented in value_evidence")
 
         v = Vector((1.0, 2.0, 3.0))
         e = Euler((0.25, 0.5, 0.75), "XYZ")
@@ -7069,7 +7073,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         pre = _snapshot_arm_rig_state(self.armature)
         def unknown(_rec):
             return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-174 transient lookup"}
-        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", unknown):
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", unknown):
             with self.assertRaisesRegex(RuntimeError, "ARMATURE_IDENTITY_UNVERIFIED_AT_ADMISSION"):
                 with _arm_rig_transaction(self.armature):
                     self.fail("UNKNOWN must not admit writes")
@@ -7087,7 +7091,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         setup_arm_ik(self.armature, initial_influence=0.5)
         session = ensure_armature_session_identity(self.armature)
         uncertain = [False]
-        real = arm_ik._check_original_object_liveness
+        real = identity_helpers._check_original_object_liveness
         def maybe_unknown(rec):
             if uncertain[0]:
                 return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-175 transient"}
@@ -7096,7 +7100,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             if stage == "set_arm_ik_influence_between_influences":
                 uncertain[0] = True
                 raise ValueError("TEST-175 primary write fault")
-        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", maybe_unknown):
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", maybe_unknown):
             _set_test_fault_injection_hook(fault)
             try:
                 with self.assertRaises(RuntimeError) as cm:
@@ -7113,7 +7117,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         setup_arm_ik(self.armature, initial_influence=0.5)
         session = ensure_armature_session_identity(self.armature)
         uncertain = [False]
-        real = arm_ik._check_original_object_liveness
+        real = identity_helpers._check_original_object_liveness
         def maybe_unknown(rec):
             if uncertain[0]:
                 return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-176 query"}
@@ -7124,7 +7128,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             if stage == "during_rollback_verification":
                 uncertain[0] = True
                 raise RuntimeError("TEST-176 verifier fault")
-        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", maybe_unknown):
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", maybe_unknown):
             _set_test_fault_injection_hook(fault)
             try:
                 with self.assertRaises(RuntimeError) as cm:
@@ -7141,7 +7145,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
     def test_177_unknown_during_snapshot_is_failed_c(self) -> None:
         session = ensure_armature_session_identity(self.armature)
         uncertain = [False]
-        real = arm_ik._check_original_object_liveness
+        real = identity_helpers._check_original_object_liveness
         def maybe_unknown(rec):
             if uncertain[0]:
                 return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-177 query"}
@@ -7150,7 +7154,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             if stage == "during_snapshot_creation":
                 uncertain[0] = True
                 raise RuntimeError("TEST-177 snapshot")
-        with _ScopedModuleAttributeProxy(arm_ik, "_check_original_object_liveness", maybe_unknown):
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", maybe_unknown):
             _set_test_fault_injection_hook(fault)
             try:
                 with self.assertRaises(RuntimeError) as cm:
@@ -7173,7 +7177,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(_check_original_object_liveness(session)["status"], "ALIVE")
 
     def test_179_fingerprint_strictly_freezes_or_rejects(self) -> None:
-        freeze = arm_ik._freeze_fingerprint_property_value
+        freeze = value_evidence._freeze_fingerprint_property_value
         src = {"x": [1.0, 2.0]}
         frozen = freeze(src)
         self.assertIsInstance(frozen, tuple)
@@ -7203,7 +7207,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_181_unverified_data_enumeration_is_not_failed_d(self) -> None:
         session = ensure_armature_session_identity(self.armature)
-        real = arm_ik.bpy
+        real = identity_helpers.bpy
         class ArmatureDataProxy:
             def __getattr__(self, name):
                 if name == "armatures":
@@ -7216,7 +7220,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             data = ArmatureDataProxy()
             def __getattr__(self, name):
                 return getattr(real, name)
-        with _ScopedModuleAttributeProxy(arm_ik, "bpy", BpyProxy()):
+        with _ScopedModuleAttributeProxy(identity_helpers, "bpy", BpyProxy()):
             check = _verify_armature_session_identity_record(session, candidate_arm=self.armature)
             self.assertFalse(check["is_valid"])
             self.assertTrue(check["identity_verification_uncertain"])
@@ -7311,7 +7315,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.context.scene.collection.objects.link(removed_obj)
         bpy.data.objects.remove(removed_obj, do_unlink=True)
         with self.assertRaisesRegex(RuntimeError, "FINGERPRINT_RNA_IDENTITY_UNVERIFIED"):
-            arm_ik._freeze_fingerprint_property_value(removed_obj)
+            value_evidence._freeze_fingerprint_property_value(removed_obj)
 
     def test_186_unsupported_constraint_property_never_proves_failed_a(self) -> None:
         setup_arm_ik(self.armature, initial_influence=0.5)
@@ -7321,7 +7325,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             if name == "use_location" and original_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
                 return object()
             return original_getattr(obj, name, *args)
-        with _ScopedModuleAttributeProxy(arm_ik, "getattr", unsupported_property):
+        with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", unsupported_property):
             with self.assertRaises(RuntimeError) as cm:
                 set_arm_ik_influence(self.armature, "L", 0.9)
         self.assertIn("FAILED-C", str(cm.exception))
@@ -7340,7 +7344,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                 raise RuntimeError("TEST-187 primary snapshot failure")
         def unreadable(_val):
             raise RuntimeError("TEST-187 finiteness scan unavailable")
-        with _ScopedModuleAttributeProxy(arm_ik, "_has_nan_or_inf", unreadable):
+        with _ScopedModuleAttributeProxy(value_evidence, "_has_nan_or_inf", unreadable):
             _set_test_fault_injection_hook(fault)
             try:
                 with self.assertRaises(RuntimeError) as cm:
@@ -9004,7 +9008,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
     def test_234_layer6_returns_cleanup_success_without_state_mutation(self) -> None:
         """TEST-234: Layer 6 正常清理返回 CLEANUP_SUCCESS，不直接修改事务状态."""
         setup_arm_ik(self.armature)
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         tx.state = _ArmRigTransactionState.COMMITTED
         wrong_mesh = bpy.data.meshes.new("Test234_Mesh")
         wrong_obj = bpy.data.objects.new("Test234_Obj", wrong_mesh)
@@ -9186,7 +9190,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_239_pending_registry_invalid_state_or_identity_rejects_and_refuses_pop(self) -> None:
         """TEST-239: Pending Registry 存在错误状态或错误事务身份时，必须抛出异常，不得注销."""
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         tx.state = _ArmRigTransactionState.ACTIVE
         _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
 
@@ -9200,7 +9204,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_240_forged_cleanup_success_with_remaining_resources_rejected_by_coordinator(self) -> None:
         """TEST-240: 伪造 CLEANUP_SUCCESS 但仍有未完成资源，Coordinator 必须拒绝成功结论."""
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         tx.state = _ArmRigTransactionState.CLEANUP_PENDING
         _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
         dummy_stashed = {"original_name": "GhostObj240", "obj_cleaned": False, "data_cleaned": False}
@@ -9240,7 +9244,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         other_arm = bpy.context.active_object
         other_arm.name = "OtherArm241"
 
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         tx.state = _ArmRigTransactionState.CLEANUP_PENDING
         _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
 
@@ -9293,7 +9297,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
     def test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending(self) -> None:
         """TEST-243: 清理成功后的重复请求不得重复删除资源、重复登记或产生幽灵 Pending."""
         setup_arm_ik(self.armature)
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         tx.state = _ArmRigTransactionState.COMMITTED
 
         res1 = tx.retry_cleanup()
@@ -9325,7 +9329,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         orig_failed_record = dict(_ISOLATED_FAILED_ARMATURES[session_id])
         orig_failed_record_ref = _ISOLATED_FAILED_ARMATURES[session_id]
 
-        tx = _ArmRigTransactionContext(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
         tx.state = _ArmRigTransactionState.CLEANUP_PENDING
         _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
 
