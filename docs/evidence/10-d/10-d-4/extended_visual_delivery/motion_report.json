@@ -1,0 +1,623 @@
+{
+  "task_id": "TASK 10-d-4 Extended Visual Delivery",
+  "timestamp_utc": "2026-11-26T16:03:12.937308+00:00",
+  "git_head": "0570d21c69e84811cdb01f154aa1a1c1151a6047",
+  "reused_script": "docs/evidence/10-d/10-d-4/visual_redelivery/generate_visual_redelivery.py",
+  "reused_script_blob": "d3d0f0e521dc0ce20d0a013608346b3c5caa8d30",
+  "source_blobs": {
+    "src/motion/terrain_walk.py": "d42519fe8e39d149bdcffec3378b5f5ee7601b91",
+    "src/motion/kinematic_bridge.py": "9e68e0a6a44bdb538b75b4f4d99b117c1737c358",
+    "src/motion/framework.py": "31a9c268e0833a93cc0e498227202256c3274f05",
+    "src/motion/whole_body_controller.py": "562de6c0ce1e9009856a7d52ec89cd6d0c012be2"
+  },
+  "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B docs/evidence/10-d/10-d-4/extended_visual_delivery/generate_extended_visual_delivery.py",
+  "passed": true,
+  "scene_3_complex_bilateral": {
+    "scene_id": "scene3",
+    "asset": {
+      "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_complex_bilateral_motion.blend",
+      "relative_path": "output/task10d_complex_bilateral_motion.blend",
+      "size_bytes": 367771,
+      "sha256": "f9ff0b09de20b8432884b7fb5ef43a7c4d269f48544e23bdbdba6a959ad1e230",
+      "frame_start": 1,
+      "frame_end": 480,
+      "frame_count": 480,
+      "duration_sec": 20.0
+    },
+    "effective_segments": {
+      "L_count": 20,
+      "L_active_sec": 17.2,
+      "L_active_ratio": 0.86,
+      "R_count": 20,
+      "R_active_sec": 18.25,
+      "R_active_ratio": 0.9125
+    },
+    "walking_stats": {
+      "route_start": [
+        0.0,
+        10.2,
+        0.0
+      ],
+      "route_target": [
+        0.0,
+        11.4,
+        0.0
+      ],
+      "walk_frames": 80,
+      "walk_sec": 3.3333333333333335,
+      "walk_ratio": 0.16666666666666666
+    },
+    "mode_combinations_observed": [
+      [
+        "FK",
+        "FK"
+      ],
+      [
+        "FK",
+        "IK"
+      ],
+      [
+        "IK",
+        "FK"
+      ],
+      [
+        "IK",
+        "IK"
+      ]
+    ],
+    "mode_switches": {
+      "L": [
+        {
+          "type": "FK_to_IK",
+          "before_frame": 144,
+          "after_frame": 145,
+          "time_sec": 6.0,
+          "root_world_delta_m": 0.0,
+          "wrist_world_delta_m": 2.384185791015625e-07,
+          "elbow_world_delta_m": 1.228781230931777e-07,
+          "wrist_root_local_delta_m": 2.384185791015625e-07,
+          "elbow_root_local_delta_m": 1.228781230931777e-07,
+          "max_world_rot_delta_deg": 5.614757911553859e-06,
+          "max_rel_rot_delta_deg": 9.695195826841255e-06,
+          "before_arm_ik_influence": 0.0,
+          "after_arm_ik_influence": 1.0
+        },
+        {
+          "type": "IK_to_FK",
+          "before_frame": 360,
+          "after_frame": 361,
+          "time_sec": 15.0,
+          "root_world_delta_m": 0.0,
+          "wrist_world_delta_m": 1.228781230931777e-07,
+          "elbow_world_delta_m": 2.9802322387695312e-08,
+          "wrist_root_local_delta_m": 1.228781230931777e-07,
+          "elbow_root_local_delta_m": 2.9802322387695312e-08,
+          "max_world_rot_delta_deg": 2.353629755370206e-06,
+          "max_rel_rot_delta_deg": 2.694460802619822e-06,
+          "before_arm_ik_influence": 1.0,
+          "after_arm_ik_influence": 0.0
+        }
+      ],
+      "R": [
+        {
+          "type": "FK_to_IK",
+          "before_frame": 84,
+          "after_frame": 85,
+          "time_sec": 3.5,
+          "root_world_delta_m": 0.0,
+          "wrist_world_delta_m": 2.4027400458748785e-07,
+          "elbow_world_delta_m": 0.0,
+          "wrist_root_local_delta_m": 2.4027400458748785e-07,
+          "elbow_root_local_delta_m": 0.0,
+          "max_world_rot_delta_deg": 5.663458048746972e-06,
+          "max_rel_rot_delta_deg": 2.1798102522560485e-06,
+          "before_arm_ik_influence": 0.0,
+          "after_arm_ik_influence": 1.0
+        },
+        {
+          "type": "IK_to_FK",
+          "before_frame": 288,
+          "after_frame": 289,
+          "time_sec": 12.0,
+          "root_world_delta_m": 0.0,
+          "wrist_world_delta_m": 0.0,
+          "elbow_world_delta_m": 5.960464477539063e-08,
+          "wrist_root_local_delta_m": 0.0,
+          "elbow_root_local_delta_m": 5.960464477539063e-08,
+          "max_world_rot_delta_deg": 3.6986133183473914e-06,
+          "max_rel_rot_delta_deg": 2.2653187016585293e-06,
+          "before_arm_ik_influence": 1.0,
+          "after_arm_ik_influence": 0.0
+        }
+      ]
+    },
+    "full_timeline_L": {
+      "upper_arm_rel_span_deg": 62.95794149883692,
+      "forearm_rel_span_deg": 62.019980200593764,
+      "hand_rel_span_deg": 29.697182542578812,
+      "wrist_root_local_span_m": 0.8676832176743335
+    },
+    "full_timeline_R": {
+      "upper_arm_rel_span_deg": 59.815539999298046,
+      "forearm_rel_span_deg": 62.70422329799325,
+      "hand_rel_span_deg": 31.188055505358548,
+      "wrist_root_local_span_m": 0.8952595525702902
+    },
+    "stage_metrics": {
+      "stage_01_both_fk_0_3.5s": {
+        "frame_range": [
+          1,
+          84
+        ],
+        "frame_count": 84,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 47.64429640369299,
+          "forearm_rel_span_deg": 44.205759426546535,
+          "hand_rel_span_deg": 27.587838469776912,
+          "wrist_root_local_span_m": 0.817369737288891
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 33.60992730050748,
+          "forearm_rel_span_deg": 54.690189366152154,
+          "hand_rel_span_deg": 28.445309761991588,
+          "wrist_root_local_span_m": 0.6639199618459044
+        }
+      },
+      "stage_02_L_fk_R_ik_3.5_6s": {
+        "frame_range": [
+          85,
+          144
+        ],
+        "frame_count": 60,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 36.199114186023905,
+          "forearm_rel_span_deg": 16.08621154482244,
+          "hand_rel_span_deg": 27.27696261389591,
+          "wrist_root_local_span_m": 0.4821097701934702
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 20.52173617484872,
+          "forearm_rel_span_deg": 5.804977631073411,
+          "hand_rel_span_deg": 5.497351675917998,
+          "wrist_root_local_span_m": 0.25102447059838784
+        }
+      },
+      "stage_03_both_ik_stand_6_8.3s": {
+        "frame_range": [
+          145,
+          200
+        ],
+        "frame_count": 56,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 21.677931753352826,
+          "forearm_rel_span_deg": 7.079916674929236,
+          "hand_rel_span_deg": 21.327104303109024,
+          "wrist_root_local_span_m": 0.2352302249670139
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 25.878532679603932,
+          "forearm_rel_span_deg": 8.329684551071937,
+          "hand_rel_span_deg": 16.061482985802584,
+          "wrist_root_local_span_m": 0.2918788411608666
+        }
+      },
+      "stage_04_both_ik_walk_8.3_11.7s": {
+        "frame_range": [
+          201,
+          280
+        ],
+        "frame_count": 80,
+        "root_world_disp_m": 1.2038856374569133,
+        "L": {
+          "upper_arm_rel_span_deg": 28.699801691451206,
+          "forearm_rel_span_deg": 20.536431966745333,
+          "hand_rel_span_deg": 28.008768898372445,
+          "wrist_root_local_span_m": 0.2540286617251537
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 26.58396061913747,
+          "forearm_rel_span_deg": 21.931730893465748,
+          "hand_rel_span_deg": 23.764152692729585,
+          "wrist_root_local_span_m": 0.3566368282042636
+        }
+      },
+      "stage_05_L_ik_R_fk_12_15s": {
+        "frame_range": [
+          289,
+          360
+        ],
+        "frame_count": 72,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 21.435737369324375,
+          "forearm_rel_span_deg": 12.743809528085546,
+          "hand_rel_span_deg": 17.069035515316,
+          "wrist_root_local_span_m": 0.2507539463105731
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 44.92724852328984,
+          "forearm_rel_span_deg": 50.146127215292125,
+          "hand_rel_span_deg": 26.86235779638803,
+          "wrist_root_local_span_m": 0.7556424984141017
+        }
+      },
+      "stage_06_both_fk_retract_15_20s": {
+        "frame_range": [
+          361,
+          480
+        ],
+        "frame_count": 120,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 62.95794149883692,
+          "forearm_rel_span_deg": 54.664412818774004,
+          "hand_rel_span_deg": 26.753418194287544,
+          "wrist_root_local_span_m": 0.8468830395446154
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 46.21090347785933,
+          "forearm_rel_span_deg": 51.313224647362965,
+          "hand_rel_span_deg": 30.154228540905805,
+          "wrist_root_local_span_m": 0.8952595525702902
+        }
+      }
+    },
+    "markers_count": 8,
+    "reopen_verification": {
+      "passed": true,
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_complex_bilateral_motion.blend",
+      "action_slot": "OBCharacterArmature",
+      "influence_fcurves": {
+        "ArmIK.L": {
+          "keyframes": 480,
+          "interpolation": "CONSTANT"
+        },
+        "ArmIK.R": {
+          "keyframes": 480,
+          "interpolation": "CONSTANT"
+        },
+        "HandRotation.L": {
+          "keyframes": 480,
+          "interpolation": "CONSTANT"
+        },
+        "HandRotation.R": {
+          "keyframes": 480,
+          "interpolation": "CONSTANT"
+        }
+      },
+      "solve_vs_reopen_traversals": [
+        {
+          "order": "forward",
+          "frames_checked": 480,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "reverse",
+          "frames_checked": 480,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "shuffled_seed_20261126",
+          "frames_checked": 480,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        }
+      ]
+    }
+  },
+  "scene_4_long_continuous": {
+    "scene_id": "scene4",
+    "asset": {
+      "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_long_continuous_motion.blend",
+      "relative_path": "output/task10d_long_continuous_motion.blend",
+      "size_bytes": 979786,
+      "sha256": "5ace7f8d6271f3380b2c6359137e8c93eda44493c0f6839e6db5ce01f8f0ea59",
+      "frame_start": 1,
+      "frame_end": 1440,
+      "frame_count": 1440,
+      "duration_sec": 60.0
+    },
+    "effective_segments": {
+      "L_count": 48,
+      "L_active_sec": 57.39999999999998,
+      "L_active_ratio": 0.9566666666666663,
+      "R_count": 46,
+      "R_active_sec": 55.70000000000004,
+      "R_active_ratio": 0.928333333333334
+    },
+    "walking_stats": {
+      "route_start": [
+        0.0,
+        10.2,
+        0.0
+      ],
+      "route_target": [
+        0.0,
+        22.4,
+        0.0
+      ],
+      "walk_frames": 936,
+      "walk_sec": 39.0,
+      "walk_ratio": 0.65
+    },
+    "mode_combinations_observed": [
+      [
+        "FK",
+        "FK"
+      ],
+      [
+        "FK",
+        "IK"
+      ],
+      [
+        "IK",
+        "FK"
+      ],
+      [
+        "IK",
+        "IK"
+      ]
+    ],
+    "mode_switches": {
+      "L": [
+        {
+          "type": "FK_to_IK",
+          "before_frame": 144,
+          "after_frame": 145,
+          "time_sec": 6.0,
+          "root_world_delta_m": 0.0,
+          "wrist_world_delta_m": 2.384185791015625e-07,
+          "elbow_world_delta_m": 1.228781230931777e-07,
+          "wrist_root_local_delta_m": 2.384185791015625e-07,
+          "elbow_root_local_delta_m": 1.228781230931777e-07,
+          "max_world_rot_delta_deg": 6.262136477958384e-06,
+          "max_rel_rot_delta_deg": 9.695195826841255e-06,
+          "before_arm_ik_influence": 0.0,
+          "after_arm_ik_influence": 1.0
+        },
+        {
+          "type": "IK_to_FK",
+          "before_frame": 936,
+          "after_frame": 937,
+          "time_sec": 39.0,
+          "root_world_delta_m": 0.013348870542039891,
+          "wrist_world_delta_m": 0.013211039078747419,
+          "elbow_world_delta_m": 0.013211167036217792,
+          "wrist_root_local_delta_m": 0.00032620589089030037,
+          "elbow_root_local_delta_m": 0.0002463103367667999,
+          "max_world_rot_delta_deg": 0.014985862832805567,
+          "max_rel_rot_delta_deg": 2.8027298034681294e-06,
+          "before_arm_ik_influence": 1.0,
+          "after_arm_ik_influence": 0.0
+        }
+      ],
+      "R": [
+        {
+          "type": "FK_to_IK",
+          "before_frame": 432,
+          "after_frame": 433,
+          "time_sec": 18.0,
+          "root_world_delta_m": 0.01334226729333473,
+          "wrist_world_delta_m": 0.013489668656355529,
+          "elbow_world_delta_m": 0.01351269621871525,
+          "wrist_root_local_delta_m": 0.00037098143507708665,
+          "elbow_root_local_delta_m": 0.0002849690648847004,
+          "max_world_rot_delta_deg": 0.014953672513338087,
+          "max_rel_rot_delta_deg": 3.5266987788241195e-06,
+          "before_arm_ik_influence": 0.0,
+          "after_arm_ik_influence": 1.0
+        },
+        {
+          "type": "IK_to_FK",
+          "before_frame": 1200,
+          "after_frame": 1201,
+          "time_sec": 50.0,
+          "root_world_delta_m": 0.0,
+          "wrist_world_delta_m": 1.1920928955078125e-07,
+          "elbow_world_delta_m": 1.228781230931777e-07,
+          "wrist_root_local_delta_m": 1.1920928955078125e-07,
+          "elbow_root_local_delta_m": 1.228781230931777e-07,
+          "max_world_rot_delta_deg": 3.0183768020963908e-06,
+          "max_rel_rot_delta_deg": 2.0291452461579392e-06,
+          "before_arm_ik_influence": 1.0,
+          "after_arm_ik_influence": 0.0
+        }
+      ]
+    },
+    "full_timeline_L": {
+      "upper_arm_rel_span_deg": 73.38634563169745,
+      "forearm_rel_span_deg": 68.72715665831304,
+      "hand_rel_span_deg": 32.17074231149989,
+      "wrist_root_local_span_m": 0.9338177376763266
+    },
+    "full_timeline_R": {
+      "upper_arm_rel_span_deg": 69.35767080902528,
+      "forearm_rel_span_deg": 68.24681639405112,
+      "hand_rel_span_deg": 32.00141097158228,
+      "wrist_root_local_span_m": 0.8714081003251569
+    },
+    "stage_metrics": {
+      "win_00_10s": {
+        "frame_range": [
+          1,
+          240
+        ],
+        "frame_count": 240,
+        "root_world_disp_m": 0.17908763885498047,
+        "L": {
+          "upper_arm_rel_span_deg": 54.40602189799084,
+          "forearm_rel_span_deg": 57.6405683716897,
+          "hand_rel_span_deg": 28.702348768013962,
+          "wrist_root_local_span_m": 0.8111026660712437
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 63.70432285741893,
+          "forearm_rel_span_deg": 52.20638323791817,
+          "hand_rel_span_deg": 29.780065378237975,
+          "wrist_root_local_span_m": 0.834288738021731
+        }
+      },
+      "win_10_20s": {
+        "frame_range": [
+          241,
+          480
+        ],
+        "frame_count": 240,
+        "root_world_disp_m": 3.1864991445411026,
+        "L": {
+          "upper_arm_rel_span_deg": 32.77055853381029,
+          "forearm_rel_span_deg": 23.962918669983534,
+          "hand_rel_span_deg": 25.135467577017604,
+          "wrist_root_local_span_m": 0.3589177968754697
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 57.863415783948454,
+          "forearm_rel_span_deg": 45.40331902402653,
+          "hand_rel_span_deg": 28.33980240490492,
+          "wrist_root_local_span_m": 0.5346598634553786
+        }
+      },
+      "win_20_30s": {
+        "frame_range": [
+          481,
+          720
+        ],
+        "frame_count": 240,
+        "root_world_disp_m": 3.2247518343069244,
+        "L": {
+          "upper_arm_rel_span_deg": 40.37075515776265,
+          "forearm_rel_span_deg": 23.896778867080883,
+          "hand_rel_span_deg": 23.987606706981875,
+          "wrist_root_local_span_m": 0.47137906221432047
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 36.18961194197231,
+          "forearm_rel_span_deg": 26.947683613916436,
+          "hand_rel_span_deg": 19.36708925697357,
+          "wrist_root_local_span_m": 0.427860793457961
+        }
+      },
+      "win_30_40s": {
+        "frame_range": [
+          721,
+          960
+        ],
+        "frame_count": 240,
+        "root_world_disp_m": 3.3415609317674466,
+        "L": {
+          "upper_arm_rel_span_deg": 41.591252450008795,
+          "forearm_rel_span_deg": 31.88301633926227,
+          "hand_rel_span_deg": 25.3323291677699,
+          "wrist_root_local_span_m": 0.34637746154625554
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 40.69965115078717,
+          "forearm_rel_span_deg": 24.334784908425593,
+          "hand_rel_span_deg": 25.79850521931035,
+          "wrist_root_local_span_m": 0.37385061901563693
+        }
+      },
+      "win_40_50s": {
+        "frame_range": [
+          961,
+          1200
+        ],
+        "frame_count": 240,
+        "root_world_disp_m": 2.510339919012217,
+        "L": {
+          "upper_arm_rel_span_deg": 65.86594941542585,
+          "forearm_rel_span_deg": 48.661350579372524,
+          "hand_rel_span_deg": 31.96279573872203,
+          "wrist_root_local_span_m": 0.69731677758132
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 30.9770677232994,
+          "forearm_rel_span_deg": 28.68759094723178,
+          "hand_rel_span_deg": 29.95013020409477,
+          "wrist_root_local_span_m": 0.3740421387467985
+        }
+      },
+      "win_50_60s": {
+        "frame_range": [
+          1201,
+          1440
+        ],
+        "frame_count": 240,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 57.270726432678174,
+          "forearm_rel_span_deg": 55.65697343242621,
+          "hand_rel_span_deg": 30.80015080668341,
+          "wrist_root_local_span_m": 0.8059553711602688
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 65.38699852716388,
+          "forearm_rel_span_deg": 56.705399923130614,
+          "hand_rel_span_deg": 32.00141097158228,
+          "wrist_root_local_span_m": 0.8714081003251569
+        }
+      }
+    },
+    "markers_count": 10,
+    "reopen_verification": {
+      "passed": true,
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_long_continuous_motion.blend",
+      "action_slot": "OBCharacterArmature",
+      "influence_fcurves": {
+        "ArmIK.L": {
+          "keyframes": 1440,
+          "interpolation": "CONSTANT"
+        },
+        "ArmIK.R": {
+          "keyframes": 1440,
+          "interpolation": "CONSTANT"
+        },
+        "HandRotation.L": {
+          "keyframes": 1440,
+          "interpolation": "CONSTANT"
+        },
+        "HandRotation.R": {
+          "keyframes": 1440,
+          "interpolation": "CONSTANT"
+        }
+      },
+      "solve_vs_reopen_traversals": [
+        {
+          "order": "forward",
+          "frames_checked": 1440,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "reverse",
+          "frames_checked": 1440,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "shuffled_seed_20261126",
+          "frames_checked": 1440,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        }
+      ]
+    }
+  }
+}

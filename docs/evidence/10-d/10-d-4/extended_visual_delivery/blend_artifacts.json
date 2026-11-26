@@ -1,0 +1,22 @@
+{
+  "task10d_complex_bilateral_motion": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_complex_bilateral_motion.blend",
+    "relative_path": "output/task10d_complex_bilateral_motion.blend",
+    "size_bytes": 367771,
+    "sha256": "f9ff0b09de20b8432884b7fb5ef43a7c4d269f48544e23bdbdba6a959ad1e230",
+    "frame_start": 1,
+    "frame_end": 480,
+    "frame_count": 480,
+    "duration_sec": 20.0
+  },
+  "task10d_long_continuous_motion": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_long_continuous_motion.blend",
+    "relative_path": "output/task10d_long_continuous_motion.blend",
+    "size_bytes": 979786,
+    "sha256": "5ace7f8d6271f3380b2c6359137e8c93eda44493c0f6839e6db5ce01f8f0ea59",
+    "frame_start": 1,
+    "frame_end": 1440,
+    "frame_count": 1440,
+    "duration_sec": 60.0
+  }
+}
