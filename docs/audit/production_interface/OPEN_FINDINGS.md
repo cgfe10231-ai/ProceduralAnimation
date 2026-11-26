@@ -1,9 +1,9 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **核验日期**：2026-11-26；当前主干基线：`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`（`master`，含 Task 10-B 六层拆分、全量回归及双父节点主干收归）。
+> **核验日期**：2026-11-26；当前主干源码及证据收归基线：`f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`；10-C 集成复验基线 `2e65a9463ab88714cfb864b4d63f1547135c29ae`。
 > **登记口径**：统一历史 Finding **16项**，14项已关闭、2项仍 OPEN；不增删、不重编号。
 > **未关闭**：`FIND-R3-03`、`FIND-R3-04`，归属 Task 11 FootLock；其他14项历史结论保持不变。10-B 验收与主干合入不得自动解释为关闭 Task 11 的 Finding。
-> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 原于 2026-11-20 获项目负责人正式验收，现已完成六层拆分回归（`2f248bf4b98776222e37bc3228506a4fb85f7c32`，证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`）并合入 `master`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`），状态为 `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；10-C：四个子节点于 2026-11-21 完成历史验收并保留于 `task/10-c-child4`（`d3d7f135975ac5a2a9b01e2706434d0463a563cd`），尚未合入 `master`，尚未在六层架构集成后重新验证；10-D 未准入。
+> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 原于 2026-11-20 获项目负责人正式验收，现已完成六层拆分回归（`2f248bf4b98776222e37bc3228506a4fb85f7c32`，证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`）并合入 `master`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`），状态为 `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。Task 10-C 四个子节点于 2026-11-21 完成历史分支验收（`task/10-c-child4`，`d3d7f135975ac5a2a9b01e2706434d0463a563cd`）；2026-11-26 在六层架构集成基线 `2e65a9463ab88714cfb864b4d63f1547135c29ae` 复验通过，已 fast-forward 收归 `master`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）。 Task 10-D `NEXT — AUDIT ONLY — NOT STARTED`：下一工程节点，仅允许独立只读审计与方案冻结，任何生产修改及测试须另行批准。
 > **独立问题域**：10-B 的 `CORE_REPAIR_LEDGER.md` 21项冻结记录（含证据与专项合同）**不属于**本16项 Finding 的新增条目，不能合并编号或机械改写历史 Finding 状态。
 > **Phase 7B**：`NOT AUTHORIZED`；须完成 Task 10/11/12 联合验收并由负责人准入。
 
@@ -21,8 +21,8 @@
 | 09-B-4 | `ACCEPTED — VERIFIED` | 不得重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
 | Task 10-B | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 原验收 2026-11-20；六层拆分回归（`2f248bf` / `dcf3057`）及双父节点合并至 `master`（`c45a40c`）已完成；不自动关闭 Task 11 的 Finding |
-| Task 10-C | `HISTORICALLY ACCEPTED ON BRANCH — NOT YET MERGED OR RE-VERIFIED ON MASTER` | 四个子节点于 2026-11-21 完成历史验收并保留于 `task/10-c-child4`（`d3d7f135975ac5a2a9b01e2706434d0463a563cd`），尚未合入 `master`，待受控集成后重新验证 |
-| Task 10-D | `BLOCKED — NOT STARTED` | 未准入 |
+| Task 10-C | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 集成复验 38/38 PASS，历史 Bridge 兼容 14/14 PASS；收归 `f2501ddc7d610d554d1e813b13564ea56ce2b51a` |
+| Task 10-D | `NEXT — AUDIT ONLY — NOT STARTED` | 下一节点，仅只读审计和方案冻结 |
 | Task 11 / Task 12 | 尚未完成 | Task 11 归属两个OPEN Finding |
 | Phase 7B | `NOT AUTHORIZED` | 不得越级开启 |
 
@@ -556,7 +556,7 @@
 
 ## 7. 集中修复建议与维护包划分 (Remediation Roadmap)
 
-> **历史路线图快照（非当前任务状态）**：本节保留原 R1–R4 审计后形成的维护包划分、依赖拓扑和早期任务建议，用于追溯历史规划。正文中的“待处理 09-B”仅代表该规划形成时的状态，不代表当前任务仍未完成。当前 PKG-5 状态以文件顶部摘要及第 8 节节点表为准：09-B-4 已验收，10-A 已归档，10-B 已获正式验收并完成六层拆分回归及合入 `master`（`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`，`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C 四个子节点已于 2026-11-21 完成历史分支验收（`task/10-c-child4`，`d3d7f135975ac5a2a9b01e2706434d0463a563cd`），尚未合入 `master`，尚未在六层架构集成后重新验证；10-D 未准入；FIND-R3-03 与 FIND-R3-04 仍归属 Task 11。不得使用本节历史规划文字覆盖当前验收状态。
+> **历史路线图快照（非当前任务状态）**：本节保留原 R1–R4 审计后形成的维护包划分、依赖拓扑和早期任务建议，用于追溯历史规划。正文中的“待处理 09-B”仅代表该规划形成时的状态，不代表当前任务仍未完成。当前 PKG-5 状态以文件顶部摘要及第 8 节节点表为准：09-B-4 已验收，10-A 已归档，10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED`；FIND-R3-03 与 FIND-R3-04 仍归属 Task 11。不得使用本节历史规划文字覆盖当前验收状态。
 
 > **权威修复方案与详细回归规划**：详见独立维护包文档 [`docs/audit/production_interface/REPAIR_GROUPING.md`](REPAIR_GROUPING.md)。
 
@@ -589,7 +589,7 @@ flowchart TD
      - `08 Rig`：刚体平移与世界空间隔离回归已完成；
      - `09-A`：Ground × Reach 三维约束求解器已完成并验证；
      - `09-B`：世界旋转、有效父级变换、状态完整性及解锁事务补强已完成，最近节点 09-B-4 为 `ACCEPTED — VERIFIED`；
-     - `10 Upper-Limb IK/FK`：10-A 已归档；10-B 已正式验收并完成六层拆分回归与合入 `master`（`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`，`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C 四个子节点已于 2026-11-21 完成历史分支验收（`task/10-c-child4`，`d3d7f135975ac5a2a9b01e2706434d0463a563cd`），尚未合入 `master` 且待集成后复验；10-D 未准入；
+     - `10 Upper-Limb IK/FK`：10-A 已归档；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED`；
      - `11 FootLock`：仍需处理 FIND-R3-03 与 FIND-R3-04；
      - `12 联合验收`：等待 Task 10、11 完成。
 
@@ -606,7 +606,7 @@ flowchart TD
 | 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | `COMPLETED / VERIFIED` |
 | 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | FIND-R3-01 | 世界旋转、有效父级矩阵、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 10-A `COMPLETED — ARCHIVED`；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（原验收 2026-11-20，主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C 四个子节点历史分支验收完成（`2026-11-21`，`task/10-c-child4` `d3d7f135975ac5a2a9b01e2706434d0463a563cd`，未合入 `master`，待集成后复验）；10-D `BLOCKED — NOT STARTED` |
+| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 10-A `COMPLETED — ARCHIVED`；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（原验收 2026-11-20，主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED` |
 | 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | `OPEN / PENDING REPAIR` |
 | 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | `PENDING` |
 
@@ -822,15 +822,15 @@ flowchart TD
 #### 10.3.5 10-C：PlannedHandTarget 到 WBC 的数据丢失
 
 * **模块归属**：10-C
-* **状态**：`AUDIT_PENDING — STATIC FIELD GAP CONFIRMED, RUNTIME IMPACT TO VERIFY`
+* **状态**：`VERIFIED — 10-C SCOPE — MERGED TO MASTER`（原状态为历史静态字段缺口，现已实现并通过集成复验；不新增 Finding）。
 * **源码**：
   - `src/motion/kinematic_bridge.py` (`PlannedHandTarget`, `KinematicPlannedPose`, `convert_planned_pose_to_wbc_targets()`)
   - `src/motion/whole_body_controller.py` (`EndEffectorTarget`, `WholeBodyControlTargets`)
-* **静态观察**：
+* **历史静态观察（10-C 修复前）**：
   - WBC 已有手部 Pole Hint 和 Reach Clamp 相关字段及接口。
-  - 但 `PlannedHandTarget` 当前没有完整对应字段。
-  - 当前 Bridge 转换过程没有无损传递手部 Pole Hint 和独立 Reach Clamp 参数的完整路径。
-* **必须验证**：
+  - 当时 `PlannedHandTarget` 没有完整对应字段。
+  - 当时 Bridge 转换过程没有无损传递手部 Pole Hint 和独立 Reach Clamp 参数的完整路径。
+* **原验证要求（保留合同）**：
   - 规划层能否表达左右肘 Pole Hint。
   - 规划层能否表达左右手各自的 Reach Clamp 策略。
   - Bridge 是否完整传递这些值。
@@ -839,6 +839,7 @@ flowchart TD
 * **预期合同**：
   - 规划层、Bridge、WBC、Rig 的目标数据必须无损传递。
   - 新增字段应采用向后兼容的字段追加方式，不得破坏已有位置参数和历史构造调用。
+* **当前证据**：PlannedHandTarget 末尾追加 `pole_hint_world_xyz=None` 与 `clamp_reach=True`，保留历史构造兼容；`convert_planned_pose_to_wbc_targets()` 对左右手独立传递字段、仲裁 FK/IK，接触意图独立。`KinematicBridgeExecutor.execute_frame()` 在启用 ROM 截断且 WBC 报告 ROM 违反时，更新场景后调用 `_reconcile_post_rom_feedback()`，从同一最终姿态重算四末端反馈并生成独立结果对象，保留原 ROM 诊断、不将失败变为成功；不修改 WBC/Rig 事务归属。 10-C 专项 A/B/C/D 分别 10/10、15/15、6/6、7/7（合计 38/38 PASS），历史 Bridge 兼容回归 14/14 PASS，累计执行 52/52 PASS；各组退出码为 0。证据：`docs/evidence/10-c-integration/`（`revalidation_manifest.json`、`source_blob_verification.json`、`execution_provenance.json` 及各组原始结果/日志）。
 
 #### 10.3.6 10-D：生产动作上肢轨迹仍依附于下肢步态
 
@@ -864,7 +865,7 @@ flowchart TD
 #### 10.3.7 10-C：手部目标位置和姿态语义
 
 * **模块归属**：10-C
-* **状态**：`INTERFACE SEMANTICS — MUST BE FROZEN`
+* **状态**：`INTERFACE SEMANTICS — FROZEN`（10-C 接口语义已冻结；后续沿用，不表示指尖控制已实现）。
 * **现有代码实际使用的目标定义**：
   - 位置：`Wrist World Position`。
   - 姿态：`Hand Bone World Orientation`。
@@ -881,7 +882,7 @@ flowchart TD
 #### 10.3.8 10-C / 10-D：原生 IK 限制与 Joint ROM 边界差异
 
 * **模块归属**：10-C、10-D
-* **状态**：`AUDIT_PENDING — BOUNDARY MISMATCH OBSERVED`
+* **状态**：`BOUNDARY MISMATCH OBSERVED — 10-C POST-ROM BRIDGE FEEDBACK VERIFIED; REMAINING BOUNDARY CHECKS NOT CLOSED`
 * **源码**：
   - `src/rig/arm_ik.py`
   - `src/motion/joint_limits.py`
@@ -899,6 +900,7 @@ flowchart TD
   - IK 的目标到达状态不能覆盖 ROM 的不合规结果。
   - ROM 截断后的实际目标误差必须真实反馈。
   - 不得在未验证前擅自修改 09-B 或当前 JointModel 的其他边界。
+* **10-C 验收边界**：Group D 7/7 验证 Bridge 最终姿态反馈同步、ROM 诊断保留和失败传播等；不宣称 145°/150° 全边界专项均已验证，不修改 Rig/ROM 角度合同，也不提前验收 10-D 或 Task 12。
 
 ### 10.4 CoM 历史回归 Test 8
 
@@ -949,7 +951,7 @@ flowchart TD
 - 08 Rig：已完成。
 - 09-A：Lower-Limb Ground × Reach，已完成。
 - 09-B：Lower-Limb World Rotation 与控制器生命周期合同，已完成；最近补强节点为 `09-B-4`。
-- 10：Upper-Limb IK/FK，10-A 已归档；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C 四个子节点于 2026-11-21 完成历史分支验收（`task/10-c-child4`，`d3d7f135975ac5a2a9b01e2706434d0463a563cd`），尚未合入 `master` 且未在六层架构集成后复验；10-D 未准入。
+- 10：Upper-Limb IK/FK，10-A 已归档；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED`。
 - 11：FootLock，处理 FIND-R3-03、FIND-R3-04。
 - 12：PKG-5 综合闭环与联合验收。
 
