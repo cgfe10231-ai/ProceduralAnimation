@@ -19,7 +19,7 @@ Architectural Principles Enforced:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import math
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -67,12 +67,18 @@ from src.motion.whole_body_controller import (
     WholeBodyControlTargets,
     WholeBodyController,
 )
+from src.rig.arm_ik import MAX_ARM_REACH, MIN_ARM_REACH
 from src.rig.foot_contact import (
     evaluate_foot_support,
     lock_foot_contact,
     unlock_foot_contact,
 )
-from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET, IK_TARGET_NAMES
+from src.rig.ik import (
+    ANKLE_REST_Z,
+    HIP_X_OFFSET,
+    IK_TARGET_NAMES,
+    MAX_LEG_REACH,
+)
 
 
 # =============================================================================
@@ -109,6 +115,9 @@ class PlannedHandTarget:
     surface_id: Optional[str] = None  # Targeted surface ID (e.g. "vault_box", "bar", "wall")
     contact_type: ContactType = ContactType.FREE  # UNILATERAL, GRASP, or FREE
     normal_world: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    # [2026-11-20T14:51:00+08:00] NODE: 10-c-child2 | FIELDS: pole_hint_world_xyz, clamp_reach | PURPOSE: Expose existing hand target Pole Hint and Reach Clamp capabilities while preserving legacy construction semantics.
+    pole_hint_world_xyz: Optional[Tuple[float, float, float]] = None
+    clamp_reach: bool = True
 
 
 @dataclass
@@ -163,6 +172,27 @@ def convert_planned_pose_to_wbc_targets(
     - Explicit foot support lock flag forwarding: `is_locked` is propagated so
       WholeBodyController will not attempt to unlock or overwrite a stance foot.
     """
+    # [INTRODUCED 2026-11-20T23:32:30+08:00]
+    # NODE: Task 10-C / 10-c-child3 (C3-03)
+    # FUNCTION: Inline enabled-hand IK weight pre-validation block inside convert_planned_pose_to_wbc_targets()
+    # PURPOSE: Validate that enabled hand_L.weight and hand_R.weight are finite real numbers in [0.0, 1.0] (rejecting bool/None/str with TypeError and NaN/Inf/out-of-range with ValueError) before target conversion while preserving disabled-side and zero-weight semantics.
+    # REASON: Downstream checks (hand_tgt.weight > 0.0) cannot reliably reject NaN, negative, or invalid weights; approved inline pre-check avoids adding any new function or dependency.
+    for _hand_field, _hand_target in (("hand_L", planned.hand_L), ("hand_R", planned.hand_R)):
+        if _hand_target is not None and _hand_target.enabled:
+            _hand_weight = _hand_target.weight
+            if isinstance(_hand_weight, bool) or not isinstance(_hand_weight, (int, float)):
+                raise TypeError(
+                    f"{_hand_field}.weight must be a finite int or float, got {type(_hand_weight).__name__}"
+                )
+            if (
+                _hand_weight < 0.0
+                or _hand_weight > 1.0
+                or not math.isfinite(float(_hand_weight))
+            ):
+                raise ValueError(
+                    f"{_hand_field}.weight must be finite and within [0.0, 1.0], got {_hand_weight!r}"
+                )
+
     targets = WholeBodyControlTargets()
 
     # Floating base
@@ -207,8 +237,10 @@ def convert_planned_pose_to_wbc_targets(
             effector_id="hand_L",
             target_world_xyz=planned.hand_L.world_xyz,
             target_rotation_deg=planned.hand_L.rotation_deg,
+            pole_hint_world_xyz=planned.hand_L.pole_hint_world_xyz,
             enabled=True,
             weight=planned.hand_L.weight,
+            clamp_reach=planned.hand_L.clamp_reach,
         )
     else:
         # Explicitly disabled hand IK: left in FK mode driven by fk_joint_rotations_deg
@@ -224,8 +256,10 @@ def convert_planned_pose_to_wbc_targets(
             effector_id="hand_R",
             target_world_xyz=planned.hand_R.world_xyz,
             target_rotation_deg=planned.hand_R.rotation_deg,
+            pole_hint_world_xyz=planned.hand_R.pole_hint_world_xyz,
             enabled=True,
             weight=planned.hand_R.weight,
+            clamp_reach=planned.hand_R.clamp_reach,
         )
     else:
         targets.hand_R = EndEffectorTarget(
@@ -257,6 +291,199 @@ class BridgeExecutionResult:
     inertia_state: Optional[WholeBodyInertiaState] = None
     contact_geometry_errors: Dict[str, GeometricConstraintResult] = field(default_factory=dict)
     multi_contact: Optional[MultiContactState] = None
+
+
+# [INTRODUCED 2026-11-21T17:05:15+08:00]
+# NODE: Task 10-C / 10-c-child4
+# FUNCTION: _reconcile_post_rom_feedback()
+# PURPOSE: Build a detached, final-pose-coherent WBC feedback snapshot for the
+#          Bridge after WBC's ROM clamping, without modifying the WBC result.
+# REASON: WBC records EndEffectorFeedback before clamping. The post-clamp
+#         Bridge must report final end-effector positions and errors, while
+#         preserving the WBC's historical ROM diagnoses and transaction ownership.
+def _reconcile_post_rom_feedback(
+    armature_obj: bpy.types.Object,
+    targets: WholeBodyControlTargets,
+    result: WholeBodyControlResult,
+) -> WholeBodyControlResult:
+    """Reconcile four end-effectors against one already-evaluated final frame.
+
+    Read-only: never updates depsgraph, advances frame, writes pose/keyframes,
+    invokes solvers or touches WBC transactions. Caller performs exactly one
+    view-layer update before invoking this function.
+
+    REACHABILITY and ORIENTATION_ERROR are current-state diagnoses and are
+    regenerated from the final pose. ROM_VIOLATION records the original
+    invalid pose; ROM_CONFLICT is WBC's own post-clamp diagnosis. Both are
+    retained verbatim and never fabricated here.
+
+    This function does not turn a failed WBC result into success.
+    """
+    if not isinstance(result, WholeBodyControlResult):
+        raise TypeError("post-ROM reconciliation requires WholeBodyControlResult")
+
+    # Four existing feedback records are mandatory. Missing records indicate
+    # a broken WBC contract, not permission to invent successful feedback.
+    required = ("foot_L", "foot_R", "hand_L", "hand_R")
+    for name in required:
+        if name not in result.end_effectors:
+            raise RuntimeError(f"POST_ROM_FEEDBACK_MISSING: {name}")
+
+    reconciled = dict(result.end_effectors)
+    diagnoses = [
+        uc for uc in result.unmet_constraints
+        if not (
+            uc.target_name in required
+            and uc.category in ("REACHABILITY", "ORIENTATION_ERROR")
+        )
+    ]
+    max_error = 0.0
+    all_reachable = True
+    position_tolerance_m = 0.005  # frozen WBC.execute_frame() default
+    orientation_tolerance_deg = 1.0  # frozen WBC.execute_frame() default
+
+    for kind, side in (("foot", "L"), ("foot", "R"),
+                       ("hand", "L"), ("hand", "R")):
+        name = f"{kind}_{side}"
+        fb = result.end_effectors[name]
+        target = getattr(targets, name)
+        bone_name = f"{'shin' if kind == 'foot' else 'forearm'}.{side}"
+        inactive_bone_name = f"{'foot' if kind == 'foot' else 'hand'}.{side}"
+        anchor_name = f"{'thigh' if kind == 'foot' else 'upper_arm'}.{side}"
+        end_bone = armature_obj.pose.bones.get(
+            bone_name if fb.enabled else inactive_bone_name
+        )
+        if end_bone is None:
+            raise RuntimeError(f"POST_ROM_BONE_MISSING: {name}")
+        end_point = end_bone.tail if fb.enabled else end_bone.head
+        actual = tuple(float(x) for x in armature_obj.matrix_world @ end_point)
+        if not all(math.isfinite(x) for x in actual):
+            raise ValueError(f"POST_ROM_NONFINITE_POSITION: {name}: {actual!r}")
+
+        if not fb.enabled:
+            # A zero-influence IK target remains FK; never reactivate it.
+            # Preserve WBC's explicit zero-error semantics for disabled sides.
+            reconciled[name] = replace(fb, actual_world_xyz=actual)
+            continue
+
+        if target is None or not target.enabled:
+            raise RuntimeError(f"POST_ROM_ENABLED_TARGET_MISMATCH: {name}")
+        anchor_bone = armature_obj.pose.bones.get(anchor_name)
+        if anchor_bone is None:
+            raise RuntimeError(f"POST_ROM_ANCHOR_MISSING: {name}")
+        anchor = tuple(float(x) for x in armature_obj.matrix_world @ anchor_bone.head)
+        requested = tuple(float(x) for x in fb.requested_world_xyz)
+        if not all(math.isfinite(x) for x in anchor + requested):
+            raise ValueError(f"POST_ROM_NONFINITE_REQUEST: {name}")
+
+        # Original planned world target, never the IK controller's clamped
+        # internal target, defines externally reported tracking error.
+        error_m = math.dist(actual, requested)
+        requested_reach_m = math.dist(anchor, requested)
+        actual_reach_m = math.dist(anchor, actual)
+        if not all(math.isfinite(x) for x in
+                   (error_m, requested_reach_m, actual_reach_m)):
+            raise ValueError(f"POST_ROM_NONFINITE_METRIC: {name}")
+
+        if kind == "hand":
+            reach_limit = MAX_ARM_REACH
+            is_reachable = (
+                MIN_ARM_REACH <= requested_reach_m <= reach_limit + 1e-4
+            )
+            strictly_in_reach = (requested_reach_m < reach_limit - 1e-4)
+            hand_bone = armature_obj.pose.bones.get(f"hand.{side}")
+            if hand_bone is None:
+                raise RuntimeError(f"POST_ROM_HAND_BONE_MISSING: {name}")
+            final_rotation = (
+                (armature_obj.matrix_world @ hand_bone.matrix)
+                .to_3x3().to_quaternion()
+            )
+            final_rotation_deg = tuple(
+                round(math.degrees(v), 4)
+                for v in final_rotation.to_euler("XYZ")
+            )
+            if fb.requested_rotation_deg is not None:
+                requested_quat = Euler(
+                    tuple(math.radians(float(v))
+                          for v in fb.requested_rotation_deg), "XYZ"
+                ).to_quaternion()
+                orientation_error_deg = round(math.degrees(
+                    requested_quat.rotation_difference(final_rotation).angle
+                ), 4)
+            else:
+                orientation_error_deg = None
+            if not all(math.isfinite(x) for x in final_rotation_deg) or (
+                orientation_error_deg is not None
+                and not math.isfinite(orientation_error_deg)
+            ):
+                raise ValueError(f"POST_ROM_NONFINITE_ORIENTATION: {name}")
+            extra = dict(
+                actual_rotation_deg=final_rotation_deg,
+                orientation_error_deg=orientation_error_deg,
+            )
+        else:
+            reach_limit = MAX_LEG_REACH
+            is_reachable = (requested_reach_m <= reach_limit + 1e-4)
+            strictly_in_reach = is_reachable  # retain WBC foot convention
+            orientation_error_deg = None
+            extra = {}  # WBC foot feedback has no actual orientation metric
+
+        reconciled[name] = replace(
+            fb,
+            actual_world_xyz=actual,
+            position_error_m=error_m,
+            is_reachable=is_reachable,
+            strictly_in_reach=strictly_in_reach,
+            reach_distance_m=actual_reach_m,
+            **extra,
+        )
+        max_error = max(max_error, error_m)
+
+        if not is_reachable or error_m > position_tolerance_m:
+            all_reachable = False
+            diagnoses.append(UnmetConstraint(
+                category="REACHABILITY",
+                target_name=name,
+                description=(
+                    f"Final post-ROM {name} requested reach {requested_reach_m:.6f}m "
+                    f"(limit {reach_limit:.6f}m); final tracking error "
+                    f"{error_m:.6f}m (tolerance {position_tolerance_m:.6f}m)"
+                ),
+                error_amount=error_m,
+                details={
+                    "requested_reach": requested_reach_m,
+                    "applied_reach": actual_reach_m,
+                    "max_reach": reach_limit,
+                },
+            ))
+        if (kind == "hand" and orientation_error_deg is not None
+                and orientation_error_deg > orientation_tolerance_deg):
+            diagnoses.append(UnmetConstraint(
+                category="ORIENTATION_ERROR",
+                target_name=name,
+                description=(
+                    f"Final post-ROM {name} orientation error "
+                    f"{orientation_error_deg:.4f}deg exceeds "
+                    f"{orientation_tolerance_deg:.4f}deg"
+                ),
+                error_amount=orientation_error_deg,
+            ))
+
+    # Atomic result publication: no mutation of frozen EndEffectorFeedback,
+    # original result, original diagnoses, Blender scene, or temporal caches.
+    return replace(
+        result,
+        success=(
+            bool(result.success)
+            and not result.has_rom_violation
+            and all_reachable
+            and not diagnoses
+        ),
+        end_effectors=reconciled,
+        unmet_constraints=diagnoses,
+        max_end_effector_error_m=max_error,
+        is_all_reachable=all_reachable,
+    )
 
 
 class KinematicBridgeExecutor:
@@ -355,6 +582,10 @@ class KinematicBridgeExecutor:
             enforce_rom_clamping=enforce_rom_clamping,
         )
 
+        if enforce_rom_clamping is True and wbc_res.has_rom_violation is True:
+            bpy.context.view_layer.update()
+            wbc_res = _reconcile_post_rom_feedback(arm, wbc_targets, wbc_res)
+
         # ---------------------------------------------------------------------
         # Phase 4: Truthful Validation (ROM, Reach, Contacts)
         # ---------------------------------------------------------------------
@@ -363,9 +594,10 @@ class KinematicBridgeExecutor:
         rom_viols = wbc_res.rom_validation.violations
 
         # ---------------------------------------------------------------------
-        # Phase 5: Blender Scene Evaluation & Read-Only Physics Telemetry
+        # Phase 5: Read-Only Physics Telemetry
         # ---------------------------------------------------------------------
-        bpy.context.view_layer.update()
+        if not (enforce_rom_clamping is True and wbc_res.has_rom_violation is True):
+            bpy.context.view_layer.update()
 
         # Telemetry A: Center of Mass (CoM)
         com_res = compute_whole_body_com(arm, self.controller.mass_distribution, update_scene=False)

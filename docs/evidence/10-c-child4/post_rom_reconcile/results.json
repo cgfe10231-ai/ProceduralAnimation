@@ -1,0 +1,98 @@
+{
+  "node": "10-c-child4",
+  "frozen_source_head": "3b86f037c1f28e0c6b84088c8a85fb5415578738",
+  "blender_version": "5.1.1",
+  "executed": 7,
+  "passed": 7,
+  "failed": 0,
+  "tests": [
+    {
+      "test": "C4-T07",
+      "status": "PASS",
+      "metrics": {
+        "max_error_m": 0.2923946489242351,
+        "active": [
+          "foot_L",
+          "foot_R",
+          "hand_L",
+          "hand_R"
+        ]
+      }
+    },
+    {
+      "test": "C4-T08",
+      "status": "PASS",
+      "metrics": {
+        "diagnoses": [
+          [
+            "ROM_VIOLATION",
+            "spine"
+          ],
+          [
+            "ROM_VIOLATION",
+            "upper_arm.L"
+          ],
+          [
+            "ROM_VIOLATION",
+            "hand.L"
+          ],
+          [
+            "ROM_VIOLATION",
+            "upper_arm.R"
+          ],
+          [
+            "ROM_VIOLATION",
+            "hand.R"
+          ],
+          [
+            "REACHABILITY",
+            "hand_L"
+          ],
+          [
+            "REACHABILITY",
+            "hand_R"
+          ]
+        ]
+      }
+    },
+    {
+      "test": "C4-T09",
+      "status": "PASS",
+      "metrics": {
+        "left_enabled": false,
+        "right_enabled": true
+      }
+    },
+    {
+      "test": "C4-T10",
+      "status": "PASS",
+      "metrics": {
+        "frame": 1,
+        "without_clamp": true
+      }
+    },
+    {
+      "test": "C4-T11",
+      "status": "PASS",
+      "metrics": {
+        "rom_diagnoses_retained": 5,
+        "idempotent": true
+      }
+    },
+    {
+      "test": "C4-T12",
+      "status": "PASS",
+      "metrics": {
+        "injection_propagated": true,
+        "bridge_time_not_advanced": true
+      }
+    },
+    {
+      "test": "C4-T13",
+      "status": "PASS",
+      "metrics": {
+        "missing_feedback_rejected": true
+      }
+    }
+  ]
+}
