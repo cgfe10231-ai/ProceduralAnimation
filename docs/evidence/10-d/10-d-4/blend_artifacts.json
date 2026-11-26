@@ -1,0 +1,38 @@
+{
+  "T02_stationary_fk": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_stationary_fk.blend",
+    "relative_path": "output/task10d_stationary_fk.blend",
+    "size_bytes": 117062,
+    "sha256": "7d2433d04013d3b75ed22455dc67ac93235b0abc2c4494d9f400cd85d8c96bee",
+    "frame_start": 1,
+    "frame_end": 36,
+    "frame_count": 36
+  },
+  "T05_bilateral_ik": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_bilateral_ik.blend",
+    "relative_path": "output/task10d_bilateral_ik.blend",
+    "size_bytes": 125528,
+    "sha256": "385d90340b32f2f4e4437906c9c3577246fc712851bed1a09468767b4858745e",
+    "frame_start": 1,
+    "frame_end": 48,
+    "frame_count": 48
+  },
+  "T06_walking_upper_limb": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_walking_upper_limb.blend",
+    "relative_path": "output/task10d_walking_upper_limb.blend",
+    "size_bytes": 181541,
+    "sha256": "d15f24d0c5e03e2fa6d9f40bfa00518601bf4b8bf200df943bd46b501712b75c",
+    "frame_start": 1,
+    "frame_end": 92,
+    "frame_count": 92
+  },
+  "T10_fk_ik_transition": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_fk_ik_transition.blend",
+    "relative_path": "output/task10d_fk_ik_transition.blend",
+    "size_bytes": 124808,
+    "sha256": "d2b7f44a26684eda5b6d497fef1a95c63cfcbd65106a38165b46b325416ab0f3",
+    "frame_start": 1,
+    "frame_end": 56,
+    "frame_count": 56
+  }
+}

@@ -1,0 +1,1399 @@
+{
+  "manifest": {
+    "task_id": "TASK 10-d-4",
+    "timestamp_utc": "2026-11-26T14:22:48.570349+00:00",
+    "branch": "task/10-d",
+    "git_head": "9cd35faa4992bfd1cd751820495753afc9d9d0ae",
+    "historical_baseline_commit": "5a4603d4ae62b870050113362f78f6ed8029dfec",
+    "historical_baseline_dir": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\baseline_5a4603d4",
+    "source_blobs": {
+      "src/motion/terrain_walk.py": "d42519fe8e39d149bdcffec3378b5f5ee7601b91",
+      "src/motion/kinematic_bridge.py": "9e68e0a6a44bdb538b75b4f4d99b117c1737c358",
+      "src/motion/framework.py": "31a9c268e0833a93cc0e498227202256c3274f05",
+      "src/motion/whole_body_controller.py": "562de6c0ce1e9009856a7d52ec89cd6d0c012be2"
+    },
+    "blender_executable": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+    "blender_version": "Blender 5.1.1\n\tbuild date: 2026-04-14\n\tbuild time: 01:37:22\n\tbuild commit date: 2026-04-13\n\tbuild commit time: 14:35\n\tbuild hash: b70da489d7f4\n\tbuild branch: blender-v5.1-release\n\tbuild platform: Windows\n\tbuild type: Release\n\tbuild c flags:  -Wall -Werror=implicit-function-declaration -Werror=return-type -Wno-tautological-compare -Wno-unknown-pragmas -Wno-char-subscripts -Wstrict-prototypes -Wmissing-prototypes -Wunused-parameter -Wundef -Wundef-prefix -Werror=unguarded-availability-new /W3 -Wno-c++98-compat -Wno-old-style-cast -Wno-unsafe-buffer-usage -Wno-missing-prototypes -Wno-sign-conversion -Wno-missing-field-initializers -Wno-extra-semi -Wno-language-extension-token -Wno-implicit-float-conversion -Wno-c++98-compat-pedantic -Wno-implicit-int-float-conversion -Wno-double-promotion -Wno-pre-c++17-compat -Wno-shorten-64-to-32 -Wno-c++98-compat-local-type-template-args -Wno-reserved-identifier -Wno-cast-align -Wno-documentation -Wno-disabled-macro-expansion -Wno-extra-semi-stmt -Wno-zero-as-null-pointer-constant -Wno-float-conversion -Wno-reserved-macro-identifier -Wno-cast-function-type-strict -Wno-float-equal -Wno-implicit-int-conversion -Wno-shadow -Wno-shadow-field-in-constructor -Wno-cast-qual -Wno-pre-c++14-compat -Wno-global-constructors -Wno-switch-enum -Wno-exit-time-destructors -Wno-ctad-maybe-unsupported -Wno-undefined-func-template -Wno-c++98-compat-extra-semi -Wno-cast-function-type -Wno-nullability-extension -Wno-shadow-field -Wno-conditional-uninitialized -Wno-unused-parameter -Wno-suggest-destructor-override -Wno-shadow-uncaptured-local -Wno-unused-macros -Wno-covered-switch-default -Wno-signed-enum-bitfield -Wno-declaration-after-statement -Wno-implicit-fallthrough -Wno-non-virtual-dtor -Wno-nested-anon-types -Wno-gnu-zero-variadic-macro-arguments -Wno-unreachable-code-break -Wno-inconsistent-missing-destructor-override -Wno-format-pedantic -Wno-nonportable-system-include-path -Wno-undef -Wno-ignored-qualifiers -Wno-used-but-marked-unused -Wno-header-hygiene -Wno-char-subscripts -Wno-unreachable-code-return -Wno-unused-template -Wno-gnu-anonymous-struct -Wno-deprecated-copy-with-user-provided-dtor -Wno-inconsistent-missing-override -Wno-unreachable-code -Wno-deprecated-dynamic-exception-spec -Wno-bad-function-cast -Wno-microsoft-enum-value -Wno-deprecated-copy-with-user-provided-copy -Wno-zero-length-array -Wno-unused-function -Wno-pedantic -Wno-deprecated-copy-with-dtor -Wno-documentation-unknown-command -Wno-undefined-reinterpret-cast -Wno-format-nonliteral -Wno-comma -Wno-documentation-deprecated-sync -Wno-shift-sign-overflow -Wno-pre-c++17-compat-pedantic -Wno-c++98-compat-unnamed-type-template-args -Wno-sign-compare -Wno-format -Wno-c++98-compat-bind-to-temporary-copy -Wno-enum-enum-conversion -Wno-anon-enum-enum-conversion -Wno-range-loop-bind-reference -Wno-enum-float-conversion -Wno-keyword-macro -Wno-deprecated-copy -Wno-unused-member-function -Wno-missing-noreturn -Wno-missing-variable-declarations -Wno-documentation-html -Wno-gnu-redeclared-enum -Wno-deprecated-declarations -Wno-overloaded-virtual -Wno-c++98-c++11-compat-binary-literal -Wno-deprecated-redundant-constexpr-static-def -Wno-missing-braces -Wno-c99-extensions -Wno-strict-prototypes -Wno-unreachable-code-loop-increment -Wno-gnu-case-range -Wno-duplicate-enum -Wno-null-pointer-subtraction -Wno-deprecated-literal-operator -Wno-newline-eof -Wno-microsoft-cast -Wno-date-time -Wno-delete-non-abstract-non-virtual-dtor -Wno-unused-private-field -Wno-flexible-array-extensions -Wno-string-conversion -Wno-final-dtor-non-final-class -Wno-microsoft-unqualified-friend -Wno-invalid-noreturn -Wno-invalid-utf8 -Wno-four-char-constants -Wno-parentheses -Wno-pessimizing-move -Wno-deprecated-non-prototype -Wno-bitfield-enum-conversion -Wno-unused-lambda-capture -Wno-shadow-field-in-constructor-modified -Wno-switch-default -Wno-nan-infinity-disabled -Wno-pre-c11-compat /DWIN32 /D_WINDOWS  /MP /nologo /J /Gy /Gd /showFilenames -Wno-unused-command-line-argument -Wno-microsoft-enum-forward-reference /clang:-funsigned-char /clang:-fno-strict-aliasing /clang:-ffp-contract=off -march=x86-64-v2 \n\tbuild c++ flags:  -Wall -Wno-tautological-compare -Wno-unknown-pragmas -Wno-char-subscripts -Wno-overloaded-virtual -Wno-sign-compare -Wno-invalid-offsetof -Wno-suggest-override -Wundef -Wundef-prefix -Wunused-parameter -Wmismatched-tags -Werror=unguarded-availability-new /W3 -Wno-c++98-compat -Wno-old-style-cast -Wno-unsafe-buffer-usage -Wno-missing-prototypes -Wno-sign-conversion -Wno-missing-field-initializers -Wno-extra-semi -Wno-language-extension-token -Wno-implicit-float-conversion -Wno-c++98-compat-pedantic -Wno-implicit-int-float-conversion -Wno-double-promotion -Wno-pre-c++17-compat -Wno-shorten-64-to-32 -Wno-c++98-compat-local-type-template-args -Wno-reserved-identifier -Wno-cast-align -Wno-documentation -Wno-disabled-macro-expansion -Wno-extra-semi-stmt -Wno-zero-as-null-pointer-constant -Wno-float-conversion -Wno-reserved-macro-identifier -Wno-cast-function-type-strict -Wno-float-equal -Wno-implicit-int-conversion -Wno-shadow -Wno-shadow-field-in-constructor -Wno-cast-qual -Wno-pre-c++14-compat -Wno-global-constructors -Wno-switch-enum -Wno-exit-time-destructors -Wno-ctad-maybe-unsupported -Wno-undefined-func-template -Wno-c++98-compat-extra-semi -Wno-cast-function-type -Wno-nullability-extension -Wno-shadow-field -Wno-conditional-uninitialized -Wno-unused-parameter -Wno-suggest-destructor-override -Wno-shadow-uncaptured-local -Wno-unused-macros -Wno-covered-switch-default -Wno-signed-enum-bitfield -Wno-declaration-after-statement -Wno-implicit-fallthrough -Wno-non-virtual-dtor -Wno-nested-anon-types -Wno-gnu-zero-variadic-macro-arguments -Wno-unreachable-code-break -Wno-inconsistent-missing-destructor-override -Wno-format-pedantic -Wno-nonportable-system-include-path -Wno-undef -Wno-ignored-qualifiers -Wno-used-but-marked-unused -Wno-header-hygiene -Wno-char-subscripts -Wno-unreachable-code-return -Wno-unused-template -Wno-gnu-anonymous-struct -Wno-deprecated-copy-with-user-provided-dtor -Wno-inconsistent-missing-override -Wno-unreachable-code -Wno-deprecated-dynamic-exception-spec -Wno-bad-function-cast -Wno-microsoft-enum-value -Wno-deprecated-copy-with-user-provided-copy -Wno-zero-length-array -Wno-unused-function -Wno-pedantic -Wno-deprecated-copy-with-dtor -Wno-documentation-unknown-command -Wno-undefined-reinterpret-cast -Wno-format-nonliteral -Wno-comma -Wno-documentation-deprecated-sync -Wno-shift-sign-overflow -Wno-pre-c++17-compat-pedantic -Wno-c++98-compat-unnamed-type-template-args -Wno-sign-compare -Wno-format -Wno-c++98-compat-bind-to-temporary-copy -Wno-enum-enum-conversion -Wno-anon-enum-enum-conversion -Wno-range-loop-bind-reference -Wno-enum-float-conversion -Wno-keyword-macro -Wno-deprecated-copy -Wno-unused-member-function -Wno-missing-noreturn -Wno-missing-variable-declarations -Wno-documentation-html -Wno-gnu-redeclared-enum -Wno-deprecated-declarations -Wno-overloaded-virtual -Wno-c++98-c++11-compat-binary-literal -Wno-deprecated-redundant-constexpr-static-def -Wno-missing-braces -Wno-c99-extensions -Wno-strict-prototypes -Wno-unreachable-code-loop-increment -Wno-gnu-case-range -Wno-duplicate-enum -Wno-null-pointer-subtraction -Wno-deprecated-literal-operator -Wno-newline-eof -Wno-microsoft-cast -Wno-date-time -Wno-delete-non-abstract-non-virtual-dtor -Wno-unused-private-field -Wno-flexible-array-extensions -Wno-string-conversion -Wno-final-dtor-non-final-class -Wno-microsoft-unqualified-friend -Wno-invalid-noreturn -Wno-invalid-utf8 -Wno-four-char-constants -Wno-parentheses -Wno-pessimizing-move -Wno-deprecated-non-prototype -Wno-bitfield-enum-conversion -Wno-unused-lambda-capture -Wno-shadow-field-in-constructor-modified -Wno-switch-default -Wno-nan-infinity-disabled -Wno-pre-c11-compat /DWIN32 /D_WINDOWS   /EHsc  /Gy /MP /nologo /J /Gd /showFilenames /EHsc -Wno-unused-command-line-argument -Wno-microsoft-enum-forward-reference /clang:-funsigned-char /clang:-fno-strict-aliasing /clang:-ffp-contract=off -march=x86-64-v2 \n\tbuild link flags: /MACHINE:X64  /SUBSYSTEM:CONSOLE /STACK:2097152 /ignore:4049 /ignore:4217 /ignore:4221\n\tbuild system: CMake",
+    "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B docs/evidence/10-d/10-d-4/verify_production_integration.py",
+    "exit_code": 0,
+    "passed_count": 18,
+    "total_tests": 18
+  },
+  "tests": {
+    "T01": {
+      "status": "PASS",
+      "test_id": "T01",
+      "passed": true,
+      "total_frames": 120,
+      "baseline_commit": "5a4603d4ae62b870050113362f78f6ed8029dfec",
+      "baseline_module_paths": {
+        "terrain_walk": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\baseline_5a4603d4\\src\\motion\\terrain_walk.py",
+        "kinematic_bridge": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\baseline_5a4603d4\\src\\motion\\kinematic_bridge.py",
+        "framework": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\baseline_5a4603d4\\src\\motion\\framework.py",
+        "whole_body_controller": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\baseline_5a4603d4\\src\\motion\\whole_body_controller.py"
+      },
+      "current_module_paths": {
+        "terrain_walk": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\motion\\terrain_walk.py",
+        "kinematic_bridge": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\motion\\kinematic_bridge.py",
+        "framework": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\motion\\framework.py",
+        "whole_body_controller": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\motion\\whole_body_controller.py"
+      },
+      "schedule_exact_match": true,
+      "max_time_diff_sec": 0.0,
+      "max_root_pos_diff_m": 0.0,
+      "max_root_matrix_diff": 0.0,
+      "max_leg_bone_matrix_diff": 0.0,
+      "max_arm_bone_matrix_diff": 0.0,
+      "max_contact_pos_diff_m": 0.0
+    },
+    "T02": {
+      "status": "PASS",
+      "test_id": "T02",
+      "passed": true,
+      "total_frames": 36,
+      "max_l_fk_err_deg": 4.497431255856554e-06,
+      "l_upper_arm_peak_x_deg": 65.00000067042492,
+      "max_root_drift_m": 0.0,
+      "max_r_baseline_matrix_diff": 0.0,
+      "max_constraint_influence": 0.0,
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_stationary_fk.blend"
+    },
+    "T03": {
+      "status": "PASS",
+      "test_id": "T03",
+      "passed": true,
+      "total_frames": 48,
+      "max_err_l_deg": 4.76637316637607e-06,
+      "max_err_r_deg": 3.926973704437842e-06,
+      "divergent_progress_frames": 19
+    },
+    "T04": {
+      "status": "PASS",
+      "test_id": "T04",
+      "passed": true,
+      "total_frames": 36,
+      "max_wrist_pos_err_m": 4.236645153489143e-05,
+      "max_r_baseline_matrix_diff": 0.0,
+      "spurious_hand_contacts": [],
+      "influence_violations": []
+    },
+    "T05": {
+      "status": "PASS",
+      "test_id": "T05",
+      "passed": true,
+      "total_frames": 48,
+      "max_wrist_pos_err_m": {
+        "L": 4.102351110343402e-05,
+        "R": 4.340658891873839e-05
+      },
+      "max_hand_rot_err_deg": {
+        "L": 2.922371008809859e-06,
+        "R": 4.3762090805457675e-06
+      },
+      "max_pole_ctrl_err_m": {
+        "L": 0.0,
+        "R": 0.0
+      },
+      "max_influence_err_from_1": 0.0,
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_bilateral_ik.blend"
+    },
+    "T06": {
+      "status": "PASS",
+      "test_id": "T06",
+      "passed": true,
+      "total_frames": 92,
+      "schedule_exact_match": true,
+      "max_root_matrix_diff": 0.0,
+      "max_leg_bone_matrix_diff": 0.0,
+      "max_l_wrist_err_m": 5.095848769068663e-05,
+      "max_l_rot_err_deg": 4.180770991575512e-06,
+      "max_r_fk_err_deg": 4.607194945549509e-06,
+      "max_whole_body_com_delta_m": 0.0193675225065643,
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_walking_upper_limb.blend"
+    },
+    "T07": {
+      "status": "PASS",
+      "test_id": "T07",
+      "passed": true,
+      "fk_side": "L",
+      "ik_side": "R",
+      "max_fk_err_deg": 3.5054536695611205e-06,
+      "max_ik_pos_err_m": 4.44569545155147e-05,
+      "max_ik_rot_err_deg": 4.371325249355864e-06,
+      "max_influence_err": 0.0
+    },
+    "T08": {
+      "status": "PASS",
+      "test_id": "T08",
+      "passed": true,
+      "fk_side": "R",
+      "ik_side": "L",
+      "max_fk_err_deg": 3.5054536695611205e-06,
+      "max_ik_pos_err_m": 4.44569545155147e-05,
+      "max_ik_rot_err_deg": 4.371325249355864e-06,
+      "max_influence_err": 0.0
+    },
+    "T09": {
+      "status": "PASS",
+      "test_id": "T09",
+      "passed": true,
+      "regions_frame_counts": {
+        "pre": 9,
+        "seg1": 14,
+        "gap": 15,
+        "seg2": 17,
+        "post": 13
+      },
+      "max_fk_err_deg": 3.3408491617592517e-06,
+      "max_gap_hold_drift_deg": 1.2522390804292627e-06,
+      "max_ik_err_m": 4.519905388676719e-05
+    },
+    "T10": {
+      "status": "PASS",
+      "test_id": "T10",
+      "passed": true,
+      "total_frames": 56,
+      "pre_solved_pose_a_wrist_local": [
+        -0.28173598647117615,
+        0.4829435348510742,
+        1.3086475133895874
+      ],
+      "pre_solved_pose_a_rot_deg": [
+        8.000001645576358,
+        12.000002895251361,
+        5.753649880982452e-07
+      ],
+      "pre_solved_pose_b_fk_deg": [
+        [
+          10.937349257576084,
+          13.059640150634431,
+          14.258957335865201
+        ],
+        [
+          106.58885860209249,
+          -1.714511129700471e-06,
+          -1.4941038809402893e-06
+        ],
+        [
+          8.76643510159006,
+          -4.049231545665162,
+          12.232834652546988
+        ]
+      ],
+      "fk_to_ik_transition": {
+        "before_frame": 20,
+        "after_frame": 21,
+        "wrist_delta_m": 1.11492555315389e-05,
+        "elbow_delta_m": 1.6038080404426055e-05,
+        "bone_rot_deltas_deg": {
+          "upper_arm.L": 0.0015184380301488595,
+          "forearm.L": 0.0017082762176646837,
+          "hand.L": 2.923622533668068e-06
+        },
+        "max_rot_delta_deg": 0.0017082762176646837,
+        "before_arm_ik_influence": 0.0,
+        "after_arm_ik_influence": 1.0,
+        "before_hand_rot_influence": 0.0,
+        "after_hand_rot_influence": 1.0,
+        "before_wrist_world": [
+          -0.28173598647117615,
+          -7.517056465148926,
+          1.3086475133895874
+        ],
+        "after_wrist_world": [
+          -0.2817367613315582,
+          -7.517045974731445,
+          1.3086438179016113
+        ],
+        "before_elbow_world": [
+          -0.28173598647117615,
+          -7.777056694030762,
+          1.3086475133895874
+        ],
+        "after_elbow_world": [
+          -0.28173354268074036,
+          -7.777045726776123,
+          1.3086589574813843
+        ],
+        "before_bone_euler_deg": {
+          "upper_arm.L": [
+            -41.999994338567305,
+            12.000001187704068,
+            1.82123283548192e-06
+          ],
+          "forearm.L": [
+            1.7456948144637862e-06,
+            12.000002895251361,
+            5.753649880982452e-07
+          ],
+          "hand.L": [
+            8.000001645576358,
+            12.000002895251361,
+            5.753649880982452e-07
+          ]
+        },
+        "after_bone_euler_deg": {
+          "upper_arm.L": [
+            -41.996954904386655,
+            11.99999862638313,
+            1.554759450492919e-06
+          ],
+          "forearm.L": [
+            -0.0034128336273059625,
+            12.000000333930423,
+            3.089648067557927e-07
+          ],
+          "hand.L": [
+            8.00000335312365,
+            12.000008017893238,
+            5.548605881777861e-07
+          ]
+        }
+      },
+      "ik_to_fk_transition": {
+        "before_frame": 40,
+        "after_frame": 41,
+        "wrist_delta_m": 1.2731557704981462e-07,
+        "elbow_delta_m": 2.9802322387695312e-08,
+        "bone_rot_deltas_deg": {
+          "upper_arm.L": 1.783771367556455e-06,
+          "forearm.L": 2.560606245789034e-06,
+          "hand.L": 2.327768674442578e-06
+        },
+        "max_rot_delta_deg": 2.560606245789034e-06,
+        "before_arm_ik_influence": 1.0,
+        "after_arm_ik_influence": 0.0,
+        "before_hand_rot_influence": 1.0,
+        "after_hand_rot_influence": 0.0,
+        "before_wrist_world": [
+          -0.21999210119247437,
+          -7.719947338104248,
+          1.319981336593628
+        ],
+        "after_wrist_world": [
+          -0.21999214589595795,
+          -7.719947338104248,
+          1.3199814558029175
+        ],
+        "before_elbow_world": [
+          -0.3000833988189697,
+          -7.944551467895508,
+          1.216355800628662
+        ],
+        "after_elbow_world": [
+          -0.30008336901664734,
+          -7.944551467895508,
+          1.216355800628662
+        ],
+        "before_bone_euler_deg": {
+          "upper_arm.L": [
+            -82.34928221890428,
+            13.882660870148044,
+            -13.459878990713424
+          ],
+          "forearm.L": [
+            24.23957638318821,
+            13.882660016374397,
+            -13.459880698260717
+          ],
+          "hand.L": [
+            35.00000325069345,
+            4.999999427659637,
+            -4.000000395901356
+          ]
+        },
+        "after_bone_euler_deg": {
+          "upper_arm.L": [
+            -82.3492753887151,
+            13.882660016374397,
+            -13.459878136939778
+          ],
+          "forearm.L": [
+            24.239579798282797,
+            13.882658308827104,
+            -13.459878136939778
+          ],
+          "hand.L": [
+            34.99999983559887,
+            4.999998146999168,
+            -3.9999982614672405
+          ]
+        }
+      },
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_fk_ik_transition.blend"
+    },
+    "T11": {
+      "test_id": "T11",
+      "status": "PASS",
+      "passed": true,
+      "assets": {
+        "T02_stationary_fk": {
+          "passed": true,
+          "invariants": {
+            "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_stationary_fk.blend",
+            "scene_key": "T02_stationary_fk",
+            "armature_present": true,
+            "root_present": true,
+            "bone_count": 19,
+            "timeline_frame_start": 1,
+            "timeline_frame_end": 36,
+            "expected_frame_start": 1,
+            "expected_frame_end": 36,
+            "has_animation_data": true,
+            "has_active_camera": true,
+            "camera_name": "Task10D_InspectCam",
+            "missing_upper_controllers": [],
+            "missing_leg_controllers": [],
+            "missing_upper_constraints": []
+          },
+          "action_slot_identifier": "OBCharacterArmature",
+          "influence_fcurve_checks": {
+            "ArmIK.L": {
+              "data_path": "pose.bones[\"forearm.L\"].constraints[\"ArmIK.L\"].influence",
+              "keyframe_count": 36,
+              "min_frame": 1,
+              "max_frame": 36,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "ArmIK.R": {
+              "data_path": "pose.bones[\"forearm.R\"].constraints[\"ArmIK.R\"].influence",
+              "keyframe_count": 36,
+              "min_frame": 1,
+              "max_frame": 36,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.L": {
+              "data_path": "pose.bones[\"hand.L\"].constraints[\"HandRotation.L\"].influence",
+              "keyframe_count": 36,
+              "min_frame": 1,
+              "max_frame": 36,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.R": {
+              "data_path": "pose.bones[\"hand.R\"].constraints[\"HandRotation.R\"].influence",
+              "keyframe_count": 36,
+              "min_frame": 1,
+              "max_frame": 36,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            }
+          },
+          "traversals": [
+            {
+              "order": "forward",
+              "frames_checked": 36,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "reverse",
+              "frames_checked": 36,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "shuffled_seed_20261126",
+              "frames_checked": 36,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            }
+          ]
+        },
+        "T05_bilateral_ik": {
+          "passed": true,
+          "invariants": {
+            "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_bilateral_ik.blend",
+            "scene_key": "T05_bilateral_ik",
+            "armature_present": true,
+            "root_present": true,
+            "bone_count": 19,
+            "timeline_frame_start": 1,
+            "timeline_frame_end": 48,
+            "expected_frame_start": 1,
+            "expected_frame_end": 48,
+            "has_animation_data": true,
+            "has_active_camera": true,
+            "camera_name": "Task10D_InspectCam",
+            "missing_upper_controllers": [],
+            "missing_leg_controllers": [],
+            "missing_upper_constraints": []
+          },
+          "action_slot_identifier": "OBCharacterArmature",
+          "influence_fcurve_checks": {
+            "ArmIK.L": {
+              "data_path": "pose.bones[\"forearm.L\"].constraints[\"ArmIK.L\"].influence",
+              "keyframe_count": 48,
+              "min_frame": 1,
+              "max_frame": 48,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "ArmIK.R": {
+              "data_path": "pose.bones[\"forearm.R\"].constraints[\"ArmIK.R\"].influence",
+              "keyframe_count": 48,
+              "min_frame": 1,
+              "max_frame": 48,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.L": {
+              "data_path": "pose.bones[\"hand.L\"].constraints[\"HandRotation.L\"].influence",
+              "keyframe_count": 48,
+              "min_frame": 1,
+              "max_frame": 48,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.R": {
+              "data_path": "pose.bones[\"hand.R\"].constraints[\"HandRotation.R\"].influence",
+              "keyframe_count": 48,
+              "min_frame": 1,
+              "max_frame": 48,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            }
+          },
+          "traversals": [
+            {
+              "order": "forward",
+              "frames_checked": 48,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "reverse",
+              "frames_checked": 48,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "shuffled_seed_20261126",
+              "frames_checked": 48,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            }
+          ]
+        },
+        "T06_walking_upper_limb": {
+          "passed": true,
+          "invariants": {
+            "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_walking_upper_limb.blend",
+            "scene_key": "T06_walking_upper_limb",
+            "armature_present": true,
+            "root_present": true,
+            "bone_count": 19,
+            "timeline_frame_start": 1,
+            "timeline_frame_end": 92,
+            "expected_frame_start": 1,
+            "expected_frame_end": 92,
+            "has_animation_data": true,
+            "has_active_camera": true,
+            "camera_name": "Task10D_WalkCam",
+            "missing_upper_controllers": [],
+            "missing_leg_controllers": [],
+            "missing_upper_constraints": []
+          },
+          "action_slot_identifier": "OBCharacterArmature",
+          "influence_fcurve_checks": {
+            "ArmIK.L": {
+              "data_path": "pose.bones[\"forearm.L\"].constraints[\"ArmIK.L\"].influence",
+              "keyframe_count": 92,
+              "min_frame": 1,
+              "max_frame": 92,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "ArmIK.R": {
+              "data_path": "pose.bones[\"forearm.R\"].constraints[\"ArmIK.R\"].influence",
+              "keyframe_count": 92,
+              "min_frame": 1,
+              "max_frame": 92,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.L": {
+              "data_path": "pose.bones[\"hand.L\"].constraints[\"HandRotation.L\"].influence",
+              "keyframe_count": 92,
+              "min_frame": 1,
+              "max_frame": 92,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.R": {
+              "data_path": "pose.bones[\"hand.R\"].constraints[\"HandRotation.R\"].influence",
+              "keyframe_count": 92,
+              "min_frame": 1,
+              "max_frame": 92,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            }
+          },
+          "traversals": [
+            {
+              "order": "forward",
+              "frames_checked": 92,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "reverse",
+              "frames_checked": 92,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "shuffled_seed_20261126",
+              "frames_checked": 92,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            }
+          ]
+        },
+        "T10_fk_ik_transition": {
+          "passed": true,
+          "invariants": {
+            "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_fk_ik_transition.blend",
+            "scene_key": "T10_fk_ik_transition",
+            "armature_present": true,
+            "root_present": true,
+            "bone_count": 19,
+            "timeline_frame_start": 1,
+            "timeline_frame_end": 56,
+            "expected_frame_start": 1,
+            "expected_frame_end": 56,
+            "has_animation_data": true,
+            "has_active_camera": true,
+            "camera_name": "Task10D_InspectCam",
+            "missing_upper_controllers": [],
+            "missing_leg_controllers": [],
+            "missing_upper_constraints": []
+          },
+          "action_slot_identifier": "OBCharacterArmature",
+          "influence_fcurve_checks": {
+            "ArmIK.L": {
+              "data_path": "pose.bones[\"forearm.L\"].constraints[\"ArmIK.L\"].influence",
+              "keyframe_count": 56,
+              "min_frame": 1,
+              "max_frame": 56,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "ArmIK.R": {
+              "data_path": "pose.bones[\"forearm.R\"].constraints[\"ArmIK.R\"].influence",
+              "keyframe_count": 56,
+              "min_frame": 1,
+              "max_frame": 56,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.L": {
+              "data_path": "pose.bones[\"hand.L\"].constraints[\"HandRotation.L\"].influence",
+              "keyframe_count": 56,
+              "min_frame": 1,
+              "max_frame": 56,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.R": {
+              "data_path": "pose.bones[\"hand.R\"].constraints[\"HandRotation.R\"].influence",
+              "keyframe_count": 56,
+              "min_frame": 1,
+              "max_frame": 56,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            }
+          },
+          "traversals": [
+            {
+              "order": "forward",
+              "frames_checked": 56,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "reverse",
+              "frames_checked": 56,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "shuffled_seed_20261126",
+              "frames_checked": 56,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            }
+          ]
+        }
+      }
+    },
+    "T12": {
+      "status": "PASS",
+      "test_id": "T12",
+      "passed": true,
+      "pass1_frames": 50,
+      "pass2_frames": 24,
+      "stale_keyframes_gt24": [],
+      "rna_pointer_identity_L": true,
+      "rna_pointer_identity_R": true,
+      "bug01_bone_conflict_error": "ExternalControllerNameConflictError: EXTERNAL_CONTROLLER_NAME_CONFLICT: WholeBodyController: controller 'HandIK.L' is present without a verified owning Armature/transaction binding",
+      "bug01_object_conflict_error": "ExternalControllerNameConflictError: EXTERNAL_CONTROLLER_NAME_CONFLICT: WholeBodyController: controller 'ElbowPole.L' is present without a verified owning Armature/transaction binding",
+      "other_armature_animation_preserved": true
+    },
+    "T13": {
+      "status": "PASS",
+      "test_id": "T13",
+      "passed": true,
+      "subcases": [
+        {
+          "case": "empty_tuple",
+          "rejected": true,
+          "error": "ValueError: upper_limb_L must not be an empty tuple",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "invalid_container_list",
+          "rejected": true,
+          "error": "TypeError: upper_limb_L must be None or a tuple of UpperLimbSegment, got list",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "invalid_element_type",
+          "rejected": true,
+          "error": "TypeError: upper_limb_L[0] must be UpperLimbSegment, got str",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "unordered_segments",
+          "rejected": true,
+          "error": "ValueError: upper_limb_L[1] start_time_sec (0.1) must be strictly greater than previous (0.5)",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "overlapping_segments",
+          "rejected": true,
+          "error": "ValueError: upper_limb_L[1] start_time_sec (0.35) overlaps previous segment ending at 0.4",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "out_of_action_time_range",
+          "rejected": true,
+          "error": "ValueError: upper_limb_L[0] end time 1.400000s exceeds action timeline upper bound 0.958333s",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "same_mode_endpoint_mismatch",
+          "rejected": true,
+          "error": "ValueError: upper_limb_L FK segment transition mismatch between index 0 and 1 at bone 0[0]",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "same_mode_space_conflict",
+          "rejected": true,
+          "error": "ValueError: upper_limb_L IK position_space mismatch between index 0 ('ROOT_LOCAL') and 1 ('WORLD')",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        },
+        {
+          "case": "same_mode_optional_rot_pole_mismatch",
+          "rejected": true,
+          "error": "ValueError: upper_limb_L IK rotation presence mismatch between index 0 and 1",
+          "wbc_frames_executed": 0,
+          "bridge_frames_executed": 0
+        }
+      ]
+    },
+    "T14": {
+      "status": "PASS",
+      "test_id": "T14",
+      "passed": true,
+      "run1_frames": [
+        1,
+        36
+      ],
+      "run2_total_frames": 136,
+      "action2_frames": [
+        101,
+        136
+      ],
+      "frame_100_to_101_dt_sec": 0.04166666666666696,
+      "max_local_time_l_fk_diff_deg": 0.0,
+      "max_local_time_r_ctrl_target_diff_m": 0.0,
+      "max_local_time_r_wrist_diff_m": 2.4965613762930442e-05,
+      "max_local_time_r_hand_rot_diff_deg": 3.4150945822375434e-06
+    },
+    "T15": {
+      "status": "PASS",
+      "test_id": "T15",
+      "pre_save_configs": [
+        {
+          "config": "config_A",
+          "rotation_modes": {
+            "HandIK.L": "XYZ",
+            "HandIK.R": "YXZ",
+            "ElbowPole.L": "QUATERNION",
+            "ElbowPole.R": "AXIS_ANGLE"
+          },
+          "channel_fcurve_paths": {
+            "HandIK.L": [
+              "location",
+              "rotation_euler"
+            ],
+            "HandIK.R": [
+              "location",
+              "rotation_euler"
+            ],
+            "ElbowPole.L": [
+              "location",
+              "rotation_quaternion"
+            ],
+            "ElbowPole.R": [
+              "location",
+              "rotation_axis_angle"
+            ]
+          },
+          "max_controller_rot_err_deg": 1.683229587975155e-06,
+          "temp_blend": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task10d4_work\\t15_config_a.blend"
+        },
+        {
+          "config": "config_B",
+          "rotation_modes": {
+            "HandIK.L": "QUATERNION",
+            "HandIK.R": "AXIS_ANGLE",
+            "ElbowPole.L": "XYZ",
+            "ElbowPole.R": "ZYX"
+          },
+          "channel_fcurve_paths": {
+            "HandIK.L": [
+              "location",
+              "rotation_quaternion"
+            ],
+            "HandIK.R": [
+              "location",
+              "rotation_axis_angle"
+            ],
+            "ElbowPole.L": [
+              "location",
+              "rotation_euler"
+            ],
+            "ElbowPole.R": [
+              "location",
+              "rotation_euler"
+            ]
+          },
+          "max_controller_rot_err_deg": 1.1492843848885333e-05,
+          "temp_blend": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task10d4_work\\t15_config_b.blend"
+        }
+      ],
+      "reopen_verification": {
+        "config_A": {
+          "passed": true,
+          "invariants": {
+            "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task10d4_work\\t15_config_a.blend",
+            "scene_key": "config_A",
+            "armature_present": true,
+            "root_present": true,
+            "bone_count": 19,
+            "timeline_frame_start": 1,
+            "timeline_frame_end": 24,
+            "expected_frame_start": 1,
+            "expected_frame_end": 24,
+            "has_animation_data": true,
+            "has_active_camera": true,
+            "camera_name": "Task10D_InspectCam",
+            "missing_upper_controllers": [],
+            "missing_leg_controllers": [],
+            "missing_upper_constraints": []
+          },
+          "action_slot_identifier": "OBCharacterArmature",
+          "influence_fcurve_checks": {
+            "ArmIK.L": {
+              "data_path": "pose.bones[\"forearm.L\"].constraints[\"ArmIK.L\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "ArmIK.R": {
+              "data_path": "pose.bones[\"forearm.R\"].constraints[\"ArmIK.R\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.L": {
+              "data_path": "pose.bones[\"hand.L\"].constraints[\"HandRotation.L\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.R": {
+              "data_path": "pose.bones[\"hand.R\"].constraints[\"HandRotation.R\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            }
+          },
+          "traversals": [
+            {
+              "order": "forward",
+              "frames_checked": 24,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "reverse",
+              "frames_checked": 24,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "shuffled_seed_20261126",
+              "frames_checked": 24,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            }
+          ]
+        },
+        "config_B": {
+          "passed": true,
+          "invariants": {
+            "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task10d4_work\\t15_config_b.blend",
+            "scene_key": "config_B",
+            "armature_present": true,
+            "root_present": true,
+            "bone_count": 19,
+            "timeline_frame_start": 1,
+            "timeline_frame_end": 24,
+            "expected_frame_start": 1,
+            "expected_frame_end": 24,
+            "has_animation_data": true,
+            "has_active_camera": true,
+            "camera_name": "Task10D_InspectCam",
+            "missing_upper_controllers": [],
+            "missing_leg_controllers": [],
+            "missing_upper_constraints": []
+          },
+          "action_slot_identifier": "OBCharacterArmature",
+          "influence_fcurve_checks": {
+            "ArmIK.L": {
+              "data_path": "pose.bones[\"forearm.L\"].constraints[\"ArmIK.L\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "ArmIK.R": {
+              "data_path": "pose.bones[\"forearm.R\"].constraints[\"ArmIK.R\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.L": {
+              "data_path": "pose.bones[\"hand.L\"].constraints[\"HandRotation.L\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            },
+            "HandRotation.R": {
+              "data_path": "pose.bones[\"hand.R\"].constraints[\"HandRotation.R\"].influence",
+              "keyframe_count": 24,
+              "min_frame": 1,
+              "max_frame": 24,
+              "interpolations": [
+                "CONSTANT"
+              ],
+              "passed": true
+            }
+          },
+          "traversals": [
+            {
+              "order": "forward",
+              "frames_checked": 24,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "reverse",
+              "frames_checked": 24,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            },
+            {
+              "order": "shuffled_seed_20261126",
+              "frames_checked": 24,
+              "max_pos_err_m": 0.0,
+              "max_rot_err_rad": 0.0,
+              "max_inf_err": 0.0,
+              "failure_count": 0,
+              "failures": [],
+              "passed": true
+            }
+          ]
+        }
+      },
+      "passed": true
+    },
+    "T16": {
+      "status": "PASS",
+      "test_id": "T16",
+      "passed": true,
+      "fresh_rig_animation_data_all_none": true,
+      "existing_curves_unchanged_exact": true,
+      "existing_fcurve_counts": {
+        "CharacterArmature": 118,
+        "HandIK.L": 6,
+        "HandIK.R": 6,
+        "ElbowPole.L": 6,
+        "ElbowPole.R": 6
+      }
+    },
+    "T17": {
+      "status": "PASS",
+      "test_id": "T17",
+      "passed": true,
+      "variants": [
+        {
+          "variant": "target_position_shift",
+          "max_l_wrist_delta_m": 0.1341705560873985,
+          "max_l_bone_deg_delta": 9.421725167550022,
+          "right_planned_identical": true,
+          "lower_limb_planned_identical": true
+        },
+        {
+          "variant": "start_time_shift",
+          "max_l_wrist_delta_m": 0.18394814942530296,
+          "max_l_bone_deg_delta": 16.113000760416515,
+          "right_planned_identical": true,
+          "lower_limb_planned_identical": true
+        },
+        {
+          "variant": "duration_shift",
+          "max_l_wrist_delta_m": 0.11794112786870845,
+          "max_l_bone_deg_delta": 9.999446651527897,
+          "right_planned_identical": true,
+          "lower_limb_planned_identical": true
+        }
+      ]
+    },
+    "T18": {
+      "status": "PASS",
+      "test_id": "T18",
+      "passed": true,
+      "subcases": [
+        {
+          "case": "unreachable_wrist_clamp_false",
+          "exception": "RuntimeError: TerrainWalkAction 'T18_Unreachable' failed at Frame 5: KinematicBridge execution failed (unmet=1): hand_L (REACHABILITY): Hand L target exceeds maximum arm reach (0.625m > 0.560m) or tracking error 65.0mm > 5.0mm (err=0.0650)",
+          "wbc_failure_observed": true,
+          "wbc_failed_records": [
+            {
+              "success": false,
+              "max_end_effector_error_m": 0.06495714311539247,
+              "has_rom_violation": false,
+              "is_all_reachable": false,
+              "root_world_position": [
+                0.0,
+                -8.0,
+                0.0
+              ],
+              "pelvis_world_position": [
+                0.0,
+                -8.0,
+                0.8549999594688416
+              ],
+              "com_world": [
+                -3.555789589881897e-06,
+                -7.967962741851807,
+                1.0256379842758179
+              ],
+              "com_total_mass_kg": 70.0,
+              "unmet_constraints": [
+                {
+                  "target_name": "hand_L",
+                  "category": "REACHABILITY",
+                  "description": "Hand L target exceeds maximum arm reach (0.625m > 0.560m) or tracking error 65.0mm > 5.0mm",
+                  "error_amount": 0.06495714311539247
+                }
+              ],
+              "end_effectors": {
+                "foot_L": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "requested_world_xyz": [
+                    -0.11,
+                    -8.0,
+                    0.07
+                  ],
+                  "actual_world_xyz": [
+                    -0.10999999940395355,
+                    -8.000000953674316,
+                    0.06998196244239807
+                  ],
+                  "position_error_m": 1.806304875306552e-05,
+                  "requested_rotation_deg": [
+                    -0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "actual_rotation_deg": null,
+                  "orientation_error_deg": null,
+                  "is_reachable": true,
+                  "strictly_in_reach": true,
+                  "reach_distance_m": 0.785017959790765,
+                  "max_reach_m": 0.8200000000000001
+                },
+                "foot_R": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "requested_world_xyz": [
+                    0.11,
+                    -8.0,
+                    0.07
+                  ],
+                  "actual_world_xyz": [
+                    0.10999999940395355,
+                    -8.000000953674316,
+                    0.06998196244239807
+                  ],
+                  "position_error_m": 1.806304875306552e-05,
+                  "requested_rotation_deg": [
+                    -0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "actual_rotation_deg": null,
+                  "orientation_error_deg": null,
+                  "is_reachable": true,
+                  "strictly_in_reach": true,
+                  "reach_distance_m": 0.785017959790765,
+                  "max_reach_m": 0.8200000000000001
+                },
+                "hand_L": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "requested_world_xyz": [
+                    -0.24000000000000002,
+                    -7.440590518904321,
+                    1.226377314814815
+                  ],
+                  "actual_world_xyz": [
+                    -0.2400076985359192,
+                    -7.498747825622559,
+                    1.2553107738494873
+                  ],
+                  "position_error_m": 0.06495714311539247,
+                  "requested_rotation_deg": null,
+                  "actual_rotation_deg": [
+                    0.0,
+                    -0.0,
+                    0.0
+                  ],
+                  "orientation_error_deg": null,
+                  "is_reachable": false,
+                  "strictly_in_reach": false,
+                  "reach_distance_m": 0.559998573126621,
+                  "max_reach_m": 0.56
+                },
+                "hand_R": {
+                  "enabled": false,
+                  "weight": 0.0,
+                  "requested_world_xyz": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "actual_world_xyz": [
+                    0.23999997973442078,
+                    -7.932706832885742,
+                    0.9538593292236328
+                  ],
+                  "position_error_m": 0.0,
+                  "requested_rotation_deg": null,
+                  "actual_rotation_deg": null,
+                  "orientation_error_deg": null,
+                  "is_reachable": true,
+                  "strictly_in_reach": true,
+                  "reach_distance_m": 0.0,
+                  "max_reach_m": 0.56
+                }
+              }
+            }
+          ],
+          "save_gate_blocked": true,
+          "blend_saved": false
+        },
+        {
+          "case": "rom_violating_fk_hyperextension",
+          "exception": "RuntimeError: TerrainWalkAction 'T18_ROMViolation' failed at Frame 3: KinematicBridge execution failed (unmet=1): forearm.L (ROM_VIOLATION): Joint 'forearm.L' (forearm_L) violates anatomical ROM by max 0.90 deg (err=0.9034)",
+          "wbc_failure_observed": true,
+          "wbc_failed_records": [
+            {
+              "success": false,
+              "max_end_effector_error_m": 1.806304875306552e-05,
+              "has_rom_violation": true,
+              "is_all_reachable": true,
+              "root_world_position": [
+                0.0,
+                -8.0,
+                0.0
+              ],
+              "pelvis_world_position": [
+                0.0,
+                -8.0,
+                0.8549999594688416
+              ],
+              "com_world": [
+                -2.7939677238464355e-09,
+                -7.980628967285156,
+                1.0178080797195435
+              ],
+              "com_total_mass_kg": 70.0,
+              "unmet_constraints": [
+                {
+                  "target_name": "forearm.L",
+                  "category": "ROM_VIOLATION",
+                  "description": "Joint 'forearm.L' (forearm_L) violates anatomical ROM by max 0.90 deg",
+                  "error_amount": 0.9034084020139317
+                }
+              ],
+              "end_effectors": {
+                "foot_L": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "requested_world_xyz": [
+                    -0.11,
+                    -8.0,
+                    0.07
+                  ],
+                  "actual_world_xyz": [
+                    -0.10999999940395355,
+                    -8.000000953674316,
+                    0.06998196244239807
+                  ],
+                  "position_error_m": 1.806304875306552e-05,
+                  "requested_rotation_deg": [
+                    -0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "actual_rotation_deg": null,
+                  "orientation_error_deg": null,
+                  "is_reachable": true,
+                  "strictly_in_reach": true,
+                  "reach_distance_m": 0.785017959790765,
+                  "max_reach_m": 0.8200000000000001
+                },
+                "foot_R": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "requested_world_xyz": [
+                    0.11,
+                    -8.0,
+                    0.07
+                  ],
+                  "actual_world_xyz": [
+                    0.10999999940395355,
+                    -8.000000953674316,
+                    0.06998196244239807
+                  ],
+                  "position_error_m": 1.806304875306552e-05,
+                  "requested_rotation_deg": [
+                    -0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "actual_rotation_deg": null,
+                  "orientation_error_deg": null,
+                  "is_reachable": true,
+                  "strictly_in_reach": true,
+                  "reach_distance_m": 0.785017959790765,
+                  "max_reach_m": 0.8200000000000001
+                },
+                "hand_L": {
+                  "enabled": false,
+                  "weight": 0.0,
+                  "requested_world_xyz": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "actual_world_xyz": [
+                    -0.23999997973442078,
+                    -8.013169288635254,
+                    0.9453338384628296
+                  ],
+                  "position_error_m": 0.0,
+                  "requested_rotation_deg": null,
+                  "actual_rotation_deg": null,
+                  "orientation_error_deg": null,
+                  "is_reachable": true,
+                  "strictly_in_reach": true,
+                  "reach_distance_m": 0.0,
+                  "max_reach_m": 0.56
+                },
+                "hand_R": {
+                  "enabled": false,
+                  "weight": 0.0,
+                  "requested_world_xyz": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "actual_world_xyz": [
+                    0.23999997973442078,
+                    -7.932706832885742,
+                    0.9538593292236328
+                  ],
+                  "position_error_m": 0.0,
+                  "requested_rotation_deg": null,
+                  "actual_rotation_deg": null,
+                  "orientation_error_deg": null,
+                  "is_reachable": true,
+                  "strictly_in_reach": true,
+                  "reach_distance_m": 0.0,
+                  "max_reach_m": 0.56
+                }
+              }
+            }
+          ],
+          "save_gate_blocked": true,
+          "blend_saved": false
+        }
+      ]
+    }
+  }
+}
