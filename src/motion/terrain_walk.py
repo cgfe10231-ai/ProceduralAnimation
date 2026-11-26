@@ -64,6 +64,71 @@ def _smooth_bell01(x: float) -> float:
     return math.sin(math.pi * t) ** 2
 
 
+# [INTRODUCED 2026-11-26T16:52:00+08:00]
+# TASK: TASK 10-d-2
+# FUNCTION: _evaluate_upper_limb_progress
+# PURPOSE: Compute stateless, action-local time normalized linear progress u and C2-smooth quintic progress h for upper-limb motion from time_sec, start_time_sec, and duration_sec.
+# REASON: Resolve TASK 10-d-2 where terrain_walk.py lacked independent upper-limb temporal parameterization and relied on cosine _smoothstep01(); historical smoothers serve lower-limb gait locomotion and cannot alter their math semantics, so upper-limb trajectories must remain decoupled from gait_u, gait_amp, MotionMode, and lower-limb state.
+def _evaluate_upper_limb_progress(
+    time_sec: float,
+    start_time_sec: float,
+    duration_sec: float,
+) -> Tuple[float, float]:
+    """Evaluate decoupled upper-limb normalized linear progress u and quintic h."""
+    converted: List[float] = []
+    for name, raw in (
+        ("time_sec", time_sec),
+        ("start_time_sec", start_time_sec),
+        ("duration_sec", duration_sec),
+    ):
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            raise TypeError(f"{name} must be int or float, got {type(raw).__name__}")
+        try:
+            val = float(raw)
+        except OverflowError as exc:
+            raise ValueError(f"{name} cannot be converted to a finite float") from exc
+        if not math.isfinite(val):
+            raise ValueError(f"{name} must be finite, got {val!r}")
+        converted.append(0.0 if val == 0.0 else val)
+
+    t, start, duration = converted
+    if t < 0.0:
+        raise ValueError(f"time_sec must be non-negative, got {t!r}")
+    if start < 0.0:
+        raise ValueError(f"start_time_sec must be non-negative, got {start!r}")
+    if not (duration > 0.0):
+        raise ValueError(f"duration_sec must be strictly positive, got {duration!r}")
+
+    end_time = start + duration
+    if not math.isfinite(end_time) or not (end_time > start):
+        raise ValueError(
+            "end_time (start_time_sec + duration_sec) must be finite and strictly "
+            f"greater than start_time_sec, got start={start!r}, duration={duration!r}, "
+            f"end={end_time!r}"
+        )
+
+    if t <= start:
+        return (0.0, 0.0)
+    if t >= end_time:
+        return (1.0, 1.0)
+
+    u = (t - start) / duration
+    if not math.isfinite(u):
+        u = 1.0
+    elif u < 0.0:
+        u = 0.0
+    elif u > 1.0:
+        u = 1.0
+
+    if u <= 0.5:
+        h = u**3 * (10.0 + u * (-15.0 + 6.0 * u))
+    else:
+        v = 1.0 - u
+        h = 1.0 - v**3 * (10.0 + v * (-15.0 + 6.0 * v))
+    h = max(0.0, min(1.0, h))
+    return (u, h)
+
+
 def _compute_swing_clearance_z(
     step_alpha: float,
     z_base: float,
