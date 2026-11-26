@@ -1,0 +1,13 @@
+[PASS] T01: 开始前及开始时边界
+[PASS] T02: 结束时及结束后边界
+[PASS] T03: 五次插值数学正确性
+[PASS] T04: 进度单调性与值域
+[PASS] T05: 端点解析导数与有限差分收敛
+[PASS] T06: 非法类型拒绝
+[PASS] T07: 非有限数值拒绝
+[PASS] T08: 时间与持续时间范围拒绝
+[PASS] T09: 数值溢出与精度退化拒绝
+[PASS] T10: 左右独立开始时间
+[PASS] T11: 左右独立持续时间
+[PASS] T12: 重复与交替调用无状态性
+SUMMARY: passed=12 failed=0 executed=12 exit_code=0
