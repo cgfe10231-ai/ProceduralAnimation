@@ -39,19 +39,33 @@ from src.motion.whole_body_controller import (
 )
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.arm_ik import (
-    _ACTIVE_TRANSACTION_STACK,
-    _FailedTransactionClass,
-    _ISOLATED_FAILED_ARMATURES,
-    _PENDING_ARM_RIG_CLEANUPS,
-    _arm_rig_transaction,
-    _clear_test_fault_injection_hook,
-    _set_test_fault_injection_hook,
-    _snapshot_arm_rig_state,
-    _verify_arm_rig_state_restored,
-    ensure_armature_session_identity,
     reset_arm_ik,
     set_hand_ik_target,
     setup_arm_ik,
+)
+from src.scene_transaction_integrity.fault_injection import (
+    _clear_test_fault_injection_hook,
+    _set_test_fault_injection_hook,
+)
+from src.scene_transaction_integrity.layer1.session_liveness import (
+    ensure_armature_session_identity,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _FailedTransactionClass,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+)
+from src.scene_transaction_integrity.wiring import (
+    _arm_rig_transaction,
+    _snapshot_arm_rig_state,
+    _verify_arm_rig_state_restored,
 )
 from src.rig.ik import setup_leg_ik
 from src.rig.pose import reset_pose
