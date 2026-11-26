@@ -81,6 +81,101 @@ from src.rig.arm_ik import (
     ARM_IK_TARGET_NAMES,
     ARM_POLE_TARGET_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
+    get_arm_ik_state,
+    reset_arm_ik,
+    set_arm_ik_influence,
+    set_hand_ik_target,
+    setup_arm_ik,
+)
+
+from src.scene_transaction_integrity.fault_injection import (
+    _clear_test_fault_injection_hook,
+    _set_test_fault_injection_hook,
+)
+
+from src.scene_transaction_integrity.layer1.post_commit_cleanup import (
+    _coordinator_apply_cleanup_result,
+)
+from src.scene_transaction_integrity.layer1.authorization_registry import (
+    _COORDINATOR_AUTHORIZATION_GRANTS,
+)
+from src.scene_transaction_integrity.layer1.authorization_grants import (
+    _clear_coordinator_authorization_grants,
+)
+from src.scene_transaction_integrity.layer1.outermost_admission import (
+    _assert_arm_rig_cleanup_gate,
+    _assert_arm_rig_failed_isolation_gate,
+)
+from src.scene_transaction_integrity.layer1.session_liveness import (
+    _sweep_dead_managed_armature_identities,
+    ensure_armature_session_identity,
+    query_admission_gate_status,
+)
+from src.scene_transaction_integrity.layer1.pending_cleanup import (
+    retry_pending_arm_rig_cleanup,
+)
+
+from src.scene_transaction_integrity.layer2.session_records import (
+    ArmatureSessionIdentityRecord,
+    _ArmatureIsolationState,
+    _ArmatureLivenessStatus,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.tombstone_registry import (
+    _ARCHIVED_FAILED_D_TOMBSTONES,
+)
+from src.scene_transaction_integrity.layer2.transaction_context import (
+    _ArmRigTransactionContext,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+    _FailedTransactionClass,
+)
+from src.scene_transaction_integrity.layer2.audit_registries import (
+    _DEISOLATION_AUDIT_LOG,
+    _FAILED_A_AUDIT_RECORDS,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+    get_pending_arm_rig_cleanup_ids,
+)
+from src.scene_transaction_integrity.layer2.relationship_states import (
+    _RelationshipOperationState,
+)
+from src.scene_transaction_integrity.layer2.identity_helpers import (
+    _check_original_object_liveness,
+)
+from src.scene_transaction_integrity.layer2.session_verification import (
+    _verify_armature_session_identity_record,
+)
+
+from src.scene_transaction_integrity.layer4.depsgraph import (
+    _clear_test_depsgraph_updater,
+    _depsgraph_update,
+    _set_test_depsgraph_updater,
+)
+
+from src.scene_transaction_integrity.layer5.snapshot_capture import (
+    _capture_pre_snapshot_structural_fingerprint,
+    _verify_pre_write_zero_mutation_and_integrity,
+)
+from src.scene_transaction_integrity.layer5.value_evidence import (
+    _has_nan_or_inf,
+    _clone_snapshot_property_value,
+)
+
+from src.scene_transaction_integrity.layer6.cleanup_results import (
+    _CleanupOutcome,
+    _CleanupResult,
+)
+
+from src.scene_transaction_integrity.wiring import (
     _authorized_create_constraint,
     _authorized_remove_constraint,
     _authorized_assign_constraint_targets,
@@ -88,59 +183,17 @@ from src.rig.arm_ik import (
     _authorized_link_child_collection,
     _authorized_unlink_child_collection,
     _authorized_restore_relationship,
-    _CleanupOutcome,
-    _CleanupResult,
-    _coordinator_apply_cleanup_result,
-    ArmatureSessionIdentityRecord,
-    _ACTIVE_TRANSACTION_STACK,
-    _ARCHIVED_FAILED_D_TOMBSTONES,
-    _ArmatureIsolationState,
-    _ArmatureLivenessStatus,
-    _ArmRigTransactionContext,
-    _ArmRigTransactionState,
-    _COORDINATOR_AUTHORIZATION_GRANTS,
-    _DEISOLATION_AUDIT_LOG,
-    _FAILED_A_AUDIT_RECORDS,
-    _FailedTransactionClass,
-    _ISOLATED_FAILED_ARMATURES,
-    _MANAGED_ARMATURE_IDENTITIES,
-    _PENDING_ARM_RIG_CLEANUPS,
-    _RelationshipOperationState,
     _arm_rig_transaction,
-    _assert_arm_rig_cleanup_gate,
-    _assert_arm_rig_failed_isolation_gate,
     _authorized_link_object_to_collection,
-    _check_original_object_liveness,
-    _clear_coordinator_authorization_grants,
     _clear_or_retire_failure_isolation_by_coordinator,
-    _clear_test_depsgraph_updater,
-    _clear_test_fault_injection_hook,
-    _depsgraph_update,
     _issue_coordinator_authorization_grant,
     _rollback_arm_rig_state,
-    _set_test_depsgraph_updater,
-    _set_test_fault_injection_hook,
     _snapshot_arm_rig_state,
-    _sweep_dead_managed_armature_identities,
     _verify_arm_rig_state_restored,
-    _verify_armature_session_identity_record,
-    ensure_armature_session_identity,
-    get_arm_ik_state,
-    get_pending_arm_rig_cleanup_ids,
-    query_admission_gate_status,
     request_armature_deisolation,
-    reset_arm_ik,
     retire_dead_armature_tombstone,
-    retry_pending_arm_rig_cleanup,
-    set_arm_ik_influence,
-    set_hand_ik_target,
-    setup_arm_ik,
     verify_armature_deisolation_evidence,
     _verify_dead_armature_tombstone_retirement_evidence,
-    _capture_pre_snapshot_structural_fingerprint,
-    _verify_pre_write_zero_mutation_and_integrity,
-    _has_nan_or_inf,
-    _clone_snapshot_property_value,
 )
 import src.rig.arm_ik as arm_ik
 from src.rig.builder import bind_character_to_rig, build_rig
