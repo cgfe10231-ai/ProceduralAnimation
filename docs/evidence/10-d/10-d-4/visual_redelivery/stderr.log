@@ -1,0 +1,12 @@
+
+=== [generate_fk_scene] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\visual_redelivery\generate_visual_redelivery.py -- --worker generate --mode FK --variant nominal --blend C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_full_body_independent_fk.blend --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\visual_redelivery_work\fk_solve.json (rc=0) ===
+C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\visual_redelivery\generate_visual_redelivery.py:182: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+
+=== [generate_ik_scene] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\visual_redelivery\generate_visual_redelivery.py -- --worker generate --mode IK --variant nominal --blend C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_full_body_independent_ik.blend --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\visual_redelivery_work\ik_solve.json (rc=0) ===
+C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\visual_redelivery\generate_visual_redelivery.py:182: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+
+=== [counterfactual_ik_left] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\visual_redelivery\generate_visual_redelivery.py -- --worker generate --mode IK --variant counterfactual_L --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\visual_redelivery_work\ik_cf_solve.json (rc=0) ===
+C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\visual_redelivery\generate_visual_redelivery.py:182: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
