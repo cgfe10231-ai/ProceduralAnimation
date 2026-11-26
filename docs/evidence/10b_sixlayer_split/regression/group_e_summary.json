@@ -1,0 +1,55 @@
+{
+  "module": "tests.test_task10b_wbc_failure_contract",
+  "test_class": "TestTask10BWBCFailureContract",
+  "failfast": false,
+  "planned_count": 6,
+  "planned_methods": [
+    "test_contract10_01_normal_bilateral_feedback",
+    "test_contract10_02_cleanup_pending_admission_rejection",
+    "test_contract10_03_failed_isolation_propagation_to_wbc",
+    "test_contract10_04_arm_ik_rollback_vs_wbc_prior_writes_restoration",
+    "test_contract10_05_unreachable_hand_target_feedback",
+    "test_contract10_06_second_hand_failure_bilateral_partial_commit"
+  ],
+  "tests_run": 6,
+  "passed_count": 6,
+  "failures_count": 0,
+  "errors_count": 0,
+  "skipped_count": 0,
+  "not_run_count": 0,
+  "not_run_methods": [],
+  "was_successful": true,
+  "duration_sec": 0.553,
+  "per_test": [
+    {
+      "test": "tests.test_task10b_wbc_failure_contract.TestTask10BWBCFailureContract.test_contract10_01_normal_bilateral_feedback",
+      "method": "test_contract10_01_normal_bilateral_feedback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_wbc_failure_contract.TestTask10BWBCFailureContract.test_contract10_02_cleanup_pending_admission_rejection",
+      "method": "test_contract10_02_cleanup_pending_admission_rejection",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_wbc_failure_contract.TestTask10BWBCFailureContract.test_contract10_03_failed_isolation_propagation_to_wbc",
+      "method": "test_contract10_03_failed_isolation_propagation_to_wbc",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_wbc_failure_contract.TestTask10BWBCFailureContract.test_contract10_04_arm_ik_rollback_vs_wbc_prior_writes_restoration",
+      "method": "test_contract10_04_arm_ik_rollback_vs_wbc_prior_writes_restoration",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_wbc_failure_contract.TestTask10BWBCFailureContract.test_contract10_05_unreachable_hand_target_feedback",
+      "method": "test_contract10_05_unreachable_hand_target_feedback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_wbc_failure_contract.TestTask10BWBCFailureContract.test_contract10_06_second_hand_failure_bilateral_partial_commit",
+      "method": "test_contract10_06_second_hand_failure_bilateral_partial_commit",
+      "status": "PASS"
+    }
+  ]
+}

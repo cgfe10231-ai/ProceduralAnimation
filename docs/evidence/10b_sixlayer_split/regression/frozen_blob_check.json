@@ -1,0 +1,10 @@
+{
+  "branch": "waiting-split",
+  "head": "2f248bf4b98776222e37bc3228506a4fb85f7c32",
+  "pre_blob_count": 225,
+  "post_blob_count": 225,
+  "frozen_blobs_identical": true,
+  "tracked_modified_files": [],
+  "tracked_staged_files": [],
+  "freeze_intact": true
+}

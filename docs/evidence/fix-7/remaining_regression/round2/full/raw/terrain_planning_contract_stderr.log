@@ -1,0 +1,7 @@
+.....................C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\character\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+....
+----------------------------------------------------------------------
+Ran 25 tests in 0.559s
+
+OK

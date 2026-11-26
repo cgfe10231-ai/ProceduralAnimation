@@ -1,0 +1,21 @@
+test_u4_t01_flat_ground_contact (__main__.TestEnvironmentGate01Unit4.test_u4_t01_flat_ground_contact)
+T01: Flat ground contact preserves Z=0.0m, normal=(0, 0, 1), and valid compliance. ... ok
+test_u4_t02_15deg_ramp_contact (__main__.TestEnvironmentGate01Unit4.test_u4_t02_15deg_ramp_contact)
+T02: 15° uphill ramp contact records authentic ramp elevation and inclined normal. ... ok
+test_u4_t03_platform_contact (__main__.TestEnvironmentGate01Unit4.test_u4_t03_platform_contact)
+T03: Top platform contact records authentic platform elevation (1.3397m) and surface ID. ... ok
+test_u4_t04_20deg_downhill_contact (__main__.TestEnvironmentGate01Unit4.test_u4_t04_20deg_downhill_contact)
+T04: 20° downhill ramp records authentic downhill slope elevation and forward normal. ... ok
+test_u4_t05_alternating_stance_swing_decoupling (__main__.TestEnvironmentGate01Unit4.test_u4_t05_alternating_stance_swing_decoupling)
+T05: Alternating steps decouple stance support from swing flight with correct SupportType. ... ok
+test_u4_t06_failed_query_truthfulness_no_fake_ground (__main__.TestEnvironmentGate01Unit4.test_u4_t06_failed_query_truthfulness_no_fake_ground)
+T06: When environment query fails, bridge records truthful failure without faking Z=0.0m. ... ok
+test_u4_t07_counterfactual_experiment_a_elevation_variation (__main__.TestEnvironmentGate01Unit4.test_u4_t07_counterfactual_experiment_a_elevation_variation)
+T07: Counter-Factual A: Platform elevation shift (+0.05m) produces exact +0.05m contact Z shift. ... ok
+test_u4_t08_counterfactual_experiment_b_slope_normal_variation (__main__.TestEnvironmentGate01Unit4.test_u4_t08_counterfactual_experiment_b_slope_normal_variation)
+T08: Counter-Factual B: Slope normal modification yields exact corresponding contact normal. ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.284s
+
+OK

@@ -1,0 +1,129 @@
+{
+  "TEST-137": {
+    "test_method": "test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+    "status": "PASS",
+    "transaction_id": "63fcc39f",
+    "registry_session_id": "02a462d7-2f8a-4024-b09f-b322e25ee62d",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+    "mutation_detected": "sub_micro_pose_delta_2e-7"
+  },
+  "TEST-138": {
+    "test_method": "test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+    "status": "PASS",
+    "transaction_id": "5b46106d",
+    "registry_session_id": "076376c0-7b31-41e2-8f20-52555642973f",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+    "mutation_detected": "constraint_pole_angle_delta_0.05"
+  },
+  "TEST-139": {
+    "test_method": "test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+    "status": "PASS",
+    "transaction_id": "a55b3a62",
+    "registry_session_id": "2918ce89-62dd-4325-8c5c-0e19671a7155",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+    "mutation_detected": "controller_matrix_parent_inverse_delta_0.05"
+  },
+  "TEST-140": {
+    "test_method": "test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+    "status": "PASS",
+    "transaction_id": "71b5d7e9",
+    "registry_session_id": "06a65906-aa94-4bd4-b384-a45b822013d1",
+    "failure_class": "FAILED-A",
+    "isolation_state": "NONE",
+    "admission_result": "ADMITTED_AND_COMMITTED",
+    "recovery_result": "PRE_WRITE_ZERO_MUTATION_VERIFIED"
+  },
+  "TEST-141": {
+    "test_method": "test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+    "status": "PASS",
+    "transaction_id": "26322931",
+    "registry_session_id": "b92dc448-2fc4-4c71-b592-e68f7b176a3e",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+    "recovery_result": "ISOLATED_WITH_RECOVERY_EVIDENCE_INSUFFICIENT"
+  },
+  "TEST-142": {
+    "test_method": "test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+    "status": "PASS",
+    "transaction_id": "admission_gate_rejection",
+    "registry_session_id": "22c182bc-2c48-4ef9-a567-5e5481215f5d",
+    "failure_class": "FAILED-D",
+    "isolation_state": "TOMBSTONED_FAILED_D",
+    "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+    "object_exists": true,
+    "tombstone_retirement": "REJECTED_OBJECT_ALIVE"
+  },
+  "TEST-143": {
+    "test_method": "test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+    "status": "PASS",
+    "transaction_id": "admission_gate_rejection",
+    "registry_session_id": "807f7c3e-9c27-4f38-9ed6-abe406325edc",
+    "failure_class": "FAILED-D",
+    "isolation_state": "ARCHIVED_RETIRED",
+    "object_exists": false,
+    "tombstone_retirement": "APPROVED_ARCHIVED_RETIRED"
+  },
+  "TEST-144": {
+    "test_method": "test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+    "status": "PASS",
+    "dead_session_id": "080ea6f9-5e17-4051-abdd-11ee9d09f8af",
+    "replacement_session_id": "ac6e2ac1-0a9a-4006-8914-bd9d7e07ba4e",
+    "deisolation_result": "REJECTED_DEAD_ARMATURE_TOMBSTONE"
+  },
+  "TEST-145": {
+    "test_method": "test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+    "status": "PASS",
+    "registry_session_id": "3702d900-a64a-4310-8bfb-3e0a53a3dd72",
+    "attack_type": "FORGED_CAN_DEISOLATE_DICT",
+    "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT"
+  },
+  "TEST-146": {
+    "test_method": "test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+    "status": "PASS",
+    "registry_session_id": "0285b2fe-ea8c-46c0-917b-9f1169992ace",
+    "attack_type": "FORGED_CAN_RETIRE_DICT",
+    "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT"
+  },
+  "TEST-147": {
+    "test_method": "test_147_coordinator_grant_binding_and_single_use_enforcement",
+    "status": "PASS",
+    "registry_session_id": "0327cc86-8741-446e-b3f7-1dbeb818b8a8",
+    "grant_id": "grant_2e28df4d78dd43bbb3767b45167f6f01",
+    "cross_session_rejected": true,
+    "cross_action_rejected": true,
+    "single_use_consumed": true,
+    "replay_rejected": true
+  },
+  "TEST-148": {
+    "test_method": "test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+    "status": "PASS",
+    "registry_session_id": "21b8f045-ca74-4321-ae14-ca8e740de795",
+    "invalid_reasons_tested": [
+      "None",
+      "empty_str",
+      "spaces",
+      "whitespace"
+    ],
+    "deisolation_rejected": true,
+    "retirement_rejected": true,
+    "value_error_raised_on_flag": true
+  },
+  "TEST-149": {
+    "test_method": "test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c",
+    "status": "PASS",
+    "transaction_id": "4474bc5d",
+    "registry_session_id": "df34ba2d-6d05-41e8-80e3-548390652c74",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "recovery_uncertain_ops_count": 2,
+    "preserves_primary_and_rollback_exceptions": true,
+    "subsequent_write_blocked": true
+  }
+}

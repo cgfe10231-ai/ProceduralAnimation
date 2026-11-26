@@ -1,0 +1,390 @@
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'head')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Head
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'spine')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Torso
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'pelvis')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Pelvis
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'upper_arm.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperArm_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'forearm.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerArm_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'thigh.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperLeg_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'shin.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerLeg_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'foot.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Foot_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'upper_arm.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperArm_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'forearm.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerArm_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'thigh.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperLeg_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'shin.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerLeg_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'foot.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Foot_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'head')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Head
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'spine')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Torso
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'pelvis')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Pelvis
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'upper_arm.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperArm_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'forearm.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerArm_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'thigh.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperLeg_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'shin.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerLeg_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'foot.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Foot_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'upper_arm.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperArm_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'forearm.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerArm_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'thigh.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperLeg_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'shin.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerLeg_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'foot.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Foot_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'head')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Head
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'spine')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Torso
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'pelvis')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Pelvis
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'upper_arm.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperArm_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'forearm.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerArm_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'thigh.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperLeg_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'shin.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerLeg_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'foot.L')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Foot_L
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'upper_arm.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperArm_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'forearm.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerArm_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'thigh.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   UpperLeg_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'shin.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   LowerLeg_R
+
+--------------------------------------------------------------------
+Failed to add relation "Bone Parent"
+Could not find op_from: ComponentKey(OBCharacterArmature, BONE, 'foot.R')
+
+Trace:
+
+Depth    Type                     Name
+-----    ----                     ----
+1        Object                   Foot_R
+

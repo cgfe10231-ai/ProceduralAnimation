@@ -1,0 +1,43 @@
+{
+  "module": "tests.test_bug12_cross_armature_real_resources",
+  "test_class": "TestBug12RealCrossArmaturePending",
+  "failfast": true,
+  "planned_count": 4,
+  "planned_methods": [
+    "test_bug12_01_retry_a_deletes_only_a_real_resources",
+    "test_bug12_02_pending_both_gates_and_healthy_third_armature",
+    "test_bug12_03_foreign_constraint_and_cleanup_result_cannot_be_borrowed",
+    "test_bug12_04_failed_retry_a_keeps_b_real_resources_untouched"
+  ],
+  "tests_run": 4,
+  "passed_count": 4,
+  "failures_count": 0,
+  "errors_count": 0,
+  "skipped_count": 0,
+  "not_run_count": 0,
+  "not_run_methods": [],
+  "was_successful": true,
+  "duration_sec": 0.458,
+  "per_test": [
+    {
+      "test": "tests.test_bug12_cross_armature_real_resources.TestBug12RealCrossArmaturePending.test_bug12_01_retry_a_deletes_only_a_real_resources",
+      "method": "test_bug12_01_retry_a_deletes_only_a_real_resources",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug12_cross_armature_real_resources.TestBug12RealCrossArmaturePending.test_bug12_02_pending_both_gates_and_healthy_third_armature",
+      "method": "test_bug12_02_pending_both_gates_and_healthy_third_armature",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug12_cross_armature_real_resources.TestBug12RealCrossArmaturePending.test_bug12_03_foreign_constraint_and_cleanup_result_cannot_be_borrowed",
+      "method": "test_bug12_03_foreign_constraint_and_cleanup_result_cannot_be_borrowed",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug12_cross_armature_real_resources.TestBug12RealCrossArmaturePending.test_bug12_04_failed_retry_a_keeps_b_real_resources_untouched",
+      "method": "test_bug12_04_failed_retry_a_keeps_b_real_resources_untouched",
+      "status": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,1357 @@
+{
+  "module": "tests.test_task10b_transaction_atomicity",
+  "test_class": "TestArmIKTransactionAtomicity",
+  "failfast": true,
+  "planned_count": 223,
+  "planned_methods": [
+    "test_100_reversible_vs_post_commit_failure_boundaries",
+    "test_101_joint_multi_resource_identity_and_ownership_verification",
+    "test_102_continuous_full_lifecycle_and_reentry",
+    "test_103_transaction_created_constraint_cleaned_up_by_identity",
+    "test_104_external_constraint_preserved_on_transaction_failure",
+    "test_105_same_name_different_identity_constraint_not_erroneously_deleted",
+    "test_106_external_constraint_insertion_preserves_original_constraint_order",
+    "test_107_transaction_created_collection_link_undone_on_failure",
+    "test_108_external_collection_member_link_preserved_on_rollback",
+    "test_109_reset_arm_ik_left_write_failure_restores_bilateral_state",
+    "test_110_reset_arm_ik_right_write_failure_restores_bilateral_state",
+    "test_111_reset_arm_ik_parent_preflight_failure_zero_business_writes",
+    "test_112_joint_regression_reset_constraint_collection_cleanup_pending",
+    "test_113_pre_existing_collection_link_transitions_to_no_effect_without_revocation_authority",
+    "test_114_apply_succeeded_before_confirm_exception_safely_reverted_on_rollback",
+    "test_115_apply_exception_with_zero_side_effect_transitions_log_to_no_effect",
+    "test_116_external_same_name_object_and_external_collection_link_protected_on_rollback",
+    "test_117_rollback_verifies_relationship_log_terminal_states_and_reports_recovery_uncertain",
+    "test_118_normal_same_armature_nested_transaction",
+    "test_119_inner_exception_caught_by_outer_forces_rollback",
+    "test_120_multi_level_same_armature_nested_transaction_failure",
+    "test_121_poisoned_rollback_only_transaction_rejects_subsequent_nested_writes",
+    "test_122_normal_admission_restored_after_rollback",
+    "test_123_uncaught_inner_exception_preserves_historical_propagation_and_rollback",
+    "test_124_failed_a_pre_write_snapshot_abort_verified_zero_mutation_no_isolation",
+    "test_125_pre_write_abort_without_zero_mutation_proof_isolated_as_failed_c",
+    "test_126_failed_b_rollback_execution_failure_records_isolation",
+    "test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation",
+    "test_128_isolated_armature_renamed_still_rejected_before_snapshotting",
+    "test_129_other_healthy_armature_unaffected_by_isolated_armature",
+    "test_130_failed_d_armature_destroyed_during_active_records_tombstone_without_rollback",
+    "test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission",
+    "test_132_incomplete_recovery_deisolation_rejected_with_audit_log",
+    "test_133_missing_snapshot_deisolation_rejected_as_recovery_evidence_insufficient",
+    "test_134_direct_isolation_dict_tampering_without_coordinator_verification_rejected",
+    "test_135_failed_d_tombstone_cannot_return_to_active_and_retires_to_archived",
+    "test_136_cleanup_pending_and_failed_isolation_strictly_separated",
+    "test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+    "test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+    "test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+    "test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+    "test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+    "test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+    "test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+    "test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+    "test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+    "test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+    "test_147_coordinator_grant_binding_and_single_use_enforcement",
+    "test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+    "test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c",
+    "test_150_failed_b_unrestored_grant_issuance_rejected",
+    "test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+    "test_152_grant_transaction_id_mismatch_rejected",
+    "test_153_grant_failure_class_mismatch_rejected",
+    "test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+    "test_155_verified_recovery_issues_grant_and_single_use_consumed",
+    "test_156_live_armature_object_reports_alive",
+    "test_157_live_object_with_replaced_data_remains_alive",
+    "test_158_deleted_original_object_reports_absent",
+    "test_159_live_object_enumeration_failure_returns_unknown",
+    "test_160_unverified_reference_access_returns_unknown",
+    "test_161_pointer_mismatch_cannot_prove_absence",
+    "test_162_missing_original_reference_is_unknown",
+    "test_163_unknown_liveness_preserves_failed_isolation",
+    "test_164_unknown_liveness_blocks_tombstone_retirement",
+    "test_165_constraint_property_getter_failure_is_not_silently_ignored",
+    "test_166_constraint_property_clone_failure_is_not_silently_ignored",
+    "test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a",
+    "test_168_post_exception_fingerprint_capture_failure_preserves_primary_error",
+    "test_169_real_generic_ik_property_mutation_is_detected",
+    "test_170_clean_snapshot_exception_still_allows_failed_a",
+    "test_171_nonfinite_nested_fingerprint_values_are_rejected",
+    "test_172_fingerprint_freeze_does_not_alias_mutable_mathutils",
+    "test_173_complete_fingerprint_and_existing_snapshot_contract_coexist",
+    "test_174_unknown_admission_rejected_without_isolation",
+    "test_175_unknown_before_rollback_keeps_failed_c",
+    "test_176_unknown_after_rollback_verification_is_failed_c",
+    "test_177_unknown_during_snapshot_is_failed_c",
+    "test_178_verified_data_replacement_remains_failed_d",
+    "test_179_fingerprint_strictly_freezes_or_rejects",
+    "test_180_nonfinite_iterator_failure_cannot_prove_finite",
+    "test_181_unverified_data_enumeration_is_not_failed_d",
+    "test_182_verification_evidence_cannot_replace_explicit_grant",
+    "test_183_nested_dual_exception_chain_and_isolation_record",
+    "test_184_shared_curve_and_armature_data_are_preserved",
+    "test_185_destroyed_rna_reference_fingerprint_fails_closed",
+    "test_186_unsupported_constraint_property_never_proves_failed_a",
+    "test_187_nonfinite_scan_exception_isolated_as_failed_c",
+    "test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit",
+    "test_189_zero_user_unauthorized_curve_datablock_preserved_on_commit",
+    "test_190_zero_user_unauthorized_armature_datablock_preserved_on_commit",
+    "test_191_same_name_different_identity_datablocks_protected",
+    "test_192_forged_type_a_authorization_rejected_and_datablock_protected",
+    "test_193_preserved_no_delete_authority_terminal_state_and_idempotency",
+    "test_194_external_mesh_occupying_handik_l_rejected_by_setup",
+    "test_195_opposite_elbowpole_curve_preflight_rejected_by_hand_target",
+    "test_196_transaction_created_wrong_type_object_safely_replaced",
+    "test_197_pre_existing_object_added_to_created_controller_objects_rejected",
+    "test_198_collection_creation_fault_before_registration_no_orphan",
+    "test_199_collection_fault_after_registration_before_link_rolls_back",
+    "test_200_collection_fault_after_link_rolls_back_parent_child_and_collection",
+    "test_201_pre_existing_character_collection_preserved_on_reentry",
+    "test_202_constraints_created_via_layer_3_with_identity_registration",
+    "test_203_constraint_fault_after_creation_before_registration_cleaned_up",
+    "test_204_constraint_fault_after_registration_before_config_rolls_back",
+    "test_205_stashed_constraint_lossless_rollback_recovery",
+    "test_206_external_same_name_constraint_on_other_bone_not_deleted",
+    "test_207_stashed_constraint_cleanup_only_removes_authorized_identity",
+    "test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds",
+    "test_209_ik_target_assignment_7_state_logging_confirmed",
+    "test_210_ik_pole_target_assignment_and_pole_subtarget_logging",
+    "test_211_copy_rotation_target_assignment_preserves_wrist_constraints",
+    "test_212_unchanged_target_and_subtarget_transitions_to_no_effect",
+    "test_213_fault_before_target_write_transitions_to_no_effect_and_rolls_back",
+    "test_214_fault_after_target_write_before_confirm_reverts",
+    "test_215_replaced_target_or_constraint_identity_enters_recovery_uncertain",
+    "test_216_joint_left_right_fault_rollback_preserves_all_constraints_and_targets",
+    "test_217_hand_ik_parent_and_inverse_layer3_confirmed",
+    "test_218_parent_and_inverse_unchanged_transitions_to_no_effect",
+    "test_219_invalid_parent_rejected_controller_untouched",
+    "test_220_fault_before_parent_write_transitions_to_no_effect",
+    "test_221_fault_after_parent_before_inverse_rollback_restores_initial",
+    "test_222_fault_after_inverse_before_confirm_reverts_with_matrix_diff",
+    "test_223_original_parent_destroyed_enters_recovery_uncertain",
+    "test_224_external_unowned_object_parent_assignment_rejected",
+    "test_225_character_collection_scene_link_has_tx_added_and_confirms",
+    "test_226_pre_existing_collection_child_link_transitions_to_no_effect",
+    "test_227_collection_child_link_fault_before_c_api_no_effect",
+    "test_228_collection_child_link_fault_before_confirm_reverts",
+    "test_229_authorized_unlinked_child_collection_restored_on_rollback",
+    "test_230_external_second_parent_preserved_on_rollback",
+    "test_231_renamed_collection_with_same_name_replacement_preserved",
+    "test_232_created_collection_with_external_members_refuses_deletion",
+    "test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets",
+    "test_234_layer6_returns_cleanup_success_without_state_mutation",
+    "test_235_initial_cleanup_failure_coordinator_sets_cleanup_pending_and_chains_cause",
+    "test_236_pending_retry_failure_preserves_state_and_pending_gate_with_chain",
+    "test_237_pending_retry_success_coordinator_transitions_committed_and_unregisters",
+    "test_238_failed_transaction_rejected_by_cleanup_isolation_preserved",
+    "test_239_pending_registry_invalid_state_or_identity_rejects_and_refuses_pop",
+    "test_240_forged_cleanup_success_with_remaining_resources_rejected_by_coordinator",
+    "test_241_cross_armature_cannot_borrow_cleanup_result_or_pending_gate",
+    "test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback",
+    "test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending",
+    "test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation",
+    "test_245_partial_cleanup_progress_preserved_subsequent_retry_only_processes_remaining",
+    "test_246_cleanup_pending_blocks_bilateral_reset",
+    "test_247_all_bilateral_write_entrypoints_blocked_under_cleanup_pending",
+    "test_248_reinitialization_under_pending_cannot_bypass_gate",
+    "test_249_armature_a_pending_does_not_block_independent_armature_b",
+    "test_250_alternating_execution_pending_a_and_healthy_b",
+    "test_251_retry_cleanup_failure_on_a_preserves_b_admission",
+    "test_252_a_cleanup_success_restores_bilateral_reset_admission",
+    "test_253_concurrent_pending_records_on_distinct_armatures",
+    "test_31_snapshot_fidelity_controllers",
+    "test_32_snapshot_fidelity_pose_bones",
+    "test_33_snapshot_fidelity_constraints_and_collection",
+    "test_34_direct_rollback_uninitialized_scene",
+    "test_35_direct_rollback_wrong_type_controller",
+    "test_36_direct_rollback_initialized_scene_controllers",
+    "test_37_direct_rollback_pose_bones",
+    "test_38_direct_rollback_constraints",
+    "test_39_fault_injection_setup_arm_ik_after_first_controller",
+    "test_40_fault_injection_setup_arm_ik_after_controller_replaced",
+    "test_41_fault_injection_setup_arm_ik_after_constraints_or_prebend",
+    "test_42_fault_injection_set_hand_ik_target_during_auto_init",
+    "test_43_fault_injection_set_hand_ik_target_after_hand_location",
+    "test_44_fault_injection_set_hand_ik_target_after_hand_rotation",
+    "test_45_fault_injection_set_hand_ik_target_after_pole_location",
+    "test_46_fault_injection_set_hand_ik_target_between_influences",
+    "test_47_fault_injection_set_hand_ik_target_after_rot_influence",
+    "test_48_fault_injection_set_hand_ik_target_during_state_read",
+    "test_49_fault_injection_set_arm_ik_influence_side_l",
+    "test_50_fault_injection_set_arm_ik_influence_side_both",
+    "test_51_success_path_fresh_and_reentrant_across_8_rotation_modes",
+    "test_52_success_after_failure_recovery_and_explicit_verification_error",
+    "test_53_controller_full_fields_verification",
+    "test_54_bone_full_fields_verification",
+    "test_55_constraints_full_fields_verification",
+    "test_56_wrong_type_and_unrelated_constraints_lossless_recovery",
+    "test_57_collection_hierarchy_full_recovery",
+    "test_58_snapshot_failure_clears_active_transaction_stack",
+    "test_59_cross_armature_nested_transaction_rejection",
+    "test_60_get_arm_ik_state_internal_exception_triggers_rollback",
+    "test_61_depsgraph_update_exception_triggers_rollback",
+    "test_62_first_time_autoinit_success_path_and_failure_resilience",
+    "test_63_fault_injection_public_interface_boundary",
+    "test_64_commit_cleanup_failure_and_datablock_lifecycle",
+    "test_65_reversible_commit_preparation_failure_rolls_back",
+    "test_66_irreversible_cleanup_failure_semantics_and_retry",
+    "test_67_partial_cleanup_failure_and_convergence",
+    "test_68_depsgraph_update_call_boundary_exception_rollback",
+    "test_69_snapshot_array_immutability_and_independence",
+    "test_70_rna_property_restoration_failure_error_aggregation",
+    "test_71_external_collection_protection_during_rollback",
+    "test_72_collection_rename_and_multi_parent_restoration",
+    "test_73_stashed_constraint_identity_and_ordering",
+    "test_74_sequential_failures_and_subsequent_success_avalanche_protection",
+    "test_75_side_isolation_and_shared_resource_protection",
+    "test_76_validator_corruption_detection",
+    "test_77_destroyed_constraint_identity_is_rejected",
+    "test_78_destroyed_constraint_causes_rollback_failure",
+    "test_79_external_character_collection_creation_preserved",
+    "test_80_external_character_collection_members_preserved",
+    "test_81_cleanup_pending_registry_and_retry",
+    "test_82_partial_cleanup_object_removed_datablock_failure_and_retry",
+    "test_83_datablock_shared_users_and_same_name_replacement_preserved",
+    "test_84_sequential_transactions_failure_recovery_isolation",
+    "test_85_same_armature_cleanup_pending_blocks_new_transaction",
+    "test_86_unrelated_armature_not_blocked_by_pending_cleanup",
+    "test_87_pending_cleanup_retry_success_restores_write_admission",
+    "test_88_stashed_constraint_same_name_replacement_not_erroneously_deleted",
+    "test_89_original_character_collection_rename_restores_identity_and_name",
+    "test_90_original_parent_collection_rename_restored_by_identity",
+    "test_91_external_child_collection_preserved_on_rollback",
+    "test_92_full_lifecycle_and_continuous_transaction_integration",
+    "test_93_transaction_created_controller_renamed_cleaned_by_identity",
+    "test_94_external_same_name_controller_preserved_when_transaction_controller_renamed",
+    "test_95_original_controller_physically_destroyed_fails_restoration",
+    "test_96_original_controller_name_occupied_by_external_object_fails_restoration",
+    "test_97_stashed_constraint_reference_invalid_with_same_name_replacement",
+    "test_98_controller_registered_before_collection_link_failure",
+    "test_99_exception_after_logical_commit_enters_cleanup_pending"
+  ],
+  "tests_run": 223,
+  "passed_count": 223,
+  "failures_count": 0,
+  "errors_count": 0,
+  "skipped_count": 0,
+  "not_run_count": 0,
+  "not_run_methods": [],
+  "was_successful": true,
+  "duration_sec": 16.262,
+  "per_test": [
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_100_reversible_vs_post_commit_failure_boundaries",
+      "method": "test_100_reversible_vs_post_commit_failure_boundaries",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_101_joint_multi_resource_identity_and_ownership_verification",
+      "method": "test_101_joint_multi_resource_identity_and_ownership_verification",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_102_continuous_full_lifecycle_and_reentry",
+      "method": "test_102_continuous_full_lifecycle_and_reentry",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_103_transaction_created_constraint_cleaned_up_by_identity",
+      "method": "test_103_transaction_created_constraint_cleaned_up_by_identity",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_104_external_constraint_preserved_on_transaction_failure",
+      "method": "test_104_external_constraint_preserved_on_transaction_failure",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_105_same_name_different_identity_constraint_not_erroneously_deleted",
+      "method": "test_105_same_name_different_identity_constraint_not_erroneously_deleted",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_106_external_constraint_insertion_preserves_original_constraint_order",
+      "method": "test_106_external_constraint_insertion_preserves_original_constraint_order",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_107_transaction_created_collection_link_undone_on_failure",
+      "method": "test_107_transaction_created_collection_link_undone_on_failure",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_108_external_collection_member_link_preserved_on_rollback",
+      "method": "test_108_external_collection_member_link_preserved_on_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_109_reset_arm_ik_left_write_failure_restores_bilateral_state",
+      "method": "test_109_reset_arm_ik_left_write_failure_restores_bilateral_state",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_110_reset_arm_ik_right_write_failure_restores_bilateral_state",
+      "method": "test_110_reset_arm_ik_right_write_failure_restores_bilateral_state",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_111_reset_arm_ik_parent_preflight_failure_zero_business_writes",
+      "method": "test_111_reset_arm_ik_parent_preflight_failure_zero_business_writes",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_112_joint_regression_reset_constraint_collection_cleanup_pending",
+      "method": "test_112_joint_regression_reset_constraint_collection_cleanup_pending",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_113_pre_existing_collection_link_transitions_to_no_effect_without_revocation_authority",
+      "method": "test_113_pre_existing_collection_link_transitions_to_no_effect_without_revocation_authority",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_114_apply_succeeded_before_confirm_exception_safely_reverted_on_rollback",
+      "method": "test_114_apply_succeeded_before_confirm_exception_safely_reverted_on_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_115_apply_exception_with_zero_side_effect_transitions_log_to_no_effect",
+      "method": "test_115_apply_exception_with_zero_side_effect_transitions_log_to_no_effect",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_116_external_same_name_object_and_external_collection_link_protected_on_rollback",
+      "method": "test_116_external_same_name_object_and_external_collection_link_protected_on_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_117_rollback_verifies_relationship_log_terminal_states_and_reports_recovery_uncertain",
+      "method": "test_117_rollback_verifies_relationship_log_terminal_states_and_reports_recovery_uncertain",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_118_normal_same_armature_nested_transaction",
+      "method": "test_118_normal_same_armature_nested_transaction",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_119_inner_exception_caught_by_outer_forces_rollback",
+      "method": "test_119_inner_exception_caught_by_outer_forces_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_120_multi_level_same_armature_nested_transaction_failure",
+      "method": "test_120_multi_level_same_armature_nested_transaction_failure",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_121_poisoned_rollback_only_transaction_rejects_subsequent_nested_writes",
+      "method": "test_121_poisoned_rollback_only_transaction_rejects_subsequent_nested_writes",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_122_normal_admission_restored_after_rollback",
+      "method": "test_122_normal_admission_restored_after_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_123_uncaught_inner_exception_preserves_historical_propagation_and_rollback",
+      "method": "test_123_uncaught_inner_exception_preserves_historical_propagation_and_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_124_failed_a_pre_write_snapshot_abort_verified_zero_mutation_no_isolation",
+      "method": "test_124_failed_a_pre_write_snapshot_abort_verified_zero_mutation_no_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_125_pre_write_abort_without_zero_mutation_proof_isolated_as_failed_c",
+      "method": "test_125_pre_write_abort_without_zero_mutation_proof_isolated_as_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_126_failed_b_rollback_execution_failure_records_isolation",
+      "method": "test_126_failed_b_rollback_execution_failure_records_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation",
+      "method": "test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_128_isolated_armature_renamed_still_rejected_before_snapshotting",
+      "method": "test_128_isolated_armature_renamed_still_rejected_before_snapshotting",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_129_other_healthy_armature_unaffected_by_isolated_armature",
+      "method": "test_129_other_healthy_armature_unaffected_by_isolated_armature",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_130_failed_d_armature_destroyed_during_active_records_tombstone_without_rollback",
+      "method": "test_130_failed_d_armature_destroyed_during_active_records_tombstone_without_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission",
+      "method": "test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_132_incomplete_recovery_deisolation_rejected_with_audit_log",
+      "method": "test_132_incomplete_recovery_deisolation_rejected_with_audit_log",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_133_missing_snapshot_deisolation_rejected_as_recovery_evidence_insufficient",
+      "method": "test_133_missing_snapshot_deisolation_rejected_as_recovery_evidence_insufficient",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_134_direct_isolation_dict_tampering_without_coordinator_verification_rejected",
+      "method": "test_134_direct_isolation_dict_tampering_without_coordinator_verification_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_135_failed_d_tombstone_cannot_return_to_active_and_retires_to_archived",
+      "method": "test_135_failed_d_tombstone_cannot_return_to_active_and_retires_to_archived",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_136_cleanup_pending_and_failed_isolation_strictly_separated",
+      "method": "test_136_cleanup_pending_and_failed_isolation_strictly_separated",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+      "method": "test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+      "method": "test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+      "method": "test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+      "method": "test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+      "method": "test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+      "method": "test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+      "method": "test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+      "method": "test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+      "method": "test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+      "method": "test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_147_coordinator_grant_binding_and_single_use_enforcement",
+      "method": "test_147_coordinator_grant_binding_and_single_use_enforcement",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+      "method": "test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c",
+      "method": "test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_150_failed_b_unrestored_grant_issuance_rejected",
+      "method": "test_150_failed_b_unrestored_grant_issuance_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+      "method": "test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_152_grant_transaction_id_mismatch_rejected",
+      "method": "test_152_grant_transaction_id_mismatch_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_153_grant_failure_class_mismatch_rejected",
+      "method": "test_153_grant_failure_class_mismatch_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+      "method": "test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_155_verified_recovery_issues_grant_and_single_use_consumed",
+      "method": "test_155_verified_recovery_issues_grant_and_single_use_consumed",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_156_live_armature_object_reports_alive",
+      "method": "test_156_live_armature_object_reports_alive",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_157_live_object_with_replaced_data_remains_alive",
+      "method": "test_157_live_object_with_replaced_data_remains_alive",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_158_deleted_original_object_reports_absent",
+      "method": "test_158_deleted_original_object_reports_absent",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_159_live_object_enumeration_failure_returns_unknown",
+      "method": "test_159_live_object_enumeration_failure_returns_unknown",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_160_unverified_reference_access_returns_unknown",
+      "method": "test_160_unverified_reference_access_returns_unknown",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_161_pointer_mismatch_cannot_prove_absence",
+      "method": "test_161_pointer_mismatch_cannot_prove_absence",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_162_missing_original_reference_is_unknown",
+      "method": "test_162_missing_original_reference_is_unknown",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_163_unknown_liveness_preserves_failed_isolation",
+      "method": "test_163_unknown_liveness_preserves_failed_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_164_unknown_liveness_blocks_tombstone_retirement",
+      "method": "test_164_unknown_liveness_blocks_tombstone_retirement",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_165_constraint_property_getter_failure_is_not_silently_ignored",
+      "method": "test_165_constraint_property_getter_failure_is_not_silently_ignored",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_166_constraint_property_clone_failure_is_not_silently_ignored",
+      "method": "test_166_constraint_property_clone_failure_is_not_silently_ignored",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a",
+      "method": "test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_168_post_exception_fingerprint_capture_failure_preserves_primary_error",
+      "method": "test_168_post_exception_fingerprint_capture_failure_preserves_primary_error",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_169_real_generic_ik_property_mutation_is_detected",
+      "method": "test_169_real_generic_ik_property_mutation_is_detected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_170_clean_snapshot_exception_still_allows_failed_a",
+      "method": "test_170_clean_snapshot_exception_still_allows_failed_a",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_171_nonfinite_nested_fingerprint_values_are_rejected",
+      "method": "test_171_nonfinite_nested_fingerprint_values_are_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_172_fingerprint_freeze_does_not_alias_mutable_mathutils",
+      "method": "test_172_fingerprint_freeze_does_not_alias_mutable_mathutils",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_173_complete_fingerprint_and_existing_snapshot_contract_coexist",
+      "method": "test_173_complete_fingerprint_and_existing_snapshot_contract_coexist",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_174_unknown_admission_rejected_without_isolation",
+      "method": "test_174_unknown_admission_rejected_without_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_175_unknown_before_rollback_keeps_failed_c",
+      "method": "test_175_unknown_before_rollback_keeps_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_176_unknown_after_rollback_verification_is_failed_c",
+      "method": "test_176_unknown_after_rollback_verification_is_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_177_unknown_during_snapshot_is_failed_c",
+      "method": "test_177_unknown_during_snapshot_is_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_178_verified_data_replacement_remains_failed_d",
+      "method": "test_178_verified_data_replacement_remains_failed_d",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_179_fingerprint_strictly_freezes_or_rejects",
+      "method": "test_179_fingerprint_strictly_freezes_or_rejects",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_180_nonfinite_iterator_failure_cannot_prove_finite",
+      "method": "test_180_nonfinite_iterator_failure_cannot_prove_finite",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_181_unverified_data_enumeration_is_not_failed_d",
+      "method": "test_181_unverified_data_enumeration_is_not_failed_d",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_182_verification_evidence_cannot_replace_explicit_grant",
+      "method": "test_182_verification_evidence_cannot_replace_explicit_grant",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_183_nested_dual_exception_chain_and_isolation_record",
+      "method": "test_183_nested_dual_exception_chain_and_isolation_record",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_184_shared_curve_and_armature_data_are_preserved",
+      "method": "test_184_shared_curve_and_armature_data_are_preserved",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_185_destroyed_rna_reference_fingerprint_fails_closed",
+      "method": "test_185_destroyed_rna_reference_fingerprint_fails_closed",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_186_unsupported_constraint_property_never_proves_failed_a",
+      "method": "test_186_unsupported_constraint_property_never_proves_failed_a",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_187_nonfinite_scan_exception_isolated_as_failed_c",
+      "method": "test_187_nonfinite_scan_exception_isolated_as_failed_c",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit",
+      "method": "test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_189_zero_user_unauthorized_curve_datablock_preserved_on_commit",
+      "method": "test_189_zero_user_unauthorized_curve_datablock_preserved_on_commit",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_190_zero_user_unauthorized_armature_datablock_preserved_on_commit",
+      "method": "test_190_zero_user_unauthorized_armature_datablock_preserved_on_commit",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_191_same_name_different_identity_datablocks_protected",
+      "method": "test_191_same_name_different_identity_datablocks_protected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_192_forged_type_a_authorization_rejected_and_datablock_protected",
+      "method": "test_192_forged_type_a_authorization_rejected_and_datablock_protected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_193_preserved_no_delete_authority_terminal_state_and_idempotency",
+      "method": "test_193_preserved_no_delete_authority_terminal_state_and_idempotency",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_194_external_mesh_occupying_handik_l_rejected_by_setup",
+      "method": "test_194_external_mesh_occupying_handik_l_rejected_by_setup",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_195_opposite_elbowpole_curve_preflight_rejected_by_hand_target",
+      "method": "test_195_opposite_elbowpole_curve_preflight_rejected_by_hand_target",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_196_transaction_created_wrong_type_object_safely_replaced",
+      "method": "test_196_transaction_created_wrong_type_object_safely_replaced",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_197_pre_existing_object_added_to_created_controller_objects_rejected",
+      "method": "test_197_pre_existing_object_added_to_created_controller_objects_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_198_collection_creation_fault_before_registration_no_orphan",
+      "method": "test_198_collection_creation_fault_before_registration_no_orphan",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_199_collection_fault_after_registration_before_link_rolls_back",
+      "method": "test_199_collection_fault_after_registration_before_link_rolls_back",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_200_collection_fault_after_link_rolls_back_parent_child_and_collection",
+      "method": "test_200_collection_fault_after_link_rolls_back_parent_child_and_collection",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_201_pre_existing_character_collection_preserved_on_reentry",
+      "method": "test_201_pre_existing_character_collection_preserved_on_reentry",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_202_constraints_created_via_layer_3_with_identity_registration",
+      "method": "test_202_constraints_created_via_layer_3_with_identity_registration",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_203_constraint_fault_after_creation_before_registration_cleaned_up",
+      "method": "test_203_constraint_fault_after_creation_before_registration_cleaned_up",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_204_constraint_fault_after_registration_before_config_rolls_back",
+      "method": "test_204_constraint_fault_after_registration_before_config_rolls_back",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_205_stashed_constraint_lossless_rollback_recovery",
+      "method": "test_205_stashed_constraint_lossless_rollback_recovery",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_206_external_same_name_constraint_on_other_bone_not_deleted",
+      "method": "test_206_external_same_name_constraint_on_other_bone_not_deleted",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_207_stashed_constraint_cleanup_only_removes_authorized_identity",
+      "method": "test_207_stashed_constraint_cleanup_only_removes_authorized_identity",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds",
+      "method": "test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_209_ik_target_assignment_7_state_logging_confirmed",
+      "method": "test_209_ik_target_assignment_7_state_logging_confirmed",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_210_ik_pole_target_assignment_and_pole_subtarget_logging",
+      "method": "test_210_ik_pole_target_assignment_and_pole_subtarget_logging",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_211_copy_rotation_target_assignment_preserves_wrist_constraints",
+      "method": "test_211_copy_rotation_target_assignment_preserves_wrist_constraints",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_212_unchanged_target_and_subtarget_transitions_to_no_effect",
+      "method": "test_212_unchanged_target_and_subtarget_transitions_to_no_effect",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_213_fault_before_target_write_transitions_to_no_effect_and_rolls_back",
+      "method": "test_213_fault_before_target_write_transitions_to_no_effect_and_rolls_back",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_214_fault_after_target_write_before_confirm_reverts",
+      "method": "test_214_fault_after_target_write_before_confirm_reverts",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_215_replaced_target_or_constraint_identity_enters_recovery_uncertain",
+      "method": "test_215_replaced_target_or_constraint_identity_enters_recovery_uncertain",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_216_joint_left_right_fault_rollback_preserves_all_constraints_and_targets",
+      "method": "test_216_joint_left_right_fault_rollback_preserves_all_constraints_and_targets",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_217_hand_ik_parent_and_inverse_layer3_confirmed",
+      "method": "test_217_hand_ik_parent_and_inverse_layer3_confirmed",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_218_parent_and_inverse_unchanged_transitions_to_no_effect",
+      "method": "test_218_parent_and_inverse_unchanged_transitions_to_no_effect",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_219_invalid_parent_rejected_controller_untouched",
+      "method": "test_219_invalid_parent_rejected_controller_untouched",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_220_fault_before_parent_write_transitions_to_no_effect",
+      "method": "test_220_fault_before_parent_write_transitions_to_no_effect",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_221_fault_after_parent_before_inverse_rollback_restores_initial",
+      "method": "test_221_fault_after_parent_before_inverse_rollback_restores_initial",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_222_fault_after_inverse_before_confirm_reverts_with_matrix_diff",
+      "method": "test_222_fault_after_inverse_before_confirm_reverts_with_matrix_diff",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_223_original_parent_destroyed_enters_recovery_uncertain",
+      "method": "test_223_original_parent_destroyed_enters_recovery_uncertain",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_224_external_unowned_object_parent_assignment_rejected",
+      "method": "test_224_external_unowned_object_parent_assignment_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_225_character_collection_scene_link_has_tx_added_and_confirms",
+      "method": "test_225_character_collection_scene_link_has_tx_added_and_confirms",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_226_pre_existing_collection_child_link_transitions_to_no_effect",
+      "method": "test_226_pre_existing_collection_child_link_transitions_to_no_effect",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_227_collection_child_link_fault_before_c_api_no_effect",
+      "method": "test_227_collection_child_link_fault_before_c_api_no_effect",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_228_collection_child_link_fault_before_confirm_reverts",
+      "method": "test_228_collection_child_link_fault_before_confirm_reverts",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_229_authorized_unlinked_child_collection_restored_on_rollback",
+      "method": "test_229_authorized_unlinked_child_collection_restored_on_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_230_external_second_parent_preserved_on_rollback",
+      "method": "test_230_external_second_parent_preserved_on_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_231_renamed_collection_with_same_name_replacement_preserved",
+      "method": "test_231_renamed_collection_with_same_name_replacement_preserved",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_232_created_collection_with_external_members_refuses_deletion",
+      "method": "test_232_created_collection_with_external_members_refuses_deletion",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets",
+      "method": "test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_234_layer6_returns_cleanup_success_without_state_mutation",
+      "method": "test_234_layer6_returns_cleanup_success_without_state_mutation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_235_initial_cleanup_failure_coordinator_sets_cleanup_pending_and_chains_cause",
+      "method": "test_235_initial_cleanup_failure_coordinator_sets_cleanup_pending_and_chains_cause",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_236_pending_retry_failure_preserves_state_and_pending_gate_with_chain",
+      "method": "test_236_pending_retry_failure_preserves_state_and_pending_gate_with_chain",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_237_pending_retry_success_coordinator_transitions_committed_and_unregisters",
+      "method": "test_237_pending_retry_success_coordinator_transitions_committed_and_unregisters",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_238_failed_transaction_rejected_by_cleanup_isolation_preserved",
+      "method": "test_238_failed_transaction_rejected_by_cleanup_isolation_preserved",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_239_pending_registry_invalid_state_or_identity_rejects_and_refuses_pop",
+      "method": "test_239_pending_registry_invalid_state_or_identity_rejects_and_refuses_pop",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_240_forged_cleanup_success_with_remaining_resources_rejected_by_coordinator",
+      "method": "test_240_forged_cleanup_success_with_remaining_resources_rejected_by_coordinator",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_241_cross_armature_cannot_borrow_cleanup_result_or_pending_gate",
+      "method": "test_241_cross_armature_cannot_borrow_cleanup_result_or_pending_gate",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback",
+      "method": "test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending",
+      "method": "test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation",
+      "method": "test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_245_partial_cleanup_progress_preserved_subsequent_retry_only_processes_remaining",
+      "method": "test_245_partial_cleanup_progress_preserved_subsequent_retry_only_processes_remaining",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_246_cleanup_pending_blocks_bilateral_reset",
+      "method": "test_246_cleanup_pending_blocks_bilateral_reset",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_247_all_bilateral_write_entrypoints_blocked_under_cleanup_pending",
+      "method": "test_247_all_bilateral_write_entrypoints_blocked_under_cleanup_pending",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_248_reinitialization_under_pending_cannot_bypass_gate",
+      "method": "test_248_reinitialization_under_pending_cannot_bypass_gate",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_249_armature_a_pending_does_not_block_independent_armature_b",
+      "method": "test_249_armature_a_pending_does_not_block_independent_armature_b",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_250_alternating_execution_pending_a_and_healthy_b",
+      "method": "test_250_alternating_execution_pending_a_and_healthy_b",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_251_retry_cleanup_failure_on_a_preserves_b_admission",
+      "method": "test_251_retry_cleanup_failure_on_a_preserves_b_admission",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_252_a_cleanup_success_restores_bilateral_reset_admission",
+      "method": "test_252_a_cleanup_success_restores_bilateral_reset_admission",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_253_concurrent_pending_records_on_distinct_armatures",
+      "method": "test_253_concurrent_pending_records_on_distinct_armatures",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_31_snapshot_fidelity_controllers",
+      "method": "test_31_snapshot_fidelity_controllers",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_32_snapshot_fidelity_pose_bones",
+      "method": "test_32_snapshot_fidelity_pose_bones",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_33_snapshot_fidelity_constraints_and_collection",
+      "method": "test_33_snapshot_fidelity_constraints_and_collection",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_34_direct_rollback_uninitialized_scene",
+      "method": "test_34_direct_rollback_uninitialized_scene",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_35_direct_rollback_wrong_type_controller",
+      "method": "test_35_direct_rollback_wrong_type_controller",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_36_direct_rollback_initialized_scene_controllers",
+      "method": "test_36_direct_rollback_initialized_scene_controllers",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_37_direct_rollback_pose_bones",
+      "method": "test_37_direct_rollback_pose_bones",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_38_direct_rollback_constraints",
+      "method": "test_38_direct_rollback_constraints",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_39_fault_injection_setup_arm_ik_after_first_controller",
+      "method": "test_39_fault_injection_setup_arm_ik_after_first_controller",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_40_fault_injection_setup_arm_ik_after_controller_replaced",
+      "method": "test_40_fault_injection_setup_arm_ik_after_controller_replaced",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_41_fault_injection_setup_arm_ik_after_constraints_or_prebend",
+      "method": "test_41_fault_injection_setup_arm_ik_after_constraints_or_prebend",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_42_fault_injection_set_hand_ik_target_during_auto_init",
+      "method": "test_42_fault_injection_set_hand_ik_target_during_auto_init",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_43_fault_injection_set_hand_ik_target_after_hand_location",
+      "method": "test_43_fault_injection_set_hand_ik_target_after_hand_location",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_44_fault_injection_set_hand_ik_target_after_hand_rotation",
+      "method": "test_44_fault_injection_set_hand_ik_target_after_hand_rotation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_45_fault_injection_set_hand_ik_target_after_pole_location",
+      "method": "test_45_fault_injection_set_hand_ik_target_after_pole_location",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_46_fault_injection_set_hand_ik_target_between_influences",
+      "method": "test_46_fault_injection_set_hand_ik_target_between_influences",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_47_fault_injection_set_hand_ik_target_after_rot_influence",
+      "method": "test_47_fault_injection_set_hand_ik_target_after_rot_influence",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_48_fault_injection_set_hand_ik_target_during_state_read",
+      "method": "test_48_fault_injection_set_hand_ik_target_during_state_read",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_49_fault_injection_set_arm_ik_influence_side_l",
+      "method": "test_49_fault_injection_set_arm_ik_influence_side_l",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_50_fault_injection_set_arm_ik_influence_side_both",
+      "method": "test_50_fault_injection_set_arm_ik_influence_side_both",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_51_success_path_fresh_and_reentrant_across_8_rotation_modes",
+      "method": "test_51_success_path_fresh_and_reentrant_across_8_rotation_modes",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_52_success_after_failure_recovery_and_explicit_verification_error",
+      "method": "test_52_success_after_failure_recovery_and_explicit_verification_error",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_53_controller_full_fields_verification",
+      "method": "test_53_controller_full_fields_verification",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_54_bone_full_fields_verification",
+      "method": "test_54_bone_full_fields_verification",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_55_constraints_full_fields_verification",
+      "method": "test_55_constraints_full_fields_verification",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_56_wrong_type_and_unrelated_constraints_lossless_recovery",
+      "method": "test_56_wrong_type_and_unrelated_constraints_lossless_recovery",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_57_collection_hierarchy_full_recovery",
+      "method": "test_57_collection_hierarchy_full_recovery",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_58_snapshot_failure_clears_active_transaction_stack",
+      "method": "test_58_snapshot_failure_clears_active_transaction_stack",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_59_cross_armature_nested_transaction_rejection",
+      "method": "test_59_cross_armature_nested_transaction_rejection",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_60_get_arm_ik_state_internal_exception_triggers_rollback",
+      "method": "test_60_get_arm_ik_state_internal_exception_triggers_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_61_depsgraph_update_exception_triggers_rollback",
+      "method": "test_61_depsgraph_update_exception_triggers_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_62_first_time_autoinit_success_path_and_failure_resilience",
+      "method": "test_62_first_time_autoinit_success_path_and_failure_resilience",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_63_fault_injection_public_interface_boundary",
+      "method": "test_63_fault_injection_public_interface_boundary",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_64_commit_cleanup_failure_and_datablock_lifecycle",
+      "method": "test_64_commit_cleanup_failure_and_datablock_lifecycle",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_65_reversible_commit_preparation_failure_rolls_back",
+      "method": "test_65_reversible_commit_preparation_failure_rolls_back",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_66_irreversible_cleanup_failure_semantics_and_retry",
+      "method": "test_66_irreversible_cleanup_failure_semantics_and_retry",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_67_partial_cleanup_failure_and_convergence",
+      "method": "test_67_partial_cleanup_failure_and_convergence",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_68_depsgraph_update_call_boundary_exception_rollback",
+      "method": "test_68_depsgraph_update_call_boundary_exception_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_69_snapshot_array_immutability_and_independence",
+      "method": "test_69_snapshot_array_immutability_and_independence",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_70_rna_property_restoration_failure_error_aggregation",
+      "method": "test_70_rna_property_restoration_failure_error_aggregation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_71_external_collection_protection_during_rollback",
+      "method": "test_71_external_collection_protection_during_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_72_collection_rename_and_multi_parent_restoration",
+      "method": "test_72_collection_rename_and_multi_parent_restoration",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_73_stashed_constraint_identity_and_ordering",
+      "method": "test_73_stashed_constraint_identity_and_ordering",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_74_sequential_failures_and_subsequent_success_avalanche_protection",
+      "method": "test_74_sequential_failures_and_subsequent_success_avalanche_protection",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_75_side_isolation_and_shared_resource_protection",
+      "method": "test_75_side_isolation_and_shared_resource_protection",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_76_validator_corruption_detection",
+      "method": "test_76_validator_corruption_detection",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_77_destroyed_constraint_identity_is_rejected",
+      "method": "test_77_destroyed_constraint_identity_is_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_78_destroyed_constraint_causes_rollback_failure",
+      "method": "test_78_destroyed_constraint_causes_rollback_failure",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_79_external_character_collection_creation_preserved",
+      "method": "test_79_external_character_collection_creation_preserved",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_80_external_character_collection_members_preserved",
+      "method": "test_80_external_character_collection_members_preserved",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_81_cleanup_pending_registry_and_retry",
+      "method": "test_81_cleanup_pending_registry_and_retry",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_82_partial_cleanup_object_removed_datablock_failure_and_retry",
+      "method": "test_82_partial_cleanup_object_removed_datablock_failure_and_retry",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_83_datablock_shared_users_and_same_name_replacement_preserved",
+      "method": "test_83_datablock_shared_users_and_same_name_replacement_preserved",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_84_sequential_transactions_failure_recovery_isolation",
+      "method": "test_84_sequential_transactions_failure_recovery_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_85_same_armature_cleanup_pending_blocks_new_transaction",
+      "method": "test_85_same_armature_cleanup_pending_blocks_new_transaction",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_86_unrelated_armature_not_blocked_by_pending_cleanup",
+      "method": "test_86_unrelated_armature_not_blocked_by_pending_cleanup",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_87_pending_cleanup_retry_success_restores_write_admission",
+      "method": "test_87_pending_cleanup_retry_success_restores_write_admission",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_88_stashed_constraint_same_name_replacement_not_erroneously_deleted",
+      "method": "test_88_stashed_constraint_same_name_replacement_not_erroneously_deleted",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_89_original_character_collection_rename_restores_identity_and_name",
+      "method": "test_89_original_character_collection_rename_restores_identity_and_name",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_90_original_parent_collection_rename_restored_by_identity",
+      "method": "test_90_original_parent_collection_rename_restored_by_identity",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_91_external_child_collection_preserved_on_rollback",
+      "method": "test_91_external_child_collection_preserved_on_rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_92_full_lifecycle_and_continuous_transaction_integration",
+      "method": "test_92_full_lifecycle_and_continuous_transaction_integration",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_93_transaction_created_controller_renamed_cleaned_by_identity",
+      "method": "test_93_transaction_created_controller_renamed_cleaned_by_identity",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_94_external_same_name_controller_preserved_when_transaction_controller_renamed",
+      "method": "test_94_external_same_name_controller_preserved_when_transaction_controller_renamed",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_95_original_controller_physically_destroyed_fails_restoration",
+      "method": "test_95_original_controller_physically_destroyed_fails_restoration",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_96_original_controller_name_occupied_by_external_object_fails_restoration",
+      "method": "test_96_original_controller_name_occupied_by_external_object_fails_restoration",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_97_stashed_constraint_reference_invalid_with_same_name_replacement",
+      "method": "test_97_stashed_constraint_reference_invalid_with_same_name_replacement",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_98_controller_registered_before_collection_link_failure",
+      "method": "test_98_controller_registered_before_collection_link_failure",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_99_exception_after_logical_commit_enters_cleanup_pending",
+      "method": "test_99_exception_after_logical_commit_enters_cleanup_pending",
+      "status": "PASS"
+    }
+  ]
+}

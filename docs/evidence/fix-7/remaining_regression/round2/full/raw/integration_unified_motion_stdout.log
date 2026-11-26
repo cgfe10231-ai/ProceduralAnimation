@@ -1,0 +1,19 @@
+00:01.312  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\unified_motion_integration.blend"
+================================================================================
+VERIFYING OUTPUT: unified_motion_integration.blend
+================================================================================
+[OK] File exists: C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\unified_motion_integration.blend (298537 bytes)
+[SCENE] Start frame: 1, End frame: 462, FPS: 24
+[OK] Core objects verified: Armature, Root, Camera, LookAtTarget
+  Frame   1 (Start of Walk (stationary idle)): root_Y = -8.0000m (expected ~-8.0000m, diff=0.0000m)
+  Frame 204 (End of Walk (bilateral stop)): root_Y = -6.7400m (expected ~-6.7400m, diff=0.0000m)
+  Frame 318 (End of SprintStart (high-speed burst)): root_Y = -0.1567m (expected ~-0.1567m, diff=0.0000m)
+  Frame 366 (End of SprintBrake (bilateral stop)): root_Y = 1.3433m (expected ~1.3433m, diff=0.0000m)
+  Frame 462 (End of Run (4 cycles)): root_Y = 4.9058m (expected ~4.9058m, diff=0.0000m)
+[OK] Sampled 20 frames across timeline: all bone transforms clean (no NaN/Inf)
+================================================================================
+ALL CHECKS FOR unified_motion_integration.blend PASSED 100%!
+================================================================================
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit

@@ -1,0 +1,885 @@
+=== TASK 10-B / fix-5 R3-TAIL-01 TEST ONLY ===
+
+--- PRE-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: e039874e7c82c447e4ea57c77b77b27a63f6d114
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0
+
+--- GROUP 1: EXISTING CONSTRAINT TESTS (TEST-202..208) ---
+
+--- [TEST-202] test_202_constraints_created_via_layer_3_with_identity_registration ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_202_constraints_created_via_layer_3_with_identity_registration'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_202_constraints_created_via_layer_3_with_identity_registration (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_202_constraints_created_via_layer_3_with_identity_registration)
+TEST-202: L/R arm IK and copy rotation constraints created via Layer 3 with exact identity registration. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.239s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-203] test_203_constraint_fault_after_creation_before_registration_cleaned_up ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_203_constraint_fault_after_creation_before_registration_cleaned_up'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_203_constraint_fault_after_creation_before_registration_cleaned_up (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_203_constraint_fault_after_creation_before_registration_cleaned_up)
+TEST-203: Constraint creation fault before registration cleans up instance safely without deleting external constraints. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.236s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-204] test_204_constraint_fault_after_registration_before_config_rolls_back ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_204_constraint_fault_after_registration_before_config_rolls_back'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_204_constraint_fault_after_registration_before_config_rolls_back (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_204_constraint_fault_after_registration_before_config_rolls_back)
+TEST-204: Fault after constraint registration before config rolls back registered constraint via Layer 3. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.248s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-205] test_205_stashed_constraint_lossless_rollback_recovery ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_205_stashed_constraint_lossless_rollback_recovery'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_205_stashed_constraint_lossless_rollback_recovery (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_205_stashed_constraint_lossless_rollback_recovery)
+TEST-205: Wrong-type constraint stashed during setup is losslessly recovered on rollback (ref, ptr, name, mute, order). ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.244s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-206] test_206_external_same_name_constraint_on_other_bone_not_deleted ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_206_external_same_name_constraint_on_other_bone_not_deleted'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_206_external_same_name_constraint_on_other_bone_not_deleted (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_206_external_same_name_constraint_on_other_bone_not_deleted)
+TEST-206: External constraint named 'ArmIK.L' on another bone is never deleted on rollback or cleanup. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.226s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-207] test_207_stashed_constraint_cleanup_only_removes_authorized_identity ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_207_stashed_constraint_cleanup_only_removes_authorized_identity'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_207_stashed_constraint_cleanup_only_removes_authorized_identity (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_207_stashed_constraint_cleanup_only_removes_authorized_identity)
+TEST-207: Post-commit cleanup only removes stashed constraint matching authorized identity; same-name replacement preserved. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.222s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-208] test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds)
+TEST-208: Constraint removal fault during post-commit cleanup enters CLEANUP_PENDING; subsequent retry succeeds. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.224s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- GROUP 2: CREATION/REGISTRATION FAULT WINDOW TESTS (A-F, IN-MEMORY) ---
+
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr <IN_MEMORY_EXPR>
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+IN_MEMORY_EXPR:
+import os, sys, unittest, bpy
+sys.path.insert(0, os.path.abspath('.'))
+import src.rig.arm_ik as arm_ik
+from src.config import PipelineConfig
+from src.character.builder import build_character
+from src.rig.builder import build_rig, bind_character_to_rig
+from src.rig.ik import setup_leg_ik, reset_leg_ik
+from src.rig.pose import reset_pose
+
+class _RaiseBeforeSetitemDict(dict):
+    def __init__(self, initial=None):
+        super().__init__(initial or {})
+        self.calls = []
+    def __setitem__(self, key, value):
+        self.calls.append(key)
+        raise RuntimeError('INJECTED_BEFORE_RECEIPT_WRITE')
+
+class _RaiseAfterSetitemDict(dict):
+    def __init__(self, initial=None):
+        super().__init__(initial or {})
+        self.written = []
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.written.append((key, value))
+        if key not in self:
+            raise AssertionError('Receipt key missing after super().__setitem__')
+        raise RuntimeError('INJECTED_AFTER_RECEIPT_WRITE')
+
+class _RaiseBeforeAppendList(list):
+    def __init__(self, initial=None):
+        super().__init__(initial or [])
+        self.attempted = []
+    def append(self, item):
+        self.attempted.append(item)
+        raise RuntimeError('INJECTED_BEFORE_REGISTRY_APPEND')
+
+class _RaiseAfterAppendList(list):
+    def __init__(self, initial=None):
+        super().__init__(initial or [])
+        self.appended = []
+    def append(self, item):
+        super().append(item)
+        self.appended.append(item)
+        raise RuntimeError('INJECTED_AFTER_REGISTRY_APPEND')
+
+class TestR3Tail01Group2FaultWindows(unittest.TestCase):
+    def setUp(self):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+        cfg = PipelineConfig()
+        char_data = build_character(cfg)
+        self.armature = build_rig(cfg)
+        bind_character_to_rig(self.armature, char_data['parts'])
+        setup_leg_ik(self.armature)
+        reset_leg_ik(self.armature)
+        reset_pose(self.armature)
+        bpy.context.view_layer.update()
+
+    def tearDown(self):
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+
+    def test_A_failure_before_receipt_write(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext_fore = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext_fore.name = 'ExtPreA'
+        ext_fore_ptr = int(ext_fore.as_pointer())
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        captured_tx = []
+        inner_checked = []
+        with self.assertRaises(RuntimeError) as cm:
+            with arm_ik._arm_rig_transaction(self.armature) as tx:
+                captured_tx.append(tx)
+                trap_dict = _RaiseBeforeSetitemDict(tx._constraint_creation_receipts)
+                tx._constraint_creation_receipts = trap_dict
+                try:
+                    arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                except RuntimeError as exc:
+                    self.assertIn('INJECTED_BEFORE_RECEIPT_WRITE', str(exc))
+                    self.assertEqual(len(trap_dict.calls), 1)
+                    self.assertEqual(len(tx._constraint_creation_receipts), 0)
+                    self.assertEqual(len(tx.created_constraints), 0)
+                    self.assertEqual([c.name for c in p_fore.constraints], ['ExtPreA'])
+                    self.assertEqual(p_fore.constraints[0].as_pointer(), ext_fore_ptr)
+                    inner_checked.append(True)
+                    raise
+
+        self.assertIn('INJECTED_BEFORE_RECEIPT_WRITE', str(cm.exception))
+        self.assertEqual(inner_checked, [True])
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(len(tx._constraint_creation_receipts), 0)
+        self.assertEqual(len(tx.created_constraints), 0)
+        self.assertEqual(len(arm_ik._ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual([c.name for c in p_fore.constraints], ['ExtPreA'])
+        self.assertEqual(p_fore.constraints[0], ext_fore)
+        self.assertEqual(p_fore.constraints[0].as_pointer(), ext_fore_ptr)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-A')
+
+    def test_B_failure_after_receipt_write(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext_fore = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext_fore.name = 'ExtPreB'
+        ext_fore_ptr = int(ext_fore.as_pointer())
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        cleanup_calls = []
+        orig_cleanup = arm_ik._cleanup_failed_constraint_creation
+        def spy_cleanup(pbone, con, expected_ptr, pbone_ptr, before_ptrs, active_tx):
+            cleanup_calls.append((expected_ptr, pbone_ptr))
+            return orig_cleanup(pbone, con, expected_ptr, pbone_ptr, before_ptrs, active_tx)
+
+        captured_tx = []
+        inner_checked = []
+        arm_ik._cleanup_failed_constraint_creation = spy_cleanup
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    trap_dict = _RaiseAfterSetitemDict(tx._constraint_creation_receipts)
+                    tx._constraint_creation_receipts = trap_dict
+                    try:
+                        arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                    except RuntimeError as exc:
+                        self.assertIn('INJECTED_AFTER_RECEIPT_WRITE', str(exc))
+                        self.assertEqual(len(trap_dict.written), 1)
+                        written_ptr, written_receipt = trap_dict.written[0]
+                        written_con_ref = written_receipt[0]
+                        self.assertEqual(len(cleanup_calls), 1)
+                        self.assertEqual(cleanup_calls[0][0], written_ptr)
+                        self.assertNotIn(written_ptr, tx._constraint_creation_receipts)
+                        self.assertEqual(len(tx._constraint_creation_receipts), 0)
+                        self.assertEqual(len(tx.created_constraints), 0)
+                        self.assertNotIn('ArmIK.L', p_fore.constraints)
+                        self.assertFalse(any(int(c.as_pointer()) == written_ptr for c in p_fore.constraints))
+                        self.assertNotIn(written_con_ref, list(p_fore.constraints))
+                        self.assertEqual([c.name for c in p_fore.constraints], ['ExtPreB'])
+                        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+                        inner_checked.append(written_ptr)
+                        raise
+        finally:
+            arm_ik._cleanup_failed_constraint_creation = orig_cleanup
+
+        self.assertIn('INJECTED_AFTER_RECEIPT_WRITE', str(cm.exception))
+        self.assertEqual(len(inner_checked), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(len(tx._constraint_creation_receipts), 0)
+        self.assertEqual(len(tx.created_constraints), 0)
+        self.assertEqual(p_fore.constraints['ExtPreB'], ext_fore)
+        self.assertEqual(p_fore.constraints['ExtPreB'].as_pointer(), ext_fore_ptr)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-B')
+
+    def test_C_failure_before_registry_append(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext_fore = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext_fore.name = 'ExtPreC'
+        ext_fore_ptr = int(ext_fore.as_pointer())
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        cleanup_calls = []
+        orig_cleanup = arm_ik._cleanup_failed_constraint_creation
+        def spy_cleanup(pbone, con, expected_ptr, pbone_ptr, before_ptrs, active_tx):
+            cleanup_calls.append((expected_ptr, pbone_ptr))
+            return orig_cleanup(pbone, con, expected_ptr, pbone_ptr, before_ptrs, active_tx)
+
+        captured_tx = []
+        inner_checked = []
+        arm_ik._cleanup_failed_constraint_creation = spy_cleanup
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    trap_list = _RaiseBeforeAppendList(tx.created_constraints)
+                    tx.created_constraints = trap_list
+                    try:
+                        arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                    except RuntimeError as exc:
+                        self.assertIn('INJECTED_BEFORE_REGISTRY_APPEND', str(exc))
+                        self.assertEqual(len(trap_list.attempted), 1)
+                        att = trap_list.attempted[0]
+                        self.assertEqual(len(tx.created_constraints), 0)
+                        self.assertEqual(len(cleanup_calls), 1)
+                        self.assertEqual(cleanup_calls[0][0], att['con_ptr'])
+                        self.assertEqual(len(tx._constraint_creation_receipts), 0)
+                        self.assertNotIn('ArmIK.L', p_fore.constraints)
+                        self.assertFalse(any(int(c.as_pointer()) == att['con_ptr'] for c in p_fore.constraints))
+                        self.assertNotIn(att['con_ref'], list(p_fore.constraints))
+                        self.assertEqual([c.name for c in p_fore.constraints], ['ExtPreC'])
+                        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+                        inner_checked.append(att['con_ptr'])
+                        raise
+        finally:
+            arm_ik._cleanup_failed_constraint_creation = orig_cleanup
+
+        self.assertIn('INJECTED_BEFORE_REGISTRY_APPEND', str(cm.exception))
+        self.assertEqual(len(inner_checked), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(len(tx.created_constraints), 0)
+        self.assertEqual(len(tx._constraint_creation_receipts), 0)
+        self.assertEqual(p_fore.constraints['ExtPreC'], ext_fore)
+        self.assertEqual(p_fore.constraints['ExtPreC'].as_pointer(), ext_fore_ptr)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-C')
+
+    def test_D_failure_after_registry_append(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext1 = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext1.name = 'ExtFirstD'
+        ext1.mute = True
+        ext1.influence = 0.35
+        ext1_ptr = int(ext1.as_pointer())
+
+        ext2 = p_fore.constraints.new(type='LIMIT_LOCATION')
+        ext2.name = 'ExtSecondD'
+        ext2.mute = False
+        ext2.influence = 0.75
+        ext2_ptr = int(ext2.as_pointer())
+
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        cleanup_calls = []
+        remove_calls = []
+        orig_cleanup = arm_ik._cleanup_failed_constraint_creation
+        orig_remove = arm_ik._authorized_remove_constraint
+
+        def spy_cleanup(pbone, con, expected_ptr, pbone_ptr, before_ptrs, active_tx):
+            before_names = [c.name for c in pbone.constraints]
+            res = orig_cleanup(pbone, con, expected_ptr, pbone_ptr, before_ptrs, active_tx)
+            after_names = [c.name for c in pbone.constraints]
+            cleanup_calls.append((expected_ptr, before_names, after_names))
+            return res
+
+        def spy_remove(pbone, con_record_or_ref, phase, active_tx=None):
+            rec_ptr = con_record_or_ref.get('con_ptr') if isinstance(con_record_or_ref, dict) else con_record_or_ref.as_pointer()
+            remove_calls.append((phase, rec_ptr))
+            return orig_remove(pbone, con_record_or_ref, phase, active_tx=active_tx)
+
+        captured_tx = []
+        new_ref_box = []
+        arm_ik._cleanup_failed_constraint_creation = spy_cleanup
+        arm_ik._authorized_remove_constraint = spy_remove
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    trap_list = _RaiseAfterAppendList(tx.created_constraints)
+                    tx.created_constraints = trap_list
+                    try:
+                        arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                    except RuntimeError as exc:
+                        self.assertIn('INJECTED_AFTER_REGISTRY_APPEND', str(exc))
+                        self.assertEqual(len(trap_list.appended), 1)
+                        app = trap_list.appended[0]
+                        new_ref_box.append((app['con_ref'], app['con_ptr']))
+                        self.assertEqual(len(cleanup_calls), 1)
+                        self.assertEqual(cleanup_calls[0][1], cleanup_calls[0][2])
+                        self.assertEqual([c.name for c in p_fore.constraints], ['ExtFirstD', 'ExtSecondD', 'ArmIK.L'])
+                        self.assertEqual(len(remove_calls), 0)
+                        raise
+        finally:
+            arm_ik._cleanup_failed_constraint_creation = orig_cleanup
+            arm_ik._authorized_remove_constraint = orig_remove
+
+        self.assertIn('INJECTED_AFTER_REGISTRY_APPEND', str(cm.exception))
+        self.assertEqual(len(new_ref_box), 1)
+        new_con_ref, new_con_ptr = new_ref_box[0]
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(remove_calls, [('ROLLBACK', new_con_ptr)])
+        self.assertNotIn('ArmIK.L', p_fore.constraints)
+        self.assertFalse(any(int(c.as_pointer()) == new_con_ptr for c in p_fore.constraints))
+        self.assertNotIn(new_con_ref, list(p_fore.constraints))
+        self.assertEqual([c.name for c in p_fore.constraints], ['ExtFirstD', 'ExtSecondD'])
+        self.assertEqual(p_fore.constraints[0], ext1)
+        self.assertEqual(p_fore.constraints[0].as_pointer(), ext1_ptr)
+        self.assertEqual(p_fore.constraints[0].type, 'LIMIT_ROTATION')
+        self.assertTrue(p_fore.constraints[0].mute)
+        self.assertAlmostEqual(p_fore.constraints[0].influence, 0.35, places=5)
+        self.assertEqual(p_fore.constraints[1], ext2)
+        self.assertEqual(p_fore.constraints[1].as_pointer(), ext2_ptr)
+        self.assertEqual(p_fore.constraints[1].type, 'LIMIT_LOCATION')
+        self.assertFalse(p_fore.constraints[1].mute)
+        self.assertAlmostEqual(p_fore.constraints[1].influence, 0.75, places=5)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-D')
+
+    def test_E1_cleanup_failure_real_authority_unproven(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext_fore = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext_fore.name = 'ExtPreE1'
+        ext_fore_ptr = int(ext_fore.as_pointer())
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        captured_tx = []
+        def hook(stage, ctx):
+            if stage == 'character_constraint_after_creation_before_registration':
+                ctx['tx']._constraint_creation_receipts = 'CORRUPTED_LEDGER_E1'
+                raise RuntimeError('ORIGINAL_CREATION_FAULT_E1')
+
+        arm_ik._set_test_fault_injection_hook(hook)
+        inner_checked = []
+        try:
+            with self.assertRaises(RuntimeError) as cm_tx:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    try:
+                        arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                    except RuntimeError as exc:
+                        self.assertIn('CONSTRAINT_CREATION_CLEANUP_FAILED', str(exc))
+                        self.assertIn('ORIGINAL_CREATION_FAULT_E1', str(exc))
+                        self.assertIn('CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: receipt ledger malformed', str(exc))
+                        self.assertIsNotNone(exc.__cause__)
+                        self.assertIn('CONSTRAINT_CREATION_CLEANUP_AUTHORITY_UNPROVEN: receipt ledger malformed', str(exc.__cause__))
+                        inner_checked.append(True)
+                        raise
+        finally:
+            arm_ik._clear_test_fault_injection_hook()
+
+        self.assertEqual(inner_checked, [True])
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.FAILED)
+        self.assertNotEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn('CONSTRAINT_CREATION_CLEANUP_FAILED', str(cm_tx.exception))
+        self.assertIn('ORIGINAL_CREATION_FAULT_E1', str(cm_tx.exception))
+        self.assertEqual(p_fore.constraints['ExtPreE1'], ext_fore)
+        self.assertEqual(p_fore.constraints['ExtPreE1'].as_pointer(), ext_fore_ptr)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-E1 (REAL_AUTHORITY_GUARD_FAILURE)')
+
+    def test_E2_ERROR_PROPAGATION_ONLY_monkeypatched_cleanup(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext_fore = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext_fore.name = 'ExtPreE2'
+        ext_fore_ptr = int(ext_fore.as_pointer())
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        orig_cleanup = arm_ik._cleanup_failed_constraint_creation
+        def failing_cleanup(*args, **kwargs):
+            raise RuntimeError('SIMULATED_CLEANUP_EXC_E2')
+
+        def hook(stage, ctx):
+            if stage == 'character_constraint_after_creation_before_registration':
+                raise RuntimeError('ORIGINAL_CREATION_FAULT_E2')
+
+        captured_tx = []
+        inner_checked = []
+        arm_ik._cleanup_failed_constraint_creation = failing_cleanup
+        arm_ik._set_test_fault_injection_hook(hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm_tx:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    try:
+                        arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                    except RuntimeError as exc:
+                        self.assertIn('CONSTRAINT_CREATION_CLEANUP_FAILED', str(exc))
+                        self.assertIn('ORIGINAL_CREATION_FAULT_E2', str(exc))
+                        self.assertIn('SIMULATED_CLEANUP_EXC_E2', str(exc))
+                        self.assertIsNotNone(exc.__cause__)
+                        self.assertIn('SIMULATED_CLEANUP_EXC_E2', str(exc.__cause__))
+                        inner_checked.append(True)
+                        raise
+        finally:
+            arm_ik._clear_test_fault_injection_hook()
+            arm_ik._cleanup_failed_constraint_creation = orig_cleanup
+
+        self.assertEqual(inner_checked, [True])
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.FAILED)
+        self.assertNotEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn('CONSTRAINT_CREATION_CLEANUP_FAILED', str(cm_tx.exception))
+        self.assertIn('ORIGINAL_CREATION_FAULT_E2', str(cm_tx.exception))
+        self.assertIn('SIMULATED_CLEANUP_EXC_E2', str(cm_tx.exception))
+        self.assertEqual(p_fore.constraints['ExtPreE2'], ext_fore)
+        self.assertEqual(p_fore.constraints['ExtPreE2'].as_pointer(), ext_fore_ptr)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-E2 [ERROR_PROPAGATION_ONLY]')
+
+    def test_F1_missing_receipt_rejects_deletion(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext_fore = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext_fore.name = 'ExtPreF1'
+        ext_fore_ptr = int(ext_fore.as_pointer())
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        captured_tx = []
+        created_box = []
+        with self.assertRaises(RuntimeError) as cm:
+            with arm_ik._arm_rig_transaction(self.armature) as tx:
+                captured_tx.append(tx)
+                new_con = arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                new_ptr = int(new_con.as_pointer())
+                created_box.append((new_con, new_ptr))
+                tx._constraint_creation_receipts.pop(new_ptr)
+                raise RuntimeError('FAULT_TRIGGER_ROLLBACK_F1')
+
+        new_con, new_ptr = created_box[0]
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.FAILED)
+        self.assertNotEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn('FAULT_TRIGGER_ROLLBACK_F1', str(cm.exception))
+        self.assertIn('Rollback constraint restoration failed', str(cm.exception))
+        self.assertIsNotNone(cm.exception.__cause__)
+        self.assertIn('FAULT_TRIGGER_ROLLBACK_F1', str(cm.exception.__cause__))
+        self.assertTrue(any(int(c.as_pointer()) == new_ptr for c in p_fore.constraints))
+        self.assertEqual(p_fore.constraints['ExtPreF1'], ext_fore)
+        self.assertEqual(p_fore.constraints['ExtPreF1'].as_pointer(), ext_fore_ptr)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-F1')
+
+    def test_F2_corrupted_receipt_and_same_name_bone_refuses_deletion(self):
+        p_fore = self.armature.pose.bones['forearm.L']
+        p_upper = self.armature.pose.bones['upper_arm.L']
+        ext_fore = p_fore.constraints.new(type='LIMIT_ROTATION')
+        ext_fore.name = 'ExtPreF2'
+        ext_fore_ptr = int(ext_fore.as_pointer())
+        ext_other = p_upper.constraints.new(type='LIMIT_ROTATION')
+        ext_other.name = 'ArmIK.L'
+        ext_other_ptr = int(ext_other.as_pointer())
+        bpy.context.view_layer.update()
+
+        captured_tx = []
+        created_box = []
+        layer3_rejections = []
+        def hook(stage, ctx):
+            if stage == 'during_rollback_execution':
+                act_tx = ctx['tx']
+                try:
+                    arm_ik._authorized_remove_constraint(p_upper, act_tx.created_constraints[0], phase='ROLLBACK', active_tx=act_tx)
+                except RuntimeError as l3e1:
+                    layer3_rejections.append(str(l3e1))
+                try:
+                    arm_ik._authorized_remove_constraint(
+                        p_upper,
+                        {'con_ptr': ext_other_ptr, 'con_ref': ext_other, 'pbone': p_upper, 'bone_name': 'upper_arm.L', 'created_name': 'ArmIK.L'},
+                        phase='ROLLBACK',
+                        active_tx=act_tx,
+                    )
+                except RuntimeError as l3e2:
+                    layer3_rejections.append(str(l3e2))
+
+        arm_ik._set_test_fault_injection_hook(hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    new_con = arm_ik._authorized_create_constraint(p_fore, 'IK', 'ArmIK.L', active_tx=tx, arm=self.armature)
+                    new_ptr = int(new_con.as_pointer())
+                    created_box.append((new_con, new_ptr))
+                    tx._constraint_creation_receipts[new_ptr] = (
+                        new_con,
+                        new_ptr,
+                        p_upper,
+                        int(p_upper.as_pointer()),
+                        tx.session_id,
+                        tx.tx_id,
+                        object(),
+                        frozenset(),
+                    )
+                    raise RuntimeError('FAULT_TRIGGER_ROLLBACK_F2')
+        finally:
+            arm_ik._clear_test_fault_injection_hook()
+
+        self.assertEqual(len(layer3_rejections), 2)
+        new_con, new_ptr = created_box[0]
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.FAILED)
+        self.assertNotEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn('FAULT_TRIGGER_ROLLBACK_F2', str(cm.exception))
+        self.assertIn('Rollback constraint restoration failed', str(cm.exception))
+        self.assertIsNotNone(cm.exception.__cause__)
+        self.assertIn('FAULT_TRIGGER_ROLLBACK_F2', str(cm.exception.__cause__))
+        self.assertTrue(any(int(c.as_pointer()) == new_ptr for c in p_fore.constraints))
+        self.assertEqual(p_fore.constraints['ExtPreF2'], ext_fore)
+        self.assertEqual(p_fore.constraints['ExtPreF2'].as_pointer(), ext_fore_ptr)
+        self.assertEqual(p_upper.constraints['ArmIK.L'], ext_other)
+        self.assertEqual(p_upper.constraints['ArmIK.L'].as_pointer(), ext_other_ptr)
+        print('PASS Group 2-F2')
+
+suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestR3Tail01Group2FaultWindows)
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+sys.exit(0 if result.wasSuccessful() and result.testsRun == 8 else 1)
+OUTPUT:
+test_A_failure_before_receipt_write (__main__.TestR3Tail01Group2FaultWindows.test_A_failure_before_receipt_write) ... ok
+test_B_failure_after_receipt_write (__main__.TestR3Tail01Group2FaultWindows.test_B_failure_after_receipt_write) ... ok
+test_C_failure_before_registry_append (__main__.TestR3Tail01Group2FaultWindows.test_C_failure_before_registry_append) ... ok
+test_D_failure_after_registry_append (__main__.TestR3Tail01Group2FaultWindows.test_D_failure_after_registry_append) ... ok
+test_E1_cleanup_failure_real_authority_unproven (__main__.TestR3Tail01Group2FaultWindows.test_E1_cleanup_failure_real_authority_unproven) ... ok
+test_E2_ERROR_PROPAGATION_ONLY_monkeypatched_cleanup (__main__.TestR3Tail01Group2FaultWindows.test_E2_ERROR_PROPAGATION_ONLY_monkeypatched_cleanup) ... ok
+test_F1_missing_receipt_rejects_deletion (__main__.TestR3Tail01Group2FaultWindows.test_F1_missing_receipt_rejects_deletion) ... ok
+test_F2_corrupted_receipt_and_same_name_bone_refuses_deletion (__main__.TestR3Tail01Group2FaultWindows.test_F2_corrupted_receipt_and_same_name_bone_refuses_deletion) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.676s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-A
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-B
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-C
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-D
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-E1 (REAL_AUTHORITY_GUARD_FAILURE)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-E2 [ERROR_PROPAGATION_ONLY]
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-F1
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+PASS Group 2-F2
+
+--- GROUP 3: PROTECTIVE CONSTRAINT REGRESSION TESTS (TEST-38, 103, 104, 105, 106) ---
+
+--- [TEST-38] test_38_direct_rollback_constraints ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_38_direct_rollback_constraints'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_38_direct_rollback_constraints (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_38_direct_rollback_constraints)
+TEST-38: ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.243s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-103] test_103_transaction_created_constraint_cleaned_up_by_identity ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_103_transaction_created_constraint_cleaned_up_by_identity'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_103_transaction_created_constraint_cleaned_up_by_identity (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_103_transaction_created_constraint_cleaned_up_by_identity)
+TEST-103: Transaction-created constraints are identified and removed by pointer identity upon rollback. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.226s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-104] test_104_external_constraint_preserved_on_transaction_failure ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_104_external_constraint_preserved_on_transaction_failure'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_104_external_constraint_preserved_on_transaction_failure (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_104_external_constraint_preserved_on_transaction_failure)
+TEST-104: External constraints on rig bones are strictly preserved when an arm transaction aborts. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.241s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-105] test_105_same_name_different_identity_constraint_not_erroneously_deleted ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_105_same_name_different_identity_constraint_not_erroneously_deleted'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_105_same_name_different_identity_constraint_not_erroneously_deleted (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_105_same_name_different_identity_constraint_not_erroneously_deleted)
+TEST-105: Same-name constraint with different identity pointer is never deleted by rollback. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.234s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- [TEST-106] test_106_external_constraint_insertion_preserves_original_constraint_order ---
+HEAD_BEFORE: e039874e7c82c447e4ea57c77b77b27a63f6d114
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_106_external_constraint_insertion_preserves_original_constraint_order'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: e039874e7c82c447e4ea57c77b77b27a63f6d114
+OUTPUT:
+test_106_external_constraint_insertion_preserves_original_constraint_order (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_106_external_constraint_insertion_preserves_original_constraint_order)
+TEST-106: Inserting external constraints before/between original constraints maintains relative ordering. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.249s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- POST-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: e039874e7c82c447e4ea57c77b77b27a63f6d114
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0

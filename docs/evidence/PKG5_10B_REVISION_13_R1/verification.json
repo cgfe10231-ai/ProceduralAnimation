@@ -1,0 +1,208 @@
+{
+  "task_id": "10-b-13-r1",
+  "baseline_sha": "2e63fbfc20c2206c2de36a8b3e958e14f10004b8",
+  "audit_blockers_closed": {
+    "F13-R1-01": {
+      "title": "FAILED-A Zero-Mutation Floating-Point Proof & Fingerprint Parity",
+      "resolution": "Removed lossy round(float(v), 6) rounding from _capture_pre_snapshot_structural_fingerprint in favor of exact unrounded double-precision floats. Expanded structural fingerprint to 1:1 parity with _snapshot_arm_rig_state (including controller matrix_world, matrix_parent_inverse, display attributes, and bone constraints IK/COPY_ROTATION parameters). Added NaN/Inf fail-closed detection in _verify_pre_write_zero_mutation_and_integrity. Wrapped pre-snapshot fingerprint capture in fail-closed error handling in _arm_rig_transaction so that any capture failure escalates to FAILED-C with RECOVERY_EVIDENCE_INSUFFICIENT, leaves no stack leak, and blocks subsequent writes.",
+      "source_files": ["src/rig/arm_ik.py"],
+      "verified_by": ["TEST-137", "TEST-138", "TEST-139", "TEST-140", "TEST-141"]
+    },
+    "F13-R1-02": {
+      "title": "Disentanglement of Object Existence (Eo) from Session Data Identity (Ed)",
+      "resolution": "Implemented _check_original_object_liveness to evaluate physical Blender Object existence independently from data block identity. In _verify_armature_session_identity_record, ensured in_live_blender_collection strictly tracks physical object presence in live bpy.data.objects (remains True even if armature.data is swapped or corrupted). In _verify_dead_armature_tombstone_retirement_evidence, enforced that tombstone retirement to ARCHIVED_RETIRED is strictly rejected as long as the Armature object physically exists in bpy.data.objects, requiring genuine object removal (bpy.data.objects.remove).",
+      "source_files": ["src/rig/arm_ik.py"],
+      "verified_by": ["TEST-142", "TEST-143", "TEST-144"]
+    },
+    "F13-R1-03": {
+      "title": "Coordinator Single-Use Internal Authorization Grant for Deisolation & Tombstone Retirement",
+      "resolution": "Introduced _COORDINATOR_AUTHORIZATION_GRANTS registry and _issue_coordinator_authorization_grant. Layer 1 Coordinator entrypoints request_armature_deisolation and retire_dead_armature_tombstone issue single-use authorization grants binding grant_id, registry_session_id, transaction_id, failure_class, current_isolation_state, and transition_action. Layer 2 _clear_or_retire_failure_isolation_by_coordinator validates the grant, rejects direct calls with plain unverified dictionaries like {'can_deisolate': True} or {'can_retire': True}, enforces cross-session and cross-action binding, and consumes the grant on single use. Enforced non-empty string validation for reason.",
+      "source_files": ["src/rig/arm_ik.py"],
+      "verified_by": ["TEST-145", "TEST-146", "TEST-147", "TEST-148"]
+    },
+    "F13-R1-04": {
+      "title": "Relationship Rollback Fault Propagation & FAILED-C Isolation Regression",
+      "resolution": "Verified that relationship undo failures transition operation records to RECOVERY_UNCERTAIN. _verify_arm_rig_state_restored detects RECOVERY_UNCERTAIN during rollback verification and raises RuntimeError. _arm_rig_transaction catches rollback verification failure, preserves both primary exception and rollback exception, records FAILED-C isolation, and prevents subsequent writes through Gate 2.",
+      "source_files": ["src/rig/arm_ik.py"],
+      "verified_by": ["TEST-149"]
+    }
+  },
+  "changed_functions": [
+    "src/rig/arm_ik.py::_check_original_object_liveness",
+    "src/rig/arm_ik.py::_verify_armature_session_identity_record",
+    "src/rig/arm_ik.py::_COORDINATOR_AUTHORIZATION_GRANTS",
+    "src/rig/arm_ik.py::_issue_coordinator_authorization_grant",
+    "src/rig/arm_ik.py::_clear_coordinator_authorization_grants",
+    "src/rig/arm_ik.py::_clear_or_retire_failure_isolation_by_coordinator",
+    "src/rig/arm_ik.py::_has_nan_or_inf",
+    "src/rig/arm_ik.py::_capture_pre_snapshot_structural_fingerprint",
+    "src/rig/arm_ik.py::_verify_pre_write_zero_mutation_and_integrity",
+    "src/rig/arm_ik.py::_verify_dead_armature_tombstone_retirement_evidence",
+    "src/rig/arm_ik.py::request_armature_deisolation",
+    "src/rig/arm_ik.py::retire_dead_armature_tombstone",
+    "src/rig/arm_ik.py::_arm_rig_transaction",
+    "tests/test_task10b_transaction_atomicity.py::_TEST_137_TO_149_RUNTIME_EVIDENCE",
+    "tests/test_task10b_transaction_atomicity.py::test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+    "tests/test_task10b_transaction_atomicity.py::test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+    "tests/test_task10b_transaction_atomicity.py::test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+    "tests/test_task10b_transaction_atomicity.py::test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+    "tests/test_task10b_transaction_atomicity.py::test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+    "tests/test_task10b_transaction_atomicity.py::test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+    "tests/test_task10b_transaction_atomicity.py::test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+    "tests/test_task10b_transaction_atomicity.py::test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+    "tests/test_task10b_transaction_atomicity.py::test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+    "tests/test_task10b_transaction_atomicity.py::test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+    "tests/test_task10b_transaction_atomicity.py::test_147_coordinator_grant_binding_and_single_use_enforcement",
+    "tests/test_task10b_transaction_atomicity.py::test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+    "tests/test_task10b_transaction_atomicity.py::test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c"
+  ],
+  "tests_137_to_149": {
+    "TEST-137": {
+      "test_method": "test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+      "status": "PASS",
+      "transaction_id": "04f96840",
+      "registry_session_id": "684c55a8-ec4b-45ce-acc7-a41472b60324",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "mutation_detected": "sub_micro_pose_delta_2e-7"
+    },
+    "TEST-138": {
+      "test_method": "test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+      "status": "PASS",
+      "transaction_id": "caf67c95",
+      "registry_session_id": "64f3c45e-b030-4725-8f95-1aaa5268cd61",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "mutation_detected": "constraint_pole_angle_delta_0.05"
+    },
+    "TEST-139": {
+      "test_method": "test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+      "status": "PASS",
+      "transaction_id": "a3d4f23a",
+      "registry_session_id": "9c57eb98-207d-4654-b054-19ce3b7a4c44",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "mutation_detected": "controller_matrix_parent_inverse_delta_0.05"
+    },
+    "TEST-140": {
+      "test_method": "test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+      "status": "PASS",
+      "transaction_id": "b098d06f",
+      "registry_session_id": "fd8b52c4-4706-4bb8-9579-29fa73532c76",
+      "failure_class": "FAILED-A",
+      "isolation_state": "NONE",
+      "admission_result": "ADMITTED_AND_COMMITTED",
+      "recovery_result": "PRE_WRITE_ZERO_MUTATION_VERIFIED"
+    },
+    "TEST-141": {
+      "test_method": "test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+      "status": "PASS",
+      "transaction_id": "d8264d2f",
+      "registry_session_id": "34abfa40-dc65-4aaf-8fa3-996c7ae2d1e8",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "recovery_result": "ISOLATED_WITH_RECOVERY_EVIDENCE_INSUFFICIENT"
+    },
+    "TEST-142": {
+      "test_method": "test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+      "status": "PASS",
+      "transaction_id": "admission_gate_rejection",
+      "registry_session_id": "d61946e0-a0c2-4f29-961f-453d73815970",
+      "failure_class": "FAILED-D",
+      "isolation_state": "TOMBSTONED_FAILED_D",
+      "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+      "object_exists": true,
+      "tombstone_retirement": "REJECTED_OBJECT_ALIVE"
+    },
+    "TEST-143": {
+      "test_method": "test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+      "status": "PASS",
+      "transaction_id": "admission_gate_rejection",
+      "registry_session_id": "74d6a592-aceb-444f-a395-e80b872fc85e",
+      "failure_class": "FAILED-D",
+      "isolation_state": "ARCHIVED_RETIRED",
+      "object_exists": false,
+      "tombstone_retirement": "APPROVED_ARCHIVED_RETIRED"
+    },
+    "TEST-144": {
+      "test_method": "test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+      "status": "PASS",
+      "dead_session_id": "19d2038c-0a9d-45df-83b2-9331ceaebf78",
+      "replacement_session_id": "247de34b-433f-4966-aa82-541e88143b37",
+      "deisolation_result": "REJECTED_DEAD_ARMATURE_TOMBSTONE"
+    },
+    "TEST-145": {
+      "test_method": "test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+      "status": "PASS",
+      "registry_session_id": "3dc8555e-d9ea-4e42-8f60-809a3e53e0d6",
+      "attack_type": "FORGED_CAN_DEISOLATE_DICT",
+      "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT"
+    },
+    "TEST-146": {
+      "test_method": "test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+      "status": "PASS",
+      "registry_session_id": "5ff514fb-a791-4473-8e25-0c7f6aafb0ec",
+      "attack_type": "FORGED_CAN_RETIRE_DICT",
+      "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT"
+    },
+    "TEST-147": {
+      "test_method": "test_147_coordinator_grant_binding_and_single_use_enforcement",
+      "status": "PASS",
+      "registry_session_id": "1af3427a-9d0c-4cb9-9394-5012a1e360f5",
+      "grant_id": "grant_1fd08205ed654271b4b56aa33d44cf77",
+      "cross_session_rejected": true,
+      "cross_action_rejected": true,
+      "single_use_consumed": true,
+      "replay_rejected": true
+    },
+    "TEST-148": {
+      "test_method": "test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+      "status": "PASS",
+      "registry_session_id": "b8b9cc65-03bc-4281-a285-b387b58ec82d",
+      "invalid_reasons_tested": [
+        "None",
+        "empty_str",
+        "spaces",
+        "whitespace"
+      ],
+      "deisolation_rejected": true,
+      "retirement_rejected": true,
+      "value_error_raised_on_flag": true
+    },
+    "TEST-149": {
+      "test_method": "test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c",
+      "status": "PASS",
+      "transaction_id": "315c1d61",
+      "registry_session_id": "24a965ff-d3e5-41d6-a3cb-2a6aca91f8ce",
+      "failure_class": "FAILED-C",
+      "isolation_state": "ISOLATED_FAILED_C",
+      "recovery_uncertain_ops_count": 1,
+      "preserves_primary_and_rollback_exceptions": true,
+      "subsequent_write_blocked": true
+    }
+  },
+  "test_execution_summary": {
+    "test_task10b_transaction_atomicity": {
+      "total_tests": 119,
+      "passed": 119,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "test_task10b_input_validation": {
+      "total_tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "status": "PASS"
+    },
+    "test_arm_ik_lifecycle_world_transform_contract": {
+      "total_tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "status": "PASS"
+    }
+  }
+}

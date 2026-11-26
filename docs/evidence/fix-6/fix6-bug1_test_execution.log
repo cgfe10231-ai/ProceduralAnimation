@@ -1,0 +1,66 @@
+=== TASK 10-B / fix6-bug1 (R1-TAIL-02) TEST ONLY ===
+
+--- PRE-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: 62909875359b44ad065aaa48e3ca32d6db3d592b
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0
+
+--- GROUP 1: EXISTING DATABLOCK TESTS (TEST-64, 83, 188, 191, 192, 193) ---
+
+--- [TEST-64] test_64_commit_cleanup_failure_and_datablock_lifecycle ---
+HEAD_BEFORE: 62909875359b44ad065aaa48e3ca32d6db3d592b
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_64_commit_cleanup_failure_and_datablock_lifecycle'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 1
+HEAD_AFTER: 62909875359b44ad065aaa48e3ca32d6db3d592b
+OUTPUT:
+test_64_commit_cleanup_failure_and_datablock_lifecycle (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_64_commit_cleanup_failure_and_datablock_lifecycle)
+TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, and reports cleanup errors. ... FAIL
+
+======================================================================
+FAIL: test_64_commit_cleanup_failure_and_datablock_lifecycle (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_64_commit_cleanup_failure_and_datablock_lifecycle)
+TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, and reports cleanup errors.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\test_task10b_transaction_atomicity.py", line 1557, in test_64_commit_cleanup_failure_and_datablock_lifecycle
+    self.assertIn("Simulated commit cleanup failure", str(cm.exception))
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Simulated commit cleanup failure' not found in 'Created controller registration requires an Arm IK controller role'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.252s
+
+FAILED (failures=1)
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+--- CIRCUIT BREAKER STOP ---
+STOP_REASON: TEST-64 FAILED (EXIT_CODE=1); Group 1 remaining tests (TEST-83, TEST-188, TEST-191, TEST-192, TEST-193) and Group 2 (A-D) set to NOT EXECUTED per Sections 7 & 11.
+
+--- POST-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: 62909875359b44ad065aaa48e3ca32d6db3d592b
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0

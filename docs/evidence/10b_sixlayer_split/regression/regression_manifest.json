@@ -1,0 +1,148 @@
+{
+  "task": "TASK 10-B / SIX-LAYER FULL REGRESSION",
+  "branch": "waiting-split",
+  "head": "2f248bf4b98776222e37bc3228506a4fb85f7c32",
+  "environment": {
+    "blender_exe": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+    "blender_version_lines": [
+      "Blender 5.1.1",
+      "\tbuild date: 2026-04-14",
+      "\tbuild time: 01:37:22",
+      "\tbuild commit date: 2026-04-13",
+      "\tbuild commit time: 14:35",
+      "\tbuild hash: b70da489d7f4"
+    ],
+    "python_exe": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+    "python_version": "Python 3.13.9"
+  },
+  "frozen_files_check": {
+    "branch": "waiting-split",
+    "head": "2f248bf4b98776222e37bc3228506a4fb85f7c32",
+    "pre_blob_count": 225,
+    "post_blob_count": 225,
+    "frozen_blobs_identical": true,
+    "tracked_modified_files": [],
+    "tracked_staged_files": [],
+    "freeze_intact": true
+  },
+  "groups": {
+    "Group A (Atomicity)": {
+      "command": "blender.exe -b --factory-startup -P <scratch>/regression_tmp/run_unittest_group.py -- <repo> tests.test_task10b_transaction_atomicity TestArmIKTransactionAtomicity 1 <evDir>/group_a_summary.json <evDir>",
+      "exit_code": 0,
+      "planned_count": 223,
+      "tests_run": 223,
+      "passed_count": 223,
+      "failures_count": 0,
+      "errors_count": 0,
+      "skipped_count": 0,
+      "not_run_count": 0,
+      "runtime_evidence_files": [
+        "audit_13_r1_runtime_evidence.json",
+        "audit_13_authorization_runtime_evidence.json",
+        "audit_13_round02_runtime_evidence.json",
+        "audit_13_round03_runtime_evidence.json"
+      ],
+      "failed_items": [],
+      "skipped_items": [],
+      "not_run_items": []
+    },
+    "Group B (BUG-11)": {
+      "command": "blender.exe -b --factory-startup -P <scratch>/regression_tmp/run_unittest_group.py -- <repo> tests.test_bug11_datablock_cleanup TestBug11TypeADataBlockFaults 1 <evDir>/group_b_summary.json <evDir>",
+      "exit_code": 0,
+      "planned_count": 8,
+      "tests_run": 8,
+      "passed_count": 8,
+      "failures_count": 0,
+      "errors_count": 0,
+      "skipped_count": 0,
+      "not_run_count": 0,
+      "failed_items": [],
+      "skipped_items": [],
+      "not_run_items": []
+    },
+    "Group C (BUG-12)": {
+      "command": "blender.exe -b --factory-startup -P <scratch>/regression_tmp/run_unittest_group.py -- <repo> tests.test_bug12_cross_armature_real_resources TestBug12RealCrossArmaturePending 1 <evDir>/group_c_summary.json <evDir>",
+      "exit_code": 0,
+      "planned_count": 4,
+      "tests_run": 4,
+      "passed_count": 4,
+      "failures_count": 0,
+      "errors_count": 0,
+      "skipped_count": 0,
+      "not_run_count": 0,
+      "failed_items": [],
+      "skipped_items": [],
+      "not_run_items": []
+    },
+    "Group D (FULL)": {
+      "command": "python.exe -B tests\\run_test_suite.py --tier full --fail-fast --output-dir <scratch>\\regression_tmp\\full_out",
+      "exit_code": 0,
+      "planned_count": 42,
+      "unique_suite_count": 42,
+      "status_counts": {
+        "PASSED": 33,
+        "AUTOMATED_PASS": 9
+      },
+      "visual_acceptance_suites": [
+        "environment_gate01_unit3",
+        "environment_gate01_u3_s1",
+        "environment_gate01_u3_s2",
+        "dynamics_playground_blend",
+        "playground_dynamics_states",
+        "visual_evidence_telemetry",
+        "integration_unified_motion",
+        "task7a1_character_playground",
+        "task7a2_terrain_traversal"
+      ],
+      "input_validation_suite": {
+        "test_id": "arm_ik_input_validation_contract",
+        "status": "PASSED",
+        "exit_code": 0,
+        "duration_sec": 4.09
+      },
+      "failed_items": [],
+      "skipped_items": [],
+      "not_run_items": []
+    },
+    "Group E (WBC CONTRACT-10)": {
+      "command": "blender.exe -b --factory-startup -P <scratch>/regression_tmp/run_unittest_group.py -- <repo> tests.test_task10b_wbc_failure_contract TestTask10BWBCFailureContract 0 <evDir>/group_e_summary.json <evDir>",
+      "exit_code": 0,
+      "planned_count": 6,
+      "tests_run": 6,
+      "passed_count": 6,
+      "failures_count": 0,
+      "errors_count": 0,
+      "skipped_count": 0,
+      "not_run_count": 0,
+      "per_test_statuses": [
+        {
+          "method": "test_contract10_01_normal_bilateral_feedback",
+          "status": "PASS"
+        },
+        {
+          "method": "test_contract10_02_cleanup_pending_admission_rejection",
+          "status": "PASS"
+        },
+        {
+          "method": "test_contract10_03_failed_isolation_propagation_to_wbc",
+          "status": "PASS"
+        },
+        {
+          "method": "test_contract10_04_arm_ik_rollback_vs_wbc_prior_writes_restoration",
+          "status": "PASS"
+        },
+        {
+          "method": "test_contract10_05_unreachable_hand_target_feedback",
+          "status": "PASS"
+        },
+        {
+          "method": "test_contract10_06_second_hand_failure_bilateral_partial_commit",
+          "status": "PASS"
+        }
+      ],
+      "failed_items": [],
+      "skipped_items": [],
+      "not_run_items": []
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "TEST-156": {
+    "test_method": "test_156_live_armature_object_reports_alive",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": "704b8d97-2083-4fc8-b8db-1d18611fd103",
+    "object_liveness_status": "ALIVE",
+    "verification_status": "ALIVE_VERIFIED"
+  },
+  "TEST-157": {
+    "test_method": "test_157_live_object_with_replaced_data_remains_alive",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": "a00db015-df11-42e5-9189-c6b8d041fc34",
+    "object_liveness_status": "ALIVE",
+    "verification_status": "DATA_REPLACED_REJECTED"
+  },
+  "TEST-158": {
+    "test_method": "test_158_deleted_original_object_reports_absent",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": "tx_158",
+    "registry_session_id": "bd8d55fd-362e-41e1-aa42-73330611576b",
+    "object_liveness_status": "ABSENT",
+    "verification_status": "ARCHIVED_RETIRED"
+  },
+  "TEST-159": {
+    "test_method": "test_159_live_object_enumeration_failure_returns_unknown",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": "d25ce5f8-ba94-43b2-a0df-f80e2a542e6a",
+    "object_liveness_status": "UNKNOWN",
+    "verification_status": "ENUMERATION_FAILURE_UNKNOWN"
+  },
+  "TEST-160": {
+    "test_method": "test_160_unverified_reference_access_returns_unknown",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": "1a3d1fcf-83be-4d58-8e7e-755dae87bc6d",
+    "object_liveness_status": "UNKNOWN",
+    "verification_status": "UNVERIFIED_REFERENCE_UNKNOWN"
+  },
+  "TEST-161": {
+    "test_method": "test_161_pointer_mismatch_cannot_prove_absence",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": "65379883-3465-4749-9ea4-0695ff4a89b1",
+    "object_liveness_status": "UNKNOWN",
+    "verification_status": "POINTER_MISMATCH_UNKNOWN"
+  },
+  "TEST-162": {
+    "test_method": "test_162_missing_original_reference_is_unknown",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": "9c0d65db-c518-4dc2-83ec-44e6ee37289a",
+    "object_liveness_status": "UNKNOWN",
+    "verification_status": "MISSING_REF_UNKNOWN"
+  },
+  "TEST-163": {
+    "test_method": "test_163_unknown_liveness_preserves_failed_isolation",
+    "status": "PASS",
+    "transaction_created": true,
+    "transaction_id": "4b53787d",
+    "registry_session_id": "c6b0917c-42cc-4cf7-a6d5-a098bb856098",
+    "object_liveness_status": "UNKNOWN",
+    "verification_status": "FAILED_B_C_PRESERVED"
+  },
+  "TEST-164": {
+    "test_method": "test_164_unknown_liveness_blocks_tombstone_retirement",
+    "status": "PASS",
+    "transaction_created": true,
+    "transaction_id": "85c8fe35",
+    "registry_session_id": "5852dcdd-4a9d-430c-a9a3-c705f1232cc0",
+    "object_liveness_status": "UNKNOWN_THEN_ABSENT",
+    "verification_status": "RETIREMENT_BLOCKED_UNDER_UNKNOWN"
+  }
+}

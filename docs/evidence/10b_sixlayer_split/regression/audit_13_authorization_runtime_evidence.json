@@ -1,0 +1,50 @@
+{
+  "TEST-150": {
+    "test_method": "test_150_failed_b_unrestored_grant_issuance_rejected",
+    "status": "PASS",
+    "registry_session_id": "a69efd66-5d87-4e03-898e-d62319bb7e95",
+    "failure_class": "FAILED-B",
+    "issuance_result": "REJECTED_UNRESTORED"
+  },
+  "TEST-151": {
+    "test_method": "test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+    "status": "PASS",
+    "registry_session_id": "df37f7d4-7f2b-478d-87d3-977e6aa6be3d",
+    "failure_class": "FAILED-C",
+    "case": "CASE_1_SNAPSHOT_VERIFIED",
+    "actual_verification_status": "RECOVERY_VERIFICATION_FAILED",
+    "reasons": [
+      "Relationship operation 'op_test_151' remains in unverified RECOVERY_UNCERTAIN state"
+    ]
+  },
+  "TEST-152": {
+    "test_method": "test_152_grant_transaction_id_mismatch_rejected",
+    "status": "PASS",
+    "registry_session_id": "2fffe5db-b649-4d2f-9274-355229f45bfb",
+    "attack_type": "MISMATCHED_TRANSACTION_ID",
+    "transition_result": "REJECTED_TRANSACTION_MISMATCH"
+  },
+  "TEST-153": {
+    "test_method": "test_153_grant_failure_class_mismatch_rejected",
+    "status": "PASS",
+    "registry_session_id": "5aed416b-88b3-46ad-ab49-b2e995fba9ee",
+    "attack_type": "MISMATCHED_FAILURE_CLASS",
+    "transition_result": "REJECTED_FAILURE_CLASS_MISMATCH"
+  },
+  "TEST-154": {
+    "test_method": "test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+    "status": "PASS",
+    "registry_session_id": "e6d0b3eb-f72d-495a-8b3f-d27fd0c163da",
+    "failure_class": "FAILED-D",
+    "issuance_result": "REJECTED_OBJECT_ALIVE"
+  },
+  "TEST-155": {
+    "test_method": "test_155_verified_recovery_issues_grant_and_single_use_consumed",
+    "status": "PASS",
+    "registry_session_id": "df7c2769-bc91-498d-ac25-6c781933462e",
+    "transaction_id": "1b5e6975",
+    "grant_id": "grant_29086e357be24b1fb7ec0b844108d6c4",
+    "legitimate_consumption_succeeded": true,
+    "replay_rejected": true
+  }
+}

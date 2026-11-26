@@ -1,0 +1,87 @@
+{
+  "task": "10-b-13",
+  "round": "2/5",
+  "branch": "audit/task-10-b-9",
+  "baseline_commit": "7306c6085dfd7f56329152d1526f53303cbe4468",
+  "status": "10-B-13 — ROUND 2/5 — READY FOR INDEPENDENT REVIEW",
+  "modified_production_files": [
+    "src/rig/arm_ik.py"
+  ],
+  "modified_test_files": [
+    "tests/test_task10b_transaction_atomicity.py"
+  ],
+  "modified_functions": [
+    "_check_original_object_liveness",
+    "_verify_armature_session_identity_record",
+    "_sweep_dead_managed_armature_identities",
+    "ensure_armature_session_identity",
+    "_isolate_failed_armature_transaction",
+    "_verify_dead_armature_tombstone_retirement_evidence"
+  ],
+  "core_contract_enforcements": {
+    "tri_state_liveness": {
+      "ALIVE": "original reference valid, no ReferenceError, pointer match, present in live bpy.data.objects.values(), clean enumeration; object_exists is True",
+      "ABSENT": "proven absent via ReferenceError on original reference and clean bpy.data.objects enumeration confirming absence; object_exists is False",
+      "UNKNOWN": "missing reference, RNA access exception, pointer mismatch without destruction proof, or collection enumeration exception; object_exists is None (never False)"
+    },
+    "failed_isolation_preservation": "sweep does not escalate FAILED-B or FAILED-C to TOMBSTONED_FAILED_D when object liveness is UNKNOWN",
+    "tombstone_retirement_gate": "tombstone retirement strictly requires status == ABSENT; UNKNOWN returns can_retire=False with reason OBJECT_EXISTENCE_UNVERIFIED",
+    "zero_markdown_modifications": true
+  },
+  "test_suites": {
+    "test_task10b_transaction_atomicity": {
+      "total": 134,
+      "passed": 134,
+      "failed": 0,
+      "historical_passed": 125,
+      "new_tests": {
+        "TEST-156": "PASS - live armature reports ALIVE",
+        "TEST-157": "PASS - live armature with replaced data remains ALIVE and blocks tombstone retirement",
+        "TEST-158": "PASS - genuinely deleted original armature reports ABSENT and permits tombstone retirement",
+        "TEST-159": "PASS - live collection enumeration failure returns UNKNOWN and does not infer ABSENT",
+        "TEST-160": "PASS - non-ReferenceError reference access returns UNKNOWN without claiming death",
+        "TEST-161": "PASS - pointer mismatch alone returns UNKNOWN",
+        "TEST-162": "PASS - missing original reference (None) returns UNKNOWN rather than ABSENT",
+        "TEST-163": "PASS - UNKNOWN liveness preserves existing FAILED-B and FAILED-C without false death escalation",
+        "TEST-164": "PASS - UNKNOWN liveness blocks tombstone retirement and grant issuance"
+      }
+    },
+    "test_task10b_input_validation": {
+      "total": 30,
+      "passed": 30,
+      "failed": 0
+    },
+    "test_arm_ik_lifecycle_world_transform_contract": {
+      "total": 30,
+      "passed": 30,
+      "failed": 0
+    }
+  },
+  "regression_tiers": {
+    "quick": {
+      "planned": 19,
+      "executed": 19,
+      "passed": 19,
+      "failed": 0
+    },
+    "physics": {
+      "planned": 27,
+      "executed": 27,
+      "passed": 27,
+      "failed": 0
+    },
+    "motion": {
+      "planned": 12,
+      "executed": 12,
+      "passed": 12,
+      "failed": 0
+    },
+    "full": {
+      "planned": 42,
+      "executed": 42,
+      "passed": 42,
+      "failed": 0
+    }
+  },
+  "unresolved_findings": []
+}

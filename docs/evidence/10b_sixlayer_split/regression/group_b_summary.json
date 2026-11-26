@@ -1,0 +1,67 @@
+{
+  "module": "tests.test_bug11_datablock_cleanup",
+  "test_class": "TestBug11TypeADataBlockFaults",
+  "failfast": true,
+  "planned_count": 8,
+  "planned_methods": [
+    "test_bug11_01_valid_type_a_positive_control",
+    "test_bug11_02_fault_before_authorization_then_retry",
+    "test_bug11_03_fault_after_authorization_before_physical_remove",
+    "test_bug11_04_fault_after_physical_remove_no_double_delete",
+    "test_bug11_05_forged_auth_pointer_refuses_then_recovers",
+    "test_bug11_06_mismatched_receipt_refuses_then_recovers",
+    "test_bug11_07_second_live_user_blocks_then_retry",
+    "test_bug11_08_zero_user_without_authorization_is_preserved"
+  ],
+  "tests_run": 8,
+  "passed_count": 8,
+  "failures_count": 0,
+  "errors_count": 0,
+  "skipped_count": 0,
+  "not_run_count": 0,
+  "not_run_methods": [],
+  "was_successful": true,
+  "duration_sec": 0.704,
+  "per_test": [
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_01_valid_type_a_positive_control",
+      "method": "test_bug11_01_valid_type_a_positive_control",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_02_fault_before_authorization_then_retry",
+      "method": "test_bug11_02_fault_before_authorization_then_retry",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_03_fault_after_authorization_before_physical_remove",
+      "method": "test_bug11_03_fault_after_authorization_before_physical_remove",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_04_fault_after_physical_remove_no_double_delete",
+      "method": "test_bug11_04_fault_after_physical_remove_no_double_delete",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_05_forged_auth_pointer_refuses_then_recovers",
+      "method": "test_bug11_05_forged_auth_pointer_refuses_then_recovers",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_06_mismatched_receipt_refuses_then_recovers",
+      "method": "test_bug11_06_mismatched_receipt_refuses_then_recovers",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_07_second_live_user_blocks_then_retry",
+      "method": "test_bug11_07_second_live_user_blocks_then_retry",
+      "status": "PASS"
+    },
+    {
+      "test": "tests.test_bug11_datablock_cleanup.TestBug11TypeADataBlockFaults.test_bug11_08_zero_user_without_authorization_is_preserved",
+      "method": "test_bug11_08_zero_user_without_authorization_is_preserved",
+      "status": "PASS"
+    }
+  ]
+}

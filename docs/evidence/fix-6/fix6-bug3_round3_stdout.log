@@ -1,0 +1,43 @@
+test_249_armature_a_pending_does_not_block_independent_armature_b (fix6_bug3_existing_tests.TestArmIKTransactionAtomicity.test_249_armature_a_pending_does_not_block_independent_armature_b)
+TEST-249: Armature A Pending 不得阻断独立 Armature B. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_250_alternating_execution_pending_a_and_healthy_b (fix6_bug3_existing_tests.TestArmIKTransactionAtomicity.test_250_alternating_execution_pending_a_and_healthy_b)
+TEST-250: A Pending 与 B 正常事务交替执行. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_251_retry_cleanup_failure_on_a_preserves_b_admission (fix6_bug3_existing_tests.TestArmIKTransactionAtomicity.test_251_retry_cleanup_failure_on_a_preserves_b_admission)
+TEST-251: A 的 Cleanup Retry 再次失败，不得影响 B. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_252_a_cleanup_success_restores_bilateral_reset_admission (fix6_bug3_existing_tests.TestArmIKTransactionAtomicity.test_252_a_cleanup_success_restores_bilateral_reset_admission)
+TEST-252: A 的 Pending 清理成功后，双臂 Reset 恢复准入. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_253_concurrent_pending_records_on_distinct_armatures (fix6_bug3_existing_tests.TestArmIKTransactionAtomicity.test_253_concurrent_pending_records_on_distinct_armatures)
+TEST-253: 两个独立 Armature 同时存在 Pending 记录. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.516s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+FIX6_BUG3_R3_TEST_COUNT 5
+FIX6_BUG3_R3_PASS True

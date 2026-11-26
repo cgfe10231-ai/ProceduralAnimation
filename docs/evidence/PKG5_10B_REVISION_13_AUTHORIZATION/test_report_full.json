@@ -1,0 +1,750 @@
+{
+  "metadata": {
+    "generated_at": "2026-11-08 16:26:28",
+    "tier": "full",
+    "total_planned": 42,
+    "total_executed": 42,
+    "passed_count": 42,
+    "automated_pass_count": 9,
+    "failed_count": 0,
+    "skipped_count": 0,
+    "required_skipped_count": 0,
+    "optional_skipped_count": 0,
+    "not_run_count": 0,
+    "total_duration_sec": 160.42,
+    "all_success": true
+  },
+  "results": [
+    {
+      "test_id": "architecture_integrity_gate",
+      "name": "Architecture Documentation Integrity & Symbol Existence Gate",
+      "tier_names": [
+        "quick",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.05,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "[SELF-TEST] PASS: All 6 validator test cases (Positive, Negative, Proposed, Prose, Dynamic, Clause Exemption) verified successfully.\n[ARCHITECTURE GATE] PASS: All architecture documents verified. Zero phantom symbols found.\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "spatial_layout_clearance",
+      "name": "Spatial Corridor Clearance & Math Layout",
+      "tier_names": [
+        "quick",
+        "full",
+        "legacy"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.52,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "[TEST] 1. Testing seed determinism (seed=42)...\n    [PASS] Seed determinism verified: identical coordinates generated.\n[TEST] 2. Testing seed variability (seed=42 vs seed=99)...\n    [PASS] Seed variability verified: different seeds produce different layouts.\n[TEST] 3. Testing corridor clearance preservation...\n    [PASS] Corridor clearance verified across multiple random seeds.\n\nALL TASK 3 SPATIAL & DETERMINISM UNIT TESTS PASSED!\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "dynamics_environment_query",
+      "name": "Dynamics Environment Query & 3D Surface Geometry",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 0.59,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "",
+      "stderr_tail": ".............\n----------------------------------------------------------------------\nRan 13 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "test_id": "contact_dynamics_math",
+      "name": "Contact Dynamics Foundation & Momentum Impulse",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 0.59,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "",
+      "stderr_tail": "..................\n----------------------------------------------------------------------\nRan 18 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "test_id": "contact_force_solver",
+      "name": "Multi-Contact Force Solver & Constraint Allocation",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 0.66,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "",
+      "stderr_tail": ".........................s............\n----------------------------------------------------------------------\nRan 38 tests in 0.089s\n\nOK (skipped=1)\n"
+    },
+    {
+      "test_id": "forward_dynamics",
+      "name": "Forward Dynamics Single-Step Integration Kernel",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 0.59,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "",
+      "stderr_tail": "......................\n----------------------------------------------------------------------\nRan 22 tests in 0.009s\n\nOK\n"
+    },
+    {
+      "test_id": "closed_loop_dynamics",
+      "name": "Multi-Frame Dynamics Closed-Loop Control & State Feedback",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.17,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "",
+      "stderr_tail": "...............................\n----------------------------------------------------------------------\nRan 31 tests in 0.581s\n\nOK\n"
+    },
+    {
+      "test_id": "runner_unit_tests",
+      "name": "Test Suite Runner Unit Tests",
+      "tier_names": [
+        "quick",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.22,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "",
+      "stderr_tail": "...........\n----------------------------------------------------------------------\nRan 11 tests in 0.899s\n\nOK\n"
+    },
+    {
+      "test_id": "physics_joint_limits",
+      "name": "Anatomical Joint ROM Limit Verification",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.61,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "eated CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n\n[Test 9] Verifying that pose bone clamping preserves all bone lengths...\n  Clamped 3 bones; verified 19/19 bone lengths remain 100% constant. (PASSED)\n\n[Test 10] Evaluating active Leg IK and active Arm IK poses with Joint Model...\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n  10A: Active Leg IK Standing Rest Pose -> is_valid=True\n       All leg joints within anatomical ROM limits (PASSED)\n  10B: Left Leg Raised (Foot Z=+0.27m, Y=+0.25m):\n       thigh.L evaluated rotation: (56.36, -0.0, 0.0) deg (ROM Pitch=[-25, +120])\n       shin.L  evaluated rotation: (-70.79, -0.0, -0.0) deg (ROM Flexion=[-145, +2])\n       -> Normal walking/lifting leg IK target is 100% within ROM limits. (PASSED)\n  10C: Left Arm Forward Reach (Hand Z=1.30m, Y=+0.30m):\n       upper_arm.L evaluated rotation: (9.6, 8.14, 10.3) deg (ROM Pitch=[-50, +160])\n       forearm.L   evaluated rotation: (93.67, -0.0, 0.0) deg (ROM Flexion=[-2, +145])\n       Arm IK reach -> is_valid=True\n       -> Normal forward reach Arm IK target is 100% within ROM limits. (PASSED)\n\n==========================================================================\nALL TASK 6F-C JOINT DOF AND ROM VERIFICATION TESTS PASSED SUCCESSFULLY!\n==========================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "physics_rigid_link_com",
+      "name": "Rigid Link Segments & Whole-Body CoM",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.59,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "erical discrepancy between API CoM and raw weighted sum: 0.0000000000 m\n  -> PASSED: Weighted CoM mathematically exact.\n\n[Test 5] Testing directional CoM shifts under single-arm raising (FK mode)...\n  Left Arm Forward +90 deg: dX=+0.000mm, dY=+13.915mm, dZ=+13.915mm\n  -> PASSED: Forward arm pitch shifts CoM forward (+Y) and upward (+Z).\n  Left Arm Lateral Outward: dX=-13.915mm, dZ=+13.915mm\n  -> PASSED: Lateral arm abduction shifts CoM outward (-X) and upward (+Z).\n\n[Test 6] Testing dual-arm asymmetric poses and non-destructive return to rest...\n  Dual Arm Asymmetric: CoM=(0.0000, -7.9979, 1.0560)\n  -> PASSED: CoM returns to rest with zero drift (drift = 0.0000000000m).\n\n[Test 7] Testing CoM calculation under active IK poses (leg + arm IK)...\n  Active IK Pose CoM: X=+0.0036m, Y=-7.9724m, Z=+1.0770m\n  IK Pose dZ vs Rest: +29.07 mm (PASSED)\n\n[Test 8] Testing Pelvis motion and Armature world-transform invariance...\n  Pelvis drop -80mm -> CoM dZ = -80.00 mm\n  Root Translation (+2.5, +5.0, +0.3)m -> World CoM discrepancy: 0.0000007907 m\n  Armature-space CoM invariance check: diff = 0.0000000000 m\n  -> PASSED: Armature and World coordinate transformations exact with zero double-transform.\n\n==========================================================================\nALL TASK 6F-B RIGID LINK AND CoM VERIFICATION TESTS PASSED SUCCESSFULLY!\n==========================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "mesh_environment_query",
+      "name": "Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 3.9,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "00:01.578  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n",
+      "stderr_tail": "d. ... ok\ntest_42_c06_cache_reuse_under_unchanged_scene (__main__.TestMeshEnvironmentQuery.test_42_c06_cache_reuse_under_unchanged_scene)\nC06: Guarantee 300 unchanged queries (100 same ray, 100 diff ray, 100 nearest) execute with rebuild_count=1. ... ok\ntest_43_c05_1_collection_member_unlinked (__main__.TestMeshEnvironmentQuery.test_43_c05_1_collection_member_unlinked)\nC05-1: Unlinking an object from an allowed collection removes it from query results with 1 rebuild. ... ok\ntest_44_c05_2_real_object_deletion (__main__.TestMeshEnvironmentQuery.test_44_c05_2_real_object_deletion)\nC05-2: Real object deletion via bpy.data.objects.remove removes object from cache without dangling state. ... ok\ntest_45_c05_3_non_empty_to_empty_transition_and_reuse (__main__.TestMeshEnvironmentQuery.test_45_c05_3_non_empty_to_empty_transition_and_reuse)\nC05-3: Non-empty collection transitioning to empty sets VALID_EMPTY, reuses across 100 queries, then recovers. ... ok\ntest_46_c05_4_recursive_collection_membership (__main__.TestMeshEnvironmentQuery.test_46_c05_4_recursive_collection_membership)\nC05-4: Recursive collection membership change detection and sibling isolation. ... ok\ntest_47_c06_rebuild_exception_safety (__main__.TestMeshEnvironmentQuery.test_47_c06_rebuild_exception_safety)\nC06: Verify rebuild exception safety across gather, snapshot, and BVH compilation with self-healing recovery. ... ok\n\n----------------------------------------------------------------------\nRan 47 tests in 2.152s\n\nOK\n"
+    },
+    {
+      "test_id": "task7a2_p0_teleport_regression",
+      "name": "Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect",
+      "tier_names": [
+        "quick",
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 2.1,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "eDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a2.blend\"\n00:01.297  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a2.blend\"\n00:01.657  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a2_corrected.blend\"\n======================================================================\nP0 DEFECT REGRESSION TEST: Frame 226->227 Teleportation Verification\n======================================================================\n\n[1/2] Inspecting historical failure baseline: output/dynamics_playground_task7a2.blend\n  Frame 226 Root: (0.0, 7.95, 0.75)\n  Frame 227 Root: (0.0, 10.2, 0.0)\n  Delta Vector:   (0.0, 2.25, -0.75) (Distance: 2.3717m)\n  Teleportation Detected: True\n  [PASS] Defect successfully detected and quantified in historical baseline.\n  [PASS] Strict unexempted continuity correctly failed baseline with 1 violation(s).\n         Primary violation: Frame 226 -> 227: Root displacement 2.3717m exceeds limit 0.1200m\n\n[2/2] Inspecting corrected animation scene: output/dynamics_playground_task7a2_corrected.blend\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n  [PASS] Corrected scene passed strict unexempted continuity check (0 violations)!\n\n======================================================================\nP0 REGRESSION TEST COMPLETED SUCCESSFULLY.\n======================================================================\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "task7a2_negative_invariance",
+      "name": "Task 7A-2: Terrain Walk Invariance & Negative Physics Verification",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.59,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\n[PASS] Test 1: Surface renaming invariance verified (zero string-matching dependency).\n[PASS] Test 2: Dynamic elevation perturbation adaptation verified.\n[PASS] Test 3: Unreachable cliff drop (>0.35m) correctly rejected: Footstep at (-0.11, 1.70) requires vertical reach -0.750m, exceeding physical stepping limit (0.35m)\n[PASS] Test 4: Unsupported surface landing correctly rejected: Footfall at (-0.11, 1.12) straddles unsupported surface boundary, encountered query failure, or violated step reach, and no valid support shift was found in corridor [0.00, 4.00]\n",
+      "stderr_tail": "test_01_surface_renaming_invariance (__main__.TestTerrainWalkNegativeAndInvariance.test_01_surface_renaming_invariance)\nProves planner kinematics are 100% independent of surface naming strings. ... ok\ntest_02_dynamic_elevation_perturbation_adaptation (__main__.TestTerrainWalkNegativeAndInvariance.test_02_dynamic_elevation_perturbation_adaptation)\nProves planner dynamically adapts footfall Z and clearance to vertical perturbations. ... ok\ntest_03_unreachable_cliff_drop_rejection (__main__.TestTerrainWalkNegativeAndInvariance.test_03_unreachable_cliff_drop_rejection)\nProves planner rejects physiologically impossible drops (> 0.35m vertical reach limit). ... ok\ntest_04_unsupported_surface_rejection (__main__.TestTerrainWalkNegativeAndInvariance.test_04_unsupported_surface_rejection)\nProves planner rejects landing on hazard/non-support surfaces. ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 0.002s\n\nOK\n"
+    },
+    {
+      "test_id": "environment_gate01_unit3",
+      "name": "Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification",
+      "tier_names": [
+        "quick",
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 13.81,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "erArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[MOTION_PLANNER] Executed 1 action(s) (['TerrainWalk_route_traversal']): frames 1..92 (@ 24 FPS), root Y 10.2000m -> 11.4000m (disp=1.2000m, peak_speed=0.4873m/s, unreachable=0)\n00:05.359  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\n00:05.390  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_environment_gate01_u3.blend\"\n00:08.109  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\n00:08.140  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_environment_gate01_u3.blend\"\n00:10.844  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\n00:10.875  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_environment_gate01_u3.blend\"\n00:13.594  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n",
+      "stderr_tail": " Experiment A vs B: Perturbed mesh causes measurable physical divergence. ... ok\ntest_u3_t09_counter_factual_analytical_insensitivity (__main__.TestEnvironmentGate01Unit3.test_u3_t09_counter_factual_analytical_insensitivity)\nU3-T09: Counter-factual proof: Analytical environment produces identical output despite mesh mutation. ... ok\ntest_u3_t10_blend_artifact_reopen_and_evaluation (__main__.TestEnvironmentGate01Unit3.test_u3_t10_blend_artifact_reopen_and_evaluation)\nU3-T10: Saved blend artifact output/dynamics_playground_environment_gate01_u3.blend passes full validation. ... ok\ntest_u3_t11_c0_trajectory_continuity (__main__.TestEnvironmentGate01Unit3.test_u3_t11_c0_trajectory_continuity)\nU3-T11: C0 root continuity: Zero frame exemptions, frame displacement < 0.12m across all 700 frames. ... ok\ntest_u3_t12_zero_bone_stretch_and_rom_limits (__main__.TestEnvironmentGate01Unit3.test_u3_t12_zero_bone_stretch_and_rom_limits)\nU3-T12: Bone stretch < 0.1mm and zero anatomical ROM violations across all frames. ... ok\ntest_u3_t13_locked_foot_drift (__main__.TestEnvironmentGate01Unit3.test_u3_t13_locked_foot_drift)\nU3-T13: Locked stance foot drift < 0.1mm across all stance frames. ... ok\ntest_u3_t14_baseline_file_protection (__main__.TestEnvironmentGate01Unit3.test_u3_t14_baseline_file_protection)\nU3-T14: Baseline file output/dynamics_playground.blend is 100% untouched and exists. ... ok\n\n----------------------------------------------------------------------\nRan 14 tests in 12.058s\n\nOK\n"
+    },
+    {
+      "test_id": "environment_gate01_u3_s1",
+      "name": "Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps",
+      "tier_names": [
+        "quick",
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 4.33,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "00:01.485  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_environment_gate01_u3_s1.blend\"\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n",
+      "stderr_tail": "....\n----------------------------------------------------------------------\nRan 4 tests in 2.669s\n\nOK\n"
+    },
+    {
+      "test_id": "environment_gate01_u3_s2",
+      "name": "Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair",
+      "tier_names": [
+        "quick",
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 4.41,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "00:01.547  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_environment_gate01_u3_s2.blend\"\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n",
+      "stderr_tail": "......\n----------------------------------------------------------------------\nRan 6 tests in 2.705s\n\nOK\n"
+    },
+    {
+      "test_id": "environment_gate01_unit4",
+      "name": "Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.96,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "l. ... ok\ntest_u4_t03_platform_contact (__main__.TestEnvironmentGate01Unit4.test_u4_t03_platform_contact)\nT03: Top platform contact records authentic platform elevation (1.3397m) and surface ID. ... ok\ntest_u4_t04_20deg_downhill_contact (__main__.TestEnvironmentGate01Unit4.test_u4_t04_20deg_downhill_contact)\nT04: 20° downhill ramp records authentic downhill slope elevation and forward normal. ... ok\ntest_u4_t05_alternating_stance_swing_decoupling (__main__.TestEnvironmentGate01Unit4.test_u4_t05_alternating_stance_swing_decoupling)\nT05: Alternating steps decouple stance support from swing flight with correct SupportType. ... ok\ntest_u4_t06_failed_query_truthfulness_no_fake_ground (__main__.TestEnvironmentGate01Unit4.test_u4_t06_failed_query_truthfulness_no_fake_ground)\nT06: When environment query fails, bridge records truthful failure without faking Z=0.0m. ... ok\ntest_u4_t07_counterfactual_experiment_a_elevation_variation (__main__.TestEnvironmentGate01Unit4.test_u4_t07_counterfactual_experiment_a_elevation_variation)\nT07: Counter-Factual A: Platform elevation shift (+0.05m) produces exact +0.05m contact Z shift. ... ok\ntest_u4_t08_counterfactual_experiment_b_slope_normal_variation (__main__.TestEnvironmentGate01Unit4.test_u4_t08_counterfactual_experiment_b_slope_normal_variation)\nT08: Counter-Factual B: Slope normal modification yields exact corresponding contact normal. ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.284s\n\nOK\n"
+    },
+    {
+      "test_id": "environment_gate01_unit4_closure",
+      "name": "Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure",
+      "tier_names": [
+        "quick",
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.93,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\character\\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0\n  mat.use_nodes = True\n.....\n----------------------------------------------------------------------\nRan 5 tests in 0.228s\n\nOK\n"
+    },
+    {
+      "test_id": "terrain_planning_contract",
+      "name": "Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts",
+      "tier_names": [
+        "quick",
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 2.21,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": " 7: L, disp=0.4000m, landing_y=1.6000m\n  Step 8: R, disp=0.4000m, landing_y=1.8000m\n  Step 9: L, disp=0.4000m, landing_y=2.0000m\n  Step 10: R, disp=0.2000m, landing_y=2.0000m\n\n[Case B Displacement Table]\n  Step 0: R, disp=0.2000m, landing_y=1.8000m\n  Step 1: L, disp=0.4000m, landing_y=1.6000m\n  Step 2: R, disp=0.4000m, landing_y=1.4000m\n  Step 3: L, disp=0.4000m, landing_y=1.2000m\n  Step 4: R, disp=0.4000m, landing_y=1.0000m\n  Step 5: L, disp=0.4000m, landing_y=0.8000m\n  Step 6: R, disp=0.4000m, landing_y=0.6000m\n  Step 7: L, disp=0.4000m, landing_y=0.4000m\n  Step 8: R, disp=0.4000m, landing_y=0.2000m\n  Step 9: L, disp=0.4000m, landing_y=0.0000m\n  Step 10: R, disp=0.2000m, landing_y=0.0000m\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": ".....................C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\character\\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0\n  mat.use_nodes = True\n....\n----------------------------------------------------------------------\nRan 25 tests in 0.579s\n\nOK\n"
+    },
+    {
+      "test_id": "physics_whole_body_controller",
+      "name": "Whole-Body Controller Coordination & Dispatch",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.66,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Impossible target requested: (-0.24, -6.5, 1.3)\n  Result success flag: False (must be False)\n  is_all_reachable flag: False (must be False)\n  Unmet constraints count: 2\n    - [REACHABILITY] hand_L: Hand L target exceeds maximum arm reach (1.519m > 0.560m) or tracking error 959.1mm > 5.0mm\n    - [ROM_VIOLATION] hand.L: Joint 'hand.L' (hand_L) violates anatomical ROM by max 16.82 deg\n  -> PASSED: Unreachable target accurately flagged with zero false-success reporting.\n\n[Test 9] Verifying Center of Mass consistency between Controller and rigid_link...\n  Controller CoM: (-0.0010, -7.9678, 1.0645)\n  Independent CoM: (-0.0010, -7.9678, 1.0645)\n  CoM Discrepancy: 0.0000000000 m\n  -> PASSED: Controller CoM is mathematically identical to rigid_link calculation.\n\n[Test 10] Testing clean integration within a subclassed MotionAction...\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n  Executed 8 frames via WholeBodyDemoAction(MotionAction)\n  Final frame hand_L err: 0.0137 mm\n  Final frame CoM: (-0.0007262042490765452, -7.9943156242370605, 1.0510605573654175)\n  -> PASSED: WholeBodyController seamlessly drives procedural frames within a MotionAction.\n\n==========================================================================\nALL TASK 6F-D WHOLE-BODY CONTROLLER VERIFICATION TESTS PASSED SUCCESSFULLY!\n==========================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "physics_arm_ik",
+      "name": "Dual Arm Two-Bone IK & Hand Orientation",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.6,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "le targets achieved with < 1mm error and 0 bone stretching.\n\n[Test 4] Testing simultaneous bilateral targets with zero cross-talk...\n  -> PASSED: Zero cross-arm interference (cross-talk drift = 0.00000000m).\n\n[Test 5] Testing decoupled 3D hand orientation control...\n  Hand rot (0.0, 0.0, 0.0): pos_err=0.025mm, rot_err=0.0000deg\n  Hand rot (30.0, -20.0, 45.0): pos_err=0.025mm, rot_err=0.0000deg\n  Hand rot (-25.0, 40.0, -15.0): pos_err=0.025mm, rot_err=0.0000deg\n  Hand rot (0.0, 60.0, 0.0): pos_err=0.025mm, rot_err=0.0000deg\n  -> PASSED: Hand 3D orientation independently controlled with 0 wrist drift.\n\n[Test 6] Testing elbow pole swivel control without position drift...\n  Wrist drift: 0.0048mm, Elbow movement: 11.71cm\n  -> PASSED: Elbow pole swivels arm predictably with zero wrist drift.\n\n[Test 7] Testing unreachable target handling and non-stretching guarantee...\n  Clamp=True: is_reachable=False, clamped=True, applied_reach=0.5600m\n  Clamp=False: target_err=0.3400m (expected ~0.3400m), arm_len=0.5600m\n  -> PASSED: Unreachable targets handled strictly without bone stretching.\n\n[Test 8] Testing reset_arm_ik and smooth influence blending...\n  -> PASSED: Arm IK influence blending and reset verified.\n\n==========================================================================\nALL TASK 6F-A ARM IK VERIFICATION TESTS PASSED SUCCESSFULLY!\n==========================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "physics_body_kinematics",
+      "name": "Differential Kinematics & Velocity Tracking",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 2.66,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "SSED: Whole-body CoM velocity mathematically consistent with multi-link momentum.\n\n[Test 9] Testing WholeBodyController actual pose sampling and MotionState enrichment...\n  Enriched params['com_world']            : (6.779376417398453e-05, -7.990994930267334, 1.0557383298873901)\n  Enriched params['com_linear_velocity']  : (0.0, 0.0, 0.0)\n  Enriched params['root_angular_velocity']: (0.0, 0.0, 0.0)\n  Original ms.velocity preserved          : (0.0, 0.0, 0.0)\n  -> PASSED: Actual IK pose cleanly sampled and seamlessly enriches MotionState.\n\n[Test 10] Testing SprintStart / SprintBrake boundary velocity continuity...\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n  Sprint final state: frame=114, v=2.0000 m/s, y=-1.4167 m\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n  Brake first state : frame=114, v=1.9962 m/s, y=-1.3334 m\n  Boundary root Y gap   : 0.08328044 m (expected <= 0.084 m, exactly 1 frame step)\n  Boundary velocity gap : 0.00380530 m/s (expected 0.000 m/s)\n  Derived boundary velocities: [0.0, 2.0, 1.9987, 1.9911] m/s\n  -> PASSED: SprintStart -> SprintBrake boundary velocity continuity verified.\n\n==========================================================================\nALL TASK 6G-A BODY KINEMATICS VERIFICATION TESTS PASSED SUCCESSFULLY!\n==========================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "physics_body_inertia",
+      "name": "Inertia Tensor & Whole-Body Angular Momentum",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 11.36,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "PASSED: verify_task6fd_whole_body_controller.py (exit code 0)\n\nRunning regression: verify_task6fc_joint_limits.py...\nPASSED: verify_task6fc_joint_limits.py (exit code 0)\n\nRunning regression: verify_task6fb_rigid_link.py...\nPASSED: verify_task6fb_rigid_link.py (exit code 0)\n\nRunning regression: verify_task6fa_arm_ik.py...\nPASSED: verify_task6fa_arm_ik.py (exit code 0)\n\n================================================================================\nTask 6G-B Verification Summary\n================================================================================\n[PASSED] Test 01: Segment Local Inertia Symmetric & Positive Definite\n[PASSED] Test 02: Geometric Solid Formulas Match Analytical References\n[PASSED] Test 03: Parallel Axis Theorem Numerical Correctness\n[PASSED] Test 04: Whole-Body Translation Invariance Relative to CoM\n[PASSED] Test 05: Whole-Body Rotation Tensor Transformation Covariance\n[PASSED] Test 06: Neutral Stance Bilateral Symmetry & Physical Magnitudes\n[PASSED] Test 07: Single-Arm Raised Asymmetric Inertia Response\n[PASSED] Test 08: Tucked vs Extended Posture Rotational Inertia Difference\n[PASSED] Test 09: Static Body Zero Angular Momentum\n[PASSED] Test 10: Rigid Rotation Angular Momentum Consistency with I*w\n[PASSED] Test 11: Independent Limb Motion Spin & Orbital Decomposition\n[PASSED] Test 12: Consistency with CoM, Tracker, and MotionState Integration\n[PASSED] Test 13: Core Regression Verification Suite\n\nResult: 13/13 tests passed.\nALL TASK 6G-B TESTS PASSED!\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "physics_contact_model",
+      "name": "Multi-Limb Contact Geometry & Support Classification",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 22.26,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "hand      (F100->F115): Drift = 0.0000 mm -> OK\n\n[Check 6] Contact marker activation matching clip requirements\n  Vault Touch active markers (hand_R, foot_L): OK\n  Flight Phase zero markers (all 4 hidden): OK\n\nScene B Obstacle Integration Acceptance: PASSED\n\n================================================================================\nTask 6G-C Verification Summary\n================================================================================\n[PASSED] Test 01: World to Local Anchor Transforms\n[PASSED] Test 02: Normal Unit Length & Direction Convention\n[PASSED] Test 03: Unilateral vs Grasp Constraint Types\n[PASSED] Test 04: Double Stance Simultaneous Ground Contacts\n[PASSED] Test 05: Single Stance & Swing Foot Release\n[PASSED] Test 06: Single Hand Support on Obstacle Top\n[PASSED] Test 07: Ground + Vertical Wall Multi-Normal Contacts\n[PASSED] Test 08: Double Hand Grasp Ledge Hang Suspension\n[PASSED] Test 09: Flight Phase Zero False Contacts\n[PASSED] Test 10: Lifecycle State Transitions\n[PASSED] Test 11: Quantitative Error Reporting (Gap, Penetration, Slip)\n[PASSED] Test 12: Environment Transform Covariance\n[PASSED] Test 13: WholeBodyController Evaluated Pose Compatibility\n[PASSED] Test 14: MotionState Legacy Adapter Compatibility\n[PASSED] Test 15: Core Regression Verification Suite\n[PASSED] Test 16: Scene A - Continuous Walking Integration Acceptance\n[PASSED] Test 17: Scene B - Multi-Limb Obstacle Contact Acceptance\n\nResult: 17/17 tests passed.\nALL TASK 6G-C TESTS PASSED!\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "contact_model_geometry_support_contract",
+      "name": "ContactModel Geometry-to-Support Consistency Contract (FIND-R2-05)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.9,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\character\\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0\n  mat.use_nodes = True\n................\n----------------------------------------------------------------------\nRan 16 tests in 0.225s\n\nOK\n"
+    },
+    {
+      "test_id": "leg_ik_worldspace_init_reset",
+      "name": "Leg IK Controller World-Space Initialization & Reset Invariant (PKG-5/WS-01)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 2.13,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "acterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\character\\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0\n  mat.use_nodes = True\n......\n----------------------------------------------------------------------\nRan 6 tests in 0.538s\n\nOK\n"
+    },
+    {
+      "test_id": "leg_ik_ground_height_contract",
+      "name": "Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 3.74,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bonesBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\src\\character\\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0\n  mat.use_nodes = True\n....................\n----------------------------------------------------------------------\nRan 20 tests in 2.127s\n\nOK\n"
+    },
+    {
+      "test_id": "leg_ik_world_rotation_contract",
+      "name": "Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 3.58,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "d CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "ar_rejection (__main__.TestLegIKWorldRotationContract.test_22_unlock_foot_contact_ik_shear_rejection)\nTEST-22: unlock_foot_contact rejects FootIK non-TRS shear and preserves pristine locked state. ... ok\ntest_23_unlock_foot_contact_pole_shear_rejection (__main__.TestLegIKWorldRotationContract.test_23_unlock_foot_contact_pole_shear_rejection)\nTEST-23: unlock_foot_contact rejects KneePole non-TRS shear independently while FootIK is valid. ... ok\ntest_24_unlock_foot_contact_post_commit_fault_injection (__main__.TestLegIKWorldRotationContract.test_24_unlock_foot_contact_post_commit_fault_injection)\nTEST-24: unlock_foot_contact rolls back all state atomically upon post-commit fault injection. ... ok\ntest_25_effective_parent_non_finite_rejection (__main__.TestLegIKWorldRotationContract.test_25_effective_parent_non_finite_rejection)\nTEST-25: _validate_effective_parent_transform rejects non-finite elements (NaN and Inf). ... ok\ntest_26_effective_parent_non_affine_rejection (__main__.TestLegIKWorldRotationContract.test_26_effective_parent_non_affine_rejection)\nTEST-26: _validate_effective_parent_transform rejects non-affine last row. ... ok\ntest_27_effective_parent_degenerate_scale_rejection (__main__.TestLegIKWorldRotationContract.test_27_effective_parent_degenerate_scale_rejection)\nTEST-27: _validate_effective_parent_transform rejects degenerate scale s^2 <= 1e-12 with det > 0. ... ok\n\n----------------------------------------------------------------------\nRan 27 tests in 1.833s\n\nOK\n"
+    },
+    {
+      "test_id": "arm_ik_lifecycle_world_transform_contract",
+      "name": "Arm IK Lifecycle & Effective Parent Transform Contract (Task 10-A)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 5.65,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_RBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "neutral transforms. ... ok\ntest_25_reset_rotation_mode_yxz (__main__.TestArmIKLifecycleWorldTransformContract.test_25_reset_rotation_mode_yxz)\nTEST-25: reset_arm_ik preserves YXZ rotation mode on HandIK and ElbowPole with neutral transforms. ... ok\ntest_26_reset_rotation_mode_yzx (__main__.TestArmIKLifecycleWorldTransformContract.test_26_reset_rotation_mode_yzx)\nTEST-26: reset_arm_ik preserves YZX rotation mode on HandIK and ElbowPole with neutral transforms. ... ok\ntest_27_reset_rotation_mode_zxy (__main__.TestArmIKLifecycleWorldTransformContract.test_27_reset_rotation_mode_zxy)\nTEST-27: reset_arm_ik preserves ZXY rotation mode on HandIK and ElbowPole with neutral transforms. ... ok\ntest_28_reset_rotation_mode_zyx (__main__.TestArmIKLifecycleWorldTransformContract.test_28_reset_rotation_mode_zyx)\nTEST-28: reset_arm_ik preserves ZYX rotation mode on HandIK and ElbowPole with neutral transforms. ... ok\ntest_29_reset_rotation_mode_quaternion (__main__.TestArmIKLifecycleWorldTransformContract.test_29_reset_rotation_mode_quaternion)\nTEST-29: reset_arm_ik preserves QUATERNION rotation mode on HandIK and ElbowPole with neutral transforms. ... ok\ntest_30_reset_rotation_mode_axis_angle (__main__.TestArmIKLifecycleWorldTransformContract.test_30_reset_rotation_mode_axis_angle)\nTEST-30: reset_arm_ik preserves AXIS_ANGLE rotation mode on HandIK and ElbowPole with neutral transforms. ... ok\n\n----------------------------------------------------------------------\nRan 30 tests in 4.015s\n\nOK\n"
+    },
+    {
+      "test_id": "arm_ik_input_validation_contract",
+      "name": "Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B-1)",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 3.96,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "d CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n",
+      "stderr_tail": "25_auto_init_invalid_parent_has_zero_scene_mutation)\nTEST-25: Uninitialized arm IK with invalid parent transform causes zero scene mutation. ... ok\ntest_26_partial_init_invalid_new_parent_has_zero_scene_mutation (__main__.TestArmIKInputValidationContract.test_26_partial_init_invalid_new_parent_has_zero_scene_mutation)\nTEST-26: Partially initialized arm IK with invalid new parent transform causes zero mutation. ... ok\ntest_27_valid_parent_first_time_auto_init_succeeds (__main__.TestArmIKInputValidationContract.test_27_valid_parent_first_time_auto_init_succeeds)\nTEST-27: First-time auto-initialization succeeds under valid conformal parent transforms. ... ok\ntest_28_requested_wrong_type_controller_auto_replaced (__main__.TestArmIKInputValidationContract.test_28_requested_wrong_type_controller_auto_replaced)\nTEST-28: Requested side non-EMPTY controller is replaced with EMPTY and set accurately. ... ok\ntest_29_wrong_type_other_side_controller_preflight (__main__.TestArmIKInputValidationContract.test_29_wrong_type_other_side_controller_preflight)\nTEST-29: Preflight ignores doomed non-EMPTY controller with bad parent on opposite side. ... ok\ntest_30_wrong_type_pole_controller_auto_replaced (__main__.TestArmIKInputValidationContract.test_30_wrong_type_pole_controller_auto_replaced)\nTEST-30: Requested side non-EMPTY elbow pole controller is replaced with EMPTY and set accurately. ... ok\n\n----------------------------------------------------------------------\nRan 30 tests in 2.364s\n\nOK\n"
+    },
+    {
+      "test_id": "physics_bridge_contract",
+      "name": "Kinematic Bridge 14-Point Architectural Contract",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 22.45,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": " rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n  -> Inertia tensor and angular momentum telemetry verified (I_zz=1.0777 kg*m^2, static H=0.000000).\n[PASSED] Test 12: Whole-Body Inertia & Angular Momentum Telemetry\n\n--- Test 13: Historical Actions Intactness & Planning ---\n  -> Walk, Run, SprintStart, SprintBrake actions intact and plan successfully.\n[PASSED] Test 13: Historical Motion Actions Intactness & Planning\n\n--- Test 14: Core Historical Regression Suite ---\n  Running regression: tests/verify_task6fd_whole_body_controller.py...\n  [PASSED] tests/verify_task6fd_whole_body_controller.py\n  Running regression: tests/verify_task6fc_joint_limits.py...\n  [PASSED] tests/verify_task6fc_joint_limits.py\n  Running regression: tests/verify_task6fb_rigid_link.py...\n  [PASSED] tests/verify_task6fb_rigid_link.py\n  Running regression: tests/verify_task6fa_arm_ik.py...\n  [PASSED] tests/verify_task6fa_arm_ik.py\n  Running regression: tests/verify_task6ga_body_kinematics.py...\n  [PASSED] tests/verify_task6ga_body_kinematics.py\n  Running regression: tests/verify_task6gb_body_inertia.py...\n  [PASSED] tests/verify_task6gb_body_inertia.py\n[PASSED] Test 14: Core Historical Regression Suite\n\n================================================================================\nRESULT: ALL 14 TASK 6G-C-R3B-1-FINAL VERIFICATION TESTS PASSED SUCCESSFULLY!\n================================================================================\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "dynamics_playground_blend",
+      "name": "Dynamics Playground Blender Scene Artifact Verification",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 1.54,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "00:01.344  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n================================================================================\nVERIFYING DYNAMICS PLAYGROUND BLEND SCENE (Task 6G-D-PRE-P2)\n================================================================================\n[OK] File exists: C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend (234,436 bytes)\n[SCENE] Name: DynamicsPlaygroundScene, FPS: 24, Frame Range: 1..73\n  [COLLECTION] Playground_Surfaces: 16 objects\n  [COLLECTION] Playground_Visuals: 25 objects\n  [COLLECTION] Playground_Lighting_Cameras: 4 objects\n[OK] Verified all 14 physical zone surface meshes and materials\n[OK] Verified 21 normal indicator arrow objects in visuals collection\n[OK] Verified 3D world origin axes (X, Y, Z) and 1m reference unit cube\n[OK] Verified inspection cameras and daylighting setup\n================================================================================\nALL DYNAMICS PLAYGROUND BLEND VALIDATIONS PASSED!\n================================================================================\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "playground_dynamics_states",
+      "name": "Dynamics Playground Real Dynamics State Integration Verification",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 3.24,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "00:01.437  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n",
+      "stderr_tail": ".....\n----------------------------------------------------------------------\nRan 5 tests in 1.620s\n\nOK\n"
+    },
+    {
+      "test_id": "visual_evidence_telemetry",
+      "name": "Dynamics Visual Evidence & Telemetry Coherence Verification",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "python",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 0.33,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "",
+      "stderr_tail": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.022s\n\nOK\n"
+    },
+    {
+      "test_id": "contact_elevation_gap_repro",
+      "name": "Environment Gate 01 Defect Reproduction: KinematicBridge Elevation Gap",
+      "tier_names": [
+        "physics",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 1.9,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n\n======================================================================\nCONTACT ELEVATION POST-FIX VERIFICATION EVIDENCE:\n  True Evaluated Platform Ground Z: 1.339746 m\n  MotionState Recorded Contact Z:   1.339746 m (Diff: 3.784439e-08 m)\n  MultiContact Recorded Target Z:   1.339746 m (Diff: 3.784439e-08 m)\n  Contact Geometry Errors:          {}\n  Overall Execution Success:        True\n======================================================================\n",
+      "stderr_tail": "test_verify_locked_foot_elevation_preservation (__main__.TestContactElevationGapRepro.test_verify_locked_foot_elevation_preservation)\nVerify that locked foot contact targets preserve authentic 3D mesh surface elevation. ... ok\n\n----------------------------------------------------------------------\nRan 1 test in 0.197s\n\nOK\n"
+    },
+    {
+      "test_id": "motion_walk_r3b2",
+      "name": "StartStopWalkAction Unified Bridge Regression",
+      "tier_names": [
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 5.81,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "t Y -8.0000m -> -6.7400m (disp=1.2600m, peak_speed=0.2400m/s, unreachable=0)\n  [OK] Root displacement: -8.0000m -> -6.7400m (disp=1.2600m)\n  [OK] Speed profile: start=0.0, peak=0.2400m/s, stop=0.0\n  [OK] Velocity telemetry: planned=(-0.0, 0.24, 0.0), derived=(0.0, 0.2400054931640625, 0.0), com=(0.025021210312843323, 0.27774810791015625, 0.06319427490234375)\nTesting 2-action chaining...\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'start_stop_walk']): frames 1..408 (@ 24 FPS), root Y -8.0000m -> -5.4800m (disp=2.5200m, peak_speed=0.2400m/s, unreachable=0)\n  [OK] Chaining 2 walk actions: frames 1..408, total disp = 2.5200m\n\n================================================================================\nRESULT: STARTSTOPWALKACTION MIGRATION TO KINEMATICBRIDGEEXECUTOR PASSED 100%!\n================================================================================\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "motion_run_r3b2",
+      "name": "RunAction Unified Bridge Regression",
+      "tier_names": [
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 3.84,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "m -> -4.4375m (disp=3.5625m)\n  [OK] Speed profile: constant 0.9000m/s\n  [OK] Airborne flight frames: 40 / 96 (10 per cycle)\n  [OK] Telemetry verification: planned=(-0.0, 0.9, 0.0), derived=(0.0, 0.9000091552734375, 0.0), com=(0.014717012643814087, 0.7961540222167969, 0.23060989379882812)\n\nTesting sequential action chaining: WalkAction -> RunAction...\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'run']): frames 1..252 (@ 24 FPS), root Y -8.0000m -> -4.9775m (disp=3.0225m, peak_speed=0.9000m/s, unreachable=0)\n  [OK] Chained 2-action execution: 252 frames, 0 unreachable events\n\n================================================================================\nALL RUNACTION MIGRATION CHECKS PASSED SUCCESSFULLY!\n================================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "motion_sprint_start_r3b2",
+      "name": "SprintStartAction Unified Bridge Regression",
+      "tier_names": [
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 4.52,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "profile: start=0.0m/s -> peak=2.0000m/s -> final=2.0000m/s\n  [OK] Airborne flight frames: 49 / 114\n  [OK] Telemetry verification: planned=(-0.0, 2.0, 0.0), derived=(0.0, 2.0000038146972656, 0.0), com=(0.10365953296422958, 2.0585174560546875, -0.14836978912353516)\n\nTesting sequential action chaining: WalkAction -> SprintStartAction...\n[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'sprint_start']): frames 1..318 (@ 24 FPS), root Y -8.0000m -> -0.1567m (disp=7.8433m, peak_speed=2.0000m/s, unreachable=0)\n  [OK] Chained 2-action execution: 318 frames, 0 unreachable events\n\n================================================================================\nALL SPRINTSTARTACTION MIGRATION CHECKS PASSED SUCCESSFULLY!\n================================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "motion_sprint_brake_r3b2",
+      "name": "SprintBrakeAction Unified Bridge Regression",
+      "tier_names": [
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 2.61,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "point (0.0, -8.0, 0.0)\n[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R\n[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)\n[RIG] Bound 13 character parts to CharacterArmature bones\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\nExecuting SprintStartAction -> SprintBrakeAction via MotionPlanner...\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R\n[MOTION_PLANNER] Executed 2 action(s) (['sprint_start', 'sprint_brake']): frames 1..162 (@ 24 FPS), root Y -8.0000m -> 0.0833m (disp=8.0833m, peak_speed=2.0000m/s, unreachable=0)\n  [OK] Handoff continuity: Y=-1.3334m, speed=1.9962m/s\n  [OK] Deceleration profile: initial=1.9962m/s -> final=0.0000m/s (mode=stop)\n  [OK] Bilateral stance lock verified: both feet locked at stop\n  [OK] Telemetry verification: planned=(-0.0, 1.573576436351046, 0.0), derived=(0.0, 1.6085686683654785, 0.0), com=(-1.1698342859745026e-05, 1.3905072212219238, -0.09043407440185547)\n\n================================================================================\nALL SPRINTBRAKEACTION MIGRATION CHECKS PASSED SUCCESSFULLY!\n================================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "integration_unified_motion",
+      "name": "Unified 462-Frame Motion Pipeline Artifact Verification",
+      "tier_names": [
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 1.51,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "00:01.313  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\unified_motion_integration.blend\"\n================================================================================\nVERIFYING OUTPUT: unified_motion_integration.blend\n================================================================================\n[OK] File exists: C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\unified_motion_integration.blend (298537 bytes)\n[SCENE] Start frame: 1, End frame: 462, FPS: 24\n[OK] Core objects verified: Armature, Root, Camera, LookAtTarget\n  Frame   1 (Start of Walk (stationary idle)): root_Y = -8.0000m (expected ~-8.0000m, diff=0.0000m)\n  Frame 204 (End of Walk (bilateral stop)): root_Y = -6.7400m (expected ~-6.7400m, diff=0.0000m)\n  Frame 318 (End of SprintStart (high-speed burst)): root_Y = -0.1567m (expected ~-0.1567m, diff=0.0000m)\n  Frame 366 (End of SprintBrake (bilateral stop)): root_Y = 1.3433m (expected ~1.3433m, diff=0.0000m)\n  Frame 462 (End of Run (4 cycles)): root_Y = 4.9058m (expected ~4.9058m, diff=0.0000m)\n[OK] Sampled 20 frames across timeline: all bone transforms clean (no NaN/Inf)\n================================================================================\nALL CHECKS FOR unified_motion_integration.blend PASSED 100%!\n================================================================================\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    },
+    {
+      "test_id": "task7a1_character_playground",
+      "name": "Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop",
+      "tier_names": [
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 2.77,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "00:01.563  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground.blend\"\n00:01.688  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a1.blend\"\n00:01.766  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a1.blend\"\n00:02.032  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a1.blend\"\n00:02.141  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a1.blend\"\n00:02.313  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a1.blend\"\n00:02.485  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\dynamics_playground_task7a1.blend\"\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n",
+      "stderr_tail": "7A1CharacterPlaygroundIntegration.test_10_negative_fcurve_keyframe_value_mutation)\nNegative Verification 2: Mutating an F-Curve keyframe value without altering keyframe count ... ok\ntest_11_negative_station_trajectory_interframe_mutation (__main__.TestTask7A1CharacterPlaygroundIntegration.test_11_negative_station_trajectory_interframe_mutation)\nNegative Verification 3: Mutating dynamics station pose at inter-frame 37 (between previous ... ok\ntest_12_negative_contact_missing_frame_record (__main__.TestTask7A1CharacterPlaygroundIntegration.test_12_negative_contact_missing_frame_record)\nNegative Verification 4: Deleting a frame record (e.g. frame 50) MUST trigger ... ok\ntest_13_negative_contact_tampered_anchor (__main__.TestTask7A1CharacterPlaygroundIntegration.test_13_negative_contact_tampered_anchor)\nNegative Verification 5: Tampering with a stance anchor (e.g. None or corrupted coords) ... ok\ntest_14_negative_contact_mismatched_version (__main__.TestTask7A1CharacterPlaygroundIntegration.test_14_negative_contact_mismatched_version)\nNegative Verification 6: Tampering with blend_asset_version MUST trigger ... ok\ntest_15_readonly_verification_never_modified_artifacts (__main__.TestTask7A1CharacterPlaygroundIntegration.test_15_readonly_verification_never_modified_artifacts)\nProve that running the test suite did not overwrite or touch any `.blend`, `.json`, or `.gif` artifact. ... ok\n\n----------------------------------------------------------------------\nRan 15 tests in 1.041s\n\nOK\n"
+    },
+    {
+      "test_id": "task7a2_terrain_traversal",
+      "name": "Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground",
+      "tier_names": [
+        "motion",
+        "full"
+      ],
+      "runner_type": "blender_headless",
+      "status": "AUTOMATED_PASS",
+      "exit_code": 0,
+      "duration_sec": 2.57,
+      "failure_reason": null,
+      "is_visual_acceptance": true,
+      "is_optional": false,
+      "stdout_tail": "assed strict unexempted continuity (0 violations).\n\n[CHECK 4] Verifying JSON telemetry documents in docs/evidence/task7a2/...\n  [PASS] JSON verified: task7a2_contact_state_records.json (450,768 bytes)\n  [PASS] JSON verified: task7a2_execution_summary.json (438 bytes)\n  [PASS] JSON verified: task7a2_control_chain_diagnostics.json (1,340,798 bytes)\n  [PASS] JSON verified: task7a2_validation_report.json (579 bytes)\n  [PASS] JSON verified: task7a2_evidence_manifest.json (5,885 bytes)\n\n[CHECK 5] Verifying keyframe rendered PNGs...\n  [PASS] Keyframe PNG verified: task7a2_f001_ramp_start.png (206,491 bytes)\n  [PASS] Keyframe PNG verified: task7a2_f120_ramp_uphill.png (206,491 bytes)\n  [PASS] Keyframe PNG verified: task7a2_f350_bridge_platform.png (226,045 bytes)\n  [PASS] Keyframe PNG verified: task7a2_f480_ramp_downhill.png (226,965 bytes)\n  [PASS] Keyframe PNG verified: task7a2_f685_flat_landing.png (206,491 bytes)\n  [PASS] Keyframe PNG verified: task7a2_overview_isometric.png (226,045 bytes)\n  [PASS] Keyframe PNG verified: task7a2_control_chain_debug.png (280,325 bytes)\n\n[CHECK 6] Verifying animated GIFs...\n  [PASS] Continuous Ramp Traversal GIF: 140 frames, 320x240, 399,528 bytes\n  [PASS] Diagnostic Scene Scrubbing GIF: 100 frames, 320x240, 303,006 bytes\n\n================================================================================\n[OVERALL RESULT] TASK 7A-2 VERIFICATION: ALL CHECKS PASSED (100%)\n================================================================================\n",
+      "stderr_tail": ""
+    }
+  ]
+}

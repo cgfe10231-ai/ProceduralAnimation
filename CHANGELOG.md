@@ -2,6 +2,106 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-20] Task 10-C子节点命名与规划冻结
+
+- 项目负责人正式指定Task 10-C使用`10-c-childN`编号，其中child表示第几个子节点。
+- `10-c-child1`已由ChatGPT完成独立源码审计。
+- 10-C固定划分为四个子节点：接口审计、规划字段收敛、双手目标转换、专项验证与结项。
+- 当前进入`10-c-child2`，唯一目标为补足PlannedHandTarget的pole_hint_world_xyz与clamp_reach字段。
+- `10-c-child3`和`10-c-child4`尚未准入。
+- 本轮仅进行Markdown状态同步，没有修改生产代码或执行Blender测试。
+- WBC、Arm IK、下肢、ContactModel和10-B大型代码拆分均不属于10-C的授权修改范围。
+
+### [2026-11-20] Task 10-B负责人验收与Task 10-C审计准入
+
+- Task 10-B经独立源码与测试证据审查，获项目负责人正式验收。
+- fix-7自动化回归证据口径保持不变：Atomicity跨批次223/223、BUG11 8/8、BUG12 4/4、FULL 42/42。
+- 10-B大型事务实现因代码职责集中、物理文件规模过大，暂存waiting-split，不合入master。
+- Task 10-C获准进入10-c-1只读接口审计，尚未批准生产编码。
+- 本次仅进行分支归档、文档状态同步和Markdown写入权限规则的最小修订；不包含生产功能修改或重新运行Blender测试。
+
+### [2026-11-19] Task 10-B / fix-7：剩余自动化回归证据完成（结项未裁决）
+
+- **代码/测试核验基线**：`b079af341aa032ac1f272fc354cdc5ab51a73a60`（fix-7 剩余回归测试前冻结 HEAD）；测试后源码 Blob 保持一致。文档整理由 `ace328d9a9af2684cebefe9890e1081b18128c9d` 开始，不代表重新跑过全部测试。
+- **Atomicity**：`TEST-31～253` 有效联合去重 `223/223 PASS`，由历史180项和本轮43项构成；非一次同HEAD执行；早先 `TEST-57` 的失败保留在历史原始日志，修复后的43项含 TEST-57 全部通过。
+- **BUG11**：8/8 PASS；**BUG12**：4/4 PASS；**Collection TEST-225～233**：9/9 PASS（与 Atomicity 有部分编号重叠，不能重复相加）。
+- **FULL**：42/42个唯一注册套件自动化通过，其中33 PASSED、9 AUTOMATED_PASS（视觉待人工验收）；FAIL=ERROR=SKIPPED=NOT_RUN=0，退出码0；未重复运行 QUICK、PHYSICS、MOTION。证据详见 `docs/evidence/fix-7/remaining_regression/round2/fix7_report.md` 与 `docs/evidence/fix-7/remaining_regression/round2/full/test_report.json`。
+- **合同状态边界**：历史 WBC `CONTRACT10-02/03/04/06` 有真实 FAIL 记录；新 WBC 代码已有相关逻辑，但当前代码对应的六项合同专项未重新完整运行，不能据此自动判定当前PASS或FAIL。Task 10-B 仍处于最终验收待裁决状态。
+- **禁令**：只追加此日期事实，原有历史条目原样保存，不据最新结果覆盖历史失败或更改永久架构合同。
+
+### [2026-11-06] PKG-5 / Task 10-B-9：架构驱动事务统一模型与全系统审计 (Architecture-First Transaction Consolidation)
+
+* **任务性质**：架构审计与方案设计（TASK 10-B-9），停止针对单一故障点的局部打补丁，基于真实代码与全调用拓扑建立统一架构模型、资源所有权模型、影响关系和可验证迁移方案。
+* **执行约束**：本轮严格限制为架构阶段，禁止未经审核直接修改生产代码。生产代码 `src/rig/arm_ik.py` 严格保持 0 行修改。
+* **状态**：`ARCHITECTURE PROPOSAL — PENDING REVIEW`（架构提案就绪，待独立审查批准；下一执行节点保持 `Task 10-C (BLOCKED — NOT STARTED)`）。
+* **架构成果交付归档**（`docs/evidence/PKG5_10B_REVISION_9/`）：
+  - **真实架构提取**（`01_real_architecture_extraction.md`）：完成对 `src/rig/arm_ik.py`（2414 行）及其调用者（`whole_body_controller.py`、`playground_character_assembly.py`、`run_arm_ik_prototype.py`）的逐行只读扫描，全面核实所有公开 API、内部事务入口、Blender 资源 CRUD/Link/Unlink/Rename 定位、快照与验证点、异常出口及 Cleanup 挂起路径。
+  - **六大职责边界映射**（`02_architectural_responsibility_boundaries.md`）：将现有逻辑映射为 Transaction Coordinator、State & Ownership Registry、Resource Operations、Arm IK Business Operations、Snapshot & Verification、Commit & Cleanup 六大清晰正交边界，逐项定义输入、输出、状态所有权、操作权限及异常职责。
+  - **资源所有权合同规范**（`03_resource_ownership_contract.md`）：建立 Resource Identity 与 Relationship Mutation 物理模型；确立所有权非推断原则（严禁以名称、快照差集或孤立指针推断所有权）；系统性划分原始已存在、本事务自建、本事务暂存、外部已登记、所有权不可证明 5 类资源模型。
+  - **事务生命周期合同规范**（`04_transaction_lifecycle_contract.md`）：严谨建模 9 个显式状态的进入条件、下一迁移、操作权限与不可逆提交红线；深度审计 10 项重点边缘与故障注入场景（从快照失败到提交后清理挂起与门禁阻断）。
+  - **架构驱动影响矩阵**（`05_architecture_driven_impact_matrix.md`）：建立全系统真实依赖拓扑；细化直接、间接、共享状态、生命周期 4 类依赖；明确每一依赖路径的合同、失败传播、恢复责任方及测试证据；发现 `reset_arm_ik` 缺乏事务保护与非事务历史遗留死代码两大关键架构隐患。
+  - **受控架构迁移方案**（`06_architecture_migration_plan.md`）：确立接口冻结与数学行为零退化原则；对比单文件分节重排（首选）与多模块拆分方案；制定 4 阶段平滑迁移顺序、独立回退门禁与对应测试覆盖。
+  - **测试映射与验证设计**（`07_test_mapping_and_verification_design.md`）：将现有 TEST-01 至 TEST-102 完整映射至架构职责；深度审计重复测试、未触发路径、无测试删除、孤儿状态修改等 7 大重点问题。
+* **架构同步更新**（`ARCHITECTURE_SYNC.md`）：
+  - 新增 Section 9《Task 10-B-9：架构驱动事务统一模型》，以 `[CURRENT]`、`[VERIFIED]`、`[PROPOSED]`、`[UNKNOWN]` 明确区分事实与提案；
+  - 核心 Section 4.2.3 严格保持原样未作改动。
+
+### [2026-11-06] PKG-5 / Task 10-B-8：Arm IK 全生命周期与所有权完整性修复 (Full Transaction Lifecycle & Ownership Integrity Repair)
+
+* **任务性质**：生产缺陷修复（TASK 10-B-8），针对 Task 10-B-7 遗留的控制器按名误删风险、创建后未登记即链接失败清理盲区、暂存约束仅依指针缺少原引用核验、逻辑提交后异常绕过 Phase 3 清理挂起注册表等问题进行闭环修正。
+* **状态**：`READY FOR INDEPENDENT REVIEW`（102/102 专项测试通过，全四级分层回归 0 缺陷通过，测试套件共 238 测试用例 100% PASS）。
+* **生产代码修改**（`src/rig/arm_ik.py`）：
+  - **Section 3 & 4（统一事务控制器所有权与即时登记）**：在 `_ArmRigTransactionContext` 新增 `created_controller_objects` 列表及 `register_created_controller()` 方法；在 `_get_or_create_empty()` 中在 `bpy.data.objects.new()` 创建对象后立即登记所有权（先登记后链接集合），保证创建成功但后续失败时能精准按身份追溯并删除，杜绝遗漏未登记对象。
+  - **Section 5 & 6（活体对象身份解析与控制器回滚边界重写）**：实现 `_find_live_object_by_identity()`；在 `_rollback_arm_rig_state()` 中优先遍历 `active_tx.created_controller_objects` 按物理指针删除事务控制器；彻底剔除按名删除控制器旧逻辑；原控制器存在时校验原引用与物理指针存活，并检查原始名称是否被外部对象占用，冲突时拒绝误删外部对象并聚合报告错误。
+  - **Section 7（暂存约束双重身份核验）**：在 `_ArmRigTransactionContext` 方法 `retry_cleanup()` 中联合核验 `con` 引用与 `con_ptr` 指针，对原始引用失效或指针不符的暂存记录安全报错并保留在待清理列表，严禁误删同名替代约束。
+  - **Section 8（逻辑提交后异常统一清理挂起）**：在 `_arm_rig_transaction()` 中将 `after_logical_commit` 移入 Phase 3 保护块，与 `during_commit_cleanup` 统一受异常捕获；逻辑提交后任何异常均进入 `CLEANUP_PENDING` 并登记注册表，严禁绕过清理或执行普通回滚。
+* **专项测试修改与扩充**（`tests/test_task10b_transaction_atomicity.py`）：
+  - **新增 TEST-93 至 TEST-102 全部 10 项专项测试**：
+    - TEST-93：事务创建控制器后重命名，失败回滚按身份精准删除，不残留重命名对象且不误删无关对象。
+    - TEST-94：事务控制器重命名后外部创建同名对象，回滚清理事务对象并完整保留外部同名对象及数据块。
+    - TEST-95：快照中原控制器在事务中被物理删除，回滚严格报告身份丢失错误，不创建替身。
+    - TEST-96：原控制器被重命名且原名称被外部对象占用，回滚报错且不误删外部对象、不强行覆盖。
+    - TEST-97：暂存约束原始引用失效且存在同名新约束，清理失败保留记录，不误删同名新约束。
+    - TEST-98：事务创建控制器后在集合链接阶段抛错，已登记对象被回滚精准清理，无对象与事务残留。
+    - TEST-99：逻辑提交后钩子抛出异常，进入 `CLEANUP_PENDING` 并在注册表登记，重试成功后恢复准入。
+    - TEST-100：系统性验证可逆阶段故障执行回滚、提交后阶段故障进入待清理，证明各阶段边界正交性。
+    - TEST-101：控制器重命名、约束暂存、集合外部新增成员与共享数据块联合故障模拟，全维度核验所有权与身份。
+    - TEST-102：13 步端到端连续生命周期验证，覆盖 9 状态流转、资源替换、故障挂起、准入阻断、重试收敛与重新写入。
+
+### [2026-11-06] PKG-5 / Task 10-B-7：Arm IK 生产级事务完整性与所有权生命周期最终修正 (Final Ownership & Lifecycle Correction)
+
+* **任务性质**：生产缺陷修复（TASK 10-B-7），针对 Task 10-B-6 遗留的同一 Armature 存在待清理事务时的独立写入准入门禁、暂存约束清理的指针身份核验、Character 集合身份级恢复与验证器子集匹配、TEST-79 假阳性消除及外部新增父级保留等问题进行闭环修正。
+* **状态**：`IMPLEMENTED — PENDING INDEPENDENT REVIEW`（92/92 专项测试通过，全四级分层回归 0 缺陷通过）。
+* **生产代码修改**（`src/rig/arm_ik.py`）：
+  - **Section 2（待清理事务准入严格门禁）**：在 `_ArmRigTransactionContext` 初始化方法 `__init__` 中新增 `self.arm_ptr = arm.as_pointer()`；在 `_PENDING_ARM_RIG_CLEANUPS` 附近实现 `_assert_arm_rig_cleanup_gate(arm)`，并在 `_arm_rig_transaction` 入口创建新事务前检查门禁。当同一 Armature 存在未解决的 `CLEANUP_PENDING` 事务时，严格阻断新写事务建立并抛出描述性异常，且不阻塞无关 Armature。
+  - **Section 3（暂存约束清理身份核验）**：在 `_ArmRigTransactionContext` 方法 `retry_cleanup()` 中重构暂存约束清理循环，使用原始约束指针 `expected_ptr = stashed_con.get("con_ptr")` 进行逐约束匹配，杜绝根据约束名称误删同名替代物。
+  - **Section 4（Character 集合身份级恢复）**：在 `_rollback_arm_rig_state()` 中首先验证原始集合对象的存活状态及指针一致性（`live_ptr == original_ptr`），验证失败直接报告错误且禁止对集合进行变动；父级集合恢复与子级集合恢复完全基于 `parent_refs` 与 `child_refs` 指针匹配，不解绑外部新增的父级链接与子级集合；成员对象恢复基于 `object_refs` 指针匹配，不解绑外部新增成员。
+  - **Section 5（验证器身份级匹配加固）**：在 `_verify_arm_rig_state_restored()` 中使用通用函数 `_live_identity_set` 对父级、子级及成员对象执行身份子集比对，原始快照引用销毁直接报告验证失败，外部新增的合法链接不触发假性验证失败。
+* **专项测试修改与扩充**（`tests/test_task10b_transaction_atomicity.py`）：
+  - **TEST-79 重写（消除假阳性）**：明确在事务创建自身集合后重命名该集合、外部代码新建同名集合并触发故障，断言事务所属集合被彻底清理且外部同名集合完整保留。
+  - **TEST-72 修正（所有权隔离）**：调整断言以承认外部新增父级链接在回滚中应被保留。
+  - **新增 TEST-85 至 TEST-92 全部 8 项专项测试**：
+    - TEST-85：同一 Armature 存在 Cleanup Pending 时阻止新独立写事务并在快照前拦截。
+    - TEST-86：无关 Armature B 不受 Armature A 的待清理事务阻塞。
+    - TEST-87：待清理事务重试成功并清空登记后，正常写事务恢复准入。
+    - TEST-88：暂存约束清理按指针匹配，不误删同名替代约束。
+    - TEST-89：事务期间重命名原始 Character 集合，回滚准确恢复原对象身份、名称与链接，无同名替身。
+    - TEST-90：事务期间重命名父 Collection，回滚按身份引用准确恢复父级链接。
+    - TEST-91：事务期间外部向 Character 集合新增子 Collection，回滚保留外部子级。
+    - TEST-92：覆盖快照、回滚、提交、清理失败、准入阻断、重试收敛与连续重入的端到端全生命周期联合验证。
+* **专项与分层测试验证**：
+  - `test_task10b_input_validation.py`：30/30 PASS (2.32s)。
+  - `test_task10b_transaction_atomicity.py`：62/62 PASS (4.62s)。
+  - Task 10-B 专项总计：92/92 PASS (100%)。
+  - `test_arm_ik_lifecycle_world_transform_contract.py`：30/30 PASS (3.80s)。
+  - `python tests/audit_c2_final_inspector.py --verify-docs`：6 项自测 PASS，文档符号存在性 PASS (1.80s)。
+  - 分层回归：Quick 19/19 (47.23s)、Physics 27/27 (105.34s)、Motion 12/12 (49.14s)、Full 42/42 (160.69s)，全部退出码 0，FAIL 0、ERROR 0、SKIPPED 0、NOT_RUN 0。
+* **证据归档**：
+  - `docs/evidence/PKG5_10B_REVISION_7/`：包含 4 份分析与核验报告（`baseline.md`、`test_traceability.md`、`regression_summary.md`、`final_audit_report.md`）及 8 份 raw 格式测试日志。
+* **后续任务与边界**：
+  - 当前状态为 `IMPLEMENTED — PENDING INDEPENDENT REVIEW`。
+  - 下一执行节点仍严格为 `Task 10-C (BLOCKED — NOT STARTED)`。
+
 ### [2026-11-06] PKG-5 / Task 10-B-6：Arm IK 生产级事务完整性与受控修正 (Controlled Correction)
 
 * **任务性质**：既有功能缺陷修复（TASK 10-B-6），针对 Task 10-B 遗留的约束身份核验盲区、回滚静默创建替代约束、集合所有权隔离避免解绑外部成员、不可逆清理异常挂起注册与幂等重试机制进行闭环修正。

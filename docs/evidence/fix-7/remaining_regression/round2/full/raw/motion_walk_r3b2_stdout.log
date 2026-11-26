@@ -1,0 +1,30 @@
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+================================================================================
+VERIFYING STARTSTOPWALKACTION MIGRATION TO KINEMATICBRIDGEEXECUTOR
+================================================================================
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Executing StartStopWalkAction via MotionPlanner...
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['start_stop_walk']): frames 1..204 (@ 24 FPS), root Y -8.0000m -> -6.7400m (disp=1.2600m, peak_speed=0.2400m/s, unreachable=0)
+  [OK] Root displacement: -8.0000m -> -6.7400m (disp=1.2600m)
+  [OK] Speed profile: start=0.0, peak=0.2400m/s, stop=0.0
+  [OK] Velocity telemetry: planned=(-0.0, 0.24, 0.0), derived=(0.0, 0.2400054931640625, 0.0), com=(0.025021210312843323, 0.27774810791015625, 0.06319427490234375)
+Testing 2-action chaining...
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'start_stop_walk']): frames 1..408 (@ 24 FPS), root Y -8.0000m -> -5.4800m (disp=2.5200m, peak_speed=0.2400m/s, unreachable=0)
+  [OK] Chaining 2 walk actions: frames 1..408, total disp = 2.5200m
+
+================================================================================
+RESULT: STARTSTOPWALKACTION MIGRATION TO KINEMATICBRIDGEEXECUTOR PASSED 100%!
+================================================================================

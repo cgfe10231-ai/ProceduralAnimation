@@ -1,0 +1,33 @@
+test_u3_t01_real_mesh_environment_injection (__main__.TestEnvironmentGate01Unit3.test_u3_t01_real_mesh_environment_injection)
+U3-T01: Real Mesh Environment Injection verifies prefer_mesh and adapter state. ... ok
+test_u3_t02_source_type_authenticity (__main__.TestEnvironmentGate01Unit3.test_u3_t02_source_type_authenticity)
+U3-T02: Single-hit ground support query returns source_type == 'mesh'. ... ok
+test_u3_t03_initial_footprint_mesh_hit (__main__.TestEnvironmentGate01Unit3.test_u3_t03_initial_footprint_mesh_hit)
+U3-T03: Initial Left and Right feet at start pos land on real evaluated mesh. ... ok
+test_u3_t04_single_hit_consistency (__main__.TestEnvironmentGate01Unit3.test_u3_t04_single_hit_consistency)
+U3-T04: Elevation Z, outward normal, surface_id, and support eligibility come from a single hit. ... ok
+test_u3_t05_strict_no_support_rejection (__main__.TestEnvironmentGate01Unit3.test_u3_t05_strict_no_support_rejection)
+U3-T05: Strict rejection: empty space returns NO_HIT and non-support surfaces are rejected. ... ok
+test_u3_t06_analytical_mode_preservation (__main__.TestEnvironmentGate01Unit3.test_u3_t06_analytical_mode_preservation)
+U3-T06: Analytical mode cleanly evaluates analytical surfaces with source_type == 'analytical'. ... ok
+test_u3_t07_six_phase_pipeline_preservation (__main__.TestEnvironmentGate01Unit3.test_u3_t07_six_phase_pipeline_preservation)
+U3-T07: 6-phase pipeline execution runs frame-by-frame with zero human controller modifications. ... ok
+test_u3_t08_counter_factual_mesh_mutation (__main__.TestEnvironmentGate01Unit3.test_u3_t08_counter_factual_mesh_mutation)
+U3-T08: Counter-Factual Experiment A vs B: Perturbed mesh causes measurable physical divergence. ... ok
+test_u3_t09_counter_factual_analytical_insensitivity (__main__.TestEnvironmentGate01Unit3.test_u3_t09_counter_factual_analytical_insensitivity)
+U3-T09: Counter-factual proof: Analytical environment produces identical output despite mesh mutation. ... ok
+test_u3_t10_blend_artifact_reopen_and_evaluation (__main__.TestEnvironmentGate01Unit3.test_u3_t10_blend_artifact_reopen_and_evaluation)
+U3-T10: Saved blend artifact output/dynamics_playground_environment_gate01_u3.blend passes full validation. ... ok
+test_u3_t11_c0_trajectory_continuity (__main__.TestEnvironmentGate01Unit3.test_u3_t11_c0_trajectory_continuity)
+U3-T11: C0 root continuity: Zero frame exemptions, frame displacement < 0.12m across all 700 frames. ... ok
+test_u3_t12_zero_bone_stretch_and_rom_limits (__main__.TestEnvironmentGate01Unit3.test_u3_t12_zero_bone_stretch_and_rom_limits)
+U3-T12: Bone stretch < 0.1mm and zero anatomical ROM violations across all frames. ... ok
+test_u3_t13_locked_foot_drift (__main__.TestEnvironmentGate01Unit3.test_u3_t13_locked_foot_drift)
+U3-T13: Locked stance foot drift < 0.1mm across all stance frames. ... ok
+test_u3_t14_baseline_file_protection (__main__.TestEnvironmentGate01Unit3.test_u3_t14_baseline_file_protection)
+U3-T14: Baseline file output/dynamics_playground.blend is 100% untouched and exists. ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 11.806s
+
+OK

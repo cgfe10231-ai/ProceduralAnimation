@@ -1,0 +1,237 @@
+FIX7_R3_ATOMICITY_DISCOVERED 223
+FIX7_R3_ATOMICITY_SELECTED 126
+test_197_pre_existing_object_added_to_created_controller_objects_rejected (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_197_pre_existing_object_added_to_created_controller_objects_rejected)
+TEST-197: Pre-existing controller cannot obtain transaction-created authority, even through a forged legacy registry entry. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_198_collection_creation_fault_before_registration_no_orphan (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_198_collection_creation_fault_before_registration_no_orphan)
+TEST-198: Collection creation failure before registration leaves zero orphan collections. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_199_collection_fault_after_registration_before_link_rolls_back (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_199_collection_fault_after_registration_before_link_rolls_back)
+TEST-199: Collection failure after registration before link rolls back cleanly by pointer identity. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_200_collection_fault_after_link_rolls_back_parent_child_and_collection (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_200_collection_fault_after_link_rolls_back_parent_child_and_collection)
+TEST-200: Collection failure after link rolls back parent-child link and removes collection. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_201_pre_existing_character_collection_preserved_on_reentry (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_201_pre_existing_character_collection_preserved_on_reentry)
+TEST-201: Pre-existing Character collection preserved identically on re-entry. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_202_constraints_created_via_layer_3_with_identity_registration (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_202_constraints_created_via_layer_3_with_identity_registration)
+TEST-202: L/R arm IK and copy rotation constraints created via Layer 3 with exact identity registration. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_203_constraint_fault_after_creation_before_registration_cleaned_up (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_203_constraint_fault_after_creation_before_registration_cleaned_up)
+TEST-203: Constraint creation fault before registration cleans up instance safely without deleting external constraints. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_204_constraint_fault_after_registration_before_config_rolls_back (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_204_constraint_fault_after_registration_before_config_rolls_back)
+TEST-204: Fault after constraint registration before config rolls back registered constraint via Layer 3. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_205_stashed_constraint_lossless_rollback_recovery (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_205_stashed_constraint_lossless_rollback_recovery)
+TEST-205: Wrong-type constraint stashed during setup is losslessly recovered on rollback (ref, ptr, name, mute, order). ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_206_external_same_name_constraint_on_other_bone_not_deleted (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_206_external_same_name_constraint_on_other_bone_not_deleted)
+TEST-206: External constraint named 'ArmIK.L' on another bone is never deleted on rollback or cleanup. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_207_stashed_constraint_cleanup_only_removes_authorized_identity (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_207_stashed_constraint_cleanup_only_removes_authorized_identity)
+TEST-207: Post-commit cleanup only removes stashed constraint matching authorized identity; same-name replacement preserved. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds)
+TEST-208: Constraint removal fault during post-commit cleanup enters CLEANUP_PENDING; subsequent retry succeeds. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_209_ik_target_assignment_7_state_logging_confirmed (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_209_ik_target_assignment_7_state_logging_confirmed)
+TEST-209: IK constraint target assignment creates 7-state log, verified in RNA, and confirmed on commit. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_210_ik_pole_target_assignment_and_pole_subtarget_logging (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_210_ik_pole_target_assignment_and_pole_subtarget_logging)
+TEST-210: IK pole target assignment and pole subtarget logged and restored with 7-state fidelity. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_211_copy_rotation_target_assignment_preserves_wrist_constraints (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_211_copy_rotation_target_assignment_preserves_wrist_constraints)
+TEST-211: Hand COPY_ROTATION target assignment operates through Layer 3 without perturbing other wrist constraints. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_212_unchanged_target_and_subtarget_transitions_to_no_effect (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_212_unchanged_target_and_subtarget_transitions_to_no_effect)
+TEST-212: Target and subtarget re-assignment with identical references transitions PREPARED -> NO_EFFECT. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_213_fault_before_target_write_transitions_to_no_effect_and_rolls_back (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_213_fault_before_target_write_transitions_to_no_effect_and_rolls_back)
+TEST-213: Fault before RNA target write transitions log to NO_EFFECT with zero side effects and clean rollback. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_214_fault_after_target_write_before_confirm_reverts (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_214_fault_after_target_write_before_confirm_reverts)
+TEST-214: Fault after target write (before CONFIRM) transitions APPLIED_VERIFIED -> REVERTED on rollback. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_215_replaced_target_or_constraint_identity_enters_recovery_uncertain (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_215_replaced_target_or_constraint_identity_enters_recovery_uncertain)
+TEST-215: Target or constraint identity replaced/destroyed during undo transitions to RECOVERY_UNCERTAIN and isolates session. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_216_joint_left_right_fault_rollback_preserves_all_constraints_and_targets (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_216_joint_left_right_fault_rollback_preserves_all_constraints_and_targets)
+TEST-216: Bilateral fault rollback losslessly preserves all constraints, targets, pole targets, subtargets, and external constraints. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_217_hand_ik_parent_and_inverse_layer3_confirmed (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_217_hand_ik_parent_and_inverse_layer3_confirmed)
+TEST-217: HandIK Parent and Matrix Parent Inverse Layer 3 write and 7-state log fidelity. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_218_parent_and_inverse_unchanged_transitions_to_no_effect (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_218_parent_and_inverse_unchanged_transitions_to_no_effect)
+TEST-218: Parent/Inverse unchanged -> NO_EFFECT, zero writes. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_219_invalid_parent_rejected_controller_untouched (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_219_invalid_parent_rejected_controller_untouched)
+TEST-219: Invalid parent / cross-armature rejected, controller untouched. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_220_fault_before_parent_write_transitions_to_no_effect (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_220_fault_before_parent_write_transitions_to_no_effect)
+TEST-220: Fault before C-API write (object_parent_before_write) -> NO_EFFECT. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_221_fault_after_parent_before_inverse_rollback_restores_initial (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_221_fault_after_parent_before_inverse_rollback_restores_initial)
+TEST-221: Fault after parent before inverse -> APPLIED_VERIFIED, clean rollback. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_222_fault_after_inverse_before_confirm_reverts_with_matrix_diff (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_222_fault_after_inverse_before_confirm_reverts_with_matrix_diff)
+TEST-222: Fault after inverse before confirm -> APPLIED_VERIFIED, rollback to REVERTED with matrix diff <= 1e-5. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_223_original_parent_destroyed_enters_recovery_uncertain (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_223_original_parent_destroyed_enters_recovery_uncertain)
+TEST-223: Original parent destroyed -> RECOVERY_UNCERTAIN and session isolation. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_224_external_unowned_object_parent_assignment_rejected (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_224_external_unowned_object_parent_assignment_rejected)
+TEST-224: External unowned object parent assignment rejected. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_225_character_collection_scene_link_has_tx_added_and_confirms (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_225_character_collection_scene_link_has_tx_added_and_confirms)
+TEST-225: Character collection scene link has TX_ADDED 7-state log and confirms. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_226_pre_existing_collection_child_link_transitions_to_no_effect (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_226_pre_existing_collection_child_link_transitions_to_no_effect)
+TEST-226: Pre-existing collection child link -> NO_EFFECT. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+ok
+test_227_collection_child_link_fault_before_c_api_no_effect (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_227_collection_child_link_fault_before_c_api_no_effect)
+TEST-227: Collection child link fault before C-API -> NO_EFFECT. ... [CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+FAIL
+
+======================================================================
+FAIL: test_227_collection_child_link_fault_before_c_api_no_effect (fix7_round3_atomicity.TestArmIKTransactionAtomicity.test_227_collection_child_link_fault_before_c_api_no_effect)
+TEST-227: Collection child link fault before C-API -> NO_EFFECT.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "tests/test_task10b_transaction_atomicity.py", line 8543, in test_227_collection_child_link_fault_before_c_api_no_effect
+    self.assertIn("Fault injected in TEST-227", str(cm.exception))
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Fault injected in TEST-227' not found in 'COLLECTION_RELATION_OWNERSHIP_UNPROVEN: child is not a live TX-created Collection'
+
+----------------------------------------------------------------------
+Ran 31 tests in 2.378s
+
+FAILED (failures=1)
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+FIX7_R3_ATOMICITY_TEST_COUNT 31
+FIX7_R3_ATOMICITY_PASS False

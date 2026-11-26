@@ -1,0 +1,124 @@
+=== TEST-244 EXECUTION LOG ===
+Method: tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation
+Command: & "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+Timestamp: 2026-11-16T15:02:14+08:00
+Exit code: 0
+
+test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation)
+TEST-244: CLEANUP_PENDING 与 FAILED 隔离同时存在时，清理重试必须被 Coordinator 拒绝且不得清除 FAILED 隔离. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.613s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+=== TEST-136 EXECUTION LOG ===
+Method: tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_136_cleanup_pending_and_failed_isolation_strictly_separated
+Command: & "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_136_cleanup_pending_and_failed_isolation_strictly_separated'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+Timestamp: 2026-11-16T15:02:25+08:00
+Exit code: 0
+
+test_136_cleanup_pending_and_failed_isolation_strictly_separated (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_136_cleanup_pending_and_failed_isolation_strictly_separated)
+TEST-136: CLEANUP_PENDING and FAILED isolation remain strictly separated without cross-clearing or FAILED -> COMMITTED. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.259s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+=== TEST-242 EXECUTION LOG ===
+Method: tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback
+Command: & "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+Timestamp: 2026-11-16T15:03:52+08:00
+Exit code: 0
+
+test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback)
+TEST-242: after_logical_commit 故障发生在清理器运行前，仍进入 CLEANUP_PENDING，不能执行普通回滚. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.219s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+=== TEST-243 EXECUTION LOG ===
+Method: tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending
+Command: & "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+Timestamp: 2026-11-16T15:04:27+08:00
+Exit code: 0
+
+test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending)
+TEST-243: 清理成功后的重复请求不得重复删除资源、重复登记或产生幽灵 Pending. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.229s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+=== TEST-163 EXECUTION LOG ===
+Method: tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_163_unknown_liveness_preserves_failed_isolation
+Command: & "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_163_unknown_liveness_preserves_failed_isolation'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+Timestamp: 2026-11-16T15:05:04+08:00
+Exit code: 0
+
+test_163_unknown_liveness_preserves_failed_isolation (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_163_unknown_liveness_preserves_failed_isolation)
+TEST-163: UNKNOWN liveness preserves existing FAILED-B and FAILED-C isolation without false death escalation. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.236s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+=== TEST-131 EXECUTION LOG ===
+Method: tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission
+Command: & "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+Timestamp: 2026-11-16T15:05:33+08:00
+Exit code: 0
+
+test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission)
+TEST-131: Full recovery verification de-isolates FAILED-B and FAILED-C Armature and restores write admission. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.232s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R

@@ -57,10 +57,15 @@ Tests:
 - TEST-76: Verifier captures 6 distinct corruption dimensions with exact field names without mutating scene.
 """
 
+import inspect
+import json
 import math
 import os
 import sys
+import time
 import unittest
+import uuid
+from typing import Any, Dict, List, Optional
 
 import bpy
 from mathutils import Euler, Matrix, Quaternion, Vector
@@ -76,28 +81,264 @@ from src.rig.arm_ik import (
     ARM_IK_TARGET_NAMES,
     ARM_POLE_TARGET_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
-    _ACTIVE_TRANSACTION_STACK,
-    _ArmRigTransactionState,
-    _arm_rig_transaction,
-    _clear_test_depsgraph_updater,
-    _clear_test_fault_injection_hook,
-    _depsgraph_update,
-    _rollback_arm_rig_state,
-    _set_test_depsgraph_updater,
-    _set_test_fault_injection_hook,
-    _snapshot_arm_rig_state,
-    _verify_arm_rig_state_restored,
     get_arm_ik_state,
-    get_pending_arm_rig_cleanup_ids,
     reset_arm_ik,
-    retry_pending_arm_rig_cleanup,
     set_arm_ik_influence,
     set_hand_ik_target,
     setup_arm_ik,
 )
+
+from src.scene_transaction_integrity.fault_injection import (
+    _clear_test_fault_injection_hook,
+    _set_test_fault_injection_hook,
+)
+
+from src.scene_transaction_integrity.layer1.post_commit_cleanup import (
+    _coordinator_apply_cleanup_result,
+)
+from src.scene_transaction_integrity.layer1.authorization_registry import (
+    _COORDINATOR_AUTHORIZATION_GRANTS,
+)
+from src.scene_transaction_integrity.layer1.authorization_grants import (
+    _clear_coordinator_authorization_grants,
+)
+from src.scene_transaction_integrity.layer1.outermost_admission import (
+    _assert_arm_rig_cleanup_gate,
+    _assert_arm_rig_failed_isolation_gate,
+)
+from src.scene_transaction_integrity.layer1.session_liveness import (
+    _sweep_dead_managed_armature_identities,
+    ensure_armature_session_identity,
+    query_admission_gate_status,
+)
+from src.scene_transaction_integrity.layer1.pending_cleanup import (
+    retry_pending_arm_rig_cleanup,
+)
+
+from src.scene_transaction_integrity.layer2.session_records import (
+    ArmatureSessionIdentityRecord,
+    _ArmatureIsolationState,
+    _ArmatureLivenessStatus,
+)
+from src.scene_transaction_integrity.layer2.transaction_stack import (
+    _ACTIVE_TRANSACTION_STACK,
+)
+from src.scene_transaction_integrity.layer2.tombstone_registry import (
+    _ARCHIVED_FAILED_D_TOMBSTONES,
+)
+from src.scene_transaction_integrity.layer2.transaction_states import (
+    _ArmRigTransactionState,
+    _FailedTransactionClass,
+)
+from src.scene_transaction_integrity.layer2.audit_registries import (
+    _DEISOLATION_AUDIT_LOG,
+    _FAILED_A_AUDIT_RECORDS,
+)
+from src.scene_transaction_integrity.layer2.session_registries import (
+    _ISOLATED_FAILED_ARMATURES,
+    _MANAGED_ARMATURE_IDENTITIES,
+)
+from src.scene_transaction_integrity.layer2.pending_cleanup_registry import (
+    _PENDING_ARM_RIG_CLEANUPS,
+    get_pending_arm_rig_cleanup_ids,
+)
+from src.scene_transaction_integrity.layer2.relationship_states import (
+    _RelationshipOperationState,
+)
+from src.scene_transaction_integrity.layer2.identity_helpers import (
+    _check_original_object_liveness,
+)
+from src.scene_transaction_integrity.layer2.session_verification import (
+    _verify_armature_session_identity_record,
+)
+
+from src.scene_transaction_integrity.layer4.depsgraph import (
+    _clear_test_depsgraph_updater,
+    _depsgraph_update,
+    _set_test_depsgraph_updater,
+)
+
+from src.scene_transaction_integrity.layer5.snapshot_capture import (
+    _capture_pre_snapshot_structural_fingerprint,
+    _verify_pre_write_zero_mutation_and_integrity,
+)
+from src.scene_transaction_integrity.layer5.value_evidence import (
+    _has_nan_or_inf,
+    _clone_snapshot_property_value,
+)
+
+from src.scene_transaction_integrity.layer6.cleanup_results import (
+    _CleanupOutcome,
+    _CleanupResult,
+)
+
+from src.scene_transaction_integrity.wiring import (
+    _authorized_create_constraint,
+    _authorized_remove_constraint,
+    _authorized_assign_constraint_targets,
+    _authorized_assign_object_parent,
+    _authorized_link_child_collection,
+    _authorized_unlink_child_collection,
+    _authorized_restore_relationship,
+    _arm_rig_transaction,
+    _authorized_link_object_to_collection,
+    _clear_or_retire_failure_isolation_by_coordinator,
+    _create_arm_rig_transaction_context,
+    _issue_coordinator_authorization_grant,
+    _rollback_arm_rig_state,
+    _snapshot_arm_rig_state,
+    _verify_arm_rig_state_restored,
+    request_armature_deisolation,
+    retire_dead_armature_tombstone,
+    verify_armature_deisolation_evidence,
+    _verify_dead_armature_tombstone_retirement_evidence,
+)
+from src.scene_transaction_integrity import fault_injection, wiring
+from src.scene_transaction_integrity.layer2 import identity_helpers
+from src.scene_transaction_integrity.layer5 import snapshot_capture, value_evidence
 from src.rig.builder import bind_character_to_rig, build_rig
 from src.rig.ik import reset_leg_ik, setup_leg_ik
 from src.rig.pose import reset_pose
+
+_TEST_137_TO_149_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+_TEST_150_TO_155_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+_TEST_156_TO_164_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+_TEST_165_TO_173_RUNTIME_EVIDENCE: Dict[str, Dict[str, Any]] = {}
+
+
+class _ScopedModuleAttributeProxy:
+    """Context manager to safely and temporarily override or set a module-level global attribute."""
+
+    def __init__(self, target_module: Any, attr_name: str, replacement: Any) -> None:
+        self._module = target_module
+        self._attr = attr_name
+        self._replacement = replacement
+        self._had_attr = hasattr(target_module, attr_name)
+        self._orig = getattr(target_module, attr_name, None)
+
+    def __enter__(self) -> "_ScopedModuleAttributeProxy":
+        setattr(self._module, self._attr, self._replacement)
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._had_attr:
+            setattr(self._module, self._attr, self._orig)
+        else:
+            self._module.__dict__.pop(self._attr, None)
+
+
+class _FaultyObjectRefProxy:
+    """Controlled read-only proxy for original_blender_ref to simulate non-ReferenceError access faults."""
+
+    def __init__(self, real_obj: Any, exception_to_raise: Optional[BaseException] = None) -> None:
+        self._real = real_obj
+        self._exc = exception_to_raise or RuntimeError("Controlled reference access failure in test")
+
+    def as_pointer(self) -> int:
+        raise self._exc
+
+    @property
+    def type(self) -> str:
+        raise self._exc
+
+    @property
+    def name(self) -> str:
+        raise self._exc
+
+    def __getattr__(self, name: str) -> Any:
+        raise self._exc
+
+
+class _FaultyObjectsCollectionProxy:
+    """Controlled read-only proxy for bpy.data.objects that raises during values() enumeration."""
+
+    def __init__(self, real_objects: Any, exception_to_raise: Optional[BaseException] = None) -> None:
+        self._real = real_objects
+        self._exc = exception_to_raise or RuntimeError("Controlled objects enumeration failure in test")
+
+    def values(self) -> List[Any]:
+        raise self._exc
+
+    def get(self, *args: Any, **kwargs: Any) -> Any:
+        return self._real.get(*args, **kwargs)
+
+    def __iter__(self) -> Any:
+        raise self._exc
+
+    def __len__(self) -> int:
+        return len(self._real)
+
+    def __getitem__(self, item: Any) -> Any:
+        return self._real[item]
+
+
+class _ScopedBpyObjectsProxy:
+    """Context manager to temporarily override identity_helpers.bpy with a proxy having a faulty objects collection."""
+
+    def __init__(self, faulty_objects_proxy: Any) -> None:
+        self._faulty_objects = faulty_objects_proxy
+        self._identity_module = identity_helpers
+        self._orig_bpy = self._identity_module.bpy
+
+    def __enter__(self) -> "_ScopedBpyObjectsProxy":
+        real_bpy = self._orig_bpy
+        faulty_objs = self._faulty_objects
+
+        class _BpyProxy:
+            def __init__(self) -> None:
+                class _DataProxy:
+                    def __init__(self) -> None:
+                        self.objects = faulty_objs
+
+                    def __getattr__(self, name: str) -> Any:
+                        return getattr(real_bpy.data, name)
+
+                self.data = _DataProxy()
+
+            def __getattr__(self, name: str) -> Any:
+                return getattr(real_bpy, name)
+
+        self._identity_module.bpy = _BpyProxy()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self._identity_module.bpy = self._orig_bpy
+
+
+def _request_coordinator_grant_for_test(
+    session_id: str,
+    transition_action: str = "CLEAR_TO_NONE",
+    arm: Optional[bpy.types.Object] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Helper to invoke _issue_coordinator_authorization_grant across legacy and updated signatures."""
+    sig = inspect.signature(_issue_coordinator_authorization_grant)
+    param_names = list(sig.parameters.keys())
+    if len(param_names) >= 2 and param_names[1] == "transition_action":
+        return _issue_coordinator_authorization_grant(
+            session_id=session_id,
+            transition_action=transition_action,
+            arm=arm,
+            **kwargs,
+        )
+    else:
+        iso_rec = _ISOLATED_FAILED_ARMATURES.get(session_id, {})
+        session_rec = _MANAGED_ARMATURE_IDENTITIES.get(session_id)
+        tx_id = kwargs.get("tx_id", iso_rec.get("transaction_id", "tx_test"))
+        f_class = kwargs.get("failure_class", iso_rec.get("failure_class", "FAILED-B"))
+        iso_state = kwargs.get(
+            "current_isolation_state",
+            (session_rec.isolation_state.value if session_rec else "ISOLATED_FAILED_B"),
+        )
+        ev_status = kwargs.get("evidence_status", "VERIFIED")
+        return _issue_coordinator_authorization_grant(
+            session_id=session_id,
+            tx_id=tx_id,
+            failure_class=f_class,
+            current_isolation_state=iso_state,
+            transition_action=transition_action,
+            evidence_status=ev_status,
+        )
 
 
 class TestArmIKTransactionAtomicity(unittest.TestCase):
@@ -108,8 +349,14 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.ops.wm.read_factory_settings(use_empty=True)
         _clear_test_fault_injection_hook()
         _clear_test_depsgraph_updater()
-        from src.rig.arm_ik import _PENDING_ARM_RIG_CLEANUPS
+        # Test fixture isolation only across read_factory_settings resets (not a production recovery mechanism)
         _PENDING_ARM_RIG_CLEANUPS.clear()
+        _ISOLATED_FAILED_ARMATURES.clear()
+        _MANAGED_ARMATURE_IDENTITIES.clear()
+        _ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        _FAILED_A_AUDIT_RECORDS.clear()
+        _DEISOLATION_AUDIT_LOG.clear()
+        _clear_coordinator_authorization_grants()
         self.config = PipelineConfig()
         self.char_data = build_character(self.config)
         self.root = self.char_data["root"]
@@ -122,9 +369,16 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.context.view_layer.update()
 
     def tearDown(self) -> None:
-        """Ensure fault injection hooks and depsgraph updaters are cleared."""
+        """Ensure fault injection hooks, depsgraph updaters, and test fixture registries are cleared."""
         _clear_test_fault_injection_hook()
         _clear_test_depsgraph_updater()
+        _PENDING_ARM_RIG_CLEANUPS.clear()
+        _ISOLATED_FAILED_ARMATURES.clear()
+        _MANAGED_ARMATURE_IDENTITIES.clear()
+        _ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        _FAILED_A_AUDIT_RECORDS.clear()
+        _DEISOLATION_AUDIT_LOG.clear()
+        _clear_coordinator_authorization_grants()
 
     # -------------------------------------------------------------------------
     # Snapshot Fidelity Tests (TEST-31 to TEST-33)
@@ -255,34 +509,44 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertEqual(len(self.armature.pose.bones["forearm.L"].constraints), 0)
 
     def test_35_direct_rollback_wrong_type_controller(self) -> None:
-        """TEST-35: Rollback on wrong-type controller restores original object type, data block, and collections."""
+        """TEST-35: Pre-transaction wrong-type controller is rejected and original object, datablock, parent, collections, TRS fully preserved."""
         mesh_data = bpy.data.meshes.new("OriginalHandIKMesh")
         wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
         bpy.context.scene.collection.objects.link(wrong_obj)
         wrong_obj.location = Vector((1.0, 2.0, 3.0))
+        wrong_obj.rotation_euler = Euler((0.1, 0.2, 0.3))
+        wrong_obj.scale = Vector((1.1, 1.2, 1.3))
+
+        orig_obj_ptr = wrong_obj.as_pointer()
+        orig_data_ptr = mesh_data.as_pointer()
+        orig_parent = wrong_obj.parent
+        orig_collections = list(wrong_obj.users_collection)
+        orig_loc = Vector(wrong_obj.location)
+        orig_rot = Euler(wrong_obj.rotation_euler)
+        orig_scale = Vector(wrong_obj.scale)
 
         snap = _snapshot_arm_rig_state(self.armature)
         self.assertTrue(snap["controllers"]["HandIK.L"]["exists"])
         self.assertEqual(snap["controllers"]["HandIK.L"]["type"], "MESH")
 
-        # Execute setup under transaction which replaces wrong-type object
-        with self.assertRaises(RuntimeError):
-            with _arm_rig_transaction(self.armature):
-                setup_arm_ik(self.armature)
-                # Verify that inside the transaction, HandIK.L is now an Empty
-                curr_empty = bpy.data.objects.get("HandIK.L")
-                self.assertIsNotNone(curr_empty)
-                self.assertEqual(curr_empty.type, "EMPTY")
-                raise RuntimeError("Fault injected to trigger rollback")
+        # Calling setup_arm_ik rejects the pre-transaction wrong-type object with EXTERNAL_CONTROLLER_NAME_CONFLICT
+        with self.assertRaises(RuntimeError) as ctx:
+            setup_arm_ik(self.armature)
+        self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
 
-        # After rollback, verify original object reference, datablock, and type are restored
-        restored_obj = bpy.data.objects.get("HandIK.L")
-        self.assertIsNotNone(restored_obj)
-        self.assertEqual(restored_obj.type, "MESH")
-        self.assertIs(restored_obj, wrong_obj)
-        self.assertIs(restored_obj.data, mesh_data)
-        self.assertIn(restored_obj.name, bpy.context.scene.collection.objects)
-        self.assertAlmostEqual((restored_obj.location - Vector((1.0, 2.0, 3.0))).length, 0.0, places=5)
+        # Original object, data block, parent, collections, and TRS are fully preserved
+        preserved_obj = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(preserved_obj)
+        self.assertEqual(preserved_obj.as_pointer(), orig_obj_ptr)
+        self.assertEqual(preserved_obj.type, "MESH")
+        self.assertIs(preserved_obj, wrong_obj)
+        self.assertIs(preserved_obj.data, mesh_data)
+        self.assertEqual(preserved_obj.data.as_pointer(), orig_data_ptr)
+        self.assertEqual(preserved_obj.parent, orig_parent)
+        self.assertEqual(list(preserved_obj.users_collection), orig_collections)
+        self.assertEqual(preserved_obj.location, orig_loc)
+        self.assertEqual(preserved_obj.rotation_euler, orig_rot)
+        self.assertEqual(preserved_obj.scale, orig_scale)
         _verify_arm_rig_state_restored(self.armature, snap)
 
     def test_36_direct_rollback_initialized_scene_controllers(self) -> None:
@@ -331,109 +595,96 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """
         TEST-38:
         Restore original constraint identity, order,
-        properties and remove transaction-added constraints.
+        properties and remove transaction-added constraints under live coordinator transaction.
 
         Physical destruction of an original constraint
         is covered separately by TEST-77 and TEST-78.
         """
-
         setup_arm_ik(
             self.armature,
             initial_influence=0.4,
         )
-
-        snap = _snapshot_arm_rig_state(self.armature)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
 
         p_fore = self.armature.pose.bones["forearm.L"]
-
         original = p_fore.constraints["ArmIK.L"]
         original_ptr = original.as_pointer()
-
         original_mute = original.mute
         original_influence = original.influence
+        original_order = [c.name for c in p_fore.constraints]
+        original_count = len(p_fore.constraints)
 
-        # Mutate the original constraint without destroying it.
-        original.influence = 0.9
-        original.mute = not original_mute
+        # [INTRODUCED 2026-11-16T15:45:22+08:00]
+        # FUNCTION: test_38_direct_rollback_constraints
+        # PURPOSE: Verify constraint rollback, order restoration, and created constraint removal under live coordinator transaction
+        # REASON: Task 10-B fix-4, replace mock transaction context with authorized transaction workflow
+        captured_tx = []
+        with self.assertRaises(RuntimeError) as cm:
+            with _arm_rig_transaction(self.armature) as tx:
+                captured_tx.append(tx)
+                self.assertEqual(tx.state, _ArmRigTransactionState.ACTIVE)
 
-        # Add an extraneous constraint.
-        extra = p_fore.constraints.new(type="TRACK_TO")
-        extra.name = "ExtraTrack_TEST38"
+                # Mutate original constraint without destroying it
+                original.influence = 0.9
+                original.mute = not original_mute
 
-        # Move the extra constraint before the original.
-        extra_idx = list(p_fore.constraints).index(extra)
-        p_fore.constraints.move(extra_idx, 0)
+                # Add an authorized transaction-created constraint
+                extra = _authorized_create_constraint(
+                    pbone=p_fore,
+                    con_type="COPY_ROTATION",
+                    con_name="ExtraCopyRotation_TEST38",
+                    active_tx=tx,
+                    arm=self.armature,
+                )
 
-        bpy.context.view_layer.update()
+                # Move the extra constraint before the original
+                extra_idx = list(p_fore.constraints).index(extra)
+                p_fore.constraints.move(extra_idx, 0)
 
-        # Confirm the test actually changed the scene.
-        self.assertEqual(
-            p_fore.constraints[0].name,
-            "ExtraTrack_TEST38",
-        )
+                bpy.context.view_layer.update()
 
-        self.assertAlmostEqual(
-            original.influence,
-            0.9,
-            places=5,
-        )
+                # Confirm scene changed
+                self.assertEqual(p_fore.constraints[0].name, "ExtraCopyRotation_TEST38")
+                self.assertAlmostEqual(original.influence, 0.9, places=5)
+                self.assertEqual(original.mute, not original_mute)
 
-        # Execute rollback.
-        _rollback_arm_rig_state(
-            self.armature,
-            snap,
-        )
+                raise RuntimeError("Fault injected in TEST-38")
 
-        _verify_arm_rig_state_restored(
-            self.armature,
-            snap,
-        )
+        self.assertIn("Fault injected in TEST-38", str(cm.exception))
 
-        # Original assertions: count, name, type, influence.
-        self.assertEqual(
-            len(p_fore.constraints),
-            1,
-        )
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Original assertions: count, name, type, influence, identity
+        self.assertEqual(len(p_fore.constraints), original_count)
+        self.assertEqual([c.name for c in p_fore.constraints], original_order)
 
         restored = p_fore.constraints[0]
+        self.assertEqual(restored.name, "ArmIK.L")
+        self.assertEqual(restored.type, "IK")
+        self.assertAlmostEqual(restored.influence, 0.4, places=5)
 
-        self.assertEqual(
-            restored.name,
-            "ArmIK.L",
-        )
-
-        self.assertEqual(
-            restored.type,
-            "IK",
-        )
-
-        self.assertAlmostEqual(
-            restored.influence,
-            0.4,
-            places=5,
-        )
-
-        # Additional strict identity assertions.
-        self.assertEqual(
-            restored.as_pointer(),
-            original_ptr,
-        )
-
-        self.assertAlmostEqual(
-            restored.influence,
-            original_influence,
-            places=5,
-        )
-
-        self.assertEqual(
-            restored.mute,
-            original_mute,
-        )
+        # Strict identity assertions
+        self.assertEqual(restored.as_pointer(), original_ptr)
+        self.assertAlmostEqual(restored.influence, original_influence, places=5)
+        self.assertEqual(restored.mute, original_mute)
 
         self.assertNotIn(
-            "ExtraTrack_TEST38",
+            "ExtraCopyRotation_TEST38",
             [c.name for c in p_fore.constraints],
         )
+
+        # Verify no FAILED isolation and no CLEANUP_PENDING
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        # Verify arm rig state restored precisely matches transaction snapshot
+        _verify_arm_rig_state_restored(self.armature, tx.snapshot)
 
     # -------------------------------------------------------------------------
     # Fault Injection Tests (TEST-39 to TEST-50)
@@ -460,10 +711,8 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertNotIn("ElbowPole.L", bpy.data.objects)
 
     def test_40_fault_injection_setup_arm_ik_after_controller_replaced(self) -> None:
-        """TEST-40: Fault injection in setup_arm_ik() after wrong-type controller replaced restores original object."""
+        """TEST-40: Fault injection in setup_arm_ik() after transaction-created wrong-type controller replaced rolls back cleanly."""
         mesh_data = bpy.data.meshes.new("WrongTypeMesh")
-        mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(mesh_obj)
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
         def fault_hook(stage: str, ctx: dict) -> None:
@@ -473,13 +722,14 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
 
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx:
+                mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx.register_created_controller(mesh_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, mesh_obj, tx)
+                setup_arm_ik(self.armature)
         self.assertIn("Fault injected after wrong controller replaced", str(cm.exception))
 
         _verify_arm_rig_state_restored(self.armature, snap_initial)
-        restored = bpy.data.objects.get("HandIK.L")
-        self.assertIs(restored, mesh_obj)
-        self.assertIs(restored.data, mesh_data)
 
     def test_41_fault_injection_setup_arm_ik_after_constraints_or_prebend(self) -> None:
         """TEST-41: Fault injection in setup_arm_ik() after constraints/pre-bend modified restores state."""
@@ -1083,33 +1333,128 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         bpy.context.view_layer.update()
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
-        # Inside transaction: create a new collection, reparent Character, and inject error
-        with self.assertRaises(RuntimeError):
+        # [2026-11-19] TEST-57
+        # PURPOSE: Verify authorized Collection creation/link and
+        # rollback cleanup without weakening original hierarchy checks.
+        # REASON: The legacy fixture linked RogueCol before registration,
+        # causing the ownership admission gate to reject it early.
+
+        rogue_ptr = None
+        rogue_link_op = None
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Fault inside transaction with modified collections",
+        ):
             with _arm_rig_transaction(self.armature) as tx:
+
+                # 1. Create after transaction entry.
                 rogue_col = bpy.data.collections.new("RogueCol")
-                bpy.context.scene.collection.children.link(rogue_col)
-                tx.register_created_collection(rogue_col, initial_parent=bpy.context.scene.collection)
+                rogue_ptr = int(rogue_col.as_pointer())
+
+                # 2. Register BEFORE any Collection link.
+                tx.register_created_collection(
+                    rogue_col,
+                    initial_parent=bpy.context.scene.collection,
+                )
+
+                # 3. Use the authorized relationship interface.
+                rogue_link_op = _authorized_link_child_collection(
+                    parent_collection=bpy.context.scene.collection,
+                    child_collection=rogue_col,
+                    active_tx=tx,
+                )
+
+                # 4. Prove the relationship was actually established.
+                self.assertIsNotNone(rogue_link_op)
+                self.assertEqual(
+                    rogue_link_op["intended_mutation"],
+                    "COLLECTION_CHILD_LINK",
+                )
+                self.assertEqual(
+                    rogue_link_op["operation_state"],
+                    _RelationshipOperationState.CONFIRMED,
+                )
+                self.assertIn(
+                    "RogueCol",
+                    bpy.context.scene.collection.children,
+                )
+
+                # 5. Preserve the original Arm IK integration step.
                 setup_arm_ik(self.armature)
-                raise RuntimeError("Fault inside transaction with modified collections")
 
-        # Verify:
-        # 1. RogueCol removed
-        self.assertNotIn("RogueCol", bpy.data.collections)
+                # 6. Inject the ORIGINAL intended failure.
+                raise RuntimeError(
+                    "Fault inside transaction with modified collections"
+                )
 
-        # 2. Character still child of InnerCol and NOT in scene root
-        self.assertIn(char_col.name, inner_col.children)
-        self.assertNotIn(char_col.name, bpy.context.scene.collection.children)
+        # 7. Prove the transaction completed rollback.
+        self.assertEqual(
+            tx.state,
+            _ArmRigTransactionState.ROLLED_BACK,
+        )
 
-        # 3. OuterCol and InnerCol hierarchy preserved
-        self.assertIn(outer_col.name, bpy.context.scene.collection.children)
-        self.assertIn(inner_col.name, outer_col.children)
+        self.assertIsNotNone(rogue_ptr)
+        self.assertIsNotNone(rogue_link_op)
 
-        # 4. _verify_arm_rig_state_restored succeeds
-        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(
+            rogue_link_op["operation_state"],
+            _RelationshipOperationState.REVERTED,
+        )
+
+        # 8. Verify the transaction-created Collection was removed.
+        self.assertNotIn(
+            "RogueCol",
+            bpy.data.collections,
+        )
+
+        self.assertFalse(
+            any(
+                int(col.as_pointer()) == rogue_ptr
+                for col in bpy.data.collections
+            )
+        )
+
+        self.assertNotIn(
+            "RogueCol",
+            bpy.context.scene.collection.children,
+        )
+
+        # 9. Preserve original hierarchy assertions.
+        self.assertIn(
+            char_col.name,
+            inner_col.children,
+        )
+
+        self.assertNotIn(
+            char_col.name,
+            bpy.context.scene.collection.children,
+        )
+
+        self.assertIn(
+            outer_col.name,
+            bpy.context.scene.collection.children,
+        )
+
+        self.assertIn(
+            inner_col.name,
+            outer_col.children,
+        )
+
+        # 10. Full snapshot verification.
+        _verify_arm_rig_state_restored(
+            self.armature,
+            snap_initial,
+        )
+
+        self.assertEqual(
+            len(_ACTIVE_TRANSACTION_STACK),
+            0,
+        )
 
     def test_58_snapshot_failure_clears_active_transaction_stack(self) -> None:
         """TEST-58: Fault during _snapshot_arm_rig_state() completely cleans up transaction stack allowing subsequent calls."""
-        from src.rig.arm_ik import _ACTIVE_TRANSACTION_STACK
+        from src.scene_transaction_integrity.layer2.transaction_stack import _ACTIVE_TRANSACTION_STACK
 
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_snapshot_creation":
@@ -1187,20 +1532,19 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         y_pos = self.root.location.y + 0.15
         target_pos = (-0.32, y_pos, 1.20)
 
-        # Monkeypatch get_arm_ik_state inside src.rig.arm_ik
-        import src.rig.arm_ik as arm_ik_mod
-        orig_getter = arm_ik_mod.get_arm_ik_state
+        # Monkeypatch get_arm_ik_state inside wiring
+        orig_getter = wiring.get_arm_ik_state
 
         def crashing_getter(arm, side):
             raise RuntimeError("Genuine internal getter error")
 
-        arm_ik_mod.get_arm_ik_state = crashing_getter
+        wiring.get_arm_ik_state = crashing_getter
         try:
             with self.assertRaises(RuntimeError) as cm:
                 set_hand_ik_target(self.armature, side="L", world_xyz=target_pos, influence=0.9)
             self.assertIn("Genuine internal getter error", str(cm.exception))
         finally:
-            arm_ik_mod.get_arm_ik_state = orig_getter
+            wiring.get_arm_ik_state = orig_getter
 
         # Verify complete rollback
         _verify_arm_rig_state_restored(self.armature, snap_initial)
@@ -1278,8 +1622,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         self.assertFalse(hasattr(arm_ik_mod, "clear_fault_injection_hook"))
 
         # Verify private test functions exist
-        self.assertTrue(hasattr(arm_ik_mod, "_set_test_fault_injection_hook"))
-        self.assertTrue(hasattr(arm_ik_mod, "_clear_test_fault_injection_hook"))
+        self.assertTrue(hasattr(fault_injection, "_set_test_fault_injection_hook"))
+        self.assertTrue(hasattr(fault_injection, "_clear_test_fault_injection_hook"))
+        self.assertFalse(hasattr(fault_injection, "set_fault_injection_hook"))
+        self.assertFalse(hasattr(fault_injection, "clear_fault_injection_hook"))
+        self.assertFalse(hasattr(arm_ik_mod, "_set_test_fault_injection_hook"))
+        self.assertFalse(hasattr(arm_ik_mod, "_clear_test_fault_injection_hook"))
+        self.assertFalse(hasattr(arm_ik_mod, "_trigger_fault_injection"))
 
         # Verify hook is cleared and does not leak
         called = []
@@ -1287,75 +1636,170 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             called.append(stage)
 
         _set_test_fault_injection_hook(test_hook)
-        arm_ik_mod._trigger_fault_injection("test_stage_dummy")
+        fault_injection._trigger_fault_injection("test_stage_dummy")
         self.assertEqual(called, ["test_stage_dummy"])
 
         _clear_test_fault_injection_hook()
-        arm_ik_mod._trigger_fault_injection("test_stage_dummy_2")
+        fault_injection._trigger_fault_injection("test_stage_dummy_2")
         self.assertEqual(called, ["test_stage_dummy"])
 
     def test_64_commit_cleanup_failure_and_datablock_lifecycle(self) -> None:
-        """TEST-64: Commit cleanup removes orphaned Data Blocks, preserves shared Data Blocks, and reports cleanup errors.
+        """TEST-64: Combined Mesh/Curve cleanup failure preserves both DataBlocks."""
 
-        Note: TEST-64 focuses specifically on data block reference counting and cleanup
-        error reporting. Complementary test TEST-66 verifies transaction state transitions
-        (COMMITTED / CLEANUP_PENDING) and retry_cleanup() idempotency.
-        """
-        # 1. Create wrong-type HandIK.L with MESH data block
+        # [2026-11-18] TEST-64: Verify the unique combined Mesh + shared Curve
+        # cleanup boundary without repeating the single-resource TEST-66 path.
+
         mesh_data = bpy.data.meshes.new("DoomedMesh")
-        wrong_mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(wrong_mesh_obj)
+        mesh_ptr = int(mesh_data.as_pointer())
 
-        # 2. Create wrong-type ElbowPole.L with CURVE data block that is shared with another object
         curve_data = bpy.data.curves.new("SharedCurve", type="CURVE")
-        wrong_curve_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
-        bpy.context.scene.collection.objects.link(wrong_curve_obj)
+        curve_ptr = int(curve_data.as_pointer())
 
         sharing_obj = bpy.data.objects.new("SharingCurveObj", curve_data)
         bpy.context.scene.collection.objects.link(sharing_obj)
 
-        self.assertGreater(curve_data.users, 1)
+        self.assertGreater(curve_data.users, 0)
 
-        # 3. Successful transaction commit
-        setup_arm_ik(self.armature)
+        captured_cleanup = []
 
-        # Doomed mesh data block must be cleaned up, and controller must now be an EMPTY
-        self.assertNotIn("DoomedMesh", bpy.data.meshes)
-        self.assertEqual(bpy.data.objects["HandIK.L"].type, "EMPTY")
-
-        # Shared curve object replaced with an EMPTY, but shared curve data block preserved!
-        self.assertEqual(bpy.data.objects["ElbowPole.L"].type, "EMPTY")
-        self.assertIn("SharedCurve", bpy.data.curves)
-        self.assertIs(sharing_obj.data, curve_data)
-
-        # 4. Injected commit cleanup failure reports explicit RuntimeError
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
+                captured_cleanup.append(ctx["tx"])
                 raise RuntimeError("Simulated commit cleanup failure")
 
         _set_test_fault_injection_hook(fault_hook)
 
-        # Add another wrong-type object to trigger commit cleanup
-        mesh_data_2 = bpy.data.meshes.new("DoomedMesh2")
-        wrong_obj_2 = bpy.data.objects.new("HandIK.R", mesh_data_2)
-        bpy.context.scene.collection.objects.link(wrong_obj_2)
+        try:
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Simulated commit cleanup failure"
+            ):
+                with _arm_rig_transaction(self.armature) as tx:
 
-        with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
-        self.assertIn("Simulated commit cleanup failure", str(cm.exception))
+                    wrong_mesh_obj = bpy.data.objects.new(
+                        "HandIK.L",
+                        mesh_data
+                    )
+                    tx.register_created_controller(wrong_mesh_obj)
+
+                    _authorized_link_object_to_collection(
+                        bpy.context.scene.collection,
+                        wrong_mesh_obj,
+                        tx
+                    )
+
+                    wrong_curve_obj = bpy.data.objects.new(
+                        "ElbowPole.L",
+                        curve_data
+                    )
+                    tx.register_created_controller(wrong_curve_obj)
+
+                    _authorized_link_object_to_collection(
+                        bpy.context.scene.collection,
+                        wrong_curve_obj,
+                        tx
+                    )
+
+                    self.assertGreater(curve_data.users, 1)
+
+                    setup_arm_ik(self.armature)
+
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_cleanup), 1)
+        self.assertIs(captured_cleanup[0], tx)
+
+        self.assertEqual(
+            tx.state,
+            _ArmRigTransactionState.CLEANUP_PENDING
+        )
+
+        self.assertIn(
+            tx.tx_id,
+            get_pending_arm_rig_cleanup_ids()
+        )
+
+        self.assertGreaterEqual(
+            len(tx.uncleaned_stashed_objects),
+            2
+        )
+
+        # Both active controllers have already been replaced.
+        self.assertEqual(
+            bpy.data.objects["HandIK.L"].type,
+            "EMPTY"
+        )
+        self.assertEqual(
+            bpy.data.objects["ElbowPole.L"].type,
+            "EMPTY"
+        )
+
+        # The failed cleanup must not destroy either original DataBlock.
+        self.assertIn("DoomedMesh", bpy.data.meshes)
+        self.assertEqual(
+            int(bpy.data.meshes["DoomedMesh"].as_pointer()),
+            mesh_ptr
+        )
+
+        self.assertIn("SharedCurve", bpy.data.curves)
+        self.assertEqual(
+            int(bpy.data.curves["SharedCurve"].as_pointer()),
+            curve_ptr
+        )
+        self.assertEqual(sharing_obj.data, curve_data)
+
+        # Retry the real Coordinator-owned cleanup.
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+
+        self.assertEqual(
+            tx.state,
+            _ArmRigTransactionState.COMMITTED
+        )
+
+        self.assertNotIn(
+            tx.tx_id,
+            get_pending_arm_rig_cleanup_ids()
+        )
+
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+
+        # Neither DataBlock has deletion authority.
+        self.assertIn("DoomedMesh", bpy.data.meshes)
+        self.assertEqual(
+            int(bpy.data.meshes["DoomedMesh"].as_pointer()),
+            mesh_ptr
+        )
+        self.assertEqual(bpy.data.meshes["DoomedMesh"].users, 0)
+
+        self.assertIn("SharedCurve", bpy.data.curves)
+        self.assertEqual(
+            int(bpy.data.curves["SharedCurve"].as_pointer()),
+            curve_ptr
+        )
+        self.assertEqual(sharing_obj.data, curve_data)
+        self.assertGreaterEqual(curve_data.users, 1)
+
+        outcomes = [
+            item for item in tx.datablock_cleanup_outcomes
+            if item.get("resource_name") == "DoomedMesh"
+        ]
+
+        self.assertTrue(
+            any(
+                item.get("status") == "PRESERVED_NO_DELETE_AUTHORITY"
+                for item in outcomes
+            )
+        )
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
 
     def test_65_reversible_commit_preparation_failure_rolls_back(self) -> None:
         """TEST-65: Reversible commit preparation failure (Phase 1) rolls back without destroying stashed resources."""
-        # 1. Setup initial state with a wrong-type controller to verify it's stashed and restored intact
         mesh_data = bpy.data.meshes.new("TestMesh65")
-        mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(mesh_obj)
-        orig_obj_ptr = mesh_obj.as_pointer()
-        orig_data_ptr = mesh_data.as_pointer()
-
         snap_initial = _snapshot_arm_rig_state(self.armature)
 
-        # 2. Inject failure at Phase 1 before_commit_prepare
+        # Inject failure at Phase 1 before_commit_prepare
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "before_commit_prepare":
                 raise RuntimeError("Simulated Phase 1 preparation failure")
@@ -1363,17 +1807,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
 
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx:
+                mesh_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx.register_created_controller(mesh_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, mesh_obj, tx)
+                setup_arm_ik(self.armature)
         self.assertIn("Simulated Phase 1 preparation failure", str(cm.exception))
-
-        # 3. Assertions
-        # Stashed wrong-type object and mesh data block identities must NOT be destroyed
-        self.assertIn("HandIK.L", bpy.data.objects)
-        restored_obj = bpy.data.objects["HandIK.L"]
-        self.assertEqual(restored_obj.as_pointer(), orig_obj_ptr)
-        self.assertEqual(restored_obj.type, "MESH")
-        self.assertIn("TestMesh65", bpy.data.meshes)
-        self.assertEqual(restored_obj.data.as_pointer(), orig_data_ptr)
 
         # Active transaction stack restored to empty
         self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
@@ -1385,8 +1824,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-66: Irreversible cleanup failure (Phase 3) leaves rig COMMITTED, tracks uncleaned resources, and retries cleanly."""
         # 1. Add a wrong-type object that requires cleanup
         mesh_data = bpy.data.meshes.new("DoomedMesh66")
-        wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
-        bpy.context.scene.collection.objects.link(wrong_obj)
+        orig_mesh_ptr = mesh_data.as_pointer()
 
         captured_tx = []
 
@@ -1397,9 +1835,13 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         _set_test_fault_injection_hook(fault_hook)
 
-        # 2. Call setup_arm_ik() -> must raise RuntimeError because cleanup failed
+        # 2. Call setup_arm_ik() inside outer transaction with transaction-created wrong-type controller
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx_outer:
+                wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx_outer.register_created_controller(wrong_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                setup_arm_ik(self.armature)
         self.assertIn("Simulated Phase 3 irreversible cleanup failure", str(cm.exception))
 
         # 3. Verify transaction state and semantics
@@ -1423,34 +1865,37 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # 4. Clear the fault hook and execute idempotent retry
         _clear_test_fault_injection_hook()
-        tx.retry_cleanup()
+        retry_pending_arm_rig_cleanup(tx.tx_id)
 
         # After retry, transaction converges to COMMITTED with no cleanup error
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
         self.assertIsNone(tx.cleanup_error)
         self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
-        self.assertNotIn("DoomedMesh66", bpy.data.meshes)
+
+        # DoomedMesh66 has no delete authority -> MUST be preserved after retry
+        self.assertIn("DoomedMesh66", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["DoomedMesh66"].as_pointer(), orig_mesh_ptr)
+        self.assertEqual(bpy.data.meshes["DoomedMesh66"].users, 0)
+        mesh66_outcomes = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_name") == "DoomedMesh66"]
+        self.assertTrue(any(o.get("status") == "PRESERVED_NO_DELETE_AUTHORITY" for o in mesh66_outcomes))
 
         # Second retry is idempotent and harmless
         tx.retry_cleanup()
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        mesh66_outcomes_second = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_name") == "DoomedMesh66"]
+        self.assertEqual(len(mesh66_outcomes), len(mesh66_outcomes_second))
 
     def test_67_partial_cleanup_failure_and_convergence(self) -> None:
         """TEST-67: Partial cleanup failure prevents duplicate deletions, protects shared resources, and converges on retry."""
         # Setup 2 wrong-type controllers:
         # 1) HandIK.L with exclusive mesh
         mesh_excl = bpy.data.meshes.new("ExclMesh67")
-        wrong_l = bpy.data.objects.new("HandIK.L", mesh_excl)
-        bpy.context.scene.collection.objects.link(wrong_l)
 
         # 2) HandIK.R with shared curve
         curve_shared = bpy.data.curves.new("SharedCurve67", type="CURVE")
-        wrong_r = bpy.data.objects.new("HandIK.R", curve_shared)
-        bpy.context.scene.collection.objects.link(wrong_r)
-
         other_obj = bpy.data.objects.new("OtherObj67", curve_shared)
         bpy.context.scene.collection.objects.link(other_obj)
-        self.assertGreaterEqual(curve_shared.users, 2)
+        self.assertGreaterEqual(curve_shared.users, 1)
 
         # Setup 2 wrong-type constraints on forearm.L
         pbone_l = self.armature.pose.bones["forearm.L"]
@@ -1480,7 +1925,16 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
 
         with self.assertRaises(RuntimeError) as cm:
-            setup_arm_ik(self.armature)
+            with _arm_rig_transaction(self.armature) as tx_outer:
+                wrong_l = bpy.data.objects.new("HandIK.L", mesh_excl)
+                tx_outer.register_created_controller(wrong_l)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_l, tx_outer)
+
+                wrong_r = bpy.data.objects.new("HandIK.R", curve_shared)
+                tx_outer.register_created_controller(wrong_r)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_r, tx_outer)
+
+                setup_arm_ik(self.armature)
         self.assertIn("Simulated partial commit cleanup failure", str(cm.exception))
 
         self.assertEqual(len(captured_tx), 1)
@@ -1495,7 +1949,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         # Retry cleanup converges cleanly
         _clear_test_fault_injection_hook()
-        tx.retry_cleanup()
+        retry_pending_arm_rig_cleanup(tx.tx_id)
         self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
         self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
         self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
@@ -1571,7 +2025,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_69_snapshot_array_immutability_and_independence(self) -> None:
         """TEST-69: Snapshot arrays are immutable tuples, immune to in-place RNA mutations, and restored properly."""
-        from src.rig.arm_ik import _clone_snapshot_property_value
+        from src.scene_transaction_integrity.layer5.value_evidence import _clone_snapshot_property_value
         setup_arm_ik(self.armature, initial_influence=0.5)
 
         snap = _snapshot_arm_rig_state(self.armature)
@@ -1717,7 +2171,8 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         # 2. Both original parents restored: scene.collection and parent_col2
         self.assertIn("Character", bpy.context.scene.collection.children)
         self.assertIn("Character", parent_col2.children)
-        self.assertNotIn("Character", parent_col3.children)
+        # 3. External addition parent_col3 link is preserved on rollback (Task 10-B-7 ownership isolation)
+        self.assertIn("Character", parent_col3.children)
 
         # Clean up additional collections
         bpy.context.scene.collection.children.unlink(parent_col2)
@@ -2006,6 +2461,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_79_external_character_collection_creation_preserved(self) -> None:
         """TEST-79: External Character collection created during transaction is preserved on rollback."""
+        # 1. Ensure initial scene does not have Character collection
         char_col = bpy.data.collections.get("Character")
         if char_col is not None:
             for parent in list(bpy.data.collections):
@@ -2020,31 +2476,79 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
         external_col = [None]
         external_ptr = [None]
+        owned_col_ptr = [None]
 
         def fault_hook(stage: str, ctx: dict) -> None:
-            if stage == "setup_arm_ik_after_first_controller":
-                ext = bpy.data.collections.new("External_Character_Marker")
-                bpy.context.scene.collection.children.link(ext)
-                if "Character" not in bpy.data.collections:
-                    c = bpy.data.collections.new("Character")
-                    bpy.context.scene.collection.children.link(c)
-                    external_col[0] = c
-                    external_ptr[0] = c.as_pointer()
-                raise RuntimeError("Injected fault during setup_arm_ik")
+            if stage != "setup_arm_ik_after_first_controller":
+                return
+
+            owned = bpy.data.collections.get("Character")
+            if owned is None:
+                raise AssertionError(
+                    "TEST-79: transaction did not create Character"
+                )
+
+            owned_col_ptr[0] = owned.as_pointer()
+
+            # Release the original name without destroying
+            # the transaction-owned collection.
+            owned.name = "Character_TX_79"
+
+            # External code now creates a different Collection
+            # with the original name.
+            ext = bpy.data.collections.new("Character")
+            bpy.context.scene.collection.children.link(ext)
+
+            external_col[0] = ext
+            external_ptr[0] = ext.as_pointer()
+
+            if external_ptr[0] == owned_col_ptr[0]:
+                raise AssertionError(
+                    "TEST-79: external and transaction-owned "
+                    "collections unexpectedly share identity"
+                )
+
+            raise RuntimeError(
+                "TEST-79 injected rollback failure"
+            )
 
         _set_test_fault_injection_hook(fault_hook)
         try:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(RuntimeError) as cm:
                 setup_arm_ik(self.armature)
+            self.assertIn("TEST-79 injected rollback failure", str(cm.exception))
 
+            # Required assertions (Task 10-B-7 Section 6.2)
+            self.assertIsNotNone(external_col[0])
+            self.assertIn("Character", bpy.data.collections)
+            self.assertEqual(
+                bpy.data.collections["Character"].as_pointer(),
+                external_ptr[0],
+            )
+
+            # 1. Transaction-owned original collection is cleaned up
+            self.assertNotIn("Character_TX_79", bpy.data.collections)
+            self.assertFalse(
+                any(c.as_pointer() == owned_col_ptr[0] for c in bpy.data.collections)
+            )
+
+            # 2. External Collection's parent link is preserved
+            self.assertIn("Character", bpy.context.scene.collection.children)
+            self.assertEqual(
+                bpy.context.scene.collection.children["Character"].as_pointer(),
+                external_ptr[0],
+            )
+
+            # 3. Active transaction stack is empty
             self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
-            self.assertIn("External_Character_Marker", bpy.data.collections)
-            if external_col[0] is not None:
-                self.assertIn("Character", bpy.data.collections)
-                self.assertEqual(bpy.data.collections["Character"].as_pointer(), external_ptr[0])
+
+            # 4. No lingering transaction controllers
+            for c_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+                self.assertNotIn(c_name, bpy.data.objects)
+
         finally:
             _clear_test_fault_injection_hook()
-            for c_name in ("External_Character_Marker", "Character"):
+            for c_name in ("Character_TX_79", "Character"):
                 c = bpy.data.collections.get(c_name)
                 if c is not None:
                     for parent in list(bpy.data.collections):
@@ -2092,8 +2596,6 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
     def test_81_cleanup_pending_registry_and_retry(self) -> None:
         """TEST-81: Phase 3 cleanup failure registers pending cleanup; queryable and retriable without test callbacks."""
         wrong_mesh = bpy.data.meshes.new("DoomedMesh81")
-        wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
-        bpy.data.collections["Character"].objects.link(wrong_obj)
 
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_commit_cleanup":
@@ -2102,7 +2604,11 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
         try:
             with self.assertRaises(RuntimeError) as cm:
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                    setup_arm_ik(self.armature)
 
             self.assertIn("irreversible cleanup failed", str(cm.exception))
 
@@ -2121,9 +2627,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         """TEST-82: Object removed but datablock removal fails; pending state retained and retried without RNA error."""
         exclusive_mesh = bpy.data.meshes.new("ExclusiveMesh82")
         exclusive_mesh_ptr = exclusive_mesh.as_pointer()
-        wrong_obj = bpy.data.objects.new("HandIK.L", exclusive_mesh)
-        wrong_obj_ptr = wrong_obj.as_pointer()
-        bpy.data.collections["Character"].objects.link(wrong_obj)
+        wrong_obj_ptr = None
 
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_cleanup_datablock_removal":
@@ -2132,7 +2636,12 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         _set_test_fault_injection_hook(fault_hook)
         try:
             with self.assertRaises(RuntimeError):
-                setup_arm_ik(self.armature)
+                with _arm_rig_transaction(self.armature) as tx:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", exclusive_mesh)
+                    wrong_obj_ptr = wrong_obj.as_pointer()
+                    tx.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                    setup_arm_ik(self.armature)
 
             pending_ids = get_pending_arm_rig_cleanup_ids()
             self.assertGreaterEqual(len(pending_ids), 1)
@@ -2148,7 +2657,10 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
             retry_pending_arm_rig_cleanup(target_id)
 
             mesh_alive_after_retry = any(m.as_pointer() == exclusive_mesh_ptr for m in bpy.data.meshes)
-            self.assertFalse(mesh_alive_after_retry, "Mesh datablock should be cleaned up on retry")
+            self.assertTrue(mesh_alive_after_retry, "Mesh datablock without delete authority must be preserved on retry")
+            self.assertIn("ExclusiveMesh82", bpy.data.meshes)
+            self.assertEqual(bpy.data.meshes["ExclusiveMesh82"].as_pointer(), exclusive_mesh_ptr)
+            self.assertEqual(bpy.data.meshes["ExclusiveMesh82"].users, 0)
 
             self.assertNotIn(target_id, get_pending_arm_rig_cleanup_ids())
         finally:
@@ -2159,15 +2671,15 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         shared_mesh = bpy.data.meshes.new("SharedPropMesh83")
         shared_mesh_ptr = shared_mesh.as_pointer()
 
-        wrong_obj = bpy.data.objects.new("HandIK.L", shared_mesh)
-        bpy.data.collections["Character"].objects.link(wrong_obj)
-
         external_user = bpy.data.objects.new("ExternalBackgroundObj83", shared_mesh)
         bpy.context.scene.collection.objects.link(external_user)
 
-        self.assertGreater(shared_mesh.users, 1)
-
-        setup_arm_ik(self.armature)
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.L", shared_mesh)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            self.assertGreater(shared_mesh.users, 1)
+            setup_arm_ik(self.armature)
 
         self.assertIn("SharedPropMesh83", bpy.data.meshes)
         self.assertEqual(bpy.data.meshes["SharedPropMesh83"].as_pointer(), shared_mesh_ptr)
@@ -2224,6 +2736,7071 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         snap_final = _snapshot_arm_rig_state(self.armature)
         _verify_arm_rig_state_restored(self.armature, snap_final)
 
+    def test_85_same_armature_cleanup_pending_blocks_new_transaction(self) -> None:
+        """TEST-85: Reject new independent writes while same Armature owns an unresolved committed cleanup."""
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Injected cleanup failure for TEST-85")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Injected cleanup failure for TEST-85", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Confirm that Cleanup Pending is registered on this armature
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertGreater(len(pending_ids), 0)
+
+        # Now attempt to initiate a new independent write on the SAME armature
+        with self.assertRaises(RuntimeError) as cm_block:
+            setup_arm_ik(self.armature)
+        self.assertIn("Arm IK write blocked: unresolved cleanup for the same Armature", str(cm_block.exception))
+
+        # Also verify set_hand_ik_target is blocked
+        y_pos = self.root.location.y + 0.15
+        with self.assertRaises(RuntimeError) as cm_block2:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIn("Arm IK write blocked: unresolved cleanup for the same Armature", str(cm_block2.exception))
+
+        # Prove blocking occurred before any transaction mutation (active stack depth 0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_86_unrelated_armature_not_blocked_by_pending_cleanup(self) -> None:
+        """TEST-86: Unresolved cleanup on Armature A does not block independent writes on Armature B."""
+        setup_arm_ik(self.armature)
+
+        # Manually register a mock Cleanup Pending transaction on Armature A
+        tx_a = _create_arm_rig_transaction_context(self.armature)
+        tx_a.state = _ArmRigTransactionState.CLEANUP_PENDING
+        tx_a.uncleaned_stashed_objects.append({"obj_cleaned": False, "original_name": "Mock86"})
+        _PENDING_ARM_RIG_CLEANUPS[tx_a.tx_id] = tx_a
+
+        # Create independent Armature B
+        arm_b_data = bpy.data.armatures.new("ArmBData_86")
+        arm_b = bpy.data.objects.new("ArmatureB_86", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        # Armature B should NOT be blocked
+        try:
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertIsNotNone(tx_b)
+                self.assertEqual(tx_b.arm, arm_b)
+                self.assertEqual(tx_b.state, _ArmRigTransactionState.ACTIVE)
+        finally:
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+            _PENDING_ARM_RIG_CLEANUPS.clear()
+
+    def test_87_pending_cleanup_retry_success_restores_write_admission(self) -> None:
+        """TEST-87: Retrying pending cleanup to completion clears registry and allows new write transactions."""
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Injected cleanup failure for TEST-87")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Injected cleanup failure for TEST-87", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids), 1)
+        tx_id = pending_ids[0]
+
+        # Verify admission is blocked
+        with self.assertRaises(RuntimeError) as cm_block:
+            setup_arm_ik(self.armature)
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_block.exception))
+
+        # Retry pending cleanup without fault injection -> should succeed and unregister
+        retry_pending_arm_rig_cleanup(tx_id)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        # Now public write API should succeed cleanly
+        y_pos = self.root.location.y + 0.15
+        state = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIsNotNone(state)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_88_stashed_constraint_same_name_replacement_not_erroneously_deleted(self) -> None:
+        """TEST-88: Stashed constraint cleanup matches by pointer identity and does not remove same-name substitute."""
+        setup_arm_ik(self.armature)
+        p_fore = self.armature.pose.bones["forearm.L"]
+        original_con = p_fore.constraints["ArmIK.L"]
+        original_ptr = original_con.as_pointer()
+
+        # Create a transaction context and register a stashed constraint with an obsolete pointer
+        tx = _create_arm_rig_transaction_context(self.armature)
+        obsolete_ptr = original_ptr + 999999  # distinct pointer
+        stashed_record = {
+            "pbone": p_fore,
+            "con_ptr": obsolete_ptr,
+            "orig_name": "ArmIK.L",
+        }
+        tx.uncleaned_stashed_constraints.append(stashed_record)
+
+        # Execute retry_cleanup()
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        res88 = tx.retry_cleanup()
+        self.assertEqual(res88.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(res88.remaining_constraints, 0)
+
+        # The live ArmIK.L constraint must NOT have been removed because pointers differ
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        self.assertEqual(p_fore.constraints["ArmIK.L"].as_pointer(), original_ptr)
+        # The uncleaned list should have removed the record since target was absent
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+
+    def test_89_original_character_collection_rename_restores_identity_and_name(self) -> None:
+        """TEST-89: Character collection renamed during transaction is restored by identity and name without phantom."""
+        char_col = bpy.data.collections.get("Character")
+        if char_col is None:
+            char_col = bpy.data.collections.new("Character")
+            bpy.context.scene.collection.children.link(char_col)
+
+        orig_ptr = char_col.as_pointer()
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                c = bpy.data.collections.get("Character")
+                if c is not None:
+                    c.name = "Character_Renamed_89"
+                raise RuntimeError("Inject fault for TEST-89")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Inject fault for TEST-89", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Assertions
+        self.assertIn("Character", bpy.data.collections)
+        self.assertNotIn("Character_Renamed_89", bpy.data.collections)
+        self.assertEqual(bpy.data.collections["Character"].as_pointer(), orig_ptr)
+        self.assertIn("Character", bpy.context.scene.collection.children)
+        self.assertEqual(
+            len([c for c in bpy.data.collections if c.name == "Character"]),
+            1,
+        )
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_90_original_parent_collection_rename_restored_by_identity(self) -> None:
+        """TEST-90: Parent collection renamed during transaction is restored by identity reference without relying on name."""
+        char_col = bpy.data.collections["Character"]
+        p_col = bpy.data.collections.new("ParentCol_90")
+        bpy.context.scene.collection.children.link(p_col)
+        p_col.children.link(char_col)
+
+        p_col_ptr = p_col.as_pointer()
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                p = bpy.data.collections.get("ParentCol_90")
+                if p is not None:
+                    p.name = "ParentCol_90_Renamed"
+                    c = bpy.data.collections.get("Character")
+                    if c is not None and any(child.as_pointer() == c.as_pointer() for child in p.children):
+                        p.children.unlink(c)
+                raise RuntimeError("Inject fault for TEST-90")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Inject fault for TEST-90", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Verification: link restored to p_col even though p_col is renamed!
+        self.assertTrue(
+            any(child.as_pointer() == char_col.as_pointer() for child in p_col.children)
+        )
+        self.assertEqual(p_col.as_pointer(), p_col_ptr)
+
+        # Cleanup
+        bpy.context.scene.collection.children.unlink(p_col)
+        bpy.data.collections.remove(p_col)
+
+    def test_91_external_child_collection_preserved_on_rollback(self) -> None:
+        """TEST-91: External child collection added to Character collection during transaction is preserved on rollback."""
+        setup_arm_ik(self.armature)
+        char_col = bpy.data.collections["Character"]
+        initial_child = bpy.data.collections.new("Initial_Child_91")
+        char_col.children.link(initial_child)
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        external_child = [None]
+        external_child_ptr = [None]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                ext_child = bpy.data.collections.new("External_Child_91")
+                c = bpy.data.collections["Character"]
+                c.children.link(ext_child)
+                external_child[0] = ext_child
+                external_child_ptr[0] = ext_child.as_pointer()
+                raise RuntimeError("Inject fault for TEST-91")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+            self.assertIn("Inject fault for TEST-91", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both original child and external child must be linked to Character
+        self.assertIn("Initial_Child_91", [c.name for c in char_col.children])
+        self.assertIn("External_Child_91", [c.name for c in char_col.children])
+        self.assertEqual(
+            bpy.data.collections["External_Child_91"].as_pointer(),
+            external_child_ptr[0],
+        )
+
+        # Cleanup
+        char_col.children.unlink(initial_child)
+        bpy.data.collections.remove(initial_child)
+        char_col.children.unlink(external_child[0])
+        bpy.data.collections.remove(external_child[0])
+
+    def test_92_full_lifecycle_and_continuous_transaction_integration(self) -> None:
+        """TEST-92: Comprehensive sequence of snapshot, rollback, commit, cleanup failure, admission gate, retry, and re-entry."""
+        # 1. Initial rig setup
+        setup_arm_ik(self.armature)
+        snap1 = _snapshot_arm_rig_state(self.armature)
+
+        # 2. Normal transaction
+        y_pos = self.root.location.y + 0.15
+        state1 = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIsNotNone(state1)
+        self.assertTrue(state1["is_reachable"])
+
+        # 3. Injected reversible fault and rollback
+        snap2 = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook_rb(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Injected reversible failure in TEST-92")
+
+        _set_test_fault_injection_hook(fault_hook_rb)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.25, y_pos, 1.10))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        _verify_arm_rig_state_restored(self.armature, snap2)
+
+        # 4. Replace controller, commit successfully but inject Phase 3 cleanup failure
+        old_hand = bpy.data.objects["HandIK.L"]
+        mesh_data = bpy.data.meshes.new("DoomedMesh92")
+        bpy.data.objects.remove(old_hand, do_unlink=True)
+
+        def fault_hook_clean(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Injected Phase 3 cleanup failure in TEST-92")
+
+        _set_test_fault_injection_hook(fault_hook_clean)
+        try:
+            with self.assertRaises(RuntimeError) as cm_cf:
+                with _arm_rig_transaction(self.armature) as tx_clean:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                    tx_clean.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_clean)
+                    setup_arm_ik(self.armature)
+            self.assertIn("Injected Phase 3 cleanup failure in TEST-92", str(cm_cf.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # 5. Verify Cleanup Pending and write admission blocking
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids), 1)
+        tx_id = pending_ids[0]
+
+        with self.assertRaises(RuntimeError) as cm_gate:
+            set_hand_ik_target(self.armature, side="R", world_xyz=(0.32, y_pos, 1.20))
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_gate.exception))
+
+        # 6. Retry pending cleanup to completion
+        retry_pending_arm_rig_cleanup(tx_id)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        # 7. Resume normal writes
+        state_r = set_hand_ik_target(self.armature, side="R", world_xyz=(0.32, y_pos, 1.20))
+        self.assertIsNotNone(state_r)
+        self.assertTrue(state_r["is_reachable"])
+
+        # 8. Assert absolute state integrity
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        snap_final = _snapshot_arm_rig_state(self.armature)
+        _verify_arm_rig_state_restored(self.armature, snap_final)
+
+    def test_93_transaction_created_controller_renamed_cleaned_by_identity(self) -> None:
+        """TEST-93: Transaction creates HandIK.L, then renames it; failure deletes by identity without residual."""
+        old_hand = bpy.data.objects.get("HandIK.L")
+        if old_hand is not None:
+            bpy.data.objects.remove(old_hand, do_unlink=True)
+
+        unrelated = bpy.data.objects.new("UnrelatedObj93", None)
+        bpy.context.scene.collection.objects.link(unrelated)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                hand = bpy.data.objects.get("HandIK.L")
+                if hand is not None:
+                    hand.name = "HandIK_Renamed_93"
+                raise RuntimeError("Fault injected in TEST-93 after renaming controller")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected in TEST-93", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNone(bpy.data.objects.get("HandIK_Renamed_93"))
+        self.assertIsNone(bpy.data.objects.get("HandIK.L"))
+        self.assertIsNotNone(bpy.data.objects.get("UnrelatedObj93"))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        bpy.data.objects.remove(unrelated, do_unlink=True)
+
+    def test_94_external_same_name_controller_preserved_when_transaction_controller_renamed(self) -> None:
+        """TEST-94: Transaction controller renamed, external creates same-name HandIK.L; rollback cleans tx object and preserves external."""
+        old_hand = bpy.data.objects.get("HandIK.L")
+        if old_hand is not None:
+            bpy.data.objects.remove(old_hand, do_unlink=True)
+
+        external_ptr = [None]
+        external_mesh = [None]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                hand = bpy.data.objects.get("HandIK.L")
+                if hand is not None:
+                    hand.name = "HandIK_TX_Renamed_94"
+                mesh_data = bpy.data.meshes.new("Mesh_94")
+                external_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                bpy.context.scene.collection.objects.link(external_obj)
+                external_ptr[0] = external_obj.as_pointer()
+                external_mesh[0] = mesh_data
+                raise RuntimeError("Fault injected in TEST-94 after external creation")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected in TEST-94", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNone(bpy.data.objects.get("HandIK_TX_Renamed_94"))
+        ext_live = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(ext_live)
+        self.assertEqual(ext_live.as_pointer(), external_ptr[0])
+        self.assertIsNotNone(bpy.data.meshes.get("Mesh_94"))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        bpy.data.objects.remove(ext_live, do_unlink=True)
+        if external_mesh[0] is not None and "Mesh_94" in bpy.data.meshes:
+            bpy.data.meshes.remove(external_mesh[0])
+
+    def test_95_original_controller_physically_destroyed_fails_restoration(self) -> None:
+        """TEST-95: Original controller physically destroyed during transaction fails identity restoration without substitutes."""
+        setup_arm_ik(self.armature)
+        unrelated = bpy.data.objects.new("UnrelatedObj95", None)
+        bpy.context.scene.collection.objects.link(unrelated)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                ctrl = bpy.data.objects.get("HandIK.L")
+                if ctrl is not None:
+                    bpy.data.objects.remove(ctrl, do_unlink=True)
+                raise RuntimeError("Primary business fault in TEST-95")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            y_pos = self.root.location.y + 0.15
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+            err_msg = str(cm.exception)
+            self.assertIn("Primary business fault in TEST-95", err_msg)
+            self.assertTrue(
+                "Original controller identity lost" in err_msg or "restoration failed" in err_msg or "rollback" in err_msg,
+                f"Expected identity loss in error message: {err_msg}"
+            )
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNone(bpy.data.objects.get("HandIK.L"))
+        self.assertIsNotNone(bpy.data.objects.get("UnrelatedObj95"))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        bpy.data.objects.remove(unrelated, do_unlink=True)
+
+    def test_96_original_controller_name_occupied_by_external_object_fails_restoration(self) -> None:
+        """TEST-96: Original controller renamed and original name occupied by external object fails restoration without overwriting."""
+        setup_arm_ik(self.armature)
+        hand_orig = bpy.data.objects["HandIK.L"]
+        hand_orig_ptr = hand_orig.as_pointer()
+        ext_holder = [None]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                hand_orig.name = "HandIK_Original_Renamed_96"
+                ext_obj = bpy.data.objects.new("HandIK.L", None)
+                bpy.context.scene.collection.objects.link(ext_obj)
+                ext_holder[0] = ext_obj
+                raise RuntimeError("Primary business fault in TEST-96")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            y_pos = self.root.location.y + 0.15
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+            err_msg = str(cm.exception)
+            self.assertIn("Primary business fault in TEST-96", err_msg)
+            self.assertTrue(
+                "occupied by another object" in err_msg or "restoration failed" in err_msg or "rollback" in err_msg,
+                f"Expected name occupation error in: {err_msg}"
+            )
+        finally:
+            _clear_test_fault_injection_hook()
+
+        live_occupied = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(live_occupied)
+        self.assertEqual(live_occupied.as_pointer(), ext_holder[0].as_pointer())
+        live_orig = bpy.data.objects.get("HandIK_Original_Renamed_96")
+        self.assertIsNotNone(live_orig)
+        self.assertEqual(live_orig.as_pointer(), hand_orig_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        bpy.data.objects.remove(live_occupied, do_unlink=True)
+        bpy.data.objects.remove(live_orig, do_unlink=True)
+
+    def test_97_stashed_constraint_reference_invalid_with_same_name_replacement(self) -> None:
+        """TEST-97: Stashed constraint original reference becomes invalid with live same-name replacement; cleanup fails without deleting replacement."""
+        setup_arm_ik(self.armature)
+        p_fore = self.armature.pose.bones["forearm.L"]
+
+        dummy_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        dummy_con.name = "Stashed_Con_97"
+        dummy_ptr = dummy_con.as_pointer()
+
+        tx = _create_arm_rig_transaction_context(self.armature)
+        stashed_record = {
+            "pbone": p_fore,
+            "con": dummy_con,
+            "con_ptr": dummy_ptr,
+            "orig_name": "Stashed_Con_97",
+            "orig_mute": False,
+        }
+        tx.stashed_constraints.append(stashed_record)
+        tx.uncleaned_stashed_constraints.append(stashed_record)
+
+        p_fore.constraints.remove(dummy_con)
+
+        replacement = p_fore.constraints.new(type="LIMIT_ROTATION")
+        replacement.name = "Stashed_Con_97"
+        replacement_ptr = replacement.as_pointer()
+
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        res97 = tx.retry_cleanup()
+        self.assertEqual(res97.outcome, _CleanupOutcome.CLEANUP_INCOMPLETE)
+        self.assertTrue(any("original reference invalid" in e for e in res97.errors))
+        self.assertIn("Stashed_Con_97", p_fore.constraints)
+        self.assertEqual(p_fore.constraints["Stashed_Con_97"].as_pointer(), replacement_ptr)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 1)
+
+        p_fore.constraints.remove(replacement)
+
+    def test_98_controller_registered_before_collection_link_failure(self) -> None:
+        """TEST-98: Controller registration occurs immediately after creation; collection link failure rolls back cleanly."""
+        old_hand = bpy.data.objects.get("HandIK.L")
+        if old_hand is not None:
+            bpy.data.objects.remove(old_hand, do_unlink=True)
+
+        char_col = bpy.data.collections.get("Character")
+        if char_col is None:
+            char_col = bpy.data.collections.new("Character")
+            bpy.context.scene.collection.children.link(char_col)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "get_or_create_empty_after_register" and ctx.get("name") == "HandIK.L":
+                raise RuntimeError("Simulated collection.objects.link failure in TEST-98")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Simulated collection.objects.link failure in TEST-98", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNone(bpy.data.objects.get("HandIK.L"))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_99_exception_after_logical_commit_enters_cleanup_pending(self) -> None:
+        """TEST-99: Exception at after_logical_commit enters CLEANUP_PENDING without ordinary rollback; retry succeeds."""
+        setup_arm_ik(self.armature)
+        y_pos = self.root.location.y + 0.15
+        target_pos = (-0.32, y_pos, 1.20)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "after_logical_commit":
+                raise RuntimeError("Crash after logical commit in TEST-99")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=target_pos)
+            self.assertIn("post-commit cleanup failed", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids), 1)
+        tx_id = pending_ids[0]
+
+        hand_ik = bpy.data.objects["HandIK.L"]
+        self.assertAlmostEqual(hand_ik.matrix_world.translation.x, target_pos[0], places=3)
+        self.assertAlmostEqual(hand_ik.matrix_world.translation.y, target_pos[1], places=3)
+        self.assertAlmostEqual(hand_ik.matrix_world.translation.z, target_pos[2], places=3)
+
+        with self.assertRaises(RuntimeError) as cm_gate:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_gate.exception))
+
+        retry_pending_arm_rig_cleanup(tx_id)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        state = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+        self.assertIsNotNone(state)
+        self.assertTrue(state["is_reachable"])
+
+    def test_100_reversible_vs_post_commit_failure_boundaries(self) -> None:
+        """TEST-100: Reversible stages rollback state; post-commit stages enter CLEANUP_PENDING without duplicate rollback."""
+        setup_arm_ik(self.armature)
+        y_pos = self.root.location.y + 0.15
+
+        for stage_name in ("before_commit_prepare", "during_commit_prepare"):
+            snap_before = _snapshot_arm_rig_state(self.armature)
+
+            def fault_hook(stage: str, ctx: dict) -> None:
+                if stage == stage_name:
+                    raise RuntimeError(f"Simulated fault at {stage_name}")
+
+            _set_test_fault_injection_hook(fault_hook)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    set_hand_ik_target(self.armature, side="L", world_xyz=(-0.25, y_pos, 1.10))
+                self.assertIn(f"Simulated fault at {stage_name}", str(cm.exception))
+            finally:
+                _clear_test_fault_injection_hook()
+
+            _verify_arm_rig_state_restored(self.armature, snap_before)
+            self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        for stage_name in ("after_logical_commit", "during_commit_cleanup"):
+            target_coord = (-0.31, y_pos, 1.18)
+
+            def fault_hook_post(stage: str, ctx: dict) -> None:
+                if stage == stage_name:
+                    raise RuntimeError(f"Simulated fault at {stage_name}")
+
+            _set_test_fault_injection_hook(fault_hook_post)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    set_hand_ik_target(self.armature, side="L", world_xyz=target_coord)
+                self.assertIn("post-commit cleanup failed", str(cm.exception))
+            finally:
+                _clear_test_fault_injection_hook()
+
+            hand_ctrl = bpy.data.objects["HandIK.L"]
+            self.assertAlmostEqual(hand_ctrl.location.x, target_coord[0], places=3)
+
+            pending = get_pending_arm_rig_cleanup_ids()
+            self.assertEqual(len(pending), 1)
+            retry_pending_arm_rig_cleanup(pending[0])
+            self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_101_joint_multi_resource_identity_and_ownership_verification(self) -> None:
+        """TEST-101: Joint simulation of controller rename, constraint stash, collection addition, and datablock sharing."""
+        setup_arm_ik(self.armature)
+        char_col = bpy.data.collections["Character"]
+
+        shared_mesh = bpy.data.meshes.new("SharedMesh101")
+        ext_obj = bpy.data.objects.new("ExternalObj101", shared_mesh)
+        char_col.objects.link(ext_obj)
+        ext_obj_ptr = ext_obj.as_pointer()
+        shared_mesh_ptr = shared_mesh.as_pointer()
+
+        p_fore = self.armature.pose.bones["forearm.L"]
+        orig_con_ptr = p_fore.constraints["ArmIK.L"].as_pointer()
+
+        ext_member2_ptr = [None]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                hand_ik = bpy.data.objects.get("HandIK.L")
+                if hand_ik is not None:
+                    hand_ik.name = "HandIK_L_Mutated_101"
+
+                ext_member2 = bpy.data.objects.new("ExternalMember2_101", None)
+                char_col.objects.link(ext_member2)
+                ext_member2_ptr[0] = ext_member2.as_pointer()
+
+                raise RuntimeError("Fault injected in TEST-101 joint simulation")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+            self.assertIn("Fault injected in TEST-101", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        hand_live = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(hand_live)
+        self.assertIsNone(bpy.data.objects.get("HandIK_L_Mutated_101"))
+
+        self.assertEqual(p_fore.constraints["ArmIK.L"].as_pointer(), orig_con_ptr)
+
+        char_obj_names = [o.name for o in char_col.objects]
+        self.assertIn("ExternalObj101", char_obj_names)
+        self.assertIn("ExternalMember2_101", char_obj_names)
+        self.assertEqual(bpy.data.objects["ExternalObj101"].as_pointer(), ext_obj_ptr)
+        self.assertEqual(bpy.data.objects["ExternalMember2_101"].as_pointer(), ext_member2_ptr[0])
+
+        self.assertIn("SharedMesh101", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["SharedMesh101"].as_pointer(), shared_mesh_ptr)
+
+        ext_m2 = bpy.data.objects.get("ExternalMember2_101")
+        if ext_m2:
+            bpy.data.objects.remove(ext_m2, do_unlink=True)
+        bpy.data.objects.remove(ext_obj, do_unlink=True)
+        if "SharedMesh101" in bpy.data.meshes:
+            bpy.data.meshes.remove(shared_mesh)
+
+    def test_102_continuous_full_lifecycle_and_reentry(self) -> None:
+        """TEST-102: End-to-end full continuous lifecycle covering all 9 states, admission gates, and resource classes."""
+        y_pos = self.root.location.y + 0.15
+
+        # 1. Initial setup
+        setup_arm_ik(self.armature)
+        char_col = bpy.data.collections["Character"]
+        self.assertIsNotNone(char_col)
+
+        # 2. Snapshot
+        snap1 = _snapshot_arm_rig_state(self.armature)
+
+        # 3. Transaction write with injected failure -> Rollback
+        def fault_hook_rb(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Step 3 failure in TEST-102")
+
+        _set_test_fault_injection_hook(fault_hook_rb)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.25, y_pos, 1.10))
+            self.assertIn("Step 3 failure in TEST-102", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # 4. Verify rollback
+        _verify_arm_rig_state_restored(self.armature, snap1)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # 5. Replace controller with wrong-type mesh object sharing a datablock
+        shared_mesh = bpy.data.meshes.new("DoomedMesh102")
+        old_hand_r = bpy.data.objects["HandIK.R"]
+        bpy.data.objects.remove(old_hand_r, do_unlink=True)
+
+        # 6. Commit setup_arm_ik but inject post-commit cleanup failure
+        def fault_hook_clean(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Step 6 cleanup failure in TEST-102")
+
+        _set_test_fault_injection_hook(fault_hook_clean)
+        try:
+            with self.assertRaises(RuntimeError) as cm_cf:
+                with _arm_rig_transaction(self.armature) as tx_clean:
+                    wrong_obj = bpy.data.objects.new("HandIK.R", shared_mesh)
+                    tx_clean.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(char_col, wrong_obj, tx_clean)
+                    setup_arm_ik(self.armature)
+            self.assertIn("post-commit cleanup failed", str(cm_cf.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # 7. CLEANUP_PENDING verification and write admission blocking
+        pending_ids = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids), 1)
+        tx_id = pending_ids[0]
+
+        with self.assertRaises(RuntimeError) as cm_gate:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_gate.exception))
+
+        # 8. Retry pending cleanup to completion
+        retry_pending_arm_rig_cleanup(tx_id)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        # 9. Re-entry - normal write succeeds
+        state_l = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20))
+        self.assertIsNotNone(state_l)
+        self.assertTrue(state_l["is_reachable"])
+
+        state_r = set_hand_ik_target(self.armature, side="R", world_xyz=(0.32, y_pos, 1.20))
+        self.assertIsNotNone(state_r)
+        self.assertTrue(state_r["is_reachable"])
+
+        # 10. Final state inspection across all controllers, constraints, and collections
+        for ctrl_name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            obj = bpy.data.objects.get(ctrl_name)
+            self.assertIsNotNone(obj)
+            self.assertEqual(obj.type, "EMPTY")
+
+        for b_name in ("forearm.L", "forearm.R"):
+            pbone = self.armature.pose.bones[b_name]
+            self.assertIn("ArmIK" + b_name[-2:], pbone.constraints)
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        snap_final = _snapshot_arm_rig_state(self.armature)
+        _verify_arm_rig_state_restored(self.armature, snap_final)
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-9 Extended Tests (TEST-103 to TEST-112)
+    # -------------------------------------------------------------------------
+
+    def test_103_transaction_created_constraint_cleaned_up_by_identity(self) -> None:
+        """TEST-103: Transaction-created constraints are identified and removed by pointer identity upon rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                raise RuntimeError("Fault after R constraint creation in TEST-103")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.6)
+            self.assertIn("Fault after R constraint creation in TEST-103", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both L and R created constraints must be completely unlinked and removed
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertNotIn("ArmIK.L", p_fore_l.constraints)
+        self.assertNotIn("ArmIK.R", p_fore_r.constraints)
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_104_external_constraint_preserved_on_transaction_failure(self) -> None:
+        """TEST-104: External constraints on rig bones are strictly preserved when an arm transaction aborts."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Add external constraint on forearm.L
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ext_con = p_fore.constraints.new(type="COPY_ROTATION")
+        ext_con.name = "ExternalCopyRot104"
+        ext_con.influence = 0.73
+        ext_ptr = ext_con.as_pointer()
+        bpy.context.view_layer.update()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Fault during hand location in TEST-104")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.9)
+            self.assertIn("Fault during hand location in TEST-104", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # External constraint must still exist with unchanged identity and properties
+        self.assertIn("ExternalCopyRot104", p_fore.constraints)
+        live_ext = p_fore.constraints["ExternalCopyRot104"]
+        self.assertEqual(live_ext.as_pointer(), ext_ptr)
+        self.assertAlmostEqual(live_ext.influence, 0.73, places=5)
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_105_same_name_different_identity_constraint_not_erroneously_deleted(self) -> None:
+        """TEST-105: Same-name constraint with different identity pointer is never deleted by rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Add a constraint named 'ArmIK.L' on another bone (upper_arm.L)
+        p_up = self.armature.pose.bones["upper_arm.L"]
+        alien_con = p_up.constraints.new(type="LIMIT_ROTATION")
+        alien_con.name = "ArmIK.L"
+        alien_con.use_limit_x = True
+        alien_ptr = alien_con.as_pointer()
+        bpy.context.view_layer.update()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Fault in TEST-105")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+            self.assertIn("Fault in TEST-105", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # The alien constraint on upper_arm.L must be 100% untouched
+        self.assertIn("ArmIK.L", p_up.constraints)
+        live_alien = p_up.constraints["ArmIK.L"]
+        self.assertEqual(live_alien.as_pointer(), alien_ptr)
+        self.assertTrue(live_alien.use_limit_x)
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_106_external_constraint_insertion_preserves_original_constraint_order(self) -> None:
+        """TEST-106: Inserting external constraints before/between original constraints maintains relative ordering."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        p_fore = self.armature.pose.bones["forearm.L"]
+        # Add a second constraint so we have multiple original constraints
+        orig_limit = p_fore.constraints.new(type="LIMIT_ROTATION")
+        orig_limit.name = "OrigLimit106"
+        bpy.context.view_layer.update()
+
+        arm_ik_con = p_fore.constraints["ArmIK.L"]
+        arm_ik_ref = arm_ik_con
+        arm_ik_ptr = arm_ik_con.as_pointer()
+
+        orig_limit_ref = orig_limit
+        orig_limit_ptr = orig_limit.as_pointer()
+
+        original_count = len(p_fore.constraints)
+        original_order = [c.name for c in p_fore.constraints]
+
+        # [INTRODUCED 2026-11-16T16:23:49+08:00]
+        # FUNCTION: test_106_external_constraint_insertion_preserves_original_constraint_order
+        # PURPOSE: Verify live coordinator transaction rollback preserves external constraints and restores original relative order
+        # REASON: Task 10-B fix-4, replace mock transaction context with authorized transaction workflow
+        captured_tx = []
+        ext_first_ref = None
+        ext_first_ptr = None
+
+        with self.assertRaises(RuntimeError) as cm:
+            with _arm_rig_transaction(self.armature) as tx:
+                captured_tx.append(tx)
+                self.assertEqual(tx.state, _ArmRigTransactionState.ACTIVE)
+
+                # Invert original constraint order: move OrigLimit106 before ArmIK.L
+                p_fore.constraints.move(1, 0)
+
+                # Add an external constraint at index 0 (unauthorized insertion)
+                ext_first = p_fore.constraints.new(type="TRACK_TO")
+                ext_first.name = "ExtFirst106"
+                ext_first_ref = ext_first
+                ext_first_ptr = ext_first.as_pointer()
+                p_fore.constraints.move(len(p_fore.constraints) - 1, 0)
+                bpy.context.view_layer.update()
+
+                # Confirm order was perturbed
+                perturbed_names = [c.name for c in p_fore.constraints]
+                self.assertEqual(perturbed_names[0], "ExtFirst106")
+                self.assertEqual(perturbed_names[1], "OrigLimit106")
+                self.assertEqual(perturbed_names[2], "ArmIK.L")
+
+                raise RuntimeError("Fault injected in TEST-106")
+
+        self.assertIn("Fault injected in TEST-106", str(cm.exception))
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Original constraints identity and existence assertions
+        self.assertIn("ArmIK.L", [c.name for c in p_fore.constraints])
+        live_arm_ik = p_fore.constraints["ArmIK.L"]
+        self.assertEqual(live_arm_ik, arm_ik_ref)
+        self.assertEqual(live_arm_ik.as_pointer(), arm_ik_ptr)
+
+        self.assertIn("OrigLimit106", [c.name for c in p_fore.constraints])
+        live_orig_limit = p_fore.constraints["OrigLimit106"]
+        self.assertEqual(live_orig_limit, orig_limit_ref)
+        self.assertEqual(live_orig_limit.as_pointer(), orig_limit_ptr)
+
+        # ArmIK.L must come before OrigLimit106 again (relative ordering restored)
+        c_names = [c.name for c in p_fore.constraints]
+        self.assertLess(c_names.index("ArmIK.L"), c_names.index("OrigLimit106"))
+
+        # External constraint must be preserved untouched
+        self.assertIn("ExtFirst106", c_names)
+        live_ext = p_fore.constraints["ExtFirst106"]
+        self.assertEqual(live_ext, ext_first_ref)
+        self.assertEqual(live_ext.as_pointer(), ext_first_ptr)
+        self.assertEqual(live_ext.type, "TRACK_TO")
+
+        # Total constraint count includes the preserved external constraint
+        self.assertEqual(len(p_fore.constraints), original_count + 1)
+
+        # Verify no FAILED isolation and no CLEANUP_PENDING
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_107_transaction_created_collection_link_undone_on_failure(self) -> None:
+        """TEST-107: Controller collection links created within a transaction are unlinked on rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        char_col = bpy.data.collections.get("Character")
+        self.assertIsNotNone(char_col)
+        initial_member_count = len(char_col.objects)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                raise RuntimeError("Fault after first controller in TEST-107")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after first controller in TEST-107", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Character collection must not retain any leaked objects or links
+        self.assertEqual(len(char_col.objects), initial_member_count)
+        self.assertNotIn("HandIK.L", char_col.objects)
+        self.assertNotIn("HandIK.L", bpy.data.objects)
+
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_108_external_collection_member_link_preserved_on_rollback(self) -> None:
+        """TEST-108: External collection members linked before transaction are not unlinked during rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        char_col = bpy.data.collections.get("Character")
+        ext_mesh = bpy.data.meshes.new("ExternalMesh108")
+        ext_obj = bpy.data.objects.new("ExternalMember108", ext_mesh)
+        char_col.objects.link(ext_obj)
+        ext_ptr = ext_obj.as_pointer()
+        bpy.context.view_layer.update()
+
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Fault in TEST-108")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+            self.assertIn("Fault in TEST-108", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # ext_obj must remain securely linked inside Character collection
+        self.assertIn("ExternalMember108", char_col.objects)
+        self.assertEqual(char_col.objects["ExternalMember108"].as_pointer(), ext_ptr)
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Clean up external test object
+        bpy.data.objects.remove(ext_obj, do_unlink=True)
+        bpy.data.meshes.remove(ext_mesh, do_unlink=True)
+
+    def test_109_reset_arm_ik_left_write_failure_restores_bilateral_state(self) -> None:
+        """TEST-109: reset_arm_ik left-side write failure triggers bilateral rollback preserving pre-reset pose."""
+        setup_arm_ik(self.armature, initial_influence=0.8)
+        y_pos = self.root.location.y + 0.15
+        set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.85)
+        set_hand_ik_target(self.armature, side="R", world_xyz=(0.32, y_pos, 1.20), influence=0.85)
+
+        snap_before_reset = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "reset_arm_ik_after_influence_l":
+                raise RuntimeError("Fault after Left reset write in TEST-109")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("Fault after Left reset write in TEST-109", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both Left and Right influences and positions must be completely restored
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.85, places=4)
+        self.assertAlmostEqual(p_fore_r.constraints["ArmIK.R"].influence, 0.85, places=4)
+
+        _verify_arm_rig_state_restored(self.armature, snap_before_reset)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_110_reset_arm_ik_right_write_failure_restores_bilateral_state(self) -> None:
+        """TEST-110: reset_arm_ik right-side write failure restores both left and right sides via atomic rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.7)
+        y_pos = self.root.location.y + 0.15
+        set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.75)
+        set_hand_ik_target(self.armature, side="R", world_xyz=(0.30, y_pos, 1.15), influence=0.75)
+
+        snap_before_reset = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "reset_arm_ik_after_influence_r":
+                raise RuntimeError("Fault after Right reset write in TEST-110")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("Fault after Right reset write in TEST-110", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Left side was mutated first, but atomic rollback must revert Left side as well as Right side
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.75, places=4)
+        self.assertAlmostEqual(p_fore_r.constraints["ArmIK.R"].influence, 0.75, places=4)
+
+        _verify_arm_rig_state_restored(self.armature, snap_before_reset)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_111_reset_arm_ik_parent_preflight_failure_zero_business_writes(self) -> None:
+        """TEST-111: reset_arm_ik aborts on parent transform preflight failure before performing any scene writes."""
+        setup_arm_ik(self.armature, initial_influence=0.88)
+        snap_before = _snapshot_arm_rig_state(self.armature)
+
+        # Corrupt parent transform by setting root scale to 0 (non-invertible matrix)
+        self.root.scale = Vector((0.0, 0.0, 0.0))
+        bpy.context.view_layer.update()
+
+        try:
+            with self.assertRaises(ValueError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertTrue("singular matrix" in str(cm.exception).lower() or "zero determinant" in str(cm.exception).lower())
+        finally:
+            self.root.scale = Vector((1.0, 1.0, 1.0))
+            bpy.context.view_layer.update()
+
+        # Zero business writes: bone influences and controllers remain unchanged
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        p_fore_r = self.armature.pose.bones["forearm.R"]
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.88, places=4)
+        self.assertAlmostEqual(p_fore_r.constraints["ArmIK.R"].influence, 0.88, places=4)
+
+        _verify_arm_rig_state_restored(self.armature, snap_before)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_112_joint_regression_reset_constraint_collection_cleanup_pending(self) -> None:
+        """TEST-112: Joint regression verifying reset atomicity, constraint rollback, and cleanup pending gate."""
+        setup_arm_ik(self.armature, initial_influence=0.6)
+        y_pos = self.root.location.y + 0.15
+
+        # 1. External object in Character collection
+        char_col = bpy.data.collections.get("Character")
+        ext_mesh = bpy.data.meshes.new("Mesh112")
+        ext_obj = bpy.data.objects.new("ExternalProp112", ext_mesh)
+        char_col.objects.link(ext_obj)
+        ext_ptr = ext_obj.as_pointer()
+
+        # 2. External constraint on forearm.L
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        ext_con = p_fore_l.constraints.new(type="LIMIT_ROTATION")
+        ext_con.name = "ExtLimit112"
+        ext_con_ptr = ext_con.as_pointer()
+        bpy.context.view_layer.update()
+
+        # 3. Successful pose mutation
+        set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.8)
+        set_hand_ik_target(self.armature, side="R", world_xyz=(0.30, y_pos, 1.15), influence=0.8)
+
+        snap_active = _snapshot_arm_rig_state(self.armature)
+
+        # 4. Injected reset failure -> bilateral rollback
+        def fault_hook_reset(stage: str, ctx: dict) -> None:
+            if stage == "reset_arm_ik_after_influence_l":
+                raise RuntimeError("Injected fault during reset in TEST-112")
+
+        _set_test_fault_injection_hook(fault_hook_reset)
+        try:
+            with self.assertRaises(RuntimeError):
+                reset_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Verify full state preserved after failed reset
+        _verify_arm_rig_state_restored(self.armature, snap_active)
+        self.assertEqual(char_col.objects["ExternalProp112"].as_pointer(), ext_ptr)
+        self.assertEqual(p_fore_l.constraints["ExtLimit112"].as_pointer(), ext_con_ptr)
+
+        # 5. Clean reset succeeds
+        reset_arm_ik(self.armature)
+        self.assertAlmostEqual(p_fore_l.constraints["ArmIK.L"].influence, 0.0, places=4)
+        self.assertAlmostEqual(self.armature.pose.bones["forearm.R"].constraints["ArmIK.R"].influence, 0.0, places=4)
+        # External objects and constraints still intact
+        self.assertEqual(char_col.objects["ExternalProp112"].as_pointer(), ext_ptr)
+        self.assertEqual(p_fore_l.constraints["ExtLimit112"].as_pointer(), ext_con_ptr)
+
+        # 6. Verify CLEANUP_PENDING gate blocks reset_arm_ik and mutations
+        snap_after_reset = _snapshot_arm_rig_state(self.armature)
+        fake_tx = _create_arm_rig_transaction_context(self.armature)
+        fake_tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        fake_tx.uncleaned_stashed_objects.append({"original_name": "Ghost112", "obj_cleaned": False, "data_cleaned": False})
+        from src.scene_transaction_integrity.layer2.pending_cleanup_registry import _register_pending_arm_rig_cleanup
+        _register_pending_arm_rig_cleanup(fake_tx)
+
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            reset_arm_ik(self.armature)
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_blocked.exception))
+
+        with self.assertRaises(RuntimeError) as cm_blocked2:
+            set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15))
+        self.assertIn("Arm IK write blocked: unresolved cleanup", str(cm_blocked2.exception))
+
+        # Clear gate and clean up test fixtures
+        _PENDING_ARM_RIG_CLEANUPS.clear()
+        _verify_arm_rig_state_restored(self.armature, snap_after_reset)
+
+        p_fore_l.constraints.remove(ext_con)
+        bpy.data.objects.remove(ext_obj, do_unlink=True)
+        bpy.data.meshes.remove(ext_mesh, do_unlink=True)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-11 Relationship Log & Ownership Tests (TEST-113 to TEST-117)
+    # -------------------------------------------------------------------------
+
+    def test_113_pre_existing_collection_link_transitions_to_no_effect_without_revocation_authority(self) -> None:
+        """TEST-113: Duplicate link on PRE_EXISTING_ORIGINAL transitions PREPARED -> NO_EFFECT without revocation authority."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        char_col = bpy.data.collections["Character"]
+        hand_l = bpy.data.objects["HandIK.L"]
+        hand_l_ptr = hand_l.as_pointer()
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        captured_tx = []
+        observed_prepared_states = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "relationship_link_after_prepare":
+                op = ctx.get("op", {})
+                observed_prepared_states.append(op.get("operation_state"))
+            elif stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault in TEST-113 after idempotent controller link checks")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            self.assertIn("Fault in TEST-113", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        # All 4 existing controllers were already linked (PRE_EXISTING_ORIGINAL)
+        self.assertEqual(len(tx.created_collection_links), 0)
+        col_mutations = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "COLLECTION_OBJECT_LINK"
+        ]
+        self.assertEqual(len(col_mutations), 4)
+        con_mutations = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") in ("CONSTRAINT_TARGET_ASSIGN", "CONSTRAINT_POLE_TARGET_ASSIGN")
+        ]
+        self.assertEqual(len(con_mutations), 6)
+        self.assertEqual(len(tx.prepared_relationship_mutations), 10)
+        self.assertTrue(all(s == _RelationshipOperationState.PREPARED for s in observed_prepared_states))
+
+        required_fields = {
+            "operation_id",
+            "transaction_id",
+            "source_reference",
+            "target_reference",
+            "source_identity",
+            "target_identity",
+            "original_relationship_state",
+            "intended_mutation",
+            "operation_state",
+        }
+        for rec in tx.prepared_relationship_mutations:
+            self.assertTrue(required_fields.issubset(rec.keys()))
+            self.assertEqual(rec["transaction_id"], tx.tx_id)
+            self.assertEqual(rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        for rec in col_mutations:
+            self.assertEqual(rec["intended_mutation"], "COLLECTION_OBJECT_LINK")
+            self.assertEqual(rec["original_relationship_state"]["category"], "PRE_EXISTING_ORIGINAL")
+            self.assertTrue(rec["original_relationship_state"]["linked"])
+
+        for rec in con_mutations:
+            self.assertIn(rec["intended_mutation"], ("CONSTRAINT_TARGET_ASSIGN", "CONSTRAINT_POLE_TARGET_ASSIGN"))
+            self.assertEqual(rec["original_relationship_state"]["category"], "PRE_EXISTING")
+
+        # Original collection link must remain 100% preserved after rollback
+        self.assertIn("HandIK.L", char_col.objects)
+        self.assertEqual(char_col.objects["HandIK.L"].as_pointer(), hand_l_ptr)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_114_apply_succeeded_before_confirm_exception_safely_reverted_on_rollback(self) -> None:
+        """TEST-114: Exception after C-API link apply (before CONFIRM) logs APPLIED_VERIFIED and reverts to REVERTED on rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        char_col = bpy.data.collections["Character"]
+        initial_member_ptrs = {o.as_pointer() for o in char_col.objects}
+
+        for fault_stage in ("relationship_link_during_apply_after_c_api", "relationship_link_before_confirm"):
+            captured_ops = []
+
+            def fault_hook(stage: str, ctx: dict, target_stage: str = fault_stage) -> None:
+                if stage == target_stage and ctx.get("name") == "HandIK.L":
+                    captured_ops.append(ctx["op"])
+                    raise RuntimeError(f"Injected fault at {target_stage} in TEST-114")
+
+            _set_test_fault_injection_hook(fault_hook)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    setup_arm_ik(self.armature)
+                self.assertIn(f"Injected fault at {fault_stage} in TEST-114", str(cm.exception))
+            finally:
+                _clear_test_fault_injection_hook()
+
+            self.assertEqual(len(captured_ops), 1)
+            op_rec = captured_ops[0]
+            # Rollback must have reverted the APPLIED_VERIFIED relationship to REVERTED
+            self.assertEqual(op_rec[" intended_mutation" if " intended_mutation" in op_rec else "intended_mutation"], "COLLECTION_OBJECT_LINK")
+            self.assertEqual(op_rec["original_relationship_state"]["category"], "TX_ADDED")
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.REVERTED)
+
+            # Zero residual link or controller in scene
+            self.assertNotIn("HandIK.L", char_col.objects)
+            self.assertNotIn("HandIK.L", bpy.data.objects)
+            self.assertEqual({o.as_pointer() for o in char_col.objects}, initial_member_ptrs)
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_115_apply_exception_with_zero_side_effect_transitions_log_to_no_effect(self) -> None:
+        """TEST-115: Exception during APPLYING before C-API link with zero RNA side effect transitions log to NO_EFFECT."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        char_col = bpy.data.collections["Character"]
+        captured_ops = []
+        observed_applying_state = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "relationship_link_during_apply_before_c_api" and ctx.get("name") == "HandIK.L":
+                op = ctx["op"]
+                observed_applying_state.append(op["operation_state"])
+                captured_ops.append(op)
+                raise RuntimeError("Fault during APPLYING before C-API link in TEST-115")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault during APPLYING before C-API link in TEST-115", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(observed_applying_state, [_RelationshipOperationState.APPLYING])
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        self.assertNotIn("HandIK.L", char_col.objects)
+        self.assertNotIn("HandIK.L", bpy.data.objects)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_116_external_same_name_object_and_external_collection_link_protected_on_rollback(self) -> None:
+        """TEST-116: External same-name object and EXTERNAL_ADDED collection link are never unlinked or deleted on rollback."""
+        char_col = bpy.data.collections["Character"]
+        ext_same_name_ptr = [None]
+        ext_member_ptr = [None]
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                tx = _ACTIVE_TRANSACTION_STACK[-1]
+                captured_tx.append(tx)
+                # Rename transaction-created HandIK.L and create an external same-name HandIK.L linked to Character
+                tx_hand = bpy.data.objects["HandIK.L"]
+                tx_hand.name = "HandIK_L_TX_Owned_116"
+
+                ext_same = bpy.data.objects.new("HandIK.L", None)
+                char_col.objects.link(ext_same)
+                ext_same_name_ptr[0] = ext_same.as_pointer()
+
+                ext_other = bpy.data.objects.new("ExternalAddedMember116", None)
+                char_col.objects.link(ext_other)
+                ext_member_ptr[0] = ext_other.as_pointer()
+
+                raise RuntimeError("Fault injected in TEST-116 after external links")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected in TEST-116", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(len(tx.prepared_relationship_mutations), 2)
+        for mut_rec in tx.prepared_relationship_mutations:
+            self.assertEqual(mut_rec["operation_state"], _RelationshipOperationState.REVERTED)
+
+        # Transaction-owned controller was unlinked and deleted
+        self.assertIsNone(bpy.data.objects.get("HandIK_L_TX_Owned_116"))
+
+        # External same-name HandIK.L and ExternalAddedMember116 remain linked in Character collection
+        self.assertIn("HandIK.L", char_col.objects)
+        self.assertEqual(char_col.objects["HandIK.L"].as_pointer(), ext_same_name_ptr[0])
+        self.assertIn("ExternalAddedMember116", char_col.objects)
+        self.assertEqual(char_col.objects["ExternalAddedMember116"].as_pointer(), ext_member_ptr[0])
+
+        bpy.data.objects.remove(bpy.data.objects["HandIK.L"], do_unlink=True)
+        bpy.data.objects.remove(bpy.data.objects["ExternalAddedMember116"], do_unlink=True)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_117_rollback_verifies_relationship_log_terminal_states_and_reports_recovery_uncertain(self) -> None:
+        """TEST-117: Rollback verifies all relationship log entries reach NO_EFFECT/REVERTED and raises on RECOVERY_UNCERTAIN."""
+        # Part A: Mixed PRE_EXISTING_ORIGINAL (NO_EFFECT) and TX_ADDED (REVERTED) in a single transaction rollback
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        char_col = bpy.data.collections["Character"]
+        # Unlink HandIK.R before transaction so HandIK.L is PRE_EXISTING_ORIGINAL and HandIK.R is TX_ADDED
+        hand_r = bpy.data.objects["HandIK.R"]
+        char_col.objects.unlink(hand_r)
+        snap_mixed = _snapshot_arm_rig_state(self.armature)
+
+        captured_tx_a = []
+
+        def fault_hook_a(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                captured_tx_a.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault in TEST-117 Part A")
+
+        _set_test_fault_injection_hook(fault_hook_a)
+        try:
+            with self.assertRaises(RuntimeError) as cm_a:
+                setup_arm_ik(self.armature, initial_influence=0.8)
+            self.assertIn("Fault in TEST-117 Part A", str(cm_a.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx_a), 1)
+        tx_a = captured_tx_a[0]
+        states_by_name = {
+            rec["target_identity"]["name"]: rec["operation_state"]
+            for rec in tx_a.prepared_relationship_mutations
+            if rec.get("intended_mutation") == "COLLECTION_OBJECT_LINK"
+        }
+        self.assertEqual(states_by_name["HandIK.L"], _RelationshipOperationState.NO_EFFECT)
+        self.assertEqual(states_by_name["ElbowPole.L"], _RelationshipOperationState.NO_EFFECT)
+        self.assertEqual(states_by_name["HandIK.R"], _RelationshipOperationState.REVERTED)
+        self.assertEqual(states_by_name["ElbowPole.R"], _RelationshipOperationState.NO_EFFECT)
+        _verify_arm_rig_state_restored(self.armature, snap_mixed)
+
+        # Restore HandIK.R link for Part B
+        char_col.objects.link(hand_r)
+        snap_clean = _snapshot_arm_rig_state(self.armature)
+
+        # Part B: Fault during relationship rollback undo transitions record to RECOVERY_UNCERTAIN and raises RuntimeError
+        char_col.objects.unlink(hand_r)
+        captured_tx_b = []
+
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary business fault in TEST-117 Part B")
+            elif stage == "during_relationship_rollback_undo":
+                op = ctx.get("op", {})
+                if op.get("target_identity", {}).get("name") == "HandIK.R":
+                    raise RuntimeError("Simulated C-API unlink failure during rollback")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError) as cm_b:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            err_msg = str(cm_b.exception)
+            self.assertIn("Primary business fault in TEST-117 Part B", err_msg)
+            self.assertIn("rollback verification failed", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx_b), 1)
+        tx_b = captured_tx_b[0]
+        self.assertEqual(tx_b.state, _ArmRigTransactionState.FAILED)
+        hand_r_ops = [
+            r for r in tx_b.prepared_relationship_mutations
+            if r["target_identity"]["name"] == "HandIK.R"
+            and r.get("intended_mutation") == "COLLECTION_OBJECT_LINK"
+        ]
+        self.assertEqual(len(hand_r_ops), 1)
+        self.assertEqual(hand_r_ops[0]["operation_state"], _RelationshipOperationState.RECOVERY_UNCERTAIN)
+
+        # Part C: Direct verifier check rejects any transaction context containing a RECOVERY_UNCERTAIN record
+        _ACTIVE_TRANSACTION_STACK.append(tx_b)
+        try:
+            with self.assertRaises(RuntimeError) as cm_c:
+                _verify_arm_rig_state_restored(self.armature, snap_clean, active_tx=tx_b)
+            self.assertIn("RECOVERY_UNCERTAIN", str(cm_c.exception))
+        finally:
+            _ACTIVE_TRANSACTION_STACK.pop()
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_118_normal_same_armature_nested_transaction(self) -> None:
+        """TEST-118: Normal same-Armature nested transaction shares outer context, snapshots once, and commits."""
+        setup_arm_ik(self.armature, initial_influence=0.3)
+        snapshot_calls = [0]
+        orig_snapshot_fn = wiring._snapshot_arm_rig_state
+
+        def counting_snapshot(arm):
+            snapshot_calls[0] += 1
+            return orig_snapshot_fn(arm)
+
+        wiring._snapshot_arm_rig_state = counting_snapshot
+        try:
+            with _arm_rig_transaction(self.armature) as outer_tx:
+                self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                self.assertFalse(outer_tx.rollback_only)
+                self.assertIsNone(outer_tx.rollback_only_reason)
+
+                with _arm_rig_transaction(self.armature) as inner_tx:
+                    self.assertIs(inner_tx, outer_tx)
+                    self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                    set_arm_ik_influence(self.armature, "L", 0.75)
+
+                self.assertFalse(outer_tx.rollback_only)
+                self.assertIsNone(outer_tx.rollback_only_reason)
+                self.assertEqual(outer_tx.state, _ArmRigTransactionState.ACTIVE)
+        finally:
+            wiring._snapshot_arm_rig_state = orig_snapshot_fn
+
+        self.assertEqual(snapshot_calls[0], 1)
+        self.assertFalse(outer_tx.rollback_only)
+        self.assertEqual(outer_tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.75, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["hand.L"].constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, 0.75, places=6
+        )
+
+    def test_119_inner_exception_caught_by_outer_forces_rollback(self) -> None:
+        """TEST-119: Inner nested failure caught by outer caller marks rollback_only and forces full outer rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        observed_states = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise RuntimeError("Injected inner nested failure in TEST-119")
+            if stage in ("before_commit_prepare", "during_commit_prepare", "after_logical_commit"):
+                observed_states.append(stage)
+
+        _set_test_fault_injection_hook(fault_hook)
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(RuntimeError) as outer_cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    outer_tx_ref = tx
+                    try:
+                        set_arm_ik_influence(self.armature, "L", 0.9)
+                    except RuntimeError as caught_inner:
+                        self.assertIn("Injected inner nested failure in TEST-119", str(caught_inner))
+                    # Verify rollback_only was marked immediately upon inner failure
+                    self.assertTrue(tx.rollback_only)
+                    self.assertIsNotNone(tx.rollback_only_reason)
+                    self.assertIn("Injected inner nested failure in TEST-119", tx.rollback_only_reason)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertTrue(outer_tx_ref.rollback_only)
+        self.assertIn("rollback_only", str(outer_cm.exception))
+        self.assertIn("Injected inner nested failure in TEST-119", str(outer_cm.exception))
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(observed_states, [])
+
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.4, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["hand.L"].constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence, 0.4, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.R"].constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, 0.4, places=6
+        )
+        self.assertAlmostEqual(
+            self.armature.pose.bones["hand.R"].constraints[HAND_ROT_CONSTRAINT_NAMES["R"]].influence, 0.4, places=6
+        )
+
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_120_multi_level_same_armature_nested_transaction_failure(self) -> None:
+        """TEST-120: Multi-level same-Armature nested failure (Outer -> Nested A -> Nested B) propagates rollback_only."""
+        setup_arm_ik(self.armature, initial_influence=0.25)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        tx_snapshot_calls = [0]
+        orig_snapshot_fn = wiring._snapshot_arm_rig_state
+
+        def counting_snapshot(arm):
+            if _ACTIVE_TRANSACTION_STACK and _ACTIVE_TRANSACTION_STACK[-1].state == _ArmRigTransactionState.SNAPSHOTTING:
+                tx_snapshot_calls[0] += 1
+            return orig_snapshot_fn(arm)
+
+        wiring._snapshot_arm_rig_state = counting_snapshot
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(RuntimeError) as outer_cm:
+                with _arm_rig_transaction(self.armature) as outer_tx:
+                    outer_tx_ref = outer_tx
+                    pbone_forearm_l = self.armature.pose.bones["forearm.L"]
+                    pbone_hand_l = self.armature.pose.bones["hand.L"]
+                    pbone_forearm_l.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence = 0.6
+
+                    with _arm_rig_transaction(self.armature) as nested_a:
+                        self.assertIs(nested_a, outer_tx)
+                        self.assertIs(nested_a.snapshot, outer_tx.snapshot)
+                        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                        try:
+                            with _arm_rig_transaction(self.armature) as nested_b:
+                                self.assertIs(nested_b, outer_tx)
+                                self.assertIs(nested_b.snapshot, outer_tx.snapshot)
+                                self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 1)
+                                pbone_hand_l.constraints[HAND_ROT_CONSTRAINT_NAMES["L"]].influence = 0.85
+                                raise RuntimeError("Deep nested B failure in TEST-120")
+                        except RuntimeError as caught_b:
+                            self.assertIn("Deep nested B failure in TEST-120", str(caught_b))
+
+                        self.assertTrue(outer_tx.rollback_only)
+                        self.assertIn("Deep nested B failure in TEST-120", outer_tx.rollback_only_reason)
+        finally:
+            wiring._snapshot_arm_rig_state = orig_snapshot_fn
+
+        self.assertEqual(tx_snapshot_calls[0], 1)
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertTrue(outer_tx_ref.rollback_only)
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn("Deep nested B failure in TEST-120", str(outer_cm.exception))
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_121_poisoned_rollback_only_transaction_rejects_subsequent_nested_writes(self) -> None:
+        """TEST-121: Poisoned rollback_only transaction rejects subsequent nested entries before body execution."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        second_body_executed = [False]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise RuntimeError("First nested failure reason in TEST-121")
+
+        _set_test_fault_injection_hook(fault_hook)
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(RuntimeError) as outer_cm:
+                with _arm_rig_transaction(self.armature) as outer_tx:
+                    outer_tx_ref = outer_tx
+                    try:
+                        set_arm_ik_influence(self.armature, "L", 0.9)
+                    except RuntimeError:
+                        pass
+
+                    self.assertTrue(outer_tx.rollback_only)
+                    first_reason = outer_tx.rollback_only_reason
+                    self.assertIn("First nested failure reason in TEST-121", first_reason)
+
+                    # Clear fault hook and verify second nested transaction is rejected at admission
+                    _clear_test_fault_injection_hook()
+                    pbone_r = self.armature.pose.bones["forearm.R"]
+                    r_before = pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence
+
+                    with self.assertRaises(RuntimeError) as second_cm:
+                        with _arm_rig_transaction(self.armature):
+                            second_body_executed[0] = True
+                            pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence = 0.99
+
+                    self.assertIn("already marked rollback_only", str(second_cm.exception))
+                    self.assertFalse(second_body_executed[0])
+                    self.assertAlmostEqual(
+                        pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, r_before, places=6
+                    )
+                    # Also verify public helper using nested transaction is rejected at admission
+                    with self.assertRaises(RuntimeError):
+                        set_arm_ik_influence(self.armature, "R", 0.99)
+                    self.assertAlmostEqual(
+                        pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, r_before, places=6
+                    )
+
+                    # Verify rollback_only remains True and first failure reason was preserved
+                    self.assertTrue(outer_tx.rollback_only)
+                    self.assertEqual(outer_tx.rollback_only_reason, first_reason)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertIn("First nested failure reason in TEST-121", str(outer_cm.exception))
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_122_normal_admission_restored_after_rollback(self) -> None:
+        """TEST-122: After nested-failure rollback, subsequent transactions on same and second Armature succeed."""
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+
+        # Create an independent second Armature to verify isolation
+        arm_b_data = bpy.data.armatures.new("IndependentArmB_122_Data")
+        arm_b = bpy.data.objects.new("IndependentArmB_122", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        try:
+            def fault_hook(stage: str, ctx: dict) -> None:
+                if stage == "set_arm_ik_influence_between_influences":
+                    raise RuntimeError("Transient nested fault in TEST-122")
+
+            _set_test_fault_injection_hook(fault_hook)
+            failed_tx = None
+            try:
+                with self.assertRaises(RuntimeError):
+                    with _arm_rig_transaction(self.armature) as tx1:
+                        failed_tx = tx1
+                        try:
+                            set_arm_ik_influence(self.armature, "L", 0.8)
+                        except RuntimeError:
+                            pass
+            finally:
+                _clear_test_fault_injection_hook()
+
+            self.assertIsNotNone(failed_tx)
+            self.assertEqual(failed_tx.state, _ArmRigTransactionState.ROLLED_BACK)
+            _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+            # Start a brand new transaction on the same Armature
+            with _arm_rig_transaction(self.armature) as tx2:
+                self.assertIsNot(tx2, failed_tx)
+                self.assertNotEqual(tx2.tx_id, failed_tx.tx_id)
+                self.assertFalse(tx2.rollback_only)
+                self.assertIsNone(tx2.rollback_only_reason)
+                set_arm_ik_influence(self.armature, "BOTH", 0.65)
+
+            self.assertEqual(tx2.state, _ArmRigTransactionState.COMMITTED)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+            pbone_l = self.armature.pose.bones["forearm.L"]
+            pbone_r = self.armature.pose.bones["forearm.R"]
+            self.assertAlmostEqual(pbone_l.constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence, 0.65, places=6)
+            self.assertAlmostEqual(pbone_r.constraints[ARM_IK_CONSTRAINT_NAMES["R"]].influence, 0.65, places=6)
+
+            # Verify independent second Armature is unaffected and can enter its own transaction
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertFalse(tx_b.rollback_only)
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            if arm_b.name in bpy.data.objects:
+                bpy.data.objects.remove(arm_b, do_unlink=True)
+            if arm_b_data.name in bpy.data.armatures:
+                bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_123_uncaught_inner_exception_preserves_historical_propagation_and_rollback(self) -> None:
+        """TEST-123: Uncaught inner exception propagates original error directly and triggers single outer rollback."""
+        setup_arm_ik(self.armature, initial_influence=0.45)
+        initial_snapshot = _snapshot_arm_rig_state(self.armature)
+        rollback_calls = [0]
+        orig_rollback_fn = wiring._rollback_arm_rig_state
+
+        def counting_rollback(arm, snapshot, tx=None):
+            rollback_calls[0] += 1
+            return orig_rollback_fn(arm, snapshot, tx)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise ValueError("Original uncaught inner ValueError in TEST-123")
+
+        wiring._rollback_arm_rig_state = counting_rollback
+        _set_test_fault_injection_hook(fault_hook)
+        outer_tx_ref = None
+        try:
+            with self.assertRaises(ValueError) as cm:
+                with _arm_rig_transaction(self.armature) as outer_tx:
+                    outer_tx_ref = outer_tx
+                    set_arm_ik_influence(self.armature, "L", 0.95)
+        finally:
+            _clear_test_fault_injection_hook()
+            wiring._rollback_arm_rig_state = orig_rollback_fn
+
+        self.assertEqual(str(cm.exception), "Original uncaught inner ValueError in TEST-123")
+        self.assertIsNotNone(outer_tx_ref)
+        self.assertTrue(outer_tx_ref.rollback_only)
+        self.assertIn("Original uncaught inner ValueError in TEST-123", outer_tx_ref.rollback_only_reason)
+        self.assertEqual(outer_tx_ref.state, _ArmRigTransactionState.ROLLED_BACK)
+        self.assertEqual(rollback_calls[0], 1)
+        _verify_arm_rig_state_restored(self.armature, initial_snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-13 FAILED Classification, Session Identity & Recovery Admission Tests (TEST-124 to TEST-136)
+    # -------------------------------------------------------------------------
+
+    def test_124_failed_a_pre_write_snapshot_abort_verified_zero_mutation_no_isolation(self) -> None:
+        """TEST-124: FAILED-A pre-write snapshot abort with verified zero mutation does not isolate healthy Armature."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        snap_before = _snapshot_arm_rig_state(self.armature)
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected pre-write snapshot fault in TEST-124")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("Injected pre-write snapshot fault in TEST-124", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_A.value)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # FAILED-A must NOT isolate the healthy Armature
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertEqual(session_rec.liveness_status, _ArmatureLivenessStatus.ALIVE_VERIFIED)
+        self.assertGreaterEqual(len(_FAILED_A_AUDIT_RECORDS), 1)
+        self.assertEqual(_FAILED_A_AUDIT_RECORDS[-1]["transaction_id"], tx.tx_id)
+        self.assertEqual(_FAILED_A_AUDIT_RECORDS[-1]["registry_session_id"], session_id)
+        self.assertEqual(_FAILED_A_AUDIT_RECORDS[-1]["failure_class"], "FAILED-A")
+        _verify_arm_rig_state_restored(self.armature, snap_before)
+
+        # Subsequent write transaction on the same Armature must be admitted and commit normally
+        controls = setup_arm_ik(self.armature, initial_influence=0.6)
+        self.assertIsNotNone(controls)
+        gate_status = query_admission_gate_status(arm=self.armature)
+        self.assertTrue(gate_status["can_admit"])
+        self.assertFalse(gate_status["failed_isolation_blocked"])
+
+    def test_125_pre_write_abort_without_zero_mutation_proof_isolated_as_failed_c(self) -> None:
+        """TEST-125: Pre-ACTIVE abort without zero-mutation proof or trusted snapshot is isolated as FAILED-C."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                # Mutate pose bone before snapshot completes so pre-write zero-mutation proof fails while tx.snapshot is None
+                self.armature.pose.bones["forearm.L"].location.x += 0.25
+                raise RuntimeError("Pre-write fault with unverified mutation in TEST-125")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            err_msg = str(cm.exception)
+            self.assertIn("Pre-write fault with unverified mutation in TEST-125", err_msg)
+            self.assertIn("FAILED-C", err_msg)
+            self.assertIn(session_id, err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertIsNone(tx.snapshot)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Must be isolated as FAILED-C with snapshot_trusted=False and RECOVERY_EVIDENCE_INSUFFICIENT
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_rec["failure_class"], "FAILED-C")
+        self.assertEqual(iso_rec["isolation_state"], "ISOLATED_FAILED_C")
+        self.assertIsNone(iso_rec["snapshot_reference"])
+        self.assertFalse(iso_rec["snapshot_trusted"])
+        self.assertEqual(iso_rec["evidence_status"], "RECOVERY_EVIDENCE_INSUFFICIENT")
+
+        # Subsequent write transaction must be rejected by FAILED Isolation Gate before SNAPSHOTTING
+        with self.assertRaises(RuntimeError) as cm_gate:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_gate.exception))
+        self.assertIn(tx.tx_id, str(cm_gate.exception))
+        self.assertIn(session_id, str(cm_gate.exception))
+
+    def test_126_failed_b_rollback_execution_failure_records_isolation(self) -> None:
+        """TEST-126: FAILED-B rollback execution exception isolates Armature in _ISOLATED_FAILED_ARMATURES."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-126")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Secondary rollback execution fault in TEST-126")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.85)
+            self.assertIn("Primary write fault in TEST-126", str(cm.exception))
+            self.assertIn("Secondary rollback execution fault in TEST-126", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_B.value)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_rec["registry_session_id"], session_id)
+        self.assertEqual(iso_rec["transaction_id"], tx.tx_id)
+        self.assertEqual(iso_rec["failure_class"], "FAILED-B")
+        self.assertEqual(iso_rec["isolation_state"], "ISOLATED_FAILED_B")
+        self.assertEqual(iso_rec["liveness_status"], "ALIVE_VERIFIED")
+        self.assertEqual(iso_rec["registration_pointer"], self.armature.as_pointer())
+        self.assertEqual(iso_rec["original_data_pointer"], self.armature.data.as_pointer())
+        self.assertIn("Primary write fault in TEST-126", iso_rec["primary_exception"])
+        self.assertIn("Secondary rollback execution fault in TEST-126", iso_rec["secondary_exception"])
+        self.assertIsNotNone(iso_rec["snapshot_reference"])
+        self.assertTrue(iso_rec["snapshot_trusted"])
+
+        # Subsequent write call must be blocked before SNAPSHOTTING
+        with self.assertRaises(RuntimeError) as cm_block:
+            set_arm_ik_influence(self.armature, "L", 0.5)
+        self.assertIn("FAILED-B", str(cm_block.exception))
+        self.assertIn(tx.tx_id, str(cm_block.exception))
+        self.assertIn(session_id, str(cm_block.exception))
+
+    def test_127_failed_c_rollback_verification_or_recovery_uncertain_records_isolation(self) -> None:
+        """TEST-127: FAILED-C post-rollback verification failure or RECOVERY_UNCERTAIN isolates Armature."""
+        # Part A: Post-rollback verification failure
+        setup_arm_ik(self.armature, initial_influence=0.3)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx_a = []
+
+        def fault_hook_a(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx_a.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-127A")
+            elif stage == "during_rollback_verification":
+                raise RuntimeError("Post-rollback verifier discrepancy in TEST-127A")
+
+        _set_test_fault_injection_hook(fault_hook_a)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError) as cm_a:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15), influence=0.8)
+            self.assertIn("Primary write fault in TEST-127A", str(cm_a.exception))
+            self.assertIn("Post-rollback verifier discrepancy in TEST-127A", str(cm_a.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx_a[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx_a.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], "FAILED-C")
+
+        # De-isolate Part A after verification so we can test Part B on the same Armature
+        deiso_a = request_armature_deisolation(self.armature, reason="Clear Part A in TEST-127")
+        self.assertTrue(deiso_a["approved"])
+
+        # Part B: Relationship operation log RECOVERY_UNCERTAIN during rollback
+        char_col = bpy.data.collections["Character"]
+        hand_r = bpy.data.objects["HandIK.R"]
+        char_col.objects.unlink(hand_r)
+        captured_tx_b = []
+
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary fault in TEST-127B")
+            elif stage == "during_relationship_rollback_undo":
+                op = ctx.get("op", {})
+                if op.get("target_identity", {}).get("name") == "HandIK.R":
+                    raise RuntimeError("Relationship undo failure in TEST-127B")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError) as cm_b:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            self.assertIn("Primary fault in TEST-127B", str(cm_b.exception))
+            self.assertIn("RECOVERY_UNCERTAIN", str(cm_b.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_tx_b[0]
+        self.assertEqual(tx_b.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx_b.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        iso_b = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_b["failure_class"], "FAILED-C")
+        self.assertEqual(len(iso_b["recovery_uncertain_operations"]), 1)
+
+    def test_128_isolated_armature_renamed_still_rejected_before_snapshotting(self) -> None:
+        """TEST-128: Isolated Armature renamed after FAILED-B/C is still recognized by session identity and rejected before SNAPSHOTTING."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        orig_session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary fault in TEST-128")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-128")
+
+        _set_test_fault_injection_hook(fault_hook)
+        y_pos = self.root.location.y + 0.15
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        # Rename both the Armature Object and its Armature DataBlock
+        self.armature.name = "CharacterArmature_Renamed_128"
+        self.armature.data.name = "ArmatureData_Renamed_128"
+
+        # Session identity must remain identical after rename
+        resolved_after_rename = ensure_armature_session_identity(self.armature)
+        self.assertIs(resolved_after_rename, session_rec)
+        self.assertEqual(resolved_after_rename.registry_session_id, orig_session_id)
+
+        # Count snapshot invocations to prove rejection happens strictly BEFORE SNAPSHOTTING
+        snapshot_calls = [0]
+        orig_snapshot_fn = wiring._snapshot_arm_rig_state
+
+        def counting_snapshot(arm):
+            snapshot_calls[0] += 1
+            return orig_snapshot_fn(arm)
+
+        wiring._snapshot_arm_rig_state = counting_snapshot
+        try:
+            for write_fn in (
+                lambda: setup_arm_ik(self.armature),
+                lambda: set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.15)),
+                lambda: set_arm_ik_influence(self.armature, "BOTH", 0.2),
+                lambda: reset_arm_ik(self.armature),
+            ):
+                with self.assertRaises(RuntimeError) as cm_gate:
+                    write_fn()
+                err = str(cm_gate.exception)
+                self.assertIn("FAILED-B", err)
+                self.assertIn(tx.tx_id, err)
+                self.assertIn(orig_session_id, err)
+        finally:
+            wiring._snapshot_arm_rig_state = orig_snapshot_fn
+
+        self.assertEqual(snapshot_calls[0], 0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_129_other_healthy_armature_unaffected_by_isolated_armature(self) -> None:
+        """TEST-129: Other healthy Armature executes transactions normally while Armature A is isolated."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_a = ensure_armature_session_identity(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                raise RuntimeError("Primary fault on Armature A in TEST-129")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault on Armature A in TEST-129")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_arm_ik_influence(self.armature, "L", 0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_a.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_a.registry_session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Build independent Armature B with the 6 required upper-limb bones
+        arm_b_data = bpy.data.armatures.new("ArmB_Data_129")
+        arm_b = bpy.data.objects.new("CharacterArmature_B_129", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+        bpy.context.view_layer.objects.active = arm_b
+        bpy.ops.object.mode_set(mode="EDIT")
+        for b_name in ("upper_arm.L", "upper_arm.R", "forearm.L", "forearm.R", "hand.L", "hand.R"):
+            eb = arm_b_data.edit_bones.new(b_name)
+            eb.head = (0.0, 0.0, 1.0)
+            eb.tail = (0.0, 0.0, 1.25)
+        bpy.ops.object.mode_set(mode="POSE")
+        bpy.context.view_layer.objects.active = self.armature
+        bpy.context.view_layer.update()
+
+        try:
+            session_b = ensure_armature_session_identity(arm_b)
+            self.assertNotEqual(session_b.registry_session_id, session_a.registry_session_id)
+            self.assertEqual(session_b.isolation_state, _ArmatureIsolationState.NONE)
+
+            with _arm_rig_transaction(arm_b) as tx_b:
+                arm_b.pose.bones["forearm.L"].location.y = 0.05
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+            self.assertAlmostEqual(arm_b.pose.bones["forearm.L"].location.y, 0.05, places=6)
+
+            # Armature A remains isolated and blocked
+            self.assertIn(session_a.registry_session_id, _ISOLATED_FAILED_ARMATURES)
+            with self.assertRaises(RuntimeError) as cm_a:
+                set_arm_ik_influence(self.armature, "L", 0.2)
+            self.assertIn(session_a.registry_session_id, str(cm_a.exception))
+        finally:
+            if arm_b.name in bpy.data.objects:
+                bpy.data.objects.remove(arm_b, do_unlink=True)
+            if arm_b_data.name in bpy.data.armatures:
+                bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_130_failed_d_armature_destroyed_during_active_records_tombstone_without_rollback(self) -> None:
+        """TEST-130: FAILED-D Armature destroyed during ACTIVE skips rollback on dead object, records tombstone, and isolates from same-name replacement."""
+        session_orig = ensure_armature_session_identity(self.armature)
+        orig_session_id = session_orig.registry_session_id
+        orig_arm_ptr = session_orig.registration_pointer
+        orig_data_ptr = session_orig.original_data_pointer
+
+        rollback_calls = [0]
+        orig_rollback_fn = wiring._rollback_arm_rig_state
+
+        def counting_rollback(arm, snapshot, tx=None):
+            rollback_calls[0] += 1
+            return orig_rollback_fn(arm, snapshot, tx)
+
+        wiring._rollback_arm_rig_state = counting_rollback
+        captured_tx = []
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    bpy.data.objects.remove(self.armature, do_unlink=True)
+                    raise RuntimeError("Armature destroyed inside ACTIVE in TEST-130")
+            err_msg = str(cm.exception)
+            self.assertIn("Armature destroyed inside ACTIVE in TEST-130", err_msg)
+            self.assertIn(orig_session_id, err_msg)
+        finally:
+            wiring._rollback_arm_rig_state = orig_rollback_fn
+
+        # Must NOT have executed _rollback_arm_rig_state on the dead Armature
+        self.assertEqual(rollback_calls[0], 0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_D.value)
+
+        # Verify Tombstone state
+        self.assertEqual(session_orig.liveness_status, _ArmatureLivenessStatus.INVALIDATED_DEAD)
+        self.assertFalse(session_orig.in_live_blender_collection)
+        self.assertEqual(session_orig.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertIsNotNone(session_orig.tombstone_record)
+        self.assertIn(orig_session_id, _ISOLATED_FAILED_ARMATURES)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[orig_session_id]
+        self.assertEqual(iso_rec["failure_class"], "FAILED-D")
+        self.assertEqual(iso_rec["isolation_state"], "TOMBSTONED_FAILED_D")
+        self.assertEqual(iso_rec["registration_pointer"], orig_arm_ptr)
+        self.assertEqual(iso_rec["original_data_pointer"], orig_data_ptr)
+
+        # Create a new Armature with the exact same name "CharacterArmature"
+        new_arm = build_rig(self.config)
+        self.assertEqual(new_arm.name, "CharacterArmature")
+        session_new = ensure_armature_session_identity(new_arm)
+        self.assertNotEqual(session_new.registry_session_id, orig_session_id)
+        self.assertEqual(session_new.isolation_state, _ArmatureIsolationState.NONE)
+
+        # Old tombstone remains in _ISOLATED_FAILED_ARMATURES untouched
+        self.assertIn(orig_session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[orig_session_id]["isolation_state"], "TOMBSTONED_FAILED_D")
+
+    def test_131_verified_recovery_deisolates_failed_b_and_failed_c_and_restores_admission(self) -> None:
+        """TEST-131: Full recovery verification de-isolates FAILED-B and FAILED-C Armature and restores write admission."""
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        # Part A: FAILED-B -> manual restoration -> verified de-isolation -> new write commits
+        captured_tx_b = []
+
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-131A")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-131A")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_tx_b[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # Restore scene to match tx_b.snapshot
+        _rollback_arm_rig_state(self.armature, tx_b.snapshot, tx_b)
+        _depsgraph_update()
+
+        res_b = request_armature_deisolation(self.armature, reason="Restored state verified in TEST-131A")
+        self.assertTrue(res_b["approved"])
+        self.assertEqual(res_b["isolation_state"], "NONE")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "APPROVED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["registry_session_id"], session_id)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["transaction_id"], tx_b.tx_id)
+
+        # Verify write admission is restored
+        state_after_b = set_hand_ik_target(self.armature, side="L", world_xyz=(-0.30, y_pos, 1.18), influence=0.75)
+        self.assertIsNotNone(state_after_b)
+
+        # Part B: FAILED-C -> verified de-isolation -> new write commits
+        captured_tx_c = []
+
+        def fault_hook_c(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                captured_tx_c.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-131B")
+            elif stage == "during_rollback_verification":
+                raise RuntimeError("Verification fault in TEST-131B")
+
+        _set_test_fault_injection_hook(fault_hook_c)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_arm_ik_influence(self.armature, "L", 0.95)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_c = captured_tx_c[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+
+        res_c = request_armature_deisolation(self.armature, reason="Post-rollback state verified in TEST-131B")
+        self.assertTrue(res_c["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "APPROVED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["transaction_id"], tx_c.tx_id)
+
+        set_arm_ik_influence(self.armature, "BOTH", 0.55)
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence,
+            0.55,
+            places=5,
+        )
+
+    def test_132_incomplete_recovery_deisolation_rejected_with_audit_log(self) -> None:
+        """TEST-132: De-isolation request is rejected when scene state has not been fully restored to snapshot."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary write fault in TEST-132")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Abort rollback before restoring HandIK.L location in TEST-132")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.35, y_pos, 1.25), influence=0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # HandIK.L location is still mutated because rollback aborted at start
+        res = request_armature_deisolation(self.armature, reason="Premature deisolation attempt in TEST-132")
+        self.assertFalse(res["approved"])
+        self.assertEqual(res["action"], "REJECTED")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "REJECTED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["registry_session_id"], session_id)
+        self.assertEqual(res["evidence"]["status"], "RECOVERY_VERIFICATION_FAILED")
+
+        # Confirm raise_on_reject=True raises RuntimeError
+        with self.assertRaises(RuntimeError) as cm_rej:
+            request_armature_deisolation(
+                self.armature,
+                reason="Premature deisolation with raise_on_reject",
+                raise_on_reject=True,
+            )
+        self.assertIn("RECOVERY_VERIFICATION_FAILED", str(cm_rej.exception))
+
+        # Write admission remains blocked
+        with self.assertRaises(RuntimeError) as cm_gate:
+            set_arm_ik_influence(self.armature, "L", 0.1)
+        self.assertIn("FAILED-B", str(cm_gate.exception))
+
+    def test_133_missing_snapshot_deisolation_rejected_as_recovery_evidence_insufficient(self) -> None:
+        """TEST-133: Missing trusted snapshot returns RECOVERY_EVIDENCE_INSUFFICIENT and rejects de-isolation even if structure looks normal."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        orig_loc_x = self.armature.pose.bones["forearm.L"].location.x
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                self.armature.pose.bones["forearm.L"].location.x += 0.15
+                raise RuntimeError("Snapshot aborted after bone mutation in TEST-133")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIsNone(_ISOLATED_FAILED_ARMATURES[session_id]["snapshot_reference"])
+        self.assertFalse(_ISOLATED_FAILED_ARMATURES[session_id]["snapshot_trusted"])
+
+        # Manually restore bone location so the live Armature looks completely normal
+        self.armature.pose.bones["forearm.L"].location.x = orig_loc_x
+        _depsgraph_update()
+
+        # Layer 5 must still report RECOVERY_EVIDENCE_INSUFFICIENT because no trusted snapshot exists
+        evidence = verify_armature_deisolation_evidence(arm=self.armature)
+        self.assertFalse(evidence["can_deisolate"])
+        self.assertEqual(evidence["status"], "RECOVERY_EVIDENCE_INSUFFICIENT")
+        self.assertEqual(evidence["case"], "CASE_2_NO_TRUSTED_SNAPSHOT")
+
+        res = request_armature_deisolation(self.armature, reason="Attempt deisolation without snapshot in TEST-133")
+        self.assertFalse(res["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "REJECTED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["verification_status"], "RECOVERY_EVIDENCE_INSUFFICIENT")
+
+    def test_134_direct_isolation_dict_tampering_without_coordinator_verification_rejected(self) -> None:
+        """TEST-134: Direct tampering with _ISOLATED_FAILED_ARMATURES or calling Layer 2 without verified evidence cannot bypass isolation."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary write fault in TEST-134")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-134")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.33, y_pos, 1.22), influence=0.85)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # 1. Calling Layer 2 _clear_or_retire_failure_isolation_by_coordinator with unverified evidence must raise RuntimeError
+        with self.assertRaises(RuntimeError) as cm_l2:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Bypass attempt",
+                verification_evidence={"can_deisolate": False},
+            )
+        self.assertIn("Layer 2 rejected de-isolation", str(cm_l2.exception))
+
+        # 2. Directly popping from _ISOLATED_FAILED_ARMATURES without Coordinator de-isolation leaves session_rec.isolation_state == ISOLATED_FAILED_B
+        saved_iso_entry = _ISOLATED_FAILED_ARMATURES.pop(session_id)
+        try:
+            self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+            with self.assertRaises(RuntimeError) as cm_gate:
+                set_arm_ik_influence(self.armature, "L", 0.3)
+            self.assertIn("ISOLATED_FAILED_B", str(cm_gate.exception))
+            self.assertIn(session_id, str(cm_gate.exception))
+        finally:
+            _ISOLATED_FAILED_ARMATURES[session_id] = saved_iso_entry
+
+    def test_135_failed_d_tombstone_cannot_return_to_active_and_retires_to_archived(self) -> None:
+        """TEST-135: FAILED-D tombstone rejects de-isolation, verifies residual objects before retirement, and transitions to ARCHIVED_RETIRED."""
+        session_dead = ensure_armature_session_identity(self.armature)
+        dead_session_id = session_dead.registry_session_id
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                # HandIK.L has been created and registered on tx; now destroy the Armature
+                bpy.data.objects.remove(self.armature, do_unlink=True)
+                raise RuntimeError("Armature destroyed after HandIK.L creation in TEST-135")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Create a replacement Armature with the same name "CharacterArmature"
+        replacement_arm = build_rig(self.config)
+        self.assertEqual(replacement_arm.name, "CharacterArmature")
+        session_replacement = ensure_armature_session_identity(replacement_arm)
+        self.assertNotEqual(session_replacement.registry_session_id, dead_session_id)
+
+        # 1. Attempting to de-isolate the dead session (even passing replacement_arm) must be rejected
+        deiso_attempt = request_armature_deisolation(
+            replacement_arm,
+            reason="Attempt to revive FAILED-D tombstone in TEST-135",
+            session_id=dead_session_id,
+        )
+        self.assertFalse(deiso_attempt["approved"])
+        self.assertEqual(deiso_attempt["evidence"]["status"], "REJECTED_DEAD_ARMATURE_TOMBSTONE")
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        # 2. Attempting to retire tombstone while residual transaction-created HandIK.L still exists must be rejected
+        self.assertIsNotNone(bpy.data.objects.get("HandIK.L"))
+        retire_early = retire_dead_armature_tombstone(
+            dead_session_id,
+            reason="Attempt retirement while residual HandIK.L exists in TEST-135",
+        )
+        self.assertFalse(retire_early["approved"])
+        self.assertEqual(retire_early["evidence"]["status"], "TOMBSTONE_RETIREMENT_REJECTED")
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # 3. Clean up residual transaction-created HandIK.L, then retire tombstone
+        bpy.data.objects.remove(bpy.data.objects["HandIK.L"], do_unlink=True)
+        retire_ok = retire_dead_armature_tombstone(
+            dead_session_id,
+            reason="All residual resources cleaned in TEST-135",
+        )
+        self.assertTrue(retire_ok["approved"])
+        self.assertEqual(retire_ok["action"], "ARCHIVED_RETIRED")
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+        self.assertEqual(session_dead.lifecycle_stage, "ARCHIVED_RETIRED")
+        self.assertNotIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertIn(dead_session_id, _ARCHIVED_FAILED_D_TOMBSTONES)
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["decision"], "APPROVED")
+        self.assertEqual(_DEISOLATION_AUDIT_LOG[-1]["operation"], "RETIRE_DEAD_TOMBSTONE")
+
+        # 4. Archived tombstone can never be revived to active status
+        revive_archived = request_armature_deisolation(
+            None,
+            reason="Attempt to revive ARCHIVED_RETIRED tombstone",
+            session_id=dead_session_id,
+        )
+        self.assertFalse(revive_archived["approved"])
+        self.assertEqual(revive_archived["evidence"]["status"], "REJECTED_ARCHIVED_TOMBSTONE")
+
+        # 5. Replacement Armature operates cleanly under its own session identity
+        controls_new = setup_arm_ik(replacement_arm, initial_influence=0.5)
+        self.assertIsNotNone(controls_new)
+
+    def test_136_cleanup_pending_and_failed_isolation_strictly_separated(self) -> None:
+        """TEST-136: CLEANUP_PENDING and FAILED isolation remain strictly separated without cross-clearing or FAILED -> COMMITTED."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        # 1. Trigger FAILED-B transaction
+        captured_failed_tx = []
+
+        def fault_hook_failed(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_failed_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-136")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-136")
+
+        _set_test_fault_injection_hook(fault_hook_failed)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_failed = captured_failed_tx[0]
+        self.assertEqual(tx_failed.state, _ArmRigTransactionState.FAILED)
+
+        # retry_pending_arm_rig_cleanup and tx.retry_cleanup() must reject FAILED transactions and never transition FAILED -> COMMITTED
+        with self.assertRaises(RuntimeError) as cm_retry1:
+            retry_pending_arm_rig_cleanup(tx_failed.tx_id)
+        self.assertIn("FAILED", str(cm_retry1.exception))
+        with self.assertRaises(RuntimeError) as cm_retry2:
+            tx_failed.retry_cleanup()
+        self.assertIn("FAILED -> COMMITTED transition is strictly forbidden", str(cm_retry2.exception))
+        self.assertEqual(tx_failed.state, _ArmRigTransactionState.FAILED)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Restore scene and de-isolate so we can create a real CLEANUP_PENDING record
+        _rollback_arm_rig_state(self.armature, tx_failed.snapshot, tx_failed)
+        _depsgraph_update()
+        self.assertTrue(request_armature_deisolation(self.armature, reason="Restore before cleanup test in TEST-136")["approved"])
+
+        # 2. Scenario A: When no active FAILED isolation exists, normal CLEANUP_PENDING can be retried successfully
+        old_hand_a = bpy.data.objects["HandIK.L"]
+        bpy.data.objects.remove(old_hand_a, do_unlink=True)
+        doomed_mesh_a = bpy.data.meshes.new("DoomedMesh136_A")
+
+        def fault_hook_cleanup_a(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Phase 3 cleanup failure in TEST-136 A")
+
+        _set_test_fault_injection_hook(fault_hook_cleanup_a)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_clean_a:
+                    wrong_obj_a = bpy.data.objects.new("HandIK.L", doomed_mesh_a)
+                    tx_clean_a.register_created_controller(wrong_obj_a)
+                    _authorized_link_object_to_collection(bpy.data.collections["Character"], wrong_obj_a, tx_clean_a)
+                    setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        pending_ids_a = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids_a), 1)
+        cleanup_tx_id_a = pending_ids_a[0]
+        cleanup_tx_a = _PENDING_ARM_RIG_CLEANUPS[cleanup_tx_id_a]
+
+        # Confirm that no FAILED isolation is active on the Armature before retry
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Normal CLEANUP_PENDING retry succeeds when no FAILED isolation exists
+        retry_pending_arm_rig_cleanup(cleanup_tx_id_a)
+        self.assertEqual(cleanup_tx_a.state, _ArmRigTransactionState.COMMITTED)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertNotIn(cleanup_tx_id_a, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertEqual(len(cleanup_tx_a.uncleaned_stashed_objects), 0)
+
+        # 3. Legitimate FAILED-C de-isolation and subsequent write recovery after Pending registry is cleared by Coordinator
+        snap_after_cleanup_a = _snapshot_arm_rig_state(self.armature)
+        isolated_failed_c_tx = _create_arm_rig_transaction_context(self.armature, session_record=session_rec)
+        isolated_failed_c_tx.state = _ArmRigTransactionState.FAILED
+        isolated_failed_c_tx.snapshot = snap_after_cleanup_a
+        from src.scene_transaction_integrity.layer2.session_registries import _record_armature_failure_isolation_by_coordinator
+        _record_armature_failure_isolation_by_coordinator(
+            session_rec=session_rec,
+            tx=isolated_failed_c_tx,
+            failure_class=_FailedTransactionClass.FAILED_C,
+            primary_exception=RuntimeError("FAILED-C after cleanup in TEST-136"),
+            secondary_exception=RuntimeError("Verifier fault in TEST-136"),
+            evidence_status="SNAPSHOT_AVAILABLE",
+        )
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+
+        # New write is STILL blocked by Gate 2 (FAILED Isolation Gate)
+        with self.assertRaises(RuntimeError) as cm_still_blocked:
+            set_arm_ik_influence(self.armature, "L", 0.5)
+        self.assertIn("FAILED-C", str(cm_still_blocked.exception))
+
+        # Now de-isolate FAILED-C after CLEANUP_PENDING has been legitimately resolved
+        deiso_final = request_armature_deisolation(
+            self.armature,
+            reason="De-isolate after CLEANUP_PENDING resolved in TEST-136",
+        )
+        self.assertTrue(deiso_final["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Now new write passes both gates and commits cleanly
+        set_arm_ik_influence(self.armature, "BOTH", 0.7)
+        self.assertAlmostEqual(
+            self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]].influence,
+            0.7,
+            places=5,
+        )
+
+        # 4. Scenario B: Coexistence of CLEANUP_PENDING and FAILED-C isolation (final scenario)
+        old_hand_b = bpy.data.objects.get("HandIK.L")
+        if old_hand_b is not None:
+            bpy.data.objects.remove(old_hand_b, do_unlink=True)
+        doomed_mesh_b = bpy.data.meshes.new("DoomedMesh136_B")
+        doomed_mesh_b_ptr = doomed_mesh_b.as_pointer()
+        wrong_obj_b = None
+        wrong_obj_b_ptr = None
+
+        def fault_hook_cleanup_b(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                raise RuntimeError("Phase 3 cleanup failure in TEST-136 B")
+
+        _set_test_fault_injection_hook(fault_hook_cleanup_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_clean_b:
+                    wrong_obj_b = bpy.data.objects.new("HandIK.L", doomed_mesh_b)
+                    wrong_obj_b_ptr = wrong_obj_b.as_pointer()
+                    tx_clean_b.register_created_controller(wrong_obj_b)
+                    _authorized_link_object_to_collection(bpy.data.collections["Character"], wrong_obj_b, tx_clean_b)
+                    setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(wrong_obj_b)
+        self.assertIsNotNone(wrong_obj_b_ptr)
+        pending_ids_b = get_pending_arm_rig_cleanup_ids()
+        self.assertEqual(len(pending_ids_b), 1)
+        cleanup_tx_id_b = pending_ids_b[0]
+        cleanup_tx_b = _PENDING_ARM_RIG_CLEANUPS[cleanup_tx_id_b]
+        self.assertEqual(len(cleanup_tx_b.uncleaned_stashed_objects), 1)
+
+        # Also record a FAILED-C isolation on the same Armature (simulating coexistence of CLEANUP_PENDING and FAILED)
+        snap_current = _snapshot_arm_rig_state(self.armature)
+        coexisting_failed_tx = _create_arm_rig_transaction_context(self.armature, session_record=session_rec)
+        coexisting_failed_tx.state = _ArmRigTransactionState.FAILED
+        coexisting_failed_tx.snapshot = snap_current
+        _record_armature_failure_isolation_by_coordinator(
+            session_rec=session_rec,
+            tx=coexisting_failed_tx,
+            failure_class=_FailedTransactionClass.FAILED_C,
+            primary_exception=RuntimeError("Coexisting FAILED-C in TEST-136"),
+            secondary_exception=RuntimeError("Verifier fault in TEST-136"),
+            evidence_status="SNAPSHOT_AVAILABLE",
+        )
+
+        # 4.1 De-isolation must be rejected while CLEANUP_PENDING is unresolved (Case 1 Condition 8), and must NOT clear _PENDING_ARM_RIG_CLEANUPS
+        deiso_while_cleanup = request_armature_deisolation(
+            self.armature,
+            reason="Attempt deisolation while CLEANUP_PENDING exists in TEST-136",
+        )
+        self.assertFalse(deiso_while_cleanup["approved"])
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # 4.2 Cleanup Retry must be rejected by Coordinator preflight while FAILED isolation is active
+        grants_before = len(_COORDINATOR_AUTHORIZATION_GRANTS)
+        with self.assertRaises(RuntimeError) as cm_retry_coexist:
+            retry_pending_arm_rig_cleanup(cleanup_tx_id_b)
+        self.assertIn("CLEANUP_PREFLIGHT_REJECTED", str(cm_retry_coexist.exception))
+        self.assertIn("active FAILED isolation", str(cm_retry_coexist.exception))
+
+        # Negative contract verification under coexistence:
+        # - CLEANUP_PENDING must NOT be removed
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
+        self.assertIn(cleanup_tx_id_b, _PENDING_ARM_RIG_CLEANUPS)
+        # - FAILED-C isolation must remain intact
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        # - Transaction state cannot transition to COMMITTED
+        self.assertEqual(cleanup_tx_b.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertNotEqual(cleanup_tx_b.state, _ArmRigTransactionState.COMMITTED)
+        # - Original pending resource must not be deleted without authorization (verified by original reference and pointer)
+        self.assertEqual(len(cleanup_tx_b.uncleaned_stashed_objects), 1)
+        stashed_entry = cleanup_tx_b.uncleaned_stashed_objects[0]
+        self.assertIs(stashed_entry["stashed_obj"], wrong_obj_b)
+        self.assertEqual(stashed_entry["stashed_obj_ptr"], wrong_obj_b_ptr)
+        self.assertIs(stashed_entry["stashed_data"], doomed_mesh_b)
+        self.assertEqual(stashed_entry["stashed_data_ptr"], doomed_mesh_b_ptr)
+        self.assertFalse(stashed_entry["obj_cleaned"])
+        self.assertFalse(stashed_entry["data_cleaned"])
+        self.assertEqual(wrong_obj_b.as_pointer(), wrong_obj_b_ptr)
+        self.assertTrue(
+            any(o == wrong_obj_b and o.as_pointer() == wrong_obj_b_ptr for o in bpy.data.objects.values())
+        )
+        self.assertEqual(doomed_mesh_b.as_pointer(), doomed_mesh_b_ptr)
+        self.assertTrue(
+            any(m == doomed_mesh_b and m.as_pointer() == doomed_mesh_b_ptr for m in bpy.data.meshes.values())
+        )
+        # - No new Coordinator Grant may be generated
+        self.assertEqual(len(_COORDINATOR_AUTHORIZATION_GRANTS), grants_before)
+
+        # 4.3 New business write is blocked under coexisting pending cleanup and FAILED-C isolation
+        gate_status = query_admission_gate_status(self.armature)
+        self.assertTrue(gate_status["cleanup_pending_blocked"])
+        self.assertTrue(gate_status["failed_isolation_blocked"])
+        self.assertFalse(gate_status["can_admit"])
+        with self.assertRaises(RuntimeError) as cm_coexist_blocked:
+            set_arm_ik_influence(self.armature, "L", 0.5)
+        self.assertIn("Arm IK write blocked", str(cm_coexist_blocked.exception))
+        with self.assertRaises(RuntimeError) as cm_coexist_iso_gate:
+            _assert_arm_rig_failed_isolation_gate(self.armature, session_rec)
+        self.assertIn("FAILED-C", str(cm_coexist_iso_gate.exception))
+
+    # -------------------------------------------------------------------------
+    # Audit Corrections Tests (TEST-137 to TEST-149)
+    # -------------------------------------------------------------------------
+
+    def test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c(self) -> None:
+        """TEST-137: Sub-micro pose mutation (2e-7) during snapshot is NOT masked by rounding and isolates as FAILED-C."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                pbone = self.armature.pose.bones["forearm.L"]
+                pbone.location[0] += 2e-7
+                raise RuntimeError("Injected sub-micro mutation fault in TEST-137")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write is strictly blocked by Gate 2 (FAILED Isolation Gate)
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            set_arm_ik_influence(self.armature, "L", 0.7)
+        self.assertIn("FAILED-C", str(cm_blocked.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-137"] = {
+            "test_method": "test_137_sub_micro_pose_mutation_detected_without_rounding_isolated_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "mutation_detected": "sub_micro_pose_delta_2e-7",
+        }
+
+    def test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c(self) -> None:
+        """TEST-138: Mutation to constraint pole_angle during snapshot is detected by unrounded fingerprint and isolates as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                con = self.armature.pose.bones["forearm.L"].constraints.get(ARM_IK_CONSTRAINT_NAMES["L"])
+                if con is not None:
+                    con.pole_angle += 0.05
+                raise RuntimeError("Injected constraint mutation fault in TEST-138")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-138"] = {
+            "test_method": "test_138_constraint_pole_angle_mutation_detected_and_isolated_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "mutation_detected": "constraint_pole_angle_delta_0.05",
+        }
+
+    def test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c(self) -> None:
+        """TEST-139: Mutation to controller matrix_parent_inverse during snapshot is detected and isolates as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                c_obj = bpy.data.objects.get(ARM_IK_TARGET_NAMES["L"])
+                if c_obj is not None:
+                    mat = c_obj.matrix_parent_inverse.copy()
+                    mat[0][3] += 0.05
+                    c_obj.matrix_parent_inverse = mat
+                raise RuntimeError("Injected matrix_parent_inverse mutation fault in TEST-139")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-139"] = {
+            "test_method": "test_139_controller_matrix_parent_inverse_mutation_detected_and_isolated_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "mutation_detected": "controller_matrix_parent_inverse_delta_0.05",
+        }
+
+    def test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a(self) -> None:
+        """TEST-140: Clean snapshot abort with genuine zero mutation verifies as FAILED-A without isolating healthy Armature."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                raise RuntimeError("Clean pre-write snapshot abort in TEST-140")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("Clean pre-write snapshot abort in TEST-140", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_A.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write must be admitted and succeed cleanly
+        controls = setup_arm_ik(self.armature, initial_influence=0.6)
+        self.assertIsNotNone(controls)
+        self.assertEqual(session_rec.lifecycle_stage, "NORMAL_TERMINAL")
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-140"] = {
+            "test_method": "test_140_clean_snapshot_abort_genuine_zero_mutation_classified_as_failed_a",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "ADMITTED_AND_COMMITTED",
+            "recovery_result": "PRE_WRITE_ZERO_MUTATION_VERIFIED",
+        }
+
+    def test_141_pre_snapshot_fingerprint_capture_failure_fails_closed(self) -> None:
+        """TEST-141: Pre-snapshot fingerprint capture failure fails closed, isolates as FAILED-C, and leaves no stack leak."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_pre_snapshot_fingerprint":
+                if ctx.get("tx") is not None:
+                    captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected fingerprint capture fault in TEST-141")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("classified as FAILED-C", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write blocked
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_blocked.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-141"] = {
+            "test_method": "test_141_pre_snapshot_fingerprint_capture_failure_fails_closed",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "recovery_result": "ISOLATED_WITH_RECOVERY_EVIDENCE_INSUFFICIENT",
+        }
+
+    def test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone(self) -> None:
+        """TEST-142: Armature object physically alive with replaced DataBlock cannot retire tombstone (ObjectExists == True)."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Replace armature data block (invalidating session identity while object still physically exists)
+        new_arm_data = bpy.data.armatures.new("SubstitutedArmatureData_142")
+        self.armature.data = new_arm_data
+
+        # Attempting write triggers admission rejection (Condition 7 fails), isolating as FAILED-D
+        with self.assertRaises(RuntimeError) as cm_admission:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-D", str(cm_admission.exception))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        # Physical object still exists in bpy.data.objects!
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertTrue(liveness["object_exists"])
+        self.assertTrue(session_rec.in_live_blender_collection)
+
+        # Attempting to retire tombstone while object physically exists must be strictly rejected
+        retire_attempt = retire_dead_armature_tombstone(
+            session_id,
+            reason="Illegal attempt to retire tombstone while object exists in TEST-142",
+        )
+        self.assertFalse(retire_attempt["approved"])
+        self.assertEqual(retire_attempt["evidence"]["status"], "TOMBSTONE_RETIREMENT_REJECTED")
+        self.assertTrue(any("still exists in bpy.data.objects" in r for r in retire_attempt["evidence"]["reasons"]))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-142"] = {
+            "test_method": "test_142_armature_alive_with_replaced_datablock_cannot_retire_tombstone",
+            "status": "PASS",
+            "transaction_id": "admission_gate_rejection",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-D",
+            "isolation_state": session_rec.isolation_state.value,
+            "admission_result": "REJECTED_BEFORE_SNAPSHOTTING",
+            "object_exists": True,
+            "tombstone_retirement": "REJECTED_OBJECT_ALIVE",
+        }
+
+    def test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement(self) -> None:
+        """TEST-143: Genuine deletion of original Armature object from bpy.data.objects permits retirement to ARCHIVED_RETIRED."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Replace data and isolate as FAILED-D
+        self.armature.data = bpy.data.armatures.new("TempData_143")
+        with self.assertRaises(RuntimeError):
+            setup_arm_ik(self.armature)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        # Now genuinely remove the object from bpy.data.objects
+        bpy.data.objects.remove(self.armature, do_unlink=True)
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertFalse(liveness["object_exists"])
+
+        # Retirement must now succeed
+        retire_res = retire_dead_armature_tombstone(
+            session_id,
+            reason="Legitimate retirement after genuine Armature object removal in TEST-143",
+        )
+        self.assertTrue(retire_res["approved"])
+        self.assertEqual(retire_res["action"], "ARCHIVED_RETIRED")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertIn(session_id, _ARCHIVED_FAILED_D_TOMBSTONES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-143"] = {
+            "test_method": "test_143_genuine_deletion_of_original_armature_allows_valid_tombstone_retirement",
+            "status": "PASS",
+            "transaction_id": "admission_gate_rejection",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-D",
+            "isolation_state": session_rec.isolation_state.value,
+            "object_exists": False,
+            "tombstone_retirement": "APPROVED_ARCHIVED_RETIRED",
+        }
+
+    def test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session(self) -> None:
+        """TEST-144: Same-name replacement Armature receives new UUID and cannot reuse or de-isolate old dead session."""
+        session_dead = ensure_armature_session_identity(self.armature)
+        dead_session_id = session_dead.registry_session_id
+
+        # Destroy original Armature
+        bpy.data.objects.remove(self.armature, do_unlink=True)
+        _ = _verify_armature_session_identity_record(session_dead)
+        session_dead.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[dead_session_id] = {
+            "registry_session_id": dead_session_id,
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Build new Armature with exact same name
+        replacement_arm = build_rig(self.config)
+        self.assertEqual(replacement_arm.name, "CharacterArmature")
+
+        # Must get a new session identity record with distinct UUID
+        new_session = ensure_armature_session_identity(replacement_arm)
+        self.assertNotEqual(new_session.registry_session_id, dead_session_id)
+        self.assertEqual(new_session.isolation_state, _ArmatureIsolationState.NONE)
+
+        # De-isolation on dead session using new Armature is rejected
+        deiso_dead = request_armature_deisolation(
+            replacement_arm,
+            reason="Attempt to revive old session with replacement object in TEST-144",
+            session_id=dead_session_id,
+        )
+        self.assertFalse(deiso_dead["approved"])
+        self.assertEqual(deiso_dead["evidence"]["status"], "REJECTED_DEAD_ARMATURE_TOMBSTONE")
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-144"] = {
+            "test_method": "test_144_same_name_replacement_armature_receives_new_uuid_and_cannot_reuse_dead_session",
+            "status": "PASS",
+            "dead_session_id": dead_session_id,
+            "replacement_session_id": new_session.registry_session_id,
+            "deisolation_result": "REJECTED_DEAD_ARMATURE_TOMBSTONE",
+        }
+
+    def test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected(self) -> None:
+        """TEST-145: Forged dict {'can_deisolate': True} passed directly to Layer 2 is rejected."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Put session into ISOLATED_FAILED_B
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+
+        # Passing forged plain dict without Coordinator grant must raise RuntimeError
+        with self.assertRaises(RuntimeError) as cm_forged:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Direct forgery attempt in TEST-145",
+                authorization_grant={"can_deisolate": True},
+            )
+        self.assertIn("invalid or missing Coordinator authorization grant", str(cm_forged.exception))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-145"] = {
+            "test_method": "test_145_forged_can_deisolate_dict_passed_directly_to_layer2_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "FORGED_CAN_DEISOLATE_DICT",
+            "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT",
+        }
+
+    def test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected(self) -> None:
+        """TEST-146: Forged dict {'can_retire': True} passed directly to Layer 2 is rejected."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Put session into TOMBSTONED_FAILED_D
+        session_rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Passing forged plain dict must raise RuntimeError
+        with self.assertRaises(RuntimeError) as cm_forged:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="ARCHIVE_TOMBSTONE",
+                reason="Direct retirement forgery in TEST-146",
+                authorization_grant={"can_retire": True},
+            )
+        self.assertIn("invalid or missing Coordinator authorization grant", str(cm_forged.exception))
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-146"] = {
+            "test_method": "test_146_forged_can_retire_dict_passed_directly_to_layer2_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "FORGED_CAN_RETIRE_DICT",
+            "enforcement_result": "REJECTED_INVALID_OR_MISSING_GRANT",
+        }
+
+    def test_147_coordinator_grant_binding_and_single_use_enforcement(self) -> None:
+        """TEST-147: Coordinator grant enforces cross-session rejection, cross-action rejection, and single-use consumption.
+
+        Corrected invalid historical test premise:
+        Grant issuance requires verified recovery evidence and binds strictly to session, transaction ID,
+        failure class, isolation state, and action.
+        """
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        # Fault injection into FAILED-B
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-147")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-147")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # 1. Unverified recovery: grant issuance is rejected
+        with self.assertRaises(RuntimeError) as cm_unverified:
+            _issue_coordinator_authorization_grant(
+                session_id=session_id,
+                transition_action="CLEAR_TO_NONE",
+                arm=self.armature,
+            )
+        self.assertIn("recovery verification failed", str(cm_unverified.exception).lower())
+
+        # 2. Genuine restoration to snapshot
+        _rollback_arm_rig_state(self.armature, tx.snapshot, tx)
+        _depsgraph_update()
+
+        # 3. Verified recovery: grant issuance succeeds and binds to tx.tx_id and FAILED-B
+        grant = _issue_coordinator_authorization_grant(
+            session_id=session_id,
+            transition_action="CLEAR_TO_NONE",
+            arm=self.armature,
+        )
+        issued_grant_id = grant["grant_id"]
+        self.assertEqual(grant["registry_session_id"], session_id)
+        self.assertEqual(grant["transaction_id"], tx.tx_id)
+        self.assertEqual(grant["failure_class"], _FailedTransactionClass.FAILED_B.value)
+        self.assertEqual(grant["current_isolation_state"], _ArmatureIsolationState.ISOLATED_FAILED_B.value)
+        self.assertEqual(grant["transition_action"], "CLEAR_TO_NONE")
+
+        # 4. Cross-session rejection: passing grant with different session_id raises RuntimeError
+        with self.assertRaises(RuntimeError) as cm_cross_session:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id="wrong_session_id",
+                action="CLEAR_TO_NONE",
+                reason="Cross-session attack",
+                authorization_grant=grant,
+            )
+        self.assertIn("not found in active isolation registry", str(cm_cross_session.exception))
+
+        # 5. Cross-action rejection: passing grant with mismatched transition_action raises RuntimeError
+        with self.assertRaises(RuntimeError) as cm_cross_action:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="ARCHIVE_TOMBSTONE",
+                reason="Cross-action attack",
+                authorization_grant=grant,
+            )
+        self.assertIn("grant action mismatch", str(cm_cross_action.exception))
+
+        # 6. Legitimate single use succeeds
+        res = _clear_or_retire_failure_isolation_by_coordinator(
+            session_id=session_id,
+            action="CLEAR_TO_NONE",
+            reason="Legitimate single use in TEST-147",
+            authorization_grant=grant,
+        )
+        self.assertEqual(res["new_isolation_state"], _ArmatureIsolationState.NONE.value)
+        self.assertTrue(grant["consumed"])
+
+        # 7. Reusing the exact same grant raises RuntimeError (grant already consumed/removed)
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": tx.tx_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+        with self.assertRaises(RuntimeError) as cm_reuse:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Replay attack",
+                authorization_grant=grant,
+            )
+        self.assertIn("invalid or missing Coordinator authorization grant", str(cm_reuse.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-147"] = {
+            "test_method": "test_147_coordinator_grant_binding_and_single_use_enforcement",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "grant_id": issued_grant_id,
+            "cross_session_rejected": True,
+            "cross_action_rejected": True,
+            "single_use_consumed": True,
+            "replay_rejected": True,
+        }
+
+    def test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement(self) -> None:
+        """TEST-148: Non-empty reason string is strictly required for request_armature_deisolation and retire_dead_armature_tombstone."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # 1. request_armature_deisolation rejects invalid reasons
+        for bad_reason in (None, "", "   ", "\t\n"):
+            res = request_armature_deisolation(self.armature, reason=bad_reason, session_id=session_id)
+            self.assertFalse(res["approved"])
+            self.assertTrue(any("reason must be a non-empty string" in r for r in res.get("reasons", [])))
+
+            with self.assertRaises(ValueError):
+                request_armature_deisolation(self.armature, reason=bad_reason, session_id=session_id, raise_on_reject=True)
+
+        # 2. retire_dead_armature_tombstone rejects invalid reasons
+        for bad_reason in (None, "", "   ", "\t\n"):
+            res = retire_dead_armature_tombstone(session_id, reason=bad_reason)
+            self.assertFalse(res["approved"])
+            self.assertTrue(any("reason must be a non-empty string" in r for r in res.get("reasons", [])))
+
+            with self.assertRaises(ValueError):
+                retire_dead_armature_tombstone(session_id, reason=bad_reason, raise_on_reject=True)
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-148"] = {
+            "test_method": "test_148_non_empty_reason_required_for_deisolation_and_tombstone_retirement",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "invalid_reasons_tested": ["None", "empty_str", "spaces", "whitespace"],
+            "deisolation_rejected": True,
+            "retirement_rejected": True,
+            "value_error_raised_on_flag": True,
+        }
+
+    def test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c(self) -> None:
+        """TEST-149: Relationship undo exception transitions operation to RECOVERY_UNCERTAIN and isolates session as FAILED-C."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-149")
+            elif stage == "during_relationship_rollback_undo":
+                raise RuntimeError("Undo fault in TEST-149")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            exc_str = str(cm.exception)
+            self.assertIn("Primary write fault in TEST-149", exc_str)
+            self.assertIn("rollback verification failed", exc_str)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        # Session must be isolated as FAILED-C
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertEqual(iso_rec["failure_class"], _FailedTransactionClass.FAILED_C.value)
+
+        # Confirm that the operation is recorded in recovery_uncertain_operations
+        uncertain_ops = iso_rec.get("recovery_uncertain_operations", [])
+        self.assertGreaterEqual(len(uncertain_ops), 1)
+
+        # Subsequent write must be rejected by FAILED Isolation Gate
+        with self.assertRaises(RuntimeError) as cm_blocked:
+            setup_arm_ik(self.armature, initial_influence=0.5)
+        self.assertIn("FAILED-C", str(cm_blocked.exception))
+
+        _TEST_137_TO_149_RUNTIME_EVIDENCE["TEST-149"] = {
+            "test_method": "test_149_relationship_undo_exception_transitions_to_recovery_uncertain_and_isolates_as_failed_c",
+            "status": "PASS",
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": tx.failure_class,
+            "isolation_state": session_rec.isolation_state.value,
+            "recovery_uncertain_ops_count": len(uncertain_ops),
+            "preserves_primary_and_rollback_exceptions": True,
+            "subsequent_write_blocked": True,
+        }
+
+    def test_150_failed_b_unrestored_grant_issuance_rejected(self) -> None:
+        """TEST-150: Requesting Coordinator grant when FAILED-B is unrestored must be rejected."""
+        setup_arm_ik(self.armature, initial_influence=0.4)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                raise RuntimeError("Primary write fault in TEST-150")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-150 leaving scene unrestored")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.35, y_pos, 1.25), influence=0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # FAILED-B scene state has not been restored (HandIK.L position mutated).
+        # Coordinator must reject issuing an authorization grant.
+        with self.assertRaises(RuntimeError) as cm:
+            _request_coordinator_grant_for_test(
+                session_id=session_id,
+                transition_action="CLEAR_TO_NONE",
+                arm=self.armature,
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("recovery", "verification", "grant", "cannot issue", "rejected")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-150"] = {
+            "test_method": "test_150_failed_b_unrestored_grant_issuance_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-B",
+            "issuance_result": "REJECTED_UNRESTORED",
+        }
+
+    def test_151_failed_c_recovery_uncertain_forged_verified_rejected(self) -> None:
+        """TEST-151: trusted snapshot passes Case 2, but a real uncertain journal blocks Case 1."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        tx_id = f"tx_151_{uuid.uuid4().hex[:6]}"
+        trusted_snapshot = _snapshot_arm_rig_state(self.armature)
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_C
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": tx_id,
+            "failure_class": _FailedTransactionClass.FAILED_C.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_C.value,
+            "snapshot_reference": trusted_snapshot,
+            "snapshot_trusted": True,
+            "prepared_relationship_mutations": [{
+                "operation_id": "op_test_151",
+                "operation_state": _RelationshipOperationState.RECOVERY_UNCERTAIN,
+            }],
+        }
+        direct = verify_armature_deisolation_evidence(arm=self.armature, session_id=session_id)
+        self.assertEqual(direct["case"], "CASE_1_SNAPSHOT_VERIFIED")
+        self.assertEqual(direct["status"], "RECOVERY_VERIFICATION_FAILED")
+        self.assertFalse(direct["can_deisolate"])
+        self.assertTrue(any("RECOVERY_UNCERTAIN" in r for r in direct["reasons"]), direct)
+        with self.assertRaisesRegex(RuntimeError, "RECOVERY_UNCERTAIN"):
+            _request_coordinator_grant_for_test(
+                session_id=session_id, transition_action="CLEAR_TO_NONE", arm=self.armature,
+            )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-151"] = {
+            "test_method": "test_151_failed_c_recovery_uncertain_forged_verified_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "case": direct["case"],
+            "actual_verification_status": direct["status"],
+            "reasons": direct["reasons"],
+        }
+
+    def test_152_grant_transaction_id_mismatch_rejected(self) -> None:
+        """TEST-152: Layer 2 rejects state transition when Grant transaction_id mismatches Registry transaction_id."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_real_152",
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+
+        # Forged/Mismatched grant with different transaction_id
+        grant_id = f"grant_{uuid.uuid4().hex}"
+        grant = {
+            "grant_id": grant_id,
+            "registry_session_id": session_id,
+            "transaction_id": "tx_forged_152",
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "current_isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+            "transition_action": "CLEAR_TO_NONE",
+            "evidence_status": "RECOVERY_VERIFIED",
+            "consumed": False,
+            "created_at": time.time(),
+        }
+        _COORDINATOR_AUTHORIZATION_GRANTS[grant_id] = grant
+
+        with self.assertRaises(RuntimeError) as cm:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Testing mismatched tx_id in TEST-152",
+                authorization_grant=grant,
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("transaction", "mismatch", "rejected")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-152"] = {
+            "test_method": "test_152_grant_transaction_id_mismatch_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "MISMATCHED_TRANSACTION_ID",
+            "transition_result": "REJECTED_TRANSACTION_MISMATCH",
+        }
+
+    def test_153_grant_failure_class_mismatch_rejected(self) -> None:
+        """TEST-153: Layer 2 rejects state transition when Grant failure_class mismatches Registry failure_class."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_153",
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+
+        # Forged/Mismatched grant with different failure_class
+        grant_id = f"grant_{uuid.uuid4().hex}"
+        grant = {
+            "grant_id": grant_id,
+            "registry_session_id": session_id,
+            "transaction_id": "tx_153",
+            "failure_class": _FailedTransactionClass.FAILED_C.value,
+            "current_isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+            "transition_action": "CLEAR_TO_NONE",
+            "evidence_status": "RECOVERY_VERIFIED",
+            "consumed": False,
+            "created_at": time.time(),
+        }
+        _COORDINATOR_AUTHORIZATION_GRANTS[grant_id] = grant
+
+        with self.assertRaises(RuntimeError) as cm:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Testing mismatched failure_class in TEST-153",
+                authorization_grant=grant,
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("failure", "class", "mismatch", "rejected")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-153"] = {
+            "test_method": "test_153_grant_failure_class_mismatch_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "attack_type": "MISMATCHED_FAILURE_CLASS",
+            "transition_result": "REJECTED_FAILURE_CLASS_MISMATCH",
+        }
+
+    def test_154_failed_d_unmet_retirement_conditions_grant_rejected(self) -> None:
+        """TEST-154: Coordinator rejects issuing ARCHIVE_TOMBSTONE grant when retirement conditions are unmet (Armature object alive)."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        session_rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_154",
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Original Armature object is still alive in bpy.data.objects
+        # Tombstone retirement conditions are unmet, so Coordinator must reject issuing grant
+        with self.assertRaises(RuntimeError) as cm:
+            _request_coordinator_grant_for_test(
+                session_id=session_id,
+                transition_action="ARCHIVE_TOMBSTONE",
+            )
+        self.assertTrue(
+            any(k in str(cm.exception).lower() for k in ("tombstone", "retire", "grant", "object", "alive", "rejected", "cannot issue")),
+            f"Unexpected exception message: {cm.exception}",
+        )
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-154"] = {
+            "test_method": "test_154_failed_d_unmet_retirement_conditions_grant_rejected",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-D",
+            "issuance_result": "REJECTED_OBJECT_ALIVE",
+        }
+
+    def test_155_verified_recovery_issues_grant_and_single_use_consumed(self) -> None:
+        """TEST-155: Verified recovery successfully issues Coordinator grant, Layer 2 consumes it, and replay fails."""
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-155")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback execution fault in TEST-155")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        # Genuinely restore scene to match snapshot
+        _rollback_arm_rig_state(self.armature, tx.snapshot, tx)
+        _depsgraph_update()
+
+        # Step 1: Issue grant based on real recovery evidence
+        grant = _request_coordinator_grant_for_test(
+            session_id=session_id,
+            transition_action="CLEAR_TO_NONE",
+            arm=self.armature,
+            tx_id=tx.tx_id,
+            failure_class=_FailedTransactionClass.FAILED_B.value,
+        )
+        self.assertIsNotNone(grant)
+        self.assertEqual(grant["registry_session_id"], session_id)
+        self.assertEqual(grant["transition_action"], "CLEAR_TO_NONE")
+
+        # Step 2: Layer 2 transition succeeds
+        transition = _clear_or_retire_failure_isolation_by_coordinator(
+            session_id=session_id,
+            action="CLEAR_TO_NONE",
+            reason="Legitimate recovery verified in TEST-155",
+            authorization_grant=grant,
+        )
+        self.assertEqual(transition["new_isolation_state"], _ArmatureIsolationState.NONE.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+        # Step 3: Replay attack fails
+        session_rec.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": tx.tx_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "isolation_state": _ArmatureIsolationState.ISOLATED_FAILED_B.value,
+        }
+        with self.assertRaises(RuntimeError) as cm_replay:
+            _clear_or_retire_failure_isolation_by_coordinator(
+                session_id=session_id,
+                action="CLEAR_TO_NONE",
+                reason="Replay attack in TEST-155",
+                authorization_grant=grant,
+            )
+        self.assertTrue(
+            any(k in str(cm_replay.exception).lower() for k in ("grant", "consumed", "missing", "invalid", "rejected")),
+            f"Unexpected replay exception message: {cm_replay.exception}",
+        )
+
+        _TEST_150_TO_155_RUNTIME_EVIDENCE["TEST-155"] = {
+            "test_method": "test_155_verified_recovery_issues_grant_and_single_use_consumed",
+            "status": "PASS",
+            "registry_session_id": session_id,
+            "transaction_id": tx.tx_id,
+            "grant_id": grant["grant_id"],
+            "legitimate_consumption_succeeded": True,
+            "replay_rejected": True,
+        }
+
+    def test_156_live_armature_object_reports_alive(self) -> None:
+        """TEST-156: Live Armature with valid RNA reference and live collection membership reports ALIVE."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness["status"], "ALIVE")
+        self.assertIs(liveness["object_exists"], True)
+
+        ver = _verify_armature_session_identity_record(session_rec)
+        self.assertTrue(ver["is_valid"])
+        self.assertNotEqual(session_rec.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+
+        resolved = ensure_armature_session_identity(self.armature)
+        self.assertEqual(resolved.registry_session_id, session_id)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-156"] = {
+            "test_method": "test_156_live_armature_object_reports_alive",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "ALIVE_VERIFIED",
+        }
+
+    def test_157_live_object_with_replaced_data_remains_alive(self) -> None:
+        """TEST-157: Object alive with replaced DataBlock maintains ALIVE object existence and rejects tombstone retirement."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Replace Armature data block with a new unassociated data block
+        new_data = bpy.data.armatures.new("ReplacedArmatureData_157")
+        self.armature.data = new_data
+
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness["status"], "ALIVE")
+        self.assertIs(liveness["object_exists"], True)
+
+        ver = _verify_armature_session_identity_record(session_rec)
+        self.assertFalse(ver["is_valid"])
+        self.assertIs(session_rec.in_live_blender_collection, True)
+        self.assertEqual(session_rec.registry_session_id, session_id)
+
+        # Attempting tombstone retirement must be rejected because object is ALIVE
+        ret_res = retire_dead_armature_tombstone(session_id, reason="Attempt retirement while object is ALIVE")
+        self.assertFalse(ret_res["approved"])
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-157"] = {
+            "test_method": "test_157_live_object_with_replaced_data_remains_alive",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "DATA_REPLACED_REJECTED",
+        }
+
+    def test_158_deleted_original_object_reports_absent(self) -> None:
+        """TEST-158: Genuinely deleted original Armature reports ABSENT and permits valid tombstone retirement."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        # Put into FAILED-D
+        session_rec.isolation_state = _ArmatureIsolationState.TOMBSTONED_FAILED_D
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "registry_session_id": session_id,
+            "transaction_id": "tx_158",
+            "failure_class": _FailedTransactionClass.FAILED_D.value,
+            "isolation_state": _ArmatureIsolationState.TOMBSTONED_FAILED_D.value,
+        }
+
+        # Genuinely delete the Armature object
+        bpy.data.objects.remove(self.armature, do_unlink=True)
+
+        liveness = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness["status"], "ABSENT")
+        self.assertIs(liveness["object_exists"], False)
+
+        # Replacement armature receives a new UUID
+        replacement_arm = build_rig(self.config)
+        session_new = ensure_armature_session_identity(replacement_arm)
+        self.assertNotEqual(session_new.registry_session_id, session_id)
+
+        # Tombstone retirement succeeds when object is genuinely ABSENT
+        ret_res = retire_dead_armature_tombstone(session_id, reason="Legitimate retirement in TEST-158")
+        self.assertTrue(ret_res["approved"])
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-158"] = {
+            "test_method": "test_158_deleted_original_object_reports_absent",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": "tx_158",
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "ARCHIVED_RETIRED",
+        }
+
+    def test_159_live_object_enumeration_failure_returns_unknown(self) -> None:
+        """TEST-159: Live object collection enumeration failure returns UNKNOWN and does not infer ABSENT."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            liveness = _check_original_object_liveness(session_rec)
+            self.assertEqual(liveness["status"], "UNKNOWN")
+            self.assertIsNone(liveness["object_exists"])
+            self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        # After restoring collection enumeration, liveness is ALIVE
+        liveness_restored = _check_original_object_liveness(session_rec)
+        self.assertEqual(liveness_restored["status"], "ALIVE")
+        self.assertIs(liveness_restored["object_exists"], True)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-159"] = {
+            "test_method": "test_159_live_object_enumeration_failure_returns_unknown",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "ENUMERATION_FAILURE_UNKNOWN",
+        }
+
+    def test_160_unverified_reference_access_returns_unknown(self) -> None:
+        """TEST-160: Non-ReferenceError exception reading original reference returns UNKNOWN without claiming death."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        faulty_rec = ArmatureSessionIdentityRecord(
+            registry_session_id=str(uuid.uuid4()),
+            original_blender_ref=_FaultyObjectRefProxy(self.armature),
+            registration_pointer=int(self.armature.as_pointer()),
+            original_data_pointer=int(self.armature.data.as_pointer()),
+            liveness_status=_ArmatureLivenessStatus.ALIVE_VERIFIED,
+            in_live_blender_collection=True,
+            isolation_state=_ArmatureIsolationState.NONE,
+            tombstone_record=None,
+        )
+
+        liveness = _check_original_object_liveness(faulty_rec)
+        self.assertEqual(liveness["status"], "UNKNOWN")
+        self.assertIsNone(liveness["object_exists"])
+        self.assertIn("Controlled reference access failure", str(liveness.get("reason", "")))
+        self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-160"] = {
+            "test_method": "test_160_unverified_reference_access_returns_unknown",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "UNVERIFIED_REFERENCE_UNKNOWN",
+        }
+
+    def test_161_pointer_mismatch_cannot_prove_absence(self) -> None:
+        """TEST-161: Pointer mismatch alone does not prove absence and must return UNKNOWN."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        mismatched_rec = ArmatureSessionIdentityRecord(
+            registry_session_id=str(uuid.uuid4()),
+            original_blender_ref=self.armature,
+            registration_pointer=999999999,
+            original_data_pointer=int(self.armature.data.as_pointer()),
+            liveness_status=_ArmatureLivenessStatus.ALIVE_VERIFIED,
+            in_live_blender_collection=True,
+            isolation_state=_ArmatureIsolationState.NONE,
+            tombstone_record=None,
+        )
+
+        liveness = _check_original_object_liveness(mismatched_rec)
+        self.assertEqual(liveness["status"], "UNKNOWN")
+        self.assertIsNone(liveness["object_exists"])
+        self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-161"] = {
+            "test_method": "test_161_pointer_mismatch_cannot_prove_absence",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "POINTER_MISMATCH_UNKNOWN",
+        }
+
+    def test_162_missing_original_reference_is_unknown(self) -> None:
+        """TEST-162: Missing original reference (None) returns UNKNOWN rather than inferring ABSENT."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        none_ref_rec = ArmatureSessionIdentityRecord(
+            registry_session_id=str(uuid.uuid4()),
+            original_blender_ref=None,
+            registration_pointer=int(self.armature.as_pointer()),
+            original_data_pointer=int(self.armature.data.as_pointer()),
+            liveness_status=_ArmatureLivenessStatus.ALIVE_VERIFIED,
+            in_live_blender_collection=True,
+            isolation_state=_ArmatureIsolationState.NONE,
+            tombstone_record=None,
+        )
+
+        liveness = _check_original_object_liveness(none_ref_rec)
+        self.assertEqual(liveness["status"], "UNKNOWN")
+        self.assertIsNone(liveness["object_exists"])
+        self.assertNotEqual(liveness.get("status"), "ABSENT")
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-162"] = {
+            "test_method": "test_162_missing_original_reference_is_unknown",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": session_id,
+            "object_liveness_status": liveness["status"],
+            "verification_status": "MISSING_REF_UNKNOWN",
+        }
+
+    def test_163_unknown_liveness_preserves_failed_isolation(self) -> None:
+        """TEST-163: UNKNOWN liveness preserves existing FAILED-B and FAILED-C isolation without false death escalation."""
+        # Part A: FAILED-B
+        setup_arm_ik(self.armature, initial_influence=0.35)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        y_pos = self.root.location.y + 0.15
+
+        captured_tx_b = []
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "set_hand_ik_target_after_hand_location":
+                captured_tx_b.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-163B")
+            elif stage == "during_rollback_execution":
+                raise RuntimeError("Rollback fault in TEST-163B")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.32, y_pos, 1.20), influence=0.8)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_tx_b[0]
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            _sweep_dead_managed_armature_identities()
+            # Must NOT escalate to TOMBSTONED_FAILED_D
+            self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["isolation_state"], "ISOLATED_FAILED_B")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], "FAILED-B")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], tx_b.tx_id)
+            self.assertEqual(session_rec.registry_session_id, session_id)
+
+            # Subsequent write is blocked by FAILED isolation gate
+            with self.assertRaises(RuntimeError) as cm_blocked_b:
+                setup_arm_ik(self.armature)
+            self.assertIn("FAILED-B", str(cm_blocked_b.exception))
+
+        # Part B: FAILED-C
+        captured_tx_c = []
+        def fault_hook_c(stage: str, ctx: dict) -> None:
+            if stage == "set_arm_ik_influence_between_influences":
+                captured_tx_c.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Primary write fault in TEST-163C")
+            elif stage == "during_rollback_verification":
+                raise RuntimeError("Verification fault in TEST-163C")
+
+        # Manually deisolate session_rec to test FAILED-C cleanly
+        _rollback_arm_rig_state(self.armature, tx_b.snapshot, tx_b)
+        _depsgraph_update()
+        request_armature_deisolation(self.armature, reason="Clean state for TEST-163C")
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+
+        _set_test_fault_injection_hook(fault_hook_c)
+        try:
+            with self.assertRaises(RuntimeError):
+                set_arm_ik_influence(self.armature, "L", 0.95)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        tx_c_id = _ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"]
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            _sweep_dead_managed_armature_identities()
+            # Must NOT escalate to TOMBSTONED_FAILED_D
+            self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["isolation_state"], "ISOLATED_FAILED_C")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], "FAILED-C")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], tx_c_id)
+
+            with self.assertRaises(RuntimeError) as cm_blocked_c:
+                setup_arm_ik(self.armature)
+            self.assertIn("FAILED-C", str(cm_blocked_c.exception))
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-163"] = {
+            "test_method": "test_163_unknown_liveness_preserves_failed_isolation",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx_b.tx_id,
+            "registry_session_id": session_id,
+            "object_liveness_status": "UNKNOWN",
+            "verification_status": "FAILED_B_C_PRESERVED",
+        }
+
+    def test_164_unknown_liveness_blocks_tombstone_retirement(self) -> None:
+        """TEST-164: UNKNOWN liveness strictly blocks tombstone retirement and authorization grant issuance."""
+        session_dead = ensure_armature_session_identity(self.armature)
+        dead_session_id = session_dead.registry_session_id
+
+        # Destroy Armature during transaction to enter FAILED-D
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                bpy.data.objects.remove(self.armature, do_unlink=True)
+                raise RuntimeError("Armature destroyed in TEST-164")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        # Remove any residual HandIK.L so only object liveness is the decisive retirement condition
+        if "HandIK.L" in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects["HandIK.L"], do_unlink=True)
+
+        with _ScopedBpyObjectsProxy(_FaultyObjectsCollectionProxy(bpy.data.objects)):
+            ev = _verify_dead_armature_tombstone_retirement_evidence(dead_session_id)
+            self.assertFalse(ev["can_retire"])
+            self.assertEqual(ev["status"], "TOMBSTONE_RETIREMENT_REJECTED")
+            self.assertTrue(
+                any("OBJECT_EXISTENCE_UNVERIFIED" in r for r in ev.get("reasons", [])),
+                f"Expected OBJECT_EXISTENCE_UNVERIFIED in reasons, got: {ev.get('reasons')}",
+            )
+
+            ret_res = retire_dead_armature_tombstone(dead_session_id, reason="Attempt retirement under UNKNOWN")
+            self.assertFalse(ret_res["approved"])
+            self.assertIn(dead_session_id, _ISOLATED_FAILED_ARMATURES)
+            self.assertNotIn(dead_session_id, _ARCHIVED_FAILED_D_TOMBSTONES)
+
+        # After restoring normal query, legitimate retirement succeeds
+        ret_res_ok = retire_dead_armature_tombstone(dead_session_id, reason="Legitimate retirement after restored query")
+        self.assertTrue(ret_res_ok["approved"])
+        self.assertEqual(session_dead.isolation_state, _ArmatureIsolationState.ARCHIVED_RETIRED)
+
+        _TEST_156_TO_164_RUNTIME_EVIDENCE["TEST-164"] = {
+            "test_method": "test_164_unknown_liveness_blocks_tombstone_retirement",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": _ARCHIVED_FAILED_D_TOMBSTONES[dead_session_id].get("transaction_id"),
+            "registry_session_id": dead_session_id,
+            "object_liveness_status": "UNKNOWN_THEN_ABSENT",
+            "verification_status": "RETIREMENT_BLOCKED_UNDER_UNKNOWN",
+        }
+
+    def test_165_constraint_property_getter_failure_is_not_silently_ignored(self) -> None:
+        """TEST-165: Constraint property getter failure is not silently ignored and aborts with FINGERPRINT_PROPERTY_CAPTURE_FAILED."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        pbone = self.armature.pose.bones["forearm.L"]
+        con = pbone.constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
+        self.assertTrue(hasattr(con, "use_location"))
+
+        orig_getattr = getattr
+        def faulty_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                raise RuntimeError("TEST-165 getter failure")
+            return orig_getattr(obj, name, *args)
+
+        with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", faulty_getattr):
+            with self.assertRaises(RuntimeError) as cm:
+                _capture_pre_snapshot_structural_fingerprint(self.armature)
+
+            err_msg = str(cm.exception)
+            self.assertIn("FINGERPRINT_PROPERTY_CAPTURE_FAILED", err_msg)
+            self.assertIn("forearm.L", err_msg)
+            self.assertIn("use_location", err_msg)
+            self.assertIn("TEST-165 getter failure", err_msg)
+            self.assertIsInstance(cm.exception.__cause__, RuntimeError)
+            self.assertEqual(str(cm.exception.__cause__), "TEST-165 getter failure")
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-165"] = {
+            "test_method": "test_165_constraint_property_getter_failure_is_not_silently_ignored",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "failure_injection_stage": "fingerprint_property_getter",
+            "actual_exception": "RuntimeError: FINGERPRINT_PROPERTY_CAPTURE_FAILED",
+        }
+
+    def test_166_constraint_property_clone_failure_is_not_silently_ignored(self) -> None:
+        """TEST-166: Constraint property clone failure is not silently ignored and aborts fingerprint capture."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        class _CloneFaultMarker:
+            pass
+
+        orig_getattr = getattr
+        def faulty_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                return _CloneFaultMarker()
+            return orig_getattr(obj, name, *args)
+
+        orig_clone = value_evidence._clone_snapshot_property_value
+        def faulty_clone(val: Any) -> Any:
+            if isinstance(val, _CloneFaultMarker):
+                raise RuntimeError("TEST-166 clone failure")
+            return orig_clone(val)
+
+        with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", faulty_getattr):
+            with _ScopedModuleAttributeProxy(value_evidence, "_clone_snapshot_property_value", faulty_clone):
+                with self.assertRaises(RuntimeError) as cm:
+                    _capture_pre_snapshot_structural_fingerprint(self.armature)
+
+                err_msg = str(cm.exception)
+                self.assertIn("FINGERPRINT_PROPERTY_CAPTURE_FAILED", err_msg)
+                self.assertIn("forearm.L", err_msg)
+                self.assertIn("use_location", err_msg)
+                self.assertIn("TEST-166 clone failure", err_msg)
+                self.assertIsInstance(cm.exception.__cause__, RuntimeError)
+                self.assertEqual(str(cm.exception.__cause__), "TEST-166 clone failure")
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-166"] = {
+            "test_method": "test_166_constraint_property_clone_failure_is_not_silently_ignored",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "failure_injection_stage": "fingerprint_property_clone",
+            "actual_exception": "RuntimeError: FINGERPRINT_PROPERTY_CAPTURE_FAILED",
+        }
+
+    def test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a(self) -> None:
+        """TEST-167: Same property unreadable before and after cannot prove zero mutation and must isolate as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        orig_getattr = getattr
+        def faulty_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                raise RuntimeError("Persistent unreadable property in TEST-167")
+            return orig_getattr(obj, name, *args)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage in ("during_pre_snapshot_fingerprint", "during_snapshot_creation"):
+                tx = ctx.get("tx")
+                if tx is not None and tx not in captured_tx:
+                    captured_tx.append(tx)
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", faulty_getattr):
+                with self.assertRaises(RuntimeError) as cm:
+                    set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
+                err_msg = str(cm.exception)
+                self.assertIn("FAILED-C", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.registry_session_id, session_id)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent write transaction must be rejected by FAILED isolation gate
+        with self.assertRaises(RuntimeError) as cm_gate:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_gate.exception))
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-167"] = {
+            "test_method": "test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "isolation_state": "ISOLATED_FAILED_C",
+            "admission_result": "REJECTED_AFTER_FAILED_C",
+        }
+
+    def test_168_post_exception_fingerprint_capture_failure_preserves_primary_error(self) -> None:
+        """TEST-168: Post-exception fingerprint capture failure preserves primary snapshot exception and isolates as FAILED-C."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        post_fp_active = [False]
+        orig_getattr = getattr
+        def selective_getattr(obj: Any, name: str, *args: Any) -> Any:
+            if post_fp_active[0] and name == "use_location" and orig_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                raise RuntimeError("Secondary post-fingerprint fault in TEST-168")
+            return orig_getattr(obj, name, *args)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                post_fp_active[0] = True
+                raise RuntimeError("Primary snapshot fault in TEST-168")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", selective_getattr):
+                with self.assertRaises(RuntimeError) as cm:
+                    set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
+                err_msg = str(cm.exception)
+                self.assertIn("Primary snapshot fault in TEST-168", err_msg)
+                self.assertIn("FAILED-C", err_msg)
+                self.assertIn("Secondary post-fingerprint fault in TEST-168", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        with self.assertRaises(RuntimeError) as cm_gate:
+            setup_arm_ik(self.armature)
+        self.assertIn("FAILED-C", str(cm_gate.exception))
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-168"] = {
+            "test_method": "test_168_post_exception_fingerprint_capture_failure_preserves_primary_error",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "isolation_state": "ISOLATED_FAILED_C",
+            "admission_result": "REJECTED_AFTER_FAILED_C",
+        }
+
+    def test_169_real_generic_ik_property_mutation_is_detected(self) -> None:
+        """TEST-169: Generic IK property mutation during SNAPSHOTTING is detected by unrounded fingerprint comparison."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        con = self.armature.pose.bones["forearm.L"].constraints[ARM_IK_CONSTRAINT_NAMES["L"]]
+        orig_use_location = con.use_location
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                # Mutate generic property use_location
+                con.use_location = not orig_use_location
+                raise RuntimeError("Fault after mutating generic IK property in TEST-169")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                set_hand_ik_target(self.armature, side="L", world_xyz=(-0.3, -7.8, 1.2))
+            err_msg = str(cm.exception)
+            self.assertIn("FAILED-C", err_msg)
+            self.assertIn("pose_bones", err_msg)
+        finally:
+            _clear_test_fault_injection_hook()
+            con.use_location = orig_use_location
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_C.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-169"] = {
+            "test_method": "test_169_real_generic_ik_property_mutation_is_detected",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-C",
+            "isolation_state": "ISOLATED_FAILED_C",
+            "admission_result": "REJECTED_AFTER_FAILED_C",
+        }
+
+    def test_170_clean_snapshot_exception_still_allows_failed_a(self) -> None:
+        """TEST-170: Clean snapshot exception with verified zero mutation still allows FAILED-A without isolating Armature."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_snapshot_creation":
+                tx = ctx.get("tx")
+                if tx is not None:
+                    captured_tx.append(tx)
+                raise RuntimeError("Clean snapshot abort without mutation in TEST-170")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.5)
+            self.assertIn("Clean snapshot abort without mutation in TEST-170", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertEqual(tx.failure_class, _FailedTransactionClass.FAILED_A.value)
+        self.assertEqual(session_rec.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+        # Subsequent independent transaction can be admitted and commit cleanly
+        res = setup_arm_ik(self.armature, initial_influence=0.5)
+        self.assertIsNotNone(res)
+        self.assertEqual(session_rec.lifecycle_stage, "NORMAL_TERMINAL")
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-170"] = {
+            "test_method": "test_170_clean_snapshot_exception_still_allows_failed_a",
+            "status": "PASS",
+            "transaction_created": True,
+            "transaction_id": tx.tx_id,
+            "registry_session_id": session_id,
+            "failure_class": "FAILED-A",
+            "isolation_state": "NONE",
+            "admission_result": "ADMITTED_AND_COMMITTED",
+        }
+
+    def test_171_nonfinite_nested_fingerprint_values_are_rejected(self) -> None:
+        """TEST-171: _has_nan_or_inf detects NaN and Inf in nested structures including vectors, quaternions, matrices."""
+        # Vector containing NaN
+        v_nan = Vector((float("nan"), 0.0, 1.0))
+        self.assertTrue(_has_nan_or_inf(v_nan))
+
+        # Quaternion containing Inf
+        q_inf = Quaternion((float("inf"), 0.0, 0.0, 1.0))
+        self.assertTrue(_has_nan_or_inf(q_inf))
+
+        # Matrix containing NaN
+        mat_nan = Matrix(((1.0, 0.0, 0.0, 0.0), (0.0, float("nan"), 0.0, 0.0), (0.0, 0.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0)))
+        self.assertTrue(_has_nan_or_inf(mat_nan))
+
+        # Nested tuple with Inf
+        nested_inf = (1.0, (2.0, (3.0, float("inf"))))
+        self.assertTrue(_has_nan_or_inf(nested_inf))
+
+        # Nested dict with NaN
+        nested_nan_dict = {"a": {"b": [1.0, float("nan")]}}
+        self.assertTrue(_has_nan_or_inf(nested_nan_dict))
+
+        # Purely finite structures
+        v_ok = Vector((1.0, 2.0, 3.0))
+        q_ok = Quaternion((1.0, 0.0, 0.0, 0.0))
+        mat_ok = Matrix.Identity(4)
+        nested_ok = {"a": [(1.0, 2.0), {"b": (3.0, 4.0)}]}
+        self.assertFalse(_has_nan_or_inf(v_ok))
+        self.assertFalse(_has_nan_or_inf(q_ok))
+        self.assertFalse(_has_nan_or_inf(mat_ok))
+        self.assertFalse(_has_nan_or_inf(nested_ok))
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-171"] = {
+            "test_method": "test_171_nonfinite_nested_fingerprint_values_are_rejected",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "nan_inf_detection": "VERIFIED_ALL_TYPES",
+        }
+
+    def test_172_fingerprint_freeze_does_not_alias_mutable_mathutils(self) -> None:
+        """TEST-172: _freeze_fingerprint_property_value produces immutable frozen values that do not alias mutable Mathutils."""
+        freeze_fn = getattr(value_evidence, "_freeze_fingerprint_property_value", None)
+        if freeze_fn is None:
+            self.fail("_freeze_fingerprint_property_value is not implemented in value_evidence")
+
+        v = Vector((1.0, 2.0, 3.0))
+        e = Euler((0.25, 0.5, 0.75), "XYZ")
+        q = Quaternion((1.0, 0.0, 0.0, 0.0))
+        m = Matrix.Translation(Vector((1.0, 2.0, 3.0)))
+
+        frozen_v = freeze_fn(v)
+        frozen_e = freeze_fn(e)
+        frozen_q = freeze_fn(q)
+        frozen_m = freeze_fn(m)
+
+        # Mutate original objects
+        v.x = 999.0
+        e.x = 999.0
+        e.order = "ZYX"
+        q.w = 999.0
+        m[0][3] = 999.0
+
+        # Verify frozen values did not change
+        self.assertEqual(frozen_v, (1.0, 2.0, 3.0))
+        self.assertEqual(frozen_e, ((0.25, 0.5, 0.75), "XYZ"))
+        self.assertEqual(frozen_q, (1.0, 0.0, 0.0, 0.0))
+        self.assertIsInstance(frozen_m, tuple)
+        self.assertTrue(all(isinstance(row, tuple) for row in frozen_m))
+        self.assertEqual(frozen_m[0][3], 1.0)
+
+        # Frozen values must not equal mutated values
+        self.assertNotEqual(frozen_v, tuple(v))
+        self.assertNotEqual(frozen_m[0][3], m[0][3])
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-172"] = {
+            "test_method": "test_172_fingerprint_freeze_does_not_alias_mutable_mathutils",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "freeze_immutability": "VERIFIED",
+        }
+
+    def test_173_complete_fingerprint_and_existing_snapshot_contract_coexist(self) -> None:
+        """TEST-173: Complete unrounded fingerprint capture and full snapshot contract coexist with zero regression."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Part A: Fingerprint completeness
+        fp = _capture_pre_snapshot_structural_fingerprint(self.armature)
+        self.assertIn("controllers", fp)
+        self.assertIn("pose_bones", fp)
+        self.assertIn("forearm.L", fp["pose_bones"])
+        con_fp_list = fp["pose_bones"]["forearm.L"]["constraints"]
+        self.assertGreater(len(con_fp_list), 0)
+        ik_con_fp = con_fp_list[0]
+        self.assertIn("generic_props", ik_con_fp)
+        self.assertIn("use_location", ik_con_fp["generic_props"])
+        self.assertIn("use_rotation", ik_con_fp["generic_props"])
+
+        # Repeat capture yields identical fingerprint
+        fp2 = _capture_pre_snapshot_structural_fingerprint(self.armature)
+        self.assertEqual(fp, fp2)
+
+        # Part B: Full snapshot contract & rollback fidelity
+        snap = _snapshot_arm_rig_state(self.armature)
+        self.assertIn("controllers", snap)
+        self.assertIn("pose_bones", snap)
+        self.assertIn("constraints", snap["pose_bones"]["forearm.L"])
+
+        # Verify rollback works cleanly
+        _rollback_arm_rig_state(self.armature, snap)
+        _depsgraph_update()
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+        _TEST_165_TO_173_RUNTIME_EVIDENCE["TEST-173"] = {
+            "test_method": "test_173_complete_fingerprint_and_existing_snapshot_contract_coexist",
+            "status": "PASS",
+            "transaction_created": False,
+            "transaction_id": None,
+            "registry_session_id": None,
+            "fingerprint_snapshot_coexistence": "VERIFIED",
+        }
+
+
+    # TASK 10-B-13 final repair: exact regression tests written before execution.
+    def test_174_unknown_admission_rejected_without_isolation(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        pre = _snapshot_arm_rig_state(self.armature)
+        def unknown(_rec):
+            return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-174 transient lookup"}
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", unknown):
+            with self.assertRaisesRegex(RuntimeError, "ARMATURE_IDENTITY_UNVERIFIED_AT_ADMISSION"):
+                with _arm_rig_transaction(self.armature):
+                    self.fail("UNKNOWN must not admit writes")
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertNotIn(session.registry_session_id, _ISOLATED_FAILED_ARMATURES)
+        self.assertEqual(session.liveness_status, _ArmatureLivenessStatus.ALIVE_VERIFIED)
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        _verify_arm_rig_state_restored(self.armature, pre)
+        with _arm_rig_transaction(self.armature) as tx:
+            self.assertEqual(tx.state, _ArmRigTransactionState.ACTIVE)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+    def test_175_unknown_before_rollback_keeps_failed_c(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        uncertain = [False]
+        real = identity_helpers._check_original_object_liveness
+        def maybe_unknown(rec):
+            if uncertain[0]:
+                return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-175 transient"}
+            return real(rec)
+        def fault(stage, ctx):
+            if stage == "set_arm_ik_influence_between_influences":
+                uncertain[0] = True
+                raise ValueError("TEST-175 primary write fault")
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", maybe_unknown):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    set_arm_ik_influence(self.armature, "L", 0.8)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("TEST-175 primary write fault", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_176_unknown_after_rollback_verification_is_failed_c(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        uncertain = [False]
+        real = identity_helpers._check_original_object_liveness
+        def maybe_unknown(rec):
+            if uncertain[0]:
+                return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-176 query"}
+            return real(rec)
+        def fault(stage, ctx):
+            if stage == "set_arm_ik_influence_between_influences":
+                raise ValueError("TEST-176 primary")
+            if stage == "during_rollback_verification":
+                uncertain[0] = True
+                raise RuntimeError("TEST-176 verifier fault")
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", maybe_unknown):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    set_arm_ik_influence(self.armature, "L", 0.8)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("TEST-176 primary", str(cm.exception))
+        self.assertIn("TEST-176 verifier fault", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_177_unknown_during_snapshot_is_failed_c(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        uncertain = [False]
+        real = identity_helpers._check_original_object_liveness
+        def maybe_unknown(rec):
+            if uncertain[0]:
+                return {"status": "UNKNOWN", "object_exists": None, "reason": "TEST-177 query"}
+            return real(rec)
+        def fault(stage, ctx):
+            if stage == "during_snapshot_creation":
+                uncertain[0] = True
+                raise RuntimeError("TEST-177 snapshot")
+        with _ScopedModuleAttributeProxy(identity_helpers, "_check_original_object_liveness", maybe_unknown):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    setup_arm_ik(self.armature)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("FAILED-C", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_178_verified_data_replacement_remains_failed_d(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        self.armature.data = bpy.data.armatures.new("TEST_178_replaced_data")
+        with self.assertRaisesRegex(RuntimeError, "FAILED-D"):
+            setup_arm_ik(self.armature)
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.TOMBSTONED_FAILED_D)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-D")
+        self.assertEqual(_check_original_object_liveness(session)["status"], "ALIVE")
+
+    def test_179_fingerprint_strictly_freezes_or_rejects(self) -> None:
+        freeze = value_evidence._freeze_fingerprint_property_value
+        src = {"x": [1.0, 2.0]}
+        frozen = freeze(src)
+        self.assertIsInstance(frozen, tuple)
+        src["x"].append(999.0)
+        self.assertNotIn("999.0", str(frozen))
+        with self.assertRaisesRegex(TypeError, "FINGERPRINT_UNSUPPORTED_TYPE"):
+            freeze(object())
+        live_obj = bpy.data.objects.new("test_179_ref", None)
+        bpy.context.scene.collection.objects.link(live_obj)
+        try:
+            ref_frozen = freeze(live_obj)
+            self.assertIsInstance(ref_frozen, tuple)
+            self.assertEqual(ref_frozen[0], "RNA_IDENTITY")
+            self.assertEqual(ref_frozen[2], live_obj.as_pointer())
+        finally:
+            bpy.data.objects.remove(live_obj, do_unlink=True)
+
+    def test_180_nonfinite_iterator_failure_cannot_prove_finite(self) -> None:
+        class BrokenIterator:
+            def __iter__(self):
+                raise RuntimeError("TEST-180 scan failed")
+        with self.assertRaisesRegex(RuntimeError, "TEST-180 scan failed"):
+            _has_nan_or_inf({"deep": (0.1, BrokenIterator())})
+        with self.assertRaisesRegex(TypeError, "NONFINITE_SCAN_UNSUPPORTED_TYPE"):
+            _has_nan_or_inf(object())
+        self.assertTrue(_has_nan_or_inf({"deep": [1.0, float("inf")]}))
+
+    def test_181_unverified_data_enumeration_is_not_failed_d(self) -> None:
+        session = ensure_armature_session_identity(self.armature)
+        real = identity_helpers.bpy
+        class ArmatureDataProxy:
+            def __getattr__(self, name):
+                if name == "armatures":
+                    class BrokenArmatures:
+                        def values(self):
+                            raise RuntimeError("TEST-181 enumeration unavailable")
+                    return BrokenArmatures()
+                return getattr(real.data, name)
+        class BpyProxy:
+            data = ArmatureDataProxy()
+            def __getattr__(self, name):
+                return getattr(real, name)
+        with _ScopedModuleAttributeProxy(identity_helpers, "bpy", BpyProxy()):
+            check = _verify_armature_session_identity_record(session, candidate_arm=self.armature)
+            self.assertFalse(check["is_valid"])
+            self.assertTrue(check["identity_verification_uncertain"])
+            self.assertEqual(session.liveness_status, _ArmatureLivenessStatus.ALIVE_VERIFIED)
+            _sweep_dead_managed_armature_identities()
+            self.assertEqual(session.isolation_state, _ArmatureIsolationState.NONE)
+        self.assertIsNone(session.tombstone_record)
+
+    def test_182_verification_evidence_cannot_replace_explicit_grant(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        sid = session.registry_session_id
+        session.isolation_state = _ArmatureIsolationState.ISOLATED_FAILED_B
+        _ISOLATED_FAILED_ARMATURES[sid] = {
+            "registry_session_id": sid,
+            "transaction_id": "tx_182",
+            "failure_class": "FAILED-B",
+            "isolation_state": "ISOLATED_FAILED_B",
+            "snapshot_reference": _snapshot_arm_rig_state(self.armature),
+            "snapshot_trusted": True,
+            "prepared_relationship_mutations": [],
+        }
+        grant = _issue_coordinator_authorization_grant(sid, transition_action="CLEAR_TO_NONE", arm=self.armature)
+        with self.assertRaisesRegex(RuntimeError, "authorization_grant is required"):
+            _clear_or_retire_failure_isolation_by_coordinator(
+                sid, "CLEAR_TO_NONE", "TEST-182", authorization_grant=None,
+                verification_evidence=grant,
+            )
+        self.assertIn(grant["grant_id"], _COORDINATOR_AUTHORIZATION_GRANTS)
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_B)
+        verified = _clear_or_retire_failure_isolation_by_coordinator(
+            sid, "CLEAR_TO_NONE", "TEST-182", authorization_grant=grant,
+        )
+        self.assertEqual(verified["new_isolation_state"], "NONE")
+        self.assertNotIn(grant["grant_id"], _COORDINATOR_AUTHORIZATION_GRANTS)
+
+    def test_183_nested_dual_exception_chain_and_isolation_record(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        def fault(stage, ctx):
+            if stage == "set_arm_ik_influence_between_influences":
+                raise ValueError("TEST-183 inner failure")
+            if stage == "during_rollback_execution":
+                raise RuntimeError("TEST-183 rollback failure")
+        _set_test_fault_injection_hook(fault)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature):
+                    set_arm_ik_influence(self.armature, "L", 0.9)
+        finally:
+            _clear_test_fault_injection_hook()
+        self.assertIn("TEST-183 inner failure", str(cm.exception))
+        self.assertIn("TEST-183 rollback failure", str(cm.exception))
+        self.assertIsInstance(cm.exception.__cause__, ValueError)
+        iso = _ISOLATED_FAILED_ARMATURES[session.registry_session_id]
+        self.assertIn("TEST-183 inner failure", iso["primary_exception"])
+        self.assertIn("TEST-183 rollback failure", iso["secondary_exception"])
+        self.assertEqual(iso["failure_class"], "FAILED-B")
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_184_shared_curve_and_armature_data_are_preserved(self) -> None:
+        char_col = bpy.data.collections["Character"]
+        curve = bpy.data.curves.new("TEST_184_shared_curve", type="CURVE")
+        curve.dimensions = "3D"
+        arm_data = bpy.data.armatures.new("TEST_184_shared_armature")
+        ext_curve = bpy.data.objects.new("TEST_184_curve_user", curve)
+        ext_arm = bpy.data.objects.new("TEST_184_arm_user", arm_data)
+        for obj in (ext_curve, ext_arm):
+            bpy.context.scene.collection.objects.link(obj)
+        curve_ptr, arm_ptr = curve.as_pointer(), arm_data.as_pointer()
+        self.assertEqual(curve.users, 1)
+        self.assertEqual(arm_data.users, 1)
+
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_curve = bpy.data.objects.new("HandIK.L", curve)
+            wrong_arm = bpy.data.objects.new("HandIK.R", arm_data)
+            tx.register_created_controller(wrong_curve)
+            tx.register_created_controller(wrong_arm)
+            _authorized_link_object_to_collection(char_col, wrong_curve, tx)
+            _authorized_link_object_to_collection(char_col, wrong_arm, tx)
+            setup_arm_ik(self.armature)
+
+        self.assertTrue(any(c.as_pointer() == curve_ptr for c in bpy.data.curves))
+        self.assertTrue(any(a.as_pointer() == arm_ptr for a in bpy.data.armatures))
+        self.assertEqual(bpy.data.curves["TEST_184_shared_curve"].users, 1)
+        self.assertEqual(bpy.data.armatures["TEST_184_shared_armature"].users, 1)
+        self.assertEqual(bpy.data.objects["TEST_184_curve_user"].data.as_pointer(), curve_ptr)
+        self.assertEqual(bpy.data.objects["TEST_184_arm_user"].data.as_pointer(), arm_ptr)
+
+    def test_185_destroyed_rna_reference_fingerprint_fails_closed(self) -> None:
+        removed_obj = bpy.data.objects.new("TEST_185_destroyed_ref", None)
+        bpy.context.scene.collection.objects.link(removed_obj)
+        bpy.data.objects.remove(removed_obj, do_unlink=True)
+        with self.assertRaisesRegex(RuntimeError, "FINGERPRINT_RNA_IDENTITY_UNVERIFIED"):
+            value_evidence._freeze_fingerprint_property_value(removed_obj)
+
+    def test_186_unsupported_constraint_property_never_proves_failed_a(self) -> None:
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        original_getattr = getattr
+        def unsupported_property(obj, name, *args):
+            if name == "use_location" and original_getattr(obj, "name", None) == ARM_IK_CONSTRAINT_NAMES["L"]:
+                return object()
+            return original_getattr(obj, name, *args)
+        with _ScopedModuleAttributeProxy(snapshot_capture, "getattr", unsupported_property):
+            with self.assertRaises(RuntimeError) as cm:
+                set_arm_ik_influence(self.armature, "L", 0.9)
+        self.assertIn("FAILED-C", str(cm.exception))
+        self.assertIn("FINGERPRINT_UNSUPPORTED_TYPE", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertIsNone(session.tombstone_record)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_187_nonfinite_scan_exception_isolated_as_failed_c(self) -> None:
+        """TEST-187: FAILED-A zero-mutation verifier must not lose isolation on scan errors."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        session = ensure_armature_session_identity(self.armature)
+        def fault(stage, ctx):
+            if stage == "during_snapshot_creation":
+                raise RuntimeError("TEST-187 primary snapshot failure")
+        def unreadable(_val):
+            raise RuntimeError("TEST-187 finiteness scan unavailable")
+        with _ScopedModuleAttributeProxy(value_evidence, "_has_nan_or_inf", unreadable):
+            _set_test_fault_injection_hook(fault)
+            try:
+                with self.assertRaises(RuntimeError) as cm:
+                    setup_arm_ik(self.armature, initial_influence=0.6)
+            finally:
+                _clear_test_fault_injection_hook()
+        self.assertIn("FAILED-C", str(cm.exception))
+        self.assertIn("TEST-187 finiteness scan unavailable", str(cm.exception))
+        self.assertEqual(session.isolation_state, _ArmatureIsolationState.ISOLATED_FAILED_C)
+        self.assertEqual(_ISOLATED_FAILED_ARMATURES[session.registry_session_id]["failure_class"], "FAILED-C")
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        with self.assertRaisesRegex(RuntimeError, "FAILED-C"):
+            setup_arm_ik(self.armature, initial_influence=0.7)
+
+    def test_188_zero_user_unauthorized_mesh_datablock_preserved_on_commit(self) -> None:
+        """TEST-188: Zero-user Mesh DataBlock without delete authority is preserved upon normal commit."""
+        mesh_data = bpy.data.meshes.new("Test188_UnauthorizedMesh")
+        mesh_ptr = mesh_data.as_pointer()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
+
+        controller = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(controller)
+        self.assertEqual(controller.type, "EMPTY")
+
+        self.assertIn("Test188_UnauthorizedMesh", bpy.data.meshes)
+        surviving_mesh = bpy.data.meshes["Test188_UnauthorizedMesh"]
+        self.assertEqual(surviving_mesh.as_pointer(), mesh_ptr)
+        self.assertEqual(surviving_mesh.users, 0)
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_189_zero_user_unauthorized_curve_datablock_preserved_on_commit(self) -> None:
+        """TEST-189: Zero-user Curve DataBlock without delete authority is preserved upon normal commit."""
+        curve_data = bpy.data.curves.new("Test189_UnauthorizedCurve", type="CURVE")
+        curve_ptr = curve_data.as_pointer()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("ElbowPole.L", curve_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
+
+        controller = bpy.data.objects.get("ElbowPole.L")
+        self.assertIsNotNone(controller)
+        self.assertEqual(controller.type, "EMPTY")
+
+        self.assertIn("Test189_UnauthorizedCurve", bpy.data.curves)
+        surviving_curve = bpy.data.curves["Test189_UnauthorizedCurve"]
+        self.assertEqual(surviving_curve.as_pointer(), curve_ptr)
+        self.assertEqual(surviving_curve.users, 0)
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_190_zero_user_unauthorized_armature_datablock_preserved_on_commit(self) -> None:
+        """TEST-190: Zero-user Armature DataBlock without delete authority is preserved upon normal commit."""
+        arm_data = bpy.data.armatures.new("Test190_UnauthorizedArmature")
+        arm_ptr = arm_data.as_pointer()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.R", arm_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
+
+        controller = bpy.data.objects.get("HandIK.R")
+        self.assertIsNotNone(controller)
+        self.assertEqual(controller.type, "EMPTY")
+
+        self.assertIn("Test190_UnauthorizedArmature", bpy.data.armatures)
+        surviving_arm = bpy.data.armatures["Test190_UnauthorizedArmature"]
+        self.assertEqual(surviving_arm.as_pointer(), arm_ptr)
+        self.assertEqual(surviving_arm.users, 0)
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_191_same_name_different_identity_datablocks_protected(self) -> None:
+        """TEST-191: Same-name different-identity DataBlocks are not erroneously deleted; both resources protected."""
+        orig_mesh = bpy.data.meshes.new("Test191_Mesh")
+        orig_mesh_ptr = orig_mesh.as_pointer()
+        other_mesh = bpy.data.meshes.new("Test191_Mesh")
+        other_mesh_ptr = other_mesh.as_pointer()
+        self.assertNotEqual(orig_mesh_ptr, other_mesh_ptr)
+
+        captured_tx = []
+        def cap_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+        _set_test_fault_injection_hook(cap_hook)
+
+        try:
+            with _arm_rig_transaction(self.armature) as tx:
+                wrong_obj = bpy.data.objects.new("HandIK.L", orig_mesh)
+                tx.register_created_controller(wrong_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        alive_ptrs = {m.as_pointer() for m in bpy.data.meshes}
+        self.assertIn(orig_mesh_ptr, alive_ptrs, "Original mesh datablock must be preserved")
+        self.assertIn(other_mesh_ptr, alive_ptrs, "Second mesh datablock must be preserved")
+
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        if captured_tx:
+            tx = captured_tx[0]
+            self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+    def test_192_forged_type_a_authorization_rejected_and_datablock_protected(self) -> None:
+        """TEST-192: Forged Type A authorization lacking credible creation provenance cannot bypass DataBlock protection."""
+        mesh_data = bpy.data.meshes.new("Test192_ProtectedMesh")
+        mesh_ptr = mesh_data.as_pointer()
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                tx = ctx["tx"]
+                captured_tx.append(tx)
+                forged_auth = {
+                    "resource_kind": "meshes",
+                    "original_reference": mesh_data,
+                    "original_pointer": mesh_ptr,
+                    "provenance": "TYPE_A_TX_CREATED",
+                    "authorization_source": "FORGED_TEST_FIXTURE_CLAIM",
+                    "authorization_scope": "PHYSICAL_DELETE_IF_ZERO_USERS",
+                    "authorized_transaction": tx.tx_id,
+                    "expected_lifecycle": "COMMITTED_CLEANUP",
+                }
+                tx.datablock_authorizations.append(forged_auth)
+                raise RuntimeError("Controlled fixture hook to inject forged authorization")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                    tx.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                    setup_arm_ik(self.armature)
+
+            self.assertEqual(len(captured_tx), 1)
+            tx = captured_tx[0]
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+
+            _clear_test_fault_injection_hook()
+            with self.assertRaises(RuntimeError) as cm:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+
+            self.assertIn("TYPE_A_TX_CREATED", str(cm.exception))
+            self.assertIn("lacks credible transaction creation provenance", str(cm.exception))
+
+            self.assertIn("Test192_ProtectedMesh", bpy.data.meshes)
+            self.assertEqual(bpy.data.meshes["Test192_ProtectedMesh"].as_pointer(), mesh_ptr)
+        finally:
+            _clear_test_fault_injection_hook()
+            if "Test192_ProtectedMesh" in bpy.data.meshes:
+                m = bpy.data.meshes["Test192_ProtectedMesh"]
+                if m.users == 0:
+                    bpy.data.meshes.remove(m)
+
+    def test_193_preserved_no_delete_authority_terminal_state_and_idempotency(self) -> None:
+        """TEST-193: PRESERVED_NO_DELETE_AUTHORITY is a legal terminal state; repeated cleanup is idempotent."""
+        mesh_data = bpy.data.meshes.new("Test193_Mesh")
+        mesh_ptr = mesh_data.as_pointer()
+
+        captured_tx = []
+        def cap_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+
+        _set_test_fault_injection_hook(cap_hook)
+        try:
+            with _arm_rig_transaction(self.armature) as tx:
+                wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+                tx.register_created_controller(wrong_obj)
+                _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+        outcomes = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_pointer") == mesh_ptr]
+        self.assertEqual(len(outcomes), 1)
+        self.assertEqual(outcomes[0]["status"], "PRESERVED_NO_DELETE_AUTHORITY")
+        self.assertEqual(outcomes[0]["action"], "PRESERVED")
+        self.assertEqual(outcomes[0]["tx_id"], tx.tx_id)
+
+        tx.retry_cleanup()
+        tx.retry_cleanup()
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+
+        outcomes_after = [o for o in tx.datablock_cleanup_outcomes if o.get("resource_pointer") == mesh_ptr]
+        self.assertEqual(len(outcomes_after), 1)
+
+        self.assertIn("Test193_Mesh", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["Test193_Mesh"].as_pointer(), mesh_ptr)
+
+    def test_194_external_mesh_occupying_handik_l_rejected_by_setup(self) -> None:
+        """TEST-194: External pre-existing Mesh occupying HandIK.L rejected by setup_arm_ik(); all external resources preserved."""
+        ext_mesh = bpy.data.meshes.new("ExtMesh194")
+        ext_obj = bpy.data.objects.new("HandIK.L", ext_mesh)
+        ext_obj.location = Vector((1.2, -0.5, 0.8))
+        ext_obj.rotation_euler = Euler((0.2, 0.4, 0.6))
+        ext_obj.scale = Vector((1.1, 1.1, 1.1))
+        bpy.context.scene.collection.objects.link(ext_obj)
+
+        orig_obj_ptr = ext_obj.as_pointer()
+        orig_mesh_ptr = ext_mesh.as_pointer()
+        orig_parent = ext_obj.parent
+        orig_collections = list(ext_obj.users_collection)
+        orig_loc = Vector(ext_obj.location)
+        orig_rot = Euler(ext_obj.rotation_euler)
+        orig_scale = Vector(ext_obj.scale)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            setup_arm_ik(self.armature)
+        self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
+
+        # Check external resource 100% preserved
+        live_obj = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(live_obj)
+        self.assertEqual(live_obj.as_pointer(), orig_obj_ptr)
+        self.assertEqual(live_obj.type, "MESH")
+        self.assertEqual(live_obj.data.as_pointer(), orig_mesh_ptr)
+        self.assertEqual(live_obj.parent, orig_parent)
+        self.assertEqual(list(live_obj.users_collection), orig_collections)
+        self.assertEqual(live_obj.location, orig_loc)
+        self.assertEqual(live_obj.rotation_euler, orig_rot)
+        self.assertEqual(live_obj.scale, orig_scale)
+
+        # Zero new constraints on bones
+        for b in ("forearm.L", "forearm.R", "hand.L", "hand.R"):
+            self.assertEqual(len(self.armature.pose.bones[b].constraints), 0)
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_195_opposite_elbowpole_curve_preflight_rejected_by_hand_target(self) -> None:
+        """TEST-195: External Curve occupying ElbowPole.R rejected before auto-init; zero business writes."""
+        # Setup HandIK.L as valid EMPTY under root
+        hand_l = bpy.data.objects.new("HandIK.L", None)
+        hand_l.parent = self.root
+        bpy.context.scene.collection.objects.link(hand_l)
+
+        # External curve occupying opposite pole
+        ext_curve = bpy.data.curves.new("ExtCurve195", type="CURVE")
+        ext_pole = bpy.data.objects.new("ElbowPole.R", ext_curve)
+        ext_pole.location = Vector((0.4, 0.5, 0.6))
+        bpy.context.scene.collection.objects.link(ext_pole)
+
+        orig_pole_ptr = ext_pole.as_pointer()
+        orig_curve_ptr = ext_curve.as_pointer()
+        orig_pole_parent = ext_pole.parent
+        orig_pole_collections = list(ext_pole.users_collection)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            set_hand_ik_target(
+                self.armature,
+                side="L",
+                world_xyz=(-0.35, -0.1, 1.1),
+                influence=0.8,
+            )
+        self.assertIn("EXTERNAL_CONTROLLER_NAME_CONFLICT", str(ctx.exception))
+
+        # Check external object preserved
+        live_pole = bpy.data.objects.get("ElbowPole.R")
+        self.assertIsNotNone(live_pole)
+        self.assertEqual(live_pole.as_pointer(), orig_pole_ptr)
+        self.assertEqual(live_pole.type, "CURVE")
+        self.assertEqual(live_pole.data.as_pointer(), orig_curve_ptr)
+        self.assertEqual(live_pole.parent, orig_pole_parent)
+        self.assertEqual(list(live_pole.users_collection), orig_pole_collections)
+
+        # Other controllers not created
+        self.assertNotIn("HandIK.R", bpy.data.objects)
+        self.assertNotIn("ElbowPole.L", bpy.data.objects)
+
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+
+    def test_196_transaction_created_wrong_type_object_safely_replaced(self) -> None:
+        """TEST-196: Transaction-created & registered wrong-type object safely replaced; unauth datablock preserved."""
+        mesh_data = bpy.data.meshes.new("TxMesh196")
+        mesh_ptr = mesh_data.as_pointer()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            wrong_obj = bpy.data.objects.new("HandIK.L", mesh_data)
+            tx.register_created_controller(wrong_obj)
+            _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx)
+            setup_arm_ik(self.armature)
+
+        # HandIK.L replaced with valid EMPTY controller
+        ctrl = bpy.data.objects.get("HandIK.L")
+        self.assertIsNotNone(ctrl)
+        self.assertEqual(ctrl.type, "EMPTY")
+        self.assertEqual(ctrl.parent, self.root)
+
+        # Mesh data block preserved because it has no delete authority
+        self.assertIn("TxMesh196", bpy.data.meshes)
+        self.assertEqual(bpy.data.meshes["TxMesh196"].as_pointer(), mesh_ptr)
+        self.assertEqual(bpy.data.meshes["TxMesh196"].users, 0)
+        self.assertTrue(any(o.get("status") == "PRESERVED_NO_DELETE_AUTHORITY" for o in tx.datablock_cleanup_outcomes))
+
+    def test_197_pre_existing_object_added_to_created_controller_objects_rejected(self) -> None:
+        """TEST-197: Pre-existing controller cannot obtain transaction-created authority, even through a forged legacy registry entry."""
+
+        # [2026-11-19] TEST-197:
+        # PURPOSE: Verify both registration-time rejection and resistance
+        # to forged created_controller_objects entries.
+        # REASON: fix-7 Round 2 exposed an outdated test expectation;
+        # production now rejects pre-existing objects at registration.
+
+        pre_mesh = bpy.data.meshes.new("PreMesh197")
+        pre_obj = bpy.data.objects.new("HandIK.L", pre_mesh)
+        bpy.context.scene.collection.objects.link(pre_obj)
+
+        orig_ptr = int(pre_obj.as_pointer())
+        orig_mesh_ptr = int(pre_mesh.as_pointer())
+        orig_collections = tuple(pre_obj.users_collection)
+
+        with _arm_rig_transaction(self.armature) as tx:
+
+            # 1. Prove this object existed before transaction entry.
+            self.assertIn(orig_ptr, tx.entry_object_ptrs)
+
+            # 2. Registration must reject it immediately.
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Cannot register a pre-existing object as transaction-created"
+            ):
+                tx.register_created_controller(pre_obj)
+
+            # 3. Rejected registration must create neither a registry
+            # record nor an independent authorization receipt.
+            self.assertFalse(
+                any(
+                    isinstance(record, dict)
+                    and record.get("obj_ptr") == orig_ptr
+                    for record in tx.created_controller_objects
+                )
+            )
+
+            self.assertNotIn(
+                orig_ptr,
+                tx._controller_creation_receipts
+            )
+
+            # 4. Simulate a forged legacy registry entry.
+            # This does not represent a legitimate registration.
+            tx.created_controller_objects.append({
+                "obj_ref": pre_obj,
+                "obj_ptr": orig_ptr,
+                "created_name": pre_obj.name,
+            })
+
+            try:
+                self.assertTrue(
+                    any(
+                        isinstance(record, dict)
+                        and record.get("obj_ptr") == orig_ptr
+                        for record in tx.created_controller_objects
+                    )
+                )
+
+                # 5. A forged mutable entry cannot supply ownership.
+                from src.scene_transaction_integrity.layer3.controller_ownership import (
+                    _verify_transaction_wrong_type_object_ownership
+                )
+
+                self.assertFalse(
+                    _verify_transaction_wrong_type_object_ownership(
+                        pre_obj,
+                        tx,
+                        self.armature,
+                    )
+                )
+
+                # 6. Actual Arm IK setup must still refuse replacement.
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "EXTERNAL_CONTROLLER_NAME_CONFLICT"
+                ):
+                    setup_arm_ik(self.armature)
+
+                # 7. Refusal must not replace or mutate the original object.
+                live_obj = bpy.data.objects.get("HandIK.L")
+
+                self.assertIsNotNone(live_obj)
+                self.assertEqual(
+                    int(live_obj.as_pointer()),
+                    orig_ptr
+                )
+                self.assertEqual(live_obj.type, "MESH")
+                self.assertEqual(
+                    int(live_obj.data.as_pointer()),
+                    orig_mesh_ptr
+                )
+                self.assertEqual(
+                    tuple(live_obj.users_collection),
+                    orig_collections
+                )
+
+                self.assertNotIn(
+                    orig_ptr,
+                    tx._controller_creation_receipts
+                )
+
+            finally:
+                # Restore the legacy registry before transaction exit.
+                # Never leave a forged entry available to commit/rollback.
+                tx.created_controller_objects = [
+                    record
+                    for record in tx.created_controller_objects
+                    if not (
+                        isinstance(record, dict)
+                        and record.get("obj_ptr") == orig_ptr
+                    )
+                ]
+
+        # 8. Verify the original Object and Mesh survived transaction exit.
+        live_obj = bpy.data.objects.get("HandIK.L")
+
+        self.assertIsNotNone(live_obj)
+
+        self.assertEqual(
+            int(live_obj.as_pointer()),
+            orig_ptr
+        )
+
+        self.assertEqual(
+            live_obj.type,
+            "MESH"
+        )
+
+        self.assertEqual(
+            int(live_obj.data.as_pointer()),
+            orig_mesh_ptr
+        )
+
+        self.assertEqual(
+            tuple(live_obj.users_collection),
+            orig_collections
+        )
+
+        self.assertEqual(
+            len(_ACTIVE_TRANSACTION_STACK),
+            0
+        )
+
+    def test_198_collection_creation_fault_before_registration_no_orphan(self) -> None:
+        """TEST-198: Collection creation failure before registration leaves zero orphan collections."""
+        # Ensure Character collection does not exist before test
+        old_char = bpy.data.collections.get("Character")
+        if old_char is not None:
+            bpy.data.collections.remove(old_char)
+
+        initial_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_collection_before_registration":
+                raise RuntimeError("Fault injected before Character collection registration")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected before Character collection registration", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Zero orphan collections left
+        current_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+        self.assertEqual(current_col_ptrs, initial_col_ptrs)
+        self.assertNotIn("Character", bpy.data.collections)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_199_collection_fault_after_registration_before_link_rolls_back(self) -> None:
+        """TEST-199: Collection failure after registration before link rolls back cleanly by pointer identity."""
+        old_char = bpy.data.collections.get("Character")
+        if old_char is not None:
+            bpy.data.collections.remove(old_char)
+
+        initial_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_collection_after_registration_before_link":
+                raise RuntimeError("Fault injected after registration before scene link")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected after registration before scene link", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Registered collection removed by transaction rollback
+        current_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+        self.assertEqual(current_col_ptrs, initial_col_ptrs)
+        self.assertNotIn("Character", bpy.data.collections)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_200_collection_fault_after_link_rolls_back_parent_child_and_collection(self) -> None:
+        """TEST-200: Collection failure after link rolls back parent-child link and removes collection."""
+        old_char = bpy.data.collections.get("Character")
+        if old_char is not None:
+            bpy.data.collections.remove(old_char)
+
+        initial_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_collection_after_link":
+                raise RuntimeError("Fault injected after scene link")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected after scene link", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Both parent-child link unlinked and collection removed
+        self.assertNotIn("Character", bpy.context.scene.collection.children)
+        current_col_ptrs = {c.as_pointer() for c in bpy.data.collections}
+        self.assertEqual(current_col_ptrs, initial_col_ptrs)
+        self.assertNotIn("Character", bpy.data.collections)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_201_pre_existing_character_collection_preserved_on_reentry(self) -> None:
+        """TEST-201: Pre-existing Character collection preserved identically on re-entry."""
+        setup_arm_ik(self.armature)
+        char_col = bpy.data.collections.get("Character")
+        self.assertIsNotNone(char_col)
+        orig_col_ptr = char_col.as_pointer()
+        orig_children = list(char_col.children)
+        orig_objects = list(char_col.objects)
+        self.assertIn("Character", bpy.context.scene.collection.children)
+
+        # Re-entry invocation
+        setup_arm_ik(self.armature)
+
+        char_col_after = bpy.data.collections.get("Character")
+        self.assertIsNotNone(char_col_after)
+        self.assertEqual(char_col_after.as_pointer(), orig_col_ptr)
+        self.assertEqual(list(char_col_after.children), orig_children)
+        self.assertEqual(list(char_col_after.objects), orig_objects)
+        self.assertIn("Character", bpy.context.scene.collection.children)
+
+
+    # -------------------------------------------------------------------------
+    # Task 10-B-15 Round 3/6: TEST-202 through TEST-216 (Constraint & Targets)
+    # -------------------------------------------------------------------------
+
+    def test_202_constraints_created_via_layer_3_with_identity_registration(self) -> None:
+        """TEST-202: L/R arm IK and copy rotation constraints created via Layer 3 with exact identity registration."""
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            setup_arm_ik(self.armature, initial_influence=0.6)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        # 4 constraints registered: ArmIK.L, ArmIK.R, HandRotation.L, HandRotation.R
+        self.assertEqual(len(tx.created_constraints), 4)
+
+        registered_by_bone = {rec["bone_name"]: rec for rec in tx.created_constraints}
+        self.assertIn("forearm.L", registered_by_bone)
+        self.assertIn("forearm.R", registered_by_bone)
+        self.assertIn("hand.L", registered_by_bone)
+        self.assertIn("hand.R", registered_by_bone)
+
+        for bone_name, rec in registered_by_bone.items():
+            pbone = self.armature.pose.bones[bone_name]
+            self.assertEqual(rec["pbone"], pbone)
+            con = rec["con_ref"]
+            self.assertEqual(rec["con_ptr"], con.as_pointer())
+            self.assertIn(con, pbone.constraints.values())
+            self.assertEqual(rec["created_name"], con.name)
+
+        # Verify live constraints after successful commit
+        self.assertAlmostEqual(self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"].influence, 0.6, places=5)
+        self.assertAlmostEqual(self.armature.pose.bones["hand.L"].constraints["HandRotation.L"].influence, 0.6, places=5)
+
+    def test_203_constraint_fault_after_creation_before_registration_cleaned_up(self) -> None:
+        """TEST-203: Constraint creation fault before registration cleans up instance safely without deleting external constraints."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ext_limit = p_fore.constraints.new(type="LIMIT_ROTATION")
+        ext_limit.name = "ExternalLimit203"
+        ext_ptr = ext_limit.as_pointer()
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_constraint_after_creation_before_registration" and ctx.get("name") == "ArmIK.L":
+                raise RuntimeError("Fault after creation before registration in TEST-203")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after creation before registration in TEST-203", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Newly created ArmIK.L was cleaned up immediately by pointer; not present on bone
+        self.assertNotIn("ArmIK.L", p_fore.constraints)
+        # External constraint strictly preserved
+        self.assertIn("ExternalLimit203", p_fore.constraints)
+        self.assertEqual(p_fore.constraints["ExternalLimit203"].as_pointer(), ext_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_204_constraint_fault_after_registration_before_config_rolls_back(self) -> None:
+        """TEST-204: Fault after constraint registration before config rolls back registered constraint via Layer 3."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ext_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        ext_con.name = "PreExistingExt204"
+        ext_ptr = ext_con.as_pointer()
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "character_constraint_after_registration_before_config" and ctx.get("name") == "ArmIK.L":
+                raise RuntimeError("Fault after registration before config in TEST-204")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after registration before config in TEST-204", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # ArmIK.L registered constraint rolled back via Layer 3
+        self.assertNotIn("ArmIK.L", p_fore.constraints)
+        # Pre-existing constraint unchanged
+        self.assertIn("PreExistingExt204", p_fore.constraints)
+        self.assertEqual(p_fore.constraints["PreExistingExt204"].as_pointer(), ext_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_205_stashed_constraint_lossless_rollback_recovery(self) -> None:
+        """TEST-205: Wrong-type constraint stashed during setup is losslessly recovered on rollback (ref, ptr, name, mute, order)."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+
+        # Insert a predecessor constraint
+        pred_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        pred_con.name = "PredCon205"
+
+        # Wrong-type ArmIK.L (COPY_ROTATION instead of IK)
+        wrong_con = p_fore.constraints.new(type="COPY_ROTATION")
+        wrong_con.name = "ArmIK.L"
+        wrong_con.mute = False
+        wrong_ptr = wrong_con.as_pointer()
+
+        # Successor constraint
+        succ_con = p_fore.constraints.new(type="DAMPED_TRACK")
+        succ_con.name = "SuccCon205"
+
+        orig_order_ptrs = [c.as_pointer() for c in p_fore.constraints]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                raise RuntimeError("Fault on side R in TEST-205")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault on side R in TEST-205", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Verify wrong_con restored losslessly
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        restored_con = p_fore.constraints["ArmIK.L"]
+        self.assertEqual(restored_con.as_pointer(), wrong_ptr)
+        self.assertEqual(restored_con, wrong_con)
+        self.assertEqual(restored_con.type, "COPY_ROTATION")
+        self.assertFalse(restored_con.mute)
+
+        curr_order_ptrs = [c.as_pointer() for c in p_fore.constraints]
+        self.assertEqual(curr_order_ptrs, orig_order_ptrs)
+
+    def test_206_external_same_name_constraint_on_other_bone_not_deleted(self) -> None:
+        """TEST-206: External constraint named 'ArmIK.L' on another bone is never deleted on rollback or cleanup."""
+        p_up = self.armature.pose.bones["upper_arm.L"]
+        alien_con = p_up.constraints.new(type="LIMIT_ROTATION")
+        alien_con.name = "ArmIK.L"
+        alien_ptr = alien_con.as_pointer()
+
+        # Part A: Rollback verification
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "L":
+                raise RuntimeError("Fault in TEST-206 Part A")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault in TEST-206 Part A", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIn("ArmIK.L", p_up.constraints)
+        self.assertEqual(p_up.constraints["ArmIK.L"].as_pointer(), alien_ptr)
+
+        # Part B: Commit and cleanup verification
+        setup_arm_ik(self.armature)
+        self.assertIn("ArmIK.L", p_up.constraints)
+        self.assertEqual(p_up.constraints["ArmIK.L"].as_pointer(), alien_ptr)
+        # Forearm also has its own ArmIK.L
+        p_fore = self.armature.pose.bones["forearm.L"]
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        self.assertNotEqual(p_fore.constraints["ArmIK.L"].as_pointer(), alien_ptr)
+
+    def test_207_stashed_constraint_cleanup_only_removes_authorized_identity(self) -> None:
+        """TEST-207: Post-commit cleanup only removes stashed constraint matching authorized identity; same-name replacement preserved."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        wrong_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        wrong_con.name = "ArmIK.L"
+        wrong_ptr = wrong_con.as_pointer()
+
+        setup_arm_ik(self.armature)
+
+        # The new IK constraint named ArmIK.L is present
+        self.assertIn("ArmIK.L", p_fore.constraints)
+        live_con = p_fore.constraints["ArmIK.L"]
+        self.assertEqual(live_con.type, "IK")
+        self.assertNotEqual(live_con.as_pointer(), wrong_ptr)
+
+        # The stashed wrong_con is physically removed
+        all_con_ptrs = {c.as_pointer() for c in p_fore.constraints}
+        self.assertNotIn(wrong_ptr, all_con_ptrs)
+
+    def test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds(self) -> None:
+        """TEST-208: Constraint removal fault during post-commit cleanup enters CLEANUP_PENDING; subsequent retry succeeds."""
+        p_fore = self.armature.pose.bones["forearm.L"]
+        wrong_con = p_fore.constraints.new(type="LIMIT_ROTATION")
+        wrong_con.name = "ArmIK.L"
+        wrong_ptr = wrong_con.as_pointer()
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_constraint_removal" and ctx.get("phase") == "POST_COMMIT_CLEANUP":
+                rec = ctx.get("record", {})
+                if rec.get("con_ptr") == wrong_ptr:
+                    tx_obj = ctx.get("tx") or (_ACTIVE_TRANSACTION_STACK[-1] if _ACTIVE_TRANSACTION_STACK else None)
+                    if tx_obj:
+                        captured_tx.append(tx_obj)
+                    raise RuntimeError("Injected cleanup failure in TEST-208")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Injected cleanup failure in TEST-208", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 1)
+
+        # Clear fault hook and retry cleanup
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+
+        # Confirm wrong_con is now gone
+        all_con_ptrs = {c.as_pointer() for c in p_fore.constraints}
+        self.assertNotIn(wrong_ptr, all_con_ptrs)
+
+    def test_209_ik_target_assignment_7_state_logging_confirmed(self) -> None:
+        """TEST-209: IK constraint target assignment creates 7-state log, verified in RNA, and confirmed on commit."""
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        target_records = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "CONSTRAINT_TARGET_ASSIGN"
+        ]
+        self.assertEqual(len(target_records), 4)  # 2 forearms + 2 hands
+
+        ik_l_rec = next(r for r in target_records if r.get("bone_name") == "forearm.L")
+        self.assertEqual(ik_l_rec["operation_state"], _RelationshipOperationState.CONFIRMED)
+        self.assertEqual(ik_l_rec["field"], "target")
+        self.assertEqual(ik_l_rec["con_ref"].name, "ArmIK.L")
+        self.assertEqual(ik_l_rec["dest_target_ref"].name, "HandIK.L")
+        self.assertEqual(ik_l_rec["dest_target_ptr"], bpy.data.objects["HandIK.L"].as_pointer())
+
+        # Live verification
+        ik_con_l = self.armature.pose.bones["forearm.L"].constraints["ArmIK.L"]
+        self.assertEqual(ik_con_l.target, bpy.data.objects["HandIK.L"])
+
+    def test_210_ik_pole_target_assignment_and_pole_subtarget_logging(self) -> None:
+        """TEST-210: IK pole target assignment and pole subtarget logged and restored with 7-state fidelity."""
+        setup_arm_ik(self.armature)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault after pole target config in TEST-210")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault after pole target config in TEST-210", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        pole_records = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "CONSTRAINT_POLE_TARGET_ASSIGN"
+        ]
+        self.assertGreaterEqual(len(pole_records), 1)
+        for r in pole_records:
+            self.assertEqual(r["field"], "pole_target")
+            self.assertIn(r["operation_state"], (_RelationshipOperationState.NO_EFFECT, _RelationshipOperationState.REVERTED))
+
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_211_copy_rotation_target_assignment_preserves_wrist_constraints(self) -> None:
+        """TEST-211: Hand COPY_ROTATION target assignment operates through Layer 3 without perturbing other wrist constraints."""
+        p_hand = self.armature.pose.bones["hand.L"]
+        ext_rot = p_hand.constraints.new(type="LIMIT_ROTATION")
+        ext_rot.name = "WristLimit211"
+        ext_ptr = ext_rot.as_pointer()
+
+        setup_arm_ik(self.armature)
+
+        # HandRotation.L target is HandIK.L
+        self.assertIn("HandRotation.L", p_hand.constraints)
+        rot_con = p_hand.constraints["HandRotation.L"]
+        self.assertEqual(rot_con.target, bpy.data.objects["HandIK.L"])
+
+        # External wrist constraint untouched
+        self.assertIn("WristLimit211", p_hand.constraints)
+        self.assertEqual(p_hand.constraints["WristLimit211"].as_pointer(), ext_ptr)
+
+    def test_212_unchanged_target_and_subtarget_transitions_to_no_effect(self) -> None:
+        """TEST-212: Target and subtarget re-assignment with identical references transitions PREPARED -> NO_EFFECT."""
+        setup_arm_ik(self.armature)
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                if _ACTIVE_TRANSACTION_STACK:
+                    captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            # Second setup_arm_ik with existing controllers & constraints
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+
+        target_records = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") in ("CONSTRAINT_TARGET_ASSIGN", "CONSTRAINT_POLE_TARGET_ASSIGN")
+        ]
+        self.assertEqual(len(target_records), 6)  # 3 on L, 3 on R
+        for r in target_records:
+            self.assertEqual(
+                r["operation_state"],
+                _RelationshipOperationState.NO_EFFECT,
+                f"Expected NO_EFFECT for unchanged {r.get('field')} on {r.get('bone_name')}, got {r.get('operation_state')}"
+            )
+
+    def test_213_fault_before_target_write_transitions_to_no_effect_and_rolls_back(self) -> None:
+        """TEST-213: Fault before RNA target write transitions log to NO_EFFECT with zero side effects and clean rollback."""
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_constraint_target_apply_before_write":
+                op = ctx.get("op", {})
+                if op.get("bone_name") == "forearm.L" and op.get("field") == "target":
+                    captured_ops.append(op)
+                    raise RuntimeError("Fault before RNA target write in TEST-213")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault before RNA target write in TEST-213", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+        _verify_arm_rig_state_restored(self.armature, snap_initial)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_214_fault_after_target_write_before_confirm_reverts(self) -> None:
+        """TEST-214: Fault after target write (before CONFIRM) transitions APPLIED_VERIFIED -> REVERTED on rollback."""
+        setup_arm_ik(self.armature)
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "constraint_target_before_confirm":
+                op = ctx.get("op", {})
+                if op.get("bone_name") == "forearm.L" and op.get("field") == "target":
+                    captured_ops.append(op)
+                    raise RuntimeError("Fault before confirm in TEST-214")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            # Change target temporarily to trigger a real write
+            p_fore = self.armature.pose.bones["forearm.L"]
+            ik_con = p_fore.constraints["ArmIK.L"]
+            alt_target = bpy.data.objects["ElbowPole.L"]
+
+            with _arm_rig_transaction(self.armature) as tx:
+                _authorized_assign_constraint_targets(
+                    pbone=p_fore,
+                    con=ik_con,
+                    target=alt_target,
+                    active_tx=tx,
+                )
+        except RuntimeError as cm:
+            self.assertIn("Fault before confirm in TEST-214", str(cm))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_215_replaced_target_or_constraint_identity_enters_recovery_uncertain(self) -> None:
+        """TEST-215: Target or constraint identity replaced/destroyed during undo transitions to RECOVERY_UNCERTAIN and isolates session."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        setup_arm_ik(self.armature)
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ik_con = p_fore.constraints["ArmIK.L"]
+        alt_target = bpy.data.objects["ElbowPole.L"]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_relationship_rollback_undo":
+                op = ctx.get("op", {})
+                if op.get("intended_mutation") == "CONSTRAINT_TARGET_ASSIGN":
+                    raise RuntimeError("Simulated target relationship rollback undo failure in TEST-215")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_constraint_targets(
+                        pbone=p_fore,
+                        con=ik_con,
+                        target=alt_target,
+                        active_tx=tx,
+                    )
+                    raise RuntimeError("Primary business failure in TEST-215")
+            exc_str = str(cm.exception)
+            self.assertIn("Primary business failure in TEST-215", exc_str)
+            self.assertIn("rollback verification failed", exc_str)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        # Session isolated as FAILED-B or FAILED-C due to rollback failure / RECOVERY_UNCERTAIN
+        self.assertIn(session_rec.isolation_state, (_ArmatureIsolationState.ISOLATED_FAILED_B, _ArmatureIsolationState.ISOLATED_FAILED_C))
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+        iso_rec = _ISOLATED_FAILED_ARMATURES[session_id]
+        self.assertIn(iso_rec["failure_class"], (_FailedTransactionClass.FAILED_B.value, _FailedTransactionClass.FAILED_C.value))
+
+        uncertain_ops = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("operation_state") == _RelationshipOperationState.RECOVERY_UNCERTAIN
+        ]
+        self.assertGreaterEqual(len(uncertain_ops), 1)
+
+    def test_216_joint_left_right_fault_rollback_preserves_all_constraints_and_targets(self) -> None:
+        """TEST-216: Bilateral fault rollback losslessly preserves all constraints, targets, pole targets, subtargets, and external constraints."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        # Add external constraints on forearm and hand
+        p_fore_l = self.armature.pose.bones["forearm.L"]
+        ext_limit_l = p_fore_l.constraints.new(type="LIMIT_ROTATION")
+        ext_limit_l.name = "ExtLimit216_L"
+        ext_limit_l_ptr = ext_limit_l.as_pointer()
+
+        p_hand_r = self.armature.pose.bones["hand.R"]
+        ext_track_r = p_hand_r.constraints.new(type="TRACK_TO")
+        ext_track_r.name = "ExtTrack216_R"
+        ext_track_r_ptr = ext_track_r.as_pointer()
+
+        snap_full = _snapshot_arm_rig_state(self.armature)
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_constraints_or_prebend" and ctx.get("side") == "R":
+                raise RuntimeError("Joint bilateral fault on side R in TEST-216")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.9)
+            self.assertIn("Joint bilateral fault on side R in TEST-216", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        _verify_arm_rig_state_restored(self.armature, snap_full)
+
+        # Confirm external constraints intact
+        self.assertIn("ExtLimit216_L", p_fore_l.constraints)
+        self.assertEqual(p_fore_l.constraints["ExtLimit216_L"].as_pointer(), ext_limit_l_ptr)
+        self.assertIn("ExtTrack216_R", p_hand_r.constraints)
+        self.assertEqual(p_hand_r.constraints["ExtTrack216_R"].as_pointer(), ext_track_r_ptr)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+
+    def test_217_hand_ik_parent_and_inverse_layer3_confirmed(self) -> None:
+        """TEST-217: HandIK Parent and Matrix Parent Inverse Layer 3 write and 7-state log fidelity."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        orig_parent = hand_l.parent
+        orig_inv = hand_l.matrix_parent_inverse.copy()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            new_inv = Matrix.Translation(Vector((0.0, 0.0, 0.5)))
+            op_rec = _authorized_assign_object_parent(
+                obj=hand_l,
+                parent=self.armature,
+                matrix_parent_inverse=new_inv,
+                active_tx=tx,
+            )
+            self.assertIsNotNone(op_rec)
+            self.assertEqual(op_rec["intended_mutation"], "OBJECT_PARENT_ASSIGN")
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.CONFIRMED)
+            self.assertEqual(hand_l.parent, self.armature)
+            for r in range(4):
+                for c in range(4):
+                    self.assertAlmostEqual(hand_l.matrix_parent_inverse[r][c], new_inv[r][c], places=5)
+
+    def test_218_parent_and_inverse_unchanged_transitions_to_no_effect(self) -> None:
+        """TEST-218: Parent/Inverse unchanged -> NO_EFFECT, zero writes."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        curr_parent = hand_l.parent
+        curr_inv = hand_l.matrix_parent_inverse.copy()
+
+        with _arm_rig_transaction(self.armature) as tx:
+            op_rec = _authorized_assign_object_parent(
+                obj=hand_l,
+                parent=curr_parent,
+                matrix_parent_inverse=curr_inv,
+                active_tx=tx,
+            )
+            self.assertIsNotNone(op_rec)
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+    def test_219_invalid_parent_rejected_controller_untouched(self) -> None:
+        """TEST-219: Invalid parent / cross-armature rejected, controller untouched."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        curr_parent = hand_l.parent
+        curr_inv = hand_l.matrix_parent_inverse.copy()
+
+        # Create a second armature
+        bpy.ops.object.armature_add()
+        other_arm = bpy.context.active_object
+        other_arm.name = "OtherArmature219"
+
+        with _arm_rig_transaction(self.armature) as tx:
+            with self.assertRaises(RuntimeError) as cm:
+                _authorized_assign_object_parent(
+                    obj=hand_l,
+                    parent=other_arm,
+                    matrix_parent_inverse=Matrix.Identity(4),
+                    active_tx=tx,
+                )
+            self.assertIn("Cross-armature parent assignment rejected", str(cm.exception))
+
+        self.assertEqual(hand_l.parent, curr_parent)
+        for r in range(4):
+            for c in range(4):
+                self.assertAlmostEqual(hand_l.matrix_parent_inverse[r][c], curr_inv[r][c], places=5)
+        bpy.data.objects.remove(other_arm, do_unlink=True)
+
+    def test_220_fault_before_parent_write_transitions_to_no_effect(self) -> None:
+        """TEST-220: Fault before C-API write (object_parent_before_write) -> NO_EFFECT."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_before_write":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-220 before parent write")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=None,
+                        matrix_parent_inverse=Matrix.Identity(4),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-220 before parent write", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_221_fault_after_parent_before_inverse_rollback_restores_initial(self) -> None:
+        """TEST-221: Fault after parent before inverse -> APPLIED_VERIFIED, clean rollback."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        orig_parent = hand_l.parent
+        orig_inv = hand_l.matrix_parent_inverse.copy()
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_after_parent_before_inverse":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-221 after parent before inverse")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=None,
+                        matrix_parent_inverse=Matrix.Translation(Vector((1.0, 2.0, 3.0))),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-221", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_222_fault_after_inverse_before_confirm_reverts_with_matrix_diff(self) -> None:
+        """TEST-222: Fault after inverse before confirm -> APPLIED_VERIFIED, rollback to REVERTED with matrix diff <= 1e-5."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        snap = _snapshot_arm_rig_state(self.armature)
+        captured_ops = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_before_confirm":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-222 before confirm")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=None,
+                        matrix_parent_inverse=Matrix.Translation(Vector((0.0, 0.0, 1.0))),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-222", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        _verify_arm_rig_state_restored(self.armature, snap)
+
+    def test_223_original_parent_destroyed_enters_recovery_uncertain(self) -> None:
+        """TEST-223: Original parent destroyed -> RECOVERY_UNCERTAIN and session isolation."""
+        setup_arm_ik(self.armature)
+        hand_l = bpy.data.objects["HandIK.L"]
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        temp_parent = bpy.data.objects.new("TempParent223", None)
+        bpy.context.scene.collection.objects.link(temp_parent)
+        hand_l.parent = temp_parent
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "object_parent_after_parent_before_inverse":
+                bpy.data.objects.remove(temp_parent, do_unlink=True)
+                raise RuntimeError("Fault injected in TEST-223 after parent destroyed")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    _authorized_assign_object_parent(
+                        obj=hand_l,
+                        parent=self.armature,
+                        matrix_parent_inverse=Matrix.Identity(4),
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-223", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIn(session_rec.isolation_state, (_ArmatureIsolationState.ISOLATED_FAILED_B, _ArmatureIsolationState.ISOLATED_FAILED_C))
+        self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+
+    def test_224_external_unowned_object_parent_assignment_rejected(self) -> None:
+        """TEST-224: External unowned object parent assignment rejected."""
+        setup_arm_ik(self.armature)
+        ext_obj = bpy.data.objects.new("ExternalObj224", None)
+        bpy.context.scene.collection.objects.link(ext_obj)
+
+        with _arm_rig_transaction(self.armature) as tx:
+            with self.assertRaises(RuntimeError) as cm:
+                _authorized_assign_object_parent(
+                    obj=ext_obj,
+                    parent=self.armature,
+                    matrix_parent_inverse=Matrix.Identity(4),
+                    active_tx=tx,
+                )
+            self.assertIn("is not owned or managed by the active transaction (TEST-224)", str(cm.exception))
+
+        self.assertIsNone(ext_obj.parent)
+        bpy.data.objects.remove(ext_obj, do_unlink=True)
+
+    def test_225_character_collection_scene_link_has_tx_added_and_confirms(self) -> None:
+        """TEST-225: Character collection scene link has TX_ADDED 7-state log and confirms."""
+        char_col = bpy.data.collections.get("Character")
+        if char_col is not None:
+            if char_col.name in bpy.context.scene.collection.children:
+                bpy.context.scene.collection.children.unlink(char_col)
+            bpy.data.collections.remove(char_col)
+
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        link_ops = [
+            r for r in tx.prepared_relationship_mutations
+            if r.get("intended_mutation") == "COLLECTION_CHILD_LINK"
+        ]
+        self.assertGreaterEqual(len(link_ops), 1)
+        char_link = link_ops[0]
+        self.assertEqual(char_link["category"], "TX_ADDED")
+        self.assertEqual(char_link["operation_state"], _RelationshipOperationState.CONFIRMED)
+        self.assertIn("Character", bpy.context.scene.collection.children)
+
+    def test_226_pre_existing_collection_child_link_transitions_to_no_effect(self) -> None:
+        """TEST-226: Pre-existing collection child link -> NO_EFFECT."""
+        col_child = bpy.data.collections.new("Child226")
+        bpy.context.scene.collection.children.link(col_child)
+
+        with _arm_rig_transaction(self.armature) as tx:
+            op_rec = _authorized_link_child_collection(
+                parent_collection=bpy.context.scene.collection,
+                child_collection=col_child,
+                active_tx=tx,
+            )
+            self.assertIsNotNone(op_rec)
+            self.assertEqual(op_rec["operation_state"], _RelationshipOperationState.NO_EFFECT)
+
+        bpy.context.scene.collection.children.unlink(col_child)
+        bpy.data.collections.remove(col_child)
+
+    def test_227_collection_child_link_fault_before_c_api_no_effect(self) -> None:
+        """TEST-227: Collection child link fault before C-API -> NO_EFFECT."""
+        # [2026-11-19] PURPOSE: Align TEST-227 with the current collection ownership and link authorization contract while preserving the before-C-API NO_EFFECT fault-injection check.
+        # [2026-11-19] REASON: _authorized_link_child_collection requires child_collection to be registered as transaction-created via tx.register_created_collection(..., initial_parent=bpy.context.scene.collection), and transaction rollback Step 3.1 removes verified transaction-created collections from bpy.data.collections.
+        captured_ops = []
+        col_child_ptr = None
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "collection_child_link_during_apply_before_c_api":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-227 before C-API")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaisesRegex(RuntimeError, "Fault injected in TEST-227 before C-API") as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    col_child = bpy.data.collections.new("Child227")
+                    col_child_ptr = int(col_child.as_pointer())
+                    tx.register_created_collection(
+                        col_child,
+                        initial_parent=bpy.context.scene.collection,
+                    )
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=col_child,
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-227 before C-API", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(col_child_ptr)
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.NO_EFFECT)
+        self.assertNotIn("Child227", bpy.context.scene.collection.children)
+        self.assertNotIn("Child227", bpy.data.collections)
+        self.assertFalse(any(int(c.as_pointer()) == col_child_ptr for c in bpy.data.collections))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_228_collection_child_link_fault_before_confirm_reverts(self) -> None:
+        """TEST-228: Collection child link fault before confirm -> APPLIED_VERIFIED, rollback to REVERTED."""
+        # [2026-11-19] PURPOSE: Align TEST-228 with the current collection ownership and link authorization contract while preserving the before-confirm REVERTED fault-injection check.
+        # [2026-11-19] REASON: _authorized_link_child_collection requires child_collection to be registered as transaction-created via tx.register_created_collection(..., initial_parent=bpy.context.scene.collection), and transaction rollback Step 3.0/3.1 reverts the child link and removes the collection from bpy.data.collections.
+        captured_ops = []
+        col_child_ptr = None
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "collection_child_link_before_confirm":
+                op = ctx.get("op", {})
+                captured_ops.append(op)
+                raise RuntimeError("Fault injected in TEST-228 before confirm")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaisesRegex(RuntimeError, "Fault injected in TEST-228 before confirm") as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    col_child = bpy.data.collections.new("Child228")
+                    col_child_ptr = int(col_child.as_pointer())
+                    tx.register_created_collection(
+                        col_child,
+                        initial_parent=bpy.context.scene.collection,
+                    )
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=col_child,
+                        active_tx=tx,
+                    )
+            self.assertIn("Fault injected in TEST-228 before confirm", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(col_child_ptr)
+        self.assertEqual(len(captured_ops), 1)
+        self.assertEqual(captured_ops[0]["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertNotIn("Child228", bpy.context.scene.collection.children)
+        self.assertNotIn("Child228", bpy.data.collections)
+        self.assertFalse(any(int(c.as_pointer()) == col_child_ptr for c in bpy.data.collections))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_229_authorized_unlinked_child_collection_restored_on_rollback(self) -> None:
+        """TEST-229: Authorized unlinked child collection restored during reverse-order rollback before final cleanup."""
+        # [2026-11-19] PURPOSE: Align TEST-229 with the authorized link->unlink prerequisite contract and verify both intermediate relink during reverse-order rollback and final collection cleanup.
+        # [2026-11-19] REASON: _authorized_unlink_child_collection only permits unlinking a transaction-created collection that has a prior COLLECTION_CHILD_LINK record in the active transaction; during rollback Step 3.0, COLLECTION_CHILD_UNLINK is reverted first (relinking Child229) before COLLECTION_CHILD_LINK is reverted and Step 3.1 deletes Child229.
+        link_op = None
+        unlink_op = None
+        col_child_ptr = None
+        relink_observations = []
+
+        def observe_relink_before_link_undo(stage: str, ctx: dict) -> None:
+            if stage == "during_relationship_rollback_undo" and ctx.get("op") is link_op:
+                scene_children = bpy.context.scene.collection.children
+                relink_observations.append({
+                    "unlink_state": unlink_op.get("operation_state") if isinstance(unlink_op, dict) else None,
+                    "name_in_children": "Child229" in scene_children,
+                    "ptr_in_children": any(int(c.as_pointer()) == col_child_ptr for c in scene_children),
+                })
+
+        _set_test_fault_injection_hook(observe_relink_before_link_undo)
+        try:
+            with self.assertRaisesRegex(RuntimeError, "Fault injected in TEST-229 to test relink on rollback") as cm:
+                with _arm_rig_transaction(self.armature) as tx:
+                    col_child = bpy.data.collections.new("Child229")
+                    col_child_ptr = int(col_child.as_pointer())
+                    tx.register_created_collection(
+                        col_child,
+                        initial_parent=bpy.context.scene.collection,
+                    )
+                    link_op = _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=col_child,
+                        active_tx=tx,
+                    )
+                    self.assertIsNotNone(link_op)
+                    self.assertEqual(link_op["intended_mutation"], "COLLECTION_CHILD_LINK")
+                    self.assertEqual(link_op["operation_state"], _RelationshipOperationState.CONFIRMED)
+                    self.assertIn("Child229", bpy.context.scene.collection.children)
+
+                    unlink_op = _authorized_unlink_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=col_child,
+                        active_tx=tx,
+                    )
+                    self.assertIsNotNone(unlink_op)
+                    self.assertEqual(unlink_op["intended_mutation"], "COLLECTION_CHILD_UNLINK")
+                    self.assertEqual(unlink_op["operation_state"], _RelationshipOperationState.CONFIRMED)
+                    self.assertNotIn("Child229", bpy.context.scene.collection.children)
+                    raise RuntimeError("Fault injected in TEST-229 to test relink on rollback")
+            self.assertIn("Fault injected in TEST-229 to test relink on rollback", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertIsNotNone(col_child_ptr)
+        self.assertIsNotNone(link_op)
+        self.assertIsNotNone(unlink_op)
+        self.assertEqual(len(relink_observations), 1)
+        self.assertEqual(relink_observations[0]["unlink_state"], _RelationshipOperationState.REVERTED)
+        self.assertTrue(relink_observations[0]["name_in_children"])
+        self.assertTrue(relink_observations[0]["ptr_in_children"])
+        self.assertEqual(unlink_op["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertEqual(link_op["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertNotIn("Child229", bpy.context.scene.collection.children)
+        self.assertNotIn("Child229", bpy.data.collections)
+        self.assertFalse(any(int(c.as_pointer()) == col_child_ptr for c in bpy.data.collections))
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_230_external_second_parent_preserved_on_rollback(self) -> None:
+        """TEST-230: External script added second collection parent preserved on rollback."""
+        created_col = None
+        second_parent = bpy.data.collections.new("SecondParent230")
+        bpy.context.scene.collection.children.link(second_parent)
+
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    created_col = bpy.data.collections.new("CreatedCol230")
+                    tx.register_created_collection(created_col, initial_parent=bpy.context.scene.collection)
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=created_col,
+                        active_tx=tx,
+                    )
+                    second_parent.children.link(created_col)
+                    raise RuntimeError("Fault in TEST-230 after external parent link")
+        finally:
+            pass
+
+        self.assertIn("CreatedCol230", bpy.data.collections)
+        self.assertIn("CreatedCol230", second_parent.children)
+
+        second_parent.children.unlink(created_col)
+        bpy.data.collections.remove(created_col)
+        bpy.context.scene.collection.children.unlink(second_parent)
+        bpy.data.collections.remove(second_parent)
+
+    def test_231_renamed_collection_with_same_name_replacement_preserved(self) -> None:
+        """TEST-231: Renamed collection with same-name external replacement preserved."""
+        tx_col = None
+        ext_same_name_col = None
+
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    tx_col = bpy.data.collections.new("Col231")
+                    tx_ptr = tx_col.as_pointer()
+                    tx.register_created_collection(tx_col, initial_parent=bpy.context.scene.collection)
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=tx_col,
+                        active_tx=tx,
+                    )
+                    tx_col.name = "Col231_Renamed"
+                    ext_same_name_col = bpy.data.collections.new("Col231")
+                    bpy.context.scene.collection.children.link(ext_same_name_col)
+                    raise RuntimeError("Fault in TEST-231 after same-name replacement")
+        finally:
+            pass
+
+        self.assertNotIn("Col231_Renamed", bpy.data.collections)
+        self.assertIn("Col231", bpy.data.collections)
+        self.assertEqual(bpy.data.collections["Col231"].as_pointer(), ext_same_name_col.as_pointer())
+
+        bpy.context.scene.collection.children.unlink(ext_same_name_col)
+        bpy.data.collections.remove(ext_same_name_col)
+
+    def test_232_created_collection_with_external_members_refuses_deletion(self) -> None:
+        """TEST-232: Created collection with external members/children/parents refuses deletion."""
+        ext_member = bpy.data.objects.new("ExternalMember232", None)
+        tx_col = None
+
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx:
+                    tx_col = bpy.data.collections.new("Col232")
+                    tx.register_created_collection(tx_col, initial_parent=bpy.context.scene.collection)
+                    _authorized_link_child_collection(
+                        parent_collection=bpy.context.scene.collection,
+                        child_collection=tx_col,
+                        active_tx=tx,
+                    )
+                    tx_col.objects.link(ext_member)
+                    raise RuntimeError("Fault in TEST-232 with external member")
+        finally:
+            pass
+
+        self.assertIn("Col232", bpy.data.collections)
+        self.assertIn("ExternalMember232", tx_col.objects)
+
+        tx_col.objects.unlink(ext_member)
+        bpy.data.objects.remove(ext_member)
+        bpy.data.collections.remove(tx_col)
+
+    def test_233_joint_bilateral_rollback_parent_collection_child_constraint_targets(self) -> None:
+        """TEST-233: Joint bilateral rollback of parent, collection child, constraint targets with 100% snapshot fidelity."""
+        # [2026-11-19] PURPOSE: Align TEST-233 with the collection link parent-collection contract while preserving the joint three-domain (object parent, constraint target, collection child link) rollback verification.
+        # [2026-11-19] REASON: In a fresh transaction after setup_arm_ik, the pre-existing "Character" collection is not transaction-created, so _authorized_link_child_collection requires parent_collection=bpy.context.scene.collection and a transaction-registered child_collection (which rollback Step 3.0/3.1 unlinks and removes).
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        snap = _snapshot_arm_rig_state(self.armature)
+
+        hand_l = bpy.data.objects["HandIK.L"]
+        orig_hand_parent = hand_l.parent
+        orig_hand_parent_ptr = int(orig_hand_parent.as_pointer()) if orig_hand_parent is not None else None
+        p_fore = self.armature.pose.bones["forearm.L"]
+        ik_con = p_fore.constraints["ArmIK.L"]
+        orig_ik_target = ik_con.target
+        orig_ik_target_ptr = int(orig_ik_target.as_pointer()) if orig_ik_target is not None else None
+        alt_target = bpy.data.objects["ElbowPole.L"]
+
+        char_col = bpy.data.collections["Character"]
+        char_col_ptr = int(char_col.as_pointer())
+        char_col_children_before = [c.name for c in char_col.children]
+        char_col_objects_before = [o.name for o in char_col.objects]
+
+        parent_op = None
+        target_op = None
+        col_op = None
+        test_col_ptr = None
+
+        with self.assertRaisesRegex(RuntimeError, "Joint fault across parent, constraint, and collection in TEST-233") as cm:
+            with _arm_rig_transaction(self.armature) as tx:
+                parent_op = _authorized_assign_object_parent(
+                    obj=hand_l,
+                    parent=None,
+                    matrix_parent_inverse=Matrix.Translation(Vector((1.0, 1.0, 1.0))),
+                    active_tx=tx,
+                )
+                self.assertIsNotNone(parent_op)
+                self.assertEqual(parent_op["intended_mutation"], "OBJECT_PARENT_ASSIGN")
+                self.assertEqual(parent_op["operation_state"], _RelationshipOperationState.CONFIRMED)
+                self.assertIsNone(hand_l.parent)
+
+                _authorized_assign_constraint_targets(
+                    pbone=p_fore,
+                    con=ik_con,
+                    target=alt_target,
+                    active_tx=tx,
+                )
+                target_ops = [
+                    op for op in tx.prepared_relationship_mutations
+                    if isinstance(op, dict) and op.get("intended_mutation") == "CONSTRAINT_TARGET_ASSIGN"
+                ]
+                self.assertEqual(len(target_ops), 1)
+                target_op = target_ops[0]
+                self.assertEqual(target_op["operation_state"], _RelationshipOperationState.CONFIRMED)
+                self.assertEqual(ik_con.target, alt_target)
+
+                test_col = bpy.data.collections.new("TestCol233")
+                test_col_ptr = int(test_col.as_pointer())
+                tx.register_created_collection(
+                    test_col,
+                    initial_parent=bpy.context.scene.collection,
+                )
+                col_op = _authorized_link_child_collection(
+                    parent_collection=bpy.context.scene.collection,
+                    child_collection=test_col,
+                    active_tx=tx,
+                )
+                self.assertIsNotNone(col_op)
+                self.assertEqual(col_op["intended_mutation"], "COLLECTION_CHILD_LINK")
+                self.assertEqual(col_op["operation_state"], _RelationshipOperationState.CONFIRMED)
+                self.assertIn("TestCol233", bpy.context.scene.collection.children)
+
+                raise RuntimeError("Joint fault across parent, constraint, and collection in TEST-233")
+        self.assertIn("Joint fault across parent, constraint, and collection in TEST-233", str(cm.exception))
+
+        self.assertIsNotNone(test_col_ptr)
+        self.assertIsNotNone(parent_op)
+        self.assertIsNotNone(target_op)
+        self.assertIsNotNone(col_op)
+        self.assertEqual(parent_op["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertEqual(target_op["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertEqual(col_op["operation_state"], _RelationshipOperationState.REVERTED)
+        self.assertEqual(hand_l.parent, orig_hand_parent)
+        self.assertEqual(
+            int(hand_l.parent.as_pointer()) if hand_l.parent is not None else None,
+            orig_hand_parent_ptr,
+        )
+        self.assertEqual(ik_con.target, orig_ik_target)
+        self.assertEqual(
+            int(ik_con.target.as_pointer()) if ik_con.target is not None else None,
+            orig_ik_target_ptr,
+        )
+        self.assertNotIn("TestCol233", bpy.context.scene.collection.children)
+        self.assertNotIn("TestCol233", char_col.children)
+        self.assertNotIn("TestCol233", bpy.data.collections)
+        self.assertFalse(any(int(c.as_pointer()) == test_col_ptr for c in bpy.data.collections))
+        self.assertEqual(int(bpy.data.collections["Character"].as_pointer()), char_col_ptr)
+        self.assertEqual([c.name for c in char_col.children], char_col_children_before)
+        self.assertEqual([o.name for o in char_col.objects], char_col_objects_before)
+        _verify_arm_rig_state_restored(self.armature, snap)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+
+    def test_234_layer6_returns_cleanup_success_without_state_mutation(self) -> None:
+        """TEST-234: Layer 6 正常清理返回 CLEANUP_SUCCESS，不直接修改事务状态."""
+        setup_arm_ik(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
+        tx.state = _ArmRigTransactionState.COMMITTED
+        wrong_mesh = bpy.data.meshes.new("Test234_Mesh")
+        wrong_obj = bpy.data.objects.new("Test234_Obj", wrong_mesh)
+        bpy.context.scene.collection.objects.link(wrong_obj)
+        stashed = {
+            "stashed_obj": wrong_obj,
+            "stashed_obj_ptr": wrong_obj.as_pointer(),
+            "original_name": "Test234_Obj",
+            "stashed_data": wrong_mesh,
+            "stashed_data_ptr": wrong_mesh.as_pointer(),
+            "stashed_data_name": "Test234_Mesh",
+            "obj_cleaned": False,
+            "data_cleaned": False,
+        }
+        tx.stashed_objects.append(stashed)
+        tx.uncleaned_stashed_objects.append(stashed)
+
+        result = tx.retry_cleanup()
+        self.assertIsInstance(result, _CleanupResult)
+        self.assertEqual(result.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(result.remaining_objects, 0)
+        self.assertEqual(result.remaining_constraints, 0)
+        self.assertEqual(len(result.errors), 0)
+        self.assertIsNone(result.cause)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_235_initial_cleanup_failure_coordinator_sets_cleanup_pending_and_chains_cause(self) -> None:
+        """TEST-235: 初次清理失败，Coordinator 设置 CLEANUP_PENDING、登记门禁并抛出原始异常链."""
+        captured_tx = []
+        injected_exc = RuntimeError("Injected cleanup failure in TEST-235")
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                raise injected_exc
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    wrong_mesh = bpy.data.meshes.new("Test235_Mesh")
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx_outer.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                    setup_arm_ik(self.armature)
+            self.assertIn("CLEANUP_INCOMPLETE", str(cm.exception))
+            self.assertIs(cm.exception.__cause__, injected_exc)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertIn(tx.tx_id, get_pending_arm_rig_cleanup_ids())
+        self.assertGreater(len(tx.uncleaned_stashed_objects), 0)
+
+    def test_236_pending_retry_failure_preserves_state_and_pending_gate_with_chain(self) -> None:
+        """TEST-236: Pending Retry 再次失败，状态和 Pending Gate 保留，异常明确传播."""
+        captured_tx = []
+        injected_exc = RuntimeError("Persistent cleanup failure in TEST-236")
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                raise injected_exc
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    wrong_mesh = bpy.data.meshes.new("Test236_Mesh")
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx_outer.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                    setup_arm_ik(self.armature)
+        finally:
+            pass
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            self.assertIn("CLEANUP_INCOMPLETE", str(cm.exception))
+            self.assertIs(cm.exception.__cause__, injected_exc)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertIn(tx.tx_id, get_pending_arm_rig_cleanup_ids())
+
+    def test_237_pending_retry_success_coordinator_transitions_committed_and_unregisters(self) -> None:
+        """TEST-237: Pending Retry 成功，Coordinator 转入 COMMITTED，并准确注销对应注册表条目."""
+        captured_tx = []
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                raise RuntimeError("Temporary failure in TEST-237")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    wrong_mesh = bpy.data.meshes.new("Test237_Mesh")
+                    wrong_obj = bpy.data.objects.new("HandIK.L", wrong_mesh)
+                    tx_outer.register_created_controller(wrong_obj)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, tx_outer)
+                    setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertNotIn(tx.tx_id, get_pending_arm_rig_cleanup_ids())
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+
+    def test_238_failed_transaction_rejected_by_cleanup_isolation_preserved(self) -> None:
+        """TEST-238: FAILED-B/C/D 不得通过 Cleanup 转换为 COMMITTED；原隔离记录完全保留."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "setup_arm_ik_after_first_controller":
+                captured_tx.append(_ACTIVE_TRANSACTION_STACK[-1])
+                raise RuntimeError("Fault in TEST-238")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        tx.state = _ArmRigTransactionState.FAILED
+
+        with self.assertRaises(RuntimeError) as cm1:
+            tx.retry_cleanup()
+        self.assertIn("FAILED -> COMMITTED transition is strictly forbidden", str(cm1.exception))
+
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+        try:
+            with self.assertRaises(RuntimeError) as cm2:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            self.assertIn("FAILED", str(cm2.exception))
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+        dummy_result = _CleanupResult(
+            transaction_id=tx.tx_id,
+            outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+            errors=(),
+            remaining_objects=0,
+            remaining_constraints=0,
+        )
+        with self.assertRaises(RuntimeError) as cm3:
+            _coordinator_apply_cleanup_result(tx, dummy_result, phase="PENDING_RETRY")
+        self.assertIn("FAILED", str(cm3.exception))
+
+        self.assertEqual(tx.state, _ArmRigTransactionState.FAILED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_239_pending_registry_invalid_state_or_identity_rejects_and_refuses_pop(self) -> None:
+        """TEST-239: Pending Registry 存在错误状态或错误事务身份时，必须抛出异常，不得注销."""
+        tx = _create_arm_rig_transaction_context(self.armature)
+        tx.state = _ArmRigTransactionState.ACTIVE
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            self.assertIn("expected CLEANUP_PENDING", str(cm.exception))
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_240_forged_cleanup_success_with_remaining_resources_rejected_by_coordinator(self) -> None:
+        """TEST-240: 伪造 CLEANUP_SUCCESS 但仍有未完成资源，Coordinator 必须拒绝成功结论."""
+        tx = _create_arm_rig_transaction_context(self.armature)
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+        dummy_stashed = {"original_name": "GhostObj240", "obj_cleaned": False, "data_cleaned": False}
+        tx.uncleaned_stashed_objects.append(dummy_stashed)
+
+        try:
+            forged_result = _CleanupResult(
+                transaction_id=tx.tx_id,
+                outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+                errors=(),
+                remaining_objects=0,
+                remaining_constraints=0,
+            )
+            with self.assertRaises(RuntimeError) as cm1:
+                _coordinator_apply_cleanup_result(tx, forged_result, phase="PENDING_RETRY")
+            self.assertIn("remaining resource count mismatch", str(cm1.exception))
+
+            forged_result2 = _CleanupResult(
+                transaction_id=tx.tx_id,
+                outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+                errors=(),
+                remaining_objects=1,
+                remaining_constraints=0,
+            )
+            with self.assertRaises(RuntimeError) as cm2:
+                _coordinator_apply_cleanup_result(tx, forged_result2, phase="PENDING_RETRY")
+            self.assertIn("cannot have remaining resources", str(cm2.exception))
+
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_241_cross_armature_cannot_borrow_cleanup_result_or_pending_gate(self) -> None:
+        """TEST-241: 其他 Armature 的事务不得借用当前事务的 Cleanup Result 或 Pending Gate."""
+        bpy.ops.object.armature_add()
+        other_arm = bpy.context.active_object
+        other_arm.name = "OtherArm241"
+
+        tx = _create_arm_rig_transaction_context(self.armature)
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+
+        tx.session_id = "forged-session-id-241"
+        res = _CleanupResult(
+            transaction_id=tx.tx_id,
+            outcome=_CleanupOutcome.CLEANUP_SUCCESS,
+            errors=(),
+            remaining_objects=0,
+            remaining_constraints=0,
+        )
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                _coordinator_apply_cleanup_result(tx, res, phase="PENDING_RETRY")
+            self.assertIn("session_id mismatch", str(cm.exception))
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+            bpy.data.objects.remove(other_arm, do_unlink=True)
+
+    def test_242_fault_after_logical_commit_before_layer6_enters_cleanup_pending_no_rollback(self) -> None:
+        """TEST-242: after_logical_commit 故障发生在清理器运行前，仍进入 CLEANUP_PENDING，不能执行普通回滚."""
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "after_logical_commit":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Fault injected in TEST-242 after_logical_commit")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature)
+            self.assertIn("Fault injected in TEST-242 after_logical_commit", str(cm.exception))
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        self.assertIn("HandIK.L", bpy.data.objects)
+        self.assertIn("HandIK.R", bpy.data.objects)
+
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_243_repeated_cleanup_after_success_is_idempotent_no_ghost_pending(self) -> None:
+        """TEST-243: 清理成功后的重复请求不得重复删除资源、重复登记或产生幽灵 Pending."""
+        setup_arm_ik(self.armature)
+        tx = _create_arm_rig_transaction_context(self.armature)
+        tx.state = _ArmRigTransactionState.COMMITTED
+
+        res1 = tx.retry_cleanup()
+        self.assertEqual(res1.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(res1.remaining_objects, 0)
+        self.assertEqual(res1.remaining_constraints, 0)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        res2 = tx.retry_cleanup()
+        self.assertEqual(res2.outcome, _CleanupOutcome.CLEANUP_SUCCESS)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+
+    def test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation(self) -> None:
+        """TEST-244: CLEANUP_PENDING 与 FAILED 隔离同时存在时，清理重试必须被 Coordinator 拒绝且不得清除 FAILED 隔离."""
+        session_rec = ensure_armature_session_identity(self.armature)
+        session_id = session_rec.registry_session_id
+
+        _ISOLATED_FAILED_ARMATURES[session_id] = {
+            "session_id": session_id,
+            "failure_class": _FailedTransactionClass.FAILED_B.value,
+            "transaction_id": "other-failed-tx-244",
+            "armature_name": self.armature.name,
+            "armature_pointer": self.armature.as_pointer(),
+            "timestamp": time.time(),
+        }
+        orig_failed_record = dict(_ISOLATED_FAILED_ARMATURES[session_id])
+        orig_failed_record_ref = _ISOLATED_FAILED_ARMATURES[session_id]
+
+        tx = _create_arm_rig_transaction_context(self.armature)
+        tx.state = _ArmRigTransactionState.CLEANUP_PENDING
+        _PENDING_ARM_RIG_CLEANUPS[tx.tx_id] = tx
+
+        # [INTRODUCED 2026-11-16T14:31:11+08:00]
+        # FUNCTION: test_244_cleanup_retry_does_not_clear_concurrent_failed_isolation
+        # PURPOSE: Verify that Cleanup Retry is rejected by Coordinator Preflight under concurrent FAILED isolation without altering registries
+        # REASON: Task 10-B fix-3, align TEST-244 with TEST-136 Coordinator negative gate contract
+        grants_before = dict(_COORDINATOR_AUTHORIZATION_GRANTS)
+
+        try:
+            with self.assertRaises(RuntimeError) as cm_retry:
+                retry_pending_arm_rig_cleanup(tx.tx_id)
+            err_msg = str(cm_retry.exception)
+            self.assertIn("CLEANUP_PREFLIGHT_REJECTED", err_msg)
+            self.assertIn("active FAILED isolation", err_msg)
+
+            # Assert pending transaction state and registry remain intact
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertNotEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertIs(_PENDING_ARM_RIG_CLEANUPS[tx.tx_id], tx)
+
+            # Assert FAILED isolation record remains intact
+            self.assertIn(session_id, _ISOLATED_FAILED_ARMATURES)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["failure_class"], _FailedTransactionClass.FAILED_B.value)
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id]["transaction_id"], "other-failed-tx-244")
+            self.assertEqual(_ISOLATED_FAILED_ARMATURES[session_id], orig_failed_record)
+            self.assertIs(
+                _ISOLATED_FAILED_ARMATURES[session_id],
+                orig_failed_record_ref
+            )
+
+            # Assert no Coordinator authorization grant was issued or altered
+            self.assertEqual(_COORDINATOR_AUTHORIZATION_GRANTS, grants_before)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+            _ISOLATED_FAILED_ARMATURES.pop(session_id, None)
+
+    def test_245_partial_cleanup_progress_preserved_subsequent_retry_only_processes_remaining(self) -> None:
+        """TEST-245: 资源清理发生部分成功后抛异常，保留已完成进度，下一次重试只处理剩余资源."""
+        captured_tx = []
+        fail_count = [0]
+
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+            elif stage == "during_cleanup_object_removal":
+                stashed = ctx.get("stashed", {})
+                if stashed.get("original_name") == "HandIK.R":
+                    fail_count[0] += 1
+                    raise RuntimeError("Simulated failure on HandIK.R in TEST-245")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_outer:
+                    mesh_l = bpy.data.meshes.new("Mesh245_L")
+                    obj_l = bpy.data.objects.new("HandIK.L", mesh_l)
+                    tx_outer.register_created_controller(obj_l)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, obj_l, tx_outer)
+
+                    mesh_r = bpy.data.meshes.new("Mesh245_R")
+                    obj_r = bpy.data.objects.new("HandIK.R", mesh_r)
+                    tx_outer.register_created_controller(obj_r)
+                    _authorized_link_object_to_collection(bpy.context.scene.collection, obj_r, tx_outer)
+
+                    setup_arm_ik(self.armature)
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 1)
+        rem_name = tx.uncleaned_stashed_objects[0]["original_name"]
+        self.assertEqual(rem_name, "HandIK.R")
+
+        retry_pending_arm_rig_cleanup(tx.tx_id)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(tx.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+    def test_246_cleanup_pending_blocks_bilateral_reset(self) -> None:
+        """TEST-246: CLEANUP_PENDING 阻断双臂 Reset."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2), pole_world_xyz=(0.4, 0.0, 1.3), influence=0.7)
+        set_hand_ik_target(self.armature, "R", world_xyz=(-0.5, 0.3, 1.1), pole_world_xyz=(-0.4, 0.1, 1.2), influence=0.8)
+        set_arm_ik_influence(self.armature, "BOTH", influence=0.75)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-246")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        snap_before = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                reset_arm_ik(self.armature)
+            self.assertIn("unresolved cleanup", str(cm.exception).lower())
+
+            _verify_arm_rig_state_restored(self.armature, snap_before)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_247_all_bilateral_write_entrypoints_blocked_under_cleanup_pending(self) -> None:
+        """TEST-247: 同一 Armature 的所有双臂写入入口均被阻断."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-247")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            # 1. set_hand_ik_target Left
+            with self.assertRaises(RuntimeError) as cm_l:
+                set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2))
+            self.assertIn("unresolved cleanup", str(cm_l.exception).lower())
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+            # 2. set_hand_ik_target Right
+            with self.assertRaises(RuntimeError) as cm_r:
+                set_hand_ik_target(self.armature, "R", world_xyz=(-0.5, 0.2, 1.2))
+            self.assertIn("unresolved cleanup", str(cm_r.exception).lower())
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+            # 3. set_arm_ik_influence BOTH
+            with self.assertRaises(RuntimeError) as cm_inf:
+                set_arm_ik_influence(self.armature, "BOTH", influence=0.9)
+            self.assertIn("unresolved cleanup", str(cm_inf.exception).lower())
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_248_reinitialization_under_pending_cannot_bypass_gate(self) -> None:
+        """TEST-248: Pending 状态下重新初始化不得绕过门禁."""
+        setup_arm_ik(self.armature, initial_influence=0.6)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-248")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx = captured_tx[0]
+        self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        snap_initial = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                setup_arm_ik(self.armature, initial_influence=0.0)
+            self.assertIn("unresolved cleanup", str(cm.exception).lower())
+
+            _verify_arm_rig_state_restored(self.armature, snap_initial)
+            self.assertIn(tx.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(tx.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx.tx_id, None)
+
+    def test_249_armature_a_pending_does_not_block_independent_armature_b(self) -> None:
+        """TEST-249: Armature A Pending 不得阻断独立 Armature B."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-249")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_249")
+        arm_b = bpy.data.objects.new("ArmatureB_249", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        snap_a = _snapshot_arm_rig_state(self.armature)
+
+        try:
+            sess_a = ensure_armature_session_identity(self.armature)
+            sess_b = ensure_armature_session_identity(arm_b)
+
+            self.assertNotEqual(arm_b.as_pointer(), self.armature.as_pointer())
+            self.assertNotEqual(sess_b.registry_session_id, sess_a.registry_session_id)
+
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertIsNotNone(tx_b)
+                self.assertEqual(tx_b.arm, arm_b)
+                self.assertEqual(tx_b.state, _ArmRigTransactionState.ACTIVE)
+
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            _verify_arm_rig_state_restored(self.armature, snap_a)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_250_alternating_execution_pending_a_and_healthy_b(self) -> None:
+        """TEST-250: A Pending 与 B 正常事务交替执行."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-250")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_250")
+        arm_b = bpy.data.objects.new("ArmatureB_250", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        sess_a = ensure_armature_session_identity(self.armature)
+        sess_b = ensure_armature_session_identity(arm_b)
+        self.assertNotEqual(sess_a.registry_session_id, sess_b.registry_session_id)
+
+        try:
+            with _arm_rig_transaction(arm_b) as tx_b1:
+                self.assertEqual(tx_b1.state, _ArmRigTransactionState.ACTIVE)
+            self.assertEqual(tx_b1.state, _ArmRigTransactionState.COMMITTED)
+            self.assertNotEqual(tx_b1.tx_id, tx_a.tx_id)
+
+            with self.assertRaises(RuntimeError) as cm_a1:
+                reset_arm_ik(self.armature)
+            self.assertIn("unresolved cleanup", str(cm_a1.exception).lower())
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+            with _arm_rig_transaction(arm_b) as tx_b2:
+                self.assertEqual(tx_b2.state, _ArmRigTransactionState.ACTIVE)
+            self.assertEqual(tx_b2.state, _ArmRigTransactionState.COMMITTED)
+
+            with self.assertRaises(RuntimeError) as cm_a2:
+                set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2))
+            self.assertIn("unresolved cleanup", str(cm_a2.exception).lower())
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+        finally:
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_251_retry_cleanup_failure_on_a_preserves_b_admission(self) -> None:
+        """TEST-251: A 的 Cleanup Retry 再次失败，不得影响 B."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        captured_tx = []
+        def fault_hook_commit(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Commit cleanup fault for TEST-251")
+
+        _set_test_fault_injection_hook(fault_hook_commit)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_251")
+        arm_b = bpy.data.objects.new("ArmatureB_251", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        injected_retry_exc = RuntimeError("Persistent retry failure for TEST-251")
+        def fault_hook_retry(stage: str, ctx: dict) -> None:
+            if stage == "during_cleanup_object_removal":
+                raise injected_retry_exc
+
+        try:
+            _set_test_fault_injection_hook(fault_hook_retry)
+            tx_a.uncleaned_stashed_objects.append({"original_name": "Doomed251", "obj_cleaned": False})
+            with self.assertRaises(RuntimeError) as cm_retry:
+                retry_pending_arm_rig_cleanup(tx_a.tx_id)
+            self.assertIn("CLEANUP_INCOMPLETE", str(cm_retry.exception))
+            _clear_test_fault_injection_hook()
+
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 1)
+
+            with _arm_rig_transaction(arm_b) as tx_b:
+                self.assertEqual(tx_b.state, _ArmRigTransactionState.ACTIVE)
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+        finally:
+            _clear_test_fault_injection_hook()
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
+    def test_252_a_cleanup_success_restores_bilateral_reset_admission(self) -> None:
+        """TEST-252: A 的 Pending 清理成功后，双臂 Reset 恢复准入."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+        set_hand_ik_target(self.armature, "L", world_xyz=(0.5, 0.2, 1.2), influence=0.7)
+        set_hand_ik_target(self.armature, "R", world_xyz=(-0.5, 0.3, 1.1), influence=0.8)
+
+        captured_tx = []
+        def fault_hook(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_tx.append(ctx["tx"])
+                raise RuntimeError("Injected cleanup fault for TEST-252")
+
+        _set_test_fault_injection_hook(fault_hook)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_dummy:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_tx[0]
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        with self.assertRaises(RuntimeError):
+            reset_arm_ik(self.armature)
+
+        retry_pending_arm_rig_cleanup(tx_a.tx_id)
+        self.assertEqual(tx_a.state, _ArmRigTransactionState.COMMITTED)
+        self.assertNotIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+        reset_arm_ik(self.armature)
+
+        state_l = get_arm_ik_state(self.armature, "L")
+        state_r = get_arm_ik_state(self.armature, "R")
+        self.assertEqual(state_l["ik_influence"], 0.0)
+        self.assertEqual(state_r["ik_influence"], 0.0)
+        self.assertEqual(state_l["rot_influence"], 0.0)
+        self.assertEqual(state_r["rot_influence"], 0.0)
+        self.assertEqual(len(_ACTIVE_TRANSACTION_STACK), 0)
+
+    def test_253_concurrent_pending_records_on_distinct_armatures(self) -> None:
+        """TEST-253: 两个独立 Armature 同时存在 Pending 记录."""
+        setup_arm_ik(self.armature, initial_influence=0.5)
+
+        arm_b_data = bpy.data.armatures.new("ArmBData_253")
+        arm_b = bpy.data.objects.new("ArmatureB_253", arm_b_data)
+        bpy.context.scene.collection.objects.link(arm_b)
+
+        captured_a = []
+        def fault_hook_a(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_a.append(ctx["tx"])
+                raise RuntimeError("Fault on A in TEST-253")
+
+        _set_test_fault_injection_hook(fault_hook_a)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(self.armature) as tx_a_in:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_a = captured_a[0]
+
+        captured_b = []
+        def fault_hook_b(stage: str, ctx: dict) -> None:
+            if stage == "during_commit_cleanup":
+                captured_b.append(ctx["tx"])
+                raise RuntimeError("Fault on B in TEST-253")
+
+        _set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(arm_b) as tx_b_in:
+                    pass
+        finally:
+            _clear_test_fault_injection_hook()
+
+        tx_b = captured_b[0]
+
+        try:
+            self.assertNotEqual(tx_a.tx_id, tx_b.tx_id)
+            self.assertNotEqual(tx_a.session_id, tx_b.session_id)
+            self.assertIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertIn(tx_b.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+            retry_pending_arm_rig_cleanup(tx_a.tx_id)
+            self.assertEqual(tx_a.state, _ArmRigTransactionState.COMMITTED)
+            self.assertNotIn(tx_a.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertIn(tx_b.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+
+            with self.assertRaises(RuntimeError):
+                with _arm_rig_transaction(arm_b):
+                    pass
+
+            retry_pending_arm_rig_cleanup(tx_b.tx_id)
+            self.assertEqual(tx_b.state, _ArmRigTransactionState.COMMITTED)
+            self.assertNotIn(tx_b.tx_id, _PENDING_ARM_RIG_CLEANUPS)
+            self.assertEqual(len(get_pending_arm_rig_cleanup_ids()), 0)
+        finally:
+            _clear_test_fault_injection_hook()
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_a.tx_id, None)
+            _PENDING_ARM_RIG_CLEANUPS.pop(tx_b.tx_id, None)
+            bpy.data.objects.remove(arm_b, do_unlink=True)
+            bpy.data.armatures.remove(arm_b_data, do_unlink=True)
+
 
 if __name__ == "__main__":
     args = [sys.argv[0]]
@@ -2231,4 +9808,25 @@ if __name__ == "__main__":
         args.extend(sys.argv[sys.argv.index("--") + 1:])
     else:
         args.append("-v")
-    unittest.main(argv=args)
+    runner = unittest.TextTestRunner(verbosity=2)
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestArmIKTransactionAtomicity)
+    result = runner.run(suite)
+    out_dir = os.path.join(os.path.dirname(__file__), "output")
+    os.makedirs(out_dir, exist_ok=True)
+    if _TEST_137_TO_149_RUNTIME_EVIDENCE:
+        ev_path = os.path.join(out_dir, "audit_13_r1_runtime_evidence.json")
+        with open(ev_path, "w", encoding="utf-8") as f:
+            json.dump(_TEST_137_TO_149_RUNTIME_EVIDENCE, f, indent=2)
+    if _TEST_150_TO_155_RUNTIME_EVIDENCE:
+        ev_path_150 = os.path.join(out_dir, "audit_13_authorization_runtime_evidence.json")
+        with open(ev_path_150, "w", encoding="utf-8") as f:
+            json.dump(_TEST_150_TO_155_RUNTIME_EVIDENCE, f, indent=2)
+    if _TEST_156_TO_164_RUNTIME_EVIDENCE:
+        ev_path_156 = os.path.join(out_dir, "audit_13_round02_runtime_evidence.json")
+        with open(ev_path_156, "w", encoding="utf-8") as f:
+            json.dump(_TEST_156_TO_164_RUNTIME_EVIDENCE, f, indent=2)
+    if _TEST_165_TO_173_RUNTIME_EVIDENCE:
+        ev_path_165 = os.path.join(out_dir, "audit_13_round03_runtime_evidence.json")
+        with open(ev_path_165, "w", encoding="utf-8") as f:
+            json.dump(_TEST_165_TO_173_RUNTIME_EVIDENCE, f, indent=2)
+    sys.exit(0 if result.wasSuccessful() else 1)

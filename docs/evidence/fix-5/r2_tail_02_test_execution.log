@@ -1,0 +1,578 @@
+﻿=== TASK 10-B / fix-5 R2-TAIL-02 TEST ONLY ===
+
+--- GROUP 1: EXISTING COLLECTION TESTS (TEST-198..201) ---
+
+--- [TEST-198] test_198_collection_creation_fault_before_registration_no_orphan ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_198_collection_creation_fault_before_registration_no_orphan'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_198_collection_creation_fault_before_registration_no_orphan (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_198_collection_creation_fault_before_registration_no_orphan)
+TEST-198: Collection creation failure before registration leaves zero orphan collections. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.248s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- [TEST-199] test_199_collection_fault_after_registration_before_link_rolls_back ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_199_collection_fault_after_registration_before_link_rolls_back'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_199_collection_fault_after_registration_before_link_rolls_back (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_199_collection_fault_after_registration_before_link_rolls_back)
+TEST-199: Collection failure after registration before link rolls back cleanly by pointer identity. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.265s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- [TEST-200] test_200_collection_fault_after_link_rolls_back_parent_child_and_collection ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_200_collection_fault_after_link_rolls_back_parent_child_and_collection'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_200_collection_fault_after_link_rolls_back_parent_child_and_collection (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_200_collection_fault_after_link_rolls_back_parent_child_and_collection)
+TEST-200: Collection failure after link rolls back parent-child link and removes collection. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.239s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- [TEST-201] test_201_pre_existing_character_collection_preserved_on_reentry ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_201_pre_existing_character_collection_preserved_on_reentry'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_201_pre_existing_character_collection_preserved_on_reentry (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_201_pre_existing_character_collection_preserved_on_reentry)
+TEST-201: Pre-existing Character collection preserved identically on re-entry. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.242s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- GROUP 2: COLLECTION REGISTRATION ATOMICITY FAULT TESTS (A..G) ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+IN_MEMORY_EXPR:
+import os, sys, unittest
+import bpy
+PROJECT_ROOT = os.path.abspath('.')
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from src.config import PipelineConfig
+from src.character.builder import build_character
+from src.rig.builder import build_rig, bind_character_to_rig
+from src.rig.ik import setup_leg_ik, reset_leg_ik
+from src.rig.pose import reset_pose
+import src.rig.arm_ik as arm_ik
+
+class _RaisingBeforeAppendList(list):
+    def append(self, item):
+        raise RuntimeError('Injected fault BEFORE registry.append')
+
+class _RaisingAfterAppendList(list):
+    def append(self, item):
+        super().append(item)
+        raise RuntimeError('Injected fault AFTER registry.append')
+
+class _RaisingPopAfterAppendList(list):
+    def pop(self, index=-1):
+        raise RuntimeError('Injected registry.pop failure during undo')
+
+class _RaisingBeforeSetitemDict(dict):
+    def __setitem__(self, k, v):
+        raise RuntimeError('Injected fault BEFORE receipt.__setitem__')
+
+class _RaisingAfterSetitemDict(dict):
+    def __setitem__(self, k, v):
+        super().__setitem__(k, v)
+        raise RuntimeError('Injected fault AFTER receipt.__setitem__')
+
+class _RaisingAfterSetitemAndPopDict(dict):
+    def __setitem__(self, k, v):
+        super().__setitem__(k, v)
+        raise RuntimeError('Injected fault AFTER receipt.__setitem__')
+    def pop(self, *args, **kwargs):
+        raise RuntimeError('Injected receipt.pop failure during undo')
+
+class R2Tail02CollectionAtomicityFaultTests(unittest.TestCase):
+    def setUp(self):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+        self.cfg = PipelineConfig()
+        self.char_data = build_character(self.cfg)
+        self.arm = build_rig(self.cfg)
+        bind_character_to_rig(self.arm, self.char_data['parts'])
+        setup_leg_ik(self.arm)
+        reset_leg_ik(self.arm)
+        reset_pose(self.arm)
+        bpy.context.view_layer.update()
+
+    def tearDown(self):
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+
+    def test_A_normal_collection_registration(self):
+        scene = bpy.context.scene
+        with arm_ik._arm_rig_transaction(self.arm) as tx:
+            new_col = bpy.data.collections.new('TxColA_R2T02')
+            new_ptr = int(new_col.as_pointer())
+            self.assertEqual(len(tx.created_collections), 0)
+            self.assertEqual(len(tx._collection_creation_receipts), 0)
+            tx.register_created_collection(new_col, initial_parent=scene.collection)
+            print('[A] AFTER_REG registry:', tx.created_collections)
+            print('[A] AFTER_REG receipt_keys:', list(tx._collection_creation_receipts.keys()))
+            self.assertEqual(len(tx.created_collections), 1)
+            self.assertEqual(len(tx._collection_creation_receipts), 1)
+            rec = tx.created_collections[0]
+            rc = tx._collection_creation_receipts[new_ptr]
+            self.assertEqual(rec['col_ref'], new_col)
+            self.assertEqual(rec['col_ptr'], new_ptr)
+            self.assertEqual(rec['created_name'], 'TxColA_R2T02')
+            self.assertEqual(rec['initial_parent'], scene.collection)
+            self.assertEqual(rec['initial_parent_ptr'], int(scene.collection.as_pointer()))
+            self.assertEqual(len(rc), 5)
+            self.assertEqual(rc[0], new_col)
+            self.assertEqual(rc[1], scene.collection)
+            self.assertEqual(rc[2], tx.session_id)
+            self.assertEqual(rc[3], tx.tx_id)
+            self.assertIs(rc[4], tx._collection_receipt_seal)
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.COMMITTED)
+
+    def test_B_registry_append_failure_leaves_zero_residual(self):
+        scene = bpy.context.scene
+        with arm_ik._arm_rig_transaction(self.arm) as tx:
+            prior_col = bpy.data.collections.new('PriorCol_B')
+            prior_ptr = int(prior_col.as_pointer())
+            target_col = bpy.data.collections.new('TargetCol_B')
+            target_ptr = int(target_col.as_pointer())
+            tx.register_created_collection(prior_col, initial_parent=scene.collection)
+            orig_reg = tx.created_collections
+            orig_rc = tx._collection_creation_receipts
+            snap_reg_id = orig_reg[0]
+            snap_rc_val = orig_rc[prior_ptr]
+            print('[B] BEFORE reg_len:', len(orig_reg), 'rc_keys:', list(orig_rc.keys()))
+
+            try:
+                tx.created_collections = _RaisingBeforeAppendList(orig_reg)
+                with self.assertRaises(RuntimeError) as cm:
+                    tx.register_created_collection(target_col, initial_parent=scene.collection)
+                print('[B] CAUGHT_EXC:', cm.exception)
+                self.assertIn('Injected fault BEFORE registry.append', str(cm.exception))
+                self.assertEqual(len(tx.created_collections), 1)
+                self.assertIs(tx.created_collections[0], snap_reg_id)
+                self.assertEqual(list(tx._collection_creation_receipts.keys()), [prior_ptr])
+                self.assertIs(tx._collection_creation_receipts[prior_ptr], snap_rc_val)
+                self.assertNotIn(target_ptr, tx._collection_creation_receipts)
+                self.assertIsNotNone(arm_ik._find_live_collection_by_identity(target_col, target_ptr))
+                print('[B] AFTER_FAIL reg_len:', len(tx.created_collections), 'rc_keys:', list(tx._collection_creation_receipts.keys()))
+            finally:
+                tx.created_collections = orig_reg
+
+    def test_C_fault_after_registry_append_undoes_only_current_record(self):
+        scene = bpy.context.scene
+        with arm_ik._arm_rig_transaction(self.arm) as tx:
+            prior_col = bpy.data.collections.new('PriorCol_C')
+            prior_ptr = int(prior_col.as_pointer())
+            target_col = bpy.data.collections.new('TargetCol_C')
+            target_ptr = int(target_col.as_pointer())
+            tx.register_created_collection(prior_col, initial_parent=scene.collection)
+            orig_reg = tx.created_collections
+            orig_rc = tx._collection_creation_receipts
+            prior_rec_obj = orig_reg[0]
+            prior_rc_obj = orig_rc[prior_ptr]
+            print('[C] BEFORE reg_ptrs:', [r['col_ptr'] for r in orig_reg], 'rc_keys:', list(orig_rc.keys()))
+
+            try:
+                tx.created_collections = _RaisingAfterAppendList(orig_reg)
+                with self.assertRaises(RuntimeError) as cm:
+                    tx.register_created_collection(target_col, initial_parent=scene.collection)
+                print('[C] CAUGHT_EXC:', cm.exception)
+                self.assertIn('Injected fault AFTER registry.append', str(cm.exception))
+                self.assertEqual(len(tx.created_collections), 1)
+                self.assertIs(tx.created_collections[0], prior_rec_obj)
+                self.assertEqual(list(tx._collection_creation_receipts.keys()), [prior_ptr])
+                self.assertIs(tx._collection_creation_receipts[prior_ptr], prior_rc_obj)
+                self.assertIsNotNone(arm_ik._find_live_collection_by_identity(target_col, target_ptr))
+                print('[C] AFTER_FAIL reg_ptrs:', [r['col_ptr'] for r in tx.created_collections], 'rc_keys:', list(tx._collection_creation_receipts.keys()))
+            finally:
+                tx.created_collections = orig_reg
+
+    def test_D_fault_before_receipt_write_undoes_registry_and_propagates(self):
+        scene = bpy.context.scene
+        if bpy.data.collections.get('Character') is not None:
+            bpy.data.collections.remove(bpy.data.collections['Character'])
+
+        with arm_ik._arm_rig_transaction(self.arm) as tx:
+            prior_col = bpy.data.collections.new('PriorCol_D')
+            prior_ptr = int(prior_col.as_pointer())
+            target_col = bpy.data.collections.new('TargetCol_D')
+            target_ptr = int(target_col.as_pointer())
+            tx.register_created_collection(prior_col, initial_parent=scene.collection)
+            orig_reg = tx.created_collections
+            orig_rc = tx._collection_creation_receipts
+            prior_rec_obj = orig_reg[0]
+            prior_rc_obj = orig_rc[prior_ptr]
+            print('[D1] BEFORE reg_ptrs:', [r['col_ptr'] for r in orig_reg], 'rc_keys:', list(orig_rc.keys()))
+
+            try:
+                tx._collection_creation_receipts = _RaisingBeforeSetitemDict(orig_rc)
+                with self.assertRaises(RuntimeError) as cm:
+                    tx.register_created_collection(target_col, initial_parent=scene.collection)
+                print('[D1] CAUGHT_EXC:', cm.exception)
+                self.assertIn('Injected fault BEFORE receipt.__setitem__', str(cm.exception))
+                self.assertEqual(len(tx.created_collections), 1)
+                self.assertIs(tx.created_collections[0], prior_rec_obj)
+                self.assertEqual(list(tx._collection_creation_receipts.keys()), [prior_ptr])
+                self.assertIs(tx._collection_creation_receipts[prior_ptr], prior_rc_obj)
+                self.assertIsNotNone(arm_ik._find_live_collection_by_identity(target_col, target_ptr))
+                print('[D1] AFTER_FAIL reg_ptrs:', [r['col_ptr'] for r in tx.created_collections], 'rc_keys:', list(tx._collection_creation_receipts.keys()))
+
+                with self.assertRaises(RuntimeError) as cm_col:
+                    arm_ik._ensure_character_collection()
+                print('[D2] END_TO_END_ENSURE_EXC:', cm_col.exception)
+                self.assertIn('Injected fault BEFORE receipt.__setitem__', str(cm_col.exception))
+                self.assertNotIn('COLLECTION_CREATION_CLEANUP_FAILED', str(cm_col.exception))
+                self.assertIsNone(bpy.data.collections.get('Character'))
+                self.assertEqual(len(tx.created_collections), 1)
+                self.assertEqual(list(tx._collection_creation_receipts.keys()), [prior_ptr])
+            finally:
+                tx._collection_creation_receipts = orig_rc
+
+    def test_E_fault_after_receipt_write_undoes_both_and_preserves_prior(self):
+        scene = bpy.context.scene
+        with arm_ik._arm_rig_transaction(self.arm) as tx:
+            prior_col = bpy.data.collections.new('PriorCol_E')
+            prior_ptr = int(prior_col.as_pointer())
+            target_col = bpy.data.collections.new('TargetCol_E')
+            target_ptr = int(target_col.as_pointer())
+            tx.register_created_collection(prior_col, initial_parent=scene.collection)
+            orig_reg = tx.created_collections
+            orig_rc = tx._collection_creation_receipts
+            prior_rec_obj = orig_reg[0]
+            prior_rc_obj = orig_rc[prior_ptr]
+            print('[E] BEFORE reg_ptrs:', [r['col_ptr'] for r in orig_reg], 'rc_keys:', list(orig_rc.keys()))
+
+            try:
+                tx._collection_creation_receipts = _RaisingAfterSetitemDict(orig_rc)
+                with self.assertRaises(RuntimeError) as cm:
+                    tx.register_created_collection(target_col, initial_parent=scene.collection)
+                print('[E] CAUGHT_EXC:', cm.exception)
+                self.assertIn('Injected fault AFTER receipt.__setitem__', str(cm.exception))
+                self.assertEqual(len(tx.created_collections), 1)
+                self.assertIs(tx.created_collections[0], prior_rec_obj)
+                self.assertEqual(list(tx._collection_creation_receipts.keys()), [prior_ptr])
+                self.assertIs(tx._collection_creation_receipts[prior_ptr], prior_rc_obj)
+                self.assertNotIn(target_ptr, tx._collection_creation_receipts)
+                self.assertIsNotNone(arm_ik._find_live_collection_by_identity(target_col, target_ptr))
+                print('[E] AFTER_FAIL reg_ptrs:', [r['col_ptr'] for r in tx.created_collections], 'rc_keys:', list(tx._collection_creation_receipts.keys()))
+            finally:
+                tx._collection_creation_receipts = orig_rc
+
+    def test_F_undo_failure_propagates_dual_exceptions(self):
+        scene = bpy.context.scene
+        with arm_ik._arm_rig_transaction(self.arm) as tx:
+            col_f1 = bpy.data.collections.new('ColF1')
+            col_f2 = bpy.data.collections.new('ColF2')
+            orig_reg = tx.created_collections
+            orig_rc = tx._collection_creation_receipts
+            try:
+                tx.created_collections = _RaisingPopAfterAppendList()
+                tx._collection_creation_receipts = _RaisingBeforeSetitemDict()
+                with self.assertRaises(RuntimeError) as cm1:
+                    tx.register_created_collection(col_f1, initial_parent=scene.collection)
+                msg1 = str(cm1.exception)
+                print('[F1] DUAL_EXC:', msg1)
+                self.assertIn('COLLECTION_REGISTRATION_ROLLBACK_FAILED', msg1)
+                self.assertIn('Injected fault BEFORE receipt.__setitem__', msg1)
+                self.assertIn('Injected registry.pop failure during undo', msg1)
+                self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.ACTIVE)
+            finally:
+                tx.created_collections = orig_reg
+                tx._collection_creation_receipts = orig_rc
+
+            try:
+                tx._collection_creation_receipts = _RaisingAfterSetitemAndPopDict()
+                with self.assertRaises(RuntimeError) as cm2:
+                    tx.register_created_collection(col_f2, initial_parent=scene.collection)
+                msg2 = str(cm2.exception)
+                print('[F2] DUAL_EXC:', msg2)
+                self.assertIn('COLLECTION_REGISTRATION_ROLLBACK_FAILED', msg2)
+                self.assertIn('Injected fault AFTER receipt.__setitem__', msg2)
+                self.assertIn('Injected receipt.pop failure during undo', msg2)
+            finally:
+                tx._collection_creation_receipts = orig_rc
+                tx.created_collections.clear()
+
+    def test_G_external_and_other_tx_resources_protected(self):
+        scene = bpy.context.scene
+        orig_ext_col = bpy.data.collections.new('OrigExtCol_G')
+        scene.collection.children.link(orig_ext_col)
+        orig_ext_ptr = int(orig_ext_col.as_pointer())
+        bpy.context.view_layer.update()
+
+        other_tx = arm_ik._ArmRigTransactionContext(self.arm, session_record=arm_ik.ensure_armature_session_identity(self.arm))
+        other_col = bpy.data.collections.new('OtherTxCol_G')
+        other_ptr = int(other_col.as_pointer())
+        other_rec = {'col_ref': other_col, 'col_ptr': other_ptr, 'created_name': 'OtherTxCol_G', 'initial_parent': scene.collection, 'initial_parent_ptr': int(scene.collection.as_pointer())}
+        other_rc = (other_col, scene.collection, other_tx.session_id, other_tx.tx_id, other_tx._collection_receipt_seal)
+        other_tx.created_collections.append(other_rec)
+        other_tx._collection_creation_receipts[other_ptr] = other_rc
+
+        with self.assertRaises(RuntimeError) as cm_rb:
+            with arm_ik._arm_rig_transaction(self.arm) as tx:
+                target_col = bpy.data.collections.new('TxFailCol_G')
+                with self.assertRaises(RuntimeError) as cm_pre:
+                    tx.register_created_collection(orig_ext_col, initial_parent=scene.collection)
+                self.assertIn('COLLECTION_OWNERSHIP_UNPROVEN', str(cm_pre.exception))
+                self.assertEqual(len(tx.created_collections), 0)
+                self.assertEqual(len(tx._collection_creation_receipts), 0)
+
+                orig_rc = tx._collection_creation_receipts
+                try:
+                    tx._collection_creation_receipts = _RaisingBeforeSetitemDict(orig_rc)
+                    tx.register_created_collection(target_col, initial_parent=scene.collection)
+                finally:
+                    tx._collection_creation_receipts = orig_rc
+
+        print('[G] TX_ROLLBACK_EXC:', cm_rb.exception)
+        self.assertIn('Injected fault BEFORE receipt.__setitem__', str(cm_rb.exception))
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.ROLLED_BACK)
+        self.assertIsNotNone(arm_ik._find_live_collection_by_identity(orig_ext_col, orig_ext_ptr))
+        self.assertIn('OrigExtCol_G', scene.collection.children)
+        self.assertEqual(len(other_tx.created_collections), 1)
+        self.assertIs(other_tx.created_collections[0], other_rec)
+        self.assertIs(other_tx._collection_creation_receipts[other_ptr], other_rc)
+        self.assertIn('TxFailCol_G', bpy.data.collections)
+
+suite = unittest.defaultTestLoader.loadTestsFromTestCase(R2Tail02CollectionAtomicityFaultTests)
+res = unittest.TextTestRunner(verbosity=2).run(suite)
+sys.exit(0 if res.wasSuccessful() and res.testsRun == 7 else 1)
+
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_A_normal_collection_registration (__main__.R2Tail02CollectionAtomicityFaultTests.test_A_normal_collection_registration) ... ok
+test_B_registry_append_failure_leaves_zero_residual (__main__.R2Tail02CollectionAtomicityFaultTests.test_B_registry_append_failure_leaves_zero_residual) ... ok
+test_C_fault_after_registry_append_undoes_only_current_record (__main__.R2Tail02CollectionAtomicityFaultTests.test_C_fault_after_registry_append_undoes_only_current_record) ... ok
+test_D_fault_before_receipt_write_undoes_registry_and_propagates (__main__.R2Tail02CollectionAtomicityFaultTests.test_D_fault_before_receipt_write_undoes_registry_and_propagates) ... ok
+test_E_fault_after_receipt_write_undoes_both_and_preserves_prior (__main__.R2Tail02CollectionAtomicityFaultTests.test_E_fault_after_receipt_write_undoes_both_and_preserves_prior) ... ok
+test_F_undo_failure_propagates_dual_exceptions (__main__.R2Tail02CollectionAtomicityFaultTests.test_F_undo_failure_propagates_dual_exceptions) ... ok
+test_G_external_and_other_tx_resources_protected (__main__.R2Tail02CollectionAtomicityFaultTests.test_G_external_and_other_tx_resources_protected) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.626s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A] AFTER_REG registry: [{'col_ref': bpy.data.collections['TxColA_R2T02'], 'col_ptr': 2746224726792, 'created_name': 'TxColA_R2T02', 'initial_parent': bpy.data.scenes['Scene'].collection, 'initial_parent_ptr': 2746226300320}]
+[A] AFTER_REG receipt_keys: [2746224726792]
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B] BEFORE reg_len: 1 rc_keys: [2746226302856]
+[B] CAUGHT_EXC: Injected fault BEFORE registry.append
+[B] AFTER_FAIL reg_len: 1 rc_keys: [2746226302856]
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[C] BEFORE reg_ptrs: [2746195143048] rc_keys: [2746195143048]
+[C] CAUGHT_EXC: Injected fault AFTER registry.append
+[C] AFTER_FAIL reg_ptrs: [2746195143048] rc_keys: [2746195143048]
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[D1] BEFORE reg_ptrs: [2746283234056] rc_keys: [2746283234056]
+[D1] CAUGHT_EXC: Injected fault BEFORE receipt.__setitem__
+[D1] AFTER_FAIL reg_ptrs: [2746283234056] rc_keys: [2746283234056]
+[D2] END_TO_END_ENSURE_EXC: Injected fault BEFORE receipt.__setitem__
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[E] BEFORE reg_ptrs: [2746268309512] rc_keys: [2746268309512]
+[E] CAUGHT_EXC: Injected fault AFTER receipt.__setitem__
+[E] AFTER_FAIL reg_ptrs: [2746268309512] rc_keys: [2746268309512]
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[F1] DUAL_EXC: COLLECTION_REGISTRATION_ROLLBACK_FAILED: original=RuntimeError: Injected fault BEFORE receipt.__setitem__; rollback=RuntimeError: Injected registry.pop failure during undo
+[F2] DUAL_EXC: COLLECTION_REGISTRATION_ROLLBACK_FAILED: original=RuntimeError: Injected fault AFTER receipt.__setitem__; rollback=RuntimeError: Injected receipt.pop failure during undo
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[G] TX_ROLLBACK_EXC: Injected fault BEFORE receipt.__setitem__
+
+
+--- GROUP 3: PROTECTIVE REGRESSION TESTS (TEST-202, 203, 204, 207, 208) ---
+
+--- [TEST-202] test_202_constraints_created_via_layer_3_with_identity_registration ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_202_constraints_created_via_layer_3_with_identity_registration'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_202_constraints_created_via_layer_3_with_identity_registration (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_202_constraints_created_via_layer_3_with_identity_registration)
+TEST-202: L/R arm IK and copy rotation constraints created via Layer 3 with exact identity registration. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.241s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- [TEST-203] test_203_constraint_fault_after_creation_before_registration_cleaned_up ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_203_constraint_fault_after_creation_before_registration_cleaned_up'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_203_constraint_fault_after_creation_before_registration_cleaned_up (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_203_constraint_fault_after_creation_before_registration_cleaned_up)
+TEST-203: Constraint creation fault before registration cleans up instance safely without deleting external constraints. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.259s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- [TEST-204] test_204_constraint_fault_after_registration_before_config_rolls_back ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_204_constraint_fault_after_registration_before_config_rolls_back'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_204_constraint_fault_after_registration_before_config_rolls_back (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_204_constraint_fault_after_registration_before_config_rolls_back)
+TEST-204: Fault after constraint registration before config rolls back registered constraint via Layer 3. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.245s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- [TEST-207] test_207_stashed_constraint_cleanup_only_removes_authorized_identity ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_207_stashed_constraint_cleanup_only_removes_authorized_identity'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_207_stashed_constraint_cleanup_only_removes_authorized_identity (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_207_stashed_constraint_cleanup_only_removes_authorized_identity)
+TEST-207: Post-commit cleanup only removes stashed constraint matching authorized identity; same-name replacement preserved. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.246s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+
+--- [TEST-208] test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds ---
+HEAD_BEFORE: fcc7537825d430910a4602f3acce125b86d023fb
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr "import os, sys, unittest; sys.path.insert(0, os.path.abspath('.')); name = 'tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds'; suite = unittest.TestLoader().loadTestsFromName(name); result = unittest.TextTestRunner(verbosity=2).run(suite); sys.exit(0 if result.wasSuccessful() and result.testsRun == 1 else 1)"
+EXIT_CODE: 0
+HEAD_AFTER: fcc7537825d430910a4602f3acce125b86d023fb
+OUTPUT:
+test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds (tests.test_task10b_transaction_atomicity.TestArmIKTransactionAtomicity.test_208_constraint_cleanup_fault_enters_cleanup_pending_and_retry_succeeds)
+TEST-208: Constraint removal fault during post-commit cleanup enters CLEANUP_PENDING; subsequent retry succeeds. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.239s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+

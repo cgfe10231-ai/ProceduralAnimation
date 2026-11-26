@@ -1,0 +1,2366 @@
+{
+  "metadata": {
+    "document_status": "DRAFT_PENDING_INDEPENDENT_REVIEW",
+    "authoritative": false,
+    "implementation_verified": false,
+    "tests_executed_in_this_phase": false,
+    "architecture_sync_update_permitted": false,
+    "task": "TASK 10-B-9",
+    "task_nature": "Pure Architecture Revision",
+    "execution_phase": "Full Architecture Consistency Audit & Convergence — Strict Documentation Lock",
+    "production_implementation_status": "FROZEN",
+    "formal_architecture_docs_status": "LOCKED",
+    "generated_at": "2026-11-07T19:05:00+08:00",
+    "repository": "cgfe10231-ai/ProceduralAnimation",
+    "branch": "audit/task-10-b-9",
+    "base_sha": "9d875b1da78b9b27fad6409441936084b2911ae4"
+  },
+  "baseline": {
+    "repository": "cgfe10231-ai/ProceduralAnimation",
+    "branch": "audit/task-10-b-9",
+    "expected_head": "9d875b1da78b9b27fad6409441936084b2911ae4",
+    "verified_head": "9d875b1da78b9b27fad6409441936084b2911ae4",
+    "protected_untracked_files": [
+      "P2_R1_recovery.patch"
+    ],
+    "execution_constraints": [
+      "Zero Python production code modification (src/**/*.py FROZEN)",
+      "Zero test code modification (tests/**/*.py FROZEN)",
+      "Zero Blender execution (GUI and Headless strictly forbidden)",
+      "Zero test runner execution (pytest, unittest forbidden)",
+      "Zero formal architecture Markdown modification (ARCHITECTURE_SYNC.md, ARCHITECTURE.md, DECISIONS.md, PROJECT_STATE.md, AI_SYNC.md, HANDOFF.md, CHANGELOG.md, docs/**/*.md LOCKED)",
+      "Pure architecture revision output strictly confined to docs/evidence/PKG5_10B_REVISION_9/architecture_draft_candidate.json",
+      "Separation of architecture review from production implementation"
+    ]
+  },
+  "f1_resource_ownership": {
+    "core_principle": "Non-Inference and Proven Ownership Theorem",
+    "formal_rules": [
+      "Delete(r) => OwnershipVerified(r, t) and IdentityVerified(r)",
+      "CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D)",
+      "Undo(m) => Authorized(m, t) and Prepared(m, t) and IdentityVerified(m) and CausalEvidence(m) and NoExternalHarm(m)"
+    ],
+    "prohibitions": {
+      "no_name_inference": "name(r) == expected_name does NOT imply Owned(r, t). Object, constraint, collection, or datablock names in Blender are mutable strings and prone to external collision.",
+      "no_snapshot_diff_inference": "r not in Snapshot does NOT imply Owned(r, t). Resources absent from initial snapshot may belong to external pipelines or user interactions; differential deletion is strictly prohibited.",
+      "no_raw_pointer_alone_inference": "as_pointer(r) == saved_ptr does NOT imply AliveVerified(r). The underlying C allocator can reuse virtual addresses after memory destruction; pointer equality must be combined with active Python wrapper liveness (no ReferenceError), original reference identity, and data collection inclusion.",
+      "no_zero_users_deletion_inference": "Users(D) == 0 does NOT imply AuthorizedCleanup(D, t). Zero user count only proves the DataBlock currently has no active user references; it never proves the transaction holds deletion authority over D.",
+      "no_object_to_datablock_authority_inheritance": "Ownership or doomed/stashed deletion authority over an Object NEVER automatically transfers to or grants deletion authority over its bound DataBlock (obj.data)."
+    },
+    "entity_model": {
+      "Object": {
+        "ownership_criteria": "Only objects registered upon creation in active_tx.created_controller_objects or explicitly stashed with proven prior rig ownership in active_tx.stashed_objects.",
+        "mutation_authority": "Only the active transaction in ACTIVE state is permitted to modify controller numeric transforms (location, rotation_*, scale via Layer 4) or restore them in ROLLING_BACK (via Layer 5). Object relationship references (Object.parent, matrix_parent_inverse parent binding, Collection membership) may ONLY be mutated or restored via Layer 3 Authorized Resource Operations with Layer 2 7-state relationship logging.",
+        "deletion_authority": "Rollback permits deleting only active_tx.created_controller_objects with verified identity (live reference + pointer + bpy.data.objects inclusion) via Layer 3. Post-commit cleanup permits deleting only authorized stashed doomed objects via Layer 3.",
+        "death_detection": "ReferenceError on attribute access, pointer divergence, or absence from bpy.data.objects."
+      },
+      "Constraint": {
+        "ownership_criteria": "Only constraints registered upon creation in active_tx.created_constraints or explicitly stashed in active_tx.stashed_constraints.",
+        "mutation_authority": "In ACTIVE state, Layer 4 is permitted to update numeric parameters (influence, pole_angle, chain_count, use_stretch); in ROLLING_BACK, Layer 5 restores numeric parameters. Constraint relationship references (Constraint.target, Constraint.pole_target, subtarget, pole_subtarget) may ONLY be mutated or restored via Layer 3 Authorized Resource Operations with Layer 2 7-state relationship logging.",
+        "deletion_authority": "Rollback permits removing only active_tx.created_constraints matching registered bone, reference, and pointer via Layer 3. Post-commit cleanup permits removing authorized stashed doomed constraints via Layer 3.",
+        "death_detection": "ReferenceError on access, pointer divergence, or absence from pose_bone.constraints."
+      },
+      "Collection": {
+        "ownership_criteria": "Only collections created by active transaction and registered in active_tx.created_collections.",
+        "mutation_authority": "Collection object membership (objects.link/unlink) and child hierarchy links (children.link/unlink) may ONLY be modified in ACTIVE or restored in ROLLING_BACK via Layer 3 Authorized Resource Operations with Layer 2 7-state relationship logging.",
+        "deletion_authority": "Rollback permits deleting only registered created collections that contain zero external members and zero external child collections via Layer 3.",
+        "death_detection": "ReferenceError, pointer mismatch, or absence from bpy.data.collections."
+      },
+      "DataBlock": {
+        "formal_deletion_predicate": "CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D)",
+        "categories": {
+          "TYPE_A_TX_CREATED": {
+            "description": "DataBlock allocated and explicitly registered by the current transaction in active_tx.created_datablocks.",
+            "deletion_policy": "Transaction holds explicit creation authority. Permitted to delete during rollback or cleanup if and only if IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D)."
+          },
+          "TYPE_B_PRE_EXISTING": {
+            "description": "DataBlock that existed prior to transaction entry (even if bound to an Object modified or deleted by the transaction).",
+            "deletion_policy": "Transaction does NOT acquire deletion authority merely because an associated Object was deleted or marked doomed. Deletion is forbidden unless an independent, explicit, provenance-verified DataBlock cleanup authorization record exists for D. Without such independent grant, D must be preserved as PRESERVED_NO_DELETE_AUTHORITY."
+          },
+          "TYPE_C_EXTERNAL_OR_UNPROVEN": {
+            "description": "DataBlock created externally or whose provenance/authorization cannot be proven.",
+            "deletion_policy": "Strictly FORBIDDEN to delete under any circumstances, even if Users(D) == 0, absent from snapshot, or sharing a name with a doomed Object."
+          }
+        },
+        "cleanup_authorization_record_schema": {
+          "required_fields": {
+            "resource_kind": "String identifier of Blender datablock collection (e.g., 'Mesh', 'Curve', 'Armature').",
+            "original_reference": "Live Python RNA wrapper reference to the DataBlock captured at registration.",
+            "original_pointer": "Integer C-memory address (D.as_pointer()) captured at registration.",
+            "provenance": "Enum: 'TYPE_A_TX_CREATED' | 'TYPE_B_PRE_EXISTING_EXPLICIT_GRANT' | 'TYPE_C_EXTERNAL_OR_UNPROVEN'.",
+            "authorization_source": "Explicit caller/operation that granted DataBlock-specific cleanup authority (e.g., 'Layer3.allocate_internal_datablock' or explicit retirement contract; never implicit inheritance from Object deletion).",
+            "authorization_scope": "Enum: 'PHYSICAL_DELETE_IF_ZERO_USERS' | 'DETACH_ONLY_PRESERVE_DATABLOCK'.",
+            "authorized_transaction": "Unique transaction ID (tx_id) to which the authorization is bound.",
+            "expected_lifecycle": "Enum: 'EPHEMERAL_TX_ROLLBACK_BOUND' | 'POST_COMMIT_OBLIGATORY_CLEANUP' | 'PROTECTED_RETAIN'."
+          },
+          "governance_rules": {
+            "who_grants_authority": "Layer 3 Resource Operations upon direct allocation within active transaction (Type A), or Layer 4 Business API supplying an explicit, verifiable prior-ownership retirement record registered into Layer 2 before object detachment (Type B).",
+            "validity_verification": "Authorization is valid only if authorized_transaction matches the executing transaction (or its registered pending cleanup context), authorization_scope == 'PHYSICAL_DELETE_IF_ZERO_USERS', and provenance is TYPE_A or TYPE_B_PRE_EXISTING_EXPLICIT_GRANT.",
+            "identity_verification": "original_reference must not raise ReferenceError, original_reference.as_pointer() == original_pointer, and original_reference must exist in the corresponding bpy.data collection.",
+            "reference_and_dependency_verification": "D.users == 0, D.use_fake_user is False, D.library is None, and no external object, modifier, constraint, or driver references D.",
+            "unauthorized_handling": "If an Object is legally deleted/cleaned but its former DataBlock lacks valid PHYSICAL_DELETE_IF_ZERO_USERS authorization, Layer 6 / Layer 3 MUST preserve the DataBlock and record status 'PRESERVED_NO_DELETE_AUTHORITY'. This is a valid, terminal resource-protection outcome and MUST NOT trigger CLEANUP_PENDING or retry loops.",
+            "obligatory_cleanup_failure_handling": "If a DataBlock possesses valid PHYSICAL_DELETE_IF_ZERO_USERS authorization (obligatory cleanup) but cannot be deleted (e.g., unexpected active user reference or RNA removal error), Layer 6 records a cleanup failure and returns CLEANUP_INCOMPLETE / CLEANUP_FAILED to Layer 1 Coordinator, which enforces the CLEANUP_PENDING contract."
+          }
+        },
+        "death_detection": "ReferenceError on access, pointer mismatch against original_pointer, or absence from corresponding bpy.data collection."
+      }
+    },
+    "external_relationship_conflict_policy": {
+      "description": "Handling scenario where a transaction-created entity is subsequently referenced by external systems.",
+      "policy_rules": [
+        "Step 1: Verify entity's original ownership record in active_tx.",
+        "Step 2: Inspect all active live relationships (parenting, collection memberships, constraint targets, modifier targets).",
+        "Step 3: Distinguish relationships registered by this transaction from external relationships.",
+        "Step 4: If an external system has attached to the transaction-created entity and the external relationship cannot be safely undone, the transaction is FORBIDDEN from destroying the entity blindly.",
+        "Step 5: Rollback must halt, flag OWNERSHIP_CONFLICT / RECOVERY_UNCERTAIN, leave the entity intact, and report recovery failure to Layer 1 Coordinator to prevent cascading destruction of external scene graph."
+      ]
+    },
+    "unknown_ownership_policy": {
+      "tag": "OWNERSHIP_UNPROVEN",
+      "behavior": "Any entity, DataBlock, or relationship whose provenance cannot be proven to belong to the active transaction and was not recorded with explicit authority is treated as OWNERSHIP_UNPROVEN. Destructive operations (delete, unlink, overwrite) are strictly rejected."
+    }
+  },
+  "f1_relationship_atomicity": {
+    "relationship_categories": {
+      "PRE_EXISTING_ORIGINAL": {
+        "tag": "PRE_EXISTING_ORIGINAL",
+        "description": "Relationships that existed prior to transaction entry (e.g., character collection already linked to master/scene collection, pre-existing bone constraints).",
+        "rollback_rule": "Strictly protected. If the transaction executes a duplicate link or re-bind, it transitions to NO_EFFECT and NEVER acquires revocation or unlinking rights. Original links must remain intact upon rollback."
+      },
+      "TX_ADDED": {
+        "tag": "TX_ADDED",
+        "description": "Relationships newly established by the active transaction (e.g. newly created controller linked to Character collection).",
+        "rollback_rule": "Subject to rollback. Reverted by unlinking or removal upon rollback (transitioning log to REVERTED) ONLY IF supported by authorized PREPARED record, valid identity, proven causal evidence, and zero external harm."
+      },
+      "TX_UNLINKED_ORIGINAL": {
+        "tag": "TX_UNLINKED_ORIGINAL",
+        "description": "Pre-existing original relationships explicitly detached or unlinked by the transaction during business execution.",
+        "rollback_rule": "Must be re-linked / restored to original state during rollback (transitioning log to REVERTED), preserving original target and relative ordering."
+      },
+      "EXTERNAL_ADDED": {
+        "tag": "EXTERNAL_ADDED",
+        "description": "Relationships created by external scripts, operators, or user interaction during or after transaction start.",
+        "rollback_rule": "Strictly immune to rollback destruction. Transaction is FORBIDDEN from unlinking or deleting external relationships."
+      },
+      "OWNERSHIP_UNKNOWN": {
+        "tag": "OWNERSHIP_UNKNOWN",
+        "description": "Relationships whose origin, authorization, or causal history cannot be conclusively proven.",
+        "rollback_rule": "Treated as OWNERSHIP_UNPROVEN. Rollback halts destructive action on this relationship, leaves it untouched, transitions relationship log to RECOVERY_UNCERTAIN, and reports verification failure."
+      }
+    },
+    "relationship_operation_log_states": [
+      "PREPARED",
+      "APPLYING",
+      "APPLIED_VERIFIED",
+      "CONFIRMED",
+      "NO_EFFECT",
+      "REVERTED",
+      "RECOVERY_UNCERTAIN"
+    ],
+    "operation_log_state_notes": "These 7 states belong exclusively to the Relationship Operation Log State Machine tracked in active_tx.prepared_relationship_mutations. They are NOT transaction lifecycle states. The Transaction Lifecycle State Machine remains strictly composed of 9 states. No 8th relationship log state or 10th transaction lifecycle state is permitted.",
+    "relationship_log_state_definitions": {
+      "PREPARED": "Authorization verified and intent record created in transaction memory before invoking any Blender C-API relationship mutation.",
+      "APPLYING": "Authorized Blender C-API relationship operation has been invoked; execution is in progress and may succeed, partially apply, or raise an error.",
+      "APPLIED_VERIFIED": "Post-call RNA inspection confirmed the expected relationship mutation took effect in live Blender data; awaiting high-level business step confirmation.",
+      "CONFIRMED": "Relationship operation is confirmed complete within the active business step. Serves as a valid completion state when the transaction commits, but remains subject to authorized undo (CONFIRMED -> REVERTED / RECOVERY_UNCERTAIN) if the enclosing transaction rolls back.",
+      "NO_EFFECT": "Terminal log state proving zero relationship modification requiring undo occurred (e.g., aborted at PREPARED before APPLYING; APPLYING raised an error and live RNA inspection proved zero side effect; or operation was a no-op on a PRE_EXISTING_ORIGINAL relationship).",
+      "REVERTED": "Terminal rollback log state proving that a relationship modification caused by this transaction operation has been legally undone and post-undo verification confirmed restoration of the prior relationship state.",
+      "RECOVERY_UNCERTAIN": "Terminal error log state indicating provenance, live physical effect, or safe undo preconditions cannot be proven; speculative unlinking/deletion is forbidden and scene state is preserved."
+    },
+    "relationship_log_legal_transitions": [
+      {
+        "from": "PREPARED",
+        "to": "APPLYING",
+        "trigger": "Layer 3 begins executing the authorized Blender C-API relationship mutation."
+      },
+      {
+        "from": "PREPARED",
+        "to": "NO_EFFECT",
+        "trigger": "Transaction aborts before APPLYING is invoked, or pre-check determines relationship is already PRE_EXISTING_ORIGINAL requiring no mutation."
+      },
+      {
+        "from": "APPLYING",
+        "to": "APPLIED_VERIFIED",
+        "trigger": "Blender C-API call completes (or traps after partial effect) and immediate live RNA inspection proves the target relationship change occurred."
+      },
+      {
+        "from": "APPLYING",
+        "to": "NO_EFFECT",
+        "trigger": "Blender C-API call raises an exception and live RNA inspection proves zero relationship side effect occurred."
+      },
+      {
+        "from": "APPLYING",
+        "to": "RECOVERY_UNCERTAIN",
+        "trigger": "Blender C-API call fails and live RNA topology is unreadable, corrupted, or exhibits unprovable external interference."
+      },
+      {
+        "from": "APPLIED_VERIFIED",
+        "to": "CONFIRMED",
+        "trigger": "Layer 3 / Layer 4 completes post-mutation registration and confirms the operation within the active transaction."
+      },
+      {
+        "from": "APPLIED_VERIFIED",
+        "to": "REVERTED",
+        "trigger": "Transaction enters ROLLING_BACK before confirmation; Layer 5 / Layer 3 legally undoes the verified mutation and confirms restoration."
+      },
+      {
+        "from": "APPLIED_VERIFIED",
+        "to": "RECOVERY_UNCERTAIN",
+        "trigger": "Transaction enters ROLLING_BACK before confirmation, but undo fails, identity is invalidated, or external conflict prevents safe reversal."
+      },
+      {
+        "from": "CONFIRMED",
+        "to": "REVERTED",
+        "trigger": "Enclosing transaction enters ROLLING_BACK after operation confirmation; Layer 5 / Layer 3 legally undoes the mutation per ownership contract and verifies restoration."
+      },
+      {
+        "from": "CONFIRMED",
+        "to": "RECOVERY_UNCERTAIN",
+        "trigger": "Enclosing transaction enters ROLLING_BACK after operation confirmation, but undo fails or external dependency conflict prevents safe reversal."
+      }
+    ],
+    "relationship_log_terminal_states": {
+      "normal_commit_completion": [
+        "CONFIRMED",
+        "NO_EFFECT"
+      ],
+      "rollback_terminal_states": [
+        "NO_EFFECT",
+        "REVERTED",
+        "RECOVERY_UNCERTAIN"
+      ],
+      "rollback_verification_coupling": "During ROLLING_BACK, every log record in APPLIED_VERIFIED or CONFIRMED must resolve to REVERTED (or NO_EFFECT if proven pre-existing). Any record remaining in APPLIED_VERIFIED, CONFIRMED, or transitioning to RECOVERY_UNCERTAIN causes Layer 5 rollback verification to fail, triggering Layer 1 transition to FAILED (FAILED-B / FAILED-C)."
+    },
+    "formal_rollback_principle": {
+      "theorem": "Undo(m) => Authorized(m, t) and Prepared(m, t) and IdentityVerified(m) and CausalEvidence(m) and NoExternalHarm(m)",
+      "axioms": [
+        "1. Active Transaction Authorization: Mutation m must have been explicitly authorized under the active transaction context t.",
+        "2. Prepare Record Existence: A valid PREPARED log entry must exist in active_tx.prepared_relationship_mutations before any Blender C-API mutation was executed.",
+        "3. Valid Resource Identity: Source and destination RNA entities must remain alive and pointer/reference-verified (no stale pointer reuse, no ReferenceError).",
+        "4. Causal Evidence Proven: Physical inspection of live scene topology must prove the observed relationship modification was directly produced by this transaction operation (APPLIED_VERIFIED or CONFIRMED), not PRE_EXISTING_ORIGINAL or EXTERNAL_ADDED.",
+        "5. Zero External Harm Risk: Undoing the relationship mutation must carry zero risk of breaking external scene graph dependencies.",
+        "6. Incomplete CONFIRM does NOT imply mutation did not occur: An operation in APPLYING or APPLIED_VERIFIED must be evaluated against live RNA state and reverted to REVERTED if causal evidence is proven.",
+        "7. CONFIRMED is NOT permanently irreversible prior to transaction commit: When the enclosing transaction rolls back, CONFIRMED operations with TX_ADDED or TX_UNLINKED_ORIGINAL provenance must be undone and transitioned to REVERTED.",
+        "8. Prohibition of Name or Differential Inference: Relationship ownership cannot be inferred from object names or snapshot set difference.",
+        "9. Duplicate Link No Revocation: For PRE_EXISTING_ORIGINAL, repeated link operations transition to NO_EFFECT and never claim ownership or unlinking rights.",
+        "10. Site Preservation on Uncertainty: For unprovable changes, preserve scene site, transition log to RECOVERY_UNCERTAIN, and fail rollback verification."
+      ]
+    },
+    "exception_safety_protocol": {
+      "phase_prepare": {
+        "state": "PREPARED (or PREPARED -> NO_EFFECT)",
+        "description": "Pre-flight and register intent before mutating Blender relationship state.",
+        "actions": [
+          "Verify identity of source and target entities (ReferenceError, reference identity, and pointer check).",
+          "Verify mutation authorization under current transaction context.",
+          "Check whether relationship already exists in live scene; if PRE_EXISTING_ORIGINAL and operation is link, record PREPARED and immediately transition to NO_EFFECT without mutating Blender.",
+          "Otherwise record mutation intent in active_tx.prepared_relationship_mutations with unique op_id, source reference/pointer, target reference/pointer, category, and initial state PREPARED."
+        ],
+        "on_failure": "If preparation fails before C-API call, any created log entry transitions to NO_EFFECT and ZERO Blender relationships are modified."
+      },
+      "phase_apply": {
+        "state": "APPLYING -> (APPLIED_VERIFIED | NO_EFFECT | RECOVERY_UNCERTAIN)",
+        "description": "Execute authorized relationship mutation in Blender C-API and verify immediate live effect.",
+        "actions": [
+          "Transition log status from PREPARED to APPLYING.",
+          "Execute specific relationship API (col.objects.link, col.children.link, obj.parent = ..., con.target = ...).",
+          "Inspect RNA structure immediately post-call: if target mutation is present and verified, transition log status to APPLIED_VERIFIED."
+        ],
+        "on_exception": "Inspect live RNA relationship state against PREPARED record: if zero change occurred in Blender, transition log to NO_EFFECT; if change partially applied and is verified, transition to APPLIED_VERIFIED for subsequent rollback; if live state is ambiguous or corrupted, transition to RECOVERY_UNCERTAIN."
+      },
+      "phase_confirm": {
+        "state": "APPLIED_VERIFIED -> CONFIRMED",
+        "description": "Verify post-mutation state and mark operation confirmed in transaction memory.",
+        "actions": [
+          "Confirm live topology matches expected target relationship.",
+          "Transition mutation record in active_tx from APPLIED_VERIFIED to CONFIRMED."
+        ]
+      },
+      "phase_failure_recovery": {
+        "state": "(APPLIED_VERIFIED | CONFIRMED) -> (REVERTED | RECOVERY_UNCERTAIN)",
+        "description": "Rollback behavior when apply, confirm, or subsequent business operations fail.",
+        "rules": [
+          "Inspect all relationship mutation records in active_tx.",
+          "Records in NO_EFFECT require zero undo action.",
+          "Records in PREPARED (never applied) transition to NO_EFFECT.",
+          "Records in APPLYING are first resolved to NO_EFFECT, APPLIED_VERIFIED, or RECOVERY_UNCERTAIN by live inspection.",
+          "Records in APPLIED_VERIFIED or CONFIRMED are undone ONLY if Undo(m) preconditions hold; upon verified restoration, transition record to REVERTED.",
+          "If Undo(m) preconditions fail or post-undo check fails, preserve scene site and transition record to RECOVERY_UNCERTAIN."
+        ]
+      }
+    }
+  },
+  "f2_layer_responsibilities": {
+    "Layer1_TransactionCoordinator": {
+      "name": "Transaction Coordinator",
+      "functions": [
+        "_arm_rig_transaction",
+        "_assert_arm_rig_cleanup_gate",
+        "_dispatch_retry_cleanup",
+        "request_armature_deisolation",
+        "retire_dead_armature_tombstone"
+      ],
+      "input": "arm: bpy.types.Object, recovery/retry requests",
+      "output": "yields tx: _ArmRigTransactionContext; returns de-isolation or retry outcomes",
+      "state_owner": "Global _ACTIVE_TRANSACTION_STACK control, Sole Authority for all 9 Transaction Lifecycle State Machine Transitions and Gate Deregistration Decisions",
+      "callers": [
+        "Layer 4 Business Functions (setup_arm_ik, set_hand_ik_target, set_arm_ik_influence, reset_arm_ik)",
+        "External Recovery / Cleanup Retry Callers"
+      ],
+      "callees": [
+        "Layer 2 (query admission gate, authorize state transitions, authorize gate registration/deregistration, authorize FAILED isolation & audit logging)",
+        "Layer 5 (snapshot capture, rollback execution, post-rollback verification, de-isolation evidence verification)",
+        "Layer 6 (post-commit cleanup execution, returning CleanupOutcome)"
+      ],
+      "allowed_dependencies": [
+        "Layer 2",
+        "Layer 5",
+        "Layer 6"
+      ],
+      "forbidden_dependencies": [
+        "Layer 3 (no direct CRUD bypassing abstractions)",
+        "Layer 4 (no reverse business calls)"
+      ],
+      "allowed_writes": [
+        "Authorizing transaction lifecycle state transitions in Layer 2",
+        "Active transaction stack push/pop",
+        "Depsgraph update invocations at commit boundary",
+        "Rollback-only flag on nested failure",
+        "Authorizing Layer 2 to register or deregister CLEANUP_PENDING gates after evaluating Layer 6 CleanupOutcome",
+        "Authorizing Layer 2 to register or lift FAILED isolation (FAILED-B/C) or archive dead Armature tombstones (FAILED-D) after evaluating Layer 5 verification evidence"
+      ],
+      "forbidden_writes": [
+        "Blender bone transforms",
+        "Controller transforms",
+        "Constraint influences",
+        "Direct scene object/datablock allocation or deletion"
+      ],
+      "exception_propagation": "Intercepts business exceptions; triggers Layer 5 rollback; classifies failures into FAILED-A/B/C/D; evaluates Layer 6 CleanupOutcome; chains compound errors on rollback verification failure.",
+      "rollback_responsibility": "Coordinates rollback execution and verification via Layer 5; solely decides transition to ROLLED_BACK vs FAILED."
+    },
+    "Layer2_StateOwnershipRegistry": {
+      "name": "State & Ownership Registry",
+      "functions": [
+        "_ArmRigTransactionContext",
+        "ensure_armature_session_identity",
+        "register_created_controller",
+        "register_created_constraint",
+        "register_created_collection",
+        "register_datablock_cleanup_authority",
+        "prepare_relationship_mutation",
+        "update_relationship_mutation_state",
+        "_record_pending_arm_rig_cleanup",
+        "_clear_pending_arm_rig_cleanup_by_coordinator",
+        "_record_armature_failure_isolation_by_coordinator",
+        "_clear_or_retire_failure_isolation_by_coordinator",
+        "query_admission_gate_status"
+      ],
+      "input": "Entity references, pointers, DataBlock authorization records, relationship log transitions, Coordinator state/gate instructions",
+      "output": "Ownership records, ArmatureSessionIdentityRecord, GateResult, pending cleanup records, audit records",
+      "state_owner": "Passive storage for Transaction memory records (created_*, stashed_*, datablock_authorizations, prepared_relationship_mutations), _MANAGED_ARMATURE_IDENTITIES, _PENDING_ARM_RIG_CLEANUPS, _ISOLATED_FAILED_ARMATURES, _DEISOLATION_AUDIT_LOG",
+      "callers": [
+        "Layer 1 (Coordinator state/gate commands and queries)",
+        "Layer 3 (Resource & relationship log registration)",
+        "Layer 5 (Ownership & relationship log inspection)",
+        "Layer 6 (Stashed queue query & per-item progress recording)"
+      ],
+      "callees": [
+        "Python standard data structures, uuid.uuid4(), obj.as_pointer()"
+      ],
+      "allowed_dependencies": [
+        "Standard Python library, mathutils (immutable copying)"
+      ],
+      "forbidden_dependencies": [
+        "Layer 1 (Registry NEVER calls Coordinator)",
+        "Layer 3",
+        "Layer 4",
+        "Layer 5",
+        "Layer 6"
+      ],
+      "allowed_writes": [
+        "Internal record lists, sets, and dictionary indices",
+        "Per-item cleanup progress flags (obj_cleaned, data_cleaned, preserved_no_authority)",
+        "Relationship operation log state updates (7 states)",
+        "Transaction lifecycle state and admission gate indices ONLY upon explicit Layer 1 Coordinator authorization"
+      ],
+      "forbidden_writes": [
+        "Blender scene data blocks or custom object properties",
+        "Direct scene object properties",
+        "Independent transaction lifecycle state decisions",
+        "Independent deregistration of CLEANUP_PENDING or FAILED isolation without Layer 1 Coordinator authorization"
+      ],
+      "exception_propagation": "Raises RuntimeError on duplicate registration, invalid log transition, or unauthorized state mutation attempt.",
+      "rollback_responsibility": "Pure passive state container; holds ownership evidence, relationship logs, and session identity records."
+    },
+    "Layer3_AuthorizedResourceOperations": {
+      "name": "Authorized Resource Operations",
+      "functions": [
+        "_get_or_create_empty",
+        "_ensure_character_collection",
+        "_authorized_link_object_to_collection",
+        "_authorized_unlink_object_from_collection",
+        "_authorized_link_child_collection",
+        "_authorized_unlink_child_collection",
+        "_authorized_assign_object_parent",
+        "_authorized_assign_constraint_targets",
+        "_authorized_restore_relationship",
+        "_authorized_create_constraint",
+        "_authorized_remove_constraint",
+        "_authorized_remove_object",
+        "_authorized_remove_datablock_if_permitted"
+      ],
+      "input": "Explicit authorized parameters and ownership records from Layer 4, Layer 5, or Layer 6",
+      "output": "Live Blender wrappers (Object, Collection, Constraint) or deletion/preservation/restoration status",
+      "state_owner": "None (stateless execution against Blender C-API)",
+      "callers": [
+        "Layer 4 Business Operations",
+        "Layer 5 Rollback Engine",
+        "Layer 6 Cleanup Engine"
+      ],
+      "callees": [
+        "Layer 2 (mandatory entity/DataBlock registration and 7-state relationship log updates)",
+        "bpy.data.objects",
+        "bpy.data.collections",
+        "pbone.constraints"
+      ],
+      "allowed_dependencies": [
+        "Layer 2 (ownership and log registration)"
+      ],
+      "forbidden_dependencies": [
+        "Layer 1",
+        "Layer 4",
+        "Layer 5",
+        "Layer 6"
+      ],
+      "allowed_writes": [
+        "Atomic Blender entity creation and deletion as authorized",
+        "All relationship reference mutations and rollback restorations (col.objects.link/unlink, col.children.link/unlink, obj.parent, matrix_parent_inverse coupled to parent binding, con.target, con.pole_target) governed by Layer 2 7-state relationship operation log",
+        "Physical deletion of DataBlock D if and only if CanDelete(D, t) is satisfied"
+      ],
+      "forbidden_writes": [
+        "Exposing created entities before Layer 2 registration",
+        "Mutating or restoring relationship references without Layer 2 7-state relationship log tracking",
+        "Deleting entities or DataBlocks without verified ownership and explicit authorization",
+        "Calling bpy.data.orphans_purge()",
+        "Independent commit, rollback, or gate decisions"
+      ],
+      "exception_propagation": "Catches ReferenceError and wraps in descriptive operational RuntimeError; updates relationship log to NO_EFFECT or RECOVERY_UNCERTAIN on apply failure; passes exception to caller.",
+      "rollback_responsibility": "Executes single authorized deletion, unlink, or relationship reference restoration when called by Layer 5 and updates relationship log to REVERTED or RECOVERY_UNCERTAIN."
+    },
+    "Layer4_ArmIKBusinessOperations": {
+      "name": "Arm IK Business Operations",
+      "functions": [
+        "setup_arm_ik",
+        "set_hand_ik_target",
+        "set_arm_ik_influence",
+        "reset_arm_ik",
+        "get_arm_ik_state",
+        "_preflight_arm_ik_parent_transforms"
+      ],
+      "input": "Target coordinates, side, rotation, influence, armature object",
+      "output": "IK solution dictionary, controller dictionary, reachable status",
+      "state_owner": "None in Python; business state persisted in scene bone transforms and constraints",
+      "callers": [
+        "WholeBodyController",
+        "PlaygroundCharacterAssembly",
+        "Animation scripts"
+      ],
+      "callees": [
+        "Layer 1 (transaction context request)",
+        "Layer 3 (authorized resource & relationship operations)",
+        "transform_utils (math)"
+      ],
+      "allowed_dependencies": [
+        "Layer 1",
+        "Layer 3",
+        "transform_utils"
+      ],
+      "forbidden_dependencies": [
+        "Layer 5 (cannot trigger direct snapshot/rollback)",
+        "Layer 6 (cannot trigger direct commit cleanup)"
+      ],
+      "allowed_writes": [
+        "Pose bone numeric transforms (rotation_euler, rotation_quaternion, location, scale) within active transaction",
+        "Constraint numeric parameters ONLY (influence, pole_angle, chain_count, use_stretch) within active transaction",
+        "Controller world/local numeric TRS (location, rotation_*, scale) within active transaction"
+      ],
+      "forbidden_writes": [
+        "Any scene write during Phase A/B preflight (Zero Mutation Guarantee)",
+        "Unprotected scene mutations outside Layer 1 transaction",
+        "Direct relationship reference writes (con.target, con.pole_target, obj.parent, matrix_parent_inverse parent binding, col.objects.link/unlink, col.children.link/unlink) bypassing Layer 3 Authorized Resource Operations and Layer 2 7-state relationship log",
+        "Direct resource allocation or deletion bypassing Layer 3"
+      ],
+      "exception_propagation": "Raises TypeError/ValueError on preflight rejection; lets internal transaction exceptions propagate to caller; reports nested failure via outer_tx.mark_rollback_only(reason).",
+      "rollback_responsibility": "None; relies entirely on Layer 1 transaction wrapper."
+    },
+    "Layer5_SnapshotRestoreVerification": {
+      "name": "Snapshot / Restore / Verification",
+      "functions": [
+        "_snapshot_arm_rig_state",
+        "_clone_snapshot_property_value",
+        "_rollback_arm_rig_state",
+        "_verify_arm_rig_state_restored",
+        "verify_armature_deisolation_evidence"
+      ],
+      "input": "Armature object, snapshot dictionary, active_tx context, de-isolation verification requests",
+      "output": "Immutable snapshot dictionary, VerificationResult, DeisolationVerificationReport",
+      "state_owner": "Snapshot dictionary data structure (immutable)",
+      "callers": [
+        "Layer 1 Transaction Coordinator"
+      ],
+      "callees": [
+        "Layer 2 (ownership & relationship log query)",
+        "Layer 3 (authorized relationship undo/restoration and entity deletion during rollback)",
+        "Blender read-only property inspection"
+      ],
+      "allowed_dependencies": [
+        "Layer 2",
+        "Layer 3"
+      ],
+      "forbidden_dependencies": [
+        "Layer 1 (never calls Coordinator; returns results on stack)",
+        "Layer 4",
+        "Layer 6"
+      ],
+      "allowed_writes": [
+        "During ROLLING_BACK ONLY: restoring original numeric and transform values (pose bone transforms, controller TRS, constraint numeric parameters such as influence and pole_angle)",
+        "Invoking Layer 3 Authorized Resource Operations to undo or restore verified relationship references (Object.parent, matrix_parent_inverse parent binding, Constraint.target, Constraint.pole_target, Collection membership/hierarchy -> transitioning log to REVERTED) and delete transaction-created entities"
+      ],
+      "forbidden_writes": [
+        "Zero mutation during snapshot capture",
+        "Zero mutation during post-rollback or de-isolation verification",
+        "Directly mutating or restoring relationship references (Object.parent, matrix_parent_inverse parent binding, Constraint.target/pole_target, Collection link/unlink) during ROLLING_BACK without invoking Layer 3 Authorized Resource Operations",
+        "Deleting non-transaction resources or unauthorized DataBlocks",
+        "Directly setting transaction lifecycle state"
+      ],
+      "exception_propagation": "Raises RuntimeError or returns structured failure report on snapshot read failure, RECOVERY_UNCERTAIN log state, or verification diff > 1e-5.",
+      "rollback_responsibility": "Executes rollback restoration (numeric transforms directly, relationship references and deletions via Layer 3) and verifies 100% baseline match; reports outcome to Layer 1 Coordinator."
+    },
+    "Layer6_CommitCleanup": {
+      "name": "Commit & Cleanup",
+      "functions": [
+        "retry_cleanup",
+        "execute_stashed_cleanup_pass"
+      ],
+      "input": "Committed transaction cleanup context, stashed resource queues, DataBlock authorization records",
+      "output": "CleanupOutcome enum: CLEANUP_SUCCESS, CLEANUP_INCOMPLETE, CLEANUP_FAILED (returned as RESULT data flow to Layer 1 Coordinator)",
+      "state_owner": "Item-level cleanup progress flags (obj_cleaned, data_cleaned, preserved_no_authority)",
+      "callers": [
+        "Layer 1 Transaction Coordinator (_arm_rig_transaction Phase 3 and _dispatch_retry_cleanup)"
+      ],
+      "callees": [
+        "Layer 2 (read stashed queues and DataBlock authorizations; update item-level progress flags ONLY)",
+        "Layer 3 (authorized removal of doomed entities and authorized zero-user DataBlocks)"
+      ],
+      "allowed_dependencies": [
+        "Layer 2 (item-level progress read/write only)",
+        "Layer 3"
+      ],
+      "forbidden_dependencies": [
+        "Layer 1 (Layer 6 NEVER calls Coordinator)",
+        "Layer 4",
+        "Layer 5"
+      ],
+      "allowed_writes": [
+        "Invoking Layer 3 to delete authorized doomed objects, constraints, and DataBlocks satisfying CanDelete(D, t)",
+        "Recording item-level progress (obj_cleaned, data_cleaned, PRESERVED_NO_DELETE_AUTHORITY) in Layer 2"
+      ],
+      "forbidden_writes": [
+        "Deleting DataBlocks lacking explicit cleanup authorization (Type B without grant, Type C) or having Users(D) > 0 or protected dependencies",
+        "Deleting active controllers",
+        "Advancing or modifying transaction lifecycle states directly",
+        "Independently clearing CLEANUP_PENDING or deregistering pending cleanup gates in Layer 2",
+        "Triggering scene rollback"
+      ],
+      "exception_propagation": "Catches operational cleanup errors, preserves progress of already-cleaned items, records failure causes, and returns CLEANUP_INCOMPLETE or CLEANUP_FAILED to Layer 1 Coordinator.",
+      "rollback_responsibility": "No rollback capability; responsible strictly for post-commit garbage collection execution under Coordinator supervision."
+    }
+  },
+  "f2_directed_dependency_graph": {
+    "taxonomy": {
+      "CALL": "Downward invocation dependency where a higher layer calls a function in a lower layer. Participates in DAG topological sorting.",
+      "RESULT": "Upward operation outcome returned via function return value along the Python call stack (e.g., CleanupOutcome, VerificationResult, GateResult). Does NOT represent an invocation dependency and does NOT participate in DAG topological sorting.",
+      "STATE_READ": "Read-only query of passive data structures in Layer 2 Registry.",
+      "STATE_WRITE": "Authorized update of records, lifecycle states, or gate indices in Layer 2 Registry. Lifecycle state and gate registration/deregistration writes are restricted exclusively to Layer 1 Coordinator.",
+      "PROTECTION": "Read-only ownership and provenance boundary inspection where an active transaction layer (Source: Layer 3 / Layer 5 / Layer 6) inspects and protects external or unproven resources (Target: External Scene Resources & Unproven DataBlocks) from unauthorized modification or deletion."
+    },
+    "mermaid": "flowchart TD\n    classDef coord fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;\n    classDef registry fill:#fff3e0,stroke:#f57c00,stroke-width:2px;\n    classDef ops fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;\n    classDef biz fill:#e8f8f5,stroke:#00897b,stroke-width:2px;\n    classDef snap fill:#fbe9e7,stroke:#d84315,stroke-width:2px;\n    classDef clean fill:#f9fbe7,stroke:#827717,stroke-width:2px;\n    classDef external fill:#eceff1,stroke:#455a64,stroke-width:2px;\n\n    WBC[\"Upper Pipeline: WBC / Bridge\"]:::external -->|CALL: Invoke Public API| L4\n    \n    subgraph Layer4[\"Layer 4: Arm IK Business Operations\"]\n        L4[\"Business APIs<br>(setup, set_target, set_influence, reset)\"]:::biz\n    end\n\n    subgraph Layer1[\"Layer 1: Transaction Coordinator\"]\n        L1[\"_arm_rig_transaction<br>(Sole Lifecycle & Gate Authority)\"]:::coord\n    end\n\n    subgraph Layer5[\"Layer 5: Snapshot & Verification\"]\n        L5A[\"Snapshot Engine<br>(_snapshot_arm_rig_state)\"]:::snap\n        L5B[\"Rollback & Verification Engine<br>(_rollback, _verify, deisolation_verify)\"]:::snap\n    end\n\n    subgraph Layer6[\"Layer 6: Commit & Cleanup\"]\n        L6[\"Cleanup Executor<br>(retry_cleanup)\"]:::clean\n    end\n\n    subgraph Layer2[\"Layer 2: State & Ownership Registry\"]\n        L2[\"_ArmRigTransactionContext & Global Indices<br>(identities, authorizations, logs, gates)\"]:::registry\n    end\n\n    subgraph Layer3[\"Layer 3: Authorized Resource Operations\"]\n        L3[\"Authorized CRUD Engine<br>(_get_or_create, link/unlink, remove)\"]:::ops\n    end\n\n    subgraph Scene[\"Blender C-Scene Entities\"]\n        B_Scene[\"Blender C-Data<br>(Objects, Constraints, Collections, DataBlocks)\"]:::external\n    end\n\n    L4 -->|CALL: Request Transaction Context| L1\n    L4 -->|CALL: Request Authorized Mutation| L3\n    \n    L1 -->|CALL / STATE_READ: Query Admission Gate & Session Identity| L2\n    L1 -->|STATE_WRITE: Authorize Lifecycle State, Gate Deregistration & FAILED Isolation| L2\n    L1 -->|CALL: Trigger Baseline Capture| L5A\n    L1 -->|CALL: Trigger Rollback & Evidence Verification| L5B\n    L1 -->|CALL: Dispatch Post-Commit or Retry Cleanup| L6\n    \n    L3 -->|CALL / STATE_WRITE: Register Entity, DataBlock Auth & Relationship Log| L2\n    L3 -->|CALL: Execute Authorized C-Mutation| B_Scene\n    \n    L5A -->|CALL / STATE_READ: Read-only Baseline Capture| B_Scene\n    L5B -->|CALL / STATE_READ: Query Ownership & Relationship Logs| L2\n    L5B -->|CALL: Invoke Authorized Undo/Delete| L3\n    L5B -->|CALL / STATE_READ: Full-Field & Invariant Comparison| B_Scene\n    \n    L6 -->|CALL / STATE_READ: Query Stashed Records & DataBlock Auth| L2\n    L6 -->|STATE_WRITE: Record Item-Level Progress (obj/data_cleaned, PRESERVED)| L2\n    L6 -->|CALL: Invoke Authorized Destruction| L3\n    \n    L6 -.->|RESULT: CleanupOutcome (SUCCESS/INCOMPLETE/FAILED)| L1\n    L5B -.->|RESULT: VerificationResult / DeisolationReport| L1\n    L2 -.->|RESULT: GateResult (ALLOWED/BLOCKED)| L1",
+    "cycle_elimination_proof": "The dependency graph of invocation calls (CALL edges) is a strict Directed Acyclic Graph (DAG) with topological ordering: WBC -> Layer 4 -> Layer 1 -> Layer 5 -> Layer 6 -> Layer 3 -> Layer 2. Layer 2 is a pure passive store with zero outgoing calls. Layer 6 has zero call dependencies on Layer 1 and is forbidden from independently deregistering gates in Layer 2. Layer 6 returns CleanupOutcome via stack return (RESULT) to Layer 1, and Layer 1 alone commands Layer 2 to update lifecycle state and clear or retain the CLEANUP_PENDING gate."
+  },
+  "f2_state_transition_authority": {
+    "sole_authority": "Layer 1 Transaction Coordinator is the SOLE decision maker for all 9 transaction lifecycle state transitions and all admission gate registrations/deregistrations.",
+    "state_machine_separation_rule": "The 9 Transaction Lifecycle States (managed by Layer 1) and the 7 Relationship Operation Log States (managed by Layer 3/5 in Layer 2 logs) are strictly separate state machines and must never be conflated.",
+    "state_machine_states": [
+      "CREATED",
+      "SNAPSHOTTING",
+      "ACTIVE",
+      "COMMITTING",
+      "COMMITTED",
+      "ROLLING_BACK",
+      "ROLLED_BACK",
+      "CLEANUP_PENDING",
+      "FAILED"
+    ],
+    "transition_rules": {
+      "CREATED": {
+        "allowed_next": [
+          "SNAPSHOTTING",
+          "FAILED"
+        ],
+        "condition": "Coordinator verifies session identity and admission gate, then transitions to SNAPSHOTTING. If pre-snapshot initialization fails with zero writes, transitions to FAILED (classified as FAILED-A)."
+      },
+      "SNAPSHOTTING": {
+        "allowed_next": [
+          "ACTIVE",
+          "FAILED"
+        ],
+        "condition": "Layer 5 completes read-only baseline snapshot (transitions to ACTIVE). If snapshot read fails before any business write, Coordinator transitions transaction to FAILED (classified as FAILED-A if zero writes and scene uncorrupted, or FAILED-C/D if pre-existing structural corruption/death is detected)."
+      },
+      "ACTIVE": {
+        "allowed_next": [
+          "COMMITTING",
+          "ROLLING_BACK"
+        ],
+        "condition": "Business logic finishes without error and rollback_only is False (COMMITTING), or catches runtime exception / detects rollback_only == True (ROLLING_BACK)."
+      },
+      "COMMITTING": {
+        "allowed_next": [
+          "COMMITTED",
+          "ROLLING_BACK"
+        ],
+        "condition": "Phase 1 depsgraph update and commit preparation pass (crosses irreversible commit line to COMMITTED) or fail (ROLLING_BACK)."
+      },
+      "COMMITTED": {
+        "allowed_next": [
+          "CLEANUP_PENDING"
+        ],
+        "condition": "Irreversible commit crossed. Ordinary rollback FORBIDDEN. Layer 1 invokes Layer 6 cleanup. If Layer 6 returns CLEANUP_SUCCESS (including items marked PRESERVED_NO_DELETE_AUTHORITY), transaction remains COMMITTED and gate is clear. If Layer 6 returns CLEANUP_INCOMPLETE or CLEANUP_FAILED for obligatory cleanup items, Coordinator transitions state to CLEANUP_PENDING and registers gate in Layer 2."
+      },
+      "ROLLING_BACK": {
+        "allowed_next": [
+          "ROLLED_BACK",
+          "FAILED"
+        ],
+        "condition": "Layer 5 rollback and full-field verification succeed 100% with all modified relationship logs resolved to REVERTED or NO_EFFECT (ROLLED_BACK). If rollback execution fails (FAILED-B), verification detects diff/RECOVERY_UNCERTAIN (FAILED-C), or Armature died (FAILED-D), Coordinator transitions to FAILED and instructs Layer 2 to record persistent session isolation/tombstone."
+      },
+      "ROLLED_BACK": {
+        "allowed_next": [],
+        "condition": "Terminal state for cleanly aborted transaction. Baseline state 100% verified restored. Coordinator pops transaction and re-raises original business exception."
+      },
+      "CLEANUP_PENDING": {
+        "allowed_next": [
+          "COMMITTED"
+        ],
+        "condition": "Registered by Coordinator in Layer 2 _PENDING_ARM_RIG_CLEANUPS. Blocks new write transactions on the same Armature session identity. Transitions to COMMITTED ONLY when Coordinator invokes Layer 6 retry, receives CLEANUP_SUCCESS, and explicitly authorizes Layer 2 to deregister the pending gate."
+      },
+      "FAILED": {
+        "allowed_next": [],
+        "condition": "Terminal transaction state. Never transitions to COMMITTED. Coordinator classifies failure into FAILED-A, FAILED-B, FAILED-C, or FAILED-D to govern Armature session isolation."
+      }
+    },
+    "retry_cleanup_flow": "1. External Caller invokes Coordinator (_dispatch_retry_cleanup) -> 2. Coordinator calls Layer 6 (retry_cleanup) -> 3. Layer 6 executes authorized resource cleanup via Layer 3 and updates item progress in Layer 2 -> 4. Layer 6 returns CleanupOutcome (CLEANUP_SUCCESS | CLEANUP_INCOMPLETE | CLEANUP_FAILED) to Coordinator -> 5. Coordinator evaluates outcome -> 6. If and only if CLEANUP_SUCCESS, Coordinator authorizes Layer 2 Registry -> 7. Layer 2 updates transaction state to COMMITTED and removes Armature from _PENDING_ARM_RIG_CLEANUPS.",
+    "nested_transaction_rollback_only_contract": {
+      "description": "Handling nested transactions on the same Armature.",
+      "contract_rules": [
+        "1. Inner transaction invocation reuses outer transaction context (stack depth remains 1, single baseline snapshot).",
+        "2. If an inner operation raises an exception or fails preflight, even if caught by caller business try/except blocks, it invokes outer_tx.mark_rollback_only(reason).",
+        "3. When the outer block exits and attempts to commit, Layer 1 Coordinator checks tx.rollback_only.",
+        "4. If tx.rollback_only is True, normal commit is REJECTED; Coordinator forces transition to ROLLING_BACK.",
+        "5. Silent commit after inner failure is structurally impossible."
+      ]
+    },
+    "persistent_failed_protection": {
+      "isolation_scope_boundary": {
+        "supported_scope": "In-memory Python session within the active Blender process.",
+        "out_of_scope_boundary": "Cross-process restarts or bpy.ops.wm.open_mainfile() scene reloads reset the Python interpreter memory and constitute an independent persistence boundary (tracked in ARCH-ISSUE-03). The architecture does NOT falsely claim that Python memory structures survive process termination.",
+        "blender_object_property_constraint": "Modifying Blender object custom properties (e.g., arm['uuid']) to store session identity is FORBIDDEN in this phase to preserve zero-mutation snapshot invariants."
+      },
+      "session_identity_model": {
+        "record_type": "ArmatureSessionIdentityRecord",
+        "fields": {
+          "registry_session_id": "Unique UUID4 string allocated by Layer 2 Registry in Python memory when the Armature instance is first registered in the session.",
+          "original_blender_ref": "Direct Python RNA reference to the bpy.types.Object armature instance.",
+          "registration_pointer": "Integer address (arm.as_pointer()) captured at registration.",
+          "original_data_pointer": "Integer address (arm.data.as_pointer()) captured at registration.",
+          "liveness_status": "Enum: 'ALIVE_VERIFIED' | 'INVALIDATED_DEAD'.",
+          "in_live_blender_collection": "Boolean confirming object is present in bpy.data.objects.values() and scene collection hierarchy.",
+          "isolation_state": "Enum: 'NONE' | 'ISOLATED_FAILED_B' | 'ISOLATED_FAILED_C' | 'TOMBSTONED_FAILED_D' | 'ARCHIVED_RETIRED'.",
+          "tombstone_record": "Optional diagnostic dictionary populated when liveness_status becomes INVALIDATED_DEAD."
+        },
+        "identity_matching_rule": "An incoming Armature 'arm' matches an active ArmatureSessionIdentityRecord if and only if: (1) record.original_blender_ref does not raise ReferenceError, (2) arm == record.original_blender_ref, (3) arm.as_pointer() == record.registration_pointer, and (4) arm is present in bpy.data.objects.values(). Name equality is NEVER used for identity matching.",
+        "pointer_reuse_and_new_armature_protection": "If the original Armature is destroyed in Blender, its record transitions to TOMBSTONED_FAILED_D (liveness_status = INVALIDATED_DEAD). If Blender subsequently allocates a new Armature object that reuses the same C memory pointer or shares the same name, liveness/reference verification detects that the original record is already dead/tombstoned. The new Armature is assigned a fresh registry_session_id: (a) the dead object's tombstone is NOT cleared and the new object is NEVER treated as a recovery of the dead object; (b) the dead object's tombstone does NOT falsely block the legitimate new Armature from executing transactions."
+      },
+      "failure_classification": {
+        "FAILED_A_PRE_WRITE": {
+          "description": "Failure occurring prior to entering ACTIVE (during CREATED or read-only SNAPSHOTTING) with proven zero managed writes.",
+          "zero_write_proof_conditions": [
+            "Transaction state never reached ACTIVE.",
+            "created_controller_objects, created_constraints, created_collections, stashed_*, and prepared_relationship_mutations are all empty.",
+            "No external state corruption occurred during read."
+          ],
+          "isolation_policy": "The transaction terminates in FAILED state, but if zero managed writes are proven and the Armature structure is intact, Layer 1 Coordinator does NOT place the Armature into persistent FAILED isolation. Subsequent independent transactions may apply for admission. Transaction failure is not conflated with Armature corruption."
+        },
+        "FAILED_B_ROLLBACK_EXEC_ERROR": {
+          "description": "Failure occurring during ROLLING_BACK execution (e.g., exception during property restoration, OWNERSHIP_CONFLICT, or relationship log entering RECOVERY_UNCERTAIN).",
+          "isolation_policy": "Mandatory persistent session isolation (isolation_state = ISOLATED_FAILED_B). All new write transactions on this Armature session identity are rejected."
+        },
+        "FAILED_C_VERIFY_MISMATCH": {
+          "description": "Rollback execution finished, but Layer 5 _verify_arm_rig_state_restored detected missing original resource identity, property diff > 1e-5, or un-reverted relationship mutation.",
+          "isolation_policy": "Mandatory persistent session isolation (isolation_state = ISOLATED_FAILED_C). All new write transactions on this Armature session identity are rejected. Cannot be cleared by same-name substitute resources."
+        },
+        "FAILED_D_IDENTITY_INVALIDATED": {
+          "description": "Original Armature RNA object became invalid/destroyed (ReferenceError or removed from bpy.data.objects) during transaction, rollback, or while isolated.",
+          "isolation_policy": "Record transitions to TOMBSTONED_FAILED_D. Original identity is permanently dead; cannot be cleared by same-name new objects or pointer reuse, while legitimate new Armature identities are not falsely blocked."
+        }
+      },
+      "deisolation_contract_by_category": {
+        "case_1_trusted_snapshot_exists": {
+          "applicable_to": "ISOLATED_FAILED_B or ISOLATED_FAILED_C where baseline snapshot was completely captured and verified immutable.",
+          "requirements": [
+            "Original ArmatureSessionIdentityRecord liveness_status is ALIVE_VERIFIED.",
+            "All original sub-resources in snapshot pass identity verification (live reference + pointer).",
+            "Layer 5 _verify_arm_rig_state_restored passes with zero diffs (tolerance 1e-5).",
+            "Zero relationship logs remain in RECOVERY_UNCERTAIN or un-reverted TX_ADDED / TX_UNLINKED_ORIGINAL states."
+          ]
+        },
+        "case_2_no_trusted_snapshot_exists": {
+          "applicable_to": "Isolation where snapshot capture was incomplete or untrusted due to concurrent structural anomaly.",
+          "requirements": [
+            "Fabricating or synthesizing a fake snapshot is strictly FORBIDDEN.",
+            "Layer 5 executes independent Structural Integrity & Invariant Verification: confirms Armature bone hierarchy is intact, controller/constraint bindings are either 100% clean uninitialized state or 100% valid conformal rig state, and zero orphan transaction artifacts exist.",
+            "If independent structural proof is insufficient, isolation MUST remain active."
+          ]
+        },
+        "case_3_original_armature_dead_tombstone": {
+          "applicable_to": "TOMBSTONED_FAILED_D.",
+          "requirements": [
+            "New objects are NEVER accepted as recovery of the dead Armature.",
+            "Handled exclusively via Authorized Tombstone Retirement (retire_dead_armature_tombstone): Layer 5 verifies original RNA object is permanently absent from bpy.data.objects and all transaction-owned orphan artifacts bound to the failed tx_id have been cleaned or accounted for.",
+            "Coordinator transitions record from TOMBSTONED_FAILED_D to ARCHIVED_RETIRED in audit log."
+          ]
+        }
+      },
+      "deisolation_authority_and_governance": {
+        "no_imaginary_tokens_rule": "Architecture does NOT assume external cryptographic tokens or imaginary key management systems. Authority is enforced through strict architectural separation of verification and state decision roles.",
+        "roles_and_workflow": [
+          "1. Applicant (Caller): Upper recovery handler invokes Layer 1 Coordinator API request_armature_deisolation(arm, recovery_evidence_context) or retire_dead_armature_tombstone(registry_session_id).",
+          "2. Evidence Verifier (Layer 5): Coordinator dispatches Layer 5 verify_armature_deisolation_evidence(), which inspects live Blender state against the category-specific contract (Case 1, Case 2, or Case 3) and returns an immutable DeisolationVerificationReport.",
+          "3. Approver & State Decision Authority (Layer 1 Coordinator): Inspects DeisolationVerificationReport. Layer 1 Coordinator is the SOLE authority permitted to approve de-isolation. If report.verified is True, Coordinator issues explicit de-isolation instruction to Layer 2.",
+          "4. Registry & Audit Trail (Layer 2): Upon Coordinator authorization, Layer 2 updates isolation_state to NONE (or ARCHIVED_RETIRED for Case 3) and appends an immutable DeisolationAuditEntry (timestamp, registry_session_id, failure_category, verification_report, coordinator_decision) to _DEISOLATION_AUDIT_LOG.",
+          "5. Rejection Retention: If verification fails, Coordinator rejects the request, Layer 2 retains isolation_state unchanged, records the rejected attempt in _DEISOLATION_AUDIT_LOG, and raises RuntimeError."
+        ]
+      },
+      "distinction_from_cleanup_pending": {
+        "CLEANUP_PENDING": "Business logic committed; post-commit cleanup of obligatory doomed resources incomplete. Recoverable via controlled Layer 1 -> Layer 6 retry_pending_arm_rig_cleanup.",
+        "FAILED": "Transaction or recovery failed safely to complete. Normal Cleanup Retry NEVER clears FAILED isolation. FAILED NEVER transitions to COMMITTED."
+      }
+    }
+  },
+  "f3_contract_registry": {
+    "CONTRACT-01": {
+      "id": "CONTRACT-01",
+      "name": "Input Validation & Pre-Write Preflight",
+      "layer": "Layer 4 (Business)",
+      "invariant": "All parameters (side, world_xyz, rotation, pole, influence, clamp_reach) and parent transform domains must be pre-validated before any scene mutation. Zero scene writes on rejection.",
+      "failure_condition": "Non-finite values, out-of-range influence, bad side string, or singular non-invertible parent matrix.",
+      "exception_propagation": "Immediate TypeError or ValueError; transaction is not entered.",
+      "recovery_responsibility": "None required (natural zero-mutation invariant)."
+    },
+    "CONTRACT-02": {
+      "id": "CONTRACT-02",
+      "name": "Same-Armature Nested Transaction & Failure Propagation",
+      "layer": "Layer 1 (Coordinator)",
+      "invariant": "Re-entrant transaction requests on same Armature session identity reuse active context; stack depth remains 1; inner failure marks transaction rollback-only via explicit reporting path.",
+      "failure_condition": "Cross-armature nesting requested, or inner failure suppressed by caller.",
+      "exception_propagation": "Cross-armature raises RuntimeError; suppressed inner failure triggers forced rollback on outer commit.",
+      "recovery_responsibility": "Outermost Layer 1 Coordinator executes full rollback."
+    },
+    "CONTRACT-03": {
+      "id": "CONTRACT-03",
+      "name": "Controller & Created DataBlock Provenance Registration",
+      "layer": "Layer 3 (Resource Ops) & Layer 2 (Registry)",
+      "invariant": "New controller Empty and any Type A transaction-allocated DataBlock must be registered in active_tx with explicit provenance and pointer/reference identity immediately upon creation and before collection linkage. Rollback deletes strictly registered transaction-created resources.",
+      "failure_condition": "Creation failure, duplicate registration, or collection link failure.",
+      "exception_propagation": "Operational exception bubbles to Layer 1, triggering rollback.",
+      "recovery_responsibility": "Layer 5 deletes registered controller and Type A DataBlock (satisfying CanDelete(D,t)) via Layer 3."
+    },
+    "CONTRACT-04": {
+      "id": "CONTRACT-04",
+      "name": "Relationship Mutation 7-State Log & Evidence-Based Rollback",
+      "layer": "Layer 2 (Registry), Layer 3 (Resource Ops), Layer 5 (Restore/Verify)",
+      "invariant": "All relationship reference mutations (Collection object/child link/unlink, Object.parent, matrix_parent_inverse parent binding, Constraint.target/pole_target) — whether initiated by Layer 4 in ACTIVE or restored by Layer 5 in ROLLING_BACK — must execute through Layer 3 Authorized Resource Operations and follow the 7-state operation log (PREPARED, APPLYING, APPLIED_VERIFIED, CONFIRMED, NO_EFFECT, REVERTED, RECOVERY_UNCERTAIN) and 10 legal transitions. Undo(m) requires Authorized(m) and Prepared(m) and IdentityVerified(m) and CausalEvidence(m) and NoExternalHarm(m). Distinguishes 5 relationship categories. Duplicate link on PRE_EXISTING_ORIGINAL transitions to NO_EFFECT with zero revocation rights. During rollback, APPLIED_VERIFIED and CONFIRMED transaction mutations must resolve to REVERTED via Layer 3; unproven states transition to RECOVERY_UNCERTAIN and preserve site.",
+      "failure_condition": "RNA assignment failure, invalid collection link, RNA pointer corruption during apply, or unprovable relationship state.",
+      "exception_propagation": "Fails back to Layer 1 with precise operational context; RECOVERY_UNCERTAIN causes Layer 5 rollback verification to fail.",
+      "recovery_responsibility": "Layer 5 inspects relationship logs and invokes Layer 3 to undo/restore verified transaction mutations to REVERTED while preserving pre-existing/external links."
+    },
+    "CONTRACT-05": {
+      "id": "CONTRACT-05",
+      "name": "Constraint Configuration, Identity & Restoration",
+      "layer": "Layer 4 (Business), Layer 3 (Ops), Layer 5 (Snapshot/Restore)",
+      "invariant": "Constraint deletion is strictly identity-based (reference + pointer) via Layer 3. Constraint target/pole_target bindings are relationship mutations executed via Layer 3 with 7-state logging, while numeric parameters (influence, pole_angle) are written by Layer 4 in ACTIVE and restored by Layer 5 in ROLLING_BACK. Transaction-created constraints are registered and deleted on rollback. External constraints are preserved with relative ordering intact.",
+      "failure_condition": "Constraint creation failure, same-name external collision, or destroyed original constraint.",
+      "exception_propagation": "Bubbles to Coordinator; verifier reports identity mismatch if original constraint destroyed.",
+      "recovery_responsibility": "Layer 5 deletes created constraints and restores constraint target relationships via Layer 3, and restores original numeric properties and relative ordering."
+    },
+    "CONTRACT-06": {
+      "id": "CONTRACT-06",
+      "name": "Snapshot Integrity, Zero-Mutation Capture & FAILED-A Classification",
+      "layer": "Layer 5 (Snapshot/Verification) & Layer 1 (Coordinator)",
+      "invariant": "Snapshot captures deep immutable copies of all 4 controllers, 6 pose bones, constraints, and collection hierarchies with zero scene mutation. If snapshot read fails before any business write with proven zero mutations and intact Armature structure, Coordinator terminates transaction as FAILED-A without permanently quarantining the Armature.",
+      "failure_condition": "Unreadable property, missing bone, or view layer update failure during snapshotting.",
+      "exception_propagation": "Raises RuntimeError; Coordinator transitions transaction to FAILED (classified as FAILED-A if zero writes proven, or FAILED-C/D if structural corruption detected).",
+      "recovery_responsibility": "None required for FAILED-A (zero scene mutation occurred); structural corruption triggers FAILED-C/D isolation."
+    },
+    "CONTRACT-07": {
+      "id": "CONTRACT-07",
+      "name": "Rollback Verification Symmetry & Categorized FAILED Session Isolation",
+      "layer": "Layer 5 (Snapshot/Verification), Layer 1 (Coordinator), Layer 2 (Registry)",
+      "invariant": "Rollback restoration and post-rollback verification are strictly symmetric (tolerance 1e-5, all modified relationship logs resolved to REVERTED or NO_EFFECT). Rollback execution failure (FAILED-B), verification mismatch (FAILED-C), or Armature death (FAILED-D) triggers immediate Layer 1 instruction to Layer 2 to record session isolation/tombstone under ArmatureSessionIdentityRecord. De-isolation requires Layer 5 category-specific evidence verification and Layer 1 Coordinator approval, logged in _DEISOLATION_AUDIT_LOG.",
+      "failure_condition": "Restoration error, pointer/reference identity mismatch, relationship log in RECOVERY_UNCERTAIN, or property diff > 1e-5.",
+      "exception_propagation": "Aggregates differences, raises compound RuntimeError, persists categorized session isolation or tombstone in Layer 2.",
+      "recovery_responsibility": "Layer 1 marks state FAILED; Layer 2 enforces session isolation for FAILED-B/C and tombstone for FAILED-D without falsely blocking new independent Armature identities."
+    },
+    "CONTRACT-08": {
+      "id": "CONTRACT-08",
+      "name": "Irreversible Commit, Authorized DataBlock Cleanup & Coordinator Outcome Evaluation",
+      "layer": "Layer 1 (Coordinator), Layer 6 (Cleanup), Layer 3 (Resource Ops), Layer 2 (Registry)",
+      "invariant": "Commit crossing is irreversible; ordinary rollback is forbidden after COMMITTED. DataBlock deletion requires CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D). Type B DataBlocks without explicit grant and Type C DataBlocks are preserved as PRESERVED_NO_DELETE_AUTHORITY (not treated as failure). Layer 6 returns CleanupOutcome (SUCCESS/INCOMPLETE/FAILED) to Layer 1; Layer 6 NEVER independently modifies lifecycle state or deregisters gates.",
+      "failure_condition": "Obligatory cleanup deletion fails due to unexpected active user reference or Blender internal error.",
+      "exception_propagation": "Layer 6 returns CLEANUP_INCOMPLETE or CLEANUP_FAILED to Layer 1; Layer 1 transitions state to CLEANUP_PENDING and instructs Layer 2 to register gate.",
+      "recovery_responsibility": "Layer 1 dispatches idempotent retry via Layer 6 and alone authorizes Layer 2 gate deregistration upon CLEANUP_SUCCESS."
+    },
+    "CONTRACT-09": {
+      "id": "CONTRACT-09",
+      "name": "Unidirectional Admission Gate & Coordinator-Authorized Gate Deregistration",
+      "layer": "Layer 1 (Coordinator) & Layer 2 (Registry)",
+      "invariant": "Layer 1 queries Layer 2 admission gate (_assert_arm_rig_cleanup_gate). Gate blocks new write transactions if the matching ArmatureSessionIdentityRecord has unresolved CLEANUP_PENDING or active FAILED-B/C isolation. Dead Armature tombstones (FAILED-D) cannot be cleared by pointer/name reuse, but do not block new Armatures with fresh session identities. Only Layer 1 Coordinator can authorize Layer 2 to clear CLEANUP_PENDING (after CLEANUP_SUCCESS) or lift FAILED isolation (after verified de-isolation report).",
+      "failure_condition": "Attempted write on Armature with unresolved CLEANUP_PENDING or active FAILED-B/C isolation, or attempt to spoof recovery of FAILED-D dead Armature.",
+      "exception_propagation": "Raises RuntimeError on write admission rejection with zero scene writes.",
+      "recovery_responsibility": "CLEANUP_PENDING resolved via Coordinator-supervised retry_pending_arm_rig_cleanup; FAILED-B/C/D resolved via Coordinator-approved de-isolation/tombstone governance."
+    },
+    "CONTRACT-10": {
+      "id": "CONTRACT-10",
+      "name": "WBC / Arm IK Cross-Module Interface",
+      "layer": "Upper Pipeline (WBC) & Layer 4 (Business)",
+      "invariant": "WBC relies on Arm IK for single-frame reachability feedback and zero-side-effect exception safety. Arm IK exceptions (including admission gate rejections and transaction failures) signal frame planning failure to WBC.",
+      "failure_condition": "Arm IK raises exception or returns unreachable target.",
+      "exception_propagation": "Propagates to WBC frame step; WBC handles kinematic fallback or aborts frame.",
+      "recovery_responsibility": "Arm IK guarantees clean rollback or explicit isolation; WBC manages trajectory plan."
+    },
+    "CONTRACT-11": {
+      "id": "CONTRACT-11",
+      "name": "Bilateral Reset Atomic Transaction",
+      "layer": "Layer 4 (Business) & Layer 1 (Coordinator)",
+      "invariant": "reset_arm_ik executes dual-arm reset within unified transaction. Each side reset sequentially updates: (1) Hand Controller, (2) Elbow Pole, (3) PoseBones neutral rotations, (4) Constraint Influences to 0.0, (5) Prebend Hint. Preflight failure guarantees zero writes. Mid-reset write failure triggers bilateral rollback. Nested reset failure reports rollback_only = True to outer Coordinator.",
+      "failure_condition": "Parent transform preflight failure, controller write error, influence write error, prebend write error, or depsgraph update error.",
+      "exception_propagation": "Preflight raises ValueError; write error triggers complete bilateral rollback and re-raises; nested error sets outer rollback_only.",
+      "recovery_responsibility": "Layer 5 restores both Left and Right arms to pre-reset snapshot state."
+    },
+    "CONTRACT-12": {
+      "id": "CONTRACT-12",
+      "name": "External Resource, Unproven DataBlock & New Armature Isolation Protection",
+      "layer": "Layer 5 (Restore), Layer 6 (Cleanup), Layer 3 (Ops), Layer 1 (Coordinator)",
+      "invariant": "External resources (unregistered objects/constraints/collections, Type B DataBlocks without explicit delete grant, Type C DataBlocks even with users == 0, and EXTERNAL_ADDED / OWNERSHIP_UNKNOWN relationships) are strictly protected from deletion or unlinking. Same-name collisions reject overwrite. Dead Armature tombstones (FAILED-D) never block newly created independent Armatures.",
+      "failure_condition": "External object occupies expected name, unprovable relationship encountered, or unauthorized DataBlock encountered during cleanup.",
+      "exception_propagation": "Collision/unknown relationship flags OWNERSHIP_UNPROVEN / RECOVERY_UNCERTAIN and aborts rollback; unauthorized DataBlock is safely retained as PRESERVED_NO_DELETE_AUTHORITY.",
+      "recovery_responsibility": "Halts destructive rollback on conflict; preserves unauthorized DataBlocks without false failure."
+    }
+  },
+  "f3_architecture_impact_matrix": [
+    {
+      "edge_id": "EDGE-01",
+      "source": "Layer 4: set_hand_ik_target",
+      "target": "Layer 4: _preflight_arm_ik_parent_transforms",
+      "edge_type": "CALL",
+      "dependency_type": "CALL (Intra-Layer Preflight Validation)",
+      "direction": "Layer 4 -> Layer 4 (CALL)",
+      "state_ownership": "Layer 4 stateless preflight validation",
+      "failure_propagation": "Raises ValueError/TypeError, aborts before transaction entry",
+      "recovery_responsibility": "Natural zero-mutation invariant",
+      "contract_id": "CONTRACT-01"
+    },
+    {
+      "edge_id": "EDGE-02",
+      "source": "Layer 4: set_hand_ik_target",
+      "target": "Layer 4: setup_arm_ik",
+      "edge_type": "CALL",
+      "dependency_type": "CALL (Nested Re-Entrant Business Invocation)",
+      "direction": "Layer 4 -> Layer 4 (CALL); Inner -> Outer Context (STATE_WRITE rollback_only)",
+      "state_ownership": "Outermost Layer 1 transaction",
+      "failure_propagation": "Inner setup failure bubbles up, marks outer transaction rollback_only = True",
+      "recovery_responsibility": "Outermost Layer 1 Coordinator",
+      "contract_id": "CONTRACT-02"
+    },
+    {
+      "edge_id": "EDGE-03",
+      "source": "Layer 4: setup_arm_ik",
+      "target": "Layer 3: _get_or_create_empty",
+      "edge_type": "CALL",
+      "dependency_type": "CALL (Authorized Controller & Type A DataBlock Allocation)",
+      "direction": "Layer 4 -> Layer 3 (CALL) -> Layer 2 (STATE_WRITE Provenance Registration)",
+      "state_ownership": "Layer 3 operational execution & Layer 2 ownership store",
+      "failure_propagation": "Allocation or registration failure aborts setup, bubbles to Layer 1",
+      "recovery_responsibility": "Layer 5 deletes registered controller and Type A DataBlock by verified identity via Layer 3",
+      "contract_id": "CONTRACT-03"
+    },
+    {
+      "edge_id": "EDGE-04",
+      "source": "Layer 3: Authorized Relationship Operations",
+      "target": "Layer 2: 7-State Relationship Operation Log",
+      "edge_type": "STATE_WRITE",
+      "dependency_type": "STATE_WRITE (7-State Relationship Log Registration & Transitions)",
+      "direction": "Layer 3 -> Layer 2 (STATE_WRITE)",
+      "state_ownership": "Layer 2 relationship log store",
+      "failure_propagation": "Prepare failure transitions to NO_EFFECT with zero Blender writes; apply error resolves to NO_EFFECT, APPLIED_VERIFIED, or RECOVERY_UNCERTAIN",
+      "recovery_responsibility": "Layer 5 invokes Layer 3 to undo APPLIED_VERIFIED/CONFIRMED mutations to REVERTED; RECOVERY_UNCERTAIN halts rollback",
+      "contract_id": "CONTRACT-04"
+    },
+    {
+      "edge_id": "EDGE-05",
+      "source": "Layer 5: _rollback_arm_rig_state & _verify_arm_rig_state_restored",
+      "target": "Layer 2: 7-State Relationship Operation Log",
+      "edge_type": "STATE_READ",
+      "dependency_type": "STATE_READ (Relationship Log Inspection & Verification Coupling)",
+      "direction": "Layer 5 -> Layer 2 (STATE_READ); Layer 5 -> Layer 3 (CALL Undo) -> Layer 2 (STATE_WRITE REVERTED)",
+      "state_ownership": "Layer 2 relationship log & Layer 5 verifier",
+      "failure_propagation": "Any transaction mutation remaining un-reverted or in RECOVERY_UNCERTAIN fails post-rollback verification",
+      "recovery_responsibility": "Layer 1 transitions transaction to FAILED (FAILED-B/C) and isolates Armature",
+      "contract_id": "CONTRACT-04"
+    },
+    {
+      "edge_id": "EDGE-06",
+      "source": "Layer 4: setup_arm_ik",
+      "target": "Layer 3: _authorized_create_constraint & _authorized_assign_constraint_targets",
+      "edge_type": "CALL",
+      "dependency_type": "CALL (Authorized Constraint Creation & Target Binding)",
+      "direction": "Layer 4 -> Layer 3 (CALL)",
+      "state_ownership": "Scene constraint stack & Layer 2 ownership/relationship logs",
+      "failure_propagation": "Constraint creation/target binding error bubbles to Layer 1, triggers rollback",
+      "recovery_responsibility": "Layer 5 removes created constraints and restores original target bindings via Layer 3, and restores numeric properties & order",
+      "contract_id": "CONTRACT-05"
+    },
+    {
+      "edge_id": "EDGE-07",
+      "source": "Layer 1: _arm_rig_transaction",
+      "target": "Layer 5: _snapshot_arm_rig_state",
+      "edge_type": "CALL",
+      "dependency_type": "CALL (Read-Only Baseline Snapshot Capture)",
+      "direction": "Layer 1 -> Layer 5 (CALL); Layer 5 -> Layer 1 (RESULT Snapshot)",
+      "state_ownership": "Layer 5 immutable snapshot store",
+      "failure_propagation": "Snapshot failure transitions transaction to FAILED (classified as FAILED-A if zero writes proven and structure intact)",
+      "recovery_responsibility": "Zero rollback needed for FAILED-A; Armature not falsely quarantined if uncorrupted",
+      "contract_id": "CONTRACT-06"
+    },
+    {
+      "edge_id": "EDGE-08",
+      "source": "Layer 1: _arm_rig_transaction & request_armature_deisolation",
+      "target": "Layer 5: _rollback_arm_rig_state, _verify_arm_rig_state_restored & verify_armature_deisolation_evidence",
+      "edge_type": "CALL",
+      "dependency_type": "CALL & RESULT (Rollback Execution, Symmetry Verification & De-Isolation Evidence Verification)",
+      "direction": "Layer 1 -> Layer 5 (CALL); Layer 5 -> Layer 1 (RESULT VerificationResult / DeisolationVerificationReport)",
+      "state_ownership": "Layer 5 verifier & Layer 1 sole state decision authority",
+      "failure_propagation": "Rollback error (FAILED-B), verification diff (FAILED-C), or Armature death (FAILED-D) reported via RESULT to Layer 1, which commands Layer 2 to isolate/tombstone",
+      "recovery_responsibility": "De-isolation requires Layer 5 category-specific verification report (RESULT) and Layer 1 Coordinator approval (STATE_WRITE to Layer 2)",
+      "contract_id": "CONTRACT-07"
+    },
+    {
+      "edge_id": "EDGE-09",
+      "source": "Layer 1: _arm_rig_transaction (Phase 3) & _dispatch_retry_cleanup",
+      "target": "Layer 6: retry_cleanup",
+      "edge_type": "CALL",
+      "dependency_type": "CALL & RESULT (Post-Commit Cleanup Dispatch & CleanupOutcome Return)",
+      "direction": "Layer 1 -> Layer 6 (CALL); Layer 6 -> Layer 1 (RESULT CleanupOutcome)",
+      "state_ownership": "Layer 1 owns lifecycle/gate state; Layer 6 owns item-level progress flags",
+      "failure_propagation": "Obligatory cleanup error returns CLEANUP_INCOMPLETE/FAILED to Layer 1; unauthorized DataBlocks record PRESERVED_NO_DELETE_AUTHORITY and return CLEANUP_SUCCESS",
+      "recovery_responsibility": "Layer 1 sets CLEANUP_PENDING on obligatory failure and alone authorizes Layer 2 gate deregistration on CLEANUP_SUCCESS",
+      "contract_id": "CONTRACT-08"
+    },
+    {
+      "edge_id": "EDGE-10",
+      "source": "Layer 6: retry_cleanup",
+      "target": "Layer 2: DataBlock Cleanup Authorization Records & Layer 3: _authorized_remove_datablock_if_permitted",
+      "edge_type": "CALL",
+      "dependency_type": "STATE_READ & CALL (DataBlock Authorization Inspection & Conditional Physical Deletion)",
+      "direction": "Layer 6 -> Layer 2 (STATE_READ Auth & STATE_WRITE Item Progress); Layer 6 -> Layer 3 (CALL Conditional Delete)",
+      "state_ownership": "Layer 2 DataBlock Cleanup Authorization Records",
+      "failure_propagation": "Missing delete authority preserves DataBlock as PRESERVED_NO_DELETE_AUTHORITY without triggering false failure; obligatory delete error returns CLEANUP_FAILED to Layer 1",
+      "recovery_responsibility": "Layer 6 preserves Type B (ungranted) and Type C DataBlocks; retries only authorized obligatory DataBlocks",
+      "contract_id": "CONTRACT-08"
+    },
+    {
+      "edge_id": "EDGE-11",
+      "source": "Layer 1: _arm_rig_transaction & _assert_arm_rig_cleanup_gate",
+      "target": "Layer 2: query_admission_gate_status & Session Identity Registry",
+      "edge_type": "STATE_READ",
+      "dependency_type": "STATE_READ & STATE_WRITE (Admission Gate Query & Coordinator-Exclusive Gate/Isolation Mutation)",
+      "direction": "Layer 1 -> Layer 2 (STATE_READ / STATE_WRITE); Layer 2 -> Layer 1 (RESULT GateResult)",
+      "state_ownership": "Layer 1 decision authority; Layer 2 passive index store",
+      "failure_propagation": "Unresolved CLEANUP_PENDING or active FAILED-B/C isolation raises RuntimeError and blocks admission; FAILED-D tombstone blocks spoofing but allows new Armature identities",
+      "recovery_responsibility": "Only Layer 1 Coordinator can instruct Layer 2 to clear CLEANUP_PENDING or lift FAILED isolation",
+      "contract_id": "CONTRACT-09"
+    },
+    {
+      "edge_id": "EDGE-12",
+      "source": "Upper Pipeline: WBC",
+      "target": "Layer 4: Arm IK Public APIs",
+      "edge_type": "CALL",
+      "dependency_type": "CALL (Pipeline Single-Frame IK Invocation)",
+      "direction": "WBC -> Layer 4 (CALL); Layer 4 -> WBC (RESULT Reachability / Exception)",
+      "state_ownership": "WBC trajectory state",
+      "failure_propagation": "Arm IK admission rejection or rollback/isolation exception bubbles to WBC, signaling frame IK failure",
+      "recovery_responsibility": "Arm IK guarantees clean rollback or explicit isolation; WBC adapts trajectory plan",
+      "contract_id": "CONTRACT-10"
+    },
+    {
+      "edge_id": "EDGE-13",
+      "source": "Layer 4: reset_arm_ik",
+      "target": "Layer 1: _arm_rig_transaction",
+      "edge_type": "CALL",
+      "dependency_type": "CALL (Bilateral Reset Unified Transaction Wrapper)",
+      "direction": "Layer 4 -> Layer 1 (CALL)",
+      "state_ownership": "Layer 1 unified transaction",
+      "failure_propagation": "Left or Right reset write failure triggers full bilateral rollback; nested failure sets outer rollback_only",
+      "recovery_responsibility": "Layer 5 restores dual-arm poses, controllers, influences, and prebend hints",
+      "contract_id": "CONTRACT-11"
+    },
+    {
+      "edge_id": "EDGE-14",
+      "source": "Layer 5: _rollback_arm_rig_state, Layer 6: retry_cleanup & Layer 3: Authorized Resource Operations",
+      "target": "External Scene Resources & Unproven DataBlocks",
+      "edge_type": "PROTECTION",
+      "dependency_type": "PROTECTION (Read-Only Provenance Inspection & Non-Destruction Boundary)",
+      "direction": "Layer 5 / Layer 6 / Layer 3 -> External Scene Resources & Unproven DataBlocks (PROTECTION)",
+      "state_ownership": "External caller / scene graph",
+      "failure_propagation": "Object/relationship collision raises OWNERSHIP_UNPROVEN / RECOVERY_UNCERTAIN; ungranted DataBlock is retained as PRESERVED_NO_DELETE_AUTHORITY",
+      "recovery_responsibility": "Refuses destructive action on external objects, relationships, and DataBlocks",
+      "contract_id": "CONTRACT-12"
+    }
+  ],
+  "f3_verification_requirements": {
+    "CONTRACT-01": {
+      "contract_id": "CONTRACT-01",
+      "normal_scenario": "Valid side ('L','R','BOTH'), finite world coordinates, valid rotation degrees, valid influence [0.0, 1.0], conformal parent transform.",
+      "failure_scenario": "NaN/Inf inputs, negative influence, out-of-range degrees, singular zero-determinant parent matrix.",
+      "external_shared_state_impact": "Zero scene mutation; no empty created, no constraint added, bone transforms unchanged.",
+      "invariant_to_verify": "Zero scene mutation on invalid arguments; preflight rejection precedes transaction entry.",
+      "pass_criteria": "TypeError/ValueError raised; scene full comparison with pre-call snapshot has 0 diffs.",
+      "fail_criteria": "Any scene object allocated, bone transform altered, or transaction stack entered.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-02": {
+      "contract_id": "CONTRACT-02",
+      "normal_scenario": "set_hand_ik_target triggers setup_arm_ik on uninitialized rig within outer transaction context.",
+      "failure_scenario": "Inner setup_arm_ik raises exception, or caller attempts cross-armature nested transaction.",
+      "external_shared_state_impact": "Outer transaction absorbs failure; stack depth remains strictly 1.",
+      "invariant_to_verify": "Re-entrant call reuses outer context; inner failure sets rollback-only via explicit reporting path, preventing silent outer commit.",
+      "pass_criteria": "Single snapshot captured; inner error forces complete rollback of outer transaction.",
+      "fail_criteria": "Secondary snapshot created, stack depth > 1, or outer transaction commits despite inner failure.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-03": {
+      "contract_id": "CONTRACT-03",
+      "normal_scenario": "setup_arm_ik creates HandIK and ElbowPole empties (and any Type A internal DataBlock) with immediate Layer 2 provenance registration before collection link.",
+      "failure_scenario": "Failure injected immediately after entity creation before collection link.",
+      "external_shared_state_impact": "Unlinked entity is tracked by reference and pointer in active_tx and destroyed on rollback.",
+      "invariant_to_verify": "Creation-first provenance registration guarantees zero orphan empties or Type A DataBlocks upon failure.",
+      "pass_criteria": "Created empty and Type A DataBlock removed by verified identity; snapshot state fully restored.",
+      "fail_criteria": "Orphan empty or Type A DataBlock lingers in bpy.data, or unlinked without registration.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-04": {
+      "contract_id": "CONTRACT-04",
+      "normal_scenario": "Relationship mutation progresses PREPARED -> APPLYING -> APPLIED_VERIFIED -> CONFIRMED. Duplicate link on PRE_EXISTING_ORIGINAL transitions PREPARED -> NO_EFFECT.",
+      "failure_scenario": "Failure after APPLIED_VERIFIED or CONFIRMED triggers rollback to REVERTED; failure with zero effect transitions to NO_EFFECT; corrupt/ambiguous state transitions to RECOVERY_UNCERTAIN.",
+      "external_shared_state_impact": "Only verified TX_ADDED / TX_UNLINKED_ORIGINAL mutations are undone (to REVERTED); PRE_EXISTING_ORIGINAL and EXTERNAL_ADDED remain untouched; RECOVERY_UNCERTAIN preserves scene.",
+      "invariant_to_verify": "7-state relationship log machine and 10 legal transitions; Undo(m) theorem; rollback verification fails if any transaction mutation fails to reach REVERTED or NO_EFFECT.",
+      "pass_criteria": "Transaction link reverted to REVERTED; pre-existing link marked NO_EFFECT and preserved; RECOVERY_UNCERTAIN halts destructive unlinking and triggers FAILED-B/C.",
+      "fail_criteria": "Undefined log state used, CONFIRMED mutation skipped during rollback, pre-existing link unlinked, or RECOVERY_UNCERTAIN silently ignored.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-05": {
+      "contract_id": "CONTRACT-05",
+      "normal_scenario": "setup_arm_ik configures ArmIK and HandRotation constraints with initial influence [0.0, 1.0].",
+      "failure_scenario": "Pre-existing external constraint on bone; failure injected during ArmIK configuration.",
+      "external_shared_state_impact": "External constraint survives rollback; relative ordering of original constraints restored.",
+      "invariant_to_verify": "Constraint deletion strictly by registered reference and pointer; external constraints immune to rollback diff.",
+      "pass_criteria": "Transaction constraint removed; external constraint intact with identical pointer, properties, and relative order.",
+      "fail_criteria": "External constraint removed, modified, or ordering scrambled.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-06": {
+      "contract_id": "CONTRACT-06",
+      "normal_scenario": "Transaction captures read-only snapshot of 4 controllers, 6 pose bones, constraints, and collection trees.",
+      "failure_scenario": "Failure injected during read-only snapshot property read before any business write (FAILED-A).",
+      "external_shared_state_impact": "Zero scene mutation during capture; snapshot failure with proven zero writes terminates transaction as FAILED-A without permanently isolating the uncorrupted Armature.",
+      "invariant_to_verify": "Zero-mutation snapshot guarantee; FAILED-A (zero writes proven) distinguished from post-write FAILED-B/C contamination.",
+      "pass_criteria": "Snapshot capture leaves scene untouched; FAILED-A aborts transaction cleanly and allows subsequent independent transaction admission if Armature structure is intact.",
+      "fail_criteria": "Scene mutated during snapshot capture, or zero-write snapshot read error permanently deadlocks healthy Armature.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-07": {
+      "contract_id": "CONTRACT-07",
+      "normal_scenario": "Rollback restores exact baseline snapshot properties; verifier confirms 0 diffs; de-isolation succeeds when Layer 5 verifies category-specific evidence and Layer 1 Coordinator approves.",
+      "failure_scenario": "Rollback execution error (FAILED-B), verification diff > 1e-5 (FAILED-C), or original Armature deleted (FAILED-D); new Armature subsequently created with same name/recycled address.",
+      "external_shared_state_impact": "FAILED-B/C isolates the specific ArmatureSessionIdentityRecord across stack pops; FAILED-D records tombstone without blocking legitimate new Armature identities.",
+      "invariant_to_verify": "ArmatureSessionIdentityRecord liveness & reference matching; FAILED-A/B/C/D classification; category-specific de-isolation (Case 1 snapshot, Case 2 structural invariants, Case 3 tombstone retirement) approved solely by Layer 1 Coordinator and audited in Layer 2.",
+      "pass_criteria": "FAILED-B/C blocks subsequent writes on same Armature; unverified de-isolation rejected; verified de-isolation approved by Coordinator and logged; FAILED-D tombstone prevents spoofing while allowing new Armature.",
+      "fail_criteria": "Substitute pointer accepted as original, FAILED cleared without Layer 5 proof and Coordinator approval, or dead Armature tombstone blocks unrelated new Armature.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-08": {
+      "contract_id": "CONTRACT-08",
+      "normal_scenario": "Transaction commits; Phase 3 cleanup deletes authorized doomed objects and Type A / explicitly granted Type B DataBlocks satisfying CanDelete(D, t); ungranted Type B and Type C DataBlocks are preserved as PRESERVED_NO_DELETE_AUTHORITY.",
+      "failure_scenario": "Obligatory authorized DataBlock deletion fails (e.g. unexpected active user or RNA error); or doomed object points to pre-existing Type B DataBlock without delete authority.",
+      "external_shared_state_impact": "Unauthorized DataBlocks (even with users == 0) are preserved with PRESERVED_NO_DELETE_AUTHORITY and transaction succeeds; obligatory cleanup failure returns CLEANUP_INCOMPLETE/FAILED to Layer 1, which sets CLEANUP_PENDING.",
+      "invariant_to_verify": "CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D); Layer 6 never independently deregisters gates; Layer 1 evaluates CleanupOutcome.",
+      "pass_criteria": "Type B (ungranted) and Type C DataBlocks with users == 0 are preserved as PRESERVED_NO_DELETE_AUTHORITY without triggering CLEANUP_PENDING; obligatory cleanup failure triggers CLEANUP_PENDING via Layer 1.",
+      "fail_criteria": "DataBlock deleted solely because users == 0 or owning Object was doomed; PRESERVED_NO_DELETE_AUTHORITY treated as retry failure; or Layer 6 directly mutates gate state.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-09": {
+      "contract_id": "CONTRACT-09",
+      "normal_scenario": "Layer 1 queries Layer 2 admission gate; pending cleanup retried via Coordinator -> Layer 6 -> CleanupOutcome(CLEANUP_SUCCESS) -> Coordinator authorizes Layer 2 to clear gate.",
+      "failure_scenario": "New write attempted on Armature with unresolved CLEANUP_PENDING or active FAILED-B/C isolation; or retry_pending_arm_rig_cleanup invoked on FAILED Armature.",
+      "external_shared_state_impact": "Admission gate blocks blocked Armature; unrelated Armatures and new Armature identities after FAILED-D tombstone proceed unblocked.",
+      "invariant_to_verify": "Unidirectional Layer 1 -> Layer 2 gate query; Coordinator-exclusive gate deregistration; Cleanup Retry cannot clear FAILED isolation.",
+      "pass_criteria": "Write on blocked Armature raises RuntimeError; Coordinator-authorized retry clears CLEANUP_PENDING; Cleanup Retry refuses to clear FAILED-B/C/D.",
+      "fail_criteria": "Layer 6 or Layer 2 clears gate without Coordinator authorization, or Cleanup Retry clears FAILED isolation.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-10": {
+      "contract_id": "CONTRACT-10",
+      "normal_scenario": "WBC single-frame kinematics invokes set_hand_ik_target; reaches target within reach limit.",
+      "failure_scenario": "Arm IK admission rejection, internal rollback error, or unreachable target outside maximum reach.",
+      "external_shared_state_impact": "WBC trajectory pipeline notified; scene left in clean baseline state or explicitly isolated.",
+      "invariant_to_verify": "Zero silent side-effect on frame rejection; WBC receives accurate reachability and exception telemetry.",
+      "pass_criteria": "Arm IK guarantees clean state on recoverable error and explicit exception on isolation; WBC adapts or aborts frame cleanly.",
+      "fail_criteria": "Partial IK state silently leaked into WBC execution frame.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-11": {
+      "contract_id": "CONTRACT-11",
+      "normal_scenario": "reset_arm_ik resets dual arms to neutral rest; preflight parent transforms pass; sequential updates for Hand, Pole, Rotations, Influences, Prebend execute for Left then Right.",
+      "failure_scenario": "Preflight failure (singular root matrix); mid-reset failure (after Left arm writes); nested reset write failure.",
+      "external_shared_state_impact": "Preflight failure causes 0 scene writes; mid-reset failure rolls back both Left and Right arms; nested failure marks outer transaction rollback_only.",
+      "invariant_to_verify": "Bilateral atomicity; sequential 5-step reset per side; no half-reset state ever committed or leaked; nested failure reports rollback_only = True to outer Coordinator.",
+      "pass_criteria": "Preflight failure leaves scene untouched; mid-reset failure restores pre-reset dual-arm pose; nested failure forces outer rollback.",
+      "fail_criteria": "Left arm reset while Right arm remains in target pose, prebend omitted, or outer transaction commits despite nested reset failure.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    },
+    "CONTRACT-12": {
+      "contract_id": "CONTRACT-12",
+      "normal_scenario": "Rig operates in scene containing external objects, collections, constraints, and external/pre-existing zero-user DataBlocks.",
+      "failure_scenario": "External object shares controller name ('HandIK.L'); external/ungranted DataBlock has users == 0 during cleanup; new Armature created after prior Armature died in FAILED-D.",
+      "external_shared_state_impact": "External object, external relationship, ungranted zero-user DataBlock, and new independent Armature are all preserved and unblocked.",
+      "invariant_to_verify": "No name-based or zero-user-based deletion; external scene graph and new Armature identities strictly isolated from transaction destruction or dead tombstones.",
+      "pass_criteria": "External object intact; zero-user Type B (ungranted) / Type C DataBlock preserved; new Armature after FAILED-D executes normally.",
+      "fail_criteria": "External object deleted/unlinked by name, zero-user external DataBlock deleted, or new Armature blocked by dead object's tombstone.",
+      "verification_status": "REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE"
+    }
+  },
+  "f4_reset_transaction_contract": {
+    "architectural_position": "Layer 4 Business API operating strictly within Layer 1 Transaction Coordinator.",
+    "core_invariants": [
+      "Bilateral dual-arm atomicity: Left and Right arms belong to a single atomic transaction.",
+      "Zero-write preflight: Parent transform non-singularity verified before any scene write.",
+      "Unified snapshot: Baseline snapshot captured by Layer 1 covers both arms; no second snapshot.",
+      "Admission gate respect: Cannot execute writes if unresolved CLEANUP_PENDING or active FAILED-B/C isolation exists on Armature session identity.",
+      "Five-component reset sequence per side: Hand Controller, Elbow Pole, PoseBones neutral rotations, Constraint Influences, Prebend Hint."
+    ],
+    "execution_sequence": [
+      "1. Transaction Admission Check: Layer 1 queries Layer 2 gate via _assert_arm_rig_cleanup_gate(arm) checking ArmatureSessionIdentityRecord for CLEANUP_PENDING and FAILED-B/C isolation.",
+      "2. Parent Transform Preflight: Call compute_effective_parent_matrix() and validate_effective_parent_transform() for HandIK and ElbowPole controllers on both L and R sides. If any fails, raise ValueError with ZERO business writes (and mark outer_tx.rollback_only if nested).",
+      "3. Unified Transaction Entry: Enter with _arm_rig_transaction(arm).",
+      "4. Baseline Snapshot: Layer 5 captures immutable snapshot of both arms, controllers, constraints.",
+      "5. Left Arm Reset Writes: Sequentially update (1) HandIK.L transform, (2) ElbowPole.L transform, (3) upper_arm.L/forearm.L/hand.L Euler rotations to neutral (0,0,0), (4) ArmIK.L and HandRotation.L influences to 0.0, (5) apply Left Prebend Hint. (Observable fault boundary: reset_arm_ik_after_influence_l).",
+      "6. Right Arm Reset Writes: Sequentially update (1) HandIK.R transform, (2) ElbowPole.R transform, (3) upper_arm.R/forearm.R/hand.R Euler rotations to neutral (0,0,0), (4) ArmIK.R and HandRotation.R influences to 0.0, (5) apply Right Prebend Hint. (Observable fault boundary: reset_arm_ik_after_influence_r).",
+      "7. Commit Preparation: Depsgraph synchronization via _depsgraph_update(). (Observable fault boundary: reset_arm_ik_during_depsgraph_update).",
+      "8. Logical Commit: Coordinator transitions state to COMMITTED.",
+      "9. Post-Commit Cleanup: Coordinator invokes Layer 6 retry_cleanup(), evaluates returned CleanupOutcome, and authorizes Layer 2 state/gate update."
+    ],
+    "nested_reset_behavior": {
+      "rules": [
+        "If reset_arm_ik is invoked inside an outer transaction on the same Armature session identity, it reuses the outer context.",
+        "No independent snapshot is created.",
+        "No early commit of the outer transaction is performed.",
+        "No independent post-commit cleanup is executed.",
+        "If reset_arm_ik fails during preflight or writes inside an outer transaction, it explicitly calls outer_tx.mark_rollback_only(reason).",
+        "Outer Coordinator checks tx.rollback_only at commit gate and rejects commit, forcing full rollback.",
+        "Preflight failure in nested reset raises ValueError without modifying scene, while guaranteeing outer transaction cannot silently commit."
+      ]
+    },
+    "post_commit_error_policy": {
+      "rules": [
+        "If failure occurs on an obligatory cleanup item during Phase 3 cleanup after logical commit, ordinary rollback is forbidden.",
+        "Layer 6 returns CLEANUP_INCOMPLETE or CLEANUP_FAILED to Layer 1 Coordinator.",
+        "Coordinator transitions state to CLEANUP_PENDING and instructs Layer 2 to register the pending gate in _PENDING_ARM_RIG_CLEANUPS.",
+        "Subsequent writes on this Armature session identity are blocked until Coordinator-supervised retry_pending_arm_rig_cleanup receives CLEANUP_SUCCESS and authorizes Layer 2 gate deregistration."
+      ]
+    }
+  },
+  "f4_reset_state_graph": {
+    "mermaid": "stateDiagram-v2\n    [*] --> ADMISSION_CHECK : reset_arm_ik(arm)\n    \n    state ADMISSION_CHECK {\n        [*] --> GateAssert : _assert_arm_rig_cleanup_gate(arm)\n        GateAssert --> PREFLIGHT : Gate Clear (No Pending Cleanup / No FAILED-B/C Isolation)\n        GateAssert --> BLOCKED : Unresolved CLEANUP_PENDING or Active FAILED-B/C Isolation\n    }\n    \n    BLOCKED --> [*] : Raise RuntimeError (Zero Writes)\n    \n    state PREFLIGHT {\n        [*] --> ComputeMats : compute_effective_parent_matrix() for L/R\n        ComputeMats --> ValidateConformal : validate_effective_parent_transform()\n    }\n    \n    PREFLIGHT --> ABORT_PREFLIGHT : Invalid/Singular Matrix (det=0)\n    ABORT_PREFLIGHT --> [*] : Raise ValueError (Zero Writes / mark outer rollback_only if nested)\n    \n    PREFLIGHT --> UNIFIED_TRANSACTION : Preflight 100% Valid\n    \n    state UNIFIED_TRANSACTION {\n        [*] --> SNAPSHOTTING : Enter _arm_rig_transaction\n        SNAPSHOTTING --> ACTIVE : Layer 5 Captures Dual-Arm Snapshot\n        SNAPSHOTTING --> FAILED : Snapshot Read Error (FAILED-A if zero writes proven)\n        \n        state ACTIVE {\n            [*] --> LEFT_RESET : Start Dual-Arm Reset Sequence\n            state LEFT_RESET {\n                [*] --> L_HandPole : (1) HandIK.L & (2) ElbowPole.L Transforms\n                L_HandPole --> L_Bones : (3) PoseBone Rotations to Neutral (0,0,0)\n                L_Bones --> L_Influence : (4) ArmIK.L & HandRotation.L Influences to 0.0\n                L_Influence --> L_Prebend : (5) Apply Left Prebend Hint\n            }\n            LEFT_RESET --> RIGHT_RESET : Left Arm Writes Complete (Fault Boundary: after_influence_l)\n            state RIGHT_RESET {\n                [*] --> R_HandPole : (1) HandIK.R & (2) ElbowPole.R Transforms\n                R_HandPole --> R_Bones : (3) PoseBone Rotations to Neutral (0,0,0)\n                R_Bones --> R_Influence : (4) ArmIK.R & HandRotation.R Influences to 0.0\n                R_Influence --> R_Prebend : (5) Apply Right Prebend Hint\n            }\n            RIGHT_RESET --> [*] : Right Arm Writes Complete (Fault Boundary: after_influence_r)\n        }\n        \n        ACTIVE --> COMMITTING : Dual-Arm Writes Complete\n        COMMITTING --> COMMITTED : _depsgraph_update() Passes (Commit Line Crossed)\n        \n        ACTIVE --> ROLLING_BACK : Mid-write Failure (L or R) / Nested Error\n        COMMITTING --> ROLLING_BACK : Depsgraph Update Failure\n        \n        state ROLLING_BACK {\n            [*] --> BilateralRestore : Layer 5 Restores Dual-Arm Baseline State & Reverts Logs\n            BilateralRestore --> VerifyMatch : Layer 5 Full-Field & Log Verification (Tolerance 1e-5)\n        }\n        \n        ROLLING_BACK --> ROLLED_BACK : Verification 100% Matches Snapshot\n        ROLLING_BACK --> FAILED : Restore/Verify Error (FAILED-B/C/D)\n    }\n    \n    COMMITTED --> POST_COMMIT_CLEANUP : Coordinator Dispatches Layer 6 Cleanup\n    POST_COMMIT_CLEANUP --> [*] : CleanupOutcome == CLEANUP_SUCCESS -> Coordinator Confirms Gate Clear\n    POST_COMMIT_CLEANUP --> CLEANUP_PENDING : CleanupOutcome == INCOMPLETE/FAILED -> Coordinator Registers Gate\n    CLEANUP_PENDING --> [*]\n    \n    ROLLED_BACK --> [*] : Re-raise Original Business Error (Dual Arms Baseline Intact)\n    FAILED --> [*] : Coordinator Applies FAILED-A/B/C/D Policy in Layer 2 & Raises Error"
+  },
+  "fixed_design_decisions": {
+    "DECISION-A": {
+      "topic": "External Same-Name Resource Conflict",
+      "decision": "Refuse overwrite, protect existing scene graph. Automatic renaming of external objects is strictly forbidden. Ownership conflicts halt rollback and raise explicit errors.",
+      "rationale": "Prevents data loss or scene hierarchy scrambling in multi-asset or user-edited production environments."
+    },
+    "DECISION-B": {
+      "topic": "Multi-Armature Reset Coordination",
+      "decision": "Scoped to single-armature atomicity. Cross-armature two-phase commit (2PC) is excluded from this phase. Upper pipeline must orchestrate multi-character resets sequentially.",
+      "rationale": "Avoids over-engineering complex distributed transaction protocols before single-armature integrity is certified."
+    },
+    "DECISION-C": {
+      "topic": "DataBlock Garbage Collection & Explicit Deletion Authorization Scope",
+      "decision": "Global bpy.data.orphans_purge() is strictly forbidden. Furthermore, Users(D) == 0 or deletion of an owning Object NEVER automatically grants DataBlock deletion authority. Physical deletion of a DataBlock D is permitted if and only if CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D) holds (covering Type A transaction-created DataBlocks and Type B pre-existing DataBlocks with an independent, explicit deletion grant). Pre-existing Type B DataBlocks without an explicit grant and all Type C external/unproven DataBlocks are preserved as PRESERVED_NO_DELETE_AUTHORITY.",
+      "rationale": "Zero user count in Blender only indicates absence of active references, not ownership. Preserving unauthorized DataBlocks prevents destroying pre-loaded assets, staging caches, or user datablocks while distinguishing legitimate preservation from obligatory cleanup failures."
+    }
+  },
+  "cross_consistency_checks": {
+    "CHECK-01": {
+      "question": "资源所有权规则是否互相矛盾？",
+      "status": "PASS",
+      "json_field_path": "f1_resource_ownership.formal_rules, f1_resource_ownership.prohibitions, f1_resource_ownership.entity_model.DataBlock, f3_contract_registry.CONTRACT-08, fixed_design_decisions.DECISION-C",
+      "invariant": "Delete(r) => OwnershipVerified(r, t) and IdentityVerified(r); CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D)",
+      "dependencies": "Layer 1 -> Layer 6 -> Layer 2 (Auth Query) -> Layer 3 (Conditional Delete)",
+      "state_transitions": "ACTIVE -> ROLLING_BACK, COMMITTED -> POST_COMMIT_CLEANUP",
+      "logical_evidence": "F1, F2, F3 (CONTRACT-03, CONTRACT-08, CONTRACT-12), and DECISION-C uniformly enforce explicit ownership and deletion authorization across Objects, Constraints, Collections, and DataBlocks. The contradiction where Users(D)==0 implied deletion authority is eliminated: Type B DataBlocks without independent grant and Type C DataBlocks are preserved as PRESERVED_NO_DELETE_AUTHORITY without triggering false cleanup failures."
+    },
+    "CHECK-02": {
+      "question": "关系修改是否存在未登记的异常窗口？",
+      "status": "PASS",
+      "json_field_path": "f1_relationship_atomicity.relationship_operation_log_states, f1_relationship_atomicity.relationship_log_legal_transitions, f1_relationship_atomicity.exception_safety_protocol, f3_contract_registry.CONTRACT-04",
+      "invariant": "7-state relationship operation log (PREPARED, APPLYING, APPLIED_VERIFIED, CONFIRMED, NO_EFFECT, REVERTED, RECOVERY_UNCERTAIN) with 10 closed transitions",
+      "dependencies": "Layer 3 -> Layer 2 (prepare & state transitions) -> Layer 5 (rollback & verification)",
+      "state_transitions": "PREPARED -> APPLYING -> (APPLIED_VERIFIED | NO_EFFECT | RECOVERY_UNCERTAIN); (APPLIED_VERIFIED | CONFIRMED) -> (REVERTED | RECOVERY_UNCERTAIN)",
+      "logical_evidence": "Every relationship operation is registered in PREPARED before C-API invocation. All intermediate and terminal log states (including NO_EFFECT and REVERTED) are formally defined with explicit transition triggers, closing the undefined-state gap."
+    },
+    "CHECK-03": {
+      "question": "状态是否有多个最终决策者？",
+      "status": "PASS",
+      "json_field_path": "f2_state_transition_authority.sole_authority, f2_state_transition_authority.retry_cleanup_flow, f2_layer_responsibilities.Layer1_TransactionCoordinator, f2_layer_responsibilities.Layer6_CommitCleanup",
+      "invariant": "SoleLifecycleAndGateAuthority(Layer 1 Coordinator)",
+      "dependencies": "Layer 1 -> Layer 6 (CALL) -> CleanupOutcome (RESULT) -> Layer 1 -> Layer 2 (STATE_WRITE)",
+      "state_transitions": "COMMITTED -> CLEANUP_PENDING -> COMMITTED; ROLLING_BACK -> FAILED (isolation/tombstone); De-isolation approval",
+      "logical_evidence": "F2-B eliminates the conflict where Layer 6 directly deregistered pending cleanups in Layer 2. Layer 6 now only updates item-level progress flags and returns CleanupOutcome to Layer 1. Layer 1 Coordinator alone authorizes Layer 2 to transition lifecycle states, clear CLEANUP_PENDING gates, or lift FAILED isolation."
+    },
+    "CHECK-04": {
+      "question": "是否存在未经授权的依赖方向？",
+      "status": "PASS",
+      "json_field_path": "f2_directed_dependency_graph.taxonomy, f2_directed_dependency_graph.mermaid, f2_directed_dependency_graph.cycle_elimination_proof, f3_architecture_impact_matrix",
+      "invariant": "AcyclicInvocationDAG(WBC -> L4 -> L1 -> L5 -> L6 -> L3 -> L2)",
+      "dependencies": "CALL edges strictly downward; RESULT edges strictly upward stack return values; Lifecycle/Gate STATE_WRITE exclusive to Layer 1 -> Layer 2",
+      "state_transitions": "N/A (Static Call & Authority Topology)",
+      "logical_evidence": "All CALL dependencies form a strict DAG. Layer 2 has zero outgoing calls. Layer 5 and Layer 6 return VerificationResult and CleanupOutcome via stack return (RESULT) and never call Layer 1 or independently write lifecycle/gate states in Layer 2."
+    },
+    "CHECK-05": {
+      "question": "是否存在没有处理者的状态转换？",
+      "status": "PASS",
+      "json_field_path": "f2_state_transition_authority.transition_rules, f2_state_transition_authority.persistent_failed_protection, f1_relationship_atomicity.relationship_log_legal_transitions",
+      "invariant": "TotalHandlerCoverage(9 Transaction Lifecycle States, 7 Relationship Log States, 4 FAILED Categories)",
+      "dependencies": "Layer 1 (Lifecycle & FAILED-A/B/C/D handler), Layer 3 & Layer 5 (7-State Relationship Log handler)",
+      "state_transitions": "All 9 transaction states and 10 relationship log transitions have explicit triggers, guards, and responsible handlers",
+      "logical_evidence": "The 9-state transaction machine and 7-state relationship log machine are cleanly separated. FAILED transitions are classified into FAILED-A (pre-write zero-mutation), FAILED-B (rollback error), FAILED-C (verification mismatch), and FAILED-D (armature death tombstone), each with explicit entry and de-isolation/retirement handlers."
+    },
+    "CHECK-06": {
+      "question": "是否存在无法恢复的关系修改却仍宣告成功？",
+      "status": "PASS",
+      "json_field_path": "f1_relationship_atomicity.relationship_log_terminal_states.rollback_verification_coupling, f3_contract_registry.CONTRACT-04, f3_contract_registry.CONTRACT-07",
+      "invariant": "Forall m in ActiveTxMutations: RollbackSuccess => State(m) in {NO_EFFECT, REVERTED}",
+      "dependencies": "Layer 3 (undo execution) -> Layer 2 (log state) -> Layer 5 (verification check) -> Layer 1 (FAILED-B/C transition)",
+      "state_transitions": "(APPLIED_VERIFIED | CONFIRMED) -> RECOVERY_UNCERTAIN => ROLLING_BACK -> FAILED (ISOLATED_FAILED_B/C)",
+      "logical_evidence": "During rollback verification, Layer 5 inspects all relationship log entries. If any transaction mutation remains in APPLIED_VERIFIED/CONFIRMED or enters RECOVERY_UNCERTAIN, verification fails and Layer 1 transitions the transaction to FAILED (ISOLATED_FAILED_B/C)."
+    },
+    "CHECK-07": {
+      "question": "十二项 Contract ID 是否唯一且一致？",
+      "status": "PASS",
+      "json_field_path": "f3_contract_registry, f3_architecture_impact_matrix, f3_verification_requirements",
+      "invariant": "IDs_Registry == Unique(IDs_Impact) == IDs_Verification == {CONTRACT-01 .. CONTRACT-12} and |IDs_Registry| == 12",
+      "dependencies": "Table A (12 contracts), Table B (14 dependency impact rows covering all 12 contract IDs), Table C (12 verification specifications)",
+      "state_transitions": "N/A (Contract Set & Semantic Identity)",
+      "logical_evidence": "The unique contract ID sets across Registry, Impact Matrix, and Verification Requirements are strictly equal to {CONTRACT-01 .. CONTRACT-12} (count = 12), while multi-edge contracts (CONTRACT-04, CONTRACT-08) have explicit dependency rows in the Impact Matrix with unified semantics."
+    },
+    "CHECK-08": {
+      "question": "每项合同是否有对应的验证要求？",
+      "status": "PASS",
+      "json_field_path": "f3_verification_requirements.CONTRACT-01 .. CONTRACT-12",
+      "invariant": "Forall c in {CONTRACT-01 .. CONTRACT-12}: HasAlignedInvariantsAndPassFailCriteria(c)",
+      "dependencies": "F1-A (DataBlock CanDelete), F1-B (7-state log), F2-A (FAILED-A/B/C/D & Session Identity), F2-B (Coordinator gate authority)",
+      "state_transitions": "All normal, failure, and recovery transitions covered in verification criteria",
+      "logical_evidence": "All 12 verification entries in f3_verification_requirements have been updated to verify the 7-state relationship log (CONTRACT-04), FAILED-A zero-write non-quarantine (CONTRACT-06), FAILED-B/C/D session identity & de-isolation governance (CONTRACT-07, CONTRACT-09), and CanDelete(D,t) / PRESERVED_NO_DELETE_AUTHORITY (CONTRACT-08, CONTRACT-12)."
+    },
+    "CHECK-09": {
+      "question": "Reset 状态图是否与文字合同完全一致？",
+      "status": "PASS",
+      "json_field_path": "f4_reset_transaction_contract, f4_reset_state_graph.mermaid, f3_contract_registry.CONTRACT-11",
+      "invariant": "IsomorphicStateFlow(f4_reset_transaction_contract.execution_sequence, f4_reset_state_graph.mermaid)",
+      "dependencies": "Layer 4 reset_arm_ik -> Layer 1 Coordinator -> Layer 5 Snapshot/Restore -> Layer 6 Cleanup",
+      "state_transitions": "ADMISSION_CHECK -> PREFLIGHT -> UNIFIED_TRANSACTION (SNAPSHOTTING -> ACTIVE [LEFT_RESET -> RIGHT_RESET] -> COMMITTING -> COMMITTED) -> POST_COMMIT_CLEANUP",
+      "logical_evidence": "The Reset state diagram and text contract match across all stages, including FAILED-A/B/C/D classification, 5-step per-side reset (Hand, Pole, PoseBone Rotations, Constraint Influences, Prebend), nested rollback_only propagation, and Coordinator-evaluated POST_COMMIT_CLEANUP."
+    },
+    "CHECK-10": {
+      "question": "嵌套异常是否可能被吞掉并导致错误提交？",
+      "status": "PASS",
+      "json_field_path": "f2_state_transition_authority.nested_transaction_rollback_only_contract, f4_reset_transaction_contract.nested_reset_behavior, f3_contract_registry.CONTRACT-02",
+      "invariant": "InnerFailure => outer_tx.rollback_only == True => CommitGateRejected => ROLLING_BACK",
+      "dependencies": "Inner Layer 4 API -> Outer _ArmRigTransactionContext -> Outer Layer 1 Coordinator",
+      "state_transitions": "ACTIVE -> (inner preflight/write error sets rollback_only=True) -> COMMITTING rejected -> ROLLING_BACK",
+      "logical_evidence": "Any inner transaction failure (including nested preflight failure) invokes outer_tx.mark_rollback_only(reason) prior to raising. Even if caller code catches the exception, the outer Coordinator checks tx.rollback_only before COMMITTING and forces ROLLING_BACK."
+    },
+    "CHECK-11": {
+      "question": "外部资源是否可能被误认为事务自建资源？",
+      "status": "PASS",
+      "json_field_path": "f1_resource_ownership.prohibitions, f1_resource_ownership.entity_model.DataBlock, f2_state_transition_authority.persistent_failed_protection.session_identity_model, f3_contract_registry.CONTRACT-12",
+      "invariant": "NoNameInference and NoDiffInference and NoZeroUserInference and DeadTombstoneDoesNotBlockNewArmature",
+      "dependencies": "Layer 2 Session Identity & Ownership Registry -> Layer 3/5/6",
+      "state_transitions": "ROLLING_BACK (preserves external/unknown), POST_COMMIT_CLEANUP (PRESERVED_NO_DELETE_AUTHORITY), TOMBSTONED_FAILED_D (allows new registry_session_id)",
+      "logical_evidence": "External objects, constraints, collections, relationships (EXTERNAL_ADDED, PRE_EXISTING_ORIGINAL), and DataBlocks (Type B without explicit grant, Type C even with users==0) are strictly protected. Furthermore, when a managed Armature dies (TOMBSTONED_FAILED_D), a newly created Armature reusing its name or C address receives a new registry_session_id, neither spoofing recovery nor being falsely blocked."
+    },
+    "CHECK-12": {
+      "question": "目标架构是否被错误描述为当前已实现事实？",
+      "status": "PASS",
+      "json_field_path": "metadata, baseline.execution_constraints, f2_state_transition_authority.persistent_failed_protection.isolation_scope_boundary, f3_verification_requirements.*.verification_status",
+      "invariant": "document_status == 'DRAFT_PENDING_INDEPENDENT_REVIEW' and authoritative == false and implementation_verified == false and tests_executed_in_this_phase == false",
+      "dependencies": "Task 10-B-9 Governance Lock",
+      "state_transitions": "N/A (Documentation & Implementation Freeze)",
+      "logical_evidence": "Metadata explicitly declares authoritative: false, implementation_verified: false, tests_executed_in_this_phase: false, and architecture_sync_update_permitted: false. In-memory session boundaries and future extensions are explicitly demarcated from unverified production implementation."
+    }
+  },
+  "unresolved_design_issues": [
+    {
+      "issue_id": "ARCH-ISSUE-01",
+      "topic": "Depth of Isolation for Concurrent External Mutations During Active Transaction",
+      "blocking_current_architecture": false,
+      "scope_disposition": "NON-BLOCKING BOUNDARY — Current headless pipeline executes single-threaded frame steps sequentially. If external handlers/drivers mutate resources mid-transaction, the draft safely halts destructive rollback via OWNERSHIP_UNPROVEN / RECOVERY_UNCERTAIN and isolates the Armature (FAILED-B/C). Active suppression of Blender depsgraph handlers is deferred to future multi-pipeline extensions.",
+      "description": "Blender's Python environment executes on the main thread, but modal timers, background depsgraph handlers, or scene drivers can mutate scene data if triggered. The current architecture detects such interference during rollback/verification, transitions relationship logs to RECOVERY_UNCERTAIN, and isolates the Armature rather than performing unsafe deletions."
+    },
+    {
+      "issue_id": "ARCH-ISSUE-02",
+      "topic": "Granularity of 7-State Relationship Mutation Logging for Dense Rigs",
+      "blocking_current_architecture": false,
+      "scope_disposition": "NON-BLOCKING BOUNDARY — Scoped to standard 2-arm IK rig (4 controllers, 4 constraints, 1 collection, < 1 KB log overhead). High-density full-body rig scaling is out of scope for Task 10-B.",
+      "description": "In the 7-state relationship operation log, recording per-operation reference/pointer pairs incurs negligible overhead for Arm IK. Compacted structures are only relevant if extended to hundreds of simultaneous constraints in future phases."
+    },
+    {
+      "issue_id": "ARCH-ISSUE-03",
+      "topic": "Cross-Process Restart & Scene File Reload Persistence for FAILED Isolation",
+      "blocking_current_architecture": false,
+      "scope_disposition": "NON-BLOCKING BOUNDARY — Current architecture explicitly bounds FAILED isolation to the active Blender process Python session (f2_state_transition_authority.persistent_failed_protection.isolation_scope_boundary) and forbids mutating Blender custom object properties during transactions. Cross-session persistence across .blend file saves/reloads is marked as a future unapproved extension.",
+      "description": "Python in-memory registries (_ISOLATED_FAILED_ARMATURES, _MANAGED_ARMATURE_IDENTITIES) do not persist across Blender process termination or bpy.ops.wm.open_mainfile(). Persisting isolation across file reloads would require writing custom RNA properties onto Blender datablocks, which is intentionally prohibited in this phase to preserve the zero-mutation snapshot invariant."
+    }
+  ],
+  "architecture_audit_evidence": {
+    "source_precedence": {
+      "hierarchy": [
+        {
+          "level": "Level 1 — Authoritative Constraints",
+          "sources": [
+            "ARCHITECTURE.md",
+            "docs/ARCHITECTURE_CHANGE_GATE.md"
+          ],
+          "role": "Pipeline layer boundaries (MotionPlanner -> Bridge -> WBC -> Rig/IK/FK), Ten-Step Anti-Drift Protocol, and Strict Prohibitions."
+        },
+        {
+          "level": "Level 2 — Current Code & Sync Facts",
+          "sources": [
+            "ARCHITECTURE_SYNC.md",
+            "src/rig/arm_ik.py",
+            "src/motion/whole_body_controller.py"
+          ],
+          "role": "Actual implemented symbols, current function signatures, and current production behavior (strictly distinguished from target architecture)."
+        },
+        {
+          "level": "Level 3 — Candidate Target Architecture Draft",
+          "sources": [
+            "docs/evidence/PKG5_10B_REVISION_9/architecture_draft_candidate.json"
+          ],
+          "role": "Single converged target architecture candidate under review."
+        },
+        {
+          "level": "Level 4 — Historical Proposal Documents (Non-Authoritative)",
+          "sources": [
+            "docs/evidence/PKG5_10B_REVISION_9/01_real_architecture_extraction.md",
+            "docs/evidence/PKG5_10B_REVISION_9/02_architectural_responsibility_boundaries.md",
+            "docs/evidence/PKG5_10B_REVISION_9/03_resource_ownership_contract.md",
+            "docs/evidence/PKG5_10B_REVISION_9/04_transaction_lifecycle_contract.md",
+            "docs/evidence/PKG5_10B_REVISION_9/05_architecture_driven_impact_matrix.md",
+            "docs/evidence/PKG5_10B_REVISION_9/06_architecture_migration_plan.md",
+            "docs/evidence/PKG5_10B_REVISION_9/07_test_mapping_and_verification_design.md"
+          ],
+          "role": "Historical proposal analysis only; superseded wherever they conflict with Level 3 converged rules."
+        }
+      ],
+      "superseded_historical_conflicts": [
+        {
+          "historical_source": "02_architectural_responsibility_boundaries.md",
+          "conflict_description": "Section 2.2 Mermaid diagram drew an inverted dependency chain (L1 -> L5 & L6 -> L2 -> L3 -> L4) and allowed Layer 6 to directly mutate _PENDING_ARM_RIG_CLEANUPS.",
+          "converged_resolution": "Replaced by strict invocation DAG (WBC -> L4 -> L1 -> L5 -> L6 -> L3 -> L2) and RESULT return data flow (L6 -> L1 CleanupOutcome; L1 alone commands L2 gate registration/deregistration)."
+        },
+        {
+          "historical_source": "03_resource_ownership_contract.md",
+          "conflict_description": "Allowed snapshot-diff collection unlinking and automatic cascade deletion of DataBlocks whenever obj.data.users == 0.",
+          "converged_resolution": "Superseded by Non-Inference Theorem, 7-state Relationship Operation Log, and CanDelete(D, t) requiring explicit DataBlock cleanup authorization (preserving ungranted Type B and Type C DataBlocks as PRESERVED_NO_DELETE_AUTHORITY)."
+        },
+        {
+          "historical_source": "04_transaction_lifecycle_contract.md",
+          "conflict_description": "Used a 3-state relationship log without NO_EFFECT or REVERTED, and lacked FAILED-A/B/C/D session identity and tombstone separation.",
+          "converged_resolution": "Superseded by the 7-state relationship operation log (10 legal transitions) and categorized FAILED-A/B/C/D session isolation with ArmatureSessionIdentityRecord."
+        },
+        {
+          "historical_source": "05_architecture_driven_impact_matrix.md",
+          "conflict_description": "Reversed dependency direction in CONTRACT-09 (Gate -> Transaction) and CONTRACT-12 (External Scene -> Rollback Engine).",
+          "converged_resolution": "Normalized all impact matrix edges to canonical 5-value edge_type taxonomy (CALL, RESULT, STATE_READ, STATE_WRITE, PROTECTION) with active modules as Source."
+        }
+      ]
+    },
+    "canonical_layer_permissions": {
+      "Layer1_TransactionCoordinator": {
+        "layer_id": "Layer 1",
+        "layer_name": "Transaction Coordinator",
+        "owned_functions": [
+          "_arm_rig_transaction",
+          "_assert_arm_rig_cleanup_gate",
+          "_dispatch_retry_cleanup",
+          "request_armature_deisolation",
+          "retire_dead_armature_tombstone"
+        ],
+        "owned_state": "_ACTIVE_TRANSACTION_STACK control; sole decision authority for all 9 transaction lifecycle states, CLEANUP_PENDING gate registration/deregistration, and FAILED-A/B/C/D isolation/de-isolation.",
+        "allowed_calls": [
+          "Layer 2 (STATE_READ / STATE_WRITE)",
+          "Layer 5 (CALL)",
+          "Layer 6 (CALL)"
+        ],
+        "forbidden_calls": [
+          "Layer 3",
+          "Layer 4"
+        ],
+        "allowed_direct_blender_writes": [
+          "depsgraph.update() at commit boundary only"
+        ],
+        "forbidden_direct_blender_writes": [
+          "Object/Constraint/Collection/DataBlock creation or deletion",
+          "PoseBone/Controller transforms",
+          "Relationship reference mutations"
+        ]
+      },
+      "Layer2_StateOwnershipRegistry": {
+        "layer_id": "Layer 2",
+        "layer_name": "State & Ownership Registry",
+        "owned_functions": [
+          "_ArmRigTransactionContext",
+          "ensure_armature_session_identity",
+          "register_created_controller",
+          "register_created_constraint",
+          "register_created_collection",
+          "register_datablock_cleanup_authority",
+          "prepare_relationship_mutation",
+          "update_relationship_mutation_state",
+          "_record_pending_arm_rig_cleanup",
+          "_clear_pending_arm_rig_cleanup_by_coordinator",
+          "_record_armature_failure_isolation_by_coordinator",
+          "_clear_or_retire_failure_isolation_by_coordinator",
+          "query_admission_gate_status"
+        ],
+        "owned_state": "Passive in-memory registries: transaction ownership sets, DataBlock authorization records, 7-state relationship logs, _MANAGED_ARMATURE_IDENTITIES, _PENDING_ARM_RIG_CLEANUPS, _ISOLATED_FAILED_ARMATURES, _DEISOLATION_AUDIT_LOG.",
+        "allowed_calls": [
+          "Python stdlib & read-only as_pointer()"
+        ],
+        "forbidden_calls": [
+          "Layer 1",
+          "Layer 3",
+          "Layer 4",
+          "Layer 5",
+          "Layer 6"
+        ],
+        "allowed_direct_blender_writes": [],
+        "forbidden_direct_blender_writes": [
+          "All Blender RNA/C-API writes (including custom object properties)"
+        ]
+      },
+      "Layer3_AuthorizedResourceOperations": {
+        "layer_id": "Layer 3",
+        "layer_name": "Authorized Resource Operations",
+        "owned_functions": [
+          "_get_or_create_empty",
+          "_ensure_character_collection",
+          "_authorized_link_object_to_collection",
+          "_authorized_unlink_object_from_collection",
+          "_authorized_link_child_collection",
+          "_authorized_unlink_child_collection",
+          "_authorized_assign_object_parent",
+          "_authorized_assign_constraint_targets",
+          "_authorized_restore_relationship",
+          "_authorized_create_constraint",
+          "_authorized_remove_constraint",
+          "_authorized_remove_object",
+          "_authorized_remove_datablock_if_permitted"
+        ],
+        "owned_state": "None (stateless execution engine).",
+        "allowed_calls": [
+          "Layer 2 (STATE_WRITE entity/auth registration & 7-state relationship log transitions)",
+          "Blender C-API CRUD & relationship endpoints"
+        ],
+        "forbidden_calls": [
+          "Layer 1",
+          "Layer 4",
+          "Layer 5",
+          "Layer 6"
+        ],
+        "allowed_direct_blender_writes": [
+          "Authorized creation/deletion of Objects, Constraints, Collections, and DataBlocks (satisfying CanDelete(D,t))",
+          "All forward and rollback relationship reference mutations (col.objects.link/unlink, col.children.link/unlink, obj.parent, matrix_parent_inverse parent binding, con.target, con.pole_target)"
+        ],
+        "forbidden_direct_blender_writes": [
+          "Unregistered resource allocation",
+          "Unproven/unauthorized deletion",
+          "bpy.data.orphans_purge()"
+        ]
+      },
+      "Layer4_ArmIKBusinessOperations": {
+        "layer_id": "Layer 4",
+        "layer_name": "Arm IK Business Operations",
+        "owned_functions": [
+          "setup_arm_ik",
+          "set_hand_ik_target",
+          "set_arm_ik_influence",
+          "reset_arm_ik",
+          "get_arm_ik_state",
+          "_preflight_arm_ik_parent_transforms"
+        ],
+        "owned_state": "None in Python memory.",
+        "allowed_calls": [
+          "Layer 1 (CALL transaction context)",
+          "Layer 3 (CALL authorized resource & relationship operations)",
+          "Layer 4 (CALL intra-layer preflight & nested setup/reset)",
+          "transform_utils"
+        ],
+        "forbidden_calls": [
+          "Layer 5",
+          "Layer 6"
+        ],
+        "allowed_direct_blender_writes": [
+          "In ACTIVE state only: PoseBone numeric transforms (location, rotation_euler, rotation_quaternion, scale)",
+          "In ACTIVE state only: Controller numeric TRS (location, rotation_*, scale)",
+          "In ACTIVE state only: Constraint numeric parameters (influence, pole_angle, chain_count, use_stretch)"
+        ],
+        "forbidden_direct_blender_writes": [
+          "Any write during preflight",
+          "Direct relationship reference writes (con.target, con.pole_target, obj.parent, matrix_parent_inverse parent binding, col.objects.link/unlink, col.children.link/unlink) bypassing Layer 3",
+          "Direct entity creation or deletion bypassing Layer 3"
+        ]
+      },
+      "Layer5_SnapshotRestoreVerification": {
+        "layer_id": "Layer 5",
+        "layer_name": "Snapshot / Restore / Verification",
+        "owned_functions": [
+          "_snapshot_arm_rig_state",
+          "_clone_snapshot_property_value",
+          "_rollback_arm_rig_state",
+          "_verify_arm_rig_state_restored",
+          "verify_armature_deisolation_evidence"
+        ],
+        "owned_state": "Immutable baseline snapshot dictionary.",
+        "allowed_calls": [
+          "Layer 2 (STATE_READ ownership & relationship logs)",
+          "Layer 3 (CALL authorized entity deletion & relationship restoration during ROLLING_BACK)"
+        ],
+        "forbidden_calls": [
+          "Layer 1",
+          "Layer 4",
+          "Layer 6"
+        ],
+        "allowed_direct_blender_writes": [
+          "In ROLLING_BACK state only: restoring numeric/transform values (PoseBone TRS, Controller TRS, Constraint numeric properties influence/pole_angle)"
+        ],
+        "forbidden_direct_blender_writes": [
+          "Any write during SNAPSHOTTING or verification",
+          "Direct relationship reference restoration (Object.parent, matrix_parent_inverse parent binding, Constraint.target/pole_target, Collection link/unlink) bypassing Layer 3",
+          "Direct resource deletion bypassing Layer 3"
+        ]
+      },
+      "Layer6_CommitCleanup": {
+        "layer_id": "Layer 6",
+        "layer_name": "Commit & Cleanup",
+        "owned_functions": [
+          "retry_cleanup",
+          "execute_stashed_cleanup_pass"
+        ],
+        "owned_state": "Item-level cleanup progress flags (obj_cleaned, data_cleaned, preserved_no_authority).",
+        "allowed_calls": [
+          "Layer 2 (STATE_READ stashed queues/auth & STATE_WRITE item-level progress flags only)",
+          "Layer 3 (CALL authorized removal of doomed Objects, Constraints, and DataBlocks satisfying CanDelete(D,t))"
+        ],
+        "forbidden_calls": [
+          "Layer 1",
+          "Layer 4",
+          "Layer 5"
+        ],
+        "allowed_direct_blender_writes": [],
+        "forbidden_direct_blender_writes": [
+          "Direct C-API deletion bypassing Layer 3",
+          "Deleting ungranted Type B or Type C DataBlocks",
+          "Mutating lifecycle state or deregistering CLEANUP_PENDING gates in Layer 2"
+        ]
+      }
+    },
+    "canonical_dependency_edges": [
+      {
+        "edge_id": "DAG-01",
+        "source": "Upper Pipeline: WBC",
+        "target": "Layer 4",
+        "edge_type": "CALL",
+        "operation": "Invoke setup_arm_ik / set_hand_ik_target / set_arm_ik_influence / reset_arm_ik",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-02",
+        "source": "Layer 4",
+        "target": "Layer 4",
+        "edge_type": "CALL",
+        "operation": "Intra-layer _preflight_arm_ik_parent_transforms and nested setup_arm_ik / reset_arm_ik",
+        "participates_in_call_dag": false
+      },
+      {
+        "edge_id": "DAG-03",
+        "source": "Layer 4",
+        "target": "Layer 1",
+        "edge_type": "CALL",
+        "operation": "Enter _arm_rig_transaction context",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-04",
+        "source": "Layer 4",
+        "target": "Layer 3",
+        "edge_type": "CALL",
+        "operation": "Invoke authorized entity creation and relationship mutation APIs",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-05",
+        "source": "Layer 1",
+        "target": "Layer 2",
+        "edge_type": "STATE_READ",
+        "operation": "Query admission gate status and session identity record via _assert_arm_rig_cleanup_gate -> query_admission_gate_status",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-06",
+        "source": "Layer 1",
+        "target": "Layer 2",
+        "edge_type": "STATE_WRITE",
+        "operation": "Sole authority to write 9 transaction lifecycle states, register/deregister CLEANUP_PENDING gates, and record/lift FAILED-A/B/C/D isolation",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-07",
+        "source": "Layer 1",
+        "target": "Layer 5",
+        "edge_type": "CALL",
+        "operation": "Invoke _snapshot_arm_rig_state, _rollback_arm_rig_state, _verify_arm_rig_state_restored, verify_armature_deisolation_evidence",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-08",
+        "source": "Layer 1",
+        "target": "Layer 6",
+        "edge_type": "CALL",
+        "operation": "Dispatch post-commit or retry cleanup via retry_cleanup",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-09",
+        "source": "Layer 5",
+        "target": "Layer 2",
+        "edge_type": "STATE_READ",
+        "operation": "Inspect registered ownership sets and 7-state relationship operation logs",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-10",
+        "source": "Layer 5",
+        "target": "Layer 3",
+        "edge_type": "CALL",
+        "operation": "Invoke authorized entity deletion and relationship restoration during ROLLING_BACK",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-11",
+        "source": "Layer 6",
+        "target": "Layer 2",
+        "edge_type": "STATE_READ",
+        "operation": "Read stashed cleanup queues and DataBlock Cleanup Authorization Records",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-12",
+        "source": "Layer 6",
+        "target": "Layer 2",
+        "edge_type": "STATE_WRITE",
+        "operation": "Update per-item progress flags ONLY (obj_cleaned, data_cleaned, PRESERVED_NO_DELETE_AUTHORITY)",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-13",
+        "source": "Layer 6",
+        "target": "Layer 3",
+        "edge_type": "CALL",
+        "operation": "Invoke _authorized_remove_object, _authorized_remove_constraint, _authorized_remove_datablock_if_permitted",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-14",
+        "source": "Layer 3",
+        "target": "Layer 2",
+        "edge_type": "STATE_WRITE",
+        "operation": "Register created entities, Type A DataBlock authorizations, and 7-state relationship log transitions (PREPARED -> APPLYING -> APPLIED_VERIFIED -> CONFIRMED / NO_EFFECT / REVERTED / RECOVERY_UNCERTAIN)",
+        "participates_in_call_dag": true
+      },
+      {
+        "edge_id": "DAG-15",
+        "source": "Layer 2",
+        "target": "Layer 1",
+        "edge_type": "RESULT",
+        "operation": "Return GateResult on call stack to Coordinator",
+        "participates_in_call_dag": false
+      },
+      {
+        "edge_id": "DAG-16",
+        "source": "Layer 5",
+        "target": "Layer 1",
+        "edge_type": "RESULT",
+        "operation": "Return Snapshot, VerificationResult, and DeisolationVerificationReport on call stack to Coordinator",
+        "participates_in_call_dag": false
+      },
+      {
+        "edge_id": "DAG-17",
+        "source": "Layer 6",
+        "target": "Layer 1",
+        "edge_type": "RESULT",
+        "operation": "Return CleanupOutcome (CLEANUP_SUCCESS | CLEANUP_INCOMPLETE | CLEANUP_FAILED) on call stack to Coordinator",
+        "participates_in_call_dag": false
+      },
+      {
+        "edge_id": "DAG-18",
+        "source": "Layer 5 / Layer 6 / Layer 3",
+        "target": "External Scene Resources & Unproven DataBlocks",
+        "edge_type": "PROTECTION",
+        "operation": "Enforce Non-Inference Theorem and CanDelete(D,t) boundary to prevent unauthorized deletion or unlinking",
+        "participates_in_call_dag": false
+      }
+    ],
+    "canonical_resource_operation_permissions": [
+      {
+        "operation": "Object Creation",
+        "initiator": "Layer 4 (ACTIVE)",
+        "authorized_executor": "Layer 3 (_get_or_create_empty)",
+        "ownership_requirement": "Name collision check; immediate Layer 2 registration in created_controller_objects before collection link.",
+        "transaction_phase": "ACTIVE",
+        "prepare_requirement": "Verify active_tx is ACTIVE and no external same-name object conflict exists.",
+        "rollback_method": "Layer 5 invokes Layer 3 _authorized_remove_object by verified reference + pointer.",
+        "commit_cleanup_method": "Retained as active rig controller.",
+        "verification_requirement": "On rollback, absent from bpy.data.objects; on commit, present with verified pointer."
+      },
+      {
+        "operation": "Object Deletion",
+        "initiator": "Layer 5 (ROLLING_BACK) or Layer 6 (POST_COMMIT_CLEANUP)",
+        "authorized_executor": "Layer 3 (_authorized_remove_object)",
+        "ownership_requirement": "Proven membership in created_controller_objects (rollback) or stashed_objects (cleanup) + IdentityVerified + zero external dependent relationships.",
+        "transaction_phase": "ROLLING_BACK or POST_COMMIT_CLEANUP",
+        "prepare_requirement": "Verify live reference, pointer equality, bpy.data.objects inclusion, and absence of external attachments.",
+        "rollback_method": "N/A (is itself a rollback/cleanup action; halts with OWNERSHIP_CONFLICT if external dependency detected).",
+        "commit_cleanup_method": "Layer 6 marks obj_cleaned = True upon deletion.",
+        "verification_requirement": "Confirm object wrapper is removed from bpy.data.objects and external objects remain untouched."
+      },
+      {
+        "operation": "Constraint Creation",
+        "initiator": "Layer 4 (ACTIVE)",
+        "authorized_executor": "Layer 3 (_authorized_create_constraint)",
+        "ownership_requirement": "Immediate Layer 2 registration in created_constraints (bone name, reference, pointer).",
+        "transaction_phase": "ACTIVE",
+        "prepare_requirement": "Verify PoseBone liveness and active_tx is ACTIVE.",
+        "rollback_method": "Layer 5 invokes Layer 3 _authorized_remove_constraint by verified reference + pointer.",
+        "commit_cleanup_method": "Retained on PoseBone constraint stack.",
+        "verification_requirement": "On rollback, removed from pose_bone.constraints with pre-existing constraint order preserved."
+      },
+      {
+        "operation": "Constraint Deletion",
+        "initiator": "Layer 5 (ROLLING_BACK) or Layer 6 (POST_COMMIT_CLEANUP)",
+        "authorized_executor": "Layer 3 (_authorized_remove_constraint)",
+        "ownership_requirement": "Proven membership in created_constraints or stashed_constraints + IdentityVerified.",
+        "transaction_phase": "ROLLING_BACK or POST_COMMIT_CLEANUP",
+        "prepare_requirement": "Verify live reference, pointer equality, and presence in pose_bone.constraints.",
+        "rollback_method": "N/A (halts if identity mismatch).",
+        "commit_cleanup_method": "Layer 6 records constraint cleanup completion.",
+        "verification_requirement": "External constraints on same bone remain intact in exact relative order."
+      },
+      {
+        "operation": "Collection Creation",
+        "initiator": "Layer 4 (ACTIVE)",
+        "authorized_executor": "Layer 3 (_ensure_character_collection)",
+        "ownership_requirement": "Immediate Layer 2 registration in created_collections before parent linking.",
+        "transaction_phase": "ACTIVE",
+        "prepare_requirement": "Verify no external collection conflict; register reference + pointer.",
+        "rollback_method": "Layer 5 invokes Layer 3 to unlink and remove created collection if and only if zero external members/children exist.",
+        "commit_cleanup_method": "Retained as character rig collection.",
+        "verification_requirement": "On rollback, removed from bpy.data.collections unless external entities were added."
+      },
+      {
+        "operation": "Collection Deletion",
+        "initiator": "Layer 5 (ROLLING_BACK)",
+        "authorized_executor": "Layer 3",
+        "ownership_requirement": "Registered in created_collections + IdentityVerified + zero external objects + zero external child collections.",
+        "transaction_phase": "ROLLING_BACK",
+        "prepare_requirement": "Inspect collection.objects and collection.children for any non-transaction entities.",
+        "rollback_method": "Preserve collection and flag OWNERSHIP_CONFLICT if non-empty of external items.",
+        "commit_cleanup_method": "N/A",
+        "verification_requirement": "Pre-existing collections and non-empty collections are never deleted."
+      },
+      {
+        "operation": "DataBlock Creation",
+        "initiator": "Layer 4 / Layer 3 (ACTIVE)",
+        "authorized_executor": "Layer 3",
+        "ownership_requirement": "Immediate registration in Layer 2 datablock_authorizations with provenance = TYPE_A_TX_CREATED and scope = PHYSICAL_DELETE_IF_ZERO_USERS.",
+        "transaction_phase": "ACTIVE",
+        "prepare_requirement": "Capture original_reference, original_pointer, resource_kind, and tx_id.",
+        "rollback_method": "Layer 5 invokes Layer 3 _authorized_remove_datablock_if_permitted after owning Object is removed.",
+        "commit_cleanup_method": "Retained while referenced by committed Object.",
+        "verification_requirement": "Zero orphan Type A DataBlocks left after rollback."
+      },
+      {
+        "operation": "DataBlock Deletion",
+        "initiator": "Layer 5 (ROLLING_BACK) or Layer 6 (POST_COMMIT_CLEANUP)",
+        "authorized_executor": "Layer 3 (_authorized_remove_datablock_if_permitted)",
+        "ownership_requirement": "CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D).",
+        "transaction_phase": "ROLLING_BACK or POST_COMMIT_CLEANUP",
+        "prepare_requirement": "Verify explicit authorization record (TYPE_A or TYPE_B_PRE_EXISTING_EXPLICIT_GRANT), pointer/ref match, users == 0, use_fake_user == False, library == None.",
+        "rollback_method": "If unauthorized (Type B without grant or Type C), preserve as PRESERVED_NO_DELETE_AUTHORITY.",
+        "commit_cleanup_method": "Layer 6 deletes if CanDelete(D,t) holds; records PRESERVED_NO_DELETE_AUTHORITY if ungranted; returns CLEANUP_FAILED to Layer 1 if obligatory delete fails.",
+        "verification_requirement": "Zero-user Type B (ungranted) and Type C DataBlocks are never deleted and never trigger false CLEANUP_PENDING."
+      },
+      {
+        "operation": "Collection Object Link",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK re-link of TX_UNLINKED_ORIGINAL)",
+        "authorized_executor": "Layer 3 (_authorized_link_object_to_collection / _authorized_restore_relationship)",
+        "ownership_requirement": "Valid controller/collection identity and active transaction authorization.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Create PREPARED entry in Layer 2 7-state log; if already linked (PRE_EXISTING_ORIGINAL), transition PREPARED -> NO_EFFECT without C-API write.",
+        "rollback_method": "Layer 5 invokes Layer 3 to unlink TX_ADDED link and transition log (APPLIED_VERIFIED | CONFIRMED) -> REVERTED.",
+        "commit_cleanup_method": "Log entry remains in CONFIRMED or NO_EFFECT.",
+        "verification_requirement": "Post-rollback log state is REVERTED or NO_EFFECT; pre-existing links remain intact."
+      },
+      {
+        "operation": "Collection Object Unlink",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK undo of TX_ADDED)",
+        "authorized_executor": "Layer 3 (_authorized_unlink_object_from_collection / _authorized_restore_relationship)",
+        "ownership_requirement": "Proven TX_ADDED causal record (for rollback unlink) or explicit business detach record (TX_UNLINKED_ORIGINAL).",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Verify Undo(m) preconditions or record PREPARED detach intent.",
+        "rollback_method": "For TX_UNLINKED_ORIGINAL, Layer 5 invokes Layer 3 to re-link object and transition log to REVERTED.",
+        "commit_cleanup_method": "Confirmed detach remains unlinked.",
+        "verification_requirement": "External or PRE_EXISTING_ORIGINAL links with NO_EFFECT are never unlinked."
+      },
+      {
+        "operation": "Collection Child Link",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK)",
+        "authorized_executor": "Layer 3 (_authorized_link_child_collection / _authorized_restore_relationship)",
+        "ownership_requirement": "Valid parent and child collection identities.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Record PREPARED entry in 7-state log; if already linked, transition to NO_EFFECT.",
+        "rollback_method": "Layer 5 invokes Layer 3 to unlink TX_ADDED child collection and transition log to REVERTED.",
+        "commit_cleanup_method": "Log entry remains CONFIRMED or NO_EFFECT.",
+        "verification_requirement": "Pre-existing collection hierarchy links are never unlinked on rollback."
+      },
+      {
+        "operation": "Collection Child Unlink",
+        "initiator": "Layer 5 (ROLLING_BACK undo of TX_ADDED child link)",
+        "authorized_executor": "Layer 3 (_authorized_unlink_child_collection / _authorized_restore_relationship)",
+        "ownership_requirement": "Proven TX_ADDED child link in APPLIED_VERIFIED or CONFIRMED state + zero external harm.",
+        "transaction_phase": "ROLLING_BACK",
+        "prepare_requirement": "Verify Undo(m) theorem preconditions.",
+        "rollback_method": "Transitions log to REVERTED on verified unlink, or RECOVERY_UNCERTAIN if unsafe.",
+        "commit_cleanup_method": "N/A",
+        "verification_requirement": "Parent-child collection topology matches baseline snapshot."
+      },
+      {
+        "operation": "Object Parent Assignment",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK restoration)",
+        "authorized_executor": "Layer 3 (_authorized_assign_object_parent / _authorized_restore_relationship)",
+        "ownership_requirement": "Target controller object is transaction-managed; parent object identity verified.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Record PREPARED parent mutation in Layer 2 7-state log capturing prior parent reference/pointer.",
+        "rollback_method": "Layer 5 invokes Layer 3 _authorized_restore_relationship to restore original parent reference and transition log to REVERTED.",
+        "commit_cleanup_method": "Log entry remains CONFIRMED.",
+        "verification_requirement": "Controller parent reference and pointer match snapshot; log state is REVERTED on rollback."
+      },
+      {
+        "operation": "Matrix Parent Inverse Assignment",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK restoration)",
+        "authorized_executor": "Layer 3 (when coupled with Object.parent binding/restoration) or Layer 5 (numeric matrix value verification)",
+        "ownership_requirement": "Controller object is transaction-managed and parent transform preflight passed.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Non-singular parent matrix preflight verified; coupled with parent relationship log entry.",
+        "rollback_method": "Restored alongside original parent binding via Layer 3 / Layer 5 to exact snapshot 4x4 matrix.",
+        "commit_cleanup_method": "Committed with controller parent binding.",
+        "verification_requirement": "4x4 matrix elements match snapshot within 1e-5 tolerance."
+      },
+      {
+        "operation": "Constraint Target Assignment",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK restoration)",
+        "authorized_executor": "Layer 3 (_authorized_assign_constraint_targets / _authorized_restore_relationship)",
+        "ownership_requirement": "Constraint is transaction-managed on rig PoseBone; target controller identity verified.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Record PREPARED target relationship mutation in Layer 2 7-state log.",
+        "rollback_method": "Layer 5 invokes Layer 3 _authorized_restore_relationship to restore prior con.target / subtarget and transition log to REVERTED.",
+        "commit_cleanup_method": "Log entry remains CONFIRMED.",
+        "verification_requirement": "con.target reference/pointer and subtarget match snapshot; log reaches REVERTED on rollback."
+      },
+      {
+        "operation": "Constraint Pole Target Assignment",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK restoration)",
+        "authorized_executor": "Layer 3 (_authorized_assign_constraint_targets / _authorized_restore_relationship)",
+        "ownership_requirement": "IK Constraint is transaction-managed; pole controller identity verified.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Record PREPARED pole_target relationship mutation in Layer 2 7-state log.",
+        "rollback_method": "Layer 5 invokes Layer 3 _authorized_restore_relationship to restore prior con.pole_target / pole_subtarget and transition log to REVERTED.",
+        "commit_cleanup_method": "Log entry remains CONFIRMED.",
+        "verification_requirement": "con.pole_target reference/pointer matches snapshot; log reaches REVERTED on rollback."
+      },
+      {
+        "operation": "Constraint Influence Assignment",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK restoration)",
+        "authorized_executor": "Layer 4 (in ACTIVE) and Layer 5 (in ROLLING_BACK)",
+        "ownership_requirement": "Numeric property on managed rig constraint; baseline value captured in Layer 5 snapshot.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Input validated in [0.0, 1.0] finite range during preflight; baseline snapshot active.",
+        "rollback_method": "Layer 5 directly restores snapshot numeric influence value.",
+        "commit_cleanup_method": "Committed in scene.",
+        "verification_requirement": "Restored influence matches snapshot within 1e-5."
+      },
+      {
+        "operation": "Constraint Numeric Parameter Assignment",
+        "initiator": "Layer 4 (ACTIVE) or Layer 5 (ROLLING_BACK restoration)",
+        "authorized_executor": "Layer 4 (in ACTIVE) and Layer 5 (in ROLLING_BACK)",
+        "ownership_requirement": "Numeric parameter (pole_angle, chain_count, use_stretch) on managed rig constraint; baseline captured in snapshot.",
+        "transaction_phase": "ACTIVE or ROLLING_BACK",
+        "prepare_requirement": "Finite numeric validation in preflight; baseline snapshot active.",
+        "rollback_method": "Layer 5 directly restores snapshot numeric parameter values.",
+        "commit_cleanup_method": "Committed in scene.",
+        "verification_requirement": "Restored numeric parameters match snapshot within 1e-5."
+      }
+    ],
+    "canonical_state_transitions": {
+      "transaction_lifecycle_9_states": [
+        {
+          "source_state": "CREATED",
+          "target_state": "SNAPSHOTTING",
+          "trigger": "Transaction context entered after admission gate check passes.",
+          "guard": "query_admission_gate_status returns ALLOWED (no CLEANUP_PENDING, no active FAILED-B/C isolation).",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 commands Layer 2 state update, then calls Layer 5 _snapshot_arm_rig_state.",
+          "failure_behavior": "If gate blocked, reject before CREATED or abort with zero writes.",
+          "verification": "Transaction state == SNAPSHOTTING and stack depth == 1."
+        },
+        {
+          "source_state": "CREATED",
+          "target_state": "FAILED",
+          "trigger": "Pre-snapshot context initialization failure.",
+          "guard": "Zero managed writes occurred.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 classifies as FAILED-A (or FAILED-D if Armature already dead) and updates Layer 2.",
+          "failure_behavior": "Raises RuntimeError; does NOT quarantine healthy Armature under FAILED-A.",
+          "verification": "Zero scene mutations; Armature remains admissible if structure intact."
+        },
+        {
+          "source_state": "SNAPSHOTTING",
+          "target_state": "ACTIVE",
+          "trigger": "Layer 5 _snapshot_arm_rig_state returns complete immutable snapshot.",
+          "guard": "All 4 controllers, 6 pose bones, constraints, and collections read with zero scene mutations.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 updates state in Layer 2 and yields context to Layer 4.",
+          "failure_behavior": "If snapshot read raises exception, transition to FAILED.",
+          "verification": "Snapshot dictionary populated and immutable; zero scene writes during capture."
+        },
+        {
+          "source_state": "SNAPSHOTTING",
+          "target_state": "FAILED",
+          "trigger": "Exception during baseline snapshot capture.",
+          "guard": "Zero business writes executed.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 classifies as FAILED-A if zero writes and Armature intact, or FAILED-C/D if pre-existing structural corruption/death detected.",
+          "failure_behavior": "Pops transaction and raises RuntimeError.",
+          "verification": "FAILED-A leaves healthy Armature unquarantined; FAILED-C/D isolates corrupted/dead Armature."
+        },
+        {
+          "source_state": "ACTIVE",
+          "target_state": "COMMITTING",
+          "trigger": "Layer 4 business block exits normally without unhandled exception.",
+          "guard": "active_tx.rollback_only is False and all relationship logs are in CONFIRMED or NO_EFFECT.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 updates state in Layer 2 and begins Phase 1 commit preparation (_depsgraph_update).",
+          "failure_behavior": "If rollback_only is True, reject COMMITTING and force transition to ROLLING_BACK.",
+          "verification": "No inner suppressed failure exists."
+        },
+        {
+          "source_state": "ACTIVE",
+          "target_state": "ROLLING_BACK",
+          "trigger": "Unhandled exception in Layer 4/Layer 3 or active_tx.rollback_only == True at exit.",
+          "guard": "Baseline snapshot exists.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 updates state in Layer 2 and invokes Layer 5 _rollback_arm_rig_state.",
+          "failure_behavior": "If rollback execution fails, transition to FAILED (FAILED-B/D).",
+          "verification": "Layer 5 rollback and post-rollback verification invoked."
+        },
+        {
+          "source_state": "COMMITTING",
+          "target_state": "COMMITTED",
+          "trigger": "Phase 1 commit preparation (_depsgraph_update) succeeds.",
+          "guard": "No exception during depsgraph update.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 updates state in Layer 2 to COMMITTED (irreversible commit line crossed).",
+          "failure_behavior": "If depsgraph update fails before COMMITTED, transition to ROLLING_BACK.",
+          "verification": "Scene changes committed; ordinary rollback permanently forbidden hereafter."
+        },
+        {
+          "source_state": "COMMITTING",
+          "target_state": "ROLLING_BACK",
+          "trigger": "Exception during Phase 1 commit preparation (_depsgraph_update) prior to crossing commit line.",
+          "guard": "State has not yet reached COMMITTED.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 invokes Layer 5 _rollback_arm_rig_state and _verify_arm_rig_state_restored.",
+          "failure_behavior": "If rollback/verify fails, transition to FAILED (FAILED-B/C/D).",
+          "verification": "Full baseline state restored."
+        },
+        {
+          "source_state": "COMMITTED",
+          "target_state": "CLEANUP_PENDING",
+          "trigger": "Layer 6 Phase 3 post-commit cleanup returns CLEANUP_INCOMPLETE or CLEANUP_FAILED for an obligatory cleanup item.",
+          "guard": "At least one stashed doomed entity or obligatory authorized DataBlock (satisfying AuthorizedCleanup) failed deletion.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 updates state to CLEANUP_PENDING and commands Layer 2 _record_pending_arm_rig_cleanup.",
+          "failure_behavior": "Blocks subsequent write transactions on this Armature session identity until retry succeeds.",
+          "verification": "Armature registered in _PENDING_ARM_RIG_CLEANUPS; PRESERVED_NO_DELETE_AUTHORITY items do NOT trigger this transition."
+        },
+        {
+          "source_state": "CLEANUP_PENDING",
+          "target_state": "COMMITTED",
+          "trigger": "Coordinator-dispatched retry_cleanup returns CleanupOutcome.CLEANUP_SUCCESS.",
+          "guard": "All obligatory doomed items cleaned (and any unauthorized DataBlocks marked PRESERVED_NO_DELETE_AUTHORITY).",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 commands Layer 2 _clear_pending_arm_rig_cleanup_by_coordinator and updates state to COMMITTED.",
+          "failure_behavior": "If retry still fails, remain in CLEANUP_PENDING.",
+          "verification": "Armature removed from _PENDING_ARM_RIG_CLEANUPS; new write transactions admitted."
+        },
+        {
+          "source_state": "ROLLING_BACK",
+          "target_state": "ROLLED_BACK",
+          "trigger": "Layer 5 _rollback_arm_rig_state and _verify_arm_rig_state_restored both succeed 100%.",
+          "guard": "Zero property diffs (> 1e-5) and all relationship logs in active_tx are in NO_EFFECT or REVERTED.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 updates state to ROLLED_BACK, pops transaction stack, and re-raises original business exception.",
+          "failure_behavior": "If any diff or RECOVERY_UNCERTAIN log exists, transition to FAILED instead.",
+          "verification": "100% baseline match verified; Armature remains healthy and admissible."
+        },
+        {
+          "source_state": "ROLLING_BACK",
+          "target_state": "FAILED",
+          "trigger": "Rollback execution exception (FAILED-B), post-rollback verification mismatch / RECOVERY_UNCERTAIN log (FAILED-C), or Armature RNA death (FAILED-D).",
+          "guard": "Rollback or verification did not complete cleanly.",
+          "decision_owner": "Layer 1 Coordinator",
+          "execution_owner": "Layer 1 commands Layer 2 _record_armature_failure_isolation_by_coordinator (ISOLATED_FAILED_B, ISOLATED_FAILED_C, or TOMBSTONED_FAILED_D) and raises compound RuntimeError.",
+          "failure_behavior": "Persistent session isolation (or tombstone) enforced in Layer 2.",
+          "verification": "Subsequent writes on isolated Armature rejected by admission gate; de-isolation requires Layer 5 category-specific proof and Layer 1 Coordinator approval."
+        }
+      ],
+      "relationship_log_7_states": [
+        {
+          "source_state": "PREPARED",
+          "target_state": "APPLYING",
+          "trigger": "Layer 3 invokes Blender C-API relationship mutation.",
+          "guard": "Source/target identities verified and PREPARED record written in Layer 2.",
+          "decision_owner": "Layer 3 Authorized Resource Operations",
+          "execution_owner": "Layer 3 updates Layer 2 log state.",
+          "failure_behavior": "If pre-check fails before C-API call, transition to NO_EFFECT.",
+          "verification": "Log entry state == APPLYING prior to C-API mutation."
+        },
+        {
+          "source_state": "PREPARED",
+          "target_state": "NO_EFFECT",
+          "trigger": "Pre-check finds relationship is already PRE_EXISTING_ORIGINAL, or transaction aborts before APPLYING.",
+          "guard": "Zero Blender C-API relationship mutation executed.",
+          "decision_owner": "Layer 3 / Layer 5",
+          "execution_owner": "Layer 3 updates Layer 2 log state to NO_EFFECT.",
+          "failure_behavior": "None (terminal safe no-op state).",
+          "verification": "Pre-existing relationship remains untouched and immune to rollback unlinking."
+        },
+        {
+          "source_state": "APPLYING",
+          "target_state": "APPLIED_VERIFIED",
+          "trigger": "C-API call completes (or traps after partial effect) and live RNA inspection proves target relationship change occurred.",
+          "guard": "Live Blender RNA topology contains the expected relationship.",
+          "decision_owner": "Layer 3 Authorized Resource Operations",
+          "execution_owner": "Layer 3 updates Layer 2 log state to APPLIED_VERIFIED.",
+          "failure_behavior": "Subject to rollback undo (to REVERTED) if transaction aborts before or after confirmation.",
+          "verification": "Live RNA relationship verified present."
+        },
+        {
+          "source_state": "APPLYING",
+          "target_state": "NO_EFFECT",
+          "trigger": "C-API call raises exception and live RNA inspection proves zero relationship side effect occurred.",
+          "guard": "Live RNA topology is unchanged from pre-call state.",
+          "decision_owner": "Layer 3 Authorized Resource Operations",
+          "execution_owner": "Layer 3 updates Layer 2 log state to NO_EFFECT.",
+          "failure_behavior": "Exception propagates to Layer 1; this log record requires zero undo.",
+          "verification": "Zero side effect in live RNA."
+        },
+        {
+          "source_state": "APPLYING",
+          "target_state": "RECOVERY_UNCERTAIN",
+          "trigger": "C-API call fails and live RNA topology is unreadable, corrupted, or exhibits unprovable external interference.",
+          "guard": "Cannot prove NO_EFFECT or clean APPLIED_VERIFIED.",
+          "decision_owner": "Layer 3 / Layer 5",
+          "execution_owner": "Layer 3 updates Layer 2 log state to RECOVERY_UNCERTAIN.",
+          "failure_behavior": "Preserves scene site; forces Layer 5 rollback verification to fail -> Layer 1 transitions transaction to FAILED (FAILED-B/C).",
+          "verification": "Speculative deletion/unlinking prevented; Armature isolated."
+        },
+        {
+          "source_state": "APPLIED_VERIFIED",
+          "target_state": "CONFIRMED",
+          "trigger": "Layer 3 completes post-mutation registration and confirms step within active transaction.",
+          "guard": "Live topology matches target relationship.",
+          "decision_owner": "Layer 3 Authorized Resource Operations",
+          "execution_owner": "Layer 3 updates Layer 2 log state to CONFIRMED.",
+          "failure_behavior": "Remains reversible via Layer 3 if enclosing transaction later enters ROLLING_BACK.",
+          "verification": "Log state == CONFIRMED."
+        },
+        {
+          "source_state": "APPLIED_VERIFIED",
+          "target_state": "REVERTED",
+          "trigger": "Transaction enters ROLLING_BACK before confirmation; Layer 5 invokes Layer 3 to undo verified mutation.",
+          "guard": "Undo(m) theorem preconditions hold and post-undo RNA check confirms restoration.",
+          "decision_owner": "Layer 5 Verifier & Layer 3 Executor",
+          "execution_owner": "Layer 3 executes undo/restoration and updates Layer 2 log state to REVERTED.",
+          "failure_behavior": "If undo fails or external conflict exists, transition to RECOVERY_UNCERTAIN.",
+          "verification": "Prior relationship state verified restored in live RNA."
+        },
+        {
+          "source_state": "APPLIED_VERIFIED",
+          "target_state": "RECOVERY_UNCERTAIN",
+          "trigger": "Transaction enters ROLLING_BACK before confirmation, but Undo(m) preconditions fail or post-undo check fails.",
+          "guard": "Identity invalid, external dependency conflict, or C-API undo error.",
+          "decision_owner": "Layer 5 / Layer 3",
+          "execution_owner": "Layer 3 updates Layer 2 log state to RECOVERY_UNCERTAIN.",
+          "failure_behavior": "Halts destructive action on relationship; causes Layer 5 verification failure -> FAILED-B/C.",
+          "verification": "Scene preserved; transaction enters FAILED."
+        },
+        {
+          "source_state": "CONFIRMED",
+          "target_state": "REVERTED",
+          "trigger": "Enclosing transaction enters ROLLING_BACK after step confirmation; Layer 5 invokes Layer 3 to undo/restore mutation.",
+          "guard": "Undo(m) theorem preconditions hold and post-undo RNA check confirms restoration.",
+          "decision_owner": "Layer 5 Verifier & Layer 3 Executor",
+          "execution_owner": "Layer 3 executes undo/restoration and updates Layer 2 log state to REVERTED.",
+          "failure_behavior": "If undo fails or external conflict exists, transition to RECOVERY_UNCERTAIN.",
+          "verification": "Prior relationship state verified restored in live RNA."
+        },
+        {
+          "source_state": "CONFIRMED",
+          "target_state": "RECOVERY_UNCERTAIN",
+          "trigger": "Enclosing transaction enters ROLLING_BACK after step confirmation, but Undo(m) preconditions fail or post-undo check fails.",
+          "guard": "Identity invalid, external dependency conflict, or C-API undo error.",
+          "decision_owner": "Layer 5 / Layer 3",
+          "execution_owner": "Layer 3 updates Layer 2 log state to RECOVERY_UNCERTAIN.",
+          "failure_behavior": "Halts destructive action on relationship; causes Layer 5 verification failure -> FAILED-B/C.",
+          "verification": "Scene preserved; transaction enters FAILED."
+        }
+      ]
+    },
+    "pre_revision_findings": [
+      {
+        "finding_id": "AUDIT-BLK-01",
+        "severity": "BLOCKER",
+        "category": "Table A & Table C — Layer 4 Direct Relationship Reference Write Bypass",
+        "location": "f2_layer_responsibilities.Layer4_ArmIKBusinessOperations.allowed_writes & f1_resource_ownership.entity_model.Constraint",
+        "description": "Prior draft listed 'Constraint influence, targets, pole_angle' under Layer 4 allowed_writes, permitting Layer 4 to write relationship references (con.target, con.pole_target) directly without going through Layer 3 Authorized Resource Operations and the Layer 2 7-state relationship operation log."
+      },
+      {
+        "finding_id": "AUDIT-BLK-02",
+        "severity": "BLOCKER",
+        "category": "Table A & Table C — Layer 5 Direct Relationship Restoration Bypass During Rollback",
+        "location": "f2_layer_responsibilities.Layer5_SnapshotRestoreVerification.allowed_writes & f3_contract_registry.CONTRACT-04/05",
+        "description": "Prior draft allowed Layer 5 during ROLLING_BACK to directly restore controller parent/inverse bindings and constraint properties (including target references) without requiring relationship reference restorations to execute through Layer 3 Authorized Resource Operations."
+      },
+      {
+        "finding_id": "AUDIT-BLK-03",
+        "severity": "BLOCKER",
+        "category": "Table B — Impact Matrix Edge Taxonomy & Inverted Source/Target Direction",
+        "location": "f3_architecture_impact_matrix (Rows 5, 10, 14) & f2_directed_dependency_graph.taxonomy",
+        "description": "In f3_architecture_impact_matrix, Row 5 placed passive Layer 2 Log as source and active Layer 5 Verifier as target; Row 10 used an abstract policy name ('Layer 1: DataBlock Authorization Policy') as source; Row 14 placed 'External Scene Resources & Unproven DataBlocks' as source and 'Layer 5 & Layer 6' as target instead of a PROTECTION edge from Layer 5/6/3 to External Resources; and rows lacked normalized 5-value edge_type fields."
+      },
+      {
+        "finding_id": "AUDIT-BLK-04",
+        "severity": "BLOCKER",
+        "category": "Table A & Table B — Ambiguous Function Ownership for _assert_arm_rig_cleanup_gate",
+        "location": "f2_layer_responsibilities.Layer1_TransactionCoordinator.functions vs f3_architecture_impact_matrix (Row 11)",
+        "description": "_assert_arm_rig_cleanup_gate was listed as a Layer 1 Coordinator function in f2_layer_responsibilities, but attributed to Layer 2 ('Layer 2: _assert_arm_rig_cleanup_gate & Session Identity Registry') in f3_architecture_impact_matrix Row 11."
+      },
+      {
+        "finding_id": "AUDIT-BLK-05",
+        "severity": "BLOCKER",
+        "category": "Table C — Missing Explicit 18-Operation Resource & Relationship Permission Matrix",
+        "location": "architecture_audit_evidence.canonical_resource_operation_permissions",
+        "description": "The draft lacked the complete 18-operation canonical table specifying initiator, authorized_executor, ownership_requirement, transaction_phase, prepare_requirement, rollback_method, commit_cleanup_method, and verification_requirement for every resource and relationship operation."
+      },
+      {
+        "finding_id": "AUDIT-BLK-06",
+        "severity": "BLOCKER",
+        "category": "Section 3 & Section 9 — Missing Embedded Audit Model Evidence & Historical Conflict Resolution Table",
+        "location": "architecture_audit_evidence",
+        "description": "The draft lacked the unified architecture_audit_evidence block documenting source precedence, superseded conflicts in historical docs 01-07, canonical Tables A-D, finding resolution mapping, and GATE-01..GATE-12 verification results."
+      }
+    ],
+    "finding_resolution_map": {
+      "AUDIT-BLK-01": {
+        "status": "RESOLVED",
+        "updated_json_paths": [
+          "f1_resource_ownership.entity_model.Object.mutation_authority",
+          "f1_resource_ownership.entity_model.Constraint.mutation_authority",
+          "f2_layer_responsibilities.Layer3_AuthorizedResourceOperations",
+          "f2_layer_responsibilities.Layer4_ArmIKBusinessOperations.allowed_writes",
+          "f2_layer_responsibilities.Layer4_ArmIKBusinessOperations.forbidden_writes",
+          "architecture_audit_evidence.canonical_layer_permissions.Layer4_ArmIKBusinessOperations",
+          "architecture_audit_evidence.canonical_resource_operation_permissions"
+        ],
+        "resolution_summary": "Restricted Layer 4 direct writes strictly to numeric/transform properties (PoseBone TRS, Controller TRS, Constraint influence/pole_angle/chain_count/use_stretch) in ACTIVE state. All relationship reference writes (con.target, con.pole_target, obj.parent, matrix_parent_inverse parent binding, col.objects.link/unlink, col.children.link/unlink) are explicitly forbidden in Layer 4 and routed exclusively through Layer 3 with Layer 2 7-state logging."
+      },
+      "AUDIT-BLK-02": {
+        "status": "RESOLVED",
+        "updated_json_paths": [
+          "f2_layer_responsibilities.Layer3_AuthorizedResourceOperations.functions",
+          "f2_layer_responsibilities.Layer5_SnapshotRestoreVerification.allowed_writes",
+          "f2_layer_responsibilities.Layer5_SnapshotRestoreVerification.forbidden_writes",
+          "f3_contract_registry.CONTRACT-04",
+          "f3_contract_registry.CONTRACT-05",
+          "architecture_audit_evidence.canonical_layer_permissions.Layer5_SnapshotRestoreVerification",
+          "architecture_audit_evidence.canonical_resource_operation_permissions"
+        ],
+        "resolution_summary": "Restricted Layer 5 direct writes during ROLLING_BACK strictly to numeric/transform restorations. All relationship reference restorations (Object.parent, matrix_parent_inverse parent binding, Constraint.target/pole_target, Collection membership/hierarchy) must invoke Layer 3 Authorized Resource Operations (_authorized_restore_relationship), which validates ownership/identity and updates the Layer 2 7-state relationship log to REVERTED or RECOVERY_UNCERTAIN."
+      },
+      "AUDIT-BLK-03": {
+        "status": "RESOLVED",
+        "updated_json_paths": [
+          "f2_directed_dependency_graph.taxonomy",
+          "f3_architecture_impact_matrix",
+          "architecture_audit_evidence.canonical_dependency_edges"
+        ],
+        "resolution_summary": "Added PROTECTION to the 5-value edge_type taxonomy (CALL, RESULT, STATE_READ, STATE_WRITE, PROTECTION). Normalized all 14 impact matrix edges (EDGE-01..EDGE-14) and 18 canonical dependency edges (DAG-01..DAG-18) so active callers/verifiers are always Source, passive stores or protected external resources are Target, Row 5 has Layer 5 as Source and Layer 2 as Target (STATE_READ), Row 10 has Layer 6 as Source and Layer 2/Layer 3 as Target (STATE_READ/CALL), and Row 14 has Layer 5/6/3 as Source and External Scene Resources & Unproven DataBlocks as Target (PROTECTION)."
+      },
+      "AUDIT-BLK-04": {
+        "status": "RESOLVED",
+        "updated_json_paths": [
+          "f2_layer_responsibilities.Layer1_TransactionCoordinator.functions",
+          "f2_layer_responsibilities.Layer2_StateOwnershipRegistry.functions",
+          "f3_architecture_impact_matrix[10]",
+          "architecture_audit_evidence.canonical_layer_permissions"
+        ],
+        "resolution_summary": "Unambiguously assigned _assert_arm_rig_cleanup_gate to Layer 1 Coordinator, which queries Layer 2 passive registry function query_admission_gate_status (STATE_READ) and receives GateResult (RESULT)."
+      },
+      "AUDIT-BLK-05": {
+        "status": "RESOLVED",
+        "updated_json_paths": [
+          "architecture_audit_evidence.canonical_resource_operation_permissions"
+        ],
+        "resolution_summary": "Constructed the complete 18-operation Resource & Relationship Permission Table (Table C) covering Object, Constraint, Collection, DataBlock creation/deletion, Collection object/child link/unlink, Object.parent, matrix_parent_inverse, Constraint target/pole_target, Constraint influence, and Constraint numeric parameters."
+      },
+      "AUDIT-BLK-06": {
+        "status": "RESOLVED",
+        "updated_json_paths": [
+          "architecture_audit_evidence"
+        ],
+        "resolution_summary": "Embedded full architecture_audit_evidence including source_precedence, superseded_historical_conflicts (for 02, 03, 04, 05), Tables A-D, pre_revision_findings, finding_resolution_map, post_revision_gate_results, and scope_exclusions."
+      }
+    },
+    "post_revision_gate_results": {
+      "GATE-01": {
+        "name": "Layer Boundary Integrity",
+        "status": "PASS",
+        "evidence": "All 6 layers have mutually exclusive responsibilities and function lists in f2_layer_responsibilities and canonical_layer_permissions. Layer 4 and Layer 5 cannot bypass Layer 3 for relationship mutations or deletions; Layer 2 is purely passive; Layer 1 is the sole lifecycle and gate decision authority."
+      },
+      "GATE-02": {
+        "name": "Call & Dependency DAG Integrity",
+        "status": "PASS",
+        "evidence": "All CALL edges in canonical_dependency_edges and f2_directed_dependency_graph form a strict DAG: WBC -> Layer 4 -> Layer 1 -> Layer 5 -> Layer 6 -> Layer 3 -> Layer 2. Upward edges are strictly stack return values (RESULT). PROTECTION edges point from Layer 5/6/3 to External Resources."
+      },
+      "GATE-03": {
+        "name": "Resource Ownership Closure",
+        "status": "PASS",
+        "evidence": "All 18 operations in canonical_resource_operation_permissions enforce Delete(r) => OwnershipVerified(r, t) and IdentityVerified(r). Name inference and snapshot-diff inference are prohibited."
+      },
+      "GATE-04": {
+        "name": "DataBlock Deletion Safety",
+        "status": "PASS",
+        "evidence": "CanDelete(D, t) <=> AuthorizedCleanup(D, t) and IdentityVerified(D) and Users(D) == 0 and NoProtectedDependency(D). Type B DataBlocks without independent explicit grant and Type C DataBlocks are preserved as PRESERVED_NO_DELETE_AUTHORITY without triggering CLEANUP_PENDING."
+      },
+      "GATE-05": {
+        "name": "Relationship Log Closure",
+        "status": "PASS",
+        "evidence": "The 7-state Relationship Operation Log (PREPARED, APPLYING, APPLIED_VERIFIED, CONFIRMED, NO_EFFECT, REVERTED, RECOVERY_UNCERTAIN) and its 10 legal transitions are closed, separate from the 9-state transaction machine, and enforced across both forward mutations and rollback restorations via Layer 3."
+      },
+      "GATE-06": {
+        "name": "Transaction State Machine Closure",
+        "status": "PASS",
+        "evidence": "All 9 transaction lifecycle states (CREATED, SNAPSHOTTING, ACTIVE, COMMITTING, COMMITTED, ROLLING_BACK, ROLLED_BACK, CLEANUP_PENDING, FAILED) and 12 canonical transitions in canonical_state_transitions.transaction_lifecycle_9_states have a single decision owner (Layer 1 Coordinator) and explicit guards."
+      },
+      "GATE-07": {
+        "name": "FAILED Isolation & Recovery Closure",
+        "status": "PASS",
+        "evidence": "FAILED is categorized into FAILED-A (pre-write zero-mutation, non-quarantining), FAILED-B (rollback error), FAILED-C (verification mismatch), and FAILED-D (Armature RNA death tombstone). ArmatureSessionIdentityRecord prevents pointer/name spoofing while allowing new independent Armatures. De-isolation requires Layer 5 category-specific evidence verification and Layer 1 Coordinator approval."
+      },
+      "GATE-08": {
+        "name": "Cleanup Authority Closure",
+        "status": "PASS",
+        "evidence": "Layer 6 updates only item-level progress flags and returns CleanupOutcome (RESULT) to Layer 1 Coordinator. Layer 6 never calls Layer 1 and never independently clears CLEANUP_PENDING or FAILED isolation."
+      },
+      "GATE-09": {
+        "name": "Reset Atomicity Closure",
+        "status": "PASS",
+        "evidence": "f4_reset_transaction_contract, f4_reset_state_graph, and CONTRACT-11 define an isomorphic bilateral transaction flow with zero-write parent transform preflight, 5-step per-side reset (Hand, Pole, PoseBone Rotations, Constraint Influences, Prebend), nested rollback_only reporting, and post-commit cleanup."
+      },
+      "GATE-10": {
+        "name": "Contract Set Equivalence",
+        "status": "PASS",
+        "evidence": "IDs_Registry == Unique(IDs_Impact) == IDs_Verification == {CONTRACT-01 .. CONTRACT-12}, with cardinality 12 and 100% aligned invariants across all three tables."
+      },
+      "GATE-11": {
+        "name": "Verification Completeness",
+        "status": "PASS",
+        "evidence": "Every contract CONTRACT-01 .. CONTRACT-12 in f3_verification_requirements specifies normal_scenario, failure_scenario, external_shared_state_impact, invariant_to_verify, pass_criteria, fail_criteria, and verification_status = 'REQUIRED — NOT EXECUTED IN ARCHITECTURE PHASE'."
+      },
+      "GATE-12": {
+        "name": "Governance & Honesty Compliance",
+        "status": "PASS",
+        "evidence": "metadata retains document_status = 'DRAFT_PENDING_INDEPENDENT_REVIEW', authoritative = false, implementation_verified = false, tests_executed_in_this_phase = false, and architecture_sync_update_permitted = false. Zero Python, test, or Markdown files were modified."
+      },
+      "internal_audit_verdict": "INTERNAL ARCHITECTURE AUDIT PASS"
+    },
+    "scope_exclusions": [
+      {
+        "exclusion_id": "SCOPE-EX-01",
+        "topic": "Cross-Armature Distributed Two-Phase Commit (2PC)",
+        "rationale": "Task 10-B is scoped to single-Armature bilateral transaction atomicity (DECISION-B). Multi-character orchestration is handled sequentially by the upper pipeline."
+      },
+      {
+        "exclusion_id": "SCOPE-EX-02",
+        "topic": "Cross-Process Restart & .blend File Reload Isolation Persistence",
+        "rationale": "FAILED-B/C/D isolation is bounded to the active Python interpreter session in memory (ARCH-ISSUE-03). Persisting isolation across file reloads would require mutating custom RNA properties on Blender datablocks, which is forbidden to preserve the zero-mutation snapshot invariant."
+      },
+      {
+        "exclusion_id": "SCOPE-EX-03",
+        "topic": "Active Suppression of External Blender Modal Timers / Depsgraph Handlers",
+        "rationale": "The headless pipeline executes single-threaded frame steps sequentially (ARCH-ISSUE-01). If external handlers interfere mid-transaction, the architecture safely halts destructive rollback via OWNERSHIP_UNPROVEN / RECOVERY_UNCERTAIN and isolates the Armature."
+      }
+    ]
+  }
+}

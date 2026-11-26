@@ -1,0 +1,83 @@
+==========================================================================
+VERIFYING TASK 6G-A: CONTINUOUS BODY MOTION STATE AND DIFFERENTIAL KINEMATICS
+==========================================================================
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+
+[Test 1] Verifying static pose zero velocity...
+  Root linear speed : 0.00000000 m/s
+  Root angular speed: 0.00000000 rad/s
+  CoM linear speed  : 0.00000000 m/s
+  Max segment speed : 0.00000000 m/s
+  Max joint rot vel : 0.00000000 rad/s
+  -> PASSED: Static posture produces strictly zero linear and angular velocities.
+
+[Test 2] Verifying constant root linear translation...
+  Expected v_y: 2.5000 m/s | Derived: 2.50000000 m/s (error: 0.0000000000 m/s)
+  Cross-axis v_x: 0.0000000000 m/s, v_z: 0.0000000000 m/s
+  -> PASSED: Linear translation derived velocity matches analytic dx/dt exactly.
+
+[Test 3] Verifying constant angular velocity rotation...
+  Expected w_z: 60.0000 deg/s (1.047198 rad/s)
+  Derived w_z : 60.000002 deg/s (1.04719758 rad/s) [error: 0.0000000291 rad/s]
+  Cross-axis w_x: 0.0000000000, w_y: 0.0000000000
+  -> PASSED: Constant angular rotation derived velocity matches dtheta/dt exactly.
+
+[Test 4] Verifying compound 3D rotation angular velocity...
+  Target omega  : (0.5000, -0.8000, 1.2000) rad/s
+  Computed omega: (0.5000, -0.8000, 1.2000) rad/s
+  3D vector discrepancy: 0.0000014345 rad/s
+  -> PASSED: Arbitrary 3D compound rotation vector correctly reconstructed.
+
+[Test 5] Verifying wrap-around stability across +/-180 deg boundary...
+  +175 -> -175 deg crossing: derived w_z = 199.9998 deg/s (expected 200.0000 deg/s)
+  -175 -> +175 deg crossing: derived w_z = -199.9998 deg/s (expected -200.0000 deg/s)
+  -> PASSED: Geodesic SO(3) formulation guarantees zero +/-180 deg velocity spikes.
+
+[Test 6] Verifying variable dt scaling...
+  dt=0.1000s -> derived v=1.0000 m/s, expected=1.0000 m/s (err=0.0000000000)
+  dt=0.0500s -> derived v=2.0000 m/s, expected=2.0000 m/s (err=0.0000000000)
+  dt=0.0200s -> derived v=5.0000 m/s, expected=5.0000 m/s (err=0.0000000000)
+  dt=0.0100s -> derived v=10.0000 m/s, expected=10.0000 m/s (err=0.0000000000)
+  dt=0.0050s -> derived v=20.0000 m/s, expected=20.0000 m/s (err=0.0000000000)
+  -> PASSED: Kinematics strictly parameterizes by arbitrary dt without assuming 24 FPS.
+
+[Test 7] Verifying single-limb motion isolation...
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  Left Hand speed : 1.9998 m/s (expected ~2.000 m/s)
+  Right Hand speed: 0.00000000 m/s (expected 0.000 m/s)
+  Left Foot speed : 0.00000000 m/s (expected 0.000 m/s)
+  Right Foot speed: 0.00000000 m/s (expected 0.000 m/s)
+  -> PASSED: Single-limb motion cleanly isolated with zero contralateral cross-talk.
+
+[Test 8] Verifying Whole-Body CoM velocity consistency with segment momentum...
+  Direct CoM velocity       : (0.001356, 0.068207, -0.001183) m/s
+  Mass-weighted segment sum : (0.001356, 0.068212, -0.001180) m/s
+  Mathematical discrepancy   : 0.0000061159 m/s
+  -> PASSED: Whole-body CoM velocity mathematically consistent with multi-link momentum.
+
+[Test 9] Testing WholeBodyController actual pose sampling and MotionState enrichment...
+  Enriched params['com_world']            : (6.779376417398453e-05, -7.990994930267334, 1.0557383298873901)
+  Enriched params['com_linear_velocity']  : (0.0, 0.0, 0.0)
+  Enriched params['root_angular_velocity']: (0.0, 0.0, 0.0)
+  Original ms.velocity preserved          : (0.0, 0.0, 0.0)
+  -> PASSED: Actual IK pose cleanly sampled and seamlessly enriches MotionState.
+
+[Test 10] Testing SprintStart / SprintBrake boundary velocity continuity...
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  Sprint final state: frame=114, v=2.0000 m/s, y=-1.4167 m
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  Brake first state : frame=114, v=1.9962 m/s, y=-1.3334 m
+  Boundary root Y gap   : 0.08328044 m (expected <= 0.084 m, exactly 1 frame step)
+  Boundary velocity gap : 0.00380530 m/s (expected 0.000 m/s)
+  Derived boundary velocities: [0.0, 2.0, 1.9987, 1.9911] m/s
+  -> PASSED: SprintStart -> SprintBrake boundary velocity continuity verified.
+
+==========================================================================
+ALL TASK 6G-A BODY KINEMATICS VERIFICATION TESTS PASSED SUCCESSFULLY!
+==========================================================================
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit

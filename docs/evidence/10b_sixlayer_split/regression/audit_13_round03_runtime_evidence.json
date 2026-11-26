@@ -1,0 +1,84 @@
+{
+  "TEST-165": {
+    "test_method": "test_165_constraint_property_getter_failure_is_not_silently_ignored",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": null,
+    "failure_injection_stage": "fingerprint_property_getter",
+    "actual_exception": "RuntimeError: FINGERPRINT_PROPERTY_CAPTURE_FAILED"
+  },
+  "TEST-166": {
+    "test_method": "test_166_constraint_property_clone_failure_is_not_silently_ignored",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": null,
+    "failure_injection_stage": "fingerprint_property_clone",
+    "actual_exception": "RuntimeError: FINGERPRINT_PROPERTY_CAPTURE_FAILED"
+  },
+  "TEST-167": {
+    "test_method": "test_167_same_property_unreadable_before_and_after_cannot_prove_failed_a",
+    "status": "PASS",
+    "transaction_created": true,
+    "transaction_id": "f1bf05ef",
+    "registry_session_id": "777a020d-15ef-4de4-904a-fdaa6d64b303",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "admission_result": "REJECTED_AFTER_FAILED_C"
+  },
+  "TEST-168": {
+    "test_method": "test_168_post_exception_fingerprint_capture_failure_preserves_primary_error",
+    "status": "PASS",
+    "transaction_created": true,
+    "transaction_id": "364b85d5",
+    "registry_session_id": "16889bbd-e24b-4612-9e74-a1894f1cf494",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "admission_result": "REJECTED_AFTER_FAILED_C"
+  },
+  "TEST-169": {
+    "test_method": "test_169_real_generic_ik_property_mutation_is_detected",
+    "status": "PASS",
+    "transaction_created": true,
+    "transaction_id": "48eb27de",
+    "registry_session_id": "a0a8f909-4b94-4d44-9386-d1cf7a61dcaa",
+    "failure_class": "FAILED-C",
+    "isolation_state": "ISOLATED_FAILED_C",
+    "admission_result": "REJECTED_AFTER_FAILED_C"
+  },
+  "TEST-170": {
+    "test_method": "test_170_clean_snapshot_exception_still_allows_failed_a",
+    "status": "PASS",
+    "transaction_created": true,
+    "transaction_id": "e0aa6f6c",
+    "registry_session_id": "afbc806e-a502-4ded-bf11-72c42fbce427",
+    "failure_class": "FAILED-A",
+    "isolation_state": "NONE",
+    "admission_result": "ADMITTED_AND_COMMITTED"
+  },
+  "TEST-171": {
+    "test_method": "test_171_nonfinite_nested_fingerprint_values_are_rejected",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": null,
+    "nan_inf_detection": "VERIFIED_ALL_TYPES"
+  },
+  "TEST-172": {
+    "test_method": "test_172_fingerprint_freeze_does_not_alias_mutable_mathutils",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": null,
+    "freeze_immutability": "VERIFIED"
+  },
+  "TEST-173": {
+    "test_method": "test_173_complete_fingerprint_and_existing_snapshot_contract_coexist",
+    "status": "PASS",
+    "transaction_created": false,
+    "transaction_id": null,
+    "registry_session_id": null,
+    "fingerprint_snapshot_coexistence": "VERIFIED"
+  }
+}

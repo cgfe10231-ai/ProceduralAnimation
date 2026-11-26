@@ -1,0 +1,377 @@
+=== TASK 10-B / fix6-bug2 (R1-TAIL-03) TEST ONLY ===
+
+--- PRE-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: e1b5796d3abc38057720c126c0ba849db18098dc
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0
+
+--- TEST EXECUTION (TEST A & TEST B, IN-MEMORY) ---
+
+HEAD_BEFORE: e1b5796d3abc38057720c126c0ba849db18098dc
+CMD: "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" --background --python-exit-code 1 --python-expr <IN_MEMORY_EXPR>
+EXIT_CODE: 0
+HEAD_AFTER: e1b5796d3abc38057720c126c0ba849db18098dc
+IN_MEMORY_EXPR:
+import os, sys, unittest, bpy
+sys.path.insert(0, os.path.abspath('.'))
+import src.rig.arm_ik as arm_ik
+from src.config import PipelineConfig
+from src.character.builder import build_character
+from src.rig.builder import build_rig, bind_character_to_rig
+from src.rig.ik import setup_leg_ik, reset_leg_ik
+from src.rig.pose import reset_pose
+
+def _build_clean_armature_fixture():
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    cfg = PipelineConfig()
+    char_data = build_character(cfg)
+    arm = build_rig(cfg)
+    bind_character_to_rig(arm, char_data['parts'])
+    setup_leg_ik(arm)
+    reset_leg_ik(arm)
+    reset_pose(arm)
+    bpy.context.view_layer.update()
+    return arm
+
+class TestFix6Bug2TypeAExceptionWindows(unittest.TestCase):
+    def setUp(self):
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+        self.armature = _build_clean_armature_fixture()
+
+    def tearDown(self):
+        arm_ik._clear_test_fault_injection_hook()
+        arm_ik._clear_test_depsgraph_updater()
+        arm_ik._PENDING_ARM_RIG_CLEANUPS.clear()
+        arm_ik._ISOLATED_FAILED_ARMATURES.clear()
+        arm_ik._MANAGED_ARMATURE_IDENTITIES.clear()
+        arm_ik._ARCHIVED_FAILED_D_TOMBSTONES.clear()
+        arm_ik._FAILED_A_AUDIT_RECORDS.clear()
+        arm_ik._DEISOLATION_AUDIT_LOG.clear()
+        arm_ik._clear_coordinator_authorization_grants()
+
+    def test_A_fault_after_auth_before_remove_enters_pending_and_retries_cleanly(self):
+        self.assertNotIn('HandIK.L', bpy.data.objects)
+
+        ext_unauth_mesh = bpy.data.meshes.new('Fix6Bug2_A_ExtUnauth')
+        ext_unauth_ptr = int(ext_unauth_mesh.as_pointer())
+        self.assertEqual(int(ext_unauth_mesh.users), 0)
+
+        ext_same_base_mesh = bpy.data.meshes.new('Fix6Bug2_A_TypeA')
+        ext_same_base_ptr = int(ext_same_base_mesh.as_pointer())
+        self.assertEqual(int(ext_same_base_mesh.users), 0)
+
+        captured_tx = []
+        created_meta = {}
+        hook_calls = []
+
+        def fault_hook_a(stage, ctx):
+            if stage == 'during_cleanup_datablock_after_auth_before_remove':
+                tx_arg = ctx.get('tx')
+                data = ctx.get('data')
+                data_ptr = int(ctx.get('data_ptr') or 0)
+                stashed = ctx.get('stashed') or {}
+                self.assertEqual(data_ptr, created_meta['ptr'])
+                self.assertEqual(data, created_meta['ref'])
+                self.assertEqual(int(data.users), 0)
+                self.assertEqual(tx_arg.state, arm_ik._ArmRigTransactionState.COMMITTED)
+                self.assertTrue(stashed.get('obj_cleaned'))
+                self.assertFalse(stashed.get('data_cleaned'))
+                self.assertTrue(any(int(m.as_pointer()) == data_ptr for m in bpy.data.meshes))
+                hook_calls.append((stage, data_ptr, int(data.users), tx_arg.state.value))
+                raise RuntimeError('INJECTED_TEST_A_BEFORE_REMOVE')
+
+        arm_ik._set_test_fault_injection_hook(fault_hook_a)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    before_ptrs = frozenset(int(m.as_pointer()) for m in bpy.data.meshes)
+                    type_a_mesh = arm_ik._authorized_create_type_a_mesh('Fix6Bug2_A_TypeA', tx)
+                    type_a_ptr = int(type_a_mesh.as_pointer())
+                    type_a_name = str(type_a_mesh.name)
+                    self.assertNotIn(type_a_ptr, before_ptrs)
+                    self.assertEqual(int(type_a_mesh.users), 0)
+                    created_meta['ptr'] = type_a_ptr
+                    created_meta['ref'] = type_a_mesh
+                    created_meta['name'] = type_a_name
+
+                    wrong_obj = bpy.data.objects.new('HandIK.L', type_a_mesh)
+                    self.assertEqual(wrong_obj.name, 'HandIK.L')
+                    self.assertEqual(int(type_a_mesh.users), 1)
+                    tx.register_created_controller(wrong_obj)
+                    arm_ik._authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, active_tx=tx)
+                    arm_ik.setup_arm_ik(self.armature, initial_influence=0.5)
+        finally:
+            arm_ik._clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        type_a_ptr = created_meta['ptr']
+        type_a_name = created_meta['name']
+
+        # Checks 1-9 for Test A failure window
+        self.assertEqual(len(hook_calls), 1)
+        self.assertEqual(hook_calls[0], ('during_cleanup_datablock_after_auth_before_remove', type_a_ptr, 0, 'COMMITTED'))
+        self.assertIn(type_a_ptr, tx._type_a_datablock_receipts)
+        auths = [a for a in tx.datablock_authorizations if a.get('original_pointer') == type_a_ptr]
+        self.assertEqual(len(auths), 1)
+        self.assertEqual(auths[0]['provenance'], 'TYPE_A_TX_CREATED')
+        self.assertEqual(auths[0]['authorization_source'], 'TX_CREATE_RECEIPT')
+
+        self.assertTrue(any(int(m.as_pointer()) == type_a_ptr and m == type_a_mesh for m in bpy.data.meshes))
+        self.assertEqual(int(type_a_mesh.users), 0)
+        self.assertIn(type_a_name, bpy.data.meshes)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 1)
+        self.assertFalse(tx.uncleaned_stashed_objects[0].get('data_cleaned'))
+        self.assertEqual(len(tx.datablock_cleanup_outcomes), 0)
+
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, arm_ik._PENDING_ARM_RIG_CLEANUPS)
+        self.assertIs(arm_ik._PENDING_ARM_RIG_CLEANUPS[tx.tx_id], tx)
+        self.assertIn(tx.tx_id, arm_ik.get_pending_arm_rig_cleanup_ids())
+        self.assertIn('INJECTED_TEST_A_BEFORE_REMOVE', str(cm.exception))
+        self.assertIsNotNone(cm.exception.__cause__)
+        self.assertIn('INJECTED_TEST_A_BEFORE_REMOVE', str(cm.exception.__cause__))
+
+        # Check 10: Pending Gate blocks new writes on the same Armature
+        gate_status = arm_ik.query_admission_gate_status(self.armature)
+        self.assertTrue(gate_status.get('cleanup_pending_blocked'))
+        self.assertIn(tx.tx_id, gate_status.get('pending_cleanup_transaction_ids', []))
+        with self.assertRaises(RuntimeError) as gate_cm:
+            arm_ik.set_arm_ik_influence(self.armature, side='L', influence=0.25)
+        self.assertIn('Arm IK write blocked: unresolved cleanup', str(gate_cm.exception))
+        self.assertIn(tx.tx_id, str(gate_cm.exception))
+
+        print('TEST_A_PENDING_SNAPSHOT:', 'tx_id=', tx.tx_id, 'state=', tx.state.value, 'ptr=', type_a_ptr, 'users=', int(type_a_mesh.users), 'gate_err=', str(gate_cm.exception))
+
+        # Retry after clearing fault injection via formal entrypoint
+        arm_ik.retry_pending_arm_rig_cleanup(tx.tx_id)
+
+        # Post-retry assertions for Test A
+        live_ptrs = {int(m.as_pointer()) for m in bpy.data.meshes}
+        self.assertNotIn(type_a_ptr, live_ptrs)
+        self.assertNotIn(type_a_name, bpy.data.meshes)
+        outcomes = [o for o in tx.datablock_cleanup_outcomes if o.get('resource_pointer') == type_a_ptr]
+        self.assertEqual(len(outcomes), 1)
+        self.assertEqual(outcomes[0]['action'], 'DELETED')
+        self.assertEqual(outcomes[0]['status'], 'PHYSICALLY_DELETED')
+        self.assertEqual(outcomes[0]['reason'], 'AUTHORIZED_CLEANUP')
+        self.assertEqual(outcomes[0]['resource_pointer'], type_a_ptr)
+        self.assertEqual(outcomes[0]['tx_id'], tx.tx_id)
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+        self.assertNotIn(tx.tx_id, arm_ik._PENDING_ARM_RIG_CLEANUPS)
+        self.assertEqual(len(arm_ik.get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+
+        # External unauthorized meshes preserved
+        self.assertIn(ext_unauth_ptr, live_ptrs)
+        self.assertEqual(bpy.data.meshes['Fix6Bug2_A_ExtUnauth'].as_pointer(), ext_unauth_ptr)
+        self.assertEqual(int(ext_unauth_mesh.users), 0)
+        self.assertIn(ext_same_base_ptr, live_ptrs)
+        self.assertEqual(bpy.data.meshes['Fix6Bug2_A_TypeA'].as_pointer(), ext_same_base_ptr)
+        self.assertEqual(int(ext_same_base_mesh.users), 0)
+
+        # Pending Gate lifted cleanly
+        gate_after = arm_ik.query_admission_gate_status(self.armature)
+        self.assertFalse(gate_after.get('cleanup_pending_blocked'))
+        self.assertEqual(gate_after.get('pending_cleanup_transaction_ids'), [])
+        arm_ik.set_arm_ik_influence(self.armature, side='L', influence=0.25)
+        self.assertAlmostEqual(self.armature.pose.bones['forearm.L'].constraints['ArmIK.L'].influence, 0.25, places=5)
+        print('PASS TEST_A:', 'tx_id=', tx.tx_id, 'final_state=', tx.state.value, 'outcome=', outcomes[0], 'ext_unauth_ptr=', ext_unauth_ptr, 'ext_same_base_ptr=', ext_same_base_ptr)
+
+    def test_B_fault_after_remove_before_verify_enters_pending_and_converges_without_redelete(self):
+        self.assertNotIn('HandIK.L', bpy.data.objects)
+
+        ext_unauth_mesh = bpy.data.meshes.new('Fix6Bug2_B_ExtUnauth')
+        ext_unauth_ptr = int(ext_unauth_mesh.as_pointer())
+        self.assertEqual(int(ext_unauth_mesh.users), 0)
+
+        ext_same_base_mesh = bpy.data.meshes.new('Fix6Bug2_B_TypeA')
+        ext_same_base_ptr = int(ext_same_base_mesh.as_pointer())
+        self.assertEqual(int(ext_same_base_mesh.users), 0)
+
+        # Pre-allocate decoy with guaranteed distinct C pointer before type_a_mesh is ever freed
+        ext_decoy_mesh = bpy.data.meshes.new('Fix6Bug2_B_DecoyPreAlloc')
+        ext_decoy_ptr = int(ext_decoy_mesh.as_pointer())
+        self.assertEqual(int(ext_decoy_mesh.users), 0)
+
+        captured_tx = []
+        created_meta = {}
+        hook_calls = []
+
+        def fault_hook_b(stage, ctx):
+            if stage == 'during_cleanup_datablock_after_remove_before_verify':
+                tx_arg = ctx.get('tx')
+                data_ptr = int(ctx.get('data_ptr') or 0)
+                stashed = ctx.get('stashed') or {}
+                self.assertEqual(data_ptr, created_meta['ptr'])
+                self.assertFalse(any(int(m.as_pointer()) == data_ptr for m in bpy.data.meshes))
+                self.assertNotIn(created_meta['name'], bpy.data.meshes)
+                self.assertFalse(stashed.get('data_cleaned'))
+                self.assertEqual(len(tx_arg.datablock_cleanup_outcomes), 0)
+                hook_calls.append((stage, data_ptr, tx_arg.state.value))
+                raise RuntimeError('INJECTED_TEST_B_AFTER_REMOVE_BEFORE_VERIFY')
+
+        arm_ik._set_test_fault_injection_hook(fault_hook_b)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                with arm_ik._arm_rig_transaction(self.armature) as tx:
+                    captured_tx.append(tx)
+                    before_ptrs = frozenset(int(m.as_pointer()) for m in bpy.data.meshes)
+                    type_a_mesh = arm_ik._authorized_create_type_a_mesh('Fix6Bug2_B_TypeA', tx)
+                    type_a_ptr = int(type_a_mesh.as_pointer())
+                    type_a_name = str(type_a_mesh.name)
+                    self.assertNotIn(type_a_ptr, before_ptrs)
+                    self.assertNotEqual(type_a_ptr, ext_decoy_ptr)
+                    created_meta['ptr'] = type_a_ptr
+                    created_meta['name'] = type_a_name
+
+                    wrong_obj = bpy.data.objects.new('HandIK.L', type_a_mesh)
+                    self.assertEqual(wrong_obj.name, 'HandIK.L')
+                    self.assertEqual(int(type_a_mesh.users), 1)
+                    tx.register_created_controller(wrong_obj)
+                    arm_ik._authorized_link_object_to_collection(bpy.context.scene.collection, wrong_obj, active_tx=tx)
+                    arm_ik.setup_arm_ik(self.armature, initial_influence=0.5)
+        finally:
+            arm_ik._clear_test_fault_injection_hook()
+
+        self.assertEqual(len(captured_tx), 1)
+        tx = captured_tx[0]
+        type_a_ptr = created_meta['ptr']
+        type_a_name = created_meta['name']
+
+        # Checks 1-8 for Test B failure window
+        self.assertEqual(len(hook_calls), 1)
+        self.assertEqual(hook_calls[0], ('during_cleanup_datablock_after_remove_before_verify', type_a_ptr, 'COMMITTED'))
+        self.assertFalse(any(int(m.as_pointer()) == type_a_ptr for m in bpy.data.meshes))
+        self.assertNotIn(type_a_name, bpy.data.meshes)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 1)
+        stashed_rec = tx.uncleaned_stashed_objects[0]
+        self.assertTrue(stashed_rec.get('obj_cleaned'))
+        self.assertFalse(stashed_rec.get('data_cleaned'))
+        self.assertNotEqual(stashed_rec.get('data_cleanup_status'), 'PHYSICALLY_DELETED')
+        self.assertEqual(len(tx.datablock_cleanup_outcomes), 0)
+
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.CLEANUP_PENDING)
+        self.assertIn(tx.tx_id, arm_ik._PENDING_ARM_RIG_CLEANUPS)
+        self.assertIs(arm_ik._PENDING_ARM_RIG_CLEANUPS[tx.tx_id], tx)
+        self.assertIn(tx.tx_id, arm_ik.get_pending_arm_rig_cleanup_ids())
+        self.assertIn('INJECTED_TEST_B_AFTER_REMOVE_BEFORE_VERIFY', str(cm.exception))
+        self.assertIsNotNone(cm.exception.__cause__)
+        self.assertIn('INJECTED_TEST_B_AFTER_REMOVE_BEFORE_VERIFY', str(cm.exception.__cause__))
+
+        gate_status = arm_ik.query_admission_gate_status(self.armature)
+        self.assertTrue(gate_status.get('cleanup_pending_blocked'))
+        self.assertIn(tx.tx_id, gate_status.get('pending_cleanup_transaction_ids', []))
+        with self.assertRaises(RuntimeError) as gate_cm:
+            arm_ik.set_arm_ik_influence(self.armature, side='L', influence=0.25)
+        self.assertIn('Arm IK write blocked: unresolved cleanup', str(gate_cm.exception))
+
+        # Rename the pre-allocated distinct-pointer decoy to exact deleted type_a_name
+        # to prove retry_pending_arm_rig_cleanup does not fall back to name matching.
+        ext_decoy_mesh.name = type_a_name
+        self.assertEqual(ext_decoy_mesh.name, type_a_name)
+        self.assertNotEqual(int(ext_decoy_mesh.as_pointer()), type_a_ptr)
+
+        retry_remove_attempts = []
+        def retry_spy_hook(stage, ctx):
+            if stage == 'during_cleanup_datablock_after_auth_before_remove':
+                retry_remove_attempts.append(ctx.get('data_ptr'))
+
+        print('TEST_B_PENDING_SNAPSHOT:', 'tx_id=', tx.tx_id, 'state=', tx.state.value, 'deleted_ptr=', type_a_ptr, 'decoy_name=', ext_decoy_mesh.name, 'decoy_ptr=', ext_decoy_ptr, 'gate_err=', str(gate_cm.exception))
+
+        arm_ik._set_test_fault_injection_hook(retry_spy_hook)
+        try:
+            arm_ik.retry_pending_arm_rig_cleanup(tx.tx_id)
+        finally:
+            arm_ik._clear_test_fault_injection_hook()
+
+        # Post-retry assertions for Test B
+        self.assertEqual(len(retry_remove_attempts), 0)
+        self.assertTrue(stashed_rec.get('data_cleaned'))
+        self.assertEqual(stashed_rec.get('data_cleanup_status'), 'DATA_ALREADY_ABSENT')
+        self.assertEqual(len(tx.datablock_cleanup_outcomes), 0)
+        self.assertEqual(tx.state, arm_ik._ArmRigTransactionState.COMMITTED)
+        self.assertIsNone(tx.cleanup_error)
+        self.assertNotIn(tx.tx_id, arm_ik._PENDING_ARM_RIG_CLEANUPS)
+        self.assertEqual(len(arm_ik.get_pending_arm_rig_cleanup_ids()), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_objects), 0)
+        self.assertEqual(len(tx.uncleaned_stashed_constraints), 0)
+
+        live_ptrs = {int(m.as_pointer()) for m in bpy.data.meshes}
+        self.assertIn(ext_decoy_ptr, live_ptrs)
+        self.assertEqual(bpy.data.meshes[type_a_name], ext_decoy_mesh)
+        self.assertEqual(bpy.data.meshes[type_a_name].as_pointer(), ext_decoy_ptr)
+        self.assertIn(ext_unauth_ptr, live_ptrs)
+        self.assertEqual(bpy.data.meshes['Fix6Bug2_B_ExtUnauth'].as_pointer(), ext_unauth_ptr)
+        self.assertIn(ext_same_base_ptr, live_ptrs)
+        self.assertEqual(bpy.data.meshes['Fix6Bug2_B_TypeA'].as_pointer(), ext_same_base_ptr)
+
+        gate_after = arm_ik.query_admission_gate_status(self.armature)
+        self.assertFalse(gate_after.get('cleanup_pending_blocked'))
+        self.assertEqual(gate_after.get('pending_cleanup_transaction_ids'), [])
+        arm_ik.set_arm_ik_influence(self.armature, side='L', influence=0.25)
+        self.assertAlmostEqual(self.armature.pose.bones['forearm.L'].constraints['ArmIK.L'].influence, 0.25, places=5)
+        print('PASS TEST_B:', 'tx_id=', tx.tx_id, 'final_state=', tx.state.value, 'data_cleanup_status=', stashed_rec.get('data_cleanup_status'), 'decoy_preserved_ptr=', ext_decoy_ptr, 'ext_unauth_ptr=', ext_unauth_ptr)
+
+suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestFix6Bug2TypeAExceptionWindows)
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+sys.exit(0 if result.wasSuccessful() and result.testsRun == 2 else 1)
+OUTPUT:
+test_A_fault_after_auth_before_remove_enters_pending_and_retries_cleanly (__main__.TestFix6Bug2TypeAExceptionWindows.test_A_fault_after_auth_before_remove_enters_pending_and_retries_cleanly) ... ok
+test_B_fault_after_remove_before_verify_enters_pending_and_converges_without_redelete (__main__.TestFix6Bug2TypeAExceptionWindows.test_B_fault_after_remove_before_verify_enters_pending_and_converges_without_redelete) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.330s
+
+OK
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+TEST_A_PENDING_SNAPSHOT: tx_id= be7eb9fa state= CLEANUP_PENDING ptr= 1853253727624 users= 0 gate_err= Arm IK write blocked: unresolved cleanup for the same Armature; pending transactions=be7eb9fa
+PASS TEST_A: tx_id= be7eb9fa final_state= COMMITTED outcome= {'action': 'DELETED', 'status': 'PHYSICALLY_DELETED', 'reason': 'AUTHORIZED_CLEANUP', 'resource_kind': 'Mesh', 'resource_name': 'Fix6Bug2_A_TypeA.001', 'resource_pointer': 1853253727624, 'tx_id': 'be7eb9fa'} ext_unauth_ptr= 1853254500616 ext_same_base_ptr= 1853255407112
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+TEST_B_PENDING_SNAPSHOT: tx_id= 2ea61395 state= CLEANUP_PENDING deleted_ptr= 1851539884936 decoy_name= Fix6Bug2_B_TypeA.001 decoy_ptr= 1851539666312 gate_err= Arm IK write blocked: unresolved cleanup for the same Armature; pending transactions=2ea61395
+PASS TEST_B: tx_id= 2ea61395 final_state= COMMITTED data_cleanup_status= DATA_ALREADY_ABSENT decoy_preserved_ptr= 1851539666312 ext_unauth_ptr= 1851539887624
+
+--- POST-TEST GIT BASELINE CHECK ---
+BRANCH: audit/task-10-b-9
+HEAD: e1b5796d3abc38057720c126c0ba849db18098dc
+GIT_STATUS_SHORT:
+?? P2_R1_recovery.patch
+?? Untitled-1.cpp
+?? docs/evidence/fix-4/round2_test_report.md
+?? round05_exact_apply.py
+?? round05_exact_apply_v2.py
+?? round05_exact_apply_v3.py
+?? round05_exact_apply_v3_local.py
+?? round05_validate_finalize_v3.py
+GIT_DIFF_EXIT_CODE: 0
+GIT_DIFF_CACHED_EXIT_CODE: 0
