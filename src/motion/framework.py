@@ -1097,6 +1097,73 @@ class MotionPlanner:
             environment=self.environment,
             default_fps=self.config.fps,
         )
+        # [INTRODUCED 2026-11-26T17:52:00+08:00]
+        # TASK: TASK 10-d-4
+        # BLOCK: MotionPlanner.execute() upper-limb controller animation cleanup
+        # PURPOSE: Clear prior animation_data exclusively on the four upper-limb controllers (HandIK.L/R, ElbowPole.L/R) resolved from this Armature's own constraint bindings after WBC ownership admission and before creating MotionRuntimeContext.
+        # REASON: Resolve P03 where _clear_existing_animation_data() only cleared leg controllers, risking stale HandIK/ElbowPole curves across repeated planner executions without altering walk_cycle.py, global object lookup rules, other armatures, or Action datablocks.
+        from src.rig.arm_ik import (
+            ARM_IK_CONSTRAINT_NAMES,
+            ARM_IK_TARGET_NAMES,
+            ARM_POLE_TARGET_NAMES,
+            HAND_ROT_CONSTRAINT_NAMES,
+        )
+
+        upper_limb_controllers = []
+        seen_controller_ptrs = set()
+        for side in ("L", "R"):
+            p_fore = arm.pose.bones.get(f"forearm.{side}")
+            p_hand = arm.pose.bones.get(f"hand.{side}")
+            ik_con = p_fore.constraints.get(ARM_IK_CONSTRAINT_NAMES[side]) if p_fore is not None else None
+            rot_con = p_hand.constraints.get(HAND_ROT_CONSTRAINT_NAMES[side]) if p_hand is not None else None
+            if ik_con is None or rot_con is None:
+                raise RuntimeError(
+                    f"MotionPlanner.execute(): missing bound arm constraints for side {side!r} on {arm.name!r}"
+                )
+            ik_obj = ik_con.target
+            pole_obj = ik_con.pole_target
+            rot_obj = rot_con.target
+            if (
+                ik_obj is None
+                or ik_obj.type != "EMPTY"
+                or ik_obj.name != ARM_IK_TARGET_NAMES[side]
+                or rot_obj is not ik_obj
+            ):
+                raise RuntimeError(
+                    f"MotionPlanner.execute(): HandIK binding ownership unverified for side {side!r} on {arm.name!r}"
+                )
+            if (
+                pole_obj is None
+                or pole_obj.type != "EMPTY"
+                or pole_obj.name != ARM_POLE_TARGET_NAMES[side]
+            ):
+                raise RuntimeError(
+                    f"MotionPlanner.execute(): ElbowPole binding ownership unverified for side {side!r} on {arm.name!r}"
+                )
+            for ctrl_obj in (ik_obj, pole_obj):
+                ctrl_ptr = int(ctrl_obj.as_pointer())
+                if ctrl_ptr not in seen_controller_ptrs:
+                    seen_controller_ptrs.add(ctrl_ptr)
+                    upper_limb_controllers.append(ctrl_obj)
+
+        for other_obj in bpy.data.objects:
+            if other_obj.type == "ARMATURE" and other_obj is not arm and other_obj.pose is not None:
+                for pbone in other_obj.pose.bones:
+                    for con in pbone.constraints:
+                        t_obj = getattr(con, "target", None)
+                        p_obj = getattr(con, "pole_target", None)
+                        if (
+                            (t_obj is not None and int(t_obj.as_pointer()) in seen_controller_ptrs)
+                            or (p_obj is not None and int(p_obj.as_pointer()) in seen_controller_ptrs)
+                        ):
+                            raise RuntimeError(
+                                f"MotionPlanner.execute(): upper-limb controller shared with other Armature {other_obj.name!r}"
+                            )
+
+        for ctrl_obj in upper_limb_controllers:
+            if ctrl_obj.animation_data is not None:
+                ctrl_obj.animation_data_clear()
+
         context = MotionRuntimeContext(
             config=self.config,
             armature_obj=arm,
