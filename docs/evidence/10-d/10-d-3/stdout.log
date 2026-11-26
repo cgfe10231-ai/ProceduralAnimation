@@ -1,0 +1,19 @@
+[PASS] T01: FK 时间边界
+[PASS] T02: FK 独立三轴插值
+[PASS] T03: 左右侧隔离
+[PASS] T04: IK 世界空间插值
+[PASS] T05: IK Root 局部空间转换
+[PASS] T06: 偏航角数学合同
+[PASS] T07: Root 平移反事实
+[PASS] T08: ElbowPole 合同
+[PASS] T09: 手部姿态合同
+[PASS] T10: Reach Clamp
+[PASS] T11: IK 与接触分离
+[PASS] T12: 左右 FK/IK 混合目标
+[PASS] T13: 左右轨迹参数独立
+[PASS] T14: 枚举及类型拒绝
+[PASS] T15: 向量输入与 Root yaw 拒绝
+[PASS] T16: 模式字段冲突
+[PASS] T17: 时间及派生计算边界
+[PASS] T18: 无状态性与输入不变性
+SUMMARY: passed=18 failed=0 executed=18 exit_code=0
