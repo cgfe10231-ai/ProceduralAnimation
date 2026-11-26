@@ -1,0 +1,48 @@
+{
+  "node": "10-c-child2",
+  "source_head": "eeb1d740844210e7e2df321fab7638469c9f572a",
+  "results": [
+    {
+      "test": "A01_field_structure",
+      "status": "PASS"
+    },
+    {
+      "test": "A02_legacy_keyword_constructor",
+      "status": "PASS"
+    },
+    {
+      "test": "A03_legacy_positional_constructor",
+      "status": "PASS"
+    },
+    {
+      "test": "A04_field_defaults",
+      "status": "PASS"
+    },
+    {
+      "test": "A05_explicit_pole_hint",
+      "status": "PASS"
+    },
+    {
+      "test": "A06_explicit_clamp_reach",
+      "status": "PASS"
+    },
+    {
+      "test": "A07_left_right_instance_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "B01_bridge_lossless_mapping",
+      "status": "PASS"
+    },
+    {
+      "test": "B02_bridge_fk_ik_arbitration",
+      "status": "PASS"
+    },
+    {
+      "test": "B03_bridge_hand_contact_decoupling",
+      "status": "PASS"
+    }
+  ],
+  "passed": 10,
+  "failed": 0
+}

@@ -1,0 +1,142 @@
+================================================================================
+TASK 6G-C-R3B-1-FINAL: ARCHITECTURAL GAP FIXING & BRIDGE VERIFICATION
+================================================================================
+
+--- Test 1: Lossless Input Mapping ---
+  -> Lossless conversion verified: 100% of spatial and kinematic fields preserved.
+[PASSED] Test 01: Lossless Input Mapping
+
+--- Test 2: FK/IK Arbitration & Control Ownership ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> FK/IK arbitration verified: FK influence=0.0, IK influence=1.0, wrist tracking error=0.041mm.
+[PASSED] Test 02: FK/IK Arbitration & Control Ownership
+
+--- Test 3: Stance Foot Ground Anchor Preservation ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Stance foot preservation verified: controller drift=0.000000mm, bone drift=0.246mm.
+[PASSED] Test 03: Stance Foot Ground Anchor Preservation
+
+--- Test 4: Truthful ROM & Reach Failure Reporting ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Truthful reporting verified: REACHABILITY and ROM_VIOLATION strictly report success=False.
+[PASSED] Test 04: Truthful ROM & Reach Failure Reporting
+
+--- Test 5: Quantitative Pose Equivalence (Old vs Bridge) ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Quantitative equivalence verified: Pelvis diff=0.0000mm, Ankle L diff=0.0000mm, Ankle R diff=0.0000mm.
+[PASSED] Test 05: Quantitative Pose Equivalence (Old vs Bridge)
+
+--- Test 6: Immutability of Historical Gait Curves ---
+  -> Gait curves verified: 7 steps intact, peak speed=0.24 m/s, total disp=1.26 m.
+[PASSED] Test 06: Immutability of Historical Gait Curves
+
+--- Test 7: Data Types, Units & Coordinate Conventions ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Types, units, and coordinate conventions verified: +Z Up, ground Z=0.0, support_type=double_stance.
+[PASSED] Test 07: Data Types, Units & Coordinate Consistency
+
+--- Test 8: Duplicate Write Conflict Prevention ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Exclusive write ownership verified: zero conflict between foot_contact and WBC.
+[PASSED] Test 08: Duplicate Write Conflict Prevention
+
+--- Test 9: Full Single-Frame 6-Phase Pipeline Execution ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> 5 frames executed via 6-phase pipeline: keyframing active, support_type=single_stance_l, inertia evaluated.
+[PASSED] Test 09: Full Single-Frame 6-Phase Pipeline Execution
+
+--- Test 10: Variable Time Step (dt) & Kinematic Scaling ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Variable dt scaling & invalid timestamp protections verified.
+[PASSED] Test 10: Variable Time Step (dt) & Kinematic Scaling
+
+--- Test 11: Hand IK vs Contact Intent Decoupling ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Contact semantics decoupled: clean distinction between free IK and active contacts verified.
+[PASSED] Test 11: Hand IK vs Contact Intent Decoupling
+
+--- Test 12: Whole-Body Inertia & Angular Momentum Telemetry ---
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_RBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+  -> Inertia tensor and angular momentum telemetry verified (I_zz=1.0777 kg*m^2, static H=0.000000).
+[PASSED] Test 12: Whole-Body Inertia & Angular Momentum Telemetry
+
+--- Test 13: Historical Actions Intactness & Planning ---
+  -> Walk, Run, SprintStart, SprintBrake actions intact and plan successfully.
+[PASSED] Test 13: Historical Motion Actions Intactness & Planning
+
+--- Test 14: Core Historical Regression Suite ---
+  Running regression: tests/verify_task6fd_whole_body_controller.py...
+  [PASSED] tests/verify_task6fd_whole_body_controller.py
+  Running regression: tests/verify_task6fc_joint_limits.py...
+  [PASSED] tests/verify_task6fc_joint_limits.py
+  Running regression: tests/verify_task6fb_rigid_link.py...
+  [PASSED] tests/verify_task6fb_rigid_link.py
+  Running regression: tests/verify_task6fa_arm_ik.py...
+  [PASSED] tests/verify_task6fa_arm_ik.py
+  Running regression: tests/verify_task6ga_body_kinematics.py...
+  [PASSED] tests/verify_task6ga_body_kinematics.py
+  Running regression: tests/verify_task6gb_body_inertia.py...
+  [PASSED] tests/verify_task6gb_body_inertia.py
+[PASSED] Test 14: Core Historical Regression Suite
+
+================================================================================
+RESULT: ALL 14 TASK 6G-C-R3B-1-FINAL VERIFICATION TESTS PASSED SUCCESSFULLY!
+================================================================================

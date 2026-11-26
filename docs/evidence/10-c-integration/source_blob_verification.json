@@ -1,0 +1,13 @@
+{
+  "branch": "task/10-c-integration",
+  "integration_baseline_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+  "master_head": "d9731241f5130cd425e27758f260e1780b9e5256",
+  "child4_history_head": "d3d7f135975ac5a2a9b01e2706434d0463a563cd",
+  "kinematic_bridge_blob": "abdc74455075b83f7188c3dffabc64e456258326",
+  "pre_src_tests_blob_count": 225,
+  "post_src_tests_blob_count": 225,
+  "src_tests_blobs_identical": true,
+  "unstaged_tracked_changes": [],
+  "staged_changes": [],
+  "freeze_intact": true
+}

@@ -1,0 +1,698 @@
+{
+  "task": "TASK 10-C / INTEGRATED FULL REVALIDATION",
+  "branch": "task/10-c-integration",
+  "integration_baseline_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+  "master_head": "d9731241f5130cd425e27758f260e1780b9e5256",
+  "child4_history_head": "d3d7f135975ac5a2a9b01e2706434d0463a563cd",
+  "kinematic_bridge_blob": "abdc74455075b83f7188c3dffabc64e456258326",
+  "blender_version_lines": [
+    "Blender 5.1.1",
+    "\tbuild date: 2026-04-14",
+    "\tbuild time: 01:37:22",
+    "\tbuild commit date: 2026-04-13",
+    "\tbuild commit time: 14:35",
+    "\tbuild hash: b70da489d7f4"
+  ],
+  "scripts_sha256": {
+    "group_a_task10c_child2_verify.py": {
+      "relative_path": "docs/evidence/10-c-integration/scripts/group_a_task10c_child2_verify.py",
+      "bytes": 4787,
+      "sha256": "97fe6670bbb81fbb45634f2af90e9f747ffc31f3211d03f38ddd4a2e8b6671c8"
+    },
+    "group_b_task10c_child3_verify.py": {
+      "relative_path": "docs/evidence/10-c-integration/scripts/group_b_task10c_child3_verify.py",
+      "bytes": 11797,
+      "sha256": "6fb387306067fa611f00fcbc46179dfc00a240d684abf825aee3d590ca912110"
+    },
+    "group_c_task_10c_child4_verify.py": {
+      "relative_path": "docs/evidence/10-c-integration/scripts/group_c_task_10c_child4_verify.py",
+      "bytes": 27332,
+      "sha256": "3b4f01f86f5d37eb33faf232eb134463c5b3ab6ef1335438180a14f5e3d61b9d"
+    },
+    "group_d_verify_10c_child4_rom_feedback.py": {
+      "relative_path": "docs/evidence/10-c-integration/scripts/group_d_verify_10c_child4_rom_feedback.py",
+      "bytes": 10674,
+      "sha256": "54d0f23bca54577280f4006b04a54dff8ce0b95429b72a8eb7dd0708ad49b173"
+    }
+  },
+  "groups": {
+    "Group A (10-c-child2)": {
+      "command": "blender.exe -b --factory-startup --python-exit-code 1 --python \"<repo>/docs/evidence/10-c-integration/scripts/group_a_task10c_child2_verify.py\"",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "tests": [
+        {
+          "test": "A01_field_structure",
+          "status": "PASS"
+        },
+        {
+          "test": "A02_legacy_keyword_constructor",
+          "status": "PASS"
+        },
+        {
+          "test": "A03_legacy_positional_constructor",
+          "status": "PASS"
+        },
+        {
+          "test": "A04_field_defaults",
+          "status": "PASS"
+        },
+        {
+          "test": "A05_explicit_pole_hint",
+          "status": "PASS"
+        },
+        {
+          "test": "A06_explicit_clamp_reach",
+          "status": "PASS"
+        },
+        {
+          "test": "A07_left_right_instance_isolation",
+          "status": "PASS"
+        },
+        {
+          "test": "B01_bridge_lossless_mapping",
+          "status": "PASS"
+        },
+        {
+          "test": "B02_bridge_fk_ik_arbitration",
+          "status": "PASS"
+        },
+        {
+          "test": "B03_bridge_hand_contact_decoupling",
+          "status": "PASS"
+        }
+      ]
+    },
+    "Group B (10-c-child3)": {
+      "command": "blender.exe -b --factory-startup --python-exit-code 1 --python \"<repo>/docs/evidence/10-c-integration/scripts/group_b_task10c_child3_verify.py\"",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "tests": [
+        {
+          "test": "C3-T01",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T02",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T03",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T04",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T05",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T06",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T07",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T08",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T09",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T10",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T11",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T12",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T13",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T14",
+          "status": "PASS"
+        },
+        {
+          "test": "C3-T15",
+          "status": "PASS"
+        }
+      ]
+    },
+    "Group C (10-c-child4)": {
+      "command": "blender.exe -b --factory-startup --python-exit-code 1 --python \"<repo>/docs/evidence/10-c-integration/scripts/group_c_task_10c_child4_verify.py\" (WorkingDirectory=<detached worktree at 2e65a94>)",
+      "exit_code": 0,
+      "executed": 6,
+      "passed": 6,
+      "failed": 0,
+      "not_run": 0,
+      "tests": {
+        "C4-T01": {
+          "status": "PASS",
+          "metrics": {
+            "wbc_success": true,
+            "hand_L": {
+              "requested_world_xyz": [
+                -0.24,
+                -7.65,
+                1.35
+              ],
+              "target_world": [
+                -0.23999999463558197,
+                -7.650000095367432,
+                1.350000023841858
+              ],
+              "wrist_world": [
+                -0.23999804258346558,
+                -7.649961471557617,
+                1.3499865531921387
+              ],
+              "hand_tip_world": [
+                -0.22589156031608582,
+                -7.5568671226501465,
+                1.3836690187454224
+              ],
+              "wrist_to_tip_m": 0.10000029563063269,
+              "feedback_actual_world_xyz": [
+                -0.23999804258346558,
+                -7.649961471557617,
+                1.3499865531921387
+              ],
+              "feedback_vs_wrist_diff_m": 0.0,
+              "feedback_position_error_m": 4.095201577342168e-05,
+              "independent_e_p_m": 4.0854485599798516e-05,
+              "position_error_diff_m": 9.753017362316594e-08,
+              "requested_rotation_deg": [
+                20.0,
+                10.0,
+                -5.0
+              ],
+              "hand_world_euler_deg": [
+                20.0,
+                10.0,
+                -5.0
+              ],
+              "feedback_actual_rotation_deg": [
+                20.0,
+                10.0,
+                -5.0
+              ],
+              "feedback_orientation_error_deg": 0.0,
+              "independent_e_R_deg": 0.0,
+              "orientation_error_diff_deg": 0.0
+            },
+            "hand_R": {
+              "requested_world_xyz": [
+                0.24,
+                -7.7,
+                1.25
+              ],
+              "target_world": [
+                0.23999999463558197,
+                -7.699999809265137,
+                1.25
+              ],
+              "wrist_world": [
+                0.2399994134902954,
+                -7.699983596801758,
+                1.2499884366989136
+              ],
+              "hand_tip_world": [
+                0.2271035611629486,
+                -7.604150295257568,
+                1.2754771709442139
+              ],
+              "wrist_to_tip_m": 0.10000000132767911,
+              "feedback_actual_world_xyz": [
+                0.2399994134902954,
+                -7.699983596801758,
+                1.2499884366989136
+              ],
+              "feedback_vs_wrist_diff_m": 0.0,
+              "feedback_position_error_m": 1.9922139209226574e-05,
+              "independent_e_p_m": 2.0077819558588377e-05,
+              "position_error_diff_m": 1.5568034936180316e-07,
+              "requested_rotation_deg": [
+                15.0,
+                -10.0,
+                5.0
+              ],
+              "hand_world_euler_deg": [
+                15.0,
+                -10.0,
+                5.0
+              ],
+              "feedback_actual_rotation_deg": [
+                15.0,
+                -10.0,
+                5.0
+              ],
+              "feedback_orientation_error_deg": 0.0,
+              "independent_e_R_deg": 0.0,
+              "orientation_error_diff_deg": 0.0
+            }
+          }
+        },
+        "C4-T02": {
+          "status": "PASS",
+          "metrics": {
+            "pole": {
+              "requested_L": [
+                -0.55,
+                -8.45,
+                1.25
+              ],
+              "actual_L": [
+                -0.550000011920929,
+                -8.449999809265137,
+                1.25
+              ],
+              "error_L_m": 1.9110702851009906e-07,
+              "requested_R": [
+                0.62,
+                -8.35,
+                1.18
+              ],
+              "actual_R": [
+                0.6200000047683716,
+                -8.350000381469727,
+                1.1799999475479126
+              ],
+              "error_R_m": 3.8508844618950424e-07
+            },
+            "clamp_true": {
+              "requested_world_xyz": [
+                -0.24,
+                -6.2,
+                1.3
+              ],
+              "shoulder_world": [
+                -0.23999999463558197,
+                -8.0,
+                1.5399998426437378
+              ],
+              "applied_target_world": [
+                -0.23999997973442078,
+                -7.444912433624268,
+                1.465988278388977
+              ],
+              "raw_distance_to_shoulder_m": 1.8159294932538042,
+              "applied_distance_to_shoulder_m": 0.5599999267753255,
+              "max_arm_reach_m": 0.56
+            },
+            "clamp_false": {
+              "requested_world_xyz": [
+                -0.24,
+                -6.2,
+                1.3
+              ],
+              "shoulder_world": [
+                -0.23999999463558197,
+                -8.0,
+                1.5399998426437378
+              ],
+              "applied_target_world": [
+                -0.23999999463558197,
+                -6.199999809265137,
+                1.2999999523162842
+              ],
+              "diff_from_requested_m": 1.9667816828018874e-07,
+              "applied_distance_to_shoulder_m": 1.815929688617578
+            }
+          }
+        },
+        "C4-T03": {
+          "status": "PASS",
+          "metrics": {
+            "frames": [
+              {
+                "frame": 1,
+                "input": {
+                  "hand_L": {
+                    "enabled": true,
+                    "weight": 1.0
+                  },
+                  "hand_R": {
+                    "enabled": true,
+                    "weight": 1.0
+                  }
+                },
+                "ik_influence_L": 1.0,
+                "ik_influence_R": 1.0,
+                "feedback_enabled_L": true,
+                "feedback_enabled_R": true,
+                "feedback_weight_L": 1.0,
+                "feedback_weight_R": 1.0
+              },
+              {
+                "frame": 2,
+                "input": {
+                  "hand_L": {
+                    "enabled": true,
+                    "weight": 0.0
+                  },
+                  "hand_R": {
+                    "enabled": true,
+                    "weight": 1.0
+                  }
+                },
+                "ik_influence_L": 0.0,
+                "ik_influence_R": 1.0,
+                "feedback_enabled_L": false,
+                "feedback_enabled_R": true,
+                "feedback_weight_L": 0.0,
+                "feedback_weight_R": 1.0
+              },
+              {
+                "frame": 3,
+                "input": {
+                  "hand_L": {
+                    "enabled": false,
+                    "weight": 1.0
+                  },
+                  "hand_R": {
+                    "enabled": true,
+                    "weight": 1.0
+                  }
+                },
+                "ik_influence_L": 0.0,
+                "ik_influence_R": 1.0,
+                "feedback_enabled_L": false,
+                "feedback_enabled_R": true,
+                "feedback_weight_L": 0.0,
+                "feedback_weight_R": 1.0
+              }
+            ]
+          }
+        },
+        "C4-T04": {
+          "status": "PASS",
+          "metrics": {
+            "success": false,
+            "is_all_reachable": false,
+            "hand_L": {
+              "is_reachable": false,
+              "actual_world_xyz": [
+                -0.23999999463558197,
+                -7.443990230560303,
+                1.4732786417007446
+              ],
+              "position_error_m": 1.4543497886939727,
+              "reach_distance_m": 0.5599987231666035
+            },
+            "hand_R": {
+              "is_reachable": true,
+              "actual_world_xyz": [
+                0.2399994134902954,
+                -7.699983596801758,
+                1.2499884366989136
+              ],
+              "position_error_m": 1.9922139209226574e-05,
+              "reach_distance_m": 0.41727264764113003
+            },
+            "unmet_constraints": [
+              {
+                "category": "REACHABILITY",
+                "target_name": "hand_L",
+                "error_amount": 1.4543497886939727
+              },
+              {
+                "category": "ROM_VIOLATION",
+                "target_name": "hand.L",
+                "error_amount": 24.72149004354806
+              }
+            ]
+          }
+        },
+        "C4-T05": {
+          "status": "PASS",
+          "metrics": {
+            "success": false,
+            "has_rom_violation": true,
+            "rom_validation_is_valid": false,
+            "rom_violations": [
+              "spine",
+              "upper_arm.L",
+              "hand.L",
+              "upper_arm.R",
+              "hand.R"
+            ],
+            "final_spine_euler_deg": [
+              60.000001669652114,
+              0.0,
+              0.0
+            ],
+            "unmet_constraints": [
+              {
+                "category": "REACHABILITY",
+                "target_name": "hand_L",
+                "error_amount": 0.2924147995478358
+              },
+              {
+                "category": "REACHABILITY",
+                "target_name": "hand_R",
+                "error_amount": 0.22069358119332685
+              },
+              {
+                "category": "ROM_VIOLATION",
+                "target_name": "spine",
+                "error_amount": 24.99999667351618
+              },
+              {
+                "category": "ROM_VIOLATION",
+                "target_name": "upper_arm.L",
+                "error_amount": 78.5551234680839
+              },
+              {
+                "category": "ROM_VIOLATION",
+                "target_name": "hand.L",
+                "error_amount": 128.90734466165748
+              },
+              {
+                "category": "ROM_VIOLATION",
+                "target_name": "upper_arm.R",
+                "error_amount": 67.71038133036944
+              },
+              {
+                "category": "ROM_VIOLATION",
+                "target_name": "hand.R",
+                "error_amount": 117.69636778064694
+              }
+            ],
+            "hands": {
+              "hand_L": {
+                "requested_world_xyz": [
+                  -0.24,
+                  -7.65,
+                  1.35
+                ],
+                "final_actual_wrist_world": [
+                  -0.23999907076358795,
+                  -7.930661201477051,
+                  1.2680004835128784
+                ],
+                "returned_actual_world_xyz": [
+                  -0.24000005424022675,
+                  -7.930682182312012,
+                  1.2680001258850098
+                ],
+                "actual_pos_mismatch_m": 2.1006916947748127e-05,
+                "final_recomputed_position_error_m": 0.2923946489242351,
+                "returned_position_error_m": 0.2924147995478358,
+                "position_error_mismatch_m": 2.015062360066766e-05,
+                "final_hand_world_euler_deg": [
+                  20.0,
+                  10.0,
+                  -5.0
+                ],
+                "returned_actual_rotation_deg": [
+                  20.0,
+                  10.0,
+                  -5.0
+                ],
+                "euler_max_mismatch_deg": 0.0,
+                "final_recomputed_orientation_error_deg": 0.0,
+                "returned_orientation_error_deg": 0.0,
+                "orientation_error_mismatch_deg": 0.0
+              },
+              "hand_R": {
+                "requested_world_xyz": [
+                  0.24,
+                  -7.7,
+                  1.25
+                ],
+                "final_actual_wrist_world": [
+                  0.23999954760074615,
+                  -7.917149066925049,
+                  1.2106940746307373
+                ],
+                "returned_actual_world_xyz": [
+                  0.24000006914138794,
+                  -7.917165279388428,
+                  1.2106958627700806
+                ],
+                "actual_pos_mismatch_m": 1.631911197842364e-05,
+                "final_recomputed_position_error_m": 0.22067775836218287,
+                "returned_position_error_m": 0.22069358119332685,
+                "position_error_mismatch_m": 1.582283114398564e-05,
+                "final_hand_world_euler_deg": [
+                  15.0,
+                  -10.0,
+                  5.0
+                ],
+                "returned_actual_rotation_deg": [
+                  15.0,
+                  -10.0,
+                  5.0
+                ],
+                "euler_max_mismatch_deg": 0.0,
+                "final_recomputed_orientation_error_deg": 0.0,
+                "returned_orientation_error_deg": 0.0,
+                "orientation_error_mismatch_deg": 0.0
+              }
+            }
+          }
+        },
+        "C4-T06": {
+          "status": "PASS",
+          "metrics": {
+            "return_value": true
+          }
+        }
+      }
+    },
+    "Group D (10-c-child4 post_rom_reconcile)": {
+      "command": "blender.exe -b --factory-startup --python-exit-code 1 --python \"<repo>/docs/evidence/10-c-integration/scripts/group_d_verify_10c_child4_rom_feedback.py\"",
+      "exit_code": 0,
+      "executed": 7,
+      "passed": 7,
+      "failed": 0,
+      "tests": [
+        {
+          "test": "C4-T07",
+          "status": "PASS",
+          "metrics": {
+            "max_error_m": 0.2923946489242351,
+            "active": [
+              "foot_L",
+              "foot_R",
+              "hand_L",
+              "hand_R"
+            ]
+          }
+        },
+        {
+          "test": "C4-T08",
+          "status": "PASS",
+          "metrics": {
+            "diagnoses": [
+              [
+                "ROM_VIOLATION",
+                "spine"
+              ],
+              [
+                "ROM_VIOLATION",
+                "upper_arm.L"
+              ],
+              [
+                "ROM_VIOLATION",
+                "hand.L"
+              ],
+              [
+                "ROM_VIOLATION",
+                "upper_arm.R"
+              ],
+              [
+                "ROM_VIOLATION",
+                "hand.R"
+              ],
+              [
+                "REACHABILITY",
+                "hand_L"
+              ],
+              [
+                "REACHABILITY",
+                "hand_R"
+              ]
+            ]
+          }
+        },
+        {
+          "test": "C4-T09",
+          "status": "PASS",
+          "metrics": {
+            "left_enabled": false,
+            "right_enabled": true
+          }
+        },
+        {
+          "test": "C4-T10",
+          "status": "PASS",
+          "metrics": {
+            "frame": 1,
+            "without_clamp": true
+          }
+        },
+        {
+          "test": "C4-T11",
+          "status": "PASS",
+          "metrics": {
+            "rom_diagnoses_retained": 5,
+            "idempotent": true
+          }
+        },
+        {
+          "test": "C4-T12",
+          "status": "PASS",
+          "metrics": {
+            "injection_propagated": true,
+            "bridge_time_not_advanced": true
+          }
+        },
+        {
+          "test": "C4-T13",
+          "status": "PASS",
+          "metrics": {
+            "missing_feedback_rejected": true
+          }
+        }
+      ]
+    }
+  },
+  "total_10c_special_passed": 38,
+  "total_10c_special_expected": 38,
+  "historical_bridge_compat_regression": {
+    "script": "tests/verify_task6gc_r3b1_bridge.py",
+    "command": "blender.exe -b --factory-startup --python-exit-code 1 --python \"<repo>/tests/verify_task6gc_r3b1_bridge.py\"",
+    "exit_code": 0,
+    "tests_passed": 14,
+    "tests_total": 14,
+    "counted_separately_from_38": true
+  },
+  "source_blob_verification": {
+    "branch": "task/10-c-integration",
+    "integration_baseline_head": "2e65a9463ab88714cfb864b4d63f1547135c29ae",
+    "master_head": "d9731241f5130cd425e27758f260e1780b9e5256",
+    "child4_history_head": "d3d7f135975ac5a2a9b01e2706434d0463a563cd",
+    "kinematic_bridge_blob": "abdc74455075b83f7188c3dffabc64e456258326",
+    "pre_src_tests_blob_count": 225,
+    "post_src_tests_blob_count": 225,
+    "src_tests_blobs_identical": true,
+    "unstaged_tracked_changes": [],
+    "staged_changes": [],
+    "freeze_intact": true
+  }
+}
