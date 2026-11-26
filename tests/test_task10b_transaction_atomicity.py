@@ -1454,7 +1454,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_58_snapshot_failure_clears_active_transaction_stack(self) -> None:
         """TEST-58: Fault during _snapshot_arm_rig_state() completely cleans up transaction stack allowing subsequent calls."""
-        from src.rig.arm_ik import _ACTIVE_TRANSACTION_STACK
+        from src.scene_transaction_integrity.layer2.transaction_stack import _ACTIVE_TRANSACTION_STACK
 
         def fault_hook(stage: str, ctx: dict) -> None:
             if stage == "during_snapshot_creation":
@@ -2021,7 +2021,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
 
     def test_69_snapshot_array_immutability_and_independence(self) -> None:
         """TEST-69: Snapshot arrays are immutable tuples, immune to in-place RNA mutations, and restored properly."""
-        from src.rig.arm_ik import _clone_snapshot_property_value
+        from src.scene_transaction_integrity.layer5.value_evidence import _clone_snapshot_property_value
         setup_arm_ik(self.armature, initial_influence=0.5)
 
         snap = _snapshot_arm_rig_state(self.armature)
@@ -3883,7 +3883,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         fake_tx = _ArmRigTransactionContext(self.armature)
         fake_tx.state = _ArmRigTransactionState.CLEANUP_PENDING
         fake_tx.uncleaned_stashed_objects.append({"original_name": "Ghost112", "obj_cleaned": False, "data_cleaned": False})
-        from src.rig.arm_ik import _register_pending_arm_rig_cleanup
+        from src.scene_transaction_integrity.layer2.pending_cleanup_registry import _register_pending_arm_rig_cleanup
         _register_pending_arm_rig_cleanup(fake_tx)
 
         with self.assertRaises(RuntimeError) as cm_blocked:
@@ -5241,7 +5241,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
         isolated_failed_c_tx = _ArmRigTransactionContext(self.armature, session_record=session_rec)
         isolated_failed_c_tx.state = _ArmRigTransactionState.FAILED
         isolated_failed_c_tx.snapshot = snap_after_cleanup_a
-        from src.rig.arm_ik import _record_armature_failure_isolation_by_coordinator
+        from src.scene_transaction_integrity.layer2.session_registries import _record_armature_failure_isolation_by_coordinator
         _record_armature_failure_isolation_by_coordinator(
             session_rec=session_rec,
             tx=isolated_failed_c_tx,
@@ -7724,7 +7724,7 @@ class TestArmIKTransactionAtomicity(unittest.TestCase):
                 )
 
                 # 5. A forged mutable entry cannot supply ownership.
-                from src.rig.arm_ik import (
+                from src.scene_transaction_integrity.layer3.controller_ownership import (
                     _verify_transaction_wrong_type_object_ownership
                 )
 
