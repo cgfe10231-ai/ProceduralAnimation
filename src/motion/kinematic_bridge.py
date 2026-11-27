@@ -546,10 +546,10 @@ class KinematicBridgeExecutor:
         # ---------------------------------------------------------------------
         # Time Step Resolution & Validation
         # ---------------------------------------------------------------------
-        # [INTRODUCED 2026-11-27T20:57:10+08:00]
+        # [INTRODUCED 2026-11-27T21:05:10+08:00]
         # FUNCTION: KinematicBridgeExecutor.execute_frame.timing_admission_validation
-        # PURPOSE: Reject non-integer/bool frames, non-finite timestamps, non-finite/non-positive dt values, and duplicate or out-of-order frames/timestamps against committed history before invoking WBC, preventing explicit dt from bypassing chronological ordering.
-        # REASON: TASK 12-B (timing admission boundary)
+        # PURPOSE: Reject invalid frame/time ordering before WBC and enforce a single unified finite and > 1e-9s validity gate on the final resolved effective_dt across all timestep sources.
+        # REASON: TASK 12-B BUG-04
         if isinstance(frame, bool) or not isinstance(frame, int):
             raise ValueError(f"Frame number must be an integer, got {frame!r}")
 
@@ -570,20 +570,28 @@ class KinematicBridgeExecutor:
             )
 
         if dt is not None:
-            if isinstance(dt, bool) or not isinstance(dt, (int, float)) or not math.isfinite(float(dt)) or float(dt) <= 0.0:
-                raise ValueError(f"Explicit dt={dt!r} must be finite and strictly positive (> 0.0)")
-            effective_dt = float(dt)
+            dt_source = "explicit dt"
+            raw_dt = dt
         elif planned.dt is not None:
-            if isinstance(planned.dt, bool) or not isinstance(planned.dt, (int, float)) or not math.isfinite(float(planned.dt)) or float(planned.dt) <= 0.0:
-                raise ValueError(f"Planned dt={planned.dt!r} must be finite and strictly positive (> 0.0)")
-            effective_dt = float(planned.dt)
+            dt_source = "planned.dt"
+            raw_dt = planned.dt
+        elif self._last_time_sec is not None:
+            dt_source = "timestamp delta"
+            raw_dt = time_sec_f - self._last_time_sec
         else:
-            if self._last_time_sec is not None:
-                effective_dt = time_sec_f - self._last_time_sec
-            else:
-                if isinstance(self.default_fps, bool) or not math.isfinite(self.default_fps) or self.default_fps <= 0.0:
-                    raise ValueError(f"Bridge default_fps={self.default_fps!r} must be finite and strictly positive (> 0.0)")
-                effective_dt = 1.0 / self.default_fps
+            dt_source = f"default_fps={self.default_fps!r}"
+            if isinstance(self.default_fps, bool) or not isinstance(self.default_fps, (int, float)):
+                raise ValueError(f"Bridge default_fps={self.default_fps!r} must be numeric")
+            fps_val = float(self.default_fps)
+            raw_dt = (1.0 / fps_val) if fps_val != 0.0 else 0.0
+
+        if isinstance(raw_dt, bool) or not isinstance(raw_dt, (int, float)):
+            raise ValueError(f"Resolved timestep from {dt_source} must be numeric, got {raw_dt!r}")
+        effective_dt = float(raw_dt)
+        if not math.isfinite(effective_dt) or effective_dt <= 1e-9:
+            raise ValueError(
+                f"Resolved effective_dt={effective_dt!r} (from {dt_source}) must be finite and strictly greater than 1e-9s"
+            )
 
         # ---------------------------------------------------------------------
         # Phase 1: Planning / Target Packaging
@@ -925,15 +933,25 @@ class KinematicBridgeExecutor:
         # REASON: TASK 12-B BUG-01 & BUG-02
         if overall_success:
             if keyframe:
+                # [INTRODUCED 2026-11-27T21:05:30+08:00]
+                # FUNCTION: KinematicBridgeExecutor.execute_frame.keyframe_return_checks
+                # PURPOSE: Enforce strict return-value checks on every Root, PoseBone, Leg controller, and Upper-limb controller keyframe_insert() call so any False return aborts frame commit with frame, target identity, and data_path before updating Tracker or Bridge state.
+                # REASON: TASK 12-B BUG-05
                 # Keyframe root object
                 if root is not None:
-                    root.keyframe_insert("location", frame=frame)
-                    root.keyframe_insert("rotation_euler", frame=frame)
+                    for data_path in ("location", "rotation_euler"):
+                        if not root.keyframe_insert(data_path, frame=frame):
+                            raise RuntimeError(
+                                f"Failed to insert keyframe for object {root.name!r}.{data_path} at frame {frame}"
+                            )
 
                 # Keyframe armature pose bones
                 for pb in arm.pose.bones:
-                    pb.keyframe_insert("location", frame=frame)
-                    pb.keyframe_insert("rotation_euler", frame=frame)
+                    for data_path in ("location", "rotation_euler"):
+                        if not pb.keyframe_insert(data_path, frame=frame):
+                            raise RuntimeError(
+                                f"Failed to insert keyframe for pose bone {arm.name!r}.{pb.name}.{data_path} at frame {frame}"
+                            )
 
                 # [INTRODUCED 2026-11-26T17:52:00+08:00]
                 # TASK: TASK 10-d-4
@@ -943,13 +961,15 @@ class KinematicBridgeExecutor:
                 for name in ("FootIK.L", "FootIK.R", "KneePole.L", "KneePole.R"):
                     obj = bpy.data.objects.get(name)
                     if obj is not None:
-                        obj.keyframe_insert("location", frame=frame)
-                        obj.keyframe_insert("rotation_euler", frame=frame)
+                        for data_path in ("location", "rotation_euler"):
+                            if not obj.keyframe_insert(data_path, frame=frame):
+                                raise RuntimeError(
+                                    f"Failed to insert keyframe for controller {obj.name!r}.{data_path} at frame {frame}"
+                                )
 
                 for name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
                     obj = bpy.data.objects.get(name)
                     if obj is not None:
-                        obj.keyframe_insert("location", frame=frame)
                         rot_mode = str(obj.rotation_mode)
                         if rot_mode == "QUATERNION":
                             rot_path = "rotation_quaternion"
@@ -959,9 +979,13 @@ class KinematicBridgeExecutor:
                             rot_path = "rotation_euler"
                         else:
                             raise ValueError(
-                                f"Unsupported rotation_mode {rot_mode!r} on upper-limb controller {name!r}"
+                                f"Unsupported rotation_mode {rot_mode!r} on upper-limb controller {name!r} at frame {frame}"
                             )
-                        obj.keyframe_insert(rot_path, frame=frame)
+                        for data_path in ("location", rot_path):
+                            if not obj.keyframe_insert(data_path, frame=frame):
+                                raise RuntimeError(
+                                    f"Failed to insert keyframe for controller {obj.name!r}.{data_path} at frame {frame}"
+                                )
 
                 expected_influence_paths = set()
                 for side in ("L", "R"):
