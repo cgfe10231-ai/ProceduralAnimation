@@ -25,6 +25,7 @@ from mathutils import Euler, Matrix, Vector
 from src.character.builder import world_min_z
 from src.rig.ik import (
     ANKLE_REST_Z,
+    FOOT_LOCK_METADATA_KEYS,
     IK_TARGET_NAMES,
     MAX_LEG_REACH,
     MIN_LEG_REACH,
@@ -136,14 +137,22 @@ def lock_foot_contact(
     foot_min_z = world_min_z(foot_mesh)
 
     # Persist lock metadata on the controller object so .blend reopen retains full state
+    # [INTRODUCED 2026-11-27T17:09:00+08:00]
+    # BLOCK: lock_foot_contact full metadata rebuild and final lock publication
+    # PURPOSE: Overwrite all 7 FOOT_LOCK_METADATA_KEYS from freshly computed world lock geometry before publishing is_locked=True.
+    # REASON: TASK 11-A (FIND-R3-03) — guarantee stale snapshot values never mix into relock state and is_locked=True is published only after complete 7-field reconstruction.
+    lock_metadata_payload = {
+        "contact_world_xyz": tuple(float(v) for v in contact_world),
+        "locked_ankle_world_xyz": tuple(float(v) for v in locked_ankle_world),
+        "target_rotation_deg": tuple(float(v) for v in target_rotation_deg),
+        "locked_foot_head_xyz": tuple(float(v) for v in foot_head_world),
+        "locked_foot_tail_xyz": tuple(float(v) for v in foot_tail_world),
+        "locked_foot_center_xyz": tuple(float(v) for v in foot_center_world),
+        "locked_foot_min_z": float(foot_min_z),
+    }
+    for meta_key in FOOT_LOCK_METADATA_KEYS:
+        ik_obj[meta_key] = lock_metadata_payload[meta_key]
     ik_obj["is_locked"] = True
-    ik_obj["contact_world_xyz"] = tuple(float(v) for v in contact_world)
-    ik_obj["locked_ankle_world_xyz"] = tuple(float(v) for v in locked_ankle_world)
-    ik_obj["target_rotation_deg"] = tuple(float(v) for v in target_rotation_deg)
-    ik_obj["locked_foot_head_xyz"] = tuple(float(v) for v in foot_head_world)
-    ik_obj["locked_foot_tail_xyz"] = tuple(float(v) for v in foot_tail_world)
-    ik_obj["locked_foot_center_xyz"] = tuple(float(v) for v in foot_center_world)
-    ik_obj["locked_foot_min_z"] = float(foot_min_z)
 
     return evaluate_foot_support(arm, side)
 
@@ -206,6 +215,13 @@ def unlock_foot_contact(
 
     try:
         ik_obj["is_locked"] = False
+        # [INTRODUCED 2026-11-27T17:09:00+08:00]
+        # BLOCK: unlock_foot_contact lock metadata cleanup
+        # PURPOSE: Delete any existing 7 FootLock snapshot custom properties on FootIK.<side> inside the Phase B rollback-protected transaction.
+        # REASON: TASK 11-A (FIND-R3-03) — eliminate stale lock snapshots on unlock, repeat unlock, or legacy unlocked controllers while preserving opposite-side state and 09-B-4 failure rollback.
+        for meta_key in FOOT_LOCK_METADATA_KEYS:
+            if meta_key in ik_obj:
+                del ik_obj[meta_key]
 
         # Ensure parentless in world space with identity parent inverse and full TRS restoration
         ik_obj.parent = None
