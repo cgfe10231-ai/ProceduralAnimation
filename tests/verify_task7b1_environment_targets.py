@@ -115,13 +115,14 @@ def _assert_valid_mesh_hit(
     tc.assertTrue(math.isfinite(res.signed_distance), f"Non-finite signed_distance: {res.signed_distance}")
     tc.assertTrue(math.isfinite(res.friction_coeff), f"Non-finite friction_coeff: {res.friction_coeff}")
 
-    norm_len = math.sqrt(sum(n * n for n in res.surface_normal_world))
+    unit_norm_err = abs(norm_len - 1.0)
     tc.assertLessEqual(
-        abs(norm_len - 1.0),
+        unit_norm_err,
         UNIT_NORM_TOL,
         f"Normal must be unit length within {UNIT_NORM_TOL}: len={norm_len}, n={res.surface_normal_world}",
     )
 
+    pos_err: Optional[float] = None
     if expected_point is not None:
         pos_err = _dist3(res.contact_point_world, expected_point)
         tc.assertLessEqual(
@@ -130,6 +131,7 @@ def _assert_valid_mesh_hit(
             f"Position error {pos_err:.8f}m > {POS_TOL_M}m: actual={res.contact_point_world}, expected={expected_point}",
         )
 
+    norm_err: Optional[float] = None
     if expected_normal is not None:
         norm_err = _dist3(res.surface_normal_world, expected_normal)
         tc.assertLessEqual(
@@ -137,6 +139,25 @@ def _assert_valid_mesh_hit(
             NORM_VEC_TOL,
             f"Normal error {norm_err:.8f} > {NORM_VEC_TOL}: actual={res.surface_normal_world}, expected={expected_normal}",
         )
+
+    # [INTRODUCED 2026-11-28T00:19:00+08:00]
+    # FUNCTION: _assert_valid_mesh_hit (successful query telemetry output)
+    # PURPOSE: Emit actual test number, surface provenance, actual/expected position and normal, error metrics, and hit distances for each validated mesh query.
+    # REASON: TASK 7B-1 — Satisfy telemetry observability requirement on successful environmental surface queries without altering tolerances.
+    test_method = getattr(tc, "_testMethodName", "") or tc.id()
+    test_match = re.match(r"^test_(t\d+)", test_method)
+    test_num = test_match.group(1).upper() if test_match else test_method
+    pos_err_str = f"{pos_err:.3e}" if pos_err is not None else "N/A"
+    norm_err_str = f"{norm_err:.3e}" if norm_err is not None else "N/A"
+    print(
+        f"[7B-1][{test_num}] ({test_method}) HIT "
+        f"surface_id={res.surface_id!r} surface_type={res.surface_type!r} source_type={res.source_type!r} "
+        f"actual_point={res.contact_point_world} expected_point={expected_point} "
+        f"actual_normal={res.surface_normal_world} expected_normal={expected_normal} "
+        f"pos_err={pos_err_str} norm_err={norm_err_str} unit_norm_err={unit_norm_err:.3e} "
+        f"signed_distance={res.signed_distance:.6f} ray_hit_distance={res.ray_hit_distance}",
+        flush=True,
+    )
 
     return poly_idx
 
@@ -156,6 +177,19 @@ def _assert_failed_query(tc: unittest.TestCase, res: SurfaceQueryResult, expecte
             res.error_reason.startswith(expected_prefix),
             f"Expected error_reason starting with {expected_prefix!r}, got {res.error_reason!r}",
         )
+    # [INTRODUCED 2026-11-28T00:19:00+08:00]
+    # FUNCTION: _assert_failed_query (failed query telemetry output)
+    # PURPOSE: Emit actual failure flags and raw `error_reason` for every rejected environmental query.
+    # REASON: TASK 7B-1 — Satisfy telemetry observability requirement on genuine NO_HIT failures.
+    test_method = getattr(tc, "_testMethodName", "") or tc.id()
+    test_match = re.match(r"^test_(t\d+)", test_method)
+    test_num = test_match.group(1).upper() if test_match else test_method
+    print(
+        f"[7B-1][{test_num}] ({test_method}) FAILED_QUERY "
+        f"success={res.success} surface_id={res.surface_id!r} source_type={res.source_type!r} "
+        f"error_reason={res.error_reason!r}",
+        flush=True,
+    )
 
 
 # [INTRODUCED 2026-11-28T00:13:00+08:00]
@@ -176,6 +210,11 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
         if not os.path.isfile(PLAYGROUND_BLEND):
             raise FileNotFoundError(f"Playground blend missing: {PLAYGROUND_BLEND}")
         cls._initial_blend_sha256 = _sha256_file(PLAYGROUND_BLEND)
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.setUpClass (source blend SHA-256 log)
+        # PURPOSE: Output the actual initial SHA-256 checksum of `output/dynamics_playground.blend`.
+        # REASON: TASK 7B-1 — Record authoritative source asset checksum baseline in stdout telemetry.
+        print(f"[7B-1][setUpClass] blend={PLAYGROUND_BLEND} initial_sha256={cls._initial_blend_sha256}", flush=True)
 
     # [INTRODUCED 2026-11-28T00:13:00+08:00]
     # FUNCTION: TestTask7B1EnvironmentTargets.tearDownClass
@@ -184,6 +223,16 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         final_sha = _sha256_file(PLAYGROUND_BLEND)
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.tearDownClass (source blend SHA-256 log)
+        # PURPOSE: Output the actual final SHA-256 checksum of `output/dynamics_playground.blend` and equality check.
+        # REASON: TASK 7B-1 — Record authoritative source asset immutability result in stdout telemetry.
+        print(
+            f"[7B-1][tearDownClass] blend={PLAYGROUND_BLEND} "
+            f"initial_sha256={cls._initial_blend_sha256} final_sha256={final_sha} "
+            f"unchanged={final_sha == cls._initial_blend_sha256}",
+            flush=True,
+        )
         if final_sha != cls._initial_blend_sha256:
             raise AssertionError(
                 f"Playground blend was modified! before={cls._initial_blend_sha256} after={final_sha}"
@@ -379,6 +428,28 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
         # Shifting by (0.0, -6.0, 0.6) places VaultBox cleanly at Y in [20.5, 23.5], Z in [0.6, 1.5],
         # strictly occluding Surface_VerticalWall (Y in [23.8, 24.2]) along +Y at Z=1.3.
         vault_box = bpy.data.objects["Surface_VaultBox"]
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t08_occlusion_returns_first_hit_no_penetration (identity precondition check)
+        # PURPOSE: Check that `Surface_VaultBox.matrix_world` equals `Matrix.Identity(4)` within 1e-6 prior to transform perturbation; fail and abort without modifying source scene if not.
+        # REASON: TASK 7B-1 T08 — Prevent perturbation assertions from relying on unverified initial object transforms.
+        ident = Matrix.Identity(4)
+        init_mat = vault_box.matrix_world
+        mat_finite = all(math.isfinite(init_mat[r][c]) for r in range(4) for c in range(4))
+        max_mat_err = (
+            max(abs(init_mat[r][c] - ident[r][c]) for r in range(4) for c in range(4))
+            if mat_finite
+            else float("inf")
+        )
+        if (not mat_finite) or max_mat_err > 1e-6:
+            print(
+                f"[7B-1][T08][PRECONDITION_FAILED] Surface_VaultBox initial matrix_world != Identity(4) "
+                f"(tol=1e-6, max_err={max_mat_err}): {tuple(tuple(row) for row in init_mat)}",
+                flush=True,
+            )
+            self.fail(
+                f"PRECONDITION_FAILED (T08): Surface_VaultBox initial matrix_world is not identity within 1e-6 "
+                f"(max_err={max_mat_err})"
+            )
         vault_box.location = Vector((0.0, -6.0, 0.6))
         bpy.context.view_layer.update()
 
@@ -397,6 +468,18 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
         )
         self.assertNotIn("Surface_VerticalWall", res.surface_id)
         self.assertLessEqual(abs(res.ray_hit_distance - 1.0), POS_TOL_M)
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t08_occlusion_returns_first_hit_no_penetration (perturbation & rebuild log)
+        # PURPOSE: Output actual BVH cache rebuild counts and occlusion perturbation metrics.
+        # REASON: TASK 7B-1 T08 — Report cache rebuild count and first-hit occlusion state in stdout telemetry.
+        print(
+            f"[7B-1][T08] matrix_world_precondition_err={max_mat_err:.3e} "
+            f"rebuilds_before={rebuilds_before} rebuilds_after={adapter.rebuild_count} "
+            f"rebuild_delta={adapter.rebuild_count - rebuilds_before} "
+            f"perturbed_location={tuple(vault_box.location)} hit_surface={res.surface_id!r} "
+            f"hit_point={res.contact_point_world} ray_hit_distance={res.ray_hit_distance:.6f}",
+            flush=True,
+        )
 
     # [INTRODUCED 2026-11-28T00:13:00+08:00]
     # FUNCTION: TestTask7B1EnvironmentTargets.test_t09_environment_translation_updates_target
@@ -412,6 +495,28 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
         rebuilds_before = adapter.rebuild_count
 
         wall = bpy.data.objects["Surface_VerticalWall"]
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t09_environment_translation_updates_target (identity precondition check)
+        # PURPOSE: Check that `Surface_VerticalWall.matrix_world` equals `Matrix.Identity(4)` within 1e-6 prior to translation; fail and abort without modifying source scene if not.
+        # REASON: TASK 7B-1 T09 — Prevent translation assertions from relying on unverified initial object transforms.
+        ident = Matrix.Identity(4)
+        init_mat = wall.matrix_world
+        mat_finite = all(math.isfinite(init_mat[r][c]) for r in range(4) for c in range(4))
+        max_mat_err = (
+            max(abs(init_mat[r][c] - ident[r][c]) for r in range(4) for c in range(4))
+            if mat_finite
+            else float("inf")
+        )
+        if (not mat_finite) or max_mat_err > 1e-6:
+            print(
+                f"[7B-1][T09][PRECONDITION_FAILED] Surface_VerticalWall initial matrix_world != Identity(4) "
+                f"(tol=1e-6, max_err={max_mat_err}): {tuple(tuple(row) for row in init_mat)}",
+                flush=True,
+            )
+            self.fail(
+                f"PRECONDITION_FAILED (T09): Surface_VerticalWall initial matrix_world is not identity within 1e-6 "
+                f"(max_err={max_mat_err})"
+            )
         wall.location = Vector((0.25, -0.45, 0.30))
         bpy.context.view_layer.update()
 
@@ -425,7 +530,20 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
             expected_normal=(0.0, -1.0, 0.0),
         )
         self.assertLessEqual(abs(res_shifted.ray_hit_distance - 0.35), POS_TOL_M)
-        self.assertGreater(_dist3(res_shifted.contact_point_world, res_orig.contact_point_world), 0.40)
+        shift_delta = _dist3(res_shifted.contact_point_world, res_orig.contact_point_world)
+        self.assertGreater(shift_delta, 0.40)
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t09_environment_translation_updates_target (perturbation & rebuild log)
+        # PURPOSE: Output actual BVH cache rebuild counts and translation shift metrics.
+        # REASON: TASK 7B-1 T09 — Report cache rebuild count and shifted world target result in stdout telemetry.
+        print(
+            f"[7B-1][T09] matrix_world_precondition_err={max_mat_err:.3e} "
+            f"rebuilds_before={rebuilds_before} rebuilds_after={adapter.rebuild_count} "
+            f"rebuild_delta={adapter.rebuild_count - rebuilds_before} "
+            f"translation={tuple(wall.location)} orig_point={res_orig.contact_point_world} "
+            f"shifted_point={res_shifted.contact_point_world} shift_delta_m={shift_delta:.6f}",
+            flush=True,
+        )
 
     # [INTRODUCED 2026-11-28T00:13:00+08:00]
     # FUNCTION: TestTask7B1EnvironmentTargets.test_t10_environment_rotation_updates_position_and_normal
@@ -441,6 +559,28 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
         rebuilds_before = adapter.rebuild_count
 
         wall = bpy.data.objects["Surface_VerticalWall"]
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t10_environment_rotation_updates_position_and_normal (identity precondition check)
+        # PURPOSE: Check that `Surface_VerticalWall.matrix_world` equals `Matrix.Identity(4)` within 1e-6 prior to rotation; fail and abort without modifying source scene if not.
+        # REASON: TASK 7B-1 T10 — Prevent rotation assertions from relying on unverified initial object transforms.
+        ident = Matrix.Identity(4)
+        init_mat = wall.matrix_world
+        mat_finite = all(math.isfinite(init_mat[r][c]) for r in range(4) for c in range(4))
+        max_mat_err = (
+            max(abs(init_mat[r][c] - ident[r][c]) for r in range(4) for c in range(4))
+            if mat_finite
+            else float("inf")
+        )
+        if (not mat_finite) or max_mat_err > 1e-6:
+            print(
+                f"[7B-1][T10][PRECONDITION_FAILED] Surface_VerticalWall initial matrix_world != Identity(4) "
+                f"(tol=1e-6, max_err={max_mat_err}): {tuple(tuple(row) for row in init_mat)}",
+                flush=True,
+            )
+            self.fail(
+                f"PRECONDITION_FAILED (T10): Surface_VerticalWall initial matrix_world is not identity within 1e-6 "
+                f"(max_err={max_mat_err})"
+            )
         wall.rotation_euler = Euler((math.radians(10.0), 0.0, math.radians(30.0)), "XYZ")
         bpy.context.view_layer.update()
 
@@ -467,6 +607,19 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
         )
         self.assertFalse(res_rot.allows_regular_support)
         self.assertLessEqual(abs(res_rot.ray_hit_distance - 0.35), POS_TOL_M)
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t10_environment_rotation_updates_position_and_normal (perturbation & rebuild log)
+        # PURPOSE: Output actual BVH cache rebuild counts and rotated target position/normal results.
+        # REASON: TASK 7B-1 T10 — Report cache rebuild count and rotated world point/normal result in stdout telemetry.
+        print(
+            f"[7B-1][T10] matrix_world_precondition_err={max_mat_err:.3e} "
+            f"rebuilds_before={rebuilds_before} rebuilds_after={adapter.rebuild_count} "
+            f"rebuild_delta={adapter.rebuild_count - rebuilds_before} "
+            f"rotation_euler_rad={tuple(wall.rotation_euler)} "
+            f"rotated_point={res_rot.contact_point_world} rotated_normal={res_rot.surface_normal_world} "
+            f"ray_hit_distance={res_rot.ray_hit_distance:.6f}",
+            flush=True,
+        )
 
     # [INTRODUCED 2026-11-28T00:13:00+08:00]
     # FUNCTION: TestTask7B1EnvironmentTargets.test_t11_unlinked_object_evicted_from_cache
@@ -490,6 +643,18 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
         self.assertEqual(adapter.rebuild_count, rebuilds_before + 1, "Unlinking collection member must trigger rebuild")
         self.assertNotIn("Surface_VerticalWall", adapter.tracked_objects)
         _assert_failed_query(self, res_after, expected_prefix="NO_HIT:")
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t11_unlinked_object_evicted_from_cache (eviction & rebuild log)
+        # PURPOSE: Output actual BVH cache rebuild counts and collection-unlink eviction state.
+        # REASON: TASK 7B-1 T11 — Report cache rebuild count and evicted object state in stdout telemetry.
+        print(
+            f"[7B-1][T11] rebuilds_before={rebuilds_before} rebuilds_after={adapter.rebuild_count} "
+            f"rebuild_delta={adapter.rebuild_count - rebuilds_before} "
+            f"unlinked_obj='Surface_VerticalWall' tracked_count={len(adapter.tracked_objects)} "
+            f"still_tracked={'Surface_VerticalWall' in adapter.tracked_objects} "
+            f"post_unlink_success={res_after.success} post_unlink_error={res_after.error_reason!r}",
+            flush=True,
+        )
 
     # [INTRODUCED 2026-11-28T00:13:00+08:00]
     # FUNCTION: TestTask7B1EnvironmentTargets.test_t12_source_blend_integrity_and_repeat_consistency
@@ -520,7 +685,19 @@ class TestTask7B1EnvironmentTargets(unittest.TestCase):
                 self.assertEqual(r_rep, baselines[idx], f"Repeated unchanged query drifted on {obj_name}")
 
         self.assertEqual(adapter.rebuild_count, rebuilds_after_init, "Unchanged scene queries must perform zero extra rebuilds")
-        self.assertEqual(_sha256_file(PLAYGROUND_BLEND), self._initial_blend_sha256)
+        final_t12_sha = _sha256_file(PLAYGROUND_BLEND)
+        self.assertEqual(final_t12_sha, self._initial_blend_sha256)
+        # [INTRODUCED 2026-11-28T00:19:00+08:00]
+        # FUNCTION: TestTask7B1EnvironmentTargets.test_t12_source_blend_integrity_and_repeat_consistency (repeat & integrity log)
+        # PURPOSE: Output actual BVH cache rebuild counts across repeated queries and verified source `.blend` SHA-256 digests.
+        # REASON: TASK 7B-1 T12 — Report zero extra rebuilds and byte-level immutability in stdout telemetry.
+        print(
+            f"[7B-1][T12] rebuilds_after_init={rebuilds_after_init} rebuilds_after_repeats={adapter.rebuild_count} "
+            f"extra_rebuilds={adapter.rebuild_count - rebuilds_after_init} "
+            f"repeat_rounds=5 probes_per_round={len(probes)} "
+            f"sha256_before={self._initial_blend_sha256} sha256_after={final_t12_sha}",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
