@@ -270,20 +270,24 @@ def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -
         raise ValueError(f"Invalid leg side '{side}', expected 'L' or 'R'")
 
     arm = _resolve_armature(armature_obj)
-    ik_obj, pole_obj = _ensure_ik_controls(arm, side)
-
-    is_locked = bool(ik_obj.get("is_locked", False))
-    # [INTRODUCED 2026-11-27T17:20:00+08:00]
-    # BLOCK: evaluate_foot_support pre-write lock snapshot gate and maintenance split
-    # PURPOSE: Validate all 7 FOOT_LOCK_METADATA_KEYS via pure query before any prebend/controller write when locked, maintain locked FootIK/KneePole world state, and delegate final measurement to get_foot_support_state().
-    # REASON: TASK 11-B (FIND-R3-04) — avoid duplicating metadata validation or support metric calculation and reject incomplete lock snapshots before writing support transforms.
+    # [INTRODUCED 2026-11-27T17:27:30+08:00]
+    # BLOCK: evaluate_foot_support locked admission check before controller initialization
+    # PURPOSE: Read existing FootIK lock flag read-only before _ensure_ik_controls(), validate complete lock/pole state via get_foot_support_state() when locked without entering setup_leg_ik(), and preserve _ensure_ik_controls() only for unlocked/uninitialized paths.
+    # REASON: TASK 11-B BUG-01 — prevent _ensure_ik_controls() -> setup_leg_ik() from wiping is_locked and metadata when KneePole.<side> is missing on an already-locked FootIK controller.
+    existing_ik_obj = bpy.data.objects.get(IK_TARGET_NAMES[side])
+    is_locked = bool(existing_ik_obj.get("is_locked", False)) if existing_ik_obj is not None else False
     locked_ankle_world: Optional[Vector] = None
     target_rot_deg: Optional[Tuple[float, float, float]] = None
     if is_locked:
+        assert existing_ik_obj is not None
         pre_locked_state = get_foot_support_state(arm, side)
         locked_ankle_world = pre_locked_state["locked_ankle_world"].copy()
         rx_deg, ry_deg, rz_deg = pre_locked_state["target_rotation_deg"]
         target_rot_deg = (float(rx_deg), float(ry_deg), float(rz_deg))
+        ik_obj = existing_ik_obj
+        pole_obj = bpy.data.objects[POLE_TARGET_NAMES[side]]
+    else:
+        ik_obj, pole_obj = _ensure_ik_controls(arm, side)
 
     _apply_ik_prebend_hint(arm)
     bpy.context.view_layer.update()
