@@ -1,0 +1,310 @@
+{
+  "task": "TASK 12-D Final Acceptance Execution Manifest",
+  "generated_at": "2026-11-27T23:38:54.832848+08:00",
+  "baseline_head_sha": "90f4628a0c4212f4bb0468941cdde362cd68bef2",
+  "frozen_production_commit": "eee276b39d204ccd46f4c17f37a09ec483bfcbae",
+  "historical_preserved_evidence_commit": "c9c9a2d7949aee916fa44273399aa6aff937cd54",
+  "blender_version": "Blender 5.1.1 (build date 2026-04-14, hash b70da489d7f4)",
+  "visual_acceptance_status": "OWNER WAIVED",
+  "pre_post_blob_verification": {
+    "src/motion/whole_body_controller.py": {
+      "git_blob": "230a86acaa92b580c5c0aad0e0cdacd7df224a7a",
+      "sha256": "6628a3c38437b2ee1bb9b5960fde2ae80c7519036c6cca523a2e3c8a63191ef5"
+    },
+    "src/motion/kinematic_bridge.py": {
+      "git_blob": "4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96",
+      "sha256": "b5ac7a0b160c69b95f391777f09e25057cdcfff7ae8fd40b573621a76ef7129b"
+    },
+    "src/motion/body_kinematics.py": {
+      "git_blob": "e204793ca3a326a798f75a66e24e98a945e53be7",
+      "sha256": "2c82b3496103171d5e0c9fc54d13503f8326fc8873ef2f46b0b1b836b9c531ea"
+    },
+    "src/motion/body_inertia.py": {
+      "git_blob": "0cd7efadf265072fd1665615815792f41b792f1b",
+      "sha256": "502ed498a79f5a2462b8699e047a309fcc5fc4fc6cdb542adb073c86ba0429cb"
+    },
+    "tests/verify_task6gc_r3b1_bridge.py": {
+      "git_blob": "eb99144187291e8acd3ad2f3399fc955096c9e45",
+      "sha256": "af5ddec8493ae74ccf4c32c5da5593d87fb3292a2446c5495acad2f264f04386"
+    }
+  },
+  "historical_evidence_preservation_verified": "docs/evidence/12/unified_verification/, docs/evidence/10-d/, and docs/evidence/11/ restored identically to baseline HEAD 90f4628 with zero modified tracked files",
+  "archived_file_count": 55,
+  "archived_files": [
+    {
+      "rel_path": "results.json",
+      "size_bytes": 18756,
+      "sha256": "c37718887946edc97d1dafa5d7751dae731aa3969dc18e6e177c34921875aa22"
+    },
+    {
+      "rel_path": "phase1_task12/bridge_results.json",
+      "size_bytes": 6002,
+      "sha256": "4f20af9183130aeb156e041deb1ad949aff08afff607877eb749c8e06f85969a"
+    },
+    {
+      "rel_path": "phase1_task12/continuous_results.json",
+      "size_bytes": 882,
+      "sha256": "309b71149e1d82ca39e8611ecbc85a453a2cf0e8ded33edd0a93880660f6e89e"
+    },
+    {
+      "rel_path": "phase1_task12/phase1_manifest.json",
+      "size_bytes": 3133,
+      "sha256": "80a798992407c2f2b3d9beaf21dfeb28e49f42a50868fab47a79f0474ea8630d"
+    },
+    {
+      "rel_path": "phase1_task12/reopen_results.json",
+      "size_bytes": 1444,
+      "sha256": "86bdf4c10af3f4e33f9294a8654bc0f8badc2cd9cb4013b21ab1f1d22377795c"
+    },
+    {
+      "rel_path": "phase1_task12/telemetry_results.json",
+      "size_bytes": 3153,
+      "sha256": "fa2fc9f5cfd9fb8b7bc358ac58c98ff75dab01c0c7ffbd778d476de75a9e524d"
+    },
+    {
+      "rel_path": "phase1_task12/verify_bridge_commit_contract.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase1_task12/verify_bridge_commit_contract.stdout.log",
+      "size_bytes": 28297,
+      "sha256": "59aa257cb902f44bff9e04d1ac0716451fcf88dd17002be52f1eb04943850db4"
+    },
+    {
+      "rel_path": "phase1_task12/verify_continuous_motion.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase1_task12/verify_continuous_motion.stdout.log",
+      "size_bytes": 3962,
+      "sha256": "d7618228b2e8d521f2eb503a00ac3a77fe9e799bc730f3e61819896520f184b7"
+    },
+    {
+      "rel_path": "phase1_task12/verify_reopen.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase1_task12/verify_reopen.stdout.log",
+      "size_bytes": 2555,
+      "sha256": "c4e65d7bd16674f1bc09bc88d60ebeb78b1b094af6faf363e09f0bcac31db7bc"
+    },
+    {
+      "rel_path": "phase1_task12/verify_telemetry_ownership.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase1_task12/verify_telemetry_ownership.stdout.log",
+      "size_bytes": 19235,
+      "sha256": "eeb91fe108028868c11cf56d07d6fac92a392cc3fadf3a34cb2d98eaa43bda94"
+    },
+    {
+      "rel_path": "phase1_task12/verify_wbc_contract.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase1_task12/verify_wbc_contract.stdout.log",
+      "size_bytes": 15069,
+      "sha256": "77feb9c80bc31edba4eee159cf25dcaa49ba0ec2688be5440673f63f2edeb015"
+    },
+    {
+      "rel_path": "phase1_task12/wbc_results.json",
+      "size_bytes": 4038,
+      "sha256": "dc525309f3fdf6a098d1b81d7fbe95ef43e7a6d732687aa3c1033ec6488f6bf8"
+    },
+    {
+      "rel_path": "phase1_task12/reopen_artifacts/scene1_bridge_mixed_retry.blend",
+      "size_bytes": 112481,
+      "sha256": "5e869f3ba4d097d77fa1716c043735fa5c13943a543fa2621d273b0c431c5a98"
+    },
+    {
+      "rel_path": "phase1_task12/reopen_artifacts/scene1_bridge_mixed_retry_reopen_out.json",
+      "size_bytes": 178,
+      "sha256": "00958e81ae6e05fdaafb82b2869f1d53713520ab88bc1cc47b8cd557d7cfaeee"
+    },
+    {
+      "rel_path": "phase1_task12/reopen_artifacts/scene1_bridge_mixed_retry_spec.json",
+      "size_bytes": 39347,
+      "sha256": "6b9d11e6b55180574acdf961f21d2f1f60897572da2da8e543b4b9d8712606dd"
+    },
+    {
+      "rel_path": "phase1_task12/reopen_artifacts/scene2_terrain_bilateral.blend",
+      "size_bytes": 143948,
+      "sha256": "2d21fa1d2679d150eaaefb7b20723dd4026daf71da7c3eeac4397ac2c5a6d29e"
+    },
+    {
+      "rel_path": "phase1_task12/reopen_artifacts/scene2_terrain_bilateral_reopen_out.json",
+      "size_bytes": 178,
+      "sha256": "c0dda4e8fef0dec257c732fe6ad74df0a7c8391ab19d97978ea0ef1be0ba389a"
+    },
+    {
+      "rel_path": "phase1_task12/reopen_artifacts/scene2_terrain_bilateral_spec.json",
+      "size_bytes": 40624,
+      "sha256": "d16a571acf039f5dbcd18f338d045c8c6fd353bbbe38721bb7c1bae553937d05"
+    },
+    {
+      "rel_path": "phase2_historical/phase2_manifest.json",
+      "size_bytes": 3127,
+      "sha256": "dc63825ffa33b0ecdc213df8af36e9fa43ea83636d92c2b6977714ecb8967c97"
+    },
+    {
+      "rel_path": "phase2_historical/task09_ground_height.stderr.log",
+      "size_bytes": 312,
+      "sha256": "b2c06df0010ad6fd98ba8aa4e4985ce9079dc111d73474e3100b892a00084d0c"
+    },
+    {
+      "rel_path": "phase2_historical/task09_ground_height.stdout.log",
+      "size_bytes": 11461,
+      "sha256": "ba5a46133752aa80d78ddb56d5c0feb3a69bb63521e0675238dca273361fd72f"
+    },
+    {
+      "rel_path": "phase2_historical/task09_init_reset.stderr.log",
+      "size_bytes": 297,
+      "sha256": "b7063cba28d6126e9cd7a7f5c38239bb397942b1cbef7180a6b85b2a889271a6"
+    },
+    {
+      "rel_path": "phase2_historical/task09_init_reset.stdout.log",
+      "size_bytes": 3574,
+      "sha256": "9bde48055b95daa835d95e077b72e4db23c07af4a3fd7969460b4355170ce582"
+    },
+    {
+      "rel_path": "phase2_historical/task09b_world_rotation.stderr.log",
+      "size_bytes": 6689,
+      "sha256": "e56b180fc4728c04feb85b1ccc9125642f36067208cb9964fa709f26d2861541"
+    },
+    {
+      "rel_path": "phase2_historical/task09b_world_rotation.stdout.log",
+      "size_bytes": 15451,
+      "sha256": "c042170d302d328e0db5d789469b71cb749b9466d0f0dd3e9e7113a23069963e"
+    },
+    {
+      "rel_path": "phase2_historical/task10b_wbc_failure.stderr.log",
+      "size_bytes": 1563,
+      "sha256": "36afcc6a571a853d63ab77c8a8e6066e8be6e18d0604054b68a28ee3445970cf"
+    },
+    {
+      "rel_path": "phase2_historical/task10b_wbc_failure.stdout.log",
+      "size_bytes": 4039,
+      "sha256": "2604f516c6a433ec2823bbbd6ed85634b3c583a40924866c08933408dd515864"
+    },
+    {
+      "rel_path": "phase2_historical/task10d_t01_t15.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase2_historical/task10d_t01_t15.stdout.log",
+      "size_bytes": 4703,
+      "sha256": "a5902b63df926adc184fe0eb9cd524d1124e1d03e5fe49764dc1da426de26e3b"
+    },
+    {
+      "rel_path": "phase2_historical/task10d_t01_t15_results.json",
+      "size_bytes": 21923,
+      "sha256": "8a978c0c2b2b465469a4028c652601a1d052eaa3122da764aace8e50d7248cf7"
+    },
+    {
+      "rel_path": "phase2_historical/task11_footlock.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase2_historical/task11_footlock.stdout.log",
+      "size_bytes": 44237,
+      "sha256": "54f007c90e291ef3dc2ac1112a83554c2032c980b0bb01c10a3019ca12a5f8e9"
+    },
+    {
+      "rel_path": "phase2_historical/task11_footlock_contract_results.json",
+      "size_bytes": 11986,
+      "sha256": "d4aeb38a71ee769f464918c62823152a9b5fe4ee4dc5d9057102d7c378208075"
+    },
+    {
+      "rel_path": "phase3_regression/phase3_manifest.json",
+      "size_bytes": 3340,
+      "sha256": "2d2d83ca3886beb6e7fe1533b64a446c043901097b51b00db8c49a23bcbf8043"
+    },
+    {
+      "rel_path": "phase3_regression/tier_full.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase3_regression/tier_full.stdout.log",
+      "size_bytes": 20060,
+      "sha256": "12d6581250bc2fbe55e37073ced77001a237a2359c8fcc6824accc4f875f710b"
+    },
+    {
+      "rel_path": "phase3_regression/tier_motion.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase3_regression/tier_motion.stdout.log",
+      "size_bytes": 6735,
+      "sha256": "d304dd048bb0c62ec0396d3a87906ae9e9755f3d50d0f72dfb99db961fd2a672"
+    },
+    {
+      "rel_path": "phase3_regression/tier_physics.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase3_regression/tier_physics.stdout.log",
+      "size_bytes": 13219,
+      "sha256": "c241c5f6135d698d8c05d5c8efbf4474875245ad7a58ba678f7294c024827ce9"
+    },
+    {
+      "rel_path": "phase3_regression/tier_quick.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "phase3_regression/tier_quick.stdout.log",
+      "size_bytes": 9606,
+      "sha256": "203d96dc2fbf3682e22e04a54fd4419c7cb2f9cd06c72ea5e3e3996f4b5c2c52"
+    },
+    {
+      "rel_path": "phase3_regression/regression_full/test_report.json",
+      "size_bytes": 80347,
+      "sha256": "9cbe515c749d30dfff22c91894ce338e2fbb3f6339ef4462194475e729e4bfa8"
+    },
+    {
+      "rel_path": "phase3_regression/regression_full/test_report.md",
+      "size_bytes": 6591,
+      "sha256": "91eea614e19cd40c542ee76a8a80a3760e086ca25ea17ad9d3a2696af6a6ba3b"
+    },
+    {
+      "rel_path": "phase3_regression/regression_motion/test_report.json",
+      "size_bytes": 25556,
+      "sha256": "2aee6f3c6f0ab7bfc21e74f813db5c412c11de068c09ece509079ed261ab5975"
+    },
+    {
+      "rel_path": "phase3_regression/regression_motion/test_report.md",
+      "size_bytes": 2420,
+      "sha256": "416490ecf300d82dbdcbbee0887cc7235265b5e7964c45a79644cff7a2226c86"
+    },
+    {
+      "rel_path": "phase3_regression/regression_physics/test_report.json",
+      "size_bytes": 52982,
+      "sha256": "051f0e66b131f1975fe75608bbedb35fc4bdc0586eaad25e90e8d75ed88cfd91"
+    },
+    {
+      "rel_path": "phase3_regression/regression_physics/test_report.md",
+      "size_bytes": 4301,
+      "sha256": "11516ada3371fc278206f52191289fd1b62fe3df492903b18e5d87e6b7a9341d"
+    },
+    {
+      "rel_path": "phase3_regression/regression_quick/test_report.json",
+      "size_bytes": 31214,
+      "sha256": "8f9abf4617f045cf9044c724734bc2afbe268e1ed42cb53bfc389ac09e099bb5"
+    },
+    {
+      "rel_path": "phase3_regression/regression_quick/test_report.md",
+      "size_bytes": 3171,
+      "sha256": "e77c637385b902be49ba18fa755740d438d524fca23df92c1380c4e8de786fc1"
+    }
+  ]
+}

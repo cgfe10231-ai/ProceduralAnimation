@@ -293,6 +293,8 @@ def sample_body_pose_snapshot(
     commanded_velocity: Optional[Tuple[float, float, float]] = None,
     contacts_override: Optional[Mapping[str, bool]] = None,
     source: str = "evaluated_armature",
+    *,
+    com_result: Optional[WholeBodyCoMResult] = None,
 ) -> BodyPoseSnapshot:
     """Sample a complete, evaluated BodyPoseSnapshot from the active Blender scene.
 
@@ -342,7 +344,34 @@ def sample_body_pose_snapshot(
         pelvis_quat = root_quat
 
     # 3. Whole-Body CoM and Segments
-    com_res = compute_whole_body_com(armature_obj, dist, update_scene=False)
+    # [INTRODUCED 2026-11-27T21:20:10+08:00]
+    # FUNCTION: sample_body_pose_snapshot.authoritative_com_reuse
+    # PURPOSE: Reuse externally provided WholeBodyCoMResult after validating mass distribution consistency so production callers avoid duplicate CoM computation while standalone callers preserve original behavior.
+    # REASON: TASK 12-C BUG-02
+    if com_result is not None:
+        if not isinstance(com_result, WholeBodyCoMResult):
+            raise TypeError("com_result must be a WholeBodyCoMResult instance")
+        if not math.isclose(float(com_result.total_mass_kg), float(dist.total_mass_kg), rel_tol=1e-9, abs_tol=1e-9):
+            raise ValueError(
+                f"com_result.total_mass_kg ({com_result.total_mass_kg}) does not match mass_distribution ({dist.total_mass_kg})"
+            )
+        if len(com_result.segments) != len(dist.segments):
+            raise ValueError(
+                f"com_result segment count ({len(com_result.segments)}) does not match mass_distribution ({len(dist.segments)})"
+            )
+        for seg_spec in dist.segments:
+            s_res = com_result.segments.get(seg_spec.segment_id)
+            if (
+                s_res is None
+                or s_res.bone_name != seg_spec.bone_name
+                or not math.isclose(float(s_res.mass_ratio), float(seg_spec.mass_ratio), rel_tol=1e-9, abs_tol=1e-9)
+            ):
+                raise ValueError(
+                    f"com_result segment '{seg_spec.segment_id}' is missing or inconsistent with mass_distribution"
+                )
+        com_res = com_result
+    else:
+        com_res = compute_whole_body_com(armature_obj, dist, update_scene=False)
     com_world = (com_res.com_world.x, com_res.com_world.y, com_res.com_world.z)
 
     seg_positions: Dict[str, Tuple[float, float, float]] = {}
@@ -434,13 +463,7 @@ def sample_body_pose_from_controller_result(
     commanded_velocity: Optional[Tuple[float, float, float]] = None,
 ) -> BodyPoseSnapshot:
     """Sample a BodyPoseSnapshot directly from a WholeBodyControlResult and its armature."""
-    contacts_override = {}
-    for eff_id in ("foot_L", "foot_R", "hand_L", "hand_R"):
-        fb = ctrl_res.end_effectors.get(eff_id)
-        if fb is not None:
-            # An effector is locked if active and indicated in feedback or custom dict
-            pass
-
+    _ = ctrl_res
     return sample_body_pose_snapshot(
         armature_obj=armature_obj,
         root_obj=root_obj,
@@ -635,36 +658,61 @@ class BodyKinematicsTracker:
         self._prev_velocity = None
         self._history.clear()
 
+    # [INTRODUCED 2026-11-27T20:56:20+08:00]
+    # FUNCTION: BodyKinematicsTracker.update() / BodyKinematicsTracker.sample_and_update()
+    # PURPOSE: Support non-publishing differential evaluation (commit=False) and precomputed BodyMotionState commit without repeating differential kinematics or exposing private Tracker state to callers.
+    # REASON: TASK 12-B BUG-02
     def update(
         self,
         snapshot: BodyPoseSnapshot,
         dt: Optional[float] = None,
+        *,
+        commit: bool = True,
+        precomputed_state: Optional[BodyMotionState] = None,
     ) -> BodyMotionState:
         """Process a new pose snapshot in causal sequential order and return the updated BodyMotionState."""
-        if self._prev_snapshot is None:
-            # First frame: initialize with zero velocity (or dt from config)
-            default_dt = dt or (1.0 / self.config.fps)
-            vel_state = create_zero_velocity_state(snapshot, dt=default_dt)
+        if precomputed_state is not None:
+            if not isinstance(precomputed_state, BodyMotionState):
+                raise TypeError("precomputed_state must be a BodyMotionState instance")
+            if precomputed_state.pose is not snapshot:
+                raise ValueError("precomputed_state.pose must match the passed snapshot")
+            motion_state = precomputed_state
+            vel_state = precomputed_state.velocity
         else:
-            vel_state = compute_differential_velocity(
-                curr=snapshot,
-                prev=self._prev_snapshot,
-                dt=dt,
-                prev_velocity=self._prev_velocity,
-            )
+            if self._prev_snapshot is None:
+                # First frame: initialize with zero velocity (or dt from config)
+                default_dt = dt or (1.0 / self.config.fps)
+                vel_state = create_zero_velocity_state(snapshot, dt=default_dt)
+            else:
+                vel_state = compute_differential_velocity(
+                    curr=snapshot,
+                    prev=self._prev_snapshot,
+                    dt=dt,
+                    prev_velocity=self._prev_velocity,
+                )
 
-        motion_state = BodyMotionState(pose=snapshot, velocity=vel_state)
-        self._prev_snapshot = snapshot
-        self._prev_velocity = vel_state
-        self._history.append(motion_state)
+            motion_state = BodyMotionState(pose=snapshot, velocity=vel_state)
+
+        if commit:
+            self._prev_snapshot = snapshot
+            self._prev_velocity = vel_state
+            self._history.append(motion_state)
         return motion_state
 
+    # [INTRODUCED 2026-11-27T21:21:10+08:00]
+    # FUNCTION: BodyKinematicsTracker.sample_and_update()
+    # PURPOSE: Accept optional authoritative com_result and MultiContactState-derived contacts_override keyword-only arguments and forward them to sample_body_pose_snapshot() while preserving standalone defaults.
+    # REASON: TASK 12-C BUG-02 & BUG-03
     def sample_and_update(
         self,
         time_sec: float,
         frame: Optional[int] = None,
         commanded_velocity: Optional[Tuple[float, float, float]] = None,
         dt: Optional[float] = None,
+        *,
+        commit: bool = True,
+        com_result: Optional[WholeBodyCoMResult] = None,
+        contacts_override: Optional[Mapping[str, bool]] = None,
     ) -> BodyMotionState:
         """Sample current scene state and perform sequential differential update."""
         snap = sample_body_pose_snapshot(
@@ -675,8 +723,10 @@ class BodyKinematicsTracker:
             mass_distribution=self.mass_distribution,
             joint_model=self.joint_model,
             commanded_velocity=commanded_velocity,
+            contacts_override=contacts_override,
+            com_result=com_result,
         )
-        return self.update(snap, dt=dt)
+        return self.update(snap, dt=dt, commit=commit)
 
     def compute_trajectory_motion_states(
         self,

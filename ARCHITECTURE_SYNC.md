@@ -1,18 +1,15 @@
 # ARCHITECTURE_SYNC：工程动态架构与模块调用同步
 
 > **核验日期**：2026-11-27
-> **核验源码及证据收归基线**：Task 11 已验收生产源码基线 `added88a7e27eaaa6d1644473d560c5dcf45bc80`、联合测试证据提交 `07aec5d8d35e5d77ff956f160840d1c2491b770e`，经 `task/11` 合并收归 `master`；Task 10-D 冻结生产源码基线 `824c52ec73f86aa3d08245a58297118cb4a9f110`、10-d-5 中央验证提交 `7f14ff722caecadec555194cc7d08f454c94c6c8`，经 `task/10-d` 合并收归 `master`；10-B 历史合入 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`（回归基线 `2f248bf4b98776222e37bc3228506a4fb85f7c32`、证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`）；10-C 历史合入 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`（集成复验基线 `2e65a9463ab88714cfb864b4d63f1547135c29ae`）。10-B 六层事务实现及其测试源码未被 10-C / 10-D / 11 修改。
-> **文档职责**：记录真实存在的模块、调用链、职责和当前任务进度；不修改 `ARCHITECTURE.md` 的永久规则。
-> **10-A**：`COMPLETED — ARCHIVED`。
-> **10-B**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（原项目负责人验收日期：2026-11-20；已完成六层物理拆分、拆分后全量回归及双父节点合并至 `master`，不再重新打开）。
-> **10-C**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（2026-11-26 收归 `master`；已在现行 `src/motion/kinematic_bridge.py` 复验通过）。
-> **10-D**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（2026-11-27 项目负责人人工视觉验收通过 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend`，证据 `docs/evidence/10-d/`）。
-> **Task 10（整体）**：`COMPLETED`。
-> **Task 11（`11-A` + `11-B`）**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（2026-11-27 已完成独立源码审计与联合动态验证，证据 `docs/evidence/11/unified_verification/`；`FIND-R3-03` 与 `FIND-R3-04` 正式关闭，原 16 项历史 Finding 已全部关闭）。
-> **Task 12 / Phase 7B / 7C**：**下一节点为 `Task 12-A`**（WBC 单帧写入与失败原子性独立审计，待启动）；PKG-5 尚未整体完成；Phase 7B / Phase 7C 保持 `NOT AUTHORIZED`。
-> **现行实现核对**：`src/rig/ik.py` 提供 `FOOT_LOCK_METADATA_KEYS` 7 键生命周期管理、`IDPropertyArray` 脱离事务快照/回滚核验及 `get_leg_ik_state(..., *, update_scene: bool = True)`；`src/rig/foot_contact.py` 完成纯只读查询 `get_foot_support_state()` 与主动支撑维持 `evaluate_foot_support()` 分离、`lock_foot_contact()` 先建 7 键后设 `is_locked=True`、`unlock_foot_contact()` Phase B 清理与显式预弯刷新；`src/scene/playground_character_assembly.py` Stage D 在 `bridge.execute_frame()` 后改为 `get_foot_support_state()`；`src/rig/arm_ik.py` 与 `src/scene_transaction_integrity/`（81 个 Python 文件）承载上肢事务；`src/motion/upper_limb_trajectory.py` 与中央 `MotionPlanner` / `MotionRuntimeContext.compose_planned_pose()` 统一经唯一 `KinematicBridgeExecutor -> WholeBodyController -> Rig -> MotionState` 执行链落地。
-> **证据边界**：Task 11 联合专项与四级 `--fail-fast` 回归见 `docs/evidence/11/unified_verification/`；10-D 当前生产实测见 `docs/evidence/10-d/final_acceptance/` 与 `docs/evidence/10-d/10-d-5/centralized_verification/`；10-B 原基线（`2f248bf`）回归证据位于 `docs/evidence/10b_sixlayer_split/regression/`（`AUTOMATED_PASS` 不等于人工视觉检查已通过，九项历史视觉待办独立保留；10-D 人工验收仅登记 `task10d_centralized_whole_body.blend` 与 `task10d_running_whole_body.blend`）。
-> **跨管线状态**：19骨骼运动学生产管线与独立6-DOF数值动力学管线仍分离，不得宣称 Phase 7C 动力学合流已完成。
+> **核验源码及证据收归基线**：**Task 12 / PKG-5** 冻结生产源码基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`、冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`、最终验收证据提交 `e15d342b805ef45e7d54db2edf1c2804973e81a7`（BUG-01 过程保全 `c9c9a2d7949aee916fa44273399aa6aff937cd54`），经 `task/12` 合并收归 `master`；Task 11 历史基线 `added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`（收归 `task/11`）；Task 10-D 历史基线 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`（收归 `task/10-d`）；10-B 历史合入 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`（回归基线 `2f248bf4b98776222e37bc3228506a4fb85f7c32`、证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`）；10-C 历史合入 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`（集成复验基线 `2e65a9463ab88714cfb864b4d63f1547135c29ae`）。
+> **文档职责**：记录真实存在的模块、调用链、职责和当前任务进度；不修改 `ARCHITECTURE.md` 的永久规则或既有合同正文。
+> **10-A**：`COMPLETED — ARCHIVED`；**10-B / 10-C / 10-D / Task 10（整体）**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。
+> **Task 11（`11-A` + `11-B`）**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`FIND-R3-03` 与 `FIND-R3-04` 正式关闭，原 16 项历史 Finding 已全部关闭：16 CLOSED / 0 OPEN）。
+> **Task 12 / PKG-5**：**`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**。
+> **下一节点与阶段门禁**：**`Task 7B-1` — `AUDIT ONLY — OWNER AUTHORIZED`**（禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计）；**`Phase 7C`** 保持 `NOT AUTHORIZED`。
+> **现行实现核对**：`src/motion/whole_body_controller.py` (`230a86acaa92b580c5c0aad0e0cdacd7df224a7a`) 在 Task 12-A 收归 ROM 截断后最终四肢/CoM 重测、`ROM_CONFLICT` 真实请求误差及单帧失败原子恢复；`src/motion/kinematic_bridge.py` (`4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`) 在 Task 12-B/C 收敛 `effective_dt` 准入门禁、失败帧不提交 7 项跨帧状态，并移除废弃 `_reconcile_post_rom_feedback()`（ROM 后最终反馈归 WBC 独占）；`src/motion/body_kinematics.py` (`e204793ca3a326a798f75a66e24e98a945e53be7`) 与 `src/motion/body_inertia.py` (`0cd7efadf265072fd1665615815792f41b792f1b`) 在 Task 12-C 收敛有效支撑接触测量与时空快照一致性；`src/rig/ik.py` 与 `src/rig/foot_contact.py`、`src/rig/arm_ik.py` 与 `src/scene_transaction_integrity/`、`src/motion/upper_limb_trajectory.py` 维持既有已验收实现。
+> **证据边界**：Task 12 最终联合验收见 `docs/evidence/12/final_acceptance/`（BUG-01 过程保全见 `docs/evidence/12/unified_verification/`，Task 12 人工视觉验收登记为 `OWNER WAIVED`）；Task 11 见 `docs/evidence/11/unified_verification/`；10-D 见 `docs/evidence/10-d/final_acceptance/` 与 `docs/evidence/10-d/10-d-5/centralized_verification/`；10-B 见 `docs/evidence/10b_sixlayer_split/regression/`（九项历史视觉待办独立保留；10-D 人工验收仅登记 `task10d_centralized_whole_body.blend` 与 `task10d_running_whole_body.blend`；10-D 复验 JSON 的 `head` 引用旧常量但实际 Worker 运行于当前仓库，原始报告未篡改；B19 保留部分 F-Curve 写故障残余风险）。
+> **跨管线状态**：19骨骼运动学生产管线与独立6-DOF数值动力学管线仍分离，尚未完成 Phase 7C 合流。
 
 ---
 
@@ -179,10 +176,9 @@ Dynamics Visualization / Numerical Tests
 - 接收 `KinematicPlannedPose`。
 - 转换成 `WholeBodyControlTargets`。
 - 调用 WBC。
-- 收集末端追踪、ROM、接触几何及遥测数据。
-- 在启用 ROM 截断且 WBC 报告 ROM 违反时，通过 `_reconcile_post_rom_feedback()` 对最终姿态的四末端反馈构建独立结果对象；保留原 ROM 诊断与失败事实，不修改 WBC 事务。
-- 构建 `MotionState`。
-- 执行关键帧与帧状态提交。
+- 收集由 WBC（含 ROM 截断后重测）输出的最终末端追踪、ROM 诊断、真实请求误差及接触几何/遥测数据（废弃 `_reconcile_post_rom_feedback()` 已于 Task 12-C 移除）。
+- 执行 `effective_dt` 准入门禁与 WBC/ContactModel 失败防提交门禁（失败帧仅返回诊断状态，禁止插入关键帧或更新跨帧 7 项提交状态）。
+- 构建并仅在成功时提交 `MotionState` 与关键帧。
 
 桥接层是规划目标与实际角色执行之间的统一接口。
 
@@ -304,7 +300,7 @@ ContactModel 不取代 FootLock，也不直接取代 IK 执行器。
 | 09-B | Lower-Limb World Rotation：有效父级变换、世界旋转数学域、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
 | 10 | Upper-Limb IK/FK：双臂接口合同与独立轨迹控制 | `10-A` 已归档；`10-B` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；`10-C` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；`10-D` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（2026-11-27）；**Task 10 整体 `COMPLETED`** |
 | 11 | FootLock：锁定元数据生命周期与状态查询/支撑维持副作用合同 | **`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**（`11-A`、`11-B` 均通过独立审计与联合验收，`FIND-R3-03`、`FIND-R3-04` 已关闭） |
-| 12 | PKG-5 综合接口闭环和全仓联合验收 | **`NEXT — TASK 12-A (AUDIT READY)`**（等待 Task 12-A 独立审计启动；PKG-5 尚未整体完成） |
+| 12 | PKG-5 综合接口闭环和全仓联合验收（含 12-D BUG-01） | **`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**（`12-A/B/C/D COMPLETED`、`12-D BUG-01 CLOSED`；`eee276b39d` / `90f4628a0c` / `e15d342b80`；PKG-5 全部完成并收归 `master`；下一节点：`Task 7B-1 (AUDIT ONLY — OWNER AUTHORIZED)`） |
 
 ### 4.1 09-B：Lower-Limb World Rotation 当前准确状态
 
@@ -912,7 +908,7 @@ Task 11 已正式关闭：
 
 状态：
 
-`READY FOR AUDIT — NEXT: TASK 12-A`（Task 10 与 Task 11 均已完成并收归 `master`；Task 12 尚未验收前不得宣称 PKG-5 整体完成）
+`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（2026-11-27；`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`；冻结生产基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据提交 `e15d342b805ef45e7d54db2edf1c2804973e81a7`）
 
 正式范围：
 
@@ -922,13 +918,13 @@ Task 12 不新增独立运动功能，不重新实现已有模块。
 
 Task 12 的作用是核对各模块组合以后是否仍满足真实的数据流、状态所有权、失败传播和连续动作合同。
 
-#### 4.4.1 12-A：WBC 单帧写入与失败原子性
+#### 4.4.1 12-A：WBC 单帧写入与失败原子性（`COMPLETED / VERIFIED`）
 
 负责文件：
 
-- `src/motion/whole_body_controller.py`
+- `src/motion/whole_body_controller.py`（Blob `230a86acaa92b580c5c0aad0e0cdacd7df224a7a`）
 
-审查执行顺序：
+已收敛执行合同：
 
 1. Root / Pelvis。
 2. Spine / Neck / Head。
@@ -936,109 +932,49 @@ Task 12 的作用是核对各模块组合以后是否仍满足真实的数据流
 4. Leg IK / FootLock。
 5. Arm IK / FK。
 6. 场景更新。
-7. 末端位置及姿态反馈。
-8. ROM 校验与可选截断。
-9. CoM 计算。
-10. 结果状态返回。
+7. ROM 校验与可选截断。
+8. 截断后（与最终骨架一致的）末端位置/姿态反馈重算与 CoM 计算（`ROM_CONFLICT` 记录真实请求误差）。
+9. 失败阶段原子状态捕获与回滚（`_wbc_capture_frame_state()` / `_wbc_restore_frame_state()`）。
+10. 结果状态返回（ROM 后最终反馈所有权归 WBC 独占）。
 
-必须验证：
-
-- 任一阶段异常时，前序写入是否留下残留。
-- 左右臂、左右腿是否可能出现一侧成功、一侧失败。
-- FootLock 状态与 WBC 目标是否一致。
-- ROM 截断后的末端误差是否真实。
-- 失败结果是否反映最终实际骨架状态。
-- 是否存在需要事务恢复的部分提交。
-
-#### 4.4.2 12-B：Bridge 帧提交和失败传播
+#### 4.4.2 12-B：Bridge 帧提交和失败传播（`COMPLETED / VERIFIED`）
 
 负责文件：
 
-- `src/motion/kinematic_bridge.py`
+- `src/motion/kinematic_bridge.py`（Blob `4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`）
 - `src/motion/framework.py`
 
-必须核验：
+已收敛提交合同：
 
-- WBC 失败后是否仍插入关键帧。
-- ContactModel 几何失败后是否仍提交无效帧。
-- 失败帧是否更新 `_last_time_sec` 和 `_last_frame`。
-- 失败帧是否更新跨帧接触状态。
-- Bridge 的 `overall_success` 与 WBC 结果是否一致。
-- MotionPlanner 是否阻止失败状态继续流转。
-- 失败帧是否污染后续动画轨迹。
+- `effective_dt` 在转换进 WBC 前完成有限数且严格 `> 1e-9` 准入校验。
+- WBC 或 ContactModel 几何检查失败时仍真实构建诊断 `motion_state`/`multi_contact`，但**禁止插入关键帧、禁止提交 7 项跨帧状态**（`_last_time_sec`、`_last_frame`、`last_multi_contact`、`last_active_limb_targets`、`kinematics_tracker._prev_snapshot`/`_prev_velocity`/`_history`）。
+- B19 底层关键帧写入故障注入验证 7 项提交状态保持完整，同时保留底层部分 F-Curve 写残余风险记录。
 
-#### 4.4.3 12-C：跨模块状态所有权与接口一致性
+#### 4.4.3 12-C：跨模块状态所有权与接口一致性（`COMPLETED / VERIFIED`）
 
-至少覆盖：
+负责文件：
 
-| 模块关系 | 核验重点 |
-|---|---|
-| Bridge ↔ WBC | 目标、反馈、异常与帧状态 |
-| WBC ↔ FK / IK | 唯一骨骼写入所有权 |
-| Arm IK ↔ Joint ROM | 实际姿态、约束和反馈一致性 |
-| FootLock ↔ ContactModel | 接触生命周期与有效支撑 |
-| ContactModel ↔ MotionState | 状态提交与跨帧更新 |
-| CoM ↔ BodyKinematics | 输入姿态快照和时间戳 |
-| BodyKinematics ↔ BodyInertia | 速度、角速度和惯性状态 |
-| MotionAction ↔ Bridge | 规划目标与生产写入路径 |
-| WBC ↔ Rig | 所有控制器和 PoseBone 写入职责 |
+- `src/motion/kinematic_bridge.py`（Blob `4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`）
+- `src/motion/body_kinematics.py`（Blob `e204793ca3a326a798f75a66e24e98a945e53be7`）
+- `src/motion/body_inertia.py`（Blob `0cd7efadf265072fd1665615815792f41b792f1b`）
 
-必须识别重复状态、隐式状态、双写状态和过期快照。
+已收敛所有权合同：
 
-不得为了统一接口而破坏现有向后兼容能力。
+- 删除废弃 `_reconcile_post_rom_feedback()`，Bridge 不再重算或拼接四肢 ROM 后反馈。
+- ContactModel 有效支撑判定与 `MotionState.contacts`、BodyKinematics 快照、BodyInertia 时空对齐一致，无双写或历史兜底叠加。
 
-#### 4.4.4 12-D：全系统连续动作与联合回归
+#### 4.4.4 12-D：全系统连续动作与联合回归（`COMPLETED / VERIFIED`，`BUG-01 CLOSED`）
 
-必须覆盖：
+实测验收证据（Blender 5.1.1，`docs/evidence/12/final_acceptance/`）：
 
-- Task 09 下肢世界空间合同。
-- Task 10 双臂独立 IK/FK。
-- Task 11 FootLock 生命周期。
-- Walk / StartStopWalk。
-- Run。
-- SprintStart。
-- SprintBrake。
-- TerrainWalk。
-- 双手和双脚同时控制。
-- 左右肢体独立目标。
-- 连续帧切换。
-- IK / FK 模式切换。
-- 锁定 / 解锁。
-- 动作中断。
-- 异常恢复。
-- Reset 后重新执行。
-- Blender 场景保存与重开。
+- 第一阶段联合专项：WBC A01–A20 `20/20 PASS`；Bridge B01–B19 `19/19 PASS`；C01–C16 及 10-C Retirement `17/17 PASS`；连续生产链（5 动作、`296f` 四种双臂 FK/IK 组合、10 次锁切换、`Reset` 与不等步长重试）`PASS`；B20 场景保存与独立进程重开 `2/2 PASS`。
+- 第二阶段历史复验：WBC 失败合同 `6/6`；10-D T01–T15 `15/15`；Task 11 FootLock `38/38`；09-B 世界空间合同 `27/27`；地面高度合同 `20/20`；初始化与重置 `6/6`；历史 Bridge 合同 `14/14`（10-D 复验 JSON 的 `head` 保留旧常量但实际运行于当前仓库，原始报告未篡改）。
+- 第三阶段四级 `--fail-fast` 回归（全部 `rc=0`，`FAILED=SKIPPED=NOT_RUN=0`）：Quick `19/19`（16 PASSED + 3 AUTOMATED_PASS）、Physics `27/27`（24 PASSED + 3 AUTOMATED_PASS）、Motion `12/12`（6 PASSED + 6 AUTOMATED_PASS）、Full `42/42`（33 PASSED + 9 AUTOMATED_PASS）。
+- 视觉验收与 BUG-01：Task 12 人工视觉验收登记为 **`OWNER WAIVED`**（历史九项视觉待办保持原登记）；`Task 12-D BUG-01` (`tests/verify_task6gc_r3b1_bridge.py` `test_10` 合法姿态输入与零 `dt` 隔离迁移，Blob `eb99144187291e8acd3ad2f3399fc955096c9e45`) 已正式关闭并保全过程证据于 `docs/evidence/12/unified_verification/`。
 
-必须运行适当的 Quick、Physics、Motion、Full 回归。
+#### 4.4.5 Task 12 通过与结项结论
 
-不得仅把专项测试数量相加来判定系统通过。
-
-必须分别记录：
-
-- 普通 PASS。
-- AUTOMATED_PASS。
-- SKIPPED。
-- NOT_RUN。
-- 视觉待检查项。
-- 已完成视觉检查的项目。
-
-Task 12 必须建立独立的联合验收证据包。
-
-#### 4.4.5 Task 12 通过条件
-
-以下条件必须同时满足：
-
-1. Task 10 独立验收通过。
-2. Task 11 独立验收通过。
-3. 所有开放 Finding 已关闭并具有证据。
-4. WBC / Bridge 失败传播合同通过。
-5. 跨模块状态所有权无冲突。
-6. 历史动作回归无退化。
-7. 联合回归通过。
-8. 视觉验收单独完成并明确记录。
-9. 完整交付证据归档。
-
-Task 12 未通过，不得宣布 PKG-5 全部完成。
+九项通过条件中第 1–7 及第 9 项已由真实运行证据闭环满足，第 8 项 Task 12 人工视觉验收已由项目负责人明确豁免登记为 `OWNER WAIVED`。**Task 12 / PKG-5 已正式结项并合并至 `master`。**
 
 ### 4.5 PKG-5 子任务编号规则
 
@@ -1080,9 +1016,9 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 当前执行节点：
 
-`Task 11 FootLock 主干结项完成（FIND-R3-03、FIND-R3-04 正式关闭） — 下一工程节点：Task 12-A`
+`Task 12 / PKG-5 COMPLETED — OWNER ACCEPTED — MERGED TO MASTER — 下一工程节点：Task 7B-1 (AUDIT ONLY — OWNER AUTHORIZED)`
 
-> Task 11（`11-A` + `11-B`）已完成独立源码审计、Blender 5.1.1 联合专项与四级回归验收并收归 `master`（生产基线 `added88a7e`，证据 `07aec5d8`，`docs/evidence/11/unified_verification/`）；Task 10（`10-A` / `10-B` / `10-C` / `10-D`）保持 `COMPLETED`。原 16 项历史 Finding 已全部关闭，下一工程节点为 `Task 12-A`（PKG-5 尚未整体完成；Phase 7B / 7C 保持 `NOT AUTHORIZED`）。
+> **Task 12 / PKG-5**（`12-A` / `12-B` / `12-C` / `12-D`，`BUG-01 CLOSED`）已完成全部独立审计、Blender 5.1.1 联合验收与四级 `--fail-fast` 最终回归并收归 `master`（冻结生产基线 `eee276b39d`，冻结测试基线 `90f4628a0c`，最终验收证据 `e15d342b80`，`docs/evidence/12/final_acceptance/`）；Task 10 与 Task 11 保持 `COMPLETED`，原 16 项历史 Finding `16 CLOSED / 0 OPEN`。下一节点为 **`Task 7B-1` (`AUDIT ONLY — OWNER AUTHORIZED`)**；**`Phase 7C` 保持 `NOT AUTHORIZED`**。
 
 ## 5. 后续 Phase 阶段门禁
 
@@ -1096,15 +1032,15 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 ### Phase 7B：Upper-Limb Independent Motion & End-Effector Target Verification
 
-状态：`NOT AUTHORIZED`
+状态：`Task 7B-1: AUDIT ONLY — OWNER AUTHORIZED`（其余子阶段暂未开放编码）
 
-前置条件：
+前置条件核验情况：
 
-1. PKG-5 / 09-B 完成独立核验（09-B-4 已验收）。
-2. PKG-5 / 10 Upper-Limb IK/FK 完成。
-3. PKG-5 / 11 FootLock 完成。
-4. PKG-5 / 12 全仓联合验收通过。
-5. 项目负责人明确批准开启 Phase 7B。
+1. PKG-5 / 09-B 完成独立核验（09-B-4 已验收）。（已满足）
+2. PKG-5 / 10 Upper-Limb IK/FK 完成。（已满足）
+3. PKG-5 / 11 FootLock 完成。（已满足）
+4. PKG-5 / 12 全仓联合验收通过并合入 `master`。（已满足，`e15d342b80`）
+5. 项目负责人已授权开启 `Task 7B-1` 独立只读源码审计（禁止自行编码，待 ChatGPT 审计结论）。
 
 ### Phase 7C：Pipeline A / Pipeline B Confluence
 
@@ -1177,11 +1113,9 @@ Task 12 未通过，不得宣布 PKG-5 全部完成。
 
 ## 8. 当前架构同步状态规则
 
-- PKG-5 / 09-B 已完成，09-B-4 已通过独立验收。
-- Task 10-A `COMPLETED — ARCHIVED`；Task 10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；Task 10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；Task 10-D `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（2026-11-27 人工视觉验收两份 `.blend` 资产通过、T01–T17 及最终四级回归全 PASS）。Task 10 整体 `COMPLETED`。
-- Task 11（`11-A` + `11-B`）`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`added88a7e` / `07aec5d8`，`FIND-R3-03`、`FIND-R3-04` 正式关闭，原 16 项历史 Finding 已全部关闭；`docs/evidence/11/unified_verification/`）。
-- 下一任务为 `Task 12-A`（PKG-5 综合接口闭环与全仓联合验收，待独立审计启动；PKG-5 尚未整体完成）。
-- 10、11、12 全部通过联合验收并获得项目负责人明确批准之前，不得开启 Phase 7B 或宣称 Phase 7C 动力学合流已完成。
+- PKG-5 / 09-B、Task 10（`10-A/B/C/D`）、Task 11（`11-A/B`）及 **Task 12（`12-A/B/C/D`，`BUG-01 CLOSED`）**均已完成独立验收并合入 `master`（Task 12 冻结生产基线 `eee276b39d`，冻结测试基线 `90f4628a0c`，最终验收证据 `e15d342b80`，`docs/evidence/12/final_acceptance/`）。**PKG-5 已完成并合入主干。**
+- 原 16 项历史 Finding `16 CLOSED / 0 OPEN`；21 项冻结记录与 12 项架构合同定义保持不变。
+- **下一节点为 `Task 7B-1`（`AUDIT ONLY — OWNER AUTHORIZED`）**；**`Phase 7C` 保持 `NOT AUTHORIZED`**（19 骨骼运动学管线与 6-DOF 数值动力学管线仍保持独立，尚未完成 7C 合流）。
 - Pipeline A 与 Pipeline B 的独立性目前是设计事实，不是故障。
 - 7C 才负责未来的系统级动力学合流。
 - CoM、BodyKinematics、BodyInertia 不得被描述为已经驱动姿态补偿。
@@ -1576,4 +1510,4 @@ Post-Commit Cleanup (Coordinator dispatches Layer 6 retry_cleanup -> evaluates C
 3. **后续受控原子实施路线与准入边界**：
    - **Task 10-B**：已于 2026-11-20 获项目负责人正式验收，并已完成六层架构物理拆分、拆分后全量回归（`2f248bf4b98776222e37bc3228506a4fb85f7c32` / `dcf305738aa9191daeab0f002f97cf4975c12498`）及双父节点主干收归（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`，`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`），不再重新打开；禁止把历史“继续按原子阶段实施”解释为新修复授权。
    - **历史计划：Task 10-B-11**：当时聚焦 `Collection ↔ Object` 关系所有权；该轮已不再是当前执行节点。当前不因该旧计划自行新增代码或重复修复。
-   - **Task 10-C、Task 10-D 与 Task 11 状态**：Task 10-C（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）、Task 10-D（`824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`，2026-11-27 人工视觉验收两份 `.blend` 并完成最终回归）及 Task 11（`added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`，`11-A` + `11-B` 联合验收并关闭 `FIND-R3-03`、`FIND-R3-04`）均已收归 `master`，Task 10 与 Task 11 整体 `COMPLETED`；原 16 项历史 Finding 已全部关闭；下一节点为 `Task 12-A`（PKG-5 尚未整体完成；Phase 7B / 7C 保持 `NOT AUTHORIZED`）。本次文档结项不改变任何已批准架构合同。
+   - **Task 10-C、Task 10-D、Task 11 与 Task 12 / PKG-5 状态**：Task 10-C（`f2501ddc`）、Task 10-D（`824c52ec` / `7f14ff72`）、Task 11（`added88a7e` / `07aec5d8`）与 **Task 12 / PKG-5**（`12-A/B/C/D` `COMPLETED`、`12-D BUG-01 CLOSED`，冻结生产基线 `eee276b39d`、冻结测试基线 `90f4628a0c`、最终验收证据 `e15d342b80`，`docs/evidence/12/final_acceptance/`）均已收归 `master`；原 16 项历史 Finding `16 CLOSED / 0 OPEN`；下一节点为 **`Task 7B-1` (`AUDIT ONLY — OWNER AUTHORIZED`)**，**`Phase 7C` 保持 `NOT AUTHORIZED`**。本次文档结项不改变任何已批准架构合同定义。

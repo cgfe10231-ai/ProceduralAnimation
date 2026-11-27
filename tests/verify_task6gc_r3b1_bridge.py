@@ -560,26 +560,34 @@ def test_10_variable_dt_and_kinematic_scaling() -> bool:
     arm, root = _clean_scene()
     bridge = KinematicBridgeExecutor(armature_obj=arm, root_obj=root)
 
+    # [INTRODUCED 2026-11-27T22:26:30+08:00]
+    # FUNCTION: test_10_variable_dt_and_kinematic_scaling
+    # PURPOSE: Supply anatomically flexed stance pelvis_location=(0.0, -0.02, 0.0), enforce pre-assertion on positive frame success with unmet_constraints diagnostics, and isolate zero-dt rejection onto an uncommitted incrementing frame.
+    # REASON: TASK 12-D BUG-01 migration — under Task 12-B committed-frame isolation, straight-legged locked stance root shifts exceeded 0.820m leg reach and failed p2/p3 silently; positive kinematics tests must use valid knee-flexed poses and isolate illegal dt=0.0 from duplicate frame numbers.
     # 1. Test explicit dt = 0.01s (100 FPS) vs dt = 0.05s (20 FPS)
     # Frame 1: start at Y = -8.0
     p1 = KinematicPlannedPose(
         frame=1,
         time_seconds=0.0,
         root_position=(0.0, -8.0, 0.0),
+        pelvis_location=(0.0, -0.02, 0.0),
         foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
         foot_R=PlannedFootTarget(world_xyz=(0.11, -8.0, ANKLE_REST_Z), is_locked=True),
     )
-    bridge.execute_frame(p1, keyframe=False, dt=0.01)
+    res1 = bridge.execute_frame(p1, keyframe=False, dt=0.01)
+    assert res1.success is True, f"Expected p1 success=True, got unmet_constraints={res1.unmet_constraints}"
 
     # Frame 2: move Y by +0.02m with dt = 0.01s -> expected v_y = 0.02 / 0.01 = 2.0 m/s
     p2 = KinematicPlannedPose(
         frame=2,
         time_seconds=0.01,
         root_position=(0.0, -7.98, 0.0),
+        pelvis_location=(0.0, -0.02, 0.0),
         foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
         foot_R=PlannedFootTarget(world_xyz=(0.11, -7.98, ANKLE_REST_Z), is_locked=False),
     )
     res2 = bridge.execute_frame(p2, keyframe=False, dt=0.01)
+    assert res2.success is True, f"Expected p2 success=True, got unmet_constraints={res2.unmet_constraints}"
     derived_vy_100fps = res2.motion_state.params["root_derived_linear_velocity"][1]
     assert math.isclose(derived_vy_100fps, 2.0, abs_tol=1e-3), f"Expected 2.0 m/s at dt=0.01, got {derived_vy_100fps}"
 
@@ -588,10 +596,12 @@ def test_10_variable_dt_and_kinematic_scaling() -> bool:
         frame=3,
         time_seconds=0.05,
         root_position=(0.0, -7.96, 0.0),
+        pelvis_location=(0.0, -0.02, 0.0),
         foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
         foot_R=PlannedFootTarget(world_xyz=(0.11, -7.96, ANKLE_REST_Z), is_locked=False),
     )
     res3 = bridge.execute_frame(p3, keyframe=False, dt=0.04)
+    assert res3.success is True, f"Expected p3 success=True, got unmet_constraints={res3.unmet_constraints}"
     derived_vy_25fps = res3.motion_state.params["root_derived_linear_velocity"][1]
     assert math.isclose(derived_vy_25fps, 0.5, abs_tol=1e-3), f"Expected 0.5 m/s at dt=0.04, got {derived_vy_25fps}"
 
@@ -600,16 +610,26 @@ def test_10_variable_dt_and_kinematic_scaling() -> bool:
         frame=4,
         time_seconds=0.09,
         root_position=(0.0, -7.94, 0.0),
+        pelvis_location=(0.0, -0.02, 0.0),
         foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
         foot_R=PlannedFootTarget(world_xyz=(0.11, -7.94, ANKLE_REST_Z), is_locked=False),
     )
     res4 = bridge.execute_frame(p4, keyframe=False)  # dt derived from time_seconds
+    assert res4.success is True, f"Expected p4 success=True, got unmet_constraints={res4.unmet_constraints}"
     assert math.isclose(res4.motion_state.params["dt_seconds"], 0.04, abs_tol=1e-5), "Derived dt mismatch"
 
     # 3. Test illegal inputs: zero dt, negative dt, backward timestamps
+    p_zero_dt = KinematicPlannedPose(
+        frame=5,
+        time_seconds=0.13,
+        root_position=(0.0, -7.92, 0.0),
+        pelvis_location=(0.0, -0.02, 0.0),
+        foot_L=PlannedFootTarget(world_xyz=(-0.11, -8.0, ANKLE_REST_Z), is_locked=True),
+        foot_R=PlannedFootTarget(world_xyz=(0.11, -7.92, ANKLE_REST_Z), is_locked=False),
+    )
     illegal_dt_caught = False
     try:
-        bridge.execute_frame(p4, keyframe=False, dt=0.0)
+        bridge.execute_frame(p_zero_dt, keyframe=False, dt=0.0)
     except ValueError:
         illegal_dt_caught = True
     assert illegal_dt_caught, "dt=0.0 must raise ValueError"

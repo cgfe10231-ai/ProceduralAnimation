@@ -1,34 +1,37 @@
 # HANDOFF — 当前项目交接卡片
 
-> 核验日期：2026-11-27；Task 11 已验收生产基线：`added88a7e27eaaa6d1644473d560c5dcf45bc80`，联合验收证据提交 `07aec5d8d35e5d77ff956f160840d1c2491b770e`，收归合入自 `task/11`；10-D 历史生产基线 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`；10-C 历史合入 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史合入 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`。
+> 核验日期：2026-11-27；Task 12 / PKG-5 冻结生产基线：`eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线：`90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据提交：`e15d342b805ef45e7d54db2edf1c2804973e81a7`（收归合入自 `task/12`）；Task 11 历史合入：`added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`；10-D 历史合入 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`；10-C 历史合入 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史合入 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`。
 > 本文件是摘要，不授予任务准入；须以 `PROJECT_STATE.md`、`ARCHITECTURE_SYNC.md`、`OPEN_FINDINGS.md` 及 Git 实况核对。
 
 ## 当前交接状态
-- **当前节点：Task 11（`11-A` + `11-B`）FootLock 已完成验收并合入 `master`；下一工程节点为 `Task 12-A`（WBC 单帧写入与失败原子性独立审计）。**
-- **工作性质**：Task 11 正式结项与主干合并。无剩余 OPEN 历史 Finding（原 16 项历史 Finding **16/16 全部关闭**）；禁止自行开始 Task 12 编码；不得宣称 PKG-5 已整体完成；**Phase 7B / Phase 7C** 保持 `NOT AUTHORIZED`。
-- **Task 11（`11-A` + `11-B`）**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`FIND-R3-03`、`FIND-R3-04` 正式关闭）。
-- Task 10（`10-A` / `10-B` / `10-C` / `10-D`）：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。
+- **当前状态：`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`）。**
+- **下一节点：`Task 7B-1` — `AUDIT ONLY — OWNER AUTHORIZED`**（禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计）。
+- **`Phase 7C`**：`NOT AUTHORIZED`。
+- **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义。
 
-| 子节点 | 工作与实现边界 | 状态 |
+| 子节点 | 实现边界与关键 Blob | 状态 |
 |---|---|---|
-| 11-A (`FIND-R3-03`) | `src/rig/ik.py` 定义 7 键常量 `FOOT_LOCK_METADATA_KEYS`，`setup_leg_ik()` / `reset_leg_ik()` / `unlock_foot_contact()` 清理 7 项元数据；`_snapshot_leg_rig_state()` / `_rollback_leg_rig_state()` 脱离 `IDPropertyArray` 完整恢复/校验存在性与值；`lock_foot_contact()` 先全量重建 7 键再发布 `is_locked=True` | 已通过独立源码审计及 A01–A19 验收 |
-| 11-B (`FIND-R3-04`) | `get_leg_ik_state(..., *, update_scene: bool = True)` 增加无刷新纯读取路径；`get_foot_support_state()` 收敛为零副作用纯查询（缺失控制器/快照拒绝，解锁态不消费不清理残留）；`evaluate_foot_support()` 保留主动维护并在写入前拒绝不完整锁定，随后委托 `get_foot_support_state()`；`unlock_foot_contact()` 在 Phase B 事务内显式执行预弯与刷新；`src/scene/playground_character_assembly.py` Stage D 改用纯查询 | 已通过独立源码审计（含 BUG-01）及 B01–B20 验收 |
+| 12-A (WBC) | `src/motion/whole_body_controller.py` (`230a86acaa92b580c5c0aad0e0cdacd7df224a7a`)：ROM 截断后重测最终四肢/CoM 反馈、真实请求误差 `ROM_CONFLICT`、单帧状态捕获与失败原子回滚 | `COMPLETED` |
+| 12-B (Bridge) | `src/motion/kinematic_bridge.py` (`4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`)：`effective_dt` 准入门禁、WBC/ContactModel 失败禁止提交跨帧 7 项状态（允许诊断返回、不污染后续帧） | `COMPLETED` |
+| 12-C (所有权) | 删除废弃 `_reconcile_post_rom_feedback()`（ROM 后最终反馈归 WBC 独占），`body_kinematics.py` (`e204793ca3a326a798f75a66e24e98a945e53be7`) 与 `body_inertia.py` (`0cd7efadf265072fd1665615815792f41b792f1b`) 遥测状态所有权收敛 | `COMPLETED` |
+| 12-D & BUG-01 | 完成联合专项、历史合同复验与四级 `--fail-fast` 最终回归；`tests/verify_task6gc_r3b1_bridge.py` (`eb99144187291e8acd3ad2f3399fc955096c9e45`) `test_10_variable_dt_and_kinematic_scaling()` 修复直腿超限并隔离零 `dt` 测试 | `COMPLETED` (`BUG-01 CLOSED`) |
 
-## Task 11 联合专项与最终回归证据（`docs/evidence/11/unified_verification/`）
-| 范围 | 实测结果 | 证据路径与说明 |
+## Task 12 最终联合验收证据（`docs/evidence/12/final_acceptance/`）
+| 项目 | 实测结果 | 证据路径与说明 |
 |---|---|---|
-| A 组 / B 组与连续生产链 | **A01–A19 `19/19`**、**B01–B20 `20/20`**（B08 37 子项全过）、联合专项 **`38/38`**；五动作 542 帧、支撑转换 44 次、锁脚控制器最大漂移 `0`；两份新测试场景独立重开 `PASS` | `results.json`、`execution_manifest.json`、`verify_footlock_contract.py`、`verify_footlock_reopen.py` |
-| 历史专项复验 | WBC 失败合同 `CONTRACT10-01..06` `6/6`；`09-B-4` `27/27`；地面高度 `20/20`；初始化/重置 `6/6`；`legacy_foot_contact` `PASS`（原 `.blend` SHA-256 未变） | `wbc_failure_contract_*.log`、`legacy_foot_contact/`、`regression_physics/` |
-| `quick` 回归 (`--fail-fast`) | **19/19 PASS** (`rc=0`, 16 PASSED + 3 AUTOMATED_PASS, 78.26s) | `regression_quick/test_report.json` |
-| `physics` 回归 (`--fail-fast`) | **27/27 PASS** (`rc=0`, 24 PASSED + 3 AUTOMATED_PASS, 136.26s) | `regression_physics/test_report.json` |
-| `motion` 回归 (`--fail-fast`) | **12/12 PASS** (`rc=0`, 6 PASSED + 6 AUTOMATED_PASS, 60.59s) | `regression_motion/test_report.json` |
-| `full` 回归 (`--fail-fast`) | **42/42 PASS** (`rc=0`, 33 PASSED + 9 AUTOMATED_PASS, 199.32s) | `regression_full/test_report.json`（`AUTOMATED_PASS` 不登记为人工视觉验收） |
+| WBC A01–A20 | **20/20 PASS** (`rc=0`) | `phase1_task12/wbc_results.json` |
+| Bridge B01–B19 | **19/19 PASS** (`rc=0`) | `phase1_task12/bridge_results.json`（保留 B19 部分 F-Curve 残余风险记录） |
+| C01–C16 及 10-C Retirement | **17/17 PASS** (`rc=0`) | `phase1_task12/telemetry_results.json` |
+| 连续生产链 | **PASS** (`rc=0`) | `phase1_task12/continuous_results.json`（5 种动作、`296f` 四种双臂 FK/IK、10 次锁足切换、`Reset` 与不等步长失败重试 `dt=0.06s`） |
+| B20 场景独立重开 | **2/2 PASS** (`rc=0`) | `phase1_task12/reopen_results.json`、`phase1_task12/reopen_artifacts/`（`OWNER WAIVED`） |
+| 历史合同联合复验 | WBC `6/6`、10-D T01–T15 `15/15`、Task 11 FootLock `38/38`、09-B `27/27`、地面高度 `20/20`、初始化与重置 `6/6` | `phase2_historical/`（含原始 `.log` 与 JSON） |
+| `quick` / `physics` / `motion` / `full` (`--fail-fast`) | **19/19** (16P+3AP)、**27/27** (24P+3AP，含历史 Bridge **14/14 PASS**)、**12/12** (6P+6AP)、**42/42** (33P+9AP) | `phase3_regression/regression_*/test_report.json`（全部 `rc=0`，`FAILED=SKIPPED=NOT_RUN=0`） |
 
-## 10-B / 10-C / 10-D 既有归档证据
-- 10-D 人工视觉验收（2026-11-27）与最终回归：`docs/evidence/10-d/final_acceptance/`、`docs/evidence/10-d/10-d-5/centralized_verification/`（仅登记 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend`）。
-- 10-B 六层事务回归归档：`docs/evidence/10b_sixlayer_split/regression/`（WBC 独立合同已在 Task 11 复验 6/6 PASS）；10-C 历史归档：`docs/evidence/10-c-integration/`。
-
-## 权限与纪律
-- 架构合同 `CONTRACT-01..12` 定义不动，21 项冻结主账定义不动；原 16 项历史 Finding 已 **16/16 全部关闭**（其余 14 项历史结论保持不变）。
-- Task 12 未完成前不得宣称 PKG-5 已整体完成；不得提前开启 Phase 7B / Phase 7C；不得将 `AUTOMATED_PASS` 登记为人工视觉验收。
-- Antigravity 对 Markdown 默认只读；完成本轮结项交付后恢复默认只读并停止，等待 ChatGPT 独立核验及 Task 12 审计。
+## 保留风险、验收边界与纪律
+1. B19 底层关键帧写入故障可产生部分 F-Curve 残留，七项 Bridge 提交状态保持完整，但不宣称 Blender 关键帧写入完全事务原子化。
+2. 10-D 历史复验 JSON 的 `head` 字段引用旧固定常量，实际 Worker 使用当前仓库目录；不得篡改原始报告。
+3. Task 12 人工视觉验收登记为 `OWNER WAIVED`。
+4. 历史九项人工视觉待办保持原登记（10-D 两份场景 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend` 保持原验收登记）。
+5. 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流。
+- 历史归档目录：Task 12 BUG-01 过程保全 `docs/evidence/12/unified_verification/`（`c9c9a2d`）；Task 11 `docs/evidence/11/unified_verification/`；10-D `docs/evidence/10-d/`；10-C `docs/evidence/10-c-integration/`；10-B `docs/evidence/10b_sixlayer_split/regression/`。
+- Antigravity 完成本轮授权结项并合并后恢复 Markdown 默认只读并停止，禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计。

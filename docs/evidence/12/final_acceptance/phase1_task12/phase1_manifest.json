@@ -1,0 +1,87 @@
+[
+  {
+    "script": "docs/evidence/12/unified_verification/verify_wbc_contract.py",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "docs\\evidence\\12\\unified_verification\\verify_wbc_contract.py"
+    ],
+    "started_at": "2026-11-27T23:28:22.681468+08:00",
+    "finished_at": "2026-11-27T23:28:26.316188+08:00",
+    "duration_sec": 3.63,
+    "returncode": 0,
+    "result_json": "docs/evidence/12/final_acceptance/phase1_task12/wbc_results.json"
+  },
+  {
+    "script": "docs/evidence/12/unified_verification/verify_bridge_commit_contract.py",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "docs\\evidence\\12\\unified_verification\\verify_bridge_commit_contract.py"
+    ],
+    "started_at": "2026-11-27T23:28:26.319410+08:00",
+    "finished_at": "2026-11-27T23:28:31.383652+08:00",
+    "duration_sec": 5.06,
+    "returncode": 0,
+    "result_json": "docs/evidence/12/final_acceptance/phase1_task12/bridge_results.json"
+  },
+  {
+    "script": "docs/evidence/12/unified_verification/verify_telemetry_ownership.py",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "docs\\evidence\\12\\unified_verification\\verify_telemetry_ownership.py"
+    ],
+    "started_at": "2026-11-27T23:28:31.385343+08:00",
+    "finished_at": "2026-11-27T23:28:38.074392+08:00",
+    "duration_sec": 6.69,
+    "returncode": 0,
+    "result_json": "docs/evidence/12/final_acceptance/phase1_task12/telemetry_results.json"
+  },
+  {
+    "script": "docs/evidence/12/unified_verification/verify_continuous_motion.py",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "docs\\evidence\\12\\unified_verification\\verify_continuous_motion.py"
+    ],
+    "started_at": "2026-11-27T23:28:38.076012+08:00",
+    "finished_at": "2026-11-27T23:28:43.383234+08:00",
+    "duration_sec": 5.31,
+    "returncode": 0,
+    "result_json": "docs/evidence/12/final_acceptance/phase1_task12/continuous_results.json"
+  },
+  {
+    "script": "docs/evidence/12/unified_verification/verify_reopen.py",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "docs\\evidence\\12\\unified_verification\\verify_reopen.py"
+    ],
+    "started_at": "2026-11-27T23:28:43.385207+08:00",
+    "finished_at": "2026-11-27T23:28:49.085146+08:00",
+    "duration_sec": 5.7,
+    "returncode": 0,
+    "result_json": "docs/evidence/12/final_acceptance/phase1_task12/reopen_results.json"
+  }
+]

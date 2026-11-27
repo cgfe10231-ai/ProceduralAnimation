@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import bpy
-from mathutils import Euler, Matrix, Vector
+from mathutils import Euler, Matrix, Quaternion, Vector
 
 from src.config import PipelineConfig
 from src.motion.joint_limits import (
@@ -726,9 +726,39 @@ class WholeBodyController:
                         foot_tgt.target_world_xyz[1],
                         foot_tgt.target_world_xyz[2] - ANKLE_REST_Z,
                     )
-                    cur_locked_pt = tuple(ik_obj.get("contact_world_xyz", ())) if ik_obj is not None else ()
+                    raw_pt = ik_obj.get("contact_world_xyz") if ik_obj is not None else None
+                    cur_locked_pt = tuple(raw_pt) if raw_pt is not None else ()
                     loc_diff = math.dist(cur_locked_pt, contact_ground_xyz) if len(cur_locked_pt) == 3 else 999.0
-                    if not was_locked or loc_diff > 0.001:
+                    # [INTRODUCED 2026-11-27T20:37:14+08:00]
+                    # FUNCTION: WholeBodyController._execute_frame_dispatch.foot_lock_rotation_check
+                    # PURPOSE: Compare locked foot target orientation against ik_obj target_rotation_deg in normalized SO(3) space so rotation changes trigger re-locking instead of reusing stale support.
+                    # REASON: TASK 12-A BUG-03
+                    rot_diff_deg = 0.0
+                    if foot_tgt.target_rotation_deg is not None:
+                        raw_rot = ik_obj.get("target_rotation_deg") if ik_obj is not None else None
+                        cur_locked_rot = tuple(raw_rot) if raw_rot is not None else ()
+                        if len(cur_locked_rot) == 3:
+                            cur_quat: Quaternion = Euler(
+                                (
+                                    math.radians(float(cur_locked_rot[0])),
+                                    math.radians(float(cur_locked_rot[1])),
+                                    math.radians(float(cur_locked_rot[2])),
+                                ),
+                                "XYZ",
+                            ).to_quaternion().normalized()
+                            req_quat: Quaternion = Euler(
+                                (
+                                    math.radians(float(foot_tgt.target_rotation_deg[0])),
+                                    math.radians(float(foot_tgt.target_rotation_deg[1])),
+                                    math.radians(float(foot_tgt.target_rotation_deg[2])),
+                                ),
+                                "XYZ",
+                            ).to_quaternion().normalized()
+                            dot_abs = min(1.0, abs(cur_quat.dot(req_quat)))
+                            rot_diff_deg = math.degrees(2.0 * math.acos(dot_abs))
+                        else:
+                            rot_diff_deg = tolerance_rotation_deg + 1.0
+                    if not was_locked or loc_diff > 0.001 or rot_diff_deg > tolerance_rotation_deg:
                         lock_foot_contact(
                             arm,
                             side,
@@ -771,18 +801,53 @@ class WholeBodyController:
         if update_scene:
             bpy.context.view_layer.update()
 
+        unmet_constraints: List[UnmetConstraint] = []
+
         # ---------------------------------------------------------------------
-        # 5. End-Effector Tracking & Error Evaluation
+        # 5. Anatomical Joint ROM Validation (Evaluated Active Pose)
+        # ---------------------------------------------------------------------
+        # [INTRODUCED 2026-11-27T20:37:14+08:00]
+        # FUNCTION: WholeBodyController._execute_frame_dispatch.post_rom_feedback_pipeline
+        # PURPOSE: Validate anatomical ROM and apply optional clamping before unified limb feedback and CoM measurement so all pose telemetry reflects one solved final frame.
+        # REASON: TASK 12-A BUG-01
+        rom_validation = self.joint_model.validate_armature_pose(arm, use_evaluated_ik=True)
+        if not rom_validation.is_valid:
+            for b_name, viol in rom_validation.violations.items():
+                unmet_constraints.append(
+                    UnmetConstraint(
+                        category="ROM_VIOLATION",
+                        target_name=b_name,
+                        description=f"Joint '{b_name}' ({viol.joint_id}) violates anatomical ROM by max {viol.max_excess_deg:.2f} deg",
+                        error_amount=viol.max_excess_deg,
+                        details={"joint_id": viol.joint_id, "violations": viol.axis_violations},
+                    )
+                )
+
+        # ---------------------------------------------------------------------
+        # 6. Truthful ROM Clamping (if requested) & Final Pose Evaluation
+        # ---------------------------------------------------------------------
+        clamped_rom = bool(enforce_rom_clamping and not rom_validation.is_valid)
+        if clamped_rom:
+            # Clamping FK pose bones
+            self.joint_model.clamp_armature_pose(arm, apply=True, update_scene=True)
+            bpy.context.view_layer.update()
+
+        # ---------------------------------------------------------------------
+        # 7. End-Effector Tracking, Error Evaluation & ROM Conflict Enforcement
         # ---------------------------------------------------------------------
         effectors_feedback: Dict[str, EndEffectorFeedback] = {}
-        unmet_constraints: List[UnmetConstraint] = []
+        rom_conflict_errors: Dict[str, float] = {}
         max_effector_error = 0.0
         all_reachable = True
 
         # Evaluate Foot IK tracking
         for side, foot_tgt in leg_targets:
             eff_id = f"foot_{side}"
-            if foot_tgt is None or not foot_tgt.enabled:
+            # [INTRODUCED 2026-11-27T20:37:14+08:00]
+            # FUNCTION: WholeBodyController._execute_frame_dispatch.leg_zero_weight_guard
+            # PURPOSE: Treat zero or non-positive weight leg targets as inactive in EndEffectorFeedback and constraint checks, matching leg dispatch and hand feedback semantics.
+            # REASON: TASK 12-A BUG-02
+            if foot_tgt is None or not foot_tgt.enabled or foot_tgt.weight <= 0.0:
                 p_foot = arm.pose.bones.get(f"foot.{side}")
                 actual_pos = (arm.matrix_world @ p_foot.head).to_tuple() if p_foot else (0.0, 0.0, 0.0)
                 effectors_feedback[eff_id] = EndEffectorFeedback(
@@ -820,6 +885,9 @@ class WholeBodyController:
                         details={"requested_reach": req_dist_from_hip, "applied_reach": actual_dist_from_hip, "max_reach": MAX_LEG_REACH},
                     )
                 )
+
+            if clamped_rom:
+                rom_conflict_errors[eff_id] = pos_err
 
             effectors_feedback[eff_id] = EndEffectorFeedback(
                 effector_id=eff_id,
@@ -888,6 +956,9 @@ class WholeBodyController:
                     )
                 )
 
+            if clamped_rom:
+                rom_conflict_errors[eff_id] = pos_err
+
             actual_rot_deg = tuple(arm_state["hand_world_euler_deg"]) if arm_state.get("hand_world_euler_deg") is not None else None
             effectors_feedback[eff_id] = EndEffectorFeedback(
                 effector_id=eff_id,
@@ -905,50 +976,14 @@ class WholeBodyController:
                 max_reach_m=MAX_ARM_REACH,
             )
 
-        # ---------------------------------------------------------------------
-        # 6. Anatomical Joint ROM Validation (Evaluated Active Pose)
-        # ---------------------------------------------------------------------
-        rom_validation = self.joint_model.validate_armature_pose(arm, use_evaluated_ik=True)
-        if not rom_validation.is_valid:
-            for b_name, viol in rom_validation.violations.items():
-                unmet_constraints.append(
-                    UnmetConstraint(
-                        category="ROM_VIOLATION",
-                        target_name=b_name,
-                        description=f"Joint '{b_name}' ({viol.joint_id}) violates anatomical ROM by max {viol.max_excess_deg:.2f} deg",
-                        error_amount=viol.max_excess_deg,
-                        details={"joint_id": viol.joint_id, "violations": viol.axis_violations},
-                    )
-                )
-
-        # ---------------------------------------------------------------------
-        # 7. Truthful ROM Clamping & Conflict Enforcement (if requested)
-        # ---------------------------------------------------------------------
-        if enforce_rom_clamping and not rom_validation.is_valid:
-            # Clamping FK pose bones
-            self.joint_model.clamp_armature_pose(arm, apply=True, update_scene=True)
-
-            # Truthfully re-evaluate end-effector actual errors
-            for side, hand_tgt in arm_targets:
-                eff_id = f"hand_{side}"
-                if hand_tgt is not None and hand_tgt.enabled:
-                    arm_st = get_arm_ik_state(arm, side)
-                    new_pos_err = float(arm_st["target_error"])
-                    if new_pos_err > tolerance_position_m:
-                        unmet_constraints.append(
-                            UnmetConstraint(
-                                category="ROM_CONFLICT",
-                                target_name=eff_id,
-                                description=f"End effector '{eff_id}' cannot satisfy target under anatomical ROM limits (conflict error = {new_pos_err*1000:.2f} mm)",
-                                error_amount=new_pos_err,
-                            )
-                        )
-
-            for side, foot_tgt in leg_targets:
-                eff_id = f"foot_{side}"
-                if foot_tgt is not None and foot_tgt.enabled:
-                    leg_st = get_leg_ik_state(arm, side)
-                    new_pos_err = float(leg_st["target_error"])
+        # [INTRODUCED 2026-11-27T20:45:05+08:00]
+        # FUNCTION: WholeBodyController._execute_frame_dispatch.post_rom_conflict_emission
+        # PURPOSE: Emit ROM_CONFLICT diagnostics from post-clamp original requested target errors (pos_err) for active effectors without re-querying limb IK state.
+        # REASON: TASK 12-A BUG-01
+        if clamped_rom:
+            for eff_id in ("hand_L", "hand_R", "foot_L", "foot_R"):
+                if eff_id in rom_conflict_errors:
+                    new_pos_err = rom_conflict_errors[eff_id]
                     if new_pos_err > tolerance_position_m:
                         unmet_constraints.append(
                             UnmetConstraint(

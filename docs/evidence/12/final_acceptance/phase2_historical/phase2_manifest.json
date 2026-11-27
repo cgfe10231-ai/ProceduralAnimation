@@ -1,0 +1,99 @@
+[
+  {
+    "name": "task10b_wbc_failure",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "tests\\test_task10b_wbc_failure_contract.py"
+    ],
+    "started_at": "2026-11-27T23:29:56.414305+08:00",
+    "finished_at": "2026-11-27T23:29:58.577013+08:00",
+    "duration_sec": 2.16,
+    "returncode": 0,
+    "copied_result_json": null
+  },
+  {
+    "name": "task10d_t01_t15",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+      "docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py"
+    ],
+    "started_at": "2026-11-27T23:29:58.578085+08:00",
+    "finished_at": "2026-11-27T23:31:04.914486+08:00",
+    "duration_sec": 66.34,
+    "returncode": 0,
+    "copied_result_json": "docs/evidence/12/final_acceptance/phase2_historical/task10d_t01_t15_results.json"
+  },
+  {
+    "name": "task11_footlock",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "docs\\evidence\\11\\unified_verification\\verify_footlock_contract.py"
+    ],
+    "started_at": "2026-11-27T23:31:04.918026+08:00",
+    "finished_at": "2026-11-27T23:31:17.050864+08:00",
+    "duration_sec": 12.13,
+    "returncode": 0,
+    "copied_result_json": "docs/evidence/12/final_acceptance/phase2_historical/task11_footlock_contract_results.json"
+  },
+  {
+    "name": "task09b_world_rotation",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "tests\\test_leg_ik_world_rotation_contract.py"
+    ],
+    "started_at": "2026-11-27T23:31:17.052787+08:00",
+    "finished_at": "2026-11-27T23:31:20.587759+08:00",
+    "duration_sec": 3.53,
+    "returncode": 0,
+    "copied_result_json": null
+  },
+  {
+    "name": "task09_ground_height",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "tests\\test_leg_ik_ground_height_contract.py"
+    ],
+    "started_at": "2026-11-27T23:31:20.588772+08:00",
+    "finished_at": "2026-11-27T23:31:24.107681+08:00",
+    "duration_sec": 3.52,
+    "returncode": 0,
+    "copied_result_json": null
+  },
+  {
+    "name": "task09_init_reset",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "-P",
+      "tests\\test_leg_ik_worldspace_init_reset.py"
+    ],
+    "started_at": "2026-11-27T23:31:24.108963+08:00",
+    "finished_at": "2026-11-27T23:31:26.140636+08:00",
+    "duration_sec": 2.03,
+    "returncode": 0,
+    "copied_result_json": null
+  }
+]

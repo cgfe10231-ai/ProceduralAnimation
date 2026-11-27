@@ -153,7 +153,7 @@ class TestEnvironmentGate01Unit4Closure(unittest.TestCase):
         self.assertIn("foot_R", result.contact_geometry_errors, "foot_R must be flagged with contact geometry error")
 
         # 3. Active contacts must NOT contain the non-support foot
-        multi = bridge.last_multi_contact
+        multi = result.multi_contact
         self.assertIsNotNone(multi, "MultiContactState must exist")
         self.assertNotIn("foot_L", multi.active_contacts, "foot_L must NOT be an active established contact")
         self.assertNotIn("foot_R", multi.active_contacts, "foot_R must NOT be an active established contact")
@@ -216,7 +216,7 @@ class TestEnvironmentGate01Unit4Closure(unittest.TestCase):
         self.assertIn("foot_L", result.contact_geometry_errors)
 
         # Must not establish contact
-        multi = bridge.last_multi_contact
+        multi = result.multi_contact
         self.assertNotIn("foot_L", multi.active_contacts)
         self.assertEqual(multi.contacts["foot_L"].lifecycle, ContactLifecycle.BROKEN)
         self.assertNotEqual(multi.contacts["foot_L"].surface_id, "ground", "Must not assign fake ground surface_id")
@@ -253,7 +253,7 @@ class TestEnvironmentGate01Unit4Closure(unittest.TestCase):
         self.assertFalse(result.success, "Must fail when foot is over void")
         self.assertIn("foot_L", result.contact_geometry_errors)
 
-        multi = bridge.last_multi_contact
+        multi = result.multi_contact
         self.assertNotIn("foot_L", multi.active_contacts)
         self.assertEqual(multi.contacts["foot_L"].lifecycle, ContactLifecycle.BROKEN)
         self.assertEqual(multi.contacts["foot_L"].surface_id, "none")
@@ -289,7 +289,7 @@ class TestEnvironmentGate01Unit4Closure(unittest.TestCase):
         self.assertFalse(result.success, "Must fail when foot hits non-support mesh")
         self.assertIn("foot_L", result.contact_geometry_errors)
 
-        multi = bridge.last_multi_contact
+        multi = result.multi_contact
         self.assertNotIn("foot_L", multi.active_contacts)
         self.assertEqual(multi.contacts["foot_L"].lifecycle, ContactLifecycle.BROKEN)
         self.assertEqual(multi.contacts["foot_L"].surface_id, "none")
@@ -327,7 +327,7 @@ class TestEnvironmentGate01Unit4Closure(unittest.TestCase):
         self.assertIn("foot_L", result.contact_geometry_errors)
         self.assertIn("foot_R", result.contact_geometry_errors)
 
-        multi = bridge.last_multi_contact
+        multi = result.multi_contact
         self.assertEqual(len(multi.active_contacts), 0, "No active contacts when both queries fail")
         self.assertEqual(multi.support_type, SupportType.FLIGHT, "Support type must be FLIGHT, not DOUBLE_STANCE")
         self.assertEqual(multi.contacts["foot_L"].lifecycle, ContactLifecycle.BROKEN)

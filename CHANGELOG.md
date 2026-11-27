@@ -2,6 +2,24 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-27] Task 12 / PKG-5 正式结项、联合验收及主干合并
+
+- **完成节点与状态**：`Task 12-A/B/C/D` `COMPLETED`、`Task 12-D BUG-01` `CLOSED`、`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（收归自 `task/12`）。
+- **冻结代码与证据基线**：
+  - 冻结生产源码基线：`eee276b39d204ccd46f4c17f37a09ec483bfcbae`（`whole_body_controller.py` `230a86acaa92b580c5c0aad0e0cdacd7df224a7a`、`kinematic_bridge.py` `4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`、`body_kinematics.py` `e204793ca3a326a798f75a66e24e98a945e53be7`、`body_inertia.py` `0cd7efadf265072fd1665615815792f41b792f1b`）。
+  - 冻结测试基线：`90f4628a0c4212f4bb0468941cdde362cd68bef2`（含 `tests/verify_task6gc_r3b1_bridge.py` Blob `eb99144187291e8acd3ad2f3399fc955096c9e45` 合法输入迁移与 BUG-01 关闭）。
+  - 过程保全证据：`docs/evidence/12/unified_verification/`（`c9c9a2d7949aee916fa44273399aa6aff937cd54`）；最终验收证据：`docs/evidence/12/final_acceptance/`（`e15d342b805ef45e7d54db2edf1c2804973e81a7`）。
+- **核心架构与接口收敛**：
+  - **12-A**：WBC 收归 ROM 截断后最终四肢/CoM 重测与 `ROM_CONFLICT` 真实请求目标误差，单帧状态失败原子回滚。
+  - **12-B**：Bridge 收敛 `effective_dt` 准入门禁，WBC/ContactModel 失败时禁止提交 7 项跨帧状态（诊断返回值仍真实保留）。
+  - **12-C**：清理 Bridge 废弃 `_reconcile_post_rom_feedback()`（ROM 后最终反馈所有权归 WBC），收敛 `BodyKinematics` / `BodyInertia` 有效支撑接触测量一致性。
+- **Blender 5.1.1 最终验收与四级回归结果**：
+  - 专项与历史合同复验：WBC A01–A20 `20/20 PASS`；Bridge B01–B19 `19/19 PASS`；C01–C16 及 10-C Retirement `17/17 PASS`；连续生产链 `PASS`；B20 场景独立重开 `2/2 PASS`；历史 WBC 合同 `6/6 PASS`；10-D T01–T15 `15/15 PASS`；Task 11 FootLock `38/38 PASS`；09-B 世界空间合同 `27/27 PASS`；地面高度合同 `20/20 PASS`；初始化与重置 `6/6 PASS`；历史 Bridge 合同 `14/14 PASS`。
+  - 四级 `--fail-fast` 回归（全部 `rc=0`，`FAILED / SKIPPED / NOT_RUN` 均为 `0`）：`Quick` `19/19`（16 PASSED + 3 AUTOMATED_PASS）、`Physics` `27/27`（24 PASSED + 3 AUTOMATED_PASS）、`Motion` `12/12`（6 PASSED + 6 AUTOMATED_PASS）、`Full` `42/42`（33 PASSED + 9 AUTOMATED_PASS）。
+- **保留风险、边界及后续准入**：
+  - B19 底层关键帧写入故障可产生部分 F-Curve 残留（7 项 Bridge 提交状态完整，不宣称 Blender F-Curve 写入完全原子化）；10-D 历史复验 JSON 的 `head` 字段保留旧常量（实际 Worker 运行于当前仓库）；Task 12 人工视觉验收为 `OWNER WAIVED`；历史九项视觉待办保持原登记；19 骨骼运动学管线与 6-DOF 动力学管线仍独立（`Phase 7C` `NOT AUTHORIZED`）。
+  - 原 16 项历史 Finding `16 CLOSED / 0 OPEN`，21 项冻结记录与 12 项架构合同保持原定义；下一节点为 `Task 7B-1`（`AUDIT ONLY — OWNER AUTHORIZED`）。
+
 ### [2026-11-26] Task 10-B 六层架构拆分、回归及主干结项
 
 - 完成10-B六层事务完整性架构的物理拆分、显式依赖装配及旧测试引用适配。

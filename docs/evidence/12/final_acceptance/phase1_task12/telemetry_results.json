@@ -1,0 +1,151 @@
+{
+  "group": "Group C \u2014 Cross-Module Telemetry Ownership & 10-C Retirement (C01-C16)",
+  "timestamp_utc": "2026-11-27T15:28:37.933635+00:00",
+  "passed": true,
+  "total": 17,
+  "passed_count": 17,
+  "results": {
+    "C01": {
+      "status": "PASSED",
+      "detail": {
+        "tracking_errors": {
+          "foot_L": 3e-06,
+          "foot_R": 3e-06,
+          "hand_L": 0.209258
+        }
+      }
+    },
+    "C02": {
+      "status": "PASSED",
+      "detail": {
+        "_reconcile_post_rom_feedback_removed": true
+      }
+    },
+    "C03": {
+      "status": "PASSED",
+      "detail": {
+        "wbc": 1,
+        "body_kinematics": 0,
+        "body_inertia": 0
+      }
+    },
+    "C04": {
+      "status": "PASSED",
+      "detail": {
+        "com_world": [
+          -0.001197,
+          -7.99363,
+          1.05178
+        ]
+      }
+    },
+    "C05": {
+      "status": "PASSED",
+      "detail": {
+        "verified_segments": 15
+      }
+    },
+    "C06": {
+      "status": "PASSED",
+      "detail": {
+        "custom_total_mass_kg": 75.0
+      }
+    },
+    "C07": {
+      "status": "PASSED",
+      "detail": {
+        "total_mass": true,
+        "segment_id_map": true,
+        "bone_name": true,
+        "mass_ratio": true,
+        "local_com_fraction": true,
+        "local_com_offset": true
+      }
+    },
+    "C08": {
+      "status": "PASSED",
+      "detail": {
+        "actual_len_m": 0.4,
+        "actual_ixx": 0.04633,
+        "nominal_ixx": 0.268782
+      }
+    },
+    "C09": {
+      "status": "PASSED",
+      "detail": {
+        "frame": 4,
+        "time_sec": 0.125
+      }
+    },
+    "C10": {
+      "status": "PASSED",
+      "detail": {
+        "foot_L_effective_in_ms": false
+      }
+    },
+    "C11": {
+      "status": "PASSED",
+      "detail": {
+        "s1": {
+          "foot_L": true,
+          "foot_R": true,
+          "hand_L": false,
+          "hand_R": false
+        },
+        "s2": {
+          "foot_L": true,
+          "foot_R": false,
+          "hand_L": false,
+          "hand_R": false
+        }
+      }
+    },
+    "C12": {
+      "status": "PASSED",
+      "detail": {
+        "free": false,
+        "candidate": false,
+        "established": true
+      }
+    },
+    "C13": {
+      "status": "PASSED",
+      "detail": {
+        "effective_limbs": [
+          "foot_L",
+          "foot_R"
+        ]
+      }
+    },
+    "C14": {
+      "status": "PASSED",
+      "detail": {
+        "legacy_standalone_apis_intact": true
+      }
+    },
+    "C15": {
+      "status": "PASSED",
+      "detail": {
+        "actions_frames": {
+          "start_stop_walk": 204,
+          "terrain_walk": 92,
+          "run": 24,
+          "sprint_start": 114,
+          "sprint_brake": 48
+        }
+      }
+    },
+    "C16": {
+      "status": "PASSED",
+      "detail": {
+        "diagnostics_isolated_from_committed_cache": true
+      }
+    },
+    "10C_RETIREMENT_C4_T07_T09": {
+      "status": "PASSED",
+      "detail": {
+        "c4_t07_t08_t09_reverified_on_production": true
+      }
+    }
+  }
+}

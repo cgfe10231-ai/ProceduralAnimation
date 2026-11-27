@@ -1,0 +1,253 @@
+{
+  "group": "Group B \u2014 Bridge Frame Commit & Timing Admission (B01-B19)",
+  "timestamp_utc": "2026-11-27T14:03:36.850144+00:00",
+  "passed": true,
+  "total": 19,
+  "passed_count": 19,
+  "results": {
+    "B01": {
+      "status": "PASSED",
+      "detail": {
+        "wbc_calls": 2,
+        "diff_calls": 1,
+        "history_len": 2
+      }
+    },
+    "B02": {
+      "status": "PASSED",
+      "detail": {
+        "unmet": [
+          "ROM_VIOLATION",
+          "REACHABILITY"
+        ],
+        "keyframes_preserved": true
+      }
+    },
+    "B03": {
+      "status": "PASSED",
+      "detail": {
+        "rom_violations": [
+          "spine"
+        ],
+        "keyframes_preserved": true
+      }
+    },
+    "B04": {
+      "status": "PASSED",
+      "detail": {
+        "contact_geom_errors": [
+          "foot_L",
+          "foot_R"
+        ]
+      }
+    },
+    "B05": {
+      "status": "PASSED",
+      "detail": {
+        "first_frame_uncommitted": true
+      }
+    },
+    "B06": {
+      "status": "PASSED",
+      "detail": {
+        "seven_states_preserved": true
+      }
+    },
+    "B07": {
+      "status": "PASSED",
+      "detail": {
+        "consecutive_failures": 3,
+        "history_len": 1
+      }
+    },
+    "B08": {
+      "status": "PASSED",
+      "detail": {
+        "retried_frame1_and_frame2_committed": 2
+      }
+    },
+    "B09": {
+      "status": "PASSED",
+      "detail": {
+        "v_root": [
+          0.0,
+          1.4399986267089842,
+          0.0
+        ],
+        "v_com": [
+          1.117587089538574e-08,
+          1.3163566589355467,
+          -0.00795936584472656
+        ]
+      }
+    },
+    "B10": {
+      "status": "PASSED",
+      "detail": {
+        "a_root": [
+          0.0,
+          23.039978027343743,
+          0.0
+        ],
+        "H_total": [
+          -5.8289265632629395,
+          -0.061305299401283264,
+          0.9520767331123352
+        ]
+      }
+    },
+    "B11": {
+      "status": "PASSED",
+      "detail": {
+        "dts": [
+          0.041667,
+          0.02,
+          0.05,
+          0.03
+        ]
+      }
+    },
+    "B12": {
+      "status": "PASSED",
+      "detail": {
+        "rejected_invalid_cases": 34,
+        "wbc_calls_on_rejected": 0
+      }
+    },
+    "B13": {
+      "status": "PASSED",
+      "detail": {
+        "duplicate_and_decreasing_rejected": 4,
+        "wbc_calls": 0
+      }
+    },
+    "B14": {
+      "status": "PASSED",
+      "detail": {
+        "explicit_dt_bypass_blocked": 4
+      }
+    },
+    "B15": {
+      "status": "PASSED",
+      "detail": {
+        "keyframe_false_state_updated": true
+      }
+    },
+    "B16": {
+      "status": "PASSED",
+      "detail": {
+        "stopped_immediately": {
+          "start_stop_walk": [
+            1,
+            2,
+            3
+          ],
+          "terrain_walk": [
+            1,
+            2,
+            3
+          ],
+          "run": [
+            1,
+            2,
+            3
+          ],
+          "sprint_start": [
+            1,
+            2,
+            3
+          ],
+          "sprint_brake": [
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    "B17": {
+      "status": "PASSED",
+      "detail": {
+        "run_cycles_with_central_bilateral": 24
+      }
+    },
+    "B18": {
+      "status": "PASSED",
+      "detail": {
+        "influence_constant_keyframes": {
+          "pose.bones[\"forearm.L\"].constraints[\"ArmIK.L\"].influence": 2,
+          "pose.bones[\"forearm.R\"].constraints[\"ArmIK.R\"].influence": 2,
+          "pose.bones[\"hand.L\"].constraints[\"HandRotation.L\"].influence": 2,
+          "pose.bones[\"hand.R\"].constraints[\"HandRotation.R\"].influence": 2
+        }
+      }
+    },
+    "B19": {
+      "status": "PASSED",
+      "detail": {
+        "kinematics_exc": {
+          "keyframes_written": 0,
+          "seven_states_preserved": true
+        },
+        "inertia_exc": {
+          "keyframes_written": 0,
+          "seven_states_preserved": true
+        },
+        "contact_exc": {
+          "keyframes_written": 0,
+          "seven_states_preserved": true
+        },
+        "root_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 0,
+          "changed_vs_before": false
+        },
+        "root_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 1,
+          "changed_vs_before": true
+        },
+        "posebone_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 7,
+          "changed_vs_before": true
+        },
+        "posebone_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 4,
+          "changed_vs_before": true
+        },
+        "legctrl_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 40,
+          "changed_vs_before": true
+        },
+        "legctrl_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 47,
+          "changed_vs_before": true
+        },
+        "armctrl_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 48,
+          "changed_vs_before": true
+        },
+        "armctrl_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 55,
+          "changed_vs_before": true
+        },
+        "influence_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 56,
+          "changed_vs_before": true
+        },
+        "influence_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 59,
+          "changed_vs_before": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+[FAIL] Continuous Production Chain: Declared sequence_duration_sec=14.291667s conflicts with realized sequence time bound 12.291667s (frames=1..296)
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_continuous_motion.py", line 187, in main
+    chain_res = planner.execute(initial_state=start_state)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\framework.py", line 1921, in execute
+    raise ValueError(
+    ...<3 lines>...
+    )
+ValueError: Declared sequence_duration_sec=14.291667s conflicts with realized sequence time bound 12.291667s (frames=1..296)

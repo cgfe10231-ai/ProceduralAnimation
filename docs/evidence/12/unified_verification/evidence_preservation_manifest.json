@@ -1,0 +1,328 @@
+{
+  "task": "TASK 12-D BUG-01 Phase 1 — Evidence Preservation",
+  "generated_at": "2026-11-27T22:23:53.061468+08:00",
+  "acceptance_status": "NOT_ACCEPTED_BLOCKED_ON_PHYSICS_REGRESSION",
+  "halting_failure": {
+    "tier": "physics",
+    "test_id": "physics_bridge_contract",
+    "file": "tests/verify_task6gc_r3b1_bridge.py",
+    "function": "test_10_variable_dt_and_kinematic_scaling",
+    "line": 596,
+    "error": "AssertionError: Expected 0.5 m/s at dt=0.04, got 0.9999990463256836"
+  },
+  "log_overwrites_and_recovery_disclosure": {
+    "overwritten_in_place": [
+      "docs/evidence/12/unified_verification/logs/verify_wbc_contract.{stdout,stderr}.log (initial A19/A20 fail logs overwritten by later passing run; initial failure preserved verbatim in docs/evidence/12/unified_verification/stdout.log & stderr.log for A19 and in preserved_batch_logs/task-12039.log & task-12086.log)",
+      "docs/evidence/12/unified_verification/logs/verify_bridge_commit_contract.{stdout,stderr}.log (B01/B04/B17 initial fail logs overwritten by later passing run; preserved verbatim in preserved_batch_logs/task-12039.log, task-12086.log, task-12113.log)",
+      "docs/evidence/12/unified_verification/logs/verify_telemetry_ownership.{stdout,stderr}.log (C10/C15/C16 initial fail logs overwritten by later passing run; preserved verbatim in preserved_batch_logs/task-12039.log, task-12086.log, task-12113.log)",
+      "docs/evidence/12/unified_verification/logs/verify_continuous_motion.{stdout,stderr}.log (prior fail logs overwritten across harness fixes; preserved verbatim in preserved_batch_logs/task-12039.log, task-12086.log, task-12113.log, task-12135.log and failure_diagnostics_preserved.json)",
+      "docs/evidence/12/unified_verification/logs/verify_reopen.{stdout,stderr}.log (prior step_length_m/env/seq_dur fail logs overwritten by later passing run; preserved verbatim in preserved_batch_logs/task-12039.log, task-12086.log, task-12113.log)"
+    ],
+    "permanently_unrecoverable": [
+      "Raw full untruncated stdout/stderr of overwritten intermediate single-script failures when earlier runs truncated inside task-12*.log (however all failing tracebacks, test case IDs, probe diagnostics, and passing logs are preserved verbatim in preserved_batch_logs/ and failure_diagnostics_preserved.json)"
+    ],
+    "completely_preserved_untouched": [
+      "docs/evidence/12/unified_verification/stdout.log & stderr.log (very first A19 failure run)",
+      "docs/evidence/12/unified_verification/regression_quick/ & tier_quick_{stdout,stderr}.log",
+      "docs/evidence/12/unified_verification/regression_physics/ & tier_physics_{stdout,stderr}.log",
+      "docs/evidence/12/unified_verification/historical/ (task10b_wbc_failure, task10d_contracts, task11_footlock)",
+      "docs/evidence/12/unified_verification/reopen_artifacts/ (scene1_bridge_mixed_retry & scene2_terrain_bilateral .blend + specs + reopen outs)"
+    ]
+  },
+  "reopen_artifacts_copied": [
+    "scene1_bridge_mixed_retry.blend",
+    "scene1_bridge_mixed_retry_reopen_out.json",
+    "scene1_bridge_mixed_retry_spec.json",
+    "scene2_terrain_bilateral.blend",
+    "scene2_terrain_bilateral_reopen_out.json",
+    "scene2_terrain_bilateral_spec.json"
+  ],
+  "preserved_file_count": 57,
+  "preserved_files": [
+    {
+      "rel_path": "bridge_results.json",
+      "size_bytes": 6002,
+      "sha256": "afe38638e9ea69d6bc1f66cf4b3064612b8cbb95c428c10b8ba2d615375b36ca"
+    },
+    {
+      "rel_path": "continuous_results.json",
+      "size_bytes": 882,
+      "sha256": "24395f07598a4ea91265b075689cd7f9f3d0adf64c72e88f5d9e38bdeeeb946a"
+    },
+    {
+      "rel_path": "evidence_preservation_manifest.json",
+      "size_bytes": 13550,
+      "sha256": "dbab1e102cf9befa4b99c55b5ef670a0502b05225c47ea2c3c5224d573e0c9b6"
+    },
+    {
+      "rel_path": "failure_diagnostics_preserved.json",
+      "size_bytes": 195650,
+      "sha256": "69db455eb33c7cde6e6f7b0420249faf798be2d6ad1f0a22ee2330965c9b36ed"
+    },
+    {
+      "rel_path": "reopen_results.json",
+      "size_bytes": 1444,
+      "sha256": "dc6d3b8105d091c7718abc0c8c5193dfe4b21100a4fe85f230aded8bec598093"
+    },
+    {
+      "rel_path": "script_modification_history.json",
+      "size_bytes": 190667,
+      "sha256": "b6f757f599dcf17fe153d463943a78ee983a8168bff672e813792a0291b74564"
+    },
+    {
+      "rel_path": "stderr.log",
+      "size_bytes": 516,
+      "sha256": "ae17744add71d979ebcc235409882cfee9f52a0ee4490e180224bb61d1ee8da1"
+    },
+    {
+      "rel_path": "stdout.log",
+      "size_bytes": 14151,
+      "sha256": "d5417a68c27e34dc6140cdcdb1f0e5e15220f686af966b77f55724d900f8c064"
+    },
+    {
+      "rel_path": "telemetry_results.json",
+      "size_bytes": 3153,
+      "sha256": "73cc7d37002c2b734371a8346a85c863bbc4e91dc2e8b14ab812ca75b826c0ce"
+    },
+    {
+      "rel_path": "tier_physics_stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "tier_physics_stdout.log",
+      "size_bytes": 10560,
+      "sha256": "4d04f4d16102b6c39176d16374c4d0cc30f20d0efcd350813890d92199ed98d8"
+    },
+    {
+      "rel_path": "tier_quick_stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "tier_quick_stdout.log",
+      "size_bytes": 9579,
+      "sha256": "2a332ebbc013034fb34ed13596ef0313bd768ee0a51b4634b586cb3663586c8c"
+    },
+    {
+      "rel_path": "verify_bridge_commit_contract.py",
+      "size_bytes": 36193,
+      "sha256": "2e64511437776398ce3e347a2bfe23f7720b962818ac1b015e7bfbb757ed24fc"
+    },
+    {
+      "rel_path": "verify_continuous_motion.py",
+      "size_bytes": 12306,
+      "sha256": "2cbdb8918df91ef72a93068c86e38abc71ba01a888eb96444925e42b53b51f5b"
+    },
+    {
+      "rel_path": "verify_reopen.py",
+      "size_bytes": 17133,
+      "sha256": "8ba4d46753f54435b6e5b1c2d083c4432945dc42b084d52cc0f5bbe53f7b6b41"
+    },
+    {
+      "rel_path": "verify_telemetry_ownership.py",
+      "size_bytes": 26157,
+      "sha256": "c5c1f5beddbf05c40c3869436482862dfc4ddeb49f83c151d55c641e05492006"
+    },
+    {
+      "rel_path": "verify_wbc_contract.py",
+      "size_bytes": 30316,
+      "sha256": "7c8923456db7513e20a8bfe751cbe3657ebb302052c6253544a5e71c4aee6568"
+    },
+    {
+      "rel_path": "wbc_results.json",
+      "size_bytes": 4038,
+      "sha256": "dd6210a6ada614c11bfb40e12096de9de45f708f1a2cac1c7029336426b1ff72"
+    },
+    {
+      "rel_path": "helpers/run_hist_and_reg.py",
+      "size_bytes": 2552,
+      "sha256": "4bd586407cf7fbc980c0ae31b8036a288035d2548f02ba20fd01f4b26a25e69d"
+    },
+    {
+      "rel_path": "helpers/run_regression_tiers.py",
+      "size_bytes": 1726,
+      "sha256": "f9f76eb36dcb65491691999c78ef00aa67cc89569b1459c7a53e351b6bb1b476"
+    },
+    {
+      "rel_path": "historical/task10b_wbc_failure.stderr.log",
+      "size_bytes": 1563,
+      "sha256": "aa11d3eff8eb28a402cf33f65aa5c6c9ed1435b7dcbcb6fd198da7296ff3baa5"
+    },
+    {
+      "rel_path": "historical/task10b_wbc_failure.stdout.log",
+      "size_bytes": 4039,
+      "sha256": "2604f516c6a433ec2823bbbd6ed85634b3c583a40924866c08933408dd515864"
+    },
+    {
+      "rel_path": "historical/task10d_contracts.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "historical/task10d_contracts.stdout.log",
+      "size_bytes": 23874,
+      "sha256": "5333c3052a858b78d24d3b5a1a3c4ab32f82f6bef72145bead5c629d3975c407"
+    },
+    {
+      "rel_path": "historical/task10d_contracts_results.json",
+      "size_bytes": 16728,
+      "sha256": "a563a76385f6adf09be817a80a9959189dd57f6d32c262c800af2fde47b90ff6"
+    },
+    {
+      "rel_path": "historical/task11_footlock.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "historical/task11_footlock.stdout.log",
+      "size_bytes": 44237,
+      "sha256": "da4b58474b27ffcac58f2a272291481ba2f86814c593f73e15d3a129ec745d94"
+    },
+    {
+      "rel_path": "historical/task11_footlock_results.json",
+      "size_bytes": 11986,
+      "sha256": "c1a6243563acb115d0d3cef50bf6f1cb79eb576eda363d3013f526f05cded6c0"
+    },
+    {
+      "rel_path": "logs/task12_continuous_motion.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "logs/task12_continuous_motion.stdout.log",
+      "size_bytes": 3962,
+      "sha256": "d7618228b2e8d521f2eb503a00ac3a77fe9e799bc730f3e61819896520f184b7"
+    },
+    {
+      "rel_path": "logs/verify_bridge_commit_contract.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "logs/verify_bridge_commit_contract.stdout.log",
+      "size_bytes": 28297,
+      "sha256": "59aa257cb902f44bff9e04d1ac0716451fcf88dd17002be52f1eb04943850db4"
+    },
+    {
+      "rel_path": "logs/verify_continuous_motion.stderr.log",
+      "size_bytes": 679,
+      "sha256": "5ae7ec189f3d5eed0e91b57715e4747b809de8b7c3b3d334b5662b715564f10c"
+    },
+    {
+      "rel_path": "logs/verify_continuous_motion.stdout.log",
+      "size_bytes": 817,
+      "sha256": "9cd5ebb8d06a33a855fea8a4282c4897df133d0bc3d183751055624885378227"
+    },
+    {
+      "rel_path": "logs/verify_reopen.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "logs/verify_reopen.stdout.log",
+      "size_bytes": 2555,
+      "sha256": "4f2357560f2ea6e4ab065c8e871f8ea766022246f7347aa562b1844add8b86af"
+    },
+    {
+      "rel_path": "logs/verify_telemetry_ownership.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "logs/verify_telemetry_ownership.stdout.log",
+      "size_bytes": 19235,
+      "sha256": "eeb91fe108028868c11cf56d07d6fac92a392cc3fadf3a34cb2d98eaa43bda94"
+    },
+    {
+      "rel_path": "logs/verify_wbc_contract.stderr.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "rel_path": "logs/verify_wbc_contract.stdout.log",
+      "size_bytes": 15069,
+      "sha256": "77feb9c80bc31edba4eee159cf25dcaa49ba0ec2688be5440673f63f2edeb015"
+    },
+    {
+      "rel_path": "preserved_batch_logs/task-12039.log",
+      "size_bytes": 6275,
+      "sha256": "33166380833600ef57e17e97502f52435cb4a09b28c39b9566d9beceff22d311"
+    },
+    {
+      "rel_path": "preserved_batch_logs/task-12086.log",
+      "size_bytes": 8114,
+      "sha256": "e75d16af53b94a4df052735c22e42eadb4186d27f28ecc77cdc8ae3734dfd00b"
+    },
+    {
+      "rel_path": "preserved_batch_logs/task-12113.log",
+      "size_bytes": 6470,
+      "sha256": "cda045a2fe3dc1bfc04dcca67bf88e7c745be41122f0e0c009d80a0f26646ca4"
+    },
+    {
+      "rel_path": "preserved_batch_logs/task-12135.log",
+      "size_bytes": 4397,
+      "sha256": "9c70b9284e4e68ac1e26b0288a91a2001493ce5dde73379595c4636651adf50d"
+    },
+    {
+      "rel_path": "preserved_batch_logs/task-12189.log",
+      "size_bytes": 3418,
+      "sha256": "27be5273f9bdeb90588d81f34050745c9f656d10cf91b0be6f1649c9c95257bc"
+    },
+    {
+      "rel_path": "preserved_batch_logs/task-12197.log",
+      "size_bytes": 3482,
+      "sha256": "f19a46253bb594d6f320d1b17a24381234d2ea400d17f42cf11f470b60771491"
+    },
+    {
+      "rel_path": "regression_physics/test_report.json",
+      "size_bytes": 41561,
+      "sha256": "d329e850a8513f354eeb5ea57019722005e95273835d96ebc4787ba5612f4561"
+    },
+    {
+      "rel_path": "regression_physics/test_report.md",
+      "size_bytes": 7895,
+      "sha256": "86cb5523358a670ab8520550d9222359b774e315a39a2577af4345fa78551237"
+    },
+    {
+      "rel_path": "regression_quick/test_report.json",
+      "size_bytes": 31215,
+      "sha256": "31e6e0fa2c2948e1816ef2420999d8f784d4f17d2543a5008d22c8434eccdf84"
+    },
+    {
+      "rel_path": "regression_quick/test_report.md",
+      "size_bytes": 3172,
+      "sha256": "0e85c657e76c5175995c991e63eb910d35543f02bc8392633ee56214a9096eb1"
+    },
+    {
+      "rel_path": "reopen_artifacts/scene1_bridge_mixed_retry.blend",
+      "size_bytes": 112551,
+      "sha256": "dbc895a20b404f67420a58cc968839e0155ab4a3bc336784585da4de0f880b90"
+    },
+    {
+      "rel_path": "reopen_artifacts/scene1_bridge_mixed_retry_reopen_out.json",
+      "size_bytes": 178,
+      "sha256": "00958e81ae6e05fdaafb82b2869f1d53713520ab88bc1cc47b8cd557d7cfaeee"
+    },
+    {
+      "rel_path": "reopen_artifacts/scene1_bridge_mixed_retry_spec.json",
+      "size_bytes": 39347,
+      "sha256": "702f6c1d32939c08075606c7828c00677e2566b37e2948645c77f0b497d33604"
+    },
+    {
+      "rel_path": "reopen_artifacts/scene2_terrain_bilateral.blend",
+      "size_bytes": 143972,
+      "sha256": "03d1ba1157d75402bbd6b20122b5c4d12133d2bf8348b19b85d785f4bbbec12c"
+    },
+    {
+      "rel_path": "reopen_artifacts/scene2_terrain_bilateral_reopen_out.json",
+      "size_bytes": 178,
+      "sha256": "c0dda4e8fef0dec257c732fe6ad74df0a7c8391ab19d97978ea0ef1be0ba389a"
+    },
+    {
+      "rel_path": "reopen_artifacts/scene2_terrain_bilateral_spec.json",
+      "size_bytes": 40624,
+      "sha256": "1d27eb87dd2d175e151512a47664cfebe762bdd75b1d180b95748f98aab9970a"
+    }
+  ]
+}

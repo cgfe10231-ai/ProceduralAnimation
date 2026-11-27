@@ -632,6 +632,8 @@ def compute_whole_body_inertia(
     update_scene: bool = True,
     time_sec: float = 0.0,
     frame: Optional[int] = None,
+    *,
+    com_result: Optional[WholeBodyCoMResult] = None,
 ) -> WholeBodyInertiaState:
     """Compute whole-body inertia tensor and angular momentum from an evaluated Blender Armature.
 
@@ -645,6 +647,7 @@ def compute_whole_body_inertia(
         update_scene: If True, calls view_layer.update() before evaluation.
         time_sec: Timestamp in seconds.
         frame: Optional frame number.
+        com_result: Optional precomputed WholeBodyCoMResult from authoritative frame owner (WBC).
 
     Returns:
         WholeBodyInertiaState containing whole-body inertia tensor and angular momentum breakdown.
@@ -657,12 +660,35 @@ def compute_whole_body_inertia(
     model = inertia_model if inertia_model is not None else DEFAULT_15_SEGMENT_INERTIA_MODEL
     mass_dist = model.mass_distribution
 
-    # 1. Compute Whole-Body Center of Mass (CoM)
-    com_res = compute_whole_body_com(
-        armature_obj=armature_obj,
-        mass_distribution=mass_dist,
-        update_scene=update_scene,
-    )
+    # [INTRODUCED 2026-11-27T21:19:40+08:00]
+    # FUNCTION: compute_whole_body_inertia.authoritative_com_reuse
+    # PURPOSE: Reuse externally supplied WholeBodyCoMResult after verifying mass and segment consistency against inertia model mass_distribution, avoiding duplicate compute_whole_body_com() evaluation in Bridge execution.
+    # REASON: TASK 12-C BUG-02
+    if com_result is not None:
+        if not isinstance(com_result, WholeBodyCoMResult):
+            raise TypeError("com_result must be a WholeBodyCoMResult instance")
+        if not math.isclose(float(com_result.total_mass_kg), float(mass_dist.total_mass_kg), rel_tol=1e-9, abs_tol=1e-9):
+            raise ValueError(
+                f"com_result.total_mass_kg ({com_result.total_mass_kg}) does not match inertia model mass_distribution ({mass_dist.total_mass_kg})"
+            )
+        for seg_spec in mass_dist.segments:
+            s_res = com_result.segments.get(seg_spec.segment_id)
+            if (
+                s_res is None
+                or s_res.bone_name != seg_spec.bone_name
+                or not math.isclose(float(s_res.mass_ratio), float(seg_spec.mass_ratio), rel_tol=1e-9, abs_tol=1e-9)
+            ):
+                raise ValueError(
+                    f"com_result segment '{seg_spec.segment_id}' is missing or inconsistent with inertia model mass_distribution"
+                )
+        com_res = com_result
+    else:
+        # 1. Compute Whole-Body Center of Mass (CoM)
+        com_res = compute_whole_body_com(
+            armature_obj=armature_obj,
+            mass_distribution=mass_dist,
+            update_scene=update_scene,
+        )
     com_world = com_res.com_world
 
     # Linear velocity of body CoM

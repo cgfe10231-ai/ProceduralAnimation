@@ -1,0 +1,33 @@
+=== RUNNING task12_continuous_motion ===
+task12_continuous_motion rc=0
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[PASS] Continuous Production Chain: {'chained_walk_plus_terrain': {'frames': 296, 'counts': {'bridge_calls': 296, 'wbc_calls': 296, 'com_calls': 296}, 'modes_seen': [['FK', 'FK'], ['FK', 'IK'], ['IK', 'FK'], ['IK', 'IK']], 'foot_L_lock_transitions': 10}, 'run_and_sprint_chain': {'run_frames': 24, 'sprint_chain_frames': 162, 'sprint_boundary_pos_diff_m': 0.0}, 'reset_unequal_dt_retry': {'reset_clean': True, 'retried_dt_sec': 0.06}}
+=== RUNNING task10b_wbc_failure ===
+task10b_wbc_failure rc=0
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+=== RUNNING task10d_contracts ===
+task10d_contracts rc=0
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'run']): frames 1..276 (@ 24 FPS), root Y -8.0000m -> -4.5311m (disp=3.4689m, peak_speed=0.7467m/s, unreachable=0)
+CONTRACTS_WORKER_OK contracts
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit
+=== RUNNING task11_footlock ===
+task11_footlock rc=0
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['sprint_start', 'sprint_brake']): frames 1..162 (@ 24 FPS), root Y 0.0000m -> 8.0833m (disp=8.0833m, peak_speed=2.0000m/s, unreachable=0)
+[CHAIN] PASSED: {"StartStopWalk_with_central_bilateral_upper": {"frames": 204, "locked_checks_L": 132, "unlocked_checks_L": 72, "locked_checks_R": 96, "unlocked_checks_R": 108, "lr_lock_transitions": 8, "max_locked_ctrl_drift_m": 0.0}, "TerrainWalk": {"frames": 128, "locked_checks_L": 96, "unlocked_checks_L": 32, "locked_checks_R": 80, "unlocked_checks_R": 48, "lr_lock_transitions": 6, "max_locked_ctrl_drift_m": 0.0}, "Run": {"frames": 48, "locked_checks_L": 14, "unlocked_checks_L": 34, "locked_checks_R": 14, "unlocked_checks_R": 34, "lr_lock_transitions": 7, "max_locked_ctrl_drift_m": 0.0}, "SprintStart_SprintBrake": {"frames": 162, "locked_checks_L": 77, "unlocked_checks_L": 85, "locked_checks_R": 68, "unlocked_checks_R": 94, "lr_lock_transitions": 23, "max_locked_ctrl_drift_m": 0.0}}
+TASK11_CONTRACT_SUITE_DONE all_passed=True executed=38/38
+=== HISTORICAL_AND_CONTINUOUS_ALL_PASSED ===
