@@ -1,11 +1,11 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **核验日期**：2026-11-27；Task 10-D 冻结生产基线：`824c52ec73f86aa3d08245a58297118cb4a9f110`（10-d-5 中央验证 `7f14ff722caecadec555194cc7d08f454c94c6c8`，收归分支 `task/10-d` 合并至 `master`）；10-C 历史集成基线 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`。
-> **登记口径**：统一历史 Finding **16项**，14项已关闭、2项仍 OPEN；不增删、不重编号。
-> **未关闭**：`FIND-R3-03`、`FIND-R3-04`，归属 Task 11 FootLock；其他14项历史结论保持不变。Task 10-B / 10-C / 10-D 验收与主干合入不得自动解释为关闭 Task 11 的 Finding。
-> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 与 10-C 均为 `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；**10-D `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**（项目负责人于 2026-11-27 人工视觉验收通过两份中央全身场景 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend`，证据见 `docs/evidence/10-d/10-d-5/centralized_verification/` 与最终回归 `docs/evidence/10-d/final_acceptance/`）；**Task 10 整体 `COMPLETED`**；**下一任务为 `Task 11-A` FootLock（`FIND-R3-03`）**，Task 12 继续等待 Task 11 完成。
-> **独立问题域**：10-B 的 `CORE_REPAIR_LEDGER.md` 21项冻结记录（含证据与专项合同）**不属于**本16项 Finding 的新增条目，不能合并编号或机械改写历史 Finding 状态。
-> **Phase 7B / 7C**：`NOT AUTHORIZED`；须完成 Task 11 / Task 12 联合验收并由负责人准入，不得宣称 Phase 7C 动力学合流已完成。
+> **核验日期**：2026-11-27；Task 11 已验收生产基线：`added88a7e27eaaa6d1644473d560c5dcf45bc80`（联合测试证据提交 `07aec5d8d35e5d77ff956f160840d1c2491b770e`，收归分支 `task/11` 合并至 `master`）；Task 10-D 冻结生产基线 `824c52ec73f86aa3d08245a58297118cb4a9f110`（`7f14ff722caecadec555194cc7d08f454c94c6c8`，收归 `task/10-d`）；10-C 历史基线 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`。
+> **登记口径**：统一历史 Finding **16项**，**16项已全部关闭（0 OPEN）**；不增删、不重编号。
+> **Task 11 关闭项**：随 Task 11-A（`FIND-R3-03`）与 Task 11-B（`FIND-R3-04`）完成独立源码审计与联合动态验收，`FIND-R3-03` 与 `FIND-R3-04` 正式关闭；其余 14 项历史结论保持不变。
+> **任务事实**：09-B-4 已验收；Task 10（`10-A` / `10-B` / `10-C` / `10-D`）`COMPLETED`；**Task 11（`11-A` + `11-B`）`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**（证据 `docs/evidence/11/unified_verification/`：A01–A19 `19/19`、B01–B20 `20/20`、联合专项 `38/38`、`CONTRACT10-01..06` `6/6`、`09-B-4` `27/27`、`quick` 19/19、`physics` 27/27、`motion` 12/12、`full` 42/42 全 PASS，`AUTOMATED_PASS` 不登记为人工视觉验收）；**下一工程节点为 `Task 12-A`**（PKG-5 尚未整体完成）。
+> **独立问题域**：10-B 的 `CORE_REPAIR_LEDGER.md` 21项冻结记录（含证据与专项合同）**不属于**本16项 Finding 的新增条目，不能合并编号或改写历史含义。
+> **Phase 7B / 7C**：`NOT AUTHORIZED`；须完成 Task 12 联合验收并由负责人准入，不得宣称 Phase 7C 动力学合流已完成。
 
 ---
 
@@ -14,17 +14,18 @@
 | 指标 | 当前事实 | 说明 |
 |---|---|---|
 | 统一历史 Finding | **16** | 永久保留原16个ID |
-| 已关闭 | **14** | 历史修复结论继续有效 |
-| 当前 OPEN | **2** | `FIND-R3-03`、`FIND-R3-04`（归属 Task 11，不得提前关闭） |
+| 已关闭 | **16** | 原14项历史闭环继续有效，Task 11 正式关闭 `FIND-R3-03`、`FIND-R3-04` |
+| 当前 OPEN | **0** | **原16项历史 Finding 全部关闭** |
 | 历史已确认缺陷 | **3项已修复** | `FIND-R2-01/02/07` |
-| 当前未关闭接口合同缺口 | **2项** | `FIND-R3-03/04` |
+| 历史接口合同缺口 | **13项已修复/关闭** | 含 `FIND-R3-03`（Task 11-A）、`FIND-R3-04`（Task 11-B） |
 | 09-B-4 | `ACCEPTED — VERIFIED` | 不得重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
 | Task 10-B | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 原验收 2026-11-20；六层拆分回归及主干合并 `c45a40c` 已完成 |
-| Task 10-C | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 收归 `f2501ddc`；已在 `824c52ec` 现行 `kinematic_bridge.py` 复验通过（38/38 + 14/14） |
-| Task 10-D | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 五动作中央全身控制及公共上肢模块 `src/motion/upper_limb_trajectory.py`；2026-11-27 人工视觉验收两份场景；最终回归 `quick` 19/19、`physics` 27/27、`motion` 12/12、`full` 42/42 全 PASS（`docs/evidence/10-d/final_acceptance/`） |
+| Task 10-C | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 收归 `f2501ddc`；已复验通过 |
+| Task 10-D | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 五动作中央全身控制及公共上肢模块 `src/motion/upper_limb_trajectory.py`；2026-11-27 人工视觉验收两份场景；证据 `docs/evidence/10-d/` |
 | Task 10（整体） | `COMPLETED` | 10-A / 10-B / 10-C / 10-D 全部完成 |
-| Task 11 / Task 12 | `NEXT: Task 11-A` / Task 12 等待中 | `FIND-R3-03`、`FIND-R3-04` 仍 OPEN |
+| Task 11（`11-A` + `11-B`） | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 正式关闭 `FIND-R3-03`、`FIND-R3-04`；证据 `docs/evidence/11/unified_verification/` |
+| Task 12 | `NEXT — TASK 12-A (AUDIT READY)` | 下一工程节点；待独立审计启动，PKG-5 尚未整体完成 |
 | Phase 7B / 7C | `NOT AUTHORIZED` | 不得越级开启或宣称 7C 合流已完成 |
 
 ---
@@ -45,8 +46,8 @@
 | **FIND-T01-08** | - | `src/motion/terrain_walk.py` | `TerrainWalkAction.execute()` | Lines 920–930 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `terrain_walk.py` |
 | **FIND-R3-01** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `set_foot_ik_target()` | `foot_contact.py:151–238`; `ik.py:116–262, 333–600, 601–984` | CONTRACT_GAP (RESOLVED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `foot_contact.py` / `ik.py`（原 09-B 修复与 09-B-4 状态完整性、解锁事务和数学边界补强均已完成；27/27 专项测试通过；证据见 `docs/evidence/PKG5_09B4/`） |
 | **FIND-R3-02** | - | `src/rig/ik.py` | `set_foot_ik_target()` | Lines 334–346 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `ik.py` |
-| **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `unlock_foot_contact()` / `reset_leg_ik()` | `foot_contact.py:208`; `ik.py:244` | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` / `ik.py` |
-| **FIND-R3-04** | - | `src/rig/foot_contact.py` | `evaluate_foot_support()` | `foot_contact.py:239–354` | CONTRACT_GAP | `STATIC_CONFIRMED` | NO | `foot_contact.py` |
+| **FIND-R3-03** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` | `FOOT_LOCK_METADATA_KEYS` / `lock_foot_contact()` / `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `_snapshot_leg_rig_state()` / `_rollback_leg_rig_state()` | `foot_contact.py:144-224`; `ik.py:40-48, 182-188, 272-278, 394-572` | CONTRACT_GAP (FIXED) | `VERIFIED` | **NO (CLOSED — Task 11-A)** | `foot_contact.py` / `ik.py` |
+| **FIND-R3-04** | - | `src/rig/foot_contact.py` / `src/rig/ik.py` / `src/scene/playground_character_assembly.py` | `get_leg_ik_state()` / `get_foot_support_state()` / `evaluate_foot_support()` / `unlock_foot_contact()` | `ik.py:301-314`; `foot_contact.py:250-471`; `playground_character_assembly.py:726-730` | CONTRACT_GAP (FIXED) | `VERIFIED` | **NO (CLOSED — Task 11-B)** | `foot_contact.py` / `ik.py` / `playground_character_assembly.py` |
 | **FIND-R4-01** | - | `src/scene/playground_terrain_traversal.py` | `generate_dynamics_playground_environment_gate01_u3_blend()` | Lines 633–640, 689, 704 | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `playground_terrain_traversal.py` |
 | **FIND-R4-02** | - | `src/scene/environment_query.py` / `src/scene/blender_mesh_query_adapter.py` | `ground_height_at()` / `surface_normal_at()` / `query_ground_support_at()` | `eq:402, 588–593, 610–615` / `bmqa:885–892` | CONTRACT_GAP (FIXED) | `STATIC_CONFIRMED` | **NO (RESOLVED)** | `environment_query.py` / `blender_mesh_query_adapter.py` |
 
@@ -430,53 +431,39 @@
 
 ### FIND-R3-03: `unlock_foot_contact` 与 `reset_leg_ik` 支撑元数据混淆与跨动作残留
 * **Source Files**: `src/rig/foot_contact.py` / `src/rig/ik.py`
-* **Class / Function**: `unlock_foot_contact()` / `reset_leg_ik()`
-* **Exact Line Range**: `foot_contact.py:208`; `ik.py:244`
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 足部由锁定支撑（Stance）切换为摆动（Swing），或动作完成调用系统重置。
-* **Actual Behavior**:
-  函数仅将自定义属性 `ik_obj["is_locked"] = False`，但此前写入的 `contact_world_xyz`、`locked_ankle_world_xyz` 等几何元数据仍然持久留存在 Blender Empty 物体上。
-* **消费者排查与证据澄清 (R3-CLOSE-04)**：
-  - 经全量排查，现有生产消费者（`whole_body_controller.py:395`、`evaluate_foot_support:213, 260`）均严格前置检查了 `is_locked`，未发生有效支撑的误读；
-  - 这些属性在摆动期间属于有意保留的历史快照（记录最后一次着地锚点）；
-  - 但在系统全局 `reset_leg_ik()` 时，这些历史快照依然残留，可能对跨动作调试或未加锁校验的第三方检查产生脏数据干扰。
+* **Class / Function**: `FOOT_LOCK_METADATA_KEYS` / `lock_foot_contact()` / `unlock_foot_contact()` / `setup_leg_ik()` / `reset_leg_ik()` / `_snapshot_leg_rig_state()` / `_rollback_leg_rig_state()`
+* **Exact Line Range**: `ik.py:40-48, 182-188, 272-278, 394-572`; `foot_contact.py:144-156, 217-224`
+* **Evidence Grade**: `VERIFIED`
+* **Trigger Condition**: 足部由锁定支撑（Stance）切换为摆动（Swing），或初始化/重置 `FootIK.<side>`。
+* **Actual Behavior (修复前)**:
+  函数仅将自定义属性 `ik_obj["is_locked"] = False`，此前写入的 7 项锁定几何元数据仍然持久留存在 Blender Empty 物体上。
 * **Expected Contract**:
-  摆动期间历史快照允许保留但应明确标记为历史态；全局重置时应彻底清空。
+  以唯一不可变常量 `FOOT_LOCK_METADATA_KEYS` 收敛 7 项快照生命周期：解锁/初始化/重置同步清理全部 7 项元数据，重锁先全量写满 7 键再发布 `is_locked = True`，且事务回滚脱离 `IDPropertyArray` 完整恢复/核验存在性与数值。
+* **Responsible Module**: `src/rig/foot_contact.py` / `src/rig/ik.py`
 * **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO`
-* **Repair Status**: `OPEN / PENDING REPAIR`
-* **Fix & Verification Summary**: 待处理 (PENDING REPAIR)。经排查，现有生产消费者均前置检查了 is_locked，未引发误判；但系统全局重置时历史快照残留问题仍未清理，计划在后续维护包中处理。
-* **Suggested Repair Boundary**: 在 `reset_leg_ik()` 中清理 Empty 上的历史锁定属性；在只读查询中明确区分当前活跃支撑点与历史落点快照。
+* **Blocks Further Development**: `NO (CLOSED)`
+* **Repair Status**: `FIXED / VERIFIED (CLOSED — Task 11-A)`
+* **Fix & Verification Summary**:
+  - Task 11-A 提交 `0d7420bce8e2726eda6e7ec9b47096d8fc204264`（并经联合验收基线 `added88a7e27eaaa6d1644473d560c5dcf45bc80` + `07aec5d8d35e5d77ff956f160840d1c2491b770e` 收归 `master`）：在 `src/rig/ik.py` 定义 `FOOT_LOCK_METADATA_KEYS`，于 `setup_leg_ik()`、`reset_leg_ik()`、`unlock_foot_contact()` 清理 7 键，`lock_foot_contact()` 先全量重建再发布 `is_locked=True`，并在 `_snapshot_leg_rig_state()` / `_rollback_leg_rig_state()` 增加 7 键存在性与脱离 `IDPropertyArray` 值核验（保留无关自定义属性）。
+  - 验证结果（`docs/evidence/11/unified_verification/`）：A01–A19 `19/19 PASS`（含独立进程场景重开 `PASS` 与未修改 `09-B-4` TEST-24 `PASS`）；五种生产动作 542 帧与 44 次支撑转换中锁脚控制器最大漂移 `0`；四级回归全 PASS。
 
 ---
 
 ### FIND-R3-04: `evaluate_foot_support` 充当隐式约束维持器，具有未声明的控制器强写入与骨骼修改副作用
-* **Source File**: `src/rig/foot_contact.py`
-* **Class / Function**: `evaluate_foot_support()`
-* **Exact Line Range**: Lines 239–354
-* **Evidence Grade**: `STATIC_CONFIRMED`
-* **Trigger Condition**: 任何调用 `evaluate_foot_support()` 或包装函数 `get_foot_support_state()` 的时机。
-* **Actual Behavior**:
-  该函数在名称和文档上声明为“状态与漂移评估”（只读查询），但实际上在执行时具有极其强烈的副作用与写入行为：
-  1. 第 252 行调用 `_apply_ik_prebend_hint(arm)`，直接改写双侧小腿骨骼姿态；
-  2. 第 253 行和第 280 行触发依赖图更新；
-  3. 第 264–269 行在锁定状态下可能解绑 FootIK 并覆写位置、旋转；
-  4. 第 273–275 行可能解绑 KneePole 并覆写其位置。
-* **严重性与稳定性权衡 (R3-CLOSE-03)**：
-  - 调用者在仅想查询遥测时（如 `ContactConstraintAdapter` 或测试代码），在未知情情况下触发了骨骼与控制器写操作；
-  - 但在现有执行链中，`WholeBodyController` (L405) 在脚部持续锁定时，**正是依赖调用 `evaluate_foot_support` 来完成每帧对膝盖极向目标的动态更新和对 FootIK 的绝对世界钉死**；
-  - 如果盲目将该函数改为纯只读或删除写入，现有的微米级防滑步态将立即损坏！
-* **Affected Callers**:
-  - `WholeBodyController.execute_frame()`
-  - `ContactConstraintAdapter.to_dict()`
-  - `get_foot_support_state()`
-* **Contract Violation**: 违反函数单一职责原则（SRP）与无副作用查询合同。
+* **Source File**: `src/rig/foot_contact.py` / `src/rig/ik.py` / `src/scene/playground_character_assembly.py`
+* **Class / Function**: `get_leg_ik_state()` / `get_foot_support_state()` / `evaluate_foot_support()` / `unlock_foot_contact()`
+* **Exact Line Range**: `ik.py:301-314`; `foot_contact.py:250-471`; `playground_character_assembly.py:726-730`
+* **Evidence Grade**: `VERIFIED`
+* **Trigger Condition**: 查询接口 `get_foot_support_state()` 原直接转调含骨骼预弯、解绑写变换与 `view_layer.update()` 副作用的 `evaluate_foot_support()`。
+* **Expected Contract**:
+  纯只读查询（`get_foot_support_state()` + `get_leg_ik_state(..., update_scene=False)`）必须零副作用读取已求解状态并严格拒斥缺失控制器或缺失/非法 7 项快照；主动支撑维持保留于 `evaluate_foot_support()`（写入前先校验锁定态完整性，维持后委托 `get_foot_support_state()`）。
+* **Responsible Module**: `src/rig/foot_contact.py` / `src/rig/ik.py` / `src/scene/playground_character_assembly.py`
 * **Classification**: `CONTRACT_GAP`
-* **Blocks Further Development**: `NO` (现有 WBC 已形成隐式闭环，但阻碍接口正规化)
-* **Repair Status**: `OPEN / PENDING REPAIR`
-* **Suggested Repair Boundary**:
-  1. 严禁简单删除现有写入；
-  2. 应在架构重构时将职责拆分为显式的 `enforce_foot_support_lock()`（负责写入与约束刷新）与真正纯只读的 `query_foot_support_state()`（负责遥测提取与漂移计算）。
+* **Blocks Further Development**: `NO (CLOSED)`
+* **Repair Status**: `FIXED / VERIFIED (CLOSED — Task 11-B)`
+* **Fix & Verification Summary**:
+  - Task 11-B 提交 `e171b5b7fa98351264c2bd2f7c91a5c2c4816104` 及 BUG-01 准入修复 `added88a7e27eaaa6d1644473d560c5dcf45bc80`（证据提交 `07aec5d8d35e5d77ff956f160840d1c2491b770e`，收归 `master`）：将状态/可达性/漂移计算迁移至零副作用 `get_foot_support_state()`；`get_leg_ik_state(..., *, update_scene: bool = True)` 支持无刷新读取；`evaluate_foot_support()` 在 `_ensure_ik_controls()` 前先核验已有锁定态并拒绝缺失 `KneePole` 或残缺快照；`unlock_foot_contact()` 在 Phase B 事务内显式执行预弯与刷新；`playground_character_assembly.py` Stage D 改用纯查询；`WholeBodyController`、`ContactConstraintAdapter`、`move_character_root_with_support()` 等主动维持调用者兼容保留。
+  - 验证结果（`docs/evidence/11/unified_verification/`）：B01–B20 `20/20 PASS`（B08 37 项子测试全部通过）、WBC 历史失败合同 `CONTRACT10-01..06` `6/6 PASS`、`legacy_foot_contact` `PASS`（原 `.blend` 未改），四级 `--fail-fast` 回归（`quick` 19/19、`physics` 27/27、`motion` 12/12、`full` 42/42）全部通过。
 
 ---
 
@@ -591,8 +578,8 @@ flowchart TD
      - `09-A`：Ground × Reach 三维约束求解器已完成并验证；
      - `09-B`：世界旋转、有效父级变换、状态完整性及解锁事务补强已完成，最近节点 09-B-4 为 `ACCEPTED — VERIFIED`；
      - `10 Upper-Limb IK/FK`：10-A 已归档；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED`；
-     - `11 FootLock`：仍需处理 FIND-R3-03 与 FIND-R3-04；
-     - `12 联合验收`：等待 Task 10、11 完成。
+     - `11 FootLock`：`FIND-R3-03` 与 `FIND-R3-04` 已于 Task 11（`11-A` + `11-B`）关闭并合并至 `master`；
+     - `12 联合验收`：下一工程节点（`Task 12-A`），待独立审计启动；PKG-5 尚未整体完成。
 
 ---
 
@@ -607,9 +594,9 @@ flowchart TD
 | 08 Rig | FIND-R3-01 的早期生命周期部分 | 控制器世界空间与刚体平移隔离 | `COMPLETED / VERIFIED` |
 | 09-A | FIND-R3-02 | 下肢 Ground × Reach 三维高程和可达域约束 | `COMPLETED / VERIFIED` |
 | 09-B | FIND-R3-01 | 世界旋转、有效父级矩阵、控制器生命周期与失败原子性 | `ACCEPTED — VERIFIED`，最近补强节点 09-B-4 |
-| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | 10-A `COMPLETED — ARCHIVED`；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（原验收 2026-11-20，主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED` |
-| 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | `OPEN / PENDING REPAIR` |
-| 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | `PENDING` |
+| 10 | Upper-Limb IK/FK | 双臂独立目标、FK 摆臂解耦、手腕空间合同及接口审计 | `COMPLETED`（10-A 已归档；10-B `c45a40c`；10-C `f2501ddc`；10-D `824c52ec` / `7f14ff72`） |
+| 11 | FIND-R3-03、FIND-R3-04 | FootLock 元数据生命周期、查询与支撑维持副作用合同 | **`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**（`added88a7e` / `07aec5d8`，证据 `docs/evidence/11/unified_verification/`） |
+| 12 | PKG-5 综合闭环 | 各模块独立审计完成后的全仓跨模块接口和回归验收 | **`NEXT — TASK 12-A (AUDIT READY)`**（PKG-5 尚未整体完成） |
 
 ### 8.1 既有 Finding 的修复归属
 
@@ -627,8 +614,8 @@ flowchart TD
 | FIND-T01-08 | 历史 TerrainWalk 修复 | 根轨迹与摆动脚时间归一化不一致 | 历史已修复 |
 | FIND-R3-01 | 08 Rig / 09-B | 控制器父级生命周期与世界旋转合同 | `FIXED / VERIFIED`，09-B-4 补强与测试证据已完成 |
 | FIND-R3-02 | 09-A | 下肢 Ground × Reach 数学约束 | `FIXED / VERIFIED` |
-| FIND-R3-03 | 11 FootLock | 锁定元数据残留与生命周期状态语义 | `OPEN / PENDING REPAIR` |
-| FIND-R3-04 | 11 FootLock | `evaluate_foot_support()` 未声明的控制器和骨骼写入副作用 | `OPEN / PENDING REPAIR` |
+| FIND-R3-03 | 11-A FootLock | 7 项锁定元数据生命周期与脱离 `IDPropertyArray` 回滚覆盖 | **`FIXED / VERIFIED`（CLOSED — Task 11-A）** |
+| FIND-R3-04 | 11-B FootLock | 纯查询 `get_foot_support_state()` 与主动维持 `evaluate_foot_support()` 职责边界分离 | **`FIXED / VERIFIED`（CLOSED — Task 11-B）** |
 | FIND-R4-01 | 历史场景执行门禁修复 | 失败场景仍可能落盘或伪报成功 | 历史已修复 |
 | FIND-R4-02 | 历史 Environment Query 修复 | 无有效支撑面的错误回退 | 历史已修复 |
 
@@ -640,9 +627,9 @@ flowchart TD
 
 | 模块 | 源码文件 | 必须检查的内容 | 对应节点 | 当前状态 |
 |---|---|---|---|---|
-| Lower-Limb IK | `src/rig/ik.py` | 有效父级变换、空间合同、可达域、有限性、事务与回滚 | 09-A、09-B | `COMPLETED / VERIFIED` |
-| Upper-Limb IK | `src/rig/arm_ik.py` | 双臂目标、世界空间变换、旋转映射、pole、非有限输入、回滚和左右独立性 | 10 | 待独立审计 |
-| FootLock | `src/rig/foot_contact.py` | 锁定、解锁、元数据、状态读取、副作用与漂移保持 | 11 | 两项既有 Finding 待修 |
+| Lower-Limb IK | `src/rig/ik.py` | 有效父级变换、空间合同、可达域、有限性、事务与回滚 | 09-A、09-B、11 | `COMPLETED / VERIFIED` |
+| Upper-Limb IK | `src/rig/arm_ik.py` | 双臂目标、世界空间变换、旋转映射、pole、非有限输入、回滚和左右独立性 | 10 | `COMPLETED`（10-B/10-C/10-D 已合入） |
+| FootLock | `src/rig/foot_contact.py` | 锁定、解锁、元数据、状态读取、副作用与漂移保持 | 11 | **`COMPLETED / VERIFIED`（`FIND-R3-03` / `FIND-R3-04` 已关闭）** |
 | FK / Pose | `src/rig/pose.py`、`src/motion/whole_body_controller.py` | FK 目标、骨骼本地姿态、约束权重、IK/FK 切换和姿态所有权 | 10 / 12 | 待独立审计 |
 | WBC | `src/motion/whole_body_controller.py` | 分阶段写入、输入输出合同、失败传播、事务原子性、末端追踪与 ROM | 12 | 待独立审计 |
 | Bridge | `src/motion/kinematic_bridge.py` | 帧级协议、WBC 结果、接触遥测、失败处理、关键帧和状态提交 | 12 | 待独立审计 |
@@ -952,9 +939,9 @@ flowchart TD
 - 08 Rig：已完成。
 - 09-A：Lower-Limb Ground × Reach，已完成。
 - 09-B：Lower-Limb World Rotation 与控制器生命周期合同，已完成；最近补强节点为 `09-B-4`。
-- 10：Upper-Limb IK/FK，10-A 已归档；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED`。
-- 11：FootLock，处理 FIND-R3-03、FIND-R3-04。
-- 12：PKG-5 综合闭环与联合验收。
+- 10：Upper-Limb IK/FK，已完成（`COMPLETED`：10-A 已归档；10-B `c45a40c`；10-C `f2501ddc`；10-D `824c52ec` / `7f14ff72`）。
+- 11：FootLock，已完成并合入主干（`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`，`added88a7e` / `07aec5d8`，`FIND-R3-03`、`FIND-R3-04` 正式关闭）。
+- 12：PKG-5 综合闭环与联合验收（下一节点：`Task 12-A`，待独立审计启动；PKG-5 尚未整体完成）。
 
 09-B-4 是当前已接受的最新补强节点，不得自动衍生 09-B-5。
 

@@ -25,6 +25,7 @@ from mathutils import Euler, Matrix, Vector
 from src.character.builder import world_min_z
 from src.rig.ik import (
     ANKLE_REST_Z,
+    FOOT_LOCK_METADATA_KEYS,
     IK_TARGET_NAMES,
     MAX_LEG_REACH,
     MIN_LEG_REACH,
@@ -136,14 +137,22 @@ def lock_foot_contact(
     foot_min_z = world_min_z(foot_mesh)
 
     # Persist lock metadata on the controller object so .blend reopen retains full state
+    # [INTRODUCED 2026-11-27T17:09:00+08:00]
+    # BLOCK: lock_foot_contact full metadata rebuild and final lock publication
+    # PURPOSE: Overwrite all 7 FOOT_LOCK_METADATA_KEYS from freshly computed world lock geometry before publishing is_locked=True.
+    # REASON: TASK 11-A (FIND-R3-03) — guarantee stale snapshot values never mix into relock state and is_locked=True is published only after complete 7-field reconstruction.
+    lock_metadata_payload = {
+        "contact_world_xyz": tuple(float(v) for v in contact_world),
+        "locked_ankle_world_xyz": tuple(float(v) for v in locked_ankle_world),
+        "target_rotation_deg": tuple(float(v) for v in target_rotation_deg),
+        "locked_foot_head_xyz": tuple(float(v) for v in foot_head_world),
+        "locked_foot_tail_xyz": tuple(float(v) for v in foot_tail_world),
+        "locked_foot_center_xyz": tuple(float(v) for v in foot_center_world),
+        "locked_foot_min_z": float(foot_min_z),
+    }
+    for meta_key in FOOT_LOCK_METADATA_KEYS:
+        ik_obj[meta_key] = lock_metadata_payload[meta_key]
     ik_obj["is_locked"] = True
-    ik_obj["contact_world_xyz"] = tuple(float(v) for v in contact_world)
-    ik_obj["locked_ankle_world_xyz"] = tuple(float(v) for v in locked_ankle_world)
-    ik_obj["target_rotation_deg"] = tuple(float(v) for v in target_rotation_deg)
-    ik_obj["locked_foot_head_xyz"] = tuple(float(v) for v in foot_head_world)
-    ik_obj["locked_foot_tail_xyz"] = tuple(float(v) for v in foot_tail_world)
-    ik_obj["locked_foot_center_xyz"] = tuple(float(v) for v in foot_center_world)
-    ik_obj["locked_foot_min_z"] = float(foot_min_z)
 
     return evaluate_foot_support(arm, side)
 
@@ -206,6 +215,13 @@ def unlock_foot_contact(
 
     try:
         ik_obj["is_locked"] = False
+        # [INTRODUCED 2026-11-27T17:09:00+08:00]
+        # BLOCK: unlock_foot_contact lock metadata cleanup
+        # PURPOSE: Delete any existing 7 FootLock snapshot custom properties on FootIK.<side> inside the Phase B rollback-protected transaction.
+        # REASON: TASK 11-A (FIND-R3-03) — eliminate stale lock snapshots on unlock, repeat unlock, or legacy unlocked controllers while preserving opposite-side state and 09-B-4 failure rollback.
+        for meta_key in FOOT_LOCK_METADATA_KEYS:
+            if meta_key in ik_obj:
+                del ik_obj[meta_key]
 
         # Ensure parentless in world space with identity parent inverse and full TRS restoration
         ik_obj.parent = None
@@ -231,13 +247,21 @@ def unlock_foot_contact(
         if post_pole_diff > 1e-4:
             raise RuntimeError(f"unlock_foot_contact failed post-validation: pole_obj matrix_world drifted by {post_pole_diff:.6f}")
 
+        # [INTRODUCED 2026-11-27T17:20:00+08:00]
+        # BLOCK: unlock_foot_contact explicit Phase B prebend & scene update
+        # PURPOSE: Execute the historical leg IK prebend hint and dependency-graph update explicitly inside the Phase B rollback-protected transaction before the read-only final state query.
+        # REASON: TASK 11-B (FIND-R3-04) — preserve unlock_foot_contact's solved pose contract and 09-B-4 rollback semantics after get_foot_support_state() becomes side-effect-free.
+        _apply_ik_prebend_hint(arm)
+        bpy.context.view_layer.update()
+
         return get_foot_support_state(arm, side)
     except Exception as exc:
         _rollback_leg_rig_state(arm, ctrl_snap, bone_snap, exc)
 
 
 def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
-    """Evaluate current support state, IK reachability, and bone/mesh world drift for a foot.
+    """Actively maintain locked support transforms/knee pole alignment, update scene evaluation,
+    and return the resulting support state for a foot ('L' or 'R').
 
     Never moves or clamps the locked `FootIK.<side>` point when locked.
     """
@@ -246,19 +270,32 @@ def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -
         raise ValueError(f"Invalid leg side '{side}', expected 'L' or 'R'")
 
     arm = _resolve_armature(armature_obj)
-    ik_obj, pole_obj = _ensure_ik_controls(arm, side)
+    # [INTRODUCED 2026-11-27T17:27:30+08:00]
+    # BLOCK: evaluate_foot_support locked admission check before controller initialization
+    # PURPOSE: Read existing FootIK lock flag read-only before _ensure_ik_controls(), validate complete lock/pole state via get_foot_support_state() when locked without entering setup_leg_ik(), and preserve _ensure_ik_controls() only for unlocked/uninitialized paths.
+    # REASON: TASK 11-B BUG-01 — prevent _ensure_ik_controls() -> setup_leg_ik() from wiping is_locked and metadata when KneePole.<side> is missing on an already-locked FootIK controller.
+    existing_ik_obj = bpy.data.objects.get(IK_TARGET_NAMES[side])
+    is_locked = bool(existing_ik_obj.get("is_locked", False)) if existing_ik_obj is not None else False
+    locked_ankle_world: Optional[Vector] = None
+    target_rot_deg: Optional[Tuple[float, float, float]] = None
+    if is_locked:
+        assert existing_ik_obj is not None
+        pre_locked_state = get_foot_support_state(arm, side)
+        locked_ankle_world = pre_locked_state["locked_ankle_world"].copy()
+        rx_deg, ry_deg, rz_deg = pre_locked_state["target_rotation_deg"]
+        target_rot_deg = (float(rx_deg), float(ry_deg), float(rz_deg))
+        ik_obj = existing_ik_obj
+        pole_obj = bpy.data.objects[POLE_TARGET_NAMES[side]]
+    else:
+        ik_obj, pole_obj = _ensure_ik_controls(arm, side)
 
-    is_locked = bool(ik_obj.get("is_locked", False))
     _apply_ik_prebend_hint(arm)
     bpy.context.view_layer.update()
 
-    p_thigh = arm.pose.bones[f"thigh.{side}"]
-    hip_world = arm.matrix_world @ p_thigh.head
-
     if is_locked:
-        locked_ankle_world = Vector(ik_obj.get("locked_ankle_world_xyz", tuple(ik_obj.matrix_world.translation)))
-        contact_world = Vector(ik_obj.get("contact_world_xyz", (locked_ankle_world.x, locked_ankle_world.y, FLAT_GROUND_Z)))
-        target_rot_deg = tuple(ik_obj.get("target_rotation_deg", (0.0, 0.0, 0.0)))
+        assert locked_ankle_world is not None and target_rot_deg is not None
+        p_thigh = arm.pose.bones[f"thigh.{side}"]
+        hip_world = arm.matrix_world @ p_thigh.head
 
         # Ensure FootIK remains strictly at its locked world coordinate (never secretly moved)
         if ik_obj.parent is not None:
@@ -278,9 +315,98 @@ def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -
             0.5 * (hip_world.z + locked_ankle_world.z),
         ))
         bpy.context.view_layer.update()
+
+    return get_foot_support_state(arm, side)
+
+
+# [INTRODUCED 2026-11-27T17:20:00+08:00]
+# FUNCTION: get_foot_support_state
+# PURPOSE: Pure read-only foot support query reading current solved rig/mesh world transforms and computing reachability and drift metrics without initializing objects, mutating poses/controllers/parents/metadata, or refreshing the scene.
+# REASON: TASK 11-B (FIND-R3-04) — separate side-effect-free telemetry queries from active support maintenance in evaluate_foot_support().
+def get_foot_support_state(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
+    """Read current solved support state, reachability, and drift metrics for foot ('L' or 'R')
+    without modifying objects, bones, constraints, custom properties, or refreshing the scene.
+    """
+    side = side.upper()
+    if side not in ("L", "R"):
+        raise ValueError(f"Invalid leg side '{side}', expected 'L' or 'R'")
+
+    arm = _resolve_armature(armature_obj)
+    ik_name = IK_TARGET_NAMES[side]
+    pole_name = POLE_TARGET_NAMES[side]
+    ik_obj = bpy.data.objects.get(ik_name)
+    pole_obj = bpy.data.objects.get(pole_name)
+    missing_controls = [
+        name for name, obj in ((ik_name, ik_obj), (pole_name, pole_obj))
+        if obj is None
+    ]
+    if missing_controls:
+        raise KeyError(
+            f"Missing required leg IK controller(s) for side '{side}': {', '.join(missing_controls)}"
+        )
+
+    assert ik_obj is not None and pole_obj is not None
+    is_locked = bool(ik_obj.get("is_locked", False))
+
+    if is_locked:
+        parsed_lock_meta: Dict[str, object] = {}
+        for meta_key in FOOT_LOCK_METADATA_KEYS:
+            if meta_key not in ik_obj:
+                raise ValueError(
+                    f"Locked foot controller '{ik_name}' is missing required lock metadata '{meta_key}'"
+                )
+            raw_val = ik_obj[meta_key]
+            if meta_key == "locked_foot_min_z":
+                if isinstance(raw_val, bool) or not isinstance(raw_val, (int, float)):
+                    raise ValueError(
+                        f"Locked foot controller '{ik_name}' has invalid lock metadata '{meta_key}': expected finite number, got {type(raw_val).__name__}"
+                    )
+                fval = float(raw_val)
+                if not math.isfinite(fval):
+                    raise ValueError(
+                        f"Locked foot controller '{ik_name}' has non-finite lock metadata '{meta_key}': {fval}"
+                    )
+                parsed_lock_meta[meta_key] = fval
+            else:
+                if hasattr(raw_val, "to_list"):
+                    seq = raw_val.to_list()
+                elif isinstance(raw_val, (list, tuple, Vector, Euler)):
+                    seq = list(raw_val)
+                else:
+                    raise ValueError(
+                        f"Locked foot controller '{ik_name}' has invalid lock metadata '{meta_key}': expected 3-element sequence, got {type(raw_val).__name__}"
+                    )
+                if len(seq) != 3:
+                    raise ValueError(
+                        f"Locked foot controller '{ik_name}' has invalid lock metadata '{meta_key}': expected length 3, got {len(seq)}"
+                    )
+                vals = []
+                for elem in seq:
+                    if isinstance(elem, bool) or not isinstance(elem, (int, float)):
+                        raise ValueError(
+                            f"Locked foot controller '{ik_name}' has non-numeric element in '{meta_key}': {elem!r}"
+                        )
+                    felem = float(elem)
+                    if not math.isfinite(felem):
+                        raise ValueError(
+                            f"Locked foot controller '{ik_name}' has non-finite element in '{meta_key}': {felem}"
+                        )
+                    vals.append(felem)
+                parsed_lock_meta[meta_key] = (vals[0], vals[1], vals[2])
+
+        contact_world = Vector(parsed_lock_meta["contact_world_xyz"])
+        locked_ankle_world = Vector(parsed_lock_meta["locked_ankle_world_xyz"])
+        target_rot_deg = parsed_lock_meta["target_rotation_deg"]  # type: ignore[assignment]
+        ref_head = Vector(parsed_lock_meta["locked_foot_head_xyz"])
+        ref_tail = Vector(parsed_lock_meta["locked_foot_tail_xyz"])
+        ref_center = Vector(parsed_lock_meta["locked_foot_center_xyz"])
     else:
         locked_ankle_world = ik_obj.matrix_world.translation.copy()
-        contact_world = Vector((locked_ankle_world.x, locked_ankle_world.y, max(FLAT_GROUND_Z, locked_ankle_world.z - ANKLE_REST_Z)))
+        contact_world = Vector((
+            locked_ankle_world.x,
+            locked_ankle_world.y,
+            max(FLAT_GROUND_Z, locked_ankle_world.z - ANKLE_REST_Z),
+        ))
         euler = ik_obj.matrix_world.to_euler("XYZ")
         target_rot_deg = (
             round(math.degrees(euler.x), 4),
@@ -288,7 +414,7 @@ def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -
             round(math.degrees(euler.z), 4),
         )
 
-    ik_state = get_leg_ik_state(arm, side)
+    ik_state = get_leg_ik_state(arm, side, update_scene=False)
     hip_world = ik_state["hip_world"]
     current_controller_world = ik_obj.matrix_world.translation.copy()
     current_foot_head_world = ik_state["foot_head_world"]
@@ -302,10 +428,7 @@ def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -
 
     strictly_in_reach, is_reachable, reach_status = _classify_reach(hip_to_target_dist)
 
-    if is_locked and "locked_foot_head_xyz" in ik_obj:
-        ref_head = Vector(ik_obj["locked_foot_head_xyz"])
-        ref_tail = Vector(ik_obj["locked_foot_tail_xyz"])
-        ref_center = Vector(ik_obj["locked_foot_center_xyz"])
+    if is_locked:
         controller_drift = (current_controller_world - locked_ankle_world).length
         ankle_bone_drift = (current_foot_head_world - ref_head).length
         toe_bone_drift = (current_foot_tail_world - ref_tail).length
@@ -350,11 +473,6 @@ def evaluate_foot_support(armature_obj: Optional[bpy.types.Object], side: str) -
         "knee_flexion_deg": ik_state["knee_flexion_deg"],
         "knee_forward_y": ik_state["knee_forward_y"],
     }
-
-
-def get_foot_support_state(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
-    """Query the current support state and drift metrics for the given foot ('L' or 'R')."""
-    return evaluate_foot_support(armature_obj, side)
 
 
 def move_character_root_with_support(

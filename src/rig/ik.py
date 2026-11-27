@@ -14,6 +14,7 @@ Builds on the existing 19-bone CharacterArmature and 13 rigidly-bound body parts
   with automatic reach clamping (`[MIN_LEG_REACH, MAX_LEG_REACH]`) and ground penetration clamping.
 """
 
+import copy
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -32,6 +33,19 @@ IK_TARGET_NAMES: Dict[str, str] = {"L": "FootIK.L", "R": "FootIK.R"}
 POLE_TARGET_NAMES: Dict[str, str] = {"L": "KneePole.L", "R": "KneePole.R"}
 IK_CONSTRAINT_NAMES: Dict[str, str] = {"L": "LegIK.L", "R": "LegIK.R"}
 FOOT_ROT_CONSTRAINT_NAMES: Dict[str, str] = {"L": "FootRotation.L", "R": "FootRotation.R"}
+# [INTRODUCED 2026-11-27T17:09:00+08:00]
+# CONSTANT: FOOT_LOCK_METADATA_KEYS
+# PURPOSE: Immutable tuple defining the seven FootIK runtime lock snapshot custom property keys (excluding is_locked) shared between ik.py and foot_contact.py.
+# REASON: TASK 11-A (FIND-R3-03) — unify snapshot, rollback, setup, reset, unlock, and relock metadata schema without duplicating key lists or adding state.
+FOOT_LOCK_METADATA_KEYS: Tuple[str, ...] = (
+    "contact_world_xyz",
+    "locked_ankle_world_xyz",
+    "target_rotation_deg",
+    "locked_foot_head_xyz",
+    "locked_foot_tail_xyz",
+    "locked_foot_center_xyz",
+    "locked_foot_min_z",
+)
 
 # Exact segment geometry from Task 4A/4B (meters)
 HIP_X_OFFSET: float = 0.11
@@ -165,6 +179,13 @@ def setup_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> Dict[str, b
         ik_obj.location = root_mat @ ik_local
         ik_obj.rotation_euler = root_rot
         ik_obj["is_locked"] = False
+        # [INTRODUCED 2026-11-27T17:09:00+08:00]
+        # BLOCK: setup_leg_ik lock metadata cleanup
+        # PURPOSE: Delete any pre-existing FootLock snapshot metadata keys on FootIK.<side> when setup_leg_ik resets lock state to False.
+        # REASON: TASK 11-A (FIND-R3-03) — prevent stale lock snapshot properties from surviving controller re-initialization.
+        for meta_key in FOOT_LOCK_METADATA_KEYS:
+            if meta_key in ik_obj:
+                del ik_obj[meta_key]
 
         pole_obj.location = root_mat @ pole_local
         pole_obj.rotation_euler = root_rot
@@ -248,6 +269,13 @@ def reset_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
         pole_obj = bpy.data.objects.get(POLE_TARGET_NAMES[side])
         if ik_obj is not None:
             ik_obj["is_locked"] = False
+            # [INTRODUCED 2026-11-27T17:09:00+08:00]
+            # BLOCK: reset_leg_ik lock metadata cleanup
+            # PURPOSE: Delete the seven FootLock snapshot metadata keys on FootIK.<side> when resetting leg IK to neutral unlocked state.
+            # REASON: TASK 11-A (FIND-R3-03) — close stale lock snapshot retention after leg IK reset while preserving reset signature and behavior.
+            for meta_key in FOOT_LOCK_METADATA_KEYS:
+                if meta_key in ik_obj:
+                    del ik_obj[meta_key]
             if ik_obj.parent is not None:
                 ik_obj.parent = None
                 ik_obj.matrix_parent_inverse = Matrix.Identity(4)
@@ -266,14 +294,24 @@ def reset_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
     bpy.context.view_layer.update()
 
 
-def get_leg_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
+# [INTRODUCED 2026-11-27T17:20:00+08:00]
+# FUNCTION: get_leg_ik_state
+# PURPOSE: Add keyword-only update_scene: bool = True gate so callers performing pure read-only queries can read already-evaluated scene state without forcing view_layer.update().
+# REASON: TASK 11-B (FIND-R3-04) — eliminate hidden scene dependency-graph refresh side effects during pure foot support queries while preserving historical default behavior.
+def get_leg_ik_state(
+    armature_obj: Optional[bpy.types.Object],
+    side: str,
+    *,
+    update_scene: bool = True,
+) -> dict:
     """Inspect current world-space IK positions, target error, knee bend, and foot grounding."""
     side = side.upper()
     if side not in ("L", "R"):
         raise ValueError(f"Invalid leg side '{side}', expected 'L' or 'R'")
 
     arm = _resolve_armature(armature_obj)
-    bpy.context.view_layer.update()
+    if update_scene:
+        bpy.context.view_layer.update()
 
     p_thigh = arm.pose.bones[f"thigh.{side}"]
     p_shin = arm.pose.bones[f"shin.{side}"]
@@ -363,6 +401,28 @@ def _snapshot_leg_rig_state(arm: bpy.types.Object) -> Tuple[Dict[str, dict], Dic
                 "is_locked": obj.get("is_locked"),
                 "matrix_world": obj.matrix_world.copy(),
             }
+            # [INTRODUCED 2026-11-27T17:09:00+08:00]
+            # BLOCK: _snapshot_leg_rig_state FootIK 7-key metadata capture
+            # PURPOSE: Capture per-key existence flags and detached Python values for FOOT_LOCK_METADATA_KEYS on FootIK.L/R without holding Blender IDPropertyArray aliases or unrelated custom properties.
+            # REASON: TASK 11-A (FIND-R3-03) — preserve 09-B-4 unlock failure rollback contract when unlock_foot_contact deletes lock metadata inside Phase B.
+            if name in (IK_TARGET_NAMES["L"], IK_TARGET_NAMES["R"]):
+                meta_presence: Dict[str, bool] = {}
+                meta_values: Dict[str, Any] = {}
+                for meta_key in FOOT_LOCK_METADATA_KEYS:
+                    present = meta_key in obj
+                    meta_presence[meta_key] = present
+                    if present:
+                        raw_val = obj[meta_key]
+                        if hasattr(raw_val, "to_list"):
+                            meta_values[meta_key] = tuple(raw_val.to_list())
+                        elif isinstance(raw_val, (list, tuple)):
+                            meta_values[meta_key] = tuple(raw_val)
+                        elif isinstance(raw_val, (bool, int, float, str, type(None))):
+                            meta_values[meta_key] = raw_val
+                        else:
+                            meta_values[meta_key] = copy.deepcopy(raw_val)
+                ctrl_snap[name]["lock_metadata_presence"] = meta_presence
+                ctrl_snap[name]["lock_metadata_values"] = meta_values
 
     bone_snap: Dict[str, dict] = {}
     for name in _LEG_BONES_6:
@@ -422,6 +482,26 @@ def _rollback_leg_rig_state(
                     obj["is_locked"] = snap["is_locked"]
                 elif "is_locked" in obj:
                     del obj["is_locked"]
+                # [INTRODUCED 2026-11-27T17:09:00+08:00]
+                # BLOCK: _rollback_leg_rig_state FootIK 7-key metadata restore
+                # PURPOSE: Restore exact pre-transaction existence and values of FOOT_LOCK_METADATA_KEYS on FootIK.L/R without fabricating defaults for originally missing keys or altering unrelated custom properties.
+                # REASON: TASK 11-A (FIND-R3-03) — guarantee atomic rollback after Phase B metadata deletion failures.
+                if "lock_metadata_presence" in snap:
+                    meta_presence = snap["lock_metadata_presence"]
+                    meta_values = snap["lock_metadata_values"]
+                    for meta_key in FOOT_LOCK_METADATA_KEYS:
+                        if meta_presence[meta_key]:
+                            saved_val = meta_values[meta_key]
+                            if isinstance(saved_val, tuple):
+                                obj[meta_key] = saved_val
+                            elif isinstance(saved_val, list):
+                                obj[meta_key] = tuple(saved_val)
+                            elif isinstance(saved_val, (bool, int, float, str, type(None))):
+                                obj[meta_key] = saved_val
+                            else:
+                                obj[meta_key] = copy.deepcopy(saved_val)
+                        elif meta_key in obj:
+                            del obj[meta_key]
 
         bpy.context.view_layer.update()
 
@@ -470,6 +550,36 @@ def _rollback_leg_rig_state(
 
             if obj.get("is_locked") != snap["is_locked"]:
                 raise RuntimeError(f"Controller '{name}' rollback verification failed: is_locked value modified")
+
+            # [INTRODUCED 2026-11-27T17:09:00+08:00]
+            # BLOCK: _rollback_leg_rig_state FootIK 7-key metadata verification
+            # PURPOSE: Verify both exact existence and detached value equality for all 7 FOOT_LOCK_METADATA_KEYS on FootIK.L/R after rollback.
+            # REASON: TASK 11-A (FIND-R3-03) — prove atomic presence and value restoration across full and partial pre-failure metadata states.
+            if "lock_metadata_presence" in snap:
+                meta_presence = snap["lock_metadata_presence"]
+                meta_values = snap["lock_metadata_values"]
+                for meta_key in FOOT_LOCK_METADATA_KEYS:
+                    expected_present = meta_presence[meta_key]
+                    actual_present = meta_key in obj
+                    if actual_present != expected_present:
+                        raise RuntimeError(
+                            f"Controller '{name}' rollback verification failed: lock metadata '{meta_key}' "
+                            f"presence={actual_present}, expected={expected_present}"
+                        )
+                    if expected_present:
+                        raw_now = obj[meta_key]
+                        if hasattr(raw_now, "to_list"):
+                            now_val = tuple(raw_now.to_list())
+                        elif isinstance(raw_now, (list, tuple)):
+                            now_val = tuple(raw_now)
+                        else:
+                            now_val = raw_now
+                        exp_val = meta_values[meta_key]
+                        if (isinstance(now_val, bool) != isinstance(exp_val, bool)) or (now_val != exp_val):
+                            raise RuntimeError(
+                                f"Controller '{name}' rollback verification failed: lock metadata '{meta_key}' "
+                                f"value mismatch ({now_val!r} != {exp_val!r})"
+                            )
 
             dloc_diff = (obj.delta_location - snap["delta_location"]).length
             if dloc_diff > 1e-6:
