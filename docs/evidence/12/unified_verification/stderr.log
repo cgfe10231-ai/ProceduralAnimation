@@ -1,0 +1,10 @@
+
+=== [verify_wbc_contract.py] (rc=1) ===
+[FAIL] A19: AssertionError: 
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_wbc_contract.py", line 659, in main
+    detail = fn()
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_wbc_contract.py", line 583, in test_a19
+    assert wbc.execute_frame(t2).success
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

@@ -1,0 +1,114 @@
+=== RUNNING verify_wbc_contract.py ===
+rc=1
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] A20: AssertionError: 
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_wbc_contract.py", line 659, in main
+    detail = fn()
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_wbc_contract.py", line 617, in test_a20
+    assert res.success is True
+           ^^^^^^^^^^^^^^^^^^^
+AssertionError
+
+=== RUNNING verify_bridge_commit_contract.py ===
+rc=1
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] B04: TypeError: SurfaceQueryResult.__init__() got an unexpected keyword argument 'is_valid'
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_bridge_commit_contract.py", line 731, in main
+    detail = fn()
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_bridge_commit_contract.py", line 255, in test_b04
+    r_fail = bridge.execute_frame(_make_pose(2, 1.0 / 24.0, -7.98), keyframe=True)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\kinematic_bridge.py", line 505, in execute_frame
+    query_res = self.environment.query_ground_support_at(query_x, query_y)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_bridge_commit_contract.py", line 238, in query_ground_support_at
+    return SurfaceQueryResult(
+        surface_id="none",
+    ...<6 lines>...
+        error_reason="Void surface (B04)",
+    )
+TypeError: SurfaceQueryResult.__init__() got an unexpected keyword argument 'is_valid'
+
+=== RUNNING verify_telemetry_ownership.py ===
+rc=1
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] C15: TypeError: TerrainRouteInput.__init__() got an unexpected keyword argument 'step_length_m'. Did you mean 'step_width_m'?
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_telemetry_ownership.py", line 550, in main
+    detail = fn()
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_telemetry_ownership.py", line 467, in test_c15
+    planner.add_action(fn())
+                       ~~^^
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_telemetry_ownership.py", line 450, in <lambda>
+    route=TerrainRouteInput(start_pos=(0.0, -8.0, 0.0), target_pos=(0.0, -7.2, 0.0), step_length_m=0.35),
+          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: TerrainRouteInput.__init__() got an unexpected keyword argument 'step_length_m'. Did you mean 'step_width_m'?
+
+=== RUNNING verify_continuous_motion.py ===
+rc=1
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] Continuous Production Chain: TerrainWalk_route_traversal requires an authoritative environment instance (either bound to action, provided by caller, or injected by planner); silent fallback to synthetic flat ground is prohibited.
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_continuous_motion.py", line 86, in main
+    tw_dur = tw_action.estimate_duration_frames(start_state, cfg)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\terrain_walk.py", line 937, in estimate_duration_frames
+    env = self.resolve_environment(
+        runtime_env=environment,
+        allow_override=(environment is not None),
+    )
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\terrain_walk.py", line 924, in resolve_environment
+    raise ValueError(
+    ...<3 lines>...
+    )
+ValueError: TerrainWalk_route_traversal requires an authoritative environment instance (either bound to action, provided by caller, or injected by planner); silent fallback to synthetic flat ground is prohibited.
+
+=== RUNNING verify_reopen.py ===
+rc=1
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] verify_reopen: TerrainWalk_route_traversal requires an authoritative environment instance (either bound to action, provided by caller, or injected by planner); silent fallback to synthetic flat ground is prohibited.
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_reopen.py", line 372, in _run_orchestrator
+    spec = builder(blend_path)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_reopen.py", line 315, in _build_scene_2
+    dur = tw.estimate_duration_frames(init_st, cfg)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\terrain_walk.py", line 937, in estimate_duration_frames
+    env = self.resolve_environment(
+        runtime_env=environment,
+        allow_override=(environment is not None),
+    )
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\terrain_walk.py", line 924, in resolve_environment
+    raise ValueError(
+    ...<3 lines>...
+    )
+ValueError: TerrainWalk_route_traversal requires an authoritative environment instance (either bound to action, provided by caller, or injected by planner); silent fallback to synthetic flat ground is prohibited.
+

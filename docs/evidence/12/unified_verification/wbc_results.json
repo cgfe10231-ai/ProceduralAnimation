@@ -1,0 +1,191 @@
+{
+  "group": "Group A \u2014 WBC Single-Frame Contract (A01-A20)",
+  "timestamp_utc": "2026-11-27T14:01:57.064749+00:00",
+  "passed": true,
+  "total": 20,
+  "passed_count": 20,
+  "results": {
+    "A01": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "root_mutated": true,
+          "pelvis_mutated": true,
+          "euler_calls": 2
+        }
+      }
+    },
+    "A02": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "spine_mutated": true,
+          "fk_mutated": true
+        }
+      }
+    },
+    "A03": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "foot_L_locked": true
+        }
+      }
+    },
+    "A04": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "foot_L_now_locked": true,
+          "foot_R_now_unlocked": true
+        }
+      }
+    },
+    "A05": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "hand_L_written": true
+        }
+      }
+    },
+    "A06": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "pose_written": true
+        }
+      }
+    },
+    "A07": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "clamped_applied": true
+        }
+      }
+    },
+    "A08": {
+      "status": "PASSED",
+      "detail": {
+        "observed_prior_writes": {
+          "pose_and_clamp_done": true
+        }
+      }
+    },
+    "A09": {
+      "status": "PASSED",
+      "detail": {
+        "post_clamp_diffs_m": {
+          "hand_L": 0.0,
+          "foot_L": 0.0,
+          "hand_R": 0.0,
+          "foot_R": 0.0
+        }
+      }
+    },
+    "A10": {
+      "status": "PASSED",
+      "detail": {
+        "hand_L": {
+          "euler_diff_deg": 0.0,
+          "err_deg": 0.0
+        },
+        "hand_R": {
+          "euler_diff_deg": 0.0,
+          "err_deg": 0.0
+        }
+      }
+    },
+    "A11": {
+      "status": "PASSED",
+      "detail": {
+        "max_effector_error_m": 0.209258,
+        "com_z": 0.971368
+      }
+    },
+    "A12": {
+      "status": "PASSED",
+      "detail": {
+        "unmet_categories": [
+          "ROM_VIOLATION",
+          "ROM_VIOLATION",
+          "ROM_VIOLATION",
+          "ROM_VIOLATION",
+          "ROM_VIOLATION",
+          "REACHABILITY",
+          "REACHABILITY",
+          "ROM_CONFLICT",
+          "ROM_CONFLICT"
+        ]
+      }
+    },
+    "A13": {
+      "status": "PASSED",
+      "detail": {
+        "requested_error_m": 0.883425,
+        "rom_conflict_error_m": 0.883425
+      }
+    },
+    "A14": {
+      "status": "PASSED",
+      "detail": {
+        "foot_L_feedback_enabled": false,
+        "success": true
+      }
+    },
+    "A15": {
+      "status": "PASSED",
+      "detail": {
+        "cases_verified": 3
+      }
+    },
+    "A16": {
+      "status": "PASSED",
+      "detail": {
+        "positive_weight_reachability_rejected": true
+      }
+    },
+    "A17": {
+      "status": "PASSED",
+      "detail": {
+        "calls": {
+          "lock": 1,
+          "eval": 1
+        },
+        "updated_rot_L": [
+          10.0,
+          0.0,
+          15.0
+        ]
+      }
+    },
+    "A18": {
+      "status": "PASSED",
+      "detail": {
+        "calls": {
+          "lock": 0,
+          "eval": 4
+        }
+      }
+    },
+    "A19": {
+      "status": "PASSED",
+      "detail": {
+        "right_foot_metadata_keys_preserved": 8
+      }
+    },
+    "A20": {
+      "status": "PASSED",
+      "detail": {
+        "bilateral_10c_wbc_smoke": "PASS",
+        "hand_L_err_m": 1.1e-05,
+        "hand_R_err_m": 1.1e-05,
+        "cross_referenced_suites": [
+          "tests/test_task10b_wbc_failure_contract.py",
+          "docs/evidence/11/unified_verification/verify_footlock_contract.py"
+        ]
+      }
+    }
+  }
+}

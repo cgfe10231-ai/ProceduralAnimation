@@ -1,0 +1,91 @@
+=== RUNNING verify_wbc_contract.py ===
+rc=0
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[PASS] A20: {'bilateral_10c_wbc_smoke': 'PASS', 'hand_L_err_m': 1.1e-05, 'hand_R_err_m': 1.1e-05, 'cross_referenced_suites': ['tests/test_task10b_wbc_failure_contract.py', 'docs/evidence/11/unified_verification/verify_footlock_contract.py']}
+=== RUNNING verify_bridge_commit_contract.py ===
+rc=1
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] B17: ValueError: Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_bridge_commit_contract.py", line 749, in main
+    detail = fn()
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_bridge_commit_contract.py", line 589, in test_b17
+    planner = MotionPlanner(cfg, armature_obj=arm, upper_limb_L=seg_l, upper_limb_R=seg_r)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\framework.py", line 1486, in __init__
+    raise ValueError(
+        "Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps"
+    )
+ValueError: Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps
+
+=== RUNNING verify_telemetry_ownership.py ===
+rc=1
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] C16: AssertionError: 
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_telemetry_ownership.py", line 550, in main
+    detail = fn()
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_telemetry_ownership.py", line 483, in test_c16
+    assert r2.success is False
+           ^^^^^^^^^^^^^^^^^^^
+AssertionError
+
+=== RUNNING verify_continuous_motion.py ===
+rc=1
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] Continuous Production Chain: Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_continuous_motion.py", line 174, in main
+    planner = MotionPlanner(cfg, armature_obj=arm, environment=env, upper_limb_L=upper_l, upper_limb_R=upper_r)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\framework.py", line 1486, in __init__
+    raise ValueError(
+        "Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps"
+    )
+ValueError: Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps
+
+=== RUNNING verify_reopen.py ===
+rc=1
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+STDERR:
+[FAIL] verify_reopen: Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_reopen.py", line 375, in _run_orchestrator
+    spec = builder(blend_path)
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\12\unified_verification\verify_reopen.py", line 319, in _build_scene_2
+    planner = MotionPlanner(
+        cfg,
+    ...<20 lines>...
+        ],
+    )
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\motion\framework.py", line 1486, in __init__
+    raise ValueError(
+        "Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps"
+    )
+ValueError: Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps
+
