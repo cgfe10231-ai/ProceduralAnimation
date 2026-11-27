@@ -1,0 +1,866 @@
+{
+  "task": "10-d-5",
+  "git_head": "870e57e8cc398f40a28e93e8a99a1e86e6146449",
+  "action_boundaries": [
+    {
+      "boundary": "StageA->StageB",
+      "prev_frame": 240,
+      "next_frame": 241,
+      "prev_mode": "idle",
+      "next_mode": "idle",
+      "root_pos_delta_m": 0.0,
+      "com_delta_m": 0.03434793643917647,
+      "pelvis_location_delta_m": 0.035,
+      "planned_vel_prev_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "planned_vel_next_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "com_vel_prev_mps": [
+        0.00010693073272704775,
+        -0.0001373291015624961,
+        5.722045898437337e-06
+      ],
+      "com_vel_next_mps": [
+        6.705522537231445e-08,
+        -0.39260101318359375,
+        0.7248573303222656
+      ],
+      "foot_L_head_delta_m": 2.0585704756480954e-05,
+      "foot_R_head_delta_m": 2.0585704756480954e-05,
+      "wrist_root_local_delta_L_m": 0.034999966621398926,
+      "wrist_root_local_delta_R_m": 0.034999966621398926,
+      "max_upper_limb_rel_rot_deg": 0.0,
+      "max_full_body_rel_rot_deg": 16.65737448279701,
+      "max_full_body_rel_rot_bone": "shin.L",
+      "max_full_body_world_rot_deg": 8.537941154594584,
+      "max_full_body_world_rot_bone": "shin.L",
+      "influence_deltas": {
+        "ArmIK.L": 0.0,
+        "ArmIK.R": 0.0,
+        "HandRotation.L": 0.0,
+        "HandRotation.R": 0.0
+      },
+      "per_bone_deg": {
+        "pelvis": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "spine": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "shoulder.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "hand.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "shoulder.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "hand.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "thigh.L": {
+          "rel_deg": 8.1194320012813,
+          "world_deg": 8.119434564580986
+        },
+        "shin.L": {
+          "rel_deg": 16.65737448279701,
+          "world_deg": 8.537941154594584
+        },
+        "foot.L": {
+          "rel_deg": 8.537940128294542,
+          "world_deg": 4.240859230206663e-07
+        },
+        "thigh.R": {
+          "rel_deg": 8.1194320012813,
+          "world_deg": 8.119434564580986
+        },
+        "shin.R": {
+          "rel_deg": 16.65737448279701,
+          "world_deg": 8.537941154594584
+        },
+        "foot.R": {
+          "rel_deg": 8.537940128294542,
+          "world_deg": 4.240859230206663e-07
+        }
+      }
+    },
+    {
+      "boundary": "StageB->StageC",
+      "prev_frame": 444,
+      "next_frame": 445,
+      "prev_mode": "idle",
+      "next_mode": "idle",
+      "root_pos_delta_m": 0.0,
+      "com_delta_m": 0.03434839064154884,
+      "pelvis_location_delta_m": 0.035,
+      "planned_vel_prev_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "planned_vel_next_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "com_vel_prev_mps": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "com_vel_next_mps": [
+        -6.705522537231255e-08,
+        0.39262390136717634,
+        -0.724857330322245
+      ],
+      "foot_L_head_delta_m": 2.0585704756480954e-05,
+      "foot_R_head_delta_m": 2.0585704756480954e-05,
+      "wrist_root_local_delta_L_m": 0.034999966621398926,
+      "wrist_root_local_delta_R_m": 0.034999966621398926,
+      "max_upper_limb_rel_rot_deg": 0.0,
+      "max_full_body_rel_rot_deg": 16.65737448279701,
+      "max_full_body_rel_rot_bone": "shin.L",
+      "max_full_body_world_rot_deg": 8.537941154594584,
+      "max_full_body_world_rot_bone": "shin.L",
+      "influence_deltas": {
+        "ArmIK.L": 0.0,
+        "ArmIK.R": 0.0,
+        "HandRotation.L": 0.0,
+        "HandRotation.R": 0.0
+      },
+      "per_bone_deg": {
+        "pelvis": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "spine": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "shoulder.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "hand.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "shoulder.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "hand.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "thigh.L": {
+          "rel_deg": 8.1194320012813,
+          "world_deg": 8.119434564580986
+        },
+        "shin.L": {
+          "rel_deg": 16.65737448279701,
+          "world_deg": 8.537941154594584
+        },
+        "foot.L": {
+          "rel_deg": 8.537940128294542,
+          "world_deg": 4.240859230206663e-07
+        },
+        "thigh.R": {
+          "rel_deg": 8.1194320012813,
+          "world_deg": 8.119434564580986
+        },
+        "shin.R": {
+          "rel_deg": 16.65737448279701,
+          "world_deg": 8.537941154594584
+        },
+        "foot.R": {
+          "rel_deg": 8.537940128294542,
+          "world_deg": 4.240859230206663e-07
+        }
+      }
+    },
+    {
+      "boundary": "StageC->StageD",
+      "prev_frame": 870,
+      "next_frame": 871,
+      "prev_mode": "idle",
+      "next_mode": "idle",
+      "root_pos_delta_m": 0.0,
+      "com_delta_m": 0.03434781416799745,
+      "pelvis_location_delta_m": 0.035,
+      "planned_vel_prev_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "planned_vel_next_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "com_vel_prev_mps": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "com_vel_next_mps": [
+        6.705522537231445e-08,
+        -0.3925895690917969,
+        0.7248601913452148
+      ],
+      "foot_L_head_delta_m": 2.0585704756480954e-05,
+      "foot_R_head_delta_m": 2.0585704756480954e-05,
+      "wrist_root_local_delta_L_m": 0.034999966621398926,
+      "wrist_root_local_delta_R_m": 0.034999966621398926,
+      "max_upper_limb_rel_rot_deg": 0.0,
+      "max_full_body_rel_rot_deg": 16.65737448279701,
+      "max_full_body_rel_rot_bone": "shin.L",
+      "max_full_body_world_rot_deg": 8.537941154594584,
+      "max_full_body_world_rot_bone": "shin.L",
+      "influence_deltas": {
+        "ArmIK.L": 0.0,
+        "ArmIK.R": 0.0,
+        "HandRotation.L": 0.0,
+        "HandRotation.R": 0.0
+      },
+      "per_bone_deg": {
+        "pelvis": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "spine": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "shoulder.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "hand.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "shoulder.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "hand.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "thigh.L": {
+          "rel_deg": 8.1194320012813,
+          "world_deg": 8.119434564580986
+        },
+        "shin.L": {
+          "rel_deg": 16.65737448279701,
+          "world_deg": 8.537941154594584
+        },
+        "foot.L": {
+          "rel_deg": 8.537940128294542,
+          "world_deg": 4.240859230206663e-07
+        },
+        "thigh.R": {
+          "rel_deg": 8.1194320012813,
+          "world_deg": 8.119434564580986
+        },
+        "shin.R": {
+          "rel_deg": 16.65737448279701,
+          "world_deg": 8.537941154594584
+        },
+        "foot.R": {
+          "rel_deg": 8.537940128294542,
+          "world_deg": 4.240859230206663e-07
+        }
+      }
+    },
+    {
+      "boundary": "StageD->StageE",
+      "prev_frame": 984,
+      "next_frame": 985,
+      "prev_mode": "sprint",
+      "next_mode": "decelerate",
+      "root_pos_delta_m": 0.08328044414520264,
+      "com_delta_m": 0.08926671654651255,
+      "pelvis_location_delta_m": 0.005357570182168748,
+      "planned_vel_prev_mps": [
+        -0.0,
+        2.0,
+        0.0
+      ],
+      "planned_vel_next_mps": [
+        -0.0,
+        1.9961946980917455,
+        0.0
+      ],
+      "com_vel_prev_mps": [
+        0.20330061111599207,
+        1.9822053909301758,
+        -0.31108760833740234
+      ],
+      "com_vel_next_mps": [
+        -0.20757202059030533,
+        2.118710517883301,
+        -0.24054622650146484
+      ],
+      "foot_L_head_delta_m": 0.3980904494114066,
+      "foot_R_head_delta_m": 3.0820648451718324e-06,
+      "wrist_root_local_delta_L_m": 0.3026217310953924,
+      "wrist_root_local_delta_R_m": 0.3142149428613648,
+      "max_upper_limb_rel_rot_deg": 18.167279423900172,
+      "max_full_body_rel_rot_deg": 25.817436422634,
+      "max_full_body_rel_rot_bone": "shin.L",
+      "max_full_body_world_rot_deg": 24.6864565959405,
+      "max_full_body_world_rot_bone": "shin.L",
+      "influence_deltas": {
+        "ArmIK.L": 0.0,
+        "ArmIK.R": 0.0,
+        "HandRotation.L": 0.0,
+        "HandRotation.R": 0.0
+      },
+      "per_bone_deg": {
+        "pelvis": {
+          "rel_deg": 1.7637936535817549,
+          "world_deg": 1.7637957237155641
+        },
+        "spine": {
+          "rel_deg": 2.046691685315437,
+          "world_deg": 0.5099977047046842
+        },
+        "shoulder.L": {
+          "rel_deg": 4.2731652879163874e-07,
+          "world_deg": 0.510001857772533
+        },
+        "upper_arm.L": {
+          "rel_deg": 18.16727774018909,
+          "world_deg": 18.146981172875158
+        },
+        "forearm.L": {
+          "rel_deg": 2.3260106550418856e-07,
+          "world_deg": 18.14697963520003
+        },
+        "hand.L": {
+          "rel_deg": 1.2773975243028934e-06,
+          "world_deg": 18.14697963520003
+        },
+        "shoulder.R": {
+          "rel_deg": 4.2731652879163874e-07,
+          "world_deg": 0.5099977293113772
+        },
+        "upper_arm.R": {
+          "rel_deg": 18.167279423900172,
+          "world_deg": 18.11996301882658
+        },
+        "forearm.R": {
+          "rel_deg": 4.209514897873988,
+          "world_deg": 22.32807799253741
+        },
+        "hand.R": {
+          "rel_deg": 1.2866606977771952e-06,
+          "world_deg": 22.32807799253741
+        },
+        "thigh.L": {
+          "rel_deg": 1.3652537659508712,
+          "world_deg": 1.1879377417574901
+        },
+        "shin.L": {
+          "rel_deg": 25.817436422634,
+          "world_deg": 24.6864565959405
+        },
+        "foot.L": {
+          "rel_deg": 11.300867526326508,
+          "world_deg": 13.388717182576924
+        },
+        "thigh.R": {
+          "rel_deg": 3.0570111852431876,
+          "world_deg": 3.5930635014928707
+        },
+        "shin.R": {
+          "rel_deg": 0.2997682263213816,
+          "world_deg": 3.294003997134692
+        },
+        "foot.R": {
+          "rel_deg": 3.2940033026255473,
+          "world_deg": 4.240859230206825e-07
+        }
+      }
+    },
+    {
+      "boundary": "StageE->StageF",
+      "prev_frame": 1032,
+      "next_frame": 1033,
+      "prev_mode": "stop",
+      "next_mode": "idle",
+      "root_pos_delta_m": 0.0,
+      "com_delta_m": 0.022661123830655626,
+      "pelvis_location_delta_m": 0.02477604425548932,
+      "planned_vel_prev_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "planned_vel_next_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "com_vel_prev_mps": [
+        0.0,
+        -0.0075359344482421875,
+        0.013758659362792969
+      ],
+      "com_vel_next_mps": [
+        -4.470348358154551e-08,
+        0.18027877807618212,
+        -0.5131187438965136
+      ],
+      "foot_L_head_delta_m": 2.6656007498500226e-06,
+      "foot_R_head_delta_m": 2.6656007498500226e-06,
+      "wrist_root_local_delta_L_m": 0.024823747631392952,
+      "wrist_root_local_delta_R_m": 0.024823747631392952,
+      "max_upper_limb_rel_rot_deg": 0.0294399520531066,
+      "max_full_body_rel_rot_deg": 7.748197541997003,
+      "max_full_body_rel_rot_bone": "shin.L",
+      "max_full_body_world_rot_deg": 3.973760682162235,
+      "max_full_body_world_rot_bone": "shin.L",
+      "influence_deltas": {
+        "ArmIK.L": 0.0,
+        "ArmIK.R": 0.0,
+        "HandRotation.L": 0.0,
+        "HandRotation.R": 0.0
+      },
+      "per_bone_deg": {
+        "pelvis": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "spine": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "shoulder.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.L": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.L": {
+          "rel_deg": 0.0294399520531066,
+          "world_deg": 0.02944208171798356
+        },
+        "hand.L": {
+          "rel_deg": 1.0904016979872199e-07,
+          "world_deg": 0.02944208171798356
+        },
+        "shoulder.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "upper_arm.R": {
+          "rel_deg": 0.0,
+          "world_deg": 0.0
+        },
+        "forearm.R": {
+          "rel_deg": 0.0294399520531066,
+          "world_deg": 0.02944208171798356
+        },
+        "hand.R": {
+          "rel_deg": 1.0904016979872199e-07,
+          "world_deg": 0.02944208171798356
+        },
+        "thigh.L": {
+          "rel_deg": 3.774436981265532,
+          "world_deg": 3.7744387881706016
+        },
+        "shin.L": {
+          "rel_deg": 7.748197541997003,
+          "world_deg": 3.973760682162235
+        },
+        "foot.L": {
+          "rel_deg": 3.973760133816777,
+          "world_deg": 0.0
+        },
+        "thigh.R": {
+          "rel_deg": 3.774436981265532,
+          "world_deg": 3.7744387881706016
+        },
+        "shin.R": {
+          "rel_deg": 7.748197541997003,
+          "world_deg": 3.973760682162235
+        },
+        "foot.R": {
+          "rel_deg": 3.973760133816777,
+          "world_deg": 0.0
+        }
+      }
+    },
+    {
+      "boundary": "StageF->StageG",
+      "prev_frame": 1224,
+      "next_frame": 1225,
+      "prev_mode": "idle",
+      "next_mode": "run",
+      "root_pos_delta_m": 0.0,
+      "com_delta_m": 0.05650759987951994,
+      "pelvis_location_delta_m": 0.010999999999999996,
+      "planned_vel_prev_mps": [
+        -0.0,
+        0.0,
+        0.0
+      ],
+      "planned_vel_next_mps": [
+        -0.0,
+        0.9,
+        0.0
+      ],
+      "com_vel_prev_mps": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "com_vel_next_mps": [
+        -1.6763806343078613e-08,
+        1.3527603149414062,
+        -0.0962820053100586
+      ],
+      "foot_L_head_delta_m": 0.1125013833479052,
+      "foot_R_head_delta_m": 0.1920512154091028,
+      "wrist_root_local_delta_L_m": 0.06753811841580416,
+      "wrist_root_local_delta_R_m": 0.06753811841580416,
+      "max_upper_limb_rel_rot_deg": 4.71805134395545e-06,
+      "max_full_body_rel_rot_deg": 26.5652518055518,
+      "max_full_body_rel_rot_bone": "shin.R",
+      "max_full_body_world_rot_deg": 16.80067715382843,
+      "max_full_body_world_rot_bone": "shin.R",
+      "influence_deltas": {
+        "ArmIK.L": 0.0,
+        "ArmIK.R": 0.0,
+        "HandRotation.L": 0.0,
+        "HandRotation.R": 0.0
+      },
+      "per_bone_deg": {
+        "pelvis": {
+          "rel_deg": 1.8499997544292595,
+          "world_deg": 1.8499992440784379
+        },
+        "spine": {
+          "rel_deg": 4.500000033733326,
+          "world_deg": 6.349997884821719
+        },
+        "shoulder.L": {
+          "rel_deg": 2.8421436633557987e-08,
+          "world_deg": 6.350000232614488
+        },
+        "upper_arm.L": {
+          "rel_deg": 2.9288580374203804e-08,
+          "world_deg": 6.3499970908994525
+        },
+        "forearm.L": {
+          "rel_deg": 4.71805134395545e-06,
+          "world_deg": 6.3499999830619975
+        },
+        "hand.L": {
+          "rel_deg": 9.042879140937135e-07,
+          "world_deg": 6.3499999830619975
+        },
+        "shoulder.R": {
+          "rel_deg": 2.8421436633557987e-08,
+          "world_deg": 6.350000232614488
+        },
+        "upper_arm.R": {
+          "rel_deg": 2.9288580374203804e-08,
+          "world_deg": 6.3499970908994525
+        },
+        "forearm.R": {
+          "rel_deg": 4.71805134395545e-06,
+          "world_deg": 6.3499999830619975
+        },
+        "hand.R": {
+          "rel_deg": 9.042879140937135e-07,
+          "world_deg": 6.3499999830619975
+        },
+        "thigh.L": {
+          "rel_deg": 6.317180867348625,
+          "world_deg": 4.4671729736838985
+        },
+        "shin.L": {
+          "rel_deg": 0.6825961155875373,
+          "world_deg": 3.7845847841887434
+        },
+        "foot.L": {
+          "rel_deg": 3.7845820255562286,
+          "world_deg": 4.240859230206633e-07
+        },
+        "thigh.R": {
+          "rel_deg": 11.614571722332313,
+          "world_deg": 9.764570352994904
+        },
+        "shin.R": {
+          "rel_deg": 26.5652518055518,
+          "world_deg": 16.80067715382843
+        },
+        "foot.R": {
+          "rel_deg": 0.3461979050301159,
+          "world_deg": 16.454482379865997
+        }
+      }
+    }
+  ],
+  "upper_limb_switch_boundaries": [
+    {
+      "type": "FK_to_IK",
+      "before_frame": 96,
+      "after_frame": 97,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 2.384185791015625e-07,
+      "elbow_world_delta_m": 2.457562461863554e-07,
+      "wrist_root_local_delta_m": 2.384185791015625e-07,
+      "elbow_root_local_delta_m": 2.457562461863554e-07,
+      "max_world_rot_delta_deg": 7.67947837212474e-06,
+      "max_rel_rot_delta_deg": 4.24333133860375e-06,
+      "before_arm_ik_influence": 0.0,
+      "after_arm_ik_influence": 1.0,
+      "stage": "StageA",
+      "side": "L"
+    },
+    {
+      "type": "IK_to_FK",
+      "before_frame": 192,
+      "after_frame": 193,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 1.228781230931777e-07,
+      "elbow_world_delta_m": 1.3328003749250113e-07,
+      "wrist_root_local_delta_m": 1.228781230931777e-07,
+      "elbow_root_local_delta_m": 1.3328003749250113e-07,
+      "max_world_rot_delta_deg": 4.315173811255865e-06,
+      "max_rel_rot_delta_deg": 4.837786969111416e-06,
+      "before_arm_ik_influence": 1.0,
+      "after_arm_ik_influence": 0.0,
+      "stage": "StageA",
+      "side": "L"
+    },
+    {
+      "type": "FK_to_IK",
+      "before_frame": 54,
+      "after_frame": 55,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 1.3328003749250113e-07,
+      "elbow_world_delta_m": 1.3328003749250113e-07,
+      "wrist_root_local_delta_m": 1.3328003749250113e-07,
+      "elbow_root_local_delta_m": 1.3328003749250113e-07,
+      "max_world_rot_delta_deg": 2.7310873985389194e-06,
+      "max_rel_rot_delta_deg": 2.8431652764780993e-06,
+      "before_arm_ik_influence": 0.0,
+      "after_arm_ik_influence": 1.0,
+      "stage": "StageA",
+      "side": "R"
+    },
+    {
+      "type": "IK_to_FK",
+      "before_frame": 150,
+      "after_frame": 151,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 9.629425061585611e-07,
+      "elbow_world_delta_m": 1.3328003749250113e-07,
+      "wrist_root_local_delta_m": 9.629425061585611e-07,
+      "elbow_root_local_delta_m": 1.3328003749250113e-07,
+      "max_world_rot_delta_deg": 3.0379033702179915e-06,
+      "max_rel_rot_delta_deg": 1.8696139608749078e-06,
+      "before_arm_ik_influence": 1.0,
+      "after_arm_ik_influence": 0.0,
+      "stage": "StageA",
+      "side": "R"
+    },
+    {
+      "type": "FK_to_IK",
+      "before_frame": 612,
+      "after_frame": 613,
+      "root_world_delta_m": 0.0166664119169515,
+      "wrist_world_delta_m": 0.01655337590226942,
+      "elbow_world_delta_m": 0.0165323882127644,
+      "wrist_root_local_delta_m": 0.0003509601658185217,
+      "elbow_root_local_delta_m": 0.00025407178126664445,
+      "max_world_rot_delta_deg": 0.014914403047702501,
+      "max_rel_rot_delta_deg": 1.7653616308611826e-06,
+      "before_arm_ik_influence": 0.0,
+      "after_arm_ik_influence": 1.0,
+      "stage": "StageC",
+      "side": "L"
+    },
+    {
+      "type": "IK_to_FK",
+      "before_frame": 792,
+      "after_frame": 793,
+      "root_world_delta_m": 0.016666889511266426,
+      "wrist_world_delta_m": 0.016552793752992,
+      "elbow_world_delta_m": 0.016537279300264853,
+      "wrist_root_local_delta_m": 0.0003225081254412181,
+      "elbow_root_local_delta_m": 0.00022709366530570868,
+      "max_world_rot_delta_deg": 0.014914023602991957,
+      "max_rel_rot_delta_deg": 1.0063516953907134e-06,
+      "before_arm_ik_influence": 1.0,
+      "after_arm_ik_influence": 0.0,
+      "stage": "StageC",
+      "side": "L"
+    },
+    {
+      "type": "FK_to_IK",
+      "before_frame": 540,
+      "after_frame": 541,
+      "root_world_delta_m": 0.0166664119169515,
+      "wrist_world_delta_m": 0.016794744944358706,
+      "elbow_world_delta_m": 0.016811942989877385,
+      "wrist_root_local_delta_m": 0.0003603180002157146,
+      "elbow_root_local_delta_m": 0.00026838872877740983,
+      "max_world_rot_delta_deg": 0.014915681536926838,
+      "max_rel_rot_delta_deg": 2.823844606449324e-06,
+      "before_arm_ik_influence": 0.0,
+      "after_arm_ik_influence": 1.0,
+      "stage": "StageC",
+      "side": "R"
+    },
+    {
+      "type": "IK_to_FK",
+      "before_frame": 720,
+      "after_frame": 721,
+      "root_world_delta_m": 0.016666889511266426,
+      "wrist_world_delta_m": 0.01672568643963078,
+      "elbow_world_delta_m": 0.01678167181102327,
+      "wrist_root_local_delta_m": 0.0002681646288015909,
+      "elbow_root_local_delta_m": 0.00023736925477608412,
+      "max_world_rot_delta_deg": 0.014916339228511842,
+      "max_rel_rot_delta_deg": 5.414501194410993e-06,
+      "before_arm_ik_influence": 1.0,
+      "after_arm_ik_influence": 0.0,
+      "stage": "StageC",
+      "side": "R"
+    },
+    {
+      "type": "FK_to_IK",
+      "before_frame": 1080,
+      "after_frame": 1081,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 1.5636992004328853e-06,
+      "elbow_world_delta_m": 9.541398640621973e-07,
+      "wrist_root_local_delta_m": 1.5636992004328853e-06,
+      "elbow_root_local_delta_m": 9.541398640621973e-07,
+      "max_world_rot_delta_deg": 0.00011326888538908646,
+      "max_rel_rot_delta_deg": 0.0001933370252154152,
+      "before_arm_ik_influence": 0.0,
+      "after_arm_ik_influence": 1.0,
+      "stage": "StageF",
+      "side": "L"
+    },
+    {
+      "type": "IK_to_FK",
+      "before_frame": 1164,
+      "after_frame": 1165,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 3.68115989184996e-06,
+      "elbow_world_delta_m": 2.8349826313165364e-06,
+      "wrist_root_local_delta_m": 3.68115989184996e-06,
+      "elbow_root_local_delta_m": 2.8349826313165364e-06,
+      "max_world_rot_delta_deg": 0.0002722105031730685,
+      "max_rel_rot_delta_deg": 0.0004631714105998908,
+      "before_arm_ik_influence": 1.0,
+      "after_arm_ik_influence": 0.0,
+      "stage": "StageF",
+      "side": "L"
+    },
+    {
+      "type": "FK_to_IK",
+      "before_frame": 1110,
+      "after_frame": 1111,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 9.889387763074106e-06,
+      "elbow_world_delta_m": 7.072889177075366e-06,
+      "wrist_root_local_delta_m": 9.889387763074106e-06,
+      "elbow_root_local_delta_m": 7.072889177075366e-06,
+      "max_world_rot_delta_deg": 0.0006863228438993034,
+      "max_rel_rot_delta_deg": 0.001245405156783587,
+      "before_arm_ik_influence": 0.0,
+      "after_arm_ik_influence": 1.0,
+      "stage": "StageF",
+      "side": "R"
+    },
+    {
+      "type": "IK_to_FK",
+      "before_frame": 1194,
+      "after_frame": 1195,
+      "root_world_delta_m": 0.0,
+      "wrist_world_delta_m": 3.488272401904948e-07,
+      "elbow_world_delta_m": 3.5762786865234375e-07,
+      "wrist_root_local_delta_m": 3.488272401904948e-07,
+      "elbow_root_local_delta_m": 3.5762786865234375e-07,
+      "max_world_rot_delta_deg": 2.9930809793073844e-05,
+      "max_rel_rot_delta_deg": 4.8521955773396135e-05,
+      "before_arm_ik_influence": 1.0,
+      "after_arm_ik_influence": 0.0,
+      "stage": "StageF",
+      "side": "R"
+    }
+  ]
+}

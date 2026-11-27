@@ -1,0 +1,5 @@
+=== GENERATE STDERR ===
+C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-5\unified_motion_showcase\generate_unified_motion_showcase.py:142: DeprecationWarning: 'World.use_nodes' is expected to be removed in Blender 6.0
+  world.use_nodes = True
+
+=== REOPEN STDERR ===
