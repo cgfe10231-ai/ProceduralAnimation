@@ -381,22 +381,25 @@ class SprintBrakeAction(MotionAction):
             planned_pose, upper_diag = context.compose_planned_pose(planned_pose)
             bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
 
-            has_central_upper = upper_diag["L"]["is_independent"] or upper_diag["R"]["is_independent"]
-            if has_central_upper:
-                if not bridge_res.success:
-                    unmet_desc = "; ".join(
-                        f"{uc.target_name} ({uc.category}): {uc.description} (err={uc.error_amount:.4f})"
-                        for uc in bridge_res.unmet_constraints
-                    ) if bridge_res.unmet_constraints else "unspecified constraint failure"
-                    raise RuntimeError(
-                        f"SprintBrakeAction failed at Frame {frame}: "
-                        f"KinematicBridge execution failed (unmet={len(bridge_res.unmet_constraints)}): {unmet_desc}"
-                    )
-                if bridge_res.motion_state is None:
-                    raise RuntimeError(
-                        f"SprintBrakeAction failed at Frame {frame}: KinematicBridge returned motion_state=None"
-                    )
+            # [INTRODUCED 2026-11-27T20:57:10+08:00]
+            # FUNCTION: SprintBrakeAction.execute.bridge_failure_gate
+            # PURPOSE: Immediately reject failed Bridge frames or missing MotionState across both central upper-limb and historical execution paths so no action continues past a failed frame.
+            # REASON: TASK 12-B BUG-03
+            if not bridge_res.success:
+                unmet_desc = "; ".join(
+                    f"{uc.target_name} ({uc.category}): {uc.description} (err={uc.error_amount:.4f})"
+                    for uc in bridge_res.unmet_constraints
+                ) if bridge_res.unmet_constraints else "unspecified constraint failure"
+                raise RuntimeError(
+                    f"SprintBrakeAction failed at Frame {frame}: "
+                    f"KinematicBridge execution failed (unmet={len(bridge_res.unmet_constraints)}): {unmet_desc}"
+                )
+            if bridge_res.motion_state is None:
+                raise RuntimeError(
+                    f"SprintBrakeAction failed at Frame {frame}: KinematicBridge returned motion_state=None"
+                )
 
+            has_central_upper = upper_diag["L"]["is_independent"] or upper_diag["R"]["is_independent"]
             eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
             eff_r = bridge_res.wbc_result.end_effectors.get("foot_R")
             eff_hand_l = bridge_res.wbc_result.end_effectors.get("hand_L")
@@ -431,15 +434,6 @@ class SprintBrakeAction(MotionAction):
                         "side": "R",
                         "phase": "hand_ik",
                         "dist": round(eff_hand_r.reach_distance_m, 5),
-                    })
-            elif not bridge_res.success:
-                for uc in bridge_res.unmet_constraints:
-                    unreachable.append({
-                        "frame": frame,
-                        "category": uc.category,
-                        "target": uc.target_name,
-                        "error": uc.error_amount,
-                        "desc": uc.description,
                     })
 
             raw_l = {

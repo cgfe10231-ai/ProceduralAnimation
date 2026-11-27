@@ -546,24 +546,43 @@ class KinematicBridgeExecutor:
         # ---------------------------------------------------------------------
         # Time Step Resolution & Validation
         # ---------------------------------------------------------------------
+        # [INTRODUCED 2026-11-27T20:57:10+08:00]
+        # FUNCTION: KinematicBridgeExecutor.execute_frame.timing_admission_validation
+        # PURPOSE: Reject non-integer/bool frames, non-finite timestamps, non-finite/non-positive dt values, and duplicate or out-of-order frames/timestamps against committed history before invoking WBC, preventing explicit dt from bypassing chronological ordering.
+        # REASON: TASK 12-B (timing admission boundary)
+        if isinstance(frame, bool) or not isinstance(frame, int):
+            raise ValueError(f"Frame number must be an integer, got {frame!r}")
+
+        time_sec = planned.time_seconds
+        if isinstance(time_sec, bool) or not isinstance(time_sec, (int, float)) or not math.isfinite(float(time_sec)):
+            raise ValueError(f"Planned time_seconds={time_sec!r} must be a finite number")
+        time_sec_f = float(time_sec)
+
+        if self._last_frame is not None and frame <= self._last_frame:
+            raise ValueError(
+                f"Non-increasing frame number detected: current frame={frame} "
+                f"<= previous committed frame={self._last_frame}"
+            )
+        if self._last_time_sec is not None and (time_sec_f <= self._last_time_sec or (time_sec_f - self._last_time_sec) <= 1e-9):
+            raise ValueError(
+                f"Non-increasing time step detected: current time_seconds={time_sec_f} "
+                f"<= previous committed time_seconds={self._last_time_sec}"
+            )
+
         if dt is not None:
-            if dt <= 0.0:
-                raise ValueError(f"Explicit dt={dt} must be strictly positive (> 0.0)")
+            if isinstance(dt, bool) or not isinstance(dt, (int, float)) or not math.isfinite(float(dt)) or float(dt) <= 0.0:
+                raise ValueError(f"Explicit dt={dt!r} must be finite and strictly positive (> 0.0)")
             effective_dt = float(dt)
         elif planned.dt is not None:
-            if planned.dt <= 0.0:
-                raise ValueError(f"Planned dt={planned.dt} must be strictly positive (> 0.0)")
+            if isinstance(planned.dt, bool) or not isinstance(planned.dt, (int, float)) or not math.isfinite(float(planned.dt)) or float(planned.dt) <= 0.0:
+                raise ValueError(f"Planned dt={planned.dt!r} must be finite and strictly positive (> 0.0)")
             effective_dt = float(planned.dt)
         else:
             if self._last_time_sec is not None:
-                calc_dt = planned.time_seconds - self._last_time_sec
-                if calc_dt <= 1e-9:
-                    raise ValueError(
-                        f"Non-positive time step detected: current time_seconds={planned.time_seconds} "
-                        f"<= previous time_seconds={self._last_time_sec} (dt={calc_dt})"
-                    )
-                effective_dt = calc_dt
+                effective_dt = time_sec_f - self._last_time_sec
             else:
+                if isinstance(self.default_fps, bool) or not math.isfinite(self.default_fps) or self.default_fps <= 0.0:
+                    raise ValueError(f"Bridge default_fps={self.default_fps!r} must be finite and strictly positive (> 0.0)")
                 effective_dt = 1.0 / self.default_fps
 
         # ---------------------------------------------------------------------
@@ -587,10 +606,6 @@ class KinematicBridgeExecutor:
             enforce_rom_clamping=enforce_rom_clamping,
         )
 
-        if enforce_rom_clamping is True and wbc_res.has_rom_violation is True:
-            bpy.context.view_layer.update()
-            wbc_res = _reconcile_post_rom_feedback(arm, wbc_targets, wbc_res)
-
         # ---------------------------------------------------------------------
         # Phase 4: Truthful Validation (ROM, Reach, Contacts)
         # ---------------------------------------------------------------------
@@ -601,18 +616,18 @@ class KinematicBridgeExecutor:
         # ---------------------------------------------------------------------
         # Phase 5: Read-Only Physics Telemetry
         # ---------------------------------------------------------------------
-        if not (enforce_rom_clamping is True and wbc_res.has_rom_violation is True):
-            bpy.context.view_layer.update()
+        bpy.context.view_layer.update()
 
         # Telemetry A: Center of Mass (CoM)
         com_res = compute_whole_body_com(arm, self.controller.mass_distribution, update_scene=False)
         com_world = com_res.com_world
 
-        # Telemetry B: Differential Kinematics
+        # Telemetry B: Differential Kinematics (non-publishing until final frame commit)
         kin_result = self.kinematics_tracker.sample_and_update(
-            time_sec=planned.time_seconds,
+            time_sec=time_sec_f,
             frame=frame,
             dt=effective_dt,
+            commit=False,
         )
 
         # Telemetry C: Rigid Link Inertia Tensor & Whole-Body Angular Momentum
@@ -837,110 +852,8 @@ class KinematicBridgeExecutor:
                 )
 
         # ---------------------------------------------------------------------
-        # Phase 6: State Commit & Keyframing
+        # Phase 6: MotionState Assembly, Gated Keyframing & State Commit
         # ---------------------------------------------------------------------
-        if keyframe:
-            # Keyframe root object
-            if root is not None:
-                root.keyframe_insert("location", frame=frame)
-                root.keyframe_insert("rotation_euler", frame=frame)
-
-            # Keyframe armature pose bones
-            for pb in arm.pose.bones:
-                pb.keyframe_insert("location", frame=frame)
-                pb.keyframe_insert("rotation_euler", frame=frame)
-
-            # [INTRODUCED 2026-11-26T17:52:00+08:00]
-            # TASK: TASK 10-d-4
-            # BLOCK: Phase 6 leg & upper-limb controller rotation-mode-preserving keyframing + arm constraint influence keyframing
-            # PURPOSE: Preserve rotation_mode on HandIK/ElbowPole empties when inserting location/rotation keyframes, and record true post-solve ArmIK/HandRotation constraint influences with CONSTANT FCurve interpolation via Blender 5.1.1 Action Slot/Channelbag.
-            # REASON: Resolve P02 (missing ArmIK/HandRotation influence persistence and controller rotation channel mismatch) without changing legacy Root/bone/leg controller contracts, fabricating weights, mutating rotation modes, or altering unrelated FCurves.
-            for name in ("FootIK.L", "FootIK.R", "KneePole.L", "KneePole.R"):
-                obj = bpy.data.objects.get(name)
-                if obj is not None:
-                    obj.keyframe_insert("location", frame=frame)
-                    obj.keyframe_insert("rotation_euler", frame=frame)
-
-            for name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
-                obj = bpy.data.objects.get(name)
-                if obj is not None:
-                    obj.keyframe_insert("location", frame=frame)
-                    rot_mode = str(obj.rotation_mode)
-                    if rot_mode == "QUATERNION":
-                        rot_path = "rotation_quaternion"
-                    elif rot_mode == "AXIS_ANGLE":
-                        rot_path = "rotation_axis_angle"
-                    elif rot_mode in ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"):
-                        rot_path = "rotation_euler"
-                    else:
-                        raise ValueError(
-                            f"Unsupported rotation_mode {rot_mode!r} on upper-limb controller {name!r}"
-                        )
-                    obj.keyframe_insert(rot_path, frame=frame)
-
-            expected_influence_paths = set()
-            for side in ("L", "R"):
-                for bone_name, con_name in (
-                    (f"forearm.{side}", ARM_IK_CONSTRAINT_NAMES[side]),
-                    (f"hand.{side}", HAND_ROT_CONSTRAINT_NAMES[side]),
-                ):
-                    pbone = arm.pose.bones.get(bone_name)
-                    if pbone is None:
-                        raise RuntimeError(
-                            f"Missing required pose bone {bone_name!r} on {arm.name!r} for Phase 6 influence keyframing"
-                        )
-                    con = pbone.constraints.get(con_name)
-                    if con is None:
-                        raise RuntimeError(
-                            f"Missing required constraint {con_name!r} on {bone_name!r} for Phase 6 influence keyframing"
-                        )
-                    _ = float(con.influence)
-                    if not con.keyframe_insert("influence", frame=frame):
-                        raise RuntimeError(
-                            f"Failed to insert influence keyframe for {bone_name!r}/{con_name!r} at frame {frame}"
-                        )
-                    expected_influence_paths.add(con.path_from_id("influence"))
-
-            adt = arm.animation_data
-            action = adt.action if adt is not None else None
-            if action is None:
-                raise RuntimeError(
-                    f"Armature {arm.name!r} has no Action after Phase 6 constraint influence keyframing"
-                )
-            fcurve_groups = []
-            slot = getattr(adt, "action_slot", None)
-            if hasattr(action, "layers"):
-                if slot is None:
-                    raise RuntimeError(
-                        f"Armature {arm.name!r} Action {action.name!r} has no assigned action_slot"
-                    )
-                for layer in action.layers:
-                    for strip in layer.strips:
-                        cb = strip.channelbag(slot)
-                        if cb is not None:
-                            fcurve_groups.append(cb.fcurves)
-            elif hasattr(action, "fcurves"):
-                fcurve_groups.append(action.fcurves)
-
-            matched_paths = set()
-            for fcurves in fcurve_groups:
-                for fc in fcurves:
-                    if fc.data_path not in expected_influence_paths:
-                        continue
-                    key_found = False
-                    for kp in fc.keyframe_points:
-                        if abs(float(kp.co[0]) - float(frame)) < 1e-4:
-                            kp.interpolation = "CONSTANT"
-                            key_found = True
-                    if key_found:
-                        matched_paths.add(fc.data_path)
-
-            if matched_paths != expected_influence_paths:
-                missing_paths = sorted(expected_influence_paths - matched_paths)
-                raise RuntimeError(
-                    f"Failed to locate Phase 6 influence FCurves/keyframes on {arm.name!r} at frame {frame}: {missing_paths}"
-                )
-
         # Assemble legacy & contact states
         contact_states: Dict[str, ContactPointState] = {}
         for side in ("L", "R"):
@@ -965,7 +878,7 @@ class KinematicBridgeExecutor:
         planned_acc = (fx * planned.accel_mps2, fy * planned.accel_mps2, 0.0)
         motion_state = MotionState(
             frame=frame,
-            time_sec=planned.time_seconds,
+            time_sec=time_sec_f,
             position=root_world,
             orientation_deg=(0.0, 0.0, planned.root_yaw_deg),
             velocity=planned_vel,
@@ -989,15 +902,9 @@ class KinematicBridgeExecutor:
         motion_state = enrich_motion_state_with_contacts(motion_state, multi_contact)
         motion_state = enrich_motion_state_with_inertia(motion_state, inertia_state)
 
-        # Update internal temporal progression
-        self._last_time_sec = planned.time_seconds
-        self._last_frame = frame
-        self.last_multi_contact = multi_contact
-        self.last_active_limb_targets = active_limb_targets
-
         overall_success = wbc_res.success and (len(unmet) == 0)
 
-        return BridgeExecutionResult(
+        execution_result = BridgeExecutionResult(
             success=overall_success,
             frame=frame,
             wbc_result=wbc_res,
@@ -1011,3 +918,124 @@ class KinematicBridgeExecutor:
             contact_geometry_errors=contact_geom_errors,
             multi_contact=multi_contact,
         )
+
+        # [INTRODUCED 2026-11-27T20:57:40+08:00]
+        # FUNCTION: KinematicBridgeExecutor.execute_frame.gated_commit_boundary
+        # PURPOSE: Execute Blender keyframing and formally commit BodyKinematicsTracker and Bridge cross-frame state (_last_time_sec, _last_frame, last_multi_contact, last_active_limb_targets) strictly when overall_success=True, reusing precomputed kin_result without re-running differential kinematics.
+        # REASON: TASK 12-B BUG-01 & BUG-02
+        if overall_success:
+            if keyframe:
+                # Keyframe root object
+                if root is not None:
+                    root.keyframe_insert("location", frame=frame)
+                    root.keyframe_insert("rotation_euler", frame=frame)
+
+                # Keyframe armature pose bones
+                for pb in arm.pose.bones:
+                    pb.keyframe_insert("location", frame=frame)
+                    pb.keyframe_insert("rotation_euler", frame=frame)
+
+                # [INTRODUCED 2026-11-26T17:52:00+08:00]
+                # TASK: TASK 10-d-4
+                # BLOCK: Phase 6 leg & upper-limb controller rotation-mode-preserving keyframing + arm constraint influence keyframing
+                # PURPOSE: Preserve rotation_mode on HandIK/ElbowPole empties when inserting location/rotation keyframes, and record true post-solve ArmIK/HandRotation constraint influences with CONSTANT FCurve interpolation via Blender 5.1.1 Action Slot/Channelbag.
+                # REASON: Resolve P02 (missing ArmIK/HandRotation influence persistence and controller rotation channel mismatch) without changing legacy Root/bone/leg controller contracts, fabricating weights, mutating rotation modes, or altering unrelated FCurves.
+                for name in ("FootIK.L", "FootIK.R", "KneePole.L", "KneePole.R"):
+                    obj = bpy.data.objects.get(name)
+                    if obj is not None:
+                        obj.keyframe_insert("location", frame=frame)
+                        obj.keyframe_insert("rotation_euler", frame=frame)
+
+                for name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+                    obj = bpy.data.objects.get(name)
+                    if obj is not None:
+                        obj.keyframe_insert("location", frame=frame)
+                        rot_mode = str(obj.rotation_mode)
+                        if rot_mode == "QUATERNION":
+                            rot_path = "rotation_quaternion"
+                        elif rot_mode == "AXIS_ANGLE":
+                            rot_path = "rotation_axis_angle"
+                        elif rot_mode in ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"):
+                            rot_path = "rotation_euler"
+                        else:
+                            raise ValueError(
+                                f"Unsupported rotation_mode {rot_mode!r} on upper-limb controller {name!r}"
+                            )
+                        obj.keyframe_insert(rot_path, frame=frame)
+
+                expected_influence_paths = set()
+                for side in ("L", "R"):
+                    for bone_name, con_name in (
+                        (f"forearm.{side}", ARM_IK_CONSTRAINT_NAMES[side]),
+                        (f"hand.{side}", HAND_ROT_CONSTRAINT_NAMES[side]),
+                    ):
+                        pbone = arm.pose.bones.get(bone_name)
+                        if pbone is None:
+                            raise RuntimeError(
+                                f"Missing required pose bone {bone_name!r} on {arm.name!r} for Phase 6 influence keyframing"
+                            )
+                        con = pbone.constraints.get(con_name)
+                        if con is None:
+                            raise RuntimeError(
+                                f"Missing required constraint {con_name!r} on {bone_name!r} for Phase 6 influence keyframing"
+                            )
+                        _ = float(con.influence)
+                        if not con.keyframe_insert("influence", frame=frame):
+                            raise RuntimeError(
+                                f"Failed to insert influence keyframe for {bone_name!r}/{con_name!r} at frame {frame}"
+                            )
+                        expected_influence_paths.add(con.path_from_id("influence"))
+
+                adt = arm.animation_data
+                action = adt.action if adt is not None else None
+                if action is None:
+                    raise RuntimeError(
+                        f"Armature {arm.name!r} has no Action after Phase 6 constraint influence keyframing"
+                    )
+                fcurve_groups = []
+                slot = getattr(adt, "action_slot", None)
+                if hasattr(action, "layers"):
+                    if slot is None:
+                        raise RuntimeError(
+                            f"Armature {arm.name!r} Action {action.name!r} has no assigned action_slot"
+                        )
+                    for layer in action.layers:
+                        for strip in layer.strips:
+                            cb = strip.channelbag(slot)
+                            if cb is not None:
+                                fcurve_groups.append(cb.fcurves)
+                elif hasattr(action, "fcurves"):
+                    fcurve_groups.append(action.fcurves)
+
+                matched_paths = set()
+                for fcurves in fcurve_groups:
+                    for fc in fcurves:
+                        if fc.data_path not in expected_influence_paths:
+                            continue
+                        key_found = False
+                        for kp in fc.keyframe_points:
+                            if abs(float(kp.co[0]) - float(frame)) < 1e-4:
+                                kp.interpolation = "CONSTANT"
+                                key_found = True
+                        if key_found:
+                            matched_paths.add(fc.data_path)
+
+                if matched_paths != expected_influence_paths:
+                    missing_paths = sorted(expected_influence_paths - matched_paths)
+                    raise RuntimeError(
+                        f"Failed to locate Phase 6 influence FCurves/keyframes on {arm.name!r} at frame {frame}: {missing_paths}"
+                    )
+
+            # Publish precomputed causal kinematics and cross-frame state after successful solve & keyframing
+            self.kinematics_tracker.update(
+                kin_result.pose,
+                dt=effective_dt,
+                commit=True,
+                precomputed_state=kin_result,
+            )
+            self._last_time_sec = time_sec_f
+            self._last_frame = frame
+            self.last_multi_contact = multi_contact
+            self.last_active_limb_targets = active_limb_targets
+
+        return execution_result

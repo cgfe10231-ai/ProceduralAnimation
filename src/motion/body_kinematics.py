@@ -635,28 +635,45 @@ class BodyKinematicsTracker:
         self._prev_velocity = None
         self._history.clear()
 
+    # [INTRODUCED 2026-11-27T20:56:20+08:00]
+    # FUNCTION: BodyKinematicsTracker.update() / BodyKinematicsTracker.sample_and_update()
+    # PURPOSE: Support non-publishing differential evaluation (commit=False) and precomputed BodyMotionState commit without repeating differential kinematics or exposing private Tracker state to callers.
+    # REASON: TASK 12-B BUG-02
     def update(
         self,
         snapshot: BodyPoseSnapshot,
         dt: Optional[float] = None,
+        *,
+        commit: bool = True,
+        precomputed_state: Optional[BodyMotionState] = None,
     ) -> BodyMotionState:
         """Process a new pose snapshot in causal sequential order and return the updated BodyMotionState."""
-        if self._prev_snapshot is None:
-            # First frame: initialize with zero velocity (or dt from config)
-            default_dt = dt or (1.0 / self.config.fps)
-            vel_state = create_zero_velocity_state(snapshot, dt=default_dt)
+        if precomputed_state is not None:
+            if not isinstance(precomputed_state, BodyMotionState):
+                raise TypeError("precomputed_state must be a BodyMotionState instance")
+            if precomputed_state.pose is not snapshot:
+                raise ValueError("precomputed_state.pose must match the passed snapshot")
+            motion_state = precomputed_state
+            vel_state = precomputed_state.velocity
         else:
-            vel_state = compute_differential_velocity(
-                curr=snapshot,
-                prev=self._prev_snapshot,
-                dt=dt,
-                prev_velocity=self._prev_velocity,
-            )
+            if self._prev_snapshot is None:
+                # First frame: initialize with zero velocity (or dt from config)
+                default_dt = dt or (1.0 / self.config.fps)
+                vel_state = create_zero_velocity_state(snapshot, dt=default_dt)
+            else:
+                vel_state = compute_differential_velocity(
+                    curr=snapshot,
+                    prev=self._prev_snapshot,
+                    dt=dt,
+                    prev_velocity=self._prev_velocity,
+                )
 
-        motion_state = BodyMotionState(pose=snapshot, velocity=vel_state)
-        self._prev_snapshot = snapshot
-        self._prev_velocity = vel_state
-        self._history.append(motion_state)
+            motion_state = BodyMotionState(pose=snapshot, velocity=vel_state)
+
+        if commit:
+            self._prev_snapshot = snapshot
+            self._prev_velocity = vel_state
+            self._history.append(motion_state)
         return motion_state
 
     def sample_and_update(
@@ -665,6 +682,8 @@ class BodyKinematicsTracker:
         frame: Optional[int] = None,
         commanded_velocity: Optional[Tuple[float, float, float]] = None,
         dt: Optional[float] = None,
+        *,
+        commit: bool = True,
     ) -> BodyMotionState:
         """Sample current scene state and perform sequential differential update."""
         snap = sample_body_pose_snapshot(
@@ -676,7 +695,7 @@ class BodyKinematicsTracker:
             joint_model=self.joint_model,
             commanded_velocity=commanded_velocity,
         )
-        return self.update(snap, dt=dt)
+        return self.update(snap, dt=dt, commit=commit)
 
     def compute_trajectory_motion_states(
         self,
