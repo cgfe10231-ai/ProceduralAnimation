@@ -1,0 +1,372 @@
+{
+  "task_id": "TASK 10-d-4 Visual Redelivery",
+  "timestamp_utc": "2026-11-26T14:52:50.781423+00:00",
+  "git_head": "53d506d07b667327d0ed3b4b79dd2d313538877c",
+  "source_blobs": {
+    "src/motion/terrain_walk.py": "d42519fe8e39d149bdcffec3378b5f5ee7601b91",
+    "src/motion/kinematic_bridge.py": "9e68e0a6a44bdb538b75b4f4d99b117c1737c358",
+    "src/motion/framework.py": "31a9c268e0833a93cc0e498227202256c3274f05",
+    "src/motion/whole_body_controller.py": "562de6c0ce1e9009856a7d52ec89cd6d0c012be2"
+  },
+  "blender_executable": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+  "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B docs/evidence/10-d/10-d-4/visual_redelivery/generate_visual_redelivery.py",
+  "passed": true,
+  "scene_1_fk": {
+    "asset": {
+      "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_full_body_independent_fk.blend",
+      "relative_path": "output/task10d_full_body_independent_fk.blend",
+      "size_bytes": 235462,
+      "sha256": "b454e6c2c2ca0252276b4545b02191fb20292a742879ad1f62a0083be9cfa3df",
+      "frame_start": 1,
+      "frame_end": 240,
+      "frame_count": 240
+    },
+    "motion_metrics": {
+      "expected_mode": "FK",
+      "total_frames": 240,
+      "max_influence_err": 0.0,
+      "full_timeline_L": {
+        "upper_arm_rel_span_deg": 54.666723481468985,
+        "forearm_rel_span_deg": 53.983490580136596,
+        "hand_rel_span_deg": 37.24630151618716,
+        "wrist_root_local_span_m": 0.9277755239464885
+      },
+      "full_timeline_R": {
+        "upper_arm_rel_span_deg": 64.46047380286466,
+        "forearm_rel_span_deg": 48.29262760334021,
+        "hand_rel_span_deg": 36.826292054160916,
+        "wrist_root_local_span_m": 0.8351720376156058
+      },
+      "interval_A_stand_both_arms_move": {
+        "frame_range": [
+          8,
+          67
+        ],
+        "frame_count": 60,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 49.44645946080538,
+          "forearm_rel_span_deg": 53.87429153670986,
+          "hand_rel_span_deg": 31.837684831364317,
+          "wrist_root_local_span_m": 0.8517838740390109
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 63.86532250941336,
+          "forearm_rel_span_deg": 36.895207882875134,
+          "hand_rel_span_deg": 36.27776852211953,
+          "wrist_root_local_span_m": 0.7786113146542797
+        }
+      },
+      "interval_B_walk_both_arms_hold": {
+        "frame_range": [
+          81,
+          103
+        ],
+        "frame_count": 23,
+        "root_world_disp_m": 0.2515134811401367,
+        "L": {
+          "upper_arm_rel_span_deg": 6.190513377662634e-06,
+          "forearm_rel_span_deg": 7.026450403779088e-06,
+          "hand_rel_span_deg": 5.301302266494189e-06,
+          "wrist_root_local_span_m": 0.03728746210947587
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 3.6228181162672397e-06,
+          "forearm_rel_span_deg": 3.817885238598126e-06,
+          "hand_rel_span_deg": 4.313112356739176e-06,
+          "wrist_root_local_span_m": 0.03812693933688822
+        }
+      },
+      "interval_C_walk_both_arms_move": {
+        "frame_range": [
+          108,
+          154
+        ],
+        "frame_count": 47,
+        "root_world_disp_m": 0.8170839520809784,
+        "L": {
+          "upper_arm_rel_span_deg": 50.20422822888556,
+          "forearm_rel_span_deg": 44.59245881699822,
+          "hand_rel_span_deg": 37.18582888694694,
+          "wrist_root_local_span_m": 0.44398927402667515
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 61.39237529432054,
+          "forearm_rel_span_deg": 34.70607848063246,
+          "hand_rel_span_deg": 33.530767746805445,
+          "wrist_root_local_span_m": 0.3333741512844377
+        }
+      },
+      "interval_post_walk_arms_move_and_retract": {
+        "frame_range": [
+          165,
+          235
+        ],
+        "frame_count": 71,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 54.584682340716775,
+          "forearm_rel_span_deg": 42.737397145479534,
+          "hand_rel_span_deg": 29.840098642066284,
+          "wrist_root_local_span_m": 0.9144237028249238
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 47.35528270838788,
+          "forearm_rel_span_deg": 48.29262295767361,
+          "hand_rel_span_deg": 26.057974502874394,
+          "wrist_root_local_span_m": 0.6992877939225628
+        }
+      }
+    },
+    "reopen_verification": {
+      "passed": true,
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_full_body_independent_fk.blend",
+      "expected_mode": "FK",
+      "open_frame": 1,
+      "fps": 24,
+      "cameras": [
+        "Visual_FrontCam",
+        "Visual_ObliqueSideCam"
+      ],
+      "active_camera": "Visual_ObliqueSideCam",
+      "action_slot_identifier": "OBCharacterArmature",
+      "influence_fcurves": {
+        "ArmIK.L": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        },
+        "ArmIK.R": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        },
+        "HandRotation.L": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        },
+        "HandRotation.R": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        }
+      },
+      "solve_vs_reopen_traversals": [
+        {
+          "order": "forward",
+          "frames_checked": 240,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "reverse",
+          "frames_checked": 240,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "shuffled_seed_20261126",
+          "frames_checked": 240,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        }
+      ],
+      "playback_key_samples_count": 240
+    }
+  },
+  "scene_2_ik": {
+    "asset": {
+      "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_full_body_independent_ik.blend",
+      "relative_path": "output/task10d_full_body_independent_ik.blend",
+      "size_bytes": 243400,
+      "sha256": "0cbede1fd3e90feac994da80e944fb7b9ff9607cb5697f77ecf68d10ca2e8320",
+      "frame_start": 1,
+      "frame_end": 240,
+      "frame_count": 240
+    },
+    "motion_metrics": {
+      "expected_mode": "IK",
+      "total_frames": 240,
+      "max_influence_err": 0.0,
+      "full_timeline_L": {
+        "upper_arm_rel_span_deg": 44.82003148214855,
+        "forearm_rel_span_deg": 44.88559365355802,
+        "hand_rel_span_deg": 38.53129965150188,
+        "wrist_root_local_span_m": 0.5329684829534349
+      },
+      "full_timeline_R": {
+        "upper_arm_rel_span_deg": 38.75450085698476,
+        "forearm_rel_span_deg": 40.188630724265494,
+        "hand_rel_span_deg": 35.30678511330157,
+        "wrist_root_local_span_m": 0.5204291086347612
+      },
+      "interval_A_stand_both_arms_move": {
+        "frame_range": [
+          8,
+          67
+        ],
+        "frame_count": 60,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 29.701769002497787,
+          "forearm_rel_span_deg": 23.639271780109365,
+          "hand_rel_span_deg": 34.5878438865455,
+          "wrist_root_local_span_m": 0.4228544466970363
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 31.663715408972283,
+          "forearm_rel_span_deg": 29.678031779009892,
+          "hand_rel_span_deg": 33.19131149079405,
+          "wrist_root_local_span_m": 0.5160933257556126
+        }
+      },
+      "interval_B_walk_both_arms_hold": {
+        "frame_range": [
+          81,
+          103
+        ],
+        "frame_count": 23,
+        "root_world_disp_m": 0.2515134811401367,
+        "L": {
+          "upper_arm_rel_span_deg": 2.159903654276593,
+          "forearm_rel_span_deg": 2.2027895322154984,
+          "hand_rel_span_deg": 3.5276564707374907,
+          "wrist_root_local_span_m": 4.295258098649137e-06
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 4.005374954831669,
+          "forearm_rel_span_deg": 0.7344303766706197,
+          "hand_rel_span_deg": 4.146333244845114,
+          "wrist_root_local_span_m": 7.054594346314827e-06
+        }
+      },
+      "interval_C_walk_both_arms_move": {
+        "frame_range": [
+          108,
+          154
+        ],
+        "frame_count": 47,
+        "root_world_disp_m": 0.8170839520809784,
+        "L": {
+          "upper_arm_rel_span_deg": 34.30979952755668,
+          "forearm_rel_span_deg": 36.28895009470379,
+          "hand_rel_span_deg": 34.02374075372964,
+          "wrist_root_local_span_m": 0.41552430782498223
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 18.820615217801016,
+          "forearm_rel_span_deg": 33.826346597636984,
+          "hand_rel_span_deg": 29.831191036597993,
+          "wrist_root_local_span_m": 0.3691105576576437
+        }
+      },
+      "interval_post_walk_arms_move_and_retract": {
+        "frame_range": [
+          165,
+          235
+        ],
+        "frame_count": 71,
+        "root_world_disp_m": 0.0,
+        "L": {
+          "upper_arm_rel_span_deg": 44.82003148214855,
+          "forearm_rel_span_deg": 30.980667017981613,
+          "hand_rel_span_deg": 29.630475500773052,
+          "wrist_root_local_span_m": 0.5329612041051278
+        },
+        "R": {
+          "upper_arm_rel_span_deg": 30.70149408279883,
+          "forearm_rel_span_deg": 23.107199152724878,
+          "hand_rel_span_deg": 26.81671797207371,
+          "wrist_root_local_span_m": 0.4010177697888767
+        }
+      }
+    },
+    "reopen_verification": {
+      "passed": true,
+      "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_full_body_independent_ik.blend",
+      "expected_mode": "IK",
+      "open_frame": 1,
+      "fps": 24,
+      "cameras": [
+        "Visual_FrontCam",
+        "Visual_ObliqueSideCam"
+      ],
+      "active_camera": "Visual_ObliqueSideCam",
+      "action_slot_identifier": "OBCharacterArmature",
+      "influence_fcurves": {
+        "ArmIK.L": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        },
+        "ArmIK.R": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        },
+        "HandRotation.L": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        },
+        "HandRotation.R": {
+          "keyframe_count": 240,
+          "interpolations": [
+            "CONSTANT"
+          ]
+        }
+      },
+      "solve_vs_reopen_traversals": [
+        {
+          "order": "forward",
+          "frames_checked": 240,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "reverse",
+          "frames_checked": 240,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        },
+        {
+          "order": "shuffled_seed_20261126",
+          "frames_checked": 240,
+          "max_pos_err_m": 0.0,
+          "max_rot_err_rad": 0.0,
+          "max_inf_err": 0.0,
+          "passed": true
+        }
+      ],
+      "playback_key_samples_count": 240
+    }
+  },
+  "parameter_driven_counterfactual": {
+    "passed": true,
+    "schedule_exact_match": true,
+    "foot_contacts_exact_match": true,
+    "max_root_planned_diff_m": 0.0,
+    "max_foot_planned_diff_m": 0.0,
+    "max_right_arm_planned_diff": 0.0,
+    "max_left_wrist_counterfactual_delta_m": 0.13566179126785985,
+    "max_left_bone_counterfactual_delta_deg": 21.42650150181592
+  }
+}

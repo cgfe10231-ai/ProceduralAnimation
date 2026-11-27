@@ -32,6 +32,7 @@ from src.motion.framework import (
     MotionPlanner,
     MotionRuntimeContext,
     MotionState,
+    build_upper_limb_feedback_metadata,
     forward_unit_vector_from_yaw,
 )
 from src.motion.kinematic_bridge import (
@@ -400,10 +401,29 @@ class RunAction(MotionAction):
                 is_flight=is_flight,
             )
 
+            planned_pose, upper_diag = context.compose_planned_pose(planned_pose)
             bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
+
+            has_central_upper = upper_diag["L"]["is_independent"] or upper_diag["R"]["is_independent"]
+            if has_central_upper:
+                if not bridge_res.success:
+                    unmet_desc = "; ".join(
+                        f"{uc.target_name} ({uc.category}): {uc.description} (err={uc.error_amount:.4f})"
+                        for uc in bridge_res.unmet_constraints
+                    ) if bridge_res.unmet_constraints else "unspecified constraint failure"
+                    raise RuntimeError(
+                        f"RunAction failed at Frame {frame}: "
+                        f"KinematicBridge execution failed (unmet={len(bridge_res.unmet_constraints)}): {unmet_desc}"
+                    )
+                if bridge_res.motion_state is None:
+                    raise RuntimeError(
+                        f"RunAction failed at Frame {frame}: KinematicBridge returned motion_state=None"
+                    )
 
             eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
             eff_r = bridge_res.wbc_result.end_effectors.get("foot_R")
+            eff_hand_l = bridge_res.wbc_result.end_effectors.get("hand_L")
+            eff_hand_r = bridge_res.wbc_result.end_effectors.get("hand_R")
 
             if eff_l and (not eff_l.is_reachable or not eff_l.strictly_in_reach):
                 unreachable_events.append({
@@ -420,7 +440,22 @@ class RunAction(MotionAction):
                     "dist": round(eff_r.reach_distance_m, 5),
                 })
 
-            if not bridge_res.success:
+            if has_central_upper:
+                if eff_hand_l and eff_hand_l.enabled and (not eff_hand_l.is_reachable or not eff_hand_l.strictly_in_reach):
+                    unreachable_events.append({
+                        "frame": frame,
+                        "side": "L",
+                        "phase": "hand_ik",
+                        "dist": round(eff_hand_l.reach_distance_m, 5),
+                    })
+                if eff_hand_r and eff_hand_r.enabled and (not eff_hand_r.is_reachable or not eff_hand_r.strictly_in_reach):
+                    unreachable_events.append({
+                        "frame": frame,
+                        "side": "R",
+                        "phase": "hand_ik",
+                        "dist": round(eff_hand_r.reach_distance_m, 5),
+                    })
+            elif not bridge_res.success:
                 for uc in bridge_res.unmet_constraints:
                     unreachable_events.append({
                         "frame": frame,
@@ -452,6 +487,9 @@ class RunAction(MotionAction):
                 "mesh_center_drift": eff_r.position_error_m if eff_r else 0.0,
             }
 
+            upper_fb = build_upper_limb_feedback_metadata(
+                bridge_res, upper_diag, hist_arm_l_rx=arm_l_rx, hist_arm_r_rx=arm_r_rx
+            )
             ms = bridge_res.motion_state
             ms_params = dict(ms.params)
             ms_params.update({
@@ -462,8 +500,13 @@ class RunAction(MotionAction):
                 "cycle_phase": cycle_phase_name,
                 "pelvis_dz": round(pelvis_dz, 5),
                 "torso_lean_deg": round(-(pelvis_rx + spine_rx), 3),
-                "arm_l_rx": round(arm_l_rx, 2),
-                "arm_r_rx": round(arm_r_rx, 2),
+                "arm_l_rx": upper_fb["arm_l_rx_effective"],
+                "arm_r_rx": upper_fb["arm_r_rx_effective"],
+                "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                "planned_upper_limb": upper_fb["planned_upper_limb"],
+                "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
+                "actual_upper_limb": upper_fb["actual_upper_limb"],
             })
             ms = ms.clone_with(params=ms_params)
             states.append(ms)
@@ -486,8 +529,13 @@ class RunAction(MotionAction):
                 "phase_r": phase_r,
                 "state_l": state_l,
                 "state_r": state_r,
-                "arm_l_rx": round(arm_l_rx, 2),
-                "arm_r_rx": round(arm_r_rx, 2),
+                "arm_l_rx": upper_fb["arm_l_rx_effective"],
+                "arm_r_rx": upper_fb["arm_r_rx_effective"],
+                "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                "planned_upper_limb": upper_fb["planned_upper_limb"],
+                "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
+                "actual_upper_limb": upper_fb["actual_upper_limb"],
             })
 
         if unreachable_events:
@@ -521,6 +569,10 @@ class RunAction(MotionAction):
                 "total_root_displacement": round(total_disp, 5),
                 "unreachable_count": len(unreachable_events),
             },
+            success=True,
+            unmet_constraints=[],
+            failure_reason=None,
+            failure_frame=None,
         )
 
 

@@ -1,0 +1,53 @@
+{
+  "passed": true,
+  "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_centralized_whole_body.blend",
+  "frame_start": 1,
+  "frame_end": 1026,
+  "open_frame": 467,
+  "fps": 24,
+  "action_slot_identifier": "OBCharacterArmature",
+  "influence_fcurves": {
+    "ArmIK.L": {
+      "keyframes": 1026,
+      "interpolation": "CONSTANT"
+    },
+    "ArmIK.R": {
+      "keyframes": 1026,
+      "interpolation": "CONSTANT"
+    },
+    "HandRotation.L": {
+      "keyframes": 1026,
+      "interpolation": "CONSTANT"
+    },
+    "HandRotation.R": {
+      "keyframes": 1026,
+      "interpolation": "CONSTANT"
+    }
+  },
+  "traversals": [
+    {
+      "order": "forward",
+      "frames_checked": 1026,
+      "max_pos_err_m": 0.0,
+      "max_rot_err_rad": 1.0493014914934301e-07,
+      "max_inf_err": 0.0,
+      "passed": true
+    },
+    {
+      "order": "reverse",
+      "frames_checked": 1026,
+      "max_pos_err_m": 0.0,
+      "max_rot_err_rad": 1.0493014914934301e-07,
+      "max_inf_err": 0.0,
+      "passed": true
+    },
+    {
+      "order": "shuffled_seed_20261127",
+      "frames_checked": 1026,
+      "max_pos_err_m": 0.0,
+      "max_rot_err_rad": 1.0493014914934301e-07,
+      "max_inf_err": 0.0,
+      "passed": true
+    }
+  ]
+}

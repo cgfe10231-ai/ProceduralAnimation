@@ -1,0 +1,387 @@
+
+=== [blender_version] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe --version (rc=0) ===
+Blender 5.1.1
+	build date: 2026-04-14
+	build time: 01:37:22
+	build commit date: 2026-04-13
+	build commit time: 14:35
+	build hash: b70da489d7f4
+	build branch: blender-v5.1-release
+	build platform: Windows
+	build type: Release
+	build c flags:  -Wall -Werror=implicit-function-declaration -Werror=return-type -Wno-tautological-compare -Wno-unknown-pragmas -Wno-char-subscripts -Wstrict-prototypes -Wmissing-prototypes -Wunused-parameter -Wundef -Wundef-prefix -Werror=unguarded-availability-new /W3 -Wno-c++98-compat -Wno-old-style-cast -Wno-unsafe-buffer-usage -Wno-missing-prototypes -Wno-sign-conversion -Wno-missing-field-initializers -Wno-extra-semi -Wno-language-extension-token -Wno-implicit-float-conversion -Wno-c++98-compat-pedantic -Wno-implicit-int-float-conversion -Wno-double-promotion -Wno-pre-c++17-compat -Wno-shorten-64-to-32 -Wno-c++98-compat-local-type-template-args -Wno-reserved-identifier -Wno-cast-align -Wno-documentation -Wno-disabled-macro-expansion -Wno-extra-semi-stmt -Wno-zero-as-null-pointer-constant -Wno-float-conversion -Wno-reserved-macro-identifier -Wno-cast-function-type-strict -Wno-float-equal -Wno-implicit-int-conversion -Wno-shadow -Wno-shadow-field-in-constructor -Wno-cast-qual -Wno-pre-c++14-compat -Wno-global-constructors -Wno-switch-enum -Wno-exit-time-destructors -Wno-ctad-maybe-unsupported -Wno-undefined-func-template -Wno-c++98-compat-extra-semi -Wno-cast-function-type -Wno-nullability-extension -Wno-shadow-field -Wno-conditional-uninitialized -Wno-unused-parameter -Wno-suggest-destructor-override -Wno-shadow-uncaptured-local -Wno-unused-macros -Wno-covered-switch-default -Wno-signed-enum-bitfield -Wno-declaration-after-statement -Wno-implicit-fallthrough -Wno-non-virtual-dtor -Wno-nested-anon-types -Wno-gnu-zero-variadic-macro-arguments -Wno-unreachable-code-break -Wno-inconsistent-missing-destructor-override -Wno-format-pedantic -Wno-nonportable-system-include-path -Wno-undef -Wno-ignored-qualifiers -Wno-used-but-marked-unused -Wno-header-hygiene -Wno-char-subscripts -Wno-unreachable-code-return -Wno-unused-template -Wno-gnu-anonymous-struct -Wno-deprecated-copy-with-user-provided-dtor -Wno-inconsistent-missing-override -Wno-unreachable-code -Wno-deprecated-dynamic-exception-spec -Wno-bad-function-cast -Wno-microsoft-enum-value -Wno-deprecated-copy-with-user-provided-copy -Wno-zero-length-array -Wno-unused-function -Wno-pedantic -Wno-deprecated-copy-with-dtor -Wno-documentation-unknown-command -Wno-undefined-reinterpret-cast -Wno-format-nonliteral -Wno-comma -Wno-documentation-deprecated-sync -Wno-shift-sign-overflow -Wno-pre-c++17-compat-pedantic -Wno-c++98-compat-unnamed-type-template-args -Wno-sign-compare -Wno-format -Wno-c++98-compat-bind-to-temporary-copy -Wno-enum-enum-conversion -Wno-anon-enum-enum-conversion -Wno-range-loop-bind-reference -Wno-enum-float-conversion -Wno-keyword-macro -Wno-deprecated-copy -Wno-unused-member-function -Wno-missing-noreturn -Wno-missing-variable-declarations -Wno-documentation-html -Wno-gnu-redeclared-enum -Wno-deprecated-declarations -Wno-overloaded-virtual -Wno-c++98-c++11-compat-binary-literal -Wno-deprecated-redundant-constexpr-static-def -Wno-missing-braces -Wno-c99-extensions -Wno-strict-prototypes -Wno-unreachable-code-loop-increment -Wno-gnu-case-range -Wno-duplicate-enum -Wno-null-pointer-subtraction -Wno-deprecated-literal-operator -Wno-newline-eof -Wno-microsoft-cast -Wno-date-time -Wno-delete-non-abstract-non-virtual-dtor -Wno-unused-private-field -Wno-flexible-array-extensions -Wno-string-conversion -Wno-final-dtor-non-final-class -Wno-microsoft-unqualified-friend -Wno-invalid-noreturn -Wno-invalid-utf8 -Wno-four-char-constants -Wno-parentheses -Wno-pessimizing-move -Wno-deprecated-non-prototype -Wno-bitfield-enum-conversion -Wno-unused-lambda-capture -Wno-shadow-field-in-constructor-modified -Wno-switch-default -Wno-nan-infinity-disabled -Wno-pre-c11-compat /DWIN32 /D_WINDOWS  /MP /nologo /J /Gy /Gd /showFilenames -Wno-unused-command-line-argument -Wno-microsoft-enum-forward-reference /clang:-funsigned-char /clang:-fno-strict-aliasing /clang:-ffp-contract=off -march=x86-64-v2 
+	build c++ flags:  -Wall -Wno-tautological-compare -Wno-unknown-pragmas -Wno-char-subscripts -Wno-overloaded-virtual -Wno-sign-compare -Wno-invalid-offsetof -Wno-suggest-override -Wundef -Wundef-prefix -Wunused-parameter -Wmismatched-tags -Werror=unguarded-availability-new /W3 -Wno-c++98-compat -Wno-old-style-cast -Wno-unsafe-buffer-usage -Wno-missing-prototypes -Wno-sign-conversion -Wno-missing-field-initializers -Wno-extra-semi -Wno-language-extension-token -Wno-implicit-float-conversion -Wno-c++98-compat-pedantic -Wno-implicit-int-float-conversion -Wno-double-promotion -Wno-pre-c++17-compat -Wno-shorten-64-to-32 -Wno-c++98-compat-local-type-template-args -Wno-reserved-identifier -Wno-cast-align -Wno-documentation -Wno-disabled-macro-expansion -Wno-extra-semi-stmt -Wno-zero-as-null-pointer-constant -Wno-float-conversion -Wno-reserved-macro-identifier -Wno-cast-function-type-strict -Wno-float-equal -Wno-implicit-int-conversion -Wno-shadow -Wno-shadow-field-in-constructor -Wno-cast-qual -Wno-pre-c++14-compat -Wno-global-constructors -Wno-switch-enum -Wno-exit-time-destructors -Wno-ctad-maybe-unsupported -Wno-undefined-func-template -Wno-c++98-compat-extra-semi -Wno-cast-function-type -Wno-nullability-extension -Wno-shadow-field -Wno-conditional-uninitialized -Wno-unused-parameter -Wno-suggest-destructor-override -Wno-shadow-uncaptured-local -Wno-unused-macros -Wno-covered-switch-default -Wno-signed-enum-bitfield -Wno-declaration-after-statement -Wno-implicit-fallthrough -Wno-non-virtual-dtor -Wno-nested-anon-types -Wno-gnu-zero-variadic-macro-arguments -Wno-unreachable-code-break -Wno-inconsistent-missing-destructor-override -Wno-format-pedantic -Wno-nonportable-system-include-path -Wno-undef -Wno-ignored-qualifiers -Wno-used-but-marked-unused -Wno-header-hygiene -Wno-char-subscripts -Wno-unreachable-code-return -Wno-unused-template -Wno-gnu-anonymous-struct -Wno-deprecated-copy-with-user-provided-dtor -Wno-inconsistent-missing-override -Wno-unreachable-code -Wno-deprecated-dynamic-exception-spec -Wno-bad-function-cast -Wno-microsoft-enum-value -Wno-deprecated-copy-with-user-provided-copy -Wno-zero-length-array -Wno-unused-function -Wno-pedantic -Wno-deprecated-copy-with-dtor -Wno-documentation-unknown-command -Wno-undefined-reinterpret-cast -Wno-format-nonliteral -Wno-comma -Wno-documentation-deprecated-sync -Wno-shift-sign-overflow -Wno-pre-c++17-compat-pedantic -Wno-c++98-compat-unnamed-type-template-args -Wno-sign-compare -Wno-format -Wno-c++98-compat-bind-to-temporary-copy -Wno-enum-enum-conversion -Wno-anon-enum-enum-conversion -Wno-range-loop-bind-reference -Wno-enum-float-conversion -Wno-keyword-macro -Wno-deprecated-copy -Wno-unused-member-function -Wno-missing-noreturn -Wno-missing-variable-declarations -Wno-documentation-html -Wno-gnu-redeclared-enum -Wno-deprecated-declarations -Wno-overloaded-virtual -Wno-c++98-c++11-compat-binary-literal -Wno-deprecated-redundant-constexpr-static-def -Wno-missing-braces -Wno-c99-extensions -Wno-strict-prototypes -Wno-unreachable-code-loop-increment -Wno-gnu-case-range -Wno-duplicate-enum -Wno-null-pointer-subtraction -Wno-deprecated-literal-operator -Wno-newline-eof -Wno-microsoft-cast -Wno-date-time -Wno-delete-non-abstract-non-virtual-dtor -Wno-unused-private-field -Wno-flexible-array-extensions -Wno-string-conversion -Wno-final-dtor-non-final-class -Wno-microsoft-unqualified-friend -Wno-invalid-noreturn -Wno-invalid-utf8 -Wno-four-char-constants -Wno-parentheses -Wno-pessimizing-move -Wno-deprecated-non-prototype -Wno-bitfield-enum-conversion -Wno-unused-lambda-capture -Wno-shadow-field-in-constructor-modified -Wno-switch-default -Wno-nan-infinity-disabled -Wno-pre-c11-compat /DWIN32 /D_WINDOWS   /EHsc  /Gy /MP /nologo /J /Gd /showFilenames /EHsc -Wno-unused-command-line-argument -Wno-microsoft-enum-forward-reference /clang:-funsigned-char /clang:-fno-strict-aliasing /clang:-ffp-contract=off -march=x86-64-v2 
+	build link flags: /MACHINE:X64  /SUBSYSTEM:CONSOLE /STACK:2097152 /ignore:4049 /ignore:4217 /ignore:4221
+	build system: CMake
+
+=== [worker:T01_baseline] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T01_baseline --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t01_base.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T01_BaselineWalk']): frames 1..120 (@ 24 FPS), root Y -8.0000m -> -5.6000m (disp=2.4000m, peak_speed=0.6491m/s, unreachable=0)
+WORKER_OK T01_baseline
+
+=== [worker:T01_current] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T01_current --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t01_curr.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T01_CurrentWalk']): frames 1..120 (@ 24 FPS), root Y -8.0000m -> -5.6000m (disp=2.4000m, peak_speed=0.6491m/s, unreachable=0)
+WORKER_OK T01_current
+
+=== [worker:T02] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T02 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t02.json --meas C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\meas_t02.json (rc=0) ===
+00:02.328  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_50616_aa819e9b5c078880e7391e9a75b45689.png.png"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T02_HistRef']): frames 1..36 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T02_StationaryUnilateralFK']): frames 1..36 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Info: Saved as "task10d_stationary_fk.blend"
+WORKER_OK T02
+
+=== [worker:T03] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T03 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t03.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T03']): frames 1..48 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+WORKER_OK T03
+
+=== [worker:T04] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T04 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t04.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T04_Ref']): frames 1..36 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T04']): frames 1..36 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+WORKER_OK T04
+
+=== [worker:T05] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T05 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t05.json --meas C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\meas_t05.json (rc=0) ===
+00:02.375  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_56876_91c2392f7e9d34782e78cd8b9f9ccd6b.png.png"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T05_BilateralIK']): frames 1..48 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Info: Saved as "task10d_bilateral_ik.blend"
+WORKER_OK T05
+
+=== [worker:T06_baseline] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T06_baseline --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t06_base.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T06_WalkingBaseline']): frames 1..92 (@ 24 FPS), root Y 10.2000m -> 11.4000m (disp=1.2000m, peak_speed=0.4873m/s, unreachable=0)
+WORKER_OK T06_baseline
+
+=== [worker:T06] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T06 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t06_walk.json --meas C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\meas_t06.json (rc=0) ===
+00:02.609  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_15932_1838d21fb247115a35223b3d02b8bdb6.png.png"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T06_WalkingUpperLimb']): frames 1..92 (@ 24 FPS), root Y 10.2000m -> 11.4000m (disp=1.2000m, peak_speed=0.4873m/s, unreachable=0)
+Info: Saved as "task10d_walking_upper_limb.blend"
+WORKER_OK T06
+
+=== [worker:T07] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T07 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t07.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T07']): frames 1..36 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+WORKER_OK T07
+
+=== [worker:T08] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T08 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t08.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T08']): frames 1..36 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+WORKER_OK T08
+
+=== [worker:T09] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T09 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t09.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T09_MultiSeg']): frames 1..68 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+WORKER_OK T09
+
+=== [worker:T10] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T10 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t10.json --meas C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\meas_t10.json (rc=0) ===
+00:02.359  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_10280_67700e5a3da5fa7d4a1b4d0d3a363455.png.png"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['ProbeA']): frames 1..4 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['ProbeB']): frames 1..4 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T10_FK_IK_FK']): frames 1..56 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Info: Saved as "task10d_fk_ik_transition.blend"
+WORKER_OK T10
+
+=== [T11_reopen:T02_stationary_fk] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_saved_scene.py -- --blend C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_stationary_fk.blend --measurements C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\frame_measurements.json --scene-key T02_stationary_fk --report C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\reopen_T02_stationary_fk.json (rc=0) ===
+00:01.641  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_stationary_fk.blend"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+VERIFY_SAVED_SCENE_PASS T02_stationary_fk -> C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_stationary_fk.blend
+
+=== [T11_reopen:T05_bilateral_ik] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_saved_scene.py -- --blend C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_bilateral_ik.blend --measurements C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\frame_measurements.json --scene-key T05_bilateral_ik --report C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\reopen_T05_bilateral_ik.json (rc=0) ===
+00:01.484  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_bilateral_ik.blend"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+VERIFY_SAVED_SCENE_PASS T05_bilateral_ik -> C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_bilateral_ik.blend
+
+=== [T11_reopen:T06_walking_upper_limb] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_saved_scene.py -- --blend C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_walking_upper_limb.blend --measurements C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\frame_measurements.json --scene-key T06_walking_upper_limb --report C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\reopen_T06_walking_upper_limb.json (rc=0) ===
+00:01.469  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_walking_upper_limb.blend"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+VERIFY_SAVED_SCENE_PASS T06_walking_upper_limb -> C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_walking_upper_limb.blend
+
+=== [T11_reopen:T10_fk_ik_transition] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_saved_scene.py -- --blend C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_fk_ik_transition.blend --measurements C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\frame_measurements.json --scene-key T10_fk_ik_transition --report C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\reopen_T10_fk_ik_transition.json (rc=0) ===
+00:01.485  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_fk_ik_transition.blend"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+VERIFY_SAVED_SCENE_PASS T10_fk_ik_transition -> C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\task10d_fk_ik_transition.blend
+
+=== [worker:T12] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T12 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t12.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T12_Long']): frames 1..50 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T12_Short']): frames 1..24 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+WORKER_OK T12
+
+=== [worker:T13] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T13 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t13.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+WORKER_OK T13
+
+=== [worker:T14] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T14 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t14.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T14_Start1']): frames 1..36 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['T14_Precursor_1_to_100', 'T14_Start101']): frames 1..136 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+WORKER_OK T14
+
+=== [worker:T15] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T15 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15.json --blenda C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_a.blend --blendb C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_b.blend --measa C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_meas_a.json --measb C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_meas_b.json (rc=0) ===
+00:01.969  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_38224_738ca4f4cc550a63a2854329d6a3d1cf.png.png"
+00:02.235  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_38224_63b6304b9533f8ed663ae855dd9832df.png.png"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T15_config_A']): frames 1..24 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Info: Saved as "t15_config_a.blend"
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T15_config_B']): frames 1..24 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Info: Saved as "t15_config_b.blend"
+WORKER_OK T15
+
+=== [T15_reopen:config_A] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_saved_scene.py -- --blend C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_a.blend --measurements C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_meas_a.json --scene-key config_A --report C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_reopen_config_A.json (rc=0) ===
+00:01.391  blend            | Read blend: "C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_a.blend"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+VERIFY_SAVED_SCENE_PASS config_A -> C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_a.blend
+
+=== [T15_reopen:config_B] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_saved_scene.py -- --blend C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_b.blend --measurements C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_meas_b.json --scene-key config_B --report C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_reopen_config_B.json (rc=0) ===
+00:01.454  blend            | Read blend: "C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_b.blend"
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+VERIFY_SAVED_SCENE_PASS config_B -> C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t15_config_b.blend
+
+=== [worker:T16] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T16 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t16.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T16_PreAnim']): frames 1..24 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+WORKER_OK T16
+
+=== [worker:T17] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T17 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t17.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T17']): frames 1..48 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T17']): frames 1..48 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T17']): frames 1..48 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['T17']): frames 1..48 (@ 24 FPS), root Y -8.0000m -> -8.0000m (disp=0.0000m, peak_speed=0.0000m/s, unreachable=0)
+WORKER_OK T17
+
+=== [worker:T18] cmd: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b --factory-startup --python-exit-code 1 --python C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-4\verify_production_integration.py -- --worker T18 --out C:\Users\64701\.gemini\antigravity\brain\195cba67-abc9-47a3-9c96-4bd0bab568e0\scratch\task10d4_work\t18.json (rc=0) ===
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+WORKER_OK T18
+
+SUMMARY: 18/18 passed, exit_code=0

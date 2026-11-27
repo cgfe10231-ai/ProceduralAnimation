@@ -41,11 +41,30 @@ from src.motion.framework import (
     WORLD_FORWARD_AXIS,
     WORLD_RIGHT_AXIS,
     WORLD_UP_AXIS,
+    build_upper_limb_feedback_metadata,
     forward_unit_vector_from_yaw,
+    root_local_to_world_vector,
 )
-from src.motion.kinematic_bridge import KinematicBridgeExecutor, KinematicPlannedPose, PlannedFootTarget
+from src.motion.kinematic_bridge import (
+    KinematicBridgeExecutor,
+    KinematicPlannedPose,
+    PlannedFootTarget,
+    PlannedHandTarget,
+)
+from src.motion.upper_limb_trajectory import (
+    UpperLimbSegment,
+    _evaluate_upper_limb_progress,
+    _evaluate_upper_limb_segment,
+    _validate_upper_limb_vector,
+    validate_upper_limb_segment_sequence,
+)
 from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET, MAX_LEG_REACH, MIN_LEG_REACH
 from src.scene.environment_query import DynamicsEnvironmentQuery, SurfaceGeometryType, SurfaceQueryResult
+
+
+# UpperLimbSegment, _evaluate_upper_limb_progress, _validate_upper_limb_vector, and
+# _evaluate_upper_limb_segment are converged in src/motion/upper_limb_trajectory.py (TASK 10-d-5)
+# and re-exported above for backward compatibility.
 
 
 # =============================================================================
@@ -798,6 +817,8 @@ class TerrainWalkAction(MotionAction):
         route: Optional[TerrainRouteInput] = None,
         action_name: Optional[str] = None,
         environment: Optional[EnvironmentQuery] = None,
+        upper_limb_L: Optional[Tuple[UpperLimbSegment, ...]] = None,
+        upper_limb_R: Optional[Tuple[UpperLimbSegment, ...]] = None,
     ) -> None:
         if route is not None:
             self.route: Optional[TerrainRouteInput] = route
@@ -824,6 +845,30 @@ class TerrainWalkAction(MotionAction):
             self.route = None
         else:
             raise ValueError("TerrainWalkAction requires either 'route' or 'spec'")
+
+        # [INTRODUCED 2026-11-26T17:52:00+08:00]
+        # TASK: TASK 10-d-4
+        # BLOCK: TerrainWalkAction.__init__() upper-limb segment inputs
+        # PURPOSE: Store caller-provided immutable left/right UpperLimbSegment tuples separately while rejecting empty tuples or invalid element types instead of silently falling back to historical arm swing.
+        # REASON: Resolve P01 / A1 so optional per-side independent upper-limb trajectories are accepted cleanly without altering legacy TerrainWalkAction parameters or lower-limb specs.
+        validated_limbs: Dict[str, Optional[Tuple[UpperLimbSegment, ...]]] = {}
+        for side_label, raw_segs in (("upper_limb_L", upper_limb_L), ("upper_limb_R", upper_limb_R)):
+            if raw_segs is None:
+                validated_limbs[side_label] = None
+                continue
+            if not isinstance(raw_segs, tuple):
+                raise TypeError(f"{side_label} must be None or a tuple of UpperLimbSegment, got {type(raw_segs).__name__}")
+            if len(raw_segs) == 0:
+                raise ValueError(f"{side_label} must not be an empty tuple")
+            for idx, seg in enumerate(raw_segs):
+                if not isinstance(seg, UpperLimbSegment):
+                    raise TypeError(
+                        f"{side_label}[{idx}] must be UpperLimbSegment, got {type(seg).__name__}"
+                    )
+            validated_limbs[side_label] = tuple(raw_segs)
+
+        self.upper_limb_L: Optional[Tuple[UpperLimbSegment, ...]] = validated_limbs["upper_limb_L"]
+        self.upper_limb_R: Optional[Tuple[UpperLimbSegment, ...]] = validated_limbs["upper_limb_R"]
 
         self.environment = environment
         self._action_name = action_name or f"TerrainWalk_{self.spec.course_id}"
@@ -936,6 +981,22 @@ class TerrainWalkAction(MotionAction):
         else:
             schedule, total_frames = build_terrain_step_schedule(
                 self.spec, environment, start_frame=start_frame
+            )
+
+        # [INTRODUCED 2026-11-26T17:52:00+08:00]
+        # TASK: TASK 10-d-4
+        # BLOCK: TerrainWalkAction.execute() pre-loop independent upper-limb segment validation
+        # PURPOSE: Validate caller-supplied left/right UpperLimbSegment sequences against the action timeline before frame 0 executes, verifying field contracts, monotonic non-overlapping times, and same-mode endpoint/space/option compatibility without mutating caller inputs or lower-limb total_frames.
+        # REASON: Resolve A2 / T13 so invalid or discontinuous upper-limb segment schedules fail cleanly before entering the production frame loop.
+        if total_frames < 1:
+            raise ValueError(f"TerrainWalkAction '{self.name}' produced invalid total_frames={total_frames}")
+        max_action_time_sec = (total_frames - 1) / fps
+        for side_label, raw_segs in (("L", self.upper_limb_L), ("R", self.upper_limb_R)):
+            validate_upper_limb_segment_sequence(
+                raw_segs,
+                side_label,
+                max_time_sec=max_action_time_sec,
+                parameter_name=f"upper_limb_{side_label}",
             )
 
         # Monotonic, C1-continuous Hermite knot parameters for Root forward motion
@@ -1271,8 +1332,15 @@ class TerrainWalkAction(MotionAction):
                 "hand.R": (0.0, 0.0, 0.0),
             }
 
-            # 4. Formulate Unified Planned Pose Contract
-            planned_pose = KinematicPlannedPose(
+            # [CONVERGED 2026-11-27T13:55:00+08:00]
+            # TASK: TASK 10-d-5
+            # BLOCK: TerrainWalkAction.execute() converged upper-limb composition & Bridge call
+            # PURPOSE: Compose TerrainWalkAction's full KinematicPlannedPose with optional central or action-local upper-limb tracks through MotionRuntimeContext.compose_planned_pose() without altering lower-limb planning or duplicating segment arbitration.
+            # REASON: Converge all five MotionAction classes onto one shared pure-data upper-limb combination interface before KinematicBridgeExecutor.execute_frame().
+            action_time_sec = f_idx / fps
+
+            # 4. Formulate Unified Planned Pose Contract & Converged Upper-Limb Composition
+            base_planned_pose = KinematicPlannedPose(
                 frame=current_frame,
                 time_seconds=time_sec,
                 root_position=(root_x, root_y, root_z),
@@ -1283,9 +1351,17 @@ class TerrainWalkAction(MotionAction):
                 spine_rotation_deg=spine_rot_deg,
                 neck_rotation_deg=neck_rot_deg,
                 head_rotation_deg=head_rot_deg,
+                hand_L=None,
+                hand_R=None,
                 foot_L=foot_l_tgt,
                 foot_R=foot_r_tgt,
                 fk_joint_rotations_deg=fk_rotations,
+            )
+            planned_pose, compose_diag = context.compose_planned_pose(
+                base_planned_pose,
+                action_upper_limb_L=self.upper_limb_L,
+                action_upper_limb_R=self.upper_limb_R,
+                action_time_sec=action_time_sec,
             )
 
             # 5. Execute 6-Phase Frame via Bridge & WholeBodyController
@@ -1313,11 +1389,16 @@ class TerrainWalkAction(MotionAction):
             # Extract contacts & telemetry
             eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
             eff_r = bridge_res.wbc_result.end_effectors.get("foot_R")
+            eff_hand_l = bridge_res.wbc_result.end_effectors.get("hand_L")
+            eff_hand_r = bridge_res.wbc_result.end_effectors.get("hand_R")
             drift_l = eff_l.position_error_m if eff_l else 0.0
             drift_r = eff_r.position_error_m if eff_r else 0.0
             reach_l = eff_l.is_reachable if eff_l else True
             reach_r = eff_r.is_reachable if eff_r else True
 
+            upper_fb = build_upper_limb_feedback_metadata(
+                bridge_res, compose_diag, hist_arm_l_rx=arm_l_rx, hist_arm_r_rx=arm_r_rx
+            )
             ms_params = dict(ms.params)
             ms_params.update({
                 "planned_phase_l": phase_l,
@@ -1326,6 +1407,13 @@ class TerrainWalkAction(MotionAction):
                 "planned_locked_r": foot_r_tgt.is_locked,
                 "planned_target_l": foot_l_tgt.world_xyz,
                 "planned_target_r": foot_r_tgt.world_xyz,
+                "arm_l_rx": upper_fb["arm_l_rx_effective"],
+                "arm_r_rx": upper_fb["arm_r_rx_effective"],
+                "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                "planned_upper_limb": upper_fb["planned_upper_limb"],
+                "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
+                "actual_upper_limb": upper_fb["actual_upper_limb"],
             })
             ms = ms.clone_with(mode=mode, params=ms_params)
 
@@ -1333,6 +1421,11 @@ class TerrainWalkAction(MotionAction):
             states.append(ms)
 
             # Build 6-Phase Diagnostic Record for this frame
+            # [INTRODUCED 2026-11-26T17:52:00+08:00]
+            # [UPDATED 2026-11-27T13:55:00+08:00] TASK 10-d-5
+            # BLOCK: frame_records motion_planning & actual_armature upper-limb diagnostics
+            # PURPOSE: Record action/sequence upper-limb source, mode/segment index, planned target, historical reference separation, actual wrist position, IK tracking error, and IK reachability inside existing frame_records diagnostics.
+            # REASON: Converge upper-limb diagnostics onto compose_planned_pose() & build_upper_limb_feedback_metadata() without fabricating FK tracking accuracy or impersonating actual targets with historical arm_l_rx/arm_r_rx.
             prev_y = frame_records[-1]["root_y"] if frame_records else root_y
             speed_mps = abs(root_y - prev_y) * fps
             frame_records.append({
@@ -1355,6 +1448,7 @@ class TerrainWalkAction(MotionAction):
                 # Phase 2: Motion Planning
                 "motion_planning": {
                     "action_name": self.name,
+                    "action_time_sec": round(action_time_sec, 6),
                     "active_step_k": active_step.k if active_step else -1,
                     "stage_name": active_step.stage_name if active_step else "standing",
                     "phase_L": phase_l,
@@ -1363,6 +1457,16 @@ class TerrainWalkAction(MotionAction):
                     "planned_foot_R": [round(v, 4) for v in foot_r_tgt.world_xyz],
                     "foot_pitch_L": round(foot_l_tgt.rotation_deg[0], 2),
                     "foot_pitch_R": round(foot_r_tgt.rotation_deg[0], 2),
+                    "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                    "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                    "upper_limb_mode_L": compose_diag["L"]["mode"],
+                    "upper_limb_mode_R": compose_diag["R"]["mode"],
+                    "upper_limb_segment_index_L": compose_diag["L"]["segment_index"],
+                    "upper_limb_segment_index_R": compose_diag["R"]["segment_index"],
+                    "planned_hand_L": compose_diag["L"]["planned_target"],
+                    "planned_hand_R": compose_diag["R"]["planned_target"],
+                    "planned_upper_limb": upper_fb["planned_upper_limb"],
+                    "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
                 },
                 # Phase 3: Kinematic Bridge
                 "kinematic_bridge": {
@@ -1384,6 +1488,15 @@ class TerrainWalkAction(MotionAction):
                     "mass_kg": round(bridge_res.wbc_result.com_result.total_mass_kg, 2) if bridge_res.wbc_result.com_result else 70.0,
                     "ankle_L_world": [round(v, 4) for v in eff_l.actual_world_xyz] if eff_l else [0, 0, 0],
                     "ankle_R_world": [round(v, 4) for v in eff_r.actual_world_xyz] if eff_r else [0, 0, 0],
+                    "wrist_L_world": [round(v, 5) for v in eff_hand_l.actual_world_xyz] if eff_hand_l else None,
+                    "wrist_R_world": [round(v, 5) for v in eff_hand_r.actual_world_xyz] if eff_hand_r else None,
+                    "hand_ik_enabled_L": bool(eff_hand_l and eff_hand_l.enabled),
+                    "hand_ik_enabled_R": bool(eff_hand_r and eff_hand_r.enabled),
+                    "hand_tracking_error_L_m": round(eff_hand_l.position_error_m, 6) if (eff_hand_l and eff_hand_l.enabled) else None,
+                    "hand_tracking_error_R_m": round(eff_hand_r.position_error_m, 6) if (eff_hand_r and eff_hand_r.enabled) else None,
+                    "hand_reachable_L": eff_hand_l.is_reachable if (eff_hand_l and eff_hand_l.enabled) else None,
+                    "hand_reachable_R": eff_hand_r.is_reachable if (eff_hand_r and eff_hand_r.enabled) else None,
+                    "actual_upper_limb": upper_fb["actual_upper_limb"],
                 },
                 # Phase 6: Validation Metrics
                 "validation": {

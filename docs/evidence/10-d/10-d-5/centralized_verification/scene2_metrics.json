@@ -1,0 +1,301 @@
+{
+  "scene_tag": "scene2",
+  "asset": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_running_whole_body.blend",
+    "relative_path": "output/task10d_running_whole_body.blend",
+    "size_bytes": 474350,
+    "sha256": "5bda09fd6ac963b877904cbfa5800b0373a50e5aff5f45429fb62de041e9310f",
+    "frame_start": 1,
+    "frame_end": 528,
+    "frame_count": 528,
+    "fps": 24,
+    "duration_sec": 22.0
+  },
+  "input_file": "docs/evidence/10-d/10-d-5/centralized_verification/scene2_inputs.json",
+  "input_sha256": "d93a810a2f9740b7cf5dbef96687ac7551509427db62aa081e706cf8897214c2",
+  "effective_segments": {
+    "L_count": 20,
+    "L_active_sec": 21.7583,
+    "L_active_ratio": 0.989,
+    "R_count": 20,
+    "R_active_sec": 21.7083,
+    "R_active_ratio": 0.9867
+  },
+  "mode_combinations_observed": [
+    [
+      "FK",
+      "FK"
+    ],
+    [
+      "FK",
+      "IK"
+    ],
+    [
+      "IK",
+      "FK"
+    ],
+    [
+      "IK",
+      "IK"
+    ]
+  ],
+  "switches": {
+    "f_L_sw1": 97,
+    "f_R_sw1": 181,
+    "f_L_sw2": 349,
+    "f_R_sw2": 433
+  },
+  "markers_count": 7,
+  "call_chain": {
+    "expected_frames": 528,
+    "planner_execute_calls": 1,
+    "compose_calls": 528,
+    "bridge_exec_calls": 528,
+    "wbc_exec_calls": 528,
+    "unique_planner_instances": 1,
+    "unique_context_instances": 1,
+    "unique_bridge_instances": 1,
+    "unique_wbc_instances": 1,
+    "planner_ids": [
+      1536228343184
+    ],
+    "bridge_ids": [
+      1536228339664
+    ],
+    "wbc_ids": [
+      1536228342864
+    ],
+    "non_upper_integrity_mismatches": 0,
+    "compose_vs_bridge_mismatches": 0,
+    "all_wbc_success": true
+  },
+  "full_timeline_whole_body": {
+    "frame_range": [
+      1,
+      528
+    ],
+    "frame_count": 528,
+    "root_world_disp_m": 19.762500762939453,
+    "pelvis_local_dz_span_m": 0.04800000041723251,
+    "pelvis_rel_span_deg": 8.074561039310593,
+    "spine_rel_span_deg": 9.667484130192598,
+    "lower_L": {
+      "thigh_rel_span_deg": 19.685617949261434,
+      "shin_rel_span_deg": 31.87742886485273,
+      "foot_rel_span_deg": 12.573398445331938,
+      "ankle_world_span_m": 19.765119273669587
+    },
+    "lower_R": {
+      "thigh_rel_span_deg": 19.685649839966285,
+      "shin_rel_span_deg": 31.87745644313304,
+      "foot_rel_span_deg": 12.57338426065344,
+      "ankle_world_span_m": 19.74502734228371
+    },
+    "upper_L": {
+      "upper_arm_rel_span_deg": 73.56834562596886,
+      "forearm_rel_span_deg": 67.42121155250206,
+      "hand_rel_span_deg": 32.945642710180294,
+      "wrist_root_local_span_m": 0.9666426885907706,
+      "elbow_pole_span_m": 0.5393262019214126
+    },
+    "upper_R": {
+      "upper_arm_rel_span_deg": 77.41736626023913,
+      "forearm_rel_span_deg": 66.72483951781952,
+      "hand_rel_span_deg": 31.750703899454486,
+      "wrist_root_local_span_m": 0.9487455470319484,
+      "elbow_pole_span_m": 0.5393259819402239
+    }
+  },
+  "stage_metrics": {
+    "win_00_04s_FK_FK": {
+      "frame_range": [
+        1,
+        96
+      ],
+      "frame_count": 96,
+      "root_world_disp_m": 3.5625,
+      "pelvis_local_dz_span_m": 0.04800000041723251,
+      "pelvis_rel_span_deg": 8.074561039310593,
+      "spine_rel_span_deg": 9.667484130192598,
+      "lower_L": {
+        "thigh_rel_span_deg": 19.685532892487984,
+        "shin_rel_span_deg": 31.87740856898529,
+        "foot_rel_span_deg": 12.573278488900172,
+        "ankle_world_span_m": 3.5651713638417655
+      },
+      "lower_R": {
+        "thigh_rel_span_deg": 19.685532620238952,
+        "shin_rel_span_deg": 31.877411160466135,
+        "foot_rel_span_deg": 12.573298589686255,
+        "ankle_world_span_m": 3.545115141043731
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 51.93566438851449,
+        "forearm_rel_span_deg": 52.26380565577992,
+        "hand_rel_span_deg": 31.94613852601304,
+        "wrist_root_local_span_m": 0.9666426885907706,
+        "elbow_pole_span_m": 1.1920928955078125e-07
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 59.23507045720755,
+        "forearm_rel_span_deg": 46.72048442414758,
+        "hand_rel_span_deg": 21.829514689938495,
+        "wrist_root_local_span_m": 0.8711987090165714,
+        "elbow_pole_span_m": 1.1920928955078125e-07
+      }
+    },
+    "win_04_07s_IK_FK": {
+      "frame_range": [
+        97,
+        180
+      ],
+      "frame_count": 84,
+      "root_world_disp_m": 3.1125001907348633,
+      "pelvis_local_dz_span_m": 0.04800000041723251,
+      "pelvis_rel_span_deg": 8.074561039310593,
+      "spine_rel_span_deg": 9.667484130192598,
+      "lower_L": {
+        "thigh_rel_span_deg": 19.685561327376586,
+        "shin_rel_span_deg": 31.877397841291547,
+        "foot_rel_span_deg": 12.573307367787372,
+        "ankle_world_span_m": 2.9227830827388503
+      },
+      "lower_R": {
+        "thigh_rel_span_deg": 19.68560183444889,
+        "shin_rel_span_deg": 31.87741388544469,
+        "foot_rel_span_deg": 12.573322727219521,
+        "ankle_world_span_m": 3.2952769692773605
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 33.93045171035054,
+        "forearm_rel_span_deg": 36.4213558046886,
+        "hand_rel_span_deg": 24.391019908789342,
+        "wrist_root_local_span_m": 0.30569186621485306,
+        "elbow_pole_span_m": 0.40103448494669547
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 54.101029379295966,
+        "forearm_rel_span_deg": 39.798522602854106,
+        "hand_rel_span_deg": 31.750703899454486,
+        "wrist_root_local_span_m": 0.368627654691704,
+        "elbow_pole_span_m": 0.0
+      }
+    },
+    "win_07_14s_IK_IK": {
+      "frame_range": [
+        181,
+        348
+      ],
+      "frame_count": 168,
+      "root_world_disp_m": 6.262499809265137,
+      "pelvis_local_dz_span_m": 0.04800000041723251,
+      "pelvis_rel_span_deg": 8.074561039310593,
+      "spine_rel_span_deg": 9.667484130192598,
+      "lower_L": {
+        "thigh_rel_span_deg": 19.68561707918195,
+        "shin_rel_span_deg": 31.877407010619876,
+        "foot_rel_span_deg": 12.573398445331938,
+        "ankle_world_span_m": 6.245068789486977
+      },
+      "lower_R": {
+        "thigh_rel_span_deg": 19.685638362456682,
+        "shin_rel_span_deg": 31.877392885012597,
+        "foot_rel_span_deg": 12.573373682256108,
+        "ankle_world_span_m": 6.2651451812607295
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 28.93918717677885,
+        "forearm_rel_span_deg": 22.97224474202555,
+        "hand_rel_span_deg": 26.26524994907242,
+        "wrist_root_local_span_m": 0.2788609786846196,
+        "elbow_pole_span_m": 0.14608255456854696
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 25.39004638318095,
+        "forearm_rel_span_deg": 34.82309183268487,
+        "hand_rel_span_deg": 24.703546198144576,
+        "wrist_root_local_span_m": 0.3123424396743066,
+        "elbow_pole_span_m": 0.39545689035846093
+      }
+    },
+    "win_14_18s_FK_IK": {
+      "frame_range": [
+        349,
+        432
+      ],
+      "frame_count": 84,
+      "root_world_disp_m": 3.1125001907348633,
+      "pelvis_local_dz_span_m": 0.04800000041723251,
+      "pelvis_rel_span_deg": 8.074561039310593,
+      "spine_rel_span_deg": 9.667484130192598,
+      "lower_L": {
+        "thigh_rel_span_deg": 19.685553101358412,
+        "shin_rel_span_deg": 31.877409993852854,
+        "foot_rel_span_deg": 12.573373207031562,
+        "ankle_world_span_m": 3.2952762563211646
+      },
+      "lower_R": {
+        "thigh_rel_span_deg": 19.68553957479443,
+        "shin_rel_span_deg": 31.877444220276118,
+        "foot_rel_span_deg": 12.57338426065344,
+        "ankle_world_span_m": 2.9227830670877326
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 51.603344202003704,
+        "forearm_rel_span_deg": 44.54695850512539,
+        "hand_rel_span_deg": 30.907942404395172,
+        "wrist_root_local_span_m": 0.5993382845801397,
+        "elbow_pole_span_m": 0.0
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 18.053906535960106,
+        "forearm_rel_span_deg": 28.779204520685266,
+        "hand_rel_span_deg": 27.13894317600402,
+        "wrist_root_local_span_m": 0.29031322074741506,
+        "elbow_pole_span_m": 0.1075962513403814
+      }
+    },
+    "win_18_22s_FK_FK": {
+      "frame_range": [
+        433,
+        528
+      ],
+      "frame_count": 96,
+      "root_world_disp_m": 3.5625,
+      "pelvis_local_dz_span_m": 0.04800000041723251,
+      "pelvis_rel_span_deg": 8.074561039310593,
+      "spine_rel_span_deg": 9.667484130192598,
+      "lower_L": {
+        "thigh_rel_span_deg": 19.685599308730946,
+        "shin_rel_span_deg": 31.877405640212448,
+        "foot_rel_span_deg": 12.57324331903071,
+        "ankle_world_span_m": 3.5651693501689437
+      },
+      "lower_R": {
+        "thigh_rel_span_deg": 19.68560904988931,
+        "shin_rel_span_deg": 31.877428332508924,
+        "foot_rel_span_deg": 12.573258281700975,
+        "ankle_world_span_m": 3.5451175549583396
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 69.29105524352552,
+        "forearm_rel_span_deg": 49.697603259869695,
+        "hand_rel_span_deg": 24.11902782534855,
+        "wrist_root_local_span_m": 0.8382374388938122,
+        "elbow_pole_span_m": 0.0
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 64.30174851474324,
+        "forearm_rel_span_deg": 64.41147419294542,
+        "hand_rel_span_deg": 24.21397830989593,
+        "wrist_root_local_span_m": 0.763648994302906,
+        "elbow_pole_span_m": 0.0
+      }
+    }
+  },
+  "extra_checks": {
+    "airborne_flight_frames": 220,
+    "airborne_wrist_local_span_L_m": 0.9499622070738435,
+    "airborne_wrist_local_span_R_m": 0.9487455470319484
+  }
+}

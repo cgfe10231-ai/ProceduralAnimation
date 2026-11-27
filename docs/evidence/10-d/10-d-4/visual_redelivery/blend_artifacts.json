@@ -1,0 +1,20 @@
+{
+  "task10d_full_body_independent_fk": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_full_body_independent_fk.blend",
+    "relative_path": "output/task10d_full_body_independent_fk.blend",
+    "size_bytes": 235462,
+    "sha256": "b454e6c2c2ca0252276b4545b02191fb20292a742879ad1f62a0083be9cfa3df",
+    "frame_start": 1,
+    "frame_end": 240,
+    "frame_count": 240
+  },
+  "task10d_full_body_independent_ik": {
+    "path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_full_body_independent_ik.blend",
+    "relative_path": "output/task10d_full_body_independent_ik.blend",
+    "size_bytes": 243400,
+    "sha256": "0cbede1fd3e90feac994da80e944fb7b9ff9607cb5697f77ecf68d10ca2e8320",
+    "frame_start": 1,
+    "frame_end": 240,
+    "frame_count": 240
+  }
+}

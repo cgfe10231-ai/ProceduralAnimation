@@ -1,0 +1,1409 @@
+{
+  "task": "TASK 10-d-3 — 独立上肢轨迹目标专项验证",
+  "command": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe -B docs/evidence/10-d/10-d-3/verify_upper_limb_segment.py",
+  "exit_code": 0,
+  "source_baseline": {
+    "branch": "task/10-d",
+    "head": "e3e557e8fed57ce813ec9c899327f2c1ba561f7f",
+    "file_blobs": {
+      "src/motion/contact_model.py": "f558f42af4769d3f0ec7e74c37bacd78d7ebabb2",
+      "src/motion/framework.py": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+      "src/motion/kinematic_bridge.py": "abdc74455075b83f7188c3dffabc64e456258326",
+      "src/motion/terrain_walk.py": "aeddb52443bd448081e52e4be7261d0ab105592f"
+    },
+    "extracted_definitions": [
+      {
+        "symbol": "ContactType",
+        "kind": "class",
+        "source_file": "src/motion/contact_model.py",
+        "source_blob": "f558f42af4769d3f0ec7e74c37bacd78d7ebabb2",
+        "lines": [
+          46,
+          50
+        ],
+        "sha256": "6ebf916a28c05a01bf01ae8d8e1f52bacc257449fc695f7f0ebb9ab5d607963d"
+      },
+      {
+        "symbol": "right_unit_vector_from_yaw",
+        "kind": "def",
+        "source_file": "src/motion/framework.py",
+        "source_blob": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+        "lines": [
+          80,
+          83
+        ],
+        "sha256": "e20447aa9fd7ada6b07ab3c6f22c14bae05fc5f9071ed4884ceb3b9b2cbb8f53"
+      },
+      {
+        "symbol": "forward_unit_vector_from_yaw",
+        "kind": "def",
+        "source_file": "src/motion/framework.py",
+        "source_blob": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+        "lines": [
+          70,
+          77
+        ],
+        "sha256": "3336428e088b151aec51221f8e36c48048e06acc11da10cd52e235c8f56f8550"
+      },
+      {
+        "symbol": "root_local_to_world_vector",
+        "kind": "def",
+        "source_file": "src/motion/framework.py",
+        "source_blob": "e9e68176e4166b249474caeb58ed3b3a1bd3ccc8",
+        "lines": [
+          100,
+          111
+        ],
+        "sha256": "c13d98207e9c3baaaa91c2d268730f01536b9c5084c82cbacd1cc74460796109"
+      },
+      {
+        "symbol": "PlannedHandTarget",
+        "kind": "class",
+        "source_file": "src/motion/kinematic_bridge.py",
+        "source_blob": "abdc74455075b83f7188c3dffabc64e456258326",
+        "lines": [
+          104,
+          120
+        ],
+        "sha256": "e6d730e1f208402722ef9103010eb5a3e370c9b24b112dd0d00aad2aa425969f"
+      },
+      {
+        "symbol": "UpperLimbSegment",
+        "kind": "class",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          62,
+          83
+        ],
+        "sha256": "98461b3fbd0fa313843a7ab95b15f5fdbc3d8702842d40befda94f5005cf7ad4"
+      },
+      {
+        "symbol": "_evaluate_upper_limb_progress",
+        "kind": "def",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          107,
+          164
+        ],
+        "sha256": "e930519c622bcf406d09b2a427553ce463225047514127f2582aaa91e38f9b83"
+      },
+      {
+        "symbol": "_validate_upper_limb_vector",
+        "kind": "def",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          172,
+          197
+        ],
+        "sha256": "06a3a2fbd1a7f93374e1f4993100c16ef4949ab00c5d95acdd7491e9fcb9bba4"
+      },
+      {
+        "symbol": "_evaluate_upper_limb_segment",
+        "kind": "def",
+        "source_file": "src/motion/terrain_walk.py",
+        "source_blob": "aeddb52443bd448081e52e4be7261d0ab105592f",
+        "lines": [
+          205,
+          406
+        ],
+        "sha256": "955cd911cd81820d95ca1367406cc1af3ecb4d948818b5288b1c1578de149627"
+      }
+    ]
+  },
+  "summary": {
+    "executed": 18,
+    "passed": 18,
+    "failed": 0
+  },
+  "tests": [
+    {
+      "id": "T01",
+      "title": "FK 时间边界",
+      "status": "PASS",
+      "max_abs_err": 0.0,
+      "tolerance": 1e-12,
+      "subcases": [
+        {
+          "input_time_sec": 0.5,
+          "h": 0.0,
+          "expected": {
+            "upper_arm.L": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "forearm.L": [
+              10.0,
+              -20.0,
+              30.0
+            ],
+            "hand.L": [
+              -5.0,
+              15.0,
+              -25.0
+            ]
+          },
+          "actual": {
+            "upper_arm.L": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "forearm.L": [
+              10.0,
+              -20.0,
+              30.0
+            ],
+            "hand.L": [
+              -5.0,
+              15.0,
+              -25.0
+            ]
+          },
+          "max_abs_err": 0.0
+        },
+        {
+          "input_time_sec": 2.0,
+          "h": 0.0,
+          "expected": {
+            "upper_arm.L": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "forearm.L": [
+              10.0,
+              -20.0,
+              30.0
+            ],
+            "hand.L": [
+              -5.0,
+              15.0,
+              -25.0
+            ]
+          },
+          "actual": {
+            "upper_arm.L": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "forearm.L": [
+              10.0,
+              -20.0,
+              30.0
+            ],
+            "hand.L": [
+              -5.0,
+              15.0,
+              -25.0
+            ]
+          },
+          "max_abs_err": 0.0
+        },
+        {
+          "input_time_sec": 3.0,
+          "h": 0.103515625,
+          "expected": {
+            "upper_arm.L": [
+              2.0703125,
+              -4.140625,
+              6.2109375
+            ],
+            "forearm.L": [
+              14.140625,
+              -15.859375,
+              25.859375
+            ],
+            "hand.L": [
+              -2.9296875,
+              12.9296875,
+              -16.71875
+            ]
+          },
+          "actual": {
+            "upper_arm.L": [
+              2.0703125,
+              -4.140625,
+              6.2109375
+            ],
+            "forearm.L": [
+              14.140625,
+              -15.859375,
+              25.859375
+            ],
+            "hand.L": [
+              -2.9296875,
+              12.9296875,
+              -16.71875
+            ]
+          },
+          "max_abs_err": 0.0
+        },
+        {
+          "input_time_sec": 4.0,
+          "h": 0.5,
+          "expected": {
+            "upper_arm.L": [
+              10.0,
+              -20.0,
+              30.0
+            ],
+            "forearm.L": [
+              30.0,
+              0.0,
+              10.0
+            ],
+            "hand.L": [
+              5.0,
+              5.0,
+              15.0
+            ]
+          },
+          "actual": {
+            "upper_arm.L": [
+              10.0,
+              -20.0,
+              30.0
+            ],
+            "forearm.L": [
+              30.0,
+              0.0,
+              10.0
+            ],
+            "hand.L": [
+              5.0,
+              5.0,
+              15.0
+            ]
+          },
+          "max_abs_err": 0.0
+        },
+        {
+          "input_time_sec": 5.0,
+          "h": 0.896484375,
+          "expected": {
+            "upper_arm.L": [
+              17.9296875,
+              -35.859375,
+              53.7890625
+            ],
+            "forearm.L": [
+              45.859375,
+              15.859375,
+              -5.859375
+            ],
+            "hand.L": [
+              12.9296875,
+              -2.9296875,
+              46.71875
+            ]
+          },
+          "actual": {
+            "upper_arm.L": [
+              17.9296875,
+              -35.859375,
+              53.7890625
+            ],
+            "forearm.L": [
+              45.859375,
+              15.859375,
+              -5.859375
+            ],
+            "hand.L": [
+              12.9296875,
+              -2.9296875,
+              46.71875
+            ]
+          },
+          "max_abs_err": 0.0
+        },
+        {
+          "input_time_sec": 6.0,
+          "h": 1.0,
+          "expected": {
+            "upper_arm.L": [
+              20.0,
+              -40.0,
+              60.0
+            ],
+            "forearm.L": [
+              50.0,
+              20.0,
+              -10.0
+            ],
+            "hand.L": [
+              15.0,
+              -5.0,
+              55.0
+            ]
+          },
+          "actual": {
+            "upper_arm.L": [
+              20.0,
+              -40.0,
+              60.0
+            ],
+            "forearm.L": [
+              50.0,
+              20.0,
+              -10.0
+            ],
+            "hand.L": [
+              15.0,
+              -5.0,
+              55.0
+            ]
+          },
+          "max_abs_err": 0.0
+        },
+        {
+          "input_time_sec": 7.5,
+          "h": 1.0,
+          "expected": {
+            "upper_arm.L": [
+              20.0,
+              -40.0,
+              60.0
+            ],
+            "forearm.L": [
+              50.0,
+              20.0,
+              -10.0
+            ],
+            "hand.L": [
+              15.0,
+              -5.0,
+              55.0
+            ]
+          },
+          "actual": {
+            "upper_arm.L": [
+              20.0,
+              -40.0,
+              60.0
+            ],
+            "forearm.L": [
+              50.0,
+              20.0,
+              -10.0
+            ],
+            "hand.L": [
+              15.0,
+              -5.0,
+              55.0
+            ]
+          },
+          "max_abs_err": 0.0
+        }
+      ]
+    },
+    {
+      "id": "T02",
+      "title": "FK 独立三轴插值",
+      "status": "PASS",
+      "h": 0.103515625,
+      "max_abs_err": 0.0,
+      "components_count": 9,
+      "components": [
+        {
+          "bone": "upper_arm.R",
+          "axis": "x",
+          "input_start": 10.0,
+          "input_end": 30.0,
+          "expected": 12.0703125,
+          "actual": 12.0703125,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "upper_arm.R",
+          "axis": "y",
+          "input_start": -20.0,
+          "input_end": 20.0,
+          "expected": -15.859375,
+          "actual": -15.859375,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "upper_arm.R",
+          "axis": "z",
+          "input_start": 30.0,
+          "input_end": -10.0,
+          "expected": 25.859375,
+          "actual": 25.859375,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "forearm.R",
+          "axis": "x",
+          "input_start": -40.0,
+          "input_end": 40.0,
+          "expected": -31.71875,
+          "actual": -31.71875,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "forearm.R",
+          "axis": "y",
+          "input_start": 50.0,
+          "input_end": -30.0,
+          "expected": 41.71875,
+          "actual": 41.71875,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "forearm.R",
+          "axis": "z",
+          "input_start": -60.0,
+          "input_end": 20.0,
+          "expected": -51.71875,
+          "actual": -51.71875,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "hand.R",
+          "axis": "x",
+          "input_start": 7.0,
+          "input_end": -13.0,
+          "expected": 4.9296875,
+          "actual": 4.9296875,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "hand.R",
+          "axis": "y",
+          "input_start": -8.0,
+          "input_end": 32.0,
+          "expected": -3.859375,
+          "actual": -3.859375,
+          "abs_err": 0.0
+        },
+        {
+          "bone": "hand.R",
+          "axis": "z",
+          "input_start": 9.0,
+          "input_end": 49.0,
+          "expected": 13.140625,
+          "actual": 13.140625,
+          "abs_err": 0.0
+        }
+      ]
+    },
+    {
+      "id": "T03",
+      "title": "左右侧隔离",
+      "status": "PASS",
+      "left": {
+        "expected_keys": [
+          "upper_arm.L",
+          "forearm.L",
+          "hand.L"
+        ],
+        "actual_keys": [
+          "upper_arm.L",
+          "forearm.L",
+          "hand.L"
+        ]
+      },
+      "right": {
+        "expected_keys": [
+          "upper_arm.R",
+          "forearm.R",
+          "hand.R"
+        ],
+        "actual_keys": [
+          "upper_arm.R",
+          "forearm.R",
+          "hand.R"
+        ]
+      }
+    },
+    {
+      "id": "T04",
+      "title": "IK 世界空间插值",
+      "status": "PASS",
+      "max_abs_err": 0.0,
+      "subcases": [
+        {
+          "input_time_sec": 2.0,
+          "expected_world_xyz": [
+            0.3,
+            -0.4,
+            1.1
+          ],
+          "actual_root0": [
+            0.3,
+            -0.4,
+            1.1
+          ],
+          "actual_root_shifted": [
+            0.3,
+            -0.4,
+            1.1
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_time_sec": 3.0,
+          "expected_world_xyz": [
+            0.34140624999999997,
+            -0.27578125000000003,
+            1.1828125
+          ],
+          "actual_root0": [
+            0.34140624999999997,
+            -0.27578125000000003,
+            1.1828125
+          ],
+          "actual_root_shifted": [
+            0.34140624999999997,
+            -0.27578125000000003,
+            1.1828125
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_time_sec": 4.0,
+          "expected_world_xyz": [
+            0.5,
+            0.2,
+            1.5
+          ],
+          "actual_root0": [
+            0.5,
+            0.2,
+            1.5
+          ],
+          "actual_root_shifted": [
+            0.5,
+            0.2,
+            1.5
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_time_sec": 6.0,
+          "expected_world_xyz": [
+            0.7,
+            0.8,
+            1.9
+          ],
+          "actual_root0": [
+            0.7,
+            0.8,
+            1.9
+          ],
+          "actual_root_shifted": [
+            0.7,
+            0.8,
+            1.9
+          ],
+          "abs_err": 0.0
+        }
+      ]
+    },
+    {
+      "id": "T05",
+      "title": "IK Root 局部空间转换",
+      "status": "PASS",
+      "root_position": [
+        5.0,
+        -3.0,
+        1.2
+      ],
+      "root_yaw_deg": 37.0,
+      "max_abs_err": 0.0,
+      "subcases": [
+        {
+          "input_time_sec": 1.0,
+          "local_interp": [
+            0.2,
+            0.5,
+            0.3
+          ],
+          "expected_world_xyz": [
+            4.858819590433434,
+            -2.4803192403459438,
+            1.5
+          ],
+          "actual_world_xyz": [
+            4.858819590433434,
+            -2.4803192403459438,
+            1.5
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_time_sec": 1.5,
+          "local_interp": [
+            0.13789062500000002,
+            0.5310546875,
+            0.36210937499999996
+          ],
+          "expected_world_xyz": [
+            4.790527660574798,
+            -2.4928962191086064,
+            1.562109375
+          ],
+          "actual_world_xyz": [
+            4.790527660574798,
+            -2.4928962191086064,
+            1.562109375
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_time_sec": 2.0,
+          "local_interp": [
+            -0.1,
+            0.65,
+            0.6
+          ],
+          "expected_world_xyz": [
+            4.528956683946439,
+            -2.5410684207844643,
+            1.7999999999999998
+          ],
+          "actual_world_xyz": [
+            4.528956683946439,
+            -2.5410684207844643,
+            1.7999999999999998
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_time_sec": 3.0,
+          "local_interp": [
+            -0.4,
+            0.8,
+            0.9
+          ],
+          "expected_world_xyz": [
+            4.199093777459444,
+            -2.6018176012229848,
+            2.1
+          ],
+          "actual_world_xyz": [
+            4.199093777459444,
+            -2.6018176012229848,
+            2.1
+          ],
+          "abs_err": 0.0
+        }
+      ]
+    },
+    {
+      "id": "T06",
+      "title": "偏航角数学合同",
+      "status": "PASS",
+      "max_abs_err": 0.0,
+      "subcases": [
+        {
+          "input_local": [
+            1.0,
+            2.0,
+            3.0
+          ],
+          "input_root": [
+            10.0,
+            20.0,
+            30.0
+          ],
+          "input_yaw_deg": 0.0,
+          "expected_world_xyz": [
+            11.0,
+            22.0,
+            33.0
+          ],
+          "actual_world_xyz": [
+            11.0,
+            22.0,
+            33.0
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_local": [
+            1.0,
+            2.0,
+            3.0
+          ],
+          "input_root": [
+            10.0,
+            20.0,
+            30.0
+          ],
+          "input_yaw_deg": 90.0,
+          "expected_world_xyz": [
+            8.0,
+            21.0,
+            33.0
+          ],
+          "actual_world_xyz": [
+            8.0,
+            21.0,
+            33.0
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_local": [
+            1.0,
+            2.0,
+            3.0
+          ],
+          "input_root": [
+            10.0,
+            20.0,
+            30.0
+          ],
+          "input_yaw_deg": -90.0,
+          "expected_world_xyz": [
+            12.0,
+            19.0,
+            33.0
+          ],
+          "actual_world_xyz": [
+            12.0,
+            19.0,
+            33.0
+          ],
+          "abs_err": 0.0
+        },
+        {
+          "input_local": [
+            1.0,
+            2.0,
+            3.0
+          ],
+          "input_root": [
+            10.0,
+            20.0,
+            30.0
+          ],
+          "input_yaw_deg": 180.0,
+          "expected_world_xyz": [
+            9.0,
+            18.0,
+            33.0
+          ],
+          "actual_world_xyz": [
+            9.0,
+            18.0,
+            33.0
+          ],
+          "abs_err": 0.0
+        }
+      ]
+    },
+    {
+      "id": "T07",
+      "title": "Root 平移反事实",
+      "status": "PASS",
+      "root_1": [
+        1.5,
+        -2.0,
+        0.5
+      ],
+      "root_2": [
+        11.5,
+        4.0,
+        -3.5
+      ],
+      "expected_delta": [
+        10.0,
+        6.0,
+        -4.0
+      ],
+      "actual_wrist_delta": [
+        10.0,
+        6.0,
+        -4.0
+      ],
+      "actual_pole_delta": [
+        10.0,
+        6.0,
+        -4.0
+      ],
+      "wrist_abs_err": 0.0,
+      "pole_abs_err": 0.0
+    },
+    {
+      "id": "T08",
+      "title": "ElbowPole 合同",
+      "status": "PASS",
+      "world_mid": {
+        "expected": [
+          -0.4,
+          -0.6,
+          1.2
+        ],
+        "actual": [
+          -0.4,
+          -0.6000000000000001,
+          1.2
+        ],
+        "abs_err": 1.1102230246251565e-16
+      },
+      "local_yaw90": {
+        "expected": [
+          8.0,
+          21.0,
+          33.0
+        ],
+        "actual": [
+          8.0,
+          21.0,
+          33.0
+        ],
+        "abs_err": 0.0
+      },
+      "local_root_shifted": {
+        "expected": [
+          13.0,
+          26.0,
+          38.0
+        ],
+        "actual": [
+          13.0,
+          26.0,
+          38.0
+        ],
+        "abs_err": 0.0
+      },
+      "pole_none": {
+        "expected": null,
+        "actual": null
+      }
+    },
+    {
+      "id": "T09",
+      "title": "手部姿态合同",
+      "status": "PASS",
+      "no_wraparound_mid": {
+        "expected": [
+          0.0,
+          0.0,
+          180.0
+        ],
+        "actual": [
+          0.0,
+          0.0,
+          180.0
+        ]
+      },
+      "root_local_world_rot_mid": {
+        "expected": [
+          190.0,
+          -10.0,
+          60.0
+        ],
+        "actual": [
+          190.0,
+          -10.0,
+          60.0
+        ]
+      },
+      "rotation_none": {
+        "expected": null,
+        "actual": null
+      }
+    },
+    {
+      "id": "T10",
+      "title": "Reach Clamp",
+      "status": "PASS",
+      "true_out": true,
+      "false_out": false,
+      "negative": [
+        {
+          "input_clamp_reach": "1",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "input_clamp_reach": "0",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "input_clamp_reach": "'true'",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "input_clamp_reach": "None",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        }
+      ]
+    },
+    {
+      "id": "T11",
+      "title": "IK 与接触分离",
+      "status": "PASS",
+      "actual": {
+        "enabled": true,
+        "weight": 1.0,
+        "contact_intent": false,
+        "is_locked": false,
+        "contact_type": "free",
+        "surface_id": null,
+        "fk": {}
+      }
+    },
+    {
+      "id": "T12",
+      "title": "左右 FK/IK 混合目标",
+      "status": "PASS",
+      "scope_note": "Validates planning-target expression isolation only; does not claim Blender runtime bone arbitration.",
+      "subcases": [
+        {
+          "combo": "L_FK_R_IK",
+          "left_mode": "FK",
+          "right_mode": "IK",
+          "disjoint_fk_keys": true
+        },
+        {
+          "combo": "L_IK_R_FK",
+          "left_mode": "IK",
+          "right_mode": "FK",
+          "disjoint_fk_keys": true
+        },
+        {
+          "combo": "BOTH_FK",
+          "left_mode": "FK",
+          "right_mode": "FK",
+          "disjoint_fk_keys": true
+        },
+        {
+          "combo": "BOTH_IK",
+          "left_mode": "IK",
+          "right_mode": "IK",
+          "disjoint_fk_keys": true
+        }
+      ]
+    },
+    {
+      "id": "T13",
+      "title": "左右轨迹参数独立",
+      "status": "PASS",
+      "subcases": [
+        {
+          "varied_left_field": "start_time_sec",
+          "left_changed": true,
+          "right_unchanged": true
+        },
+        {
+          "varied_left_field": "duration_sec",
+          "left_changed": true,
+          "right_unchanged": true
+        },
+        {
+          "varied_left_field": "wrist_start_xyz",
+          "left_changed": true,
+          "right_unchanged": true
+        },
+        {
+          "varied_left_field": "wrist_end_xyz",
+          "left_changed": true,
+          "right_unchanged": true
+        },
+        {
+          "varied_left_field": "rotation",
+          "left_changed": true,
+          "right_unchanged": true
+        },
+        {
+          "varied_left_field": "pole",
+          "left_changed": true,
+          "right_unchanged": true
+        }
+      ]
+    },
+    {
+      "id": "T14",
+      "title": "枚举及类型拒绝",
+      "status": "PASS",
+      "subcases_count": 16,
+      "subcases": [
+        {
+          "case": "segment_none",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "segment_dict",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "segment_str",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "side_M",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "side_lower",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "side_empty",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "side_none",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "side_int",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "mode_hybrid",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "mode_lower",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "mode_none",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "mode_int",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "space_local",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "space_world_lower",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "space_none",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "space_bool",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        }
+      ]
+    },
+    {
+      "id": "T15",
+      "title": "向量输入与 Root yaw 拒绝",
+      "status": "PASS",
+      "subcases_count": 68,
+      "subcases": [
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "list_not_tuple",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "len_2",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "len_4",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "bool_comp",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "str_comp",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "none_vec",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "nan_comp",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "pos_inf_comp",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "neg_inf_comp",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "_validate_upper_limb_vector",
+          "case": "huge_int_comp",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "wrist_start_xyz",
+          "case": "list_not_tuple",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "rotation_start_deg",
+          "case": "list_not_tuple",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "pole_end_xyz",
+          "case": "list_not_tuple",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "fk_start_deg_0",
+          "case": "list_not_tuple",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "root_position",
+          "case": "list_not_tuple",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "target": "wrist_start_xyz",
+          "case": "len_2",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "rotation_start_deg",
+          "case": "len_2",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "pole_end_xyz",
+          "case": "len_2",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "fk_start_deg_0",
+          "case": "len_2",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "target": "root_position",
+          "case": "len_2",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        }
+      ],
+      "truncated_after": 20
+    },
+    {
+      "id": "T16",
+      "title": "模式字段冲突",
+      "status": "PASS",
+      "subcases_count": 19,
+      "subcases": [
+        {
+          "case": "fk_missing_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_missing_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_wrong_outer_len",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_wrong_outer_type",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "fk_with_wrist_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_with_wrist_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_with_rot_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_with_rot_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_with_pole_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_with_pole_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "fk_root_local",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_missing_wrist_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_missing_wrist_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_with_fk_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_with_fk_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_rot_only_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_rot_only_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_pole_only_start",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "ik_pole_only_end",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        }
+      ]
+    },
+    {
+      "id": "T17",
+      "title": "时间及派生计算边界",
+      "status": "PASS",
+      "subcases": [
+        {
+          "case": "neg_time_sec",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "zero_duration",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "nan_time_sec",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "bool_time_sec",
+          "expected": "TypeError",
+          "actual": "TypeError"
+        },
+        {
+          "case": "end_time_overflow",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "precision_loss",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "local_yaw45_rotation_overflow",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "wrist_root_translation_overflow",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        },
+        {
+          "case": "pole_root_translation_overflow",
+          "expected": "ValueError",
+          "actual": "ValueError"
+        }
+      ]
+    },
+    {
+      "id": "T18",
+      "title": "无状态性与输入不变性",
+      "status": "PASS",
+      "frozen_exception": "FrozenInstanceError",
+      "fk_isolated_after_caller_mutation": true,
+      "ik_isolated_after_caller_mutation": true,
+      "inputs_unmodified": true
+    }
+  ]
+}

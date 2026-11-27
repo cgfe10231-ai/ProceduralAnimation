@@ -1,0 +1,128 @@
+{
+  "task_id": "TASK 10-D — Final Regression & Master Closure",
+  "verification_date": "2026-11-27",
+  "feature_branch": "task/10-d",
+  "feature_head": "7f14ff722caecadec555194cc7d08f454c94c6c8",
+  "production_source_head": "824c52ec73f86aa3d08245a58297118cb4a9f110",
+  "pre_merge_master": "18858eb1d4e173ec3d1f41bd969b0cd9fc9ed371",
+  "blender_version": "Blender 5.1.1",
+  "production_src_modified_vs_master": [
+    "src/motion/framework.py",
+    "src/motion/kinematic_bridge.py",
+    "src/motion/run_cycle.py",
+    "src/motion/sprint_brake.py",
+    "src/motion/sprint_start.py",
+    "src/motion/terrain_walk.py",
+    "src/motion/upper_limb_trajectory.py"
+  ],
+  "unified_runner_tiers": {
+    "quick": {
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier quick --output-dir docs/evidence/10-d/final_acceptance/quick",
+      "exit_code": 0,
+      "planned": 19,
+      "executed": 19,
+      "passed_count": 19,
+      "strict_passed": 16,
+      "automated_pass": 3,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "duration_sec": 66.63,
+      "report_json": "docs/evidence/10-d/final_acceptance/quick/test_report.json",
+      "console_log": "docs/evidence/10-d/final_acceptance/quick_console.log"
+    },
+    "physics": {
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier physics --output-dir docs/evidence/10-d/final_acceptance/physics",
+      "exit_code": 0,
+      "planned": 27,
+      "executed": 27,
+      "passed_count": 27,
+      "strict_passed": 24,
+      "automated_pass": 3,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "duration_sec": 147.99,
+      "report_json": "docs/evidence/10-d/final_acceptance/physics/test_report.json",
+      "console_log": "docs/evidence/10-d/final_acceptance/physics_console.log"
+    },
+    "motion": {
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier motion --output-dir docs/evidence/10-d/final_acceptance/motion",
+      "exit_code": 0,
+      "planned": 12,
+      "executed": 12,
+      "passed_count": 12,
+      "strict_passed": 6,
+      "automated_pass": 6,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "duration_sec": 65.26,
+      "report_json": "docs/evidence/10-d/final_acceptance/motion/test_report.json",
+      "console_log": "docs/evidence/10-d/final_acceptance/motion_console.log"
+    },
+    "full": {
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier full --output-dir docs/evidence/10-d/final_acceptance/full",
+      "exit_code": 0,
+      "planned": 42,
+      "executed": 42,
+      "passed_count": 42,
+      "strict_passed": 33,
+      "automated_pass": 9,
+      "failed": 0,
+      "skipped": 0,
+      "not_run": 0,
+      "duration_sec": 197.91,
+      "report_json": "docs/evidence/10-d/final_acceptance/full/test_report.json",
+      "console_log": "docs/evidence/10-d/final_acceptance/full_console.log"
+    }
+  },
+  "dependency_impact_and_migrated_checks": {
+    "unchanged_10B_not_rerun_separately": {
+      "reason": "src/rig/arm_ik.py and src/scene_transaction_integrity/ have zero diff between master (18858eb1d4e173ec3d1f41bd969b0cd9fc9ed371) and 7f14ff722caecadec555194cc7d08f454c94c6c8; arm_ik_lifecycle_world_transform_contract and arm_ik_input_validation_contract also passed in physics and full tiers.",
+      "archived_evidence": "docs/evidence/10b_sixlayer_split/regression/"
+    },
+    "reverified_10C_kinematic_bridge": {
+      "reason": "src/motion/kinematic_bridge.py was modified in 10-d-4 relative to 10-C blob abdc74455075b83f7188c3dffabc64e456258326.",
+      "group_a_child2": {"passed": 10, "failed": 0, "exit_code": 0, "report": "docs/evidence/10-d/final_acceptance/migrated_checks/10c_group_a.json"},
+      "group_b_child3": {"passed": 15, "failed": 0, "exit_code": 0, "report": "docs/evidence/10-d/final_acceptance/migrated_checks/10c_group_b.json"},
+      "group_c_child4": {"passed": 6, "failed": 0, "exit_code": 0, "log": "docs/evidence/10-d/final_acceptance/migrated_checks/10c_group_c.log"},
+      "group_d_post_rom": {"passed": 7, "failed": 0, "exit_code": 0, "report": "docs/evidence/10-d/final_acceptance/migrated_checks/10c_group_d.json"},
+      "legacy_bridge_contract": "14/14 PASS via physics_bridge_contract in physics and full tiers"
+    },
+    "reverified_migrated_10d_production": {
+      "script": "docs/evidence/10-d/final_acceptance/verify_migrated_production.py",
+      "exit_code": 0,
+      "report": "docs/evidence/10-d/final_acceptance/migrated_checks/migrated_10d_production_report.json",
+      "console_log": "docs/evidence/10-d/final_acceptance/migrated_checks/migrated_10d.log",
+      "10d2_upper_limb_progress_on_upper_limb_trajectory_py": {"passed": 12, "failed": 0},
+      "10d3_upper_limb_segment_on_upper_limb_trajectory_py": {"passed": 18, "failed": 0, "t15_subcases": 68},
+      "10d4_repeat_cleanup_and_influence_fcurve_clear": {"status": "PASS", "pass1_frames": 252, "pass2_frames": 204}
+    }
+  },
+  "centralized_whole_body_verification_10d5": {
+    "evidence_dir": "docs/evidence/10-d/10-d-5/centralized_verification/",
+    "report_json": "docs/evidence/10-d/10-d-5/centralized_verification/verification_report.json",
+    "tests_passed": "17/17 (T01..T17, exit_code=0)",
+    "owner_visual_acceptance_date": "2026-11-27",
+    "approved_visual_assets": [
+      {
+        "path": "output/task10d_centralized_whole_body.blend",
+        "size_bytes": 846074,
+        "sha256": "17f217d2ccaf24d471a52e46582c02de9ba0557a0554bdfbe8a97e220741e351",
+        "frames": "1..1026",
+        "fps": 24,
+        "visual_acceptance_status": "OWNER APPROVED (2026-11-27)"
+      },
+      {
+        "path": "output/task10d_running_whole_body.blend",
+        "size_bytes": 474350,
+        "sha256": "5bda09fd6ac963b877904cbfa5800b0373a50e5aff5f45429fb62de041e9310f",
+        "frames": "1..528",
+        "fps": 24,
+        "visual_acceptance_status": "OWNER APPROVED (2026-11-27)"
+      }
+    ]
+  },
+  "overall_passed": true
+}

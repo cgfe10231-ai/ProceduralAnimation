@@ -1,0 +1,106 @@
+{
+  "task": "10-d-5",
+  "git_head": "870e57e8cc398f40a28e93e8a99a1e86e6146449",
+  "deliverable": {
+    "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_unified_motion_showcase.blend",
+    "blend_sha256": "01023db85e750bef72c28a6c548a928219d9f5ddb232844a8fa6d6231a3764b0",
+    "blend_size_bytes": 852670,
+    "bone_count": 19,
+    "action_slot_identifier": "OBCharacterArmature",
+    "influence_fcurve_summary": {
+      "ArmIK.L": {
+        "keyframe_count": 1416,
+        "interpolations": [
+          "CONSTANT"
+        ]
+      },
+      "ArmIK.R": {
+        "keyframe_count": 1416,
+        "interpolations": [
+          "CONSTANT"
+        ]
+      },
+      "HandRotation.L": {
+        "keyframe_count": 1416,
+        "interpolations": [
+          "CONSTANT"
+        ]
+      },
+      "HandRotation.R": {
+        "keyframe_count": 1416,
+        "interpolations": [
+          "CONSTANT"
+        ]
+      }
+    },
+    "open_state": {
+      "frame_current": 1,
+      "frame_start": 1,
+      "frame_end": 1416,
+      "fps": 24,
+      "active_camera": "Visual_ObliqueSideCam",
+      "markers": [
+        {
+          "name": "StageA_StageA_StandingUpperLimb",
+          "frame": 1
+        },
+        {
+          "name": "StageB_start_stop_walk",
+          "frame": 241
+        },
+        {
+          "name": "StageC_StageC_WalkUpperLimb",
+          "frame": 445
+        },
+        {
+          "name": "StageD_sprint_start",
+          "frame": 871
+        },
+        {
+          "name": "StageE_sprint_brake",
+          "frame": 985
+        },
+        {
+          "name": "StageF_StageF_PostStopUpperLimb",
+          "frame": 1033
+        },
+        {
+          "name": "StageG_run",
+          "frame": 1225
+        },
+        {
+          "name": "Showcase_End",
+          "frame": 1416
+        }
+      ]
+    },
+    "reopen_traversal_reports": [
+      {
+        "order": "forward",
+        "frames_checked": 1416,
+        "max_pos_err_m": 0.0,
+        "max_rot_err_rad": 0.0,
+        "max_inf_err": 0.0,
+        "failure_count": 0
+      },
+      {
+        "order": "reverse",
+        "frames_checked": 1416,
+        "max_pos_err_m": 0.0,
+        "max_rot_err_rad": 0.0,
+        "max_inf_err": 0.0,
+        "failure_count": 0
+      },
+      {
+        "order": "shuffled_seed_20261127",
+        "frames_checked": 1416,
+        "max_pos_err_m": 0.0,
+        "max_rot_err_rad": 0.0,
+        "max_inf_err": 0.0,
+        "failure_count": 0
+      }
+    ]
+  },
+  "visual_verification_ready": true,
+  "passed_all_reopen_orders": true
+}

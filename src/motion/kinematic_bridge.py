@@ -67,7 +67,12 @@ from src.motion.whole_body_controller import (
     WholeBodyControlTargets,
     WholeBodyController,
 )
-from src.rig.arm_ik import MAX_ARM_REACH, MIN_ARM_REACH
+from src.rig.arm_ik import (
+    ARM_IK_CONSTRAINT_NAMES,
+    HAND_ROT_CONSTRAINT_NAMES,
+    MAX_ARM_REACH,
+    MIN_ARM_REACH,
+)
 from src.rig.foot_contact import (
     evaluate_foot_support,
     lock_foot_contact,
@@ -845,12 +850,96 @@ class KinematicBridgeExecutor:
                 pb.keyframe_insert("location", frame=frame)
                 pb.keyframe_insert("rotation_euler", frame=frame)
 
-            # Keyframe IK control empties
-            for name in ("FootIK.L", "FootIK.R", "KneePole.L", "KneePole.R", "HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+            # [INTRODUCED 2026-11-26T17:52:00+08:00]
+            # TASK: TASK 10-d-4
+            # BLOCK: Phase 6 leg & upper-limb controller rotation-mode-preserving keyframing + arm constraint influence keyframing
+            # PURPOSE: Preserve rotation_mode on HandIK/ElbowPole empties when inserting location/rotation keyframes, and record true post-solve ArmIK/HandRotation constraint influences with CONSTANT FCurve interpolation via Blender 5.1.1 Action Slot/Channelbag.
+            # REASON: Resolve P02 (missing ArmIK/HandRotation influence persistence and controller rotation channel mismatch) without changing legacy Root/bone/leg controller contracts, fabricating weights, mutating rotation modes, or altering unrelated FCurves.
+            for name in ("FootIK.L", "FootIK.R", "KneePole.L", "KneePole.R"):
                 obj = bpy.data.objects.get(name)
                 if obj is not None:
                     obj.keyframe_insert("location", frame=frame)
                     obj.keyframe_insert("rotation_euler", frame=frame)
+
+            for name in ("HandIK.L", "HandIK.R", "ElbowPole.L", "ElbowPole.R"):
+                obj = bpy.data.objects.get(name)
+                if obj is not None:
+                    obj.keyframe_insert("location", frame=frame)
+                    rot_mode = str(obj.rotation_mode)
+                    if rot_mode == "QUATERNION":
+                        rot_path = "rotation_quaternion"
+                    elif rot_mode == "AXIS_ANGLE":
+                        rot_path = "rotation_axis_angle"
+                    elif rot_mode in ("XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"):
+                        rot_path = "rotation_euler"
+                    else:
+                        raise ValueError(
+                            f"Unsupported rotation_mode {rot_mode!r} on upper-limb controller {name!r}"
+                        )
+                    obj.keyframe_insert(rot_path, frame=frame)
+
+            expected_influence_paths = set()
+            for side in ("L", "R"):
+                for bone_name, con_name in (
+                    (f"forearm.{side}", ARM_IK_CONSTRAINT_NAMES[side]),
+                    (f"hand.{side}", HAND_ROT_CONSTRAINT_NAMES[side]),
+                ):
+                    pbone = arm.pose.bones.get(bone_name)
+                    if pbone is None:
+                        raise RuntimeError(
+                            f"Missing required pose bone {bone_name!r} on {arm.name!r} for Phase 6 influence keyframing"
+                        )
+                    con = pbone.constraints.get(con_name)
+                    if con is None:
+                        raise RuntimeError(
+                            f"Missing required constraint {con_name!r} on {bone_name!r} for Phase 6 influence keyframing"
+                        )
+                    _ = float(con.influence)
+                    if not con.keyframe_insert("influence", frame=frame):
+                        raise RuntimeError(
+                            f"Failed to insert influence keyframe for {bone_name!r}/{con_name!r} at frame {frame}"
+                        )
+                    expected_influence_paths.add(con.path_from_id("influence"))
+
+            adt = arm.animation_data
+            action = adt.action if adt is not None else None
+            if action is None:
+                raise RuntimeError(
+                    f"Armature {arm.name!r} has no Action after Phase 6 constraint influence keyframing"
+                )
+            fcurve_groups = []
+            slot = getattr(adt, "action_slot", None)
+            if hasattr(action, "layers"):
+                if slot is None:
+                    raise RuntimeError(
+                        f"Armature {arm.name!r} Action {action.name!r} has no assigned action_slot"
+                    )
+                for layer in action.layers:
+                    for strip in layer.strips:
+                        cb = strip.channelbag(slot)
+                        if cb is not None:
+                            fcurve_groups.append(cb.fcurves)
+            elif hasattr(action, "fcurves"):
+                fcurve_groups.append(action.fcurves)
+
+            matched_paths = set()
+            for fcurves in fcurve_groups:
+                for fc in fcurves:
+                    if fc.data_path not in expected_influence_paths:
+                        continue
+                    key_found = False
+                    for kp in fc.keyframe_points:
+                        if abs(float(kp.co[0]) - float(frame)) < 1e-4:
+                            kp.interpolation = "CONSTANT"
+                            key_found = True
+                    if key_found:
+                        matched_paths.add(fc.data_path)
+
+            if matched_paths != expected_influence_paths:
+                missing_paths = sorted(expected_influence_paths - matched_paths)
+                raise RuntimeError(
+                    f"Failed to locate Phase 6 influence FCurves/keyframes on {arm.name!r} at frame {frame}: {missing_paths}"
+                )
 
         # Assemble legacy & contact states
         contact_states: Dict[str, ContactPointState] = {}

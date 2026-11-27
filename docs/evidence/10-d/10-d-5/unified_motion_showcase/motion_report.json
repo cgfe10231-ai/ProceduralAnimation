@@ -1,0 +1,532 @@
+{
+  "task": "10-d-5",
+  "timestamp": "2026-11-27T05:24:36.754373+00:00",
+  "git_head": "870e57e8cc398f40a28e93e8a99a1e86e6146449",
+  "frozen_source_blobs": {
+    "src/motion/terrain_walk.py": "d42519fe8e39d149bdcffec3378b5f5ee7601b91",
+    "src/motion/kinematic_bridge.py": "9e68e0a6a44bdb538b75b4f4d99b117c1737c358",
+    "src/motion/framework.py": "31a9c268e0833a93cc0e498227202256c3274f05",
+    "src/motion/whole_body_controller.py": "562de6c0ce1e9009856a7d52ec89cd6d0c012be2",
+    "src/motion/run_cycle.py": "283f1ef8d21264a7da5b7c556aae2fedcd6fd604",
+    "src/motion/sprint_start.py": "e550409cd37f6175b538bea26fdc65d570976b8b",
+    "src/motion/sprint_brake.py": "98363c0f3aa07162ac181e6d4903cb338674a556"
+  },
+  "environment": "EnvironmentQuery(ground_z=0.0)",
+  "blend_path": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\task10d_unified_motion_showcase.blend",
+  "blender_version": "5.1.1",
+  "fps": 24,
+  "frame_start": 1,
+  "frame_end": 1416,
+  "total_frames": 1416,
+  "total_duration_sec": 59.0,
+  "total_root_displacement_m": 22.50583,
+  "unreachable_count": 0,
+  "run_action_note": "RunAction in Stage G executes historical lower-limb sprint/run cycle + historical FK arm swing; RunAction does NOT support UpperLimbSegment independent control yet.",
+  "upper_limb_segment_counts": {
+    "StageA": {
+      "L": 9,
+      "R": 10
+    },
+    "StageC": {
+      "L": 14,
+      "R": 17
+    },
+    "StageF": {
+      "L": 7,
+      "R": 7
+    }
+  },
+  "stage_summaries": [
+    {
+      "stage": "StageA",
+      "action_name": "StageA_StandingUpperLimb",
+      "frame_start": 1,
+      "frame_end": 240,
+      "frame_count": 240,
+      "duration_sec": 10.0,
+      "start_root_pos": [
+        0.0,
+        -12.0,
+        0.0
+      ],
+      "end_root_pos": [
+        0.0,
+        -12.0,
+        0.0
+      ],
+      "root_displacement_y_m": 0.0,
+      "com_z_min_m": 1.017735242843628,
+      "com_z_max_m": 1.0430421829223633,
+      "com_speed_min_mps": 0.0,
+      "com_speed_max_mps": 0.07184786781367677,
+      "com_accel_max_mps2": 0.3240985686237865,
+      "angular_momentum_max": 2.2914387801188454,
+      "support_type_counts": {
+        "double_stance": 240
+      },
+      "airborne_frame_count": 0,
+      "airborne_frames": [],
+      "max_end_effector_error_m": 5.752610986169376e-05,
+      "rom_violation_frames": 0,
+      "unreachable_frames": 0,
+      "upper_limb_metrics_L": {
+        "upper_arm_rel_span_deg": 56.41698499699821,
+        "forearm_rel_span_deg": 56.450632888283465,
+        "hand_rel_span_deg": 29.015405135824018,
+        "wrist_root_local_span_m": 0.7786055410078644
+      },
+      "upper_limb_metrics_R": {
+        "upper_arm_rel_span_deg": 50.57654573788034,
+        "forearm_rel_span_deg": 54.262345446661236,
+        "hand_rel_span_deg": 32.65943006133198,
+        "wrist_root_local_span_m": 0.780181509813524
+      }
+    },
+    {
+      "stage": "StageB",
+      "action_name": "start_stop_walk",
+      "frame_start": 241,
+      "frame_end": 444,
+      "frame_count": 204,
+      "duration_sec": 8.5,
+      "start_root_pos": [
+        0.0,
+        -12.0,
+        0.0
+      ],
+      "end_root_pos": [
+        0.0,
+        -10.739999771118164,
+        0.0
+      ],
+      "root_displacement_y_m": 1.260000228881836,
+      "com_z_min_m": 1.0045005083084106,
+      "com_z_max_m": 1.047949194908142,
+      "com_speed_min_mps": 0.0,
+      "com_speed_max_mps": 0.8243504745402351,
+      "com_accel_max_mps2": 19.784411388965644,
+      "angular_momentum_max": 14.610049247741811,
+      "support_type_counts": {
+        "double_stance": 24,
+        "single_stance_l": 108,
+        "single_stance_r": 72
+      },
+      "airborne_frame_count": 0,
+      "airborne_frames": [],
+      "max_end_effector_error_m": 4.619687303358809e-05,
+      "rom_violation_frames": 0,
+      "unreachable_frames": 0,
+      "upper_limb_metrics_L": {
+        "upper_arm_rel_span_deg": 25.99999878394676,
+        "forearm_rel_span_deg": 15.999999301530323,
+        "hand_rel_span_deg": 2.594054317236078e-06,
+        "wrist_root_local_span_m": 0.5463797321254974
+      },
+      "upper_limb_metrics_R": {
+        "upper_arm_rel_span_deg": 26.000001217967615,
+        "forearm_rel_span_deg": 15.999999301530323,
+        "hand_rel_span_deg": 3.0438861816982587e-06,
+        "wrist_root_local_span_m": 0.5457209591995259
+      }
+    },
+    {
+      "stage": "StageC",
+      "action_name": "StageC_WalkUpperLimb",
+      "frame_start": 445,
+      "frame_end": 870,
+      "frame_count": 426,
+      "duration_sec": 17.75,
+      "start_root_pos": [
+        0.0,
+        -10.739999771118164,
+        0.0
+      ],
+      "end_root_pos": [
+        0.0,
+        -4.739999771118164,
+        0.0
+      ],
+      "root_displacement_y_m": 6.0,
+      "com_z_min_m": 1.0165497064590454,
+      "com_z_max_m": 1.0511165857315063,
+      "com_speed_min_mps": 0.0,
+      "com_speed_max_mps": 0.8243613753971487,
+      "com_accel_max_mps2": 19.78467300953101,
+      "angular_momentum_max": 14.610048294067498,
+      "support_type_counts": {
+        "double_stance": 48,
+        "single_stance_l": 198,
+        "single_stance_r": 180
+      },
+      "airborne_frame_count": 0,
+      "airborne_frames": [],
+      "max_end_effector_error_m": 5.722992664729333e-05,
+      "rom_violation_frames": 0,
+      "unreachable_frames": 0,
+      "upper_limb_metrics_L": {
+        "upper_arm_rel_span_deg": 58.66635764294828,
+        "forearm_rel_span_deg": 58.362081173366434,
+        "hand_rel_span_deg": 28.81776262272066,
+        "wrist_root_local_span_m": 0.8676165674990345
+      },
+      "upper_limb_metrics_R": {
+        "upper_arm_rel_span_deg": 77.71598203669446,
+        "forearm_rel_span_deg": 59.68976549838073,
+        "hand_rel_span_deg": 31.385900371251818,
+        "wrist_root_local_span_m": 0.8302710985466185
+      }
+    },
+    {
+      "stage": "StageD",
+      "action_name": "sprint_start",
+      "frame_start": 871,
+      "frame_end": 984,
+      "frame_count": 114,
+      "duration_sec": 4.75,
+      "start_root_pos": [
+        0.0,
+        -4.739999771118164,
+        0.0
+      ],
+      "end_root_pos": [
+        0.0,
+        1.8433336019515991,
+        0.0
+      ],
+      "root_displacement_y_m": 6.583333373069763,
+      "com_z_min_m": 0.9500583410263062,
+      "com_z_max_m": 1.0479873418807983,
+      "com_speed_min_mps": 0.02469816038505555,
+      "com_speed_max_mps": 2.0693582997911473,
+      "com_accel_max_mps2": 20.938321418695555,
+      "angular_momentum_max": 14.611035346984975,
+      "support_type_counts": {
+        "double_stance": 18,
+        "single_stance_l": 26,
+        "flight": 49,
+        "single_stance_r": 21
+      },
+      "airborne_frame_count": 49,
+      "airborne_frames": [
+        898,
+        899,
+        900,
+        908,
+        909,
+        910,
+        911,
+        917,
+        918,
+        919,
+        920,
+        921,
+        922,
+        927,
+        928,
+        929,
+        930,
+        931,
+        932,
+        937,
+        938,
+        939,
+        940,
+        941,
+        942,
+        947,
+        948,
+        949,
+        950,
+        951,
+        952,
+        957,
+        958,
+        959,
+        960,
+        961,
+        962,
+        967,
+        968,
+        969,
+        970,
+        971,
+        972,
+        977,
+        978,
+        979,
+        980,
+        981,
+        982
+      ],
+      "max_end_effector_error_m": 8.853489027792829e-05,
+      "rom_violation_frames": 0,
+      "unreachable_frames": 0,
+      "upper_limb_metrics_L": {
+        "upper_arm_rel_span_deg": 48.00000462669206,
+        "forearm_rel_span_deg": 43.5000003162972,
+        "hand_rel_span_deg": 2.153476124688241e-06,
+        "wrist_root_local_span_m": 0.7385047370883794
+      },
+      "upper_limb_metrics_R": {
+        "upper_arm_rel_span_deg": 48.00000462669206,
+        "forearm_rel_span_deg": 43.5000003162972,
+        "hand_rel_span_deg": 2.564662701706825e-06,
+        "wrist_root_local_span_m": 0.7740137624360658
+      }
+    },
+    {
+      "stage": "StageE",
+      "action_name": "sprint_brake",
+      "frame_start": 985,
+      "frame_end": 1032,
+      "frame_count": 48,
+      "duration_sec": 2.0,
+      "start_root_pos": [
+        0.0,
+        1.9266140460968018,
+        0.0
+      ],
+      "end_root_pos": [
+        0.0,
+        3.3433337211608887,
+        0.0
+      ],
+      "root_displacement_y_m": 1.416719675064087,
+      "com_z_min_m": 0.9494277834892273,
+      "com_z_max_m": 1.0392754077911377,
+      "com_speed_min_mps": 0.015687288340231843,
+      "com_speed_max_mps": 2.1424011971163015,
+      "com_accel_max_mps2": 10.527934654780912,
+      "angular_momentum_max": 8.973471231418966,
+      "support_type_counts": {
+        "single_stance_r": 15,
+        "single_stance_l": 19,
+        "double_stance": 14
+      },
+      "airborne_frame_count": 0,
+      "airborne_frames": [],
+      "max_end_effector_error_m": 4.76112510099273e-05,
+      "rom_violation_frames": 0,
+      "unreachable_frames": 0,
+      "upper_limb_metrics_L": {
+        "upper_arm_rel_span_deg": 16.063969674762838,
+        "forearm_rel_span_deg": 27.47056209719251,
+        "hand_rel_span_deg": 2.5869634536551917e-06,
+        "wrist_root_local_span_m": 0.35508496669634276
+      },
+      "upper_limb_metrics_R": {
+        "upper_arm_rel_span_deg": 16.06397008943671,
+        "forearm_rel_span_deg": 27.470564977453936,
+        "hand_rel_span_deg": 2.574306683135108e-06,
+        "wrist_root_local_span_m": 0.2956621772742085
+      }
+    },
+    {
+      "stage": "StageF",
+      "action_name": "StageF_PostStopUpperLimb",
+      "frame_start": 1033,
+      "frame_end": 1224,
+      "frame_count": 192,
+      "duration_sec": 8.0,
+      "start_root_pos": [
+        0.0,
+        3.3433337211608887,
+        0.0
+      ],
+      "end_root_pos": [
+        0.0,
+        3.3433337211608887,
+        0.0
+      ],
+      "root_displacement_y_m": 0.0,
+      "com_z_min_m": 1.0178954601287842,
+      "com_z_max_m": 1.040898084640503,
+      "com_speed_min_mps": 0.0,
+      "com_speed_max_mps": 0.5438669719357659,
+      "com_accel_max_mps2": 13.424437367734308,
+      "angular_momentum_max": 6.80348825454718,
+      "support_type_counts": {
+        "double_stance": 192
+      },
+      "airborne_frame_count": 0,
+      "airborne_frames": [],
+      "max_end_effector_error_m": 5.665981917426862e-05,
+      "rom_violation_frames": 0,
+      "unreachable_frames": 0,
+      "upper_limb_metrics_L": {
+        "upper_arm_rel_span_deg": 37.81233234692859,
+        "forearm_rel_span_deg": 52.213762308754816,
+        "hand_rel_span_deg": 24.971573078084894,
+        "wrist_root_local_span_m": 0.6814516911193
+      },
+      "upper_limb_metrics_R": {
+        "upper_arm_rel_span_deg": 48.522775960254464,
+        "forearm_rel_span_deg": 47.59312484944586,
+        "hand_rel_span_deg": 26.90674243431725,
+        "wrist_root_local_span_m": 0.7953289741921216
+      }
+    },
+    {
+      "stage": "StageG",
+      "action_name": "run",
+      "frame_start": 1225,
+      "frame_end": 1416,
+      "frame_count": 192,
+      "duration_sec": 8.0,
+      "start_root_pos": [
+        0.0,
+        3.3433337211608887,
+        0.0
+      ],
+      "end_root_pos": [
+        0.0,
+        10.505833625793457,
+        0.0
+      ],
+      "root_displacement_y_m": 7.162499904632568,
+      "com_z_min_m": 1.0046684741973877,
+      "com_z_max_m": 1.0430500507354736,
+      "com_speed_min_mps": 0.8289777165611049,
+      "com_speed_max_mps": 1.3561823971084785,
+      "com_accel_max_mps2": 32.54837753060349,
+      "angular_momentum_max": 15.132028644178492,
+      "support_type_counts": {
+        "single_stance_l": 56,
+        "flight": 80,
+        "single_stance_r": 56
+      },
+      "airborne_frame_count": 80,
+      "airborne_frames": [
+        1232,
+        1233,
+        1234,
+        1235,
+        1236,
+        1244,
+        1245,
+        1246,
+        1247,
+        1248,
+        1256,
+        1257,
+        1258,
+        1259,
+        1260,
+        1268,
+        1269,
+        1270,
+        1271,
+        1272,
+        1280,
+        1281,
+        1282,
+        1283,
+        1284,
+        1292,
+        1293,
+        1294,
+        1295,
+        1296,
+        1304,
+        1305,
+        1306,
+        1307,
+        1308,
+        1316,
+        1317,
+        1318,
+        1319,
+        1320,
+        1328,
+        1329,
+        1330,
+        1331,
+        1332,
+        1340,
+        1341,
+        1342,
+        1343,
+        1344,
+        1352,
+        1353,
+        1354,
+        1355,
+        1356,
+        1364,
+        1365,
+        1366,
+        1367,
+        1368,
+        1376,
+        1377,
+        1378,
+        1379,
+        1380,
+        1388,
+        1389,
+        1390,
+        1391,
+        1392,
+        1400,
+        1401,
+        1402,
+        1403,
+        1404,
+        1412,
+        1413,
+        1414,
+        1415,
+        1416
+      ],
+      "max_end_effector_error_m": 6.943125381733239e-05,
+      "rom_violation_frames": 0,
+      "unreachable_frames": 0,
+      "upper_limb_metrics_L": {
+        "upper_arm_rel_span_deg": 42.0000028371833,
+        "forearm_rel_span_deg": 11.000002996765657,
+        "hand_rel_span_deg": 1.7171605695031662e-06,
+        "wrist_root_local_span_m": 0.6565021997168845
+      },
+      "upper_limb_metrics_R": {
+        "upper_arm_rel_span_deg": 42.0000028371833,
+        "forearm_rel_span_deg": 11.000002996765657,
+        "hand_rel_span_deg": 1.7171605695031662e-06,
+        "wrist_root_local_span_m": 0.6565021997168845
+      }
+    }
+  ],
+  "markers": [
+    {
+      "name": "StageA_StageA_StandingUpperLimb",
+      "frame": 1
+    },
+    {
+      "name": "StageB_start_stop_walk",
+      "frame": 241
+    },
+    {
+      "name": "StageC_StageC_WalkUpperLimb",
+      "frame": 445
+    },
+    {
+      "name": "StageD_sprint_start",
+      "frame": 871
+    },
+    {
+      "name": "StageE_sprint_brake",
+      "frame": 985
+    },
+    {
+      "name": "StageF_StageF_PostStopUpperLimb",
+      "frame": 1033
+    },
+    {
+      "name": "StageG_run",
+      "frame": 1225
+    },
+    {
+      "name": "Showcase_End",
+      "frame": 1416
+    }
+  ]
+}

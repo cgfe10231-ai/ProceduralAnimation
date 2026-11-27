@@ -1,0 +1,636 @@
+{
+  "task": "TASK 10-d-2 — TARGETED VERIFICATION",
+  "command": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe -B docs/evidence/10-d/10-d-2/verify_progress.py",
+  "exit_code": 0,
+  "source_baseline": {
+    "branch": "task/10-d",
+    "head": "21bf7ffa34f24c0f8fbfc16b670061a0ebc4cefa",
+    "terrain_walk_blob": "4c8a36d3650d94fb268c18590868af42158ec0b4",
+    "terrain_walk_sha256": "9965a0d49606049cf6f8be2de71836234e7fd654e9ef9f2d4a0911c7d6596f8e",
+    "extracted_function": "_evaluate_upper_limb_progress",
+    "extracted_source_lines": [
+      72,
+      129
+    ],
+    "extracted_source_sha256": "074aa095119a58e2025e8539e68962d6b912a18de5651c38c9092de0fca73e84",
+    "isolated_dependencies": [
+      "math",
+      "List",
+      "Tuple"
+    ]
+  },
+  "summary": {
+    "executed": 12,
+    "passed": 12,
+    "failed": 0
+  },
+  "tests": [
+    {
+      "id": "T01",
+      "title": "开始前及开始时边界",
+      "status": "PASS",
+      "subcases": [
+        {
+          "input": [
+            0.0,
+            2.0,
+            3.0
+          ],
+          "output": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "input": [
+            0.5,
+            2.0,
+            3.0
+          ],
+          "output": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "input": [
+            1.999999,
+            2.0,
+            3.0
+          ],
+          "output": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "input": [
+            2.0,
+            2.0,
+            3.0
+          ],
+          "output": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "input": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "output": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "input": [
+            -0.0,
+            0.0,
+            1.5
+          ],
+          "output": [
+            0.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "T02",
+      "title": "结束时及结束后边界",
+      "status": "PASS",
+      "subcases": [
+        {
+          "input": [
+            5.0,
+            2.0,
+            3.0
+          ],
+          "output": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            1.5,
+            0.0,
+            1.5
+          ],
+          "output": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            5.000001,
+            2.0,
+            3.0
+          ],
+          "output": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "input": [
+            100.0,
+            2.0,
+            3.0
+          ],
+          "output": [
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "T03",
+      "title": "五次插值数学正确性",
+      "status": "PASS",
+      "max_abs_err": 0.0,
+      "tolerance": 1e-12,
+      "subcases": [
+        {
+          "input": [
+            0.25,
+            0.0,
+            1.0
+          ],
+          "u": 0.25,
+          "expected_u": 0.25,
+          "h": 0.103515625,
+          "expected_h": 0.103515625,
+          "abs_err_h": 0.0
+        },
+        {
+          "input": [
+            2.0,
+            1.0,
+            4.0
+          ],
+          "u": 0.25,
+          "expected_u": 0.25,
+          "h": 0.103515625,
+          "expected_h": 0.103515625,
+          "abs_err_h": 0.0
+        },
+        {
+          "input": [
+            0.5,
+            0.0,
+            1.0
+          ],
+          "u": 0.5,
+          "expected_u": 0.5,
+          "h": 0.5,
+          "expected_h": 0.5,
+          "abs_err_h": 0.0
+        },
+        {
+          "input": [
+            3.0,
+            1.0,
+            4.0
+          ],
+          "u": 0.5,
+          "expected_u": 0.5,
+          "h": 0.5,
+          "expected_h": 0.5,
+          "abs_err_h": 0.0
+        },
+        {
+          "input": [
+            0.75,
+            0.0,
+            1.0
+          ],
+          "u": 0.75,
+          "expected_u": 0.75,
+          "h": 0.896484375,
+          "expected_h": 0.896484375,
+          "abs_err_h": 0.0
+        },
+        {
+          "input": [
+            4.0,
+            1.0,
+            4.0
+          ],
+          "u": 0.75,
+          "expected_u": 0.75,
+          "h": 0.896484375,
+          "expected_h": 0.896484375,
+          "abs_err_h": 0.0
+        }
+      ]
+    },
+    {
+      "id": "T04",
+      "title": "进度单调性与值域",
+      "status": "PASS",
+      "subcases": [
+        {
+          "interval": "normalized_0_1",
+          "sample_count": 10001,
+          "min_u": 0.0,
+          "max_u": 1.0,
+          "min_h": 0.0,
+          "max_h": 1.0
+        },
+        {
+          "interval": "shifted_1.25_2.5",
+          "sample_count": 10001,
+          "min_u": 0.0,
+          "max_u": 1.0,
+          "min_h": 0.0,
+          "max_h": 1.0
+        }
+      ]
+    },
+    {
+      "id": "T05",
+      "title": "端点解析导数与有限差分收敛",
+      "status": "PASS",
+      "analytic_endpoints": {
+        "u0_h": 0.0,
+        "u0_dh": 0.0,
+        "u0_d2h": 0.0,
+        "u1_h": 1.0,
+        "u1_dh": 0.0,
+        "u1_d2h": -0.0
+      },
+      "max_piecewise_polynomial_diff": 1.1102230246251565e-16,
+      "convergence": [
+        {
+          "step": 0.001,
+          "d1_start_abs_err": 9.985006000000002e-06,
+          "d2_start_abs_err": 0.059790180000000005,
+          "d1_end_abs_err": 9.98500604421082e-06,
+          "d2_end_abs_err": 0.05979017991819546
+        },
+        {
+          "step": 0.0001,
+          "d1_start_abs_err": 9.99850006e-08,
+          "d2_start_abs_err": 0.005997900180000001,
+          "d1_end_abs_err": 9.998446515169235e-08,
+          "d2_end_abs_err": 0.005997913277155931
+        },
+        {
+          "step": 1e-05,
+          "d1_start_abs_err": 9.999850000600002e-10,
+          "d2_start_abs_err": 0.0005999790001799999,
+          "d1_end_abs_err": 9.992007221626409e-10,
+          "d2_end_abs_err": 0.0006006306563222096
+        }
+      ]
+    },
+    {
+      "id": "T06",
+      "title": "非法类型拒绝",
+      "status": "PASS",
+      "subcases_count": 18,
+      "subcases": [
+        {
+          "param": "time_sec",
+          "bad_type": "bool_true",
+          "raised": "TypeError"
+        },
+        {
+          "param": "time_sec",
+          "bad_type": "bool_false",
+          "raised": "TypeError"
+        },
+        {
+          "param": "time_sec",
+          "bad_type": "none",
+          "raised": "TypeError"
+        },
+        {
+          "param": "time_sec",
+          "bad_type": "str",
+          "raised": "TypeError"
+        },
+        {
+          "param": "time_sec",
+          "bad_type": "list",
+          "raised": "TypeError"
+        },
+        {
+          "param": "time_sec",
+          "bad_type": "complex",
+          "raised": "TypeError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_type": "bool_true",
+          "raised": "TypeError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_type": "bool_false",
+          "raised": "TypeError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_type": "none",
+          "raised": "TypeError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_type": "str",
+          "raised": "TypeError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_type": "list",
+          "raised": "TypeError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_type": "complex",
+          "raised": "TypeError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_type": "bool_true",
+          "raised": "TypeError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_type": "bool_false",
+          "raised": "TypeError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_type": "none",
+          "raised": "TypeError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_type": "str",
+          "raised": "TypeError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_type": "list",
+          "raised": "TypeError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_type": "complex",
+          "raised": "TypeError"
+        }
+      ]
+    },
+    {
+      "id": "T07",
+      "title": "非有限数值拒绝",
+      "status": "PASS",
+      "subcases_count": 9,
+      "subcases": [
+        {
+          "param": "time_sec",
+          "bad_value": "nan",
+          "raised": "ValueError"
+        },
+        {
+          "param": "time_sec",
+          "bad_value": "pos_inf",
+          "raised": "ValueError"
+        },
+        {
+          "param": "time_sec",
+          "bad_value": "neg_inf",
+          "raised": "ValueError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_value": "nan",
+          "raised": "ValueError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_value": "pos_inf",
+          "raised": "ValueError"
+        },
+        {
+          "param": "start_time_sec",
+          "bad_value": "neg_inf",
+          "raised": "ValueError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_value": "nan",
+          "raised": "ValueError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_value": "pos_inf",
+          "raised": "ValueError"
+        },
+        {
+          "param": "duration_sec",
+          "bad_value": "neg_inf",
+          "raised": "ValueError"
+        }
+      ]
+    },
+    {
+      "id": "T08",
+      "title": "时间与持续时间范围拒绝",
+      "status": "PASS",
+      "subcases": [
+        {
+          "case": "neg_time_small",
+          "input": [
+            -1e-06,
+            0.0,
+            1.0
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "neg_time_int",
+          "input": [
+            -1,
+            0.0,
+            1.0
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "neg_start_small",
+          "input": [
+            0.0,
+            -1e-06,
+            1.0
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "neg_start_float",
+          "input": [
+            1.0,
+            -2.5,
+            1.0
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "zero_duration_int",
+          "input": [
+            0.5,
+            0.0,
+            0
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "zero_duration_float",
+          "input": [
+            0.5,
+            0.0,
+            0.0
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "neg_zero_duration",
+          "input": [
+            0.5,
+            0.0,
+            -0.0
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "neg_duration_small",
+          "input": [
+            0.5,
+            0.0,
+            -1e-06
+          ],
+          "raised": "ValueError"
+        },
+        {
+          "case": "neg_duration_float",
+          "input": [
+            0.5,
+            0.0,
+            -2.0
+          ],
+          "raised": "ValueError"
+        }
+      ]
+    },
+    {
+      "id": "T09",
+      "title": "数值溢出与精度退化拒绝",
+      "status": "PASS",
+      "subcases": [
+        {
+          "case": "huge_int_time",
+          "note": "10**400",
+          "raised": "ValueError"
+        },
+        {
+          "case": "huge_int_start",
+          "note": "10**400",
+          "raised": "ValueError"
+        },
+        {
+          "case": "huge_int_duration",
+          "note": "10**400",
+          "raised": "ValueError"
+        },
+        {
+          "case": "end_time_overflow",
+          "note": "1e308+1e308->inf",
+          "raised": "ValueError"
+        },
+        {
+          "case": "precision_loss_1e16_1",
+          "note": "1e16+1.0==1e16",
+          "raised": "ValueError"
+        },
+        {
+          "case": "precision_loss_1_1e_16",
+          "note": "1.0+1e-16==1.0",
+          "raised": "ValueError"
+        }
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "左右独立开始时间",
+      "status": "PASS",
+      "time_sec": 2.5,
+      "duration_sec": 2.0,
+      "left": [
+        0.75,
+        0.896484375
+      ],
+      "right": [
+        0.25,
+        0.103515625
+      ]
+    },
+    {
+      "id": "T11",
+      "title": "左右独立持续时间",
+      "status": "PASS",
+      "time_sec": 2.0,
+      "start_time_sec": 1.0,
+      "left": [
+        0.5,
+        0.5
+      ],
+      "right": [
+        0.25,
+        0.103515625
+      ]
+    },
+    {
+      "id": "T12",
+      "title": "重复与交替调用无状态性",
+      "status": "PASS",
+      "probe_a": {
+        "input": [
+          2.37,
+          1.2,
+          2.6
+        ],
+        "baseline": [
+          0.45000000000000007,
+          0.40687312500000006
+        ],
+        "after": [
+          0.45000000000000007,
+          0.40687312500000006
+        ]
+      },
+      "probe_b": {
+        "input": [
+          4.15,
+          3.0,
+          1.8
+        ],
+        "baseline": [
+          0.6388888888888891,
+          0.7473308383186001
+        ],
+        "after": [
+          0.6388888888888891,
+          0.7473308383186001
+        ]
+      },
+      "interleaved_cycles": 50
+    }
+  ]
+}
