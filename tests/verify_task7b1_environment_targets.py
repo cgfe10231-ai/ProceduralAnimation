@@ -115,6 +115,7 @@ def _assert_valid_mesh_hit(
     tc.assertTrue(math.isfinite(res.signed_distance), f"Non-finite signed_distance: {res.signed_distance}")
     tc.assertTrue(math.isfinite(res.friction_coeff), f"Non-finite friction_coeff: {res.friction_coeff}")
 
+    norm_len = math.sqrt(sum(n * n for n in res.surface_normal_world))
     unit_norm_err = abs(norm_len - 1.0)
     tc.assertLessEqual(
         unit_norm_err,
