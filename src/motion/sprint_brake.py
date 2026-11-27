@@ -378,9 +378,7 @@ class SprintBrakeAction(MotionAction):
                 is_flight=False,
             )
 
-            planned_pose, upper_diag = context.compose_planned_pose(
-                planned_pose, validate_segments=(tau == 0)
-            )
+            planned_pose, upper_diag = context.compose_planned_pose(planned_pose)
             bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
 
             has_central_upper = upper_diag["L"]["is_independent"] or upper_diag["R"]["is_independent"]

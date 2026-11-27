@@ -517,17 +517,16 @@ class MotionRuntimeContext:
     sequence_duration_sec: Optional[float] = None
 
     # [INTRODUCED 2026-11-27T13:55:00+08:00]
-    # [UPDATED 2026-11-27T14:15:00+08:00] TASK 10-d-5 (BUG-01 + Section 5 perf convergence)
+    # [UPDATED 2026-11-27T14:26:00+08:00] TASK 10-d-5 (BUG-01; revert unsafe validate_segments bypass)
     # FUNCTION: MotionRuntimeContext.compose_planned_pose
     # PURPOSE: Pure-data combination interface merging a MotionAction's full KinematicPlannedPose with optional central or legal action-local upper-limb tracks while preserving all non-overridden targets and rejecting same-side control conflicts.
-    # REASON: Enforce central sequence upper-bound gating before target evaluation / Bridge / WBC, preserve full sequence checks on direct calls, and allow admitted per-frame callers to avoid redundant full-sequence re-validation.
+    # REASON: Enforce central sequence upper-bound gating and unconditional full sequence validation before target evaluation / Bridge / WBC.
     def compose_planned_pose(
         self,
         planned_pose: Any,
         action_upper_limb_L: Optional[Tuple[UpperLimbSegment, ...]] = None,
         action_upper_limb_R: Optional[Tuple[UpperLimbSegment, ...]] = None,
         action_time_sec: Optional[float] = None,
-        validate_segments: bool = True,
     ) -> Tuple[Any, Dict[str, Any]]:
         """Compose a KinematicPlannedPose with independent left/right upper-limb targets cleanly."""
         from src.motion.kinematic_bridge import KinematicPlannedPose
@@ -536,8 +535,6 @@ class MotionRuntimeContext:
             raise TypeError(
                 f"planned_pose must be KinematicPlannedPose, got {type(planned_pose).__name__}"
             )
-        if not isinstance(validate_segments, bool):
-            raise TypeError(f"validate_segments must be bool, got {type(validate_segments).__name__}")
         if (
             isinstance(self.config.fps, bool)
             or not isinstance(self.config.fps, (int, float))
@@ -609,24 +606,18 @@ class MotionRuntimeContext:
                     f"central MotionPlanner upper_limb_{side} and action-local upper_limb_{side} cannot both be active."
                 )
 
-        if validate_segments:
-            central_L = validate_upper_limb_segment_sequence(
-                self.upper_limb_L, "L", max_time_sec=validated_seq_dur, parameter_name="central_upper_limb_L"
-            )
-            central_R = validate_upper_limb_segment_sequence(
-                self.upper_limb_R, "R", max_time_sec=validated_seq_dur, parameter_name="central_upper_limb_R"
-            )
-            local_L = validate_upper_limb_segment_sequence(
-                action_upper_limb_L, "L", parameter_name="action_upper_limb_L"
-            )
-            local_R = validate_upper_limb_segment_sequence(
-                action_upper_limb_R, "R", parameter_name="action_upper_limb_R"
-            )
-        else:
-            central_L = self.upper_limb_L
-            central_R = self.upper_limb_R
-            local_L = action_upper_limb_L
-            local_R = action_upper_limb_R
+        central_L = validate_upper_limb_segment_sequence(
+            self.upper_limb_L, "L", max_time_sec=validated_seq_dur, parameter_name="central_upper_limb_L"
+        )
+        central_R = validate_upper_limb_segment_sequence(
+            self.upper_limb_R, "R", max_time_sec=validated_seq_dur, parameter_name="central_upper_limb_R"
+        )
+        local_L = validate_upper_limb_segment_sequence(
+            action_upper_limb_L, "L", parameter_name="action_upper_limb_L"
+        )
+        local_R = validate_upper_limb_segment_sequence(
+            action_upper_limb_R, "R", parameter_name="action_upper_limb_R"
+        )
 
         uses_local = (local_L is not None) or (local_R is not None)
 
@@ -1205,9 +1196,7 @@ class StartStopWalkAction(MotionAction):
                 is_flight=False,
             )
 
-            planned_pose, upper_diag = context.compose_planned_pose(
-                planned_pose, validate_segments=(tau == 0)
-            )
+            planned_pose, upper_diag = context.compose_planned_pose(planned_pose)
             bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
 
             has_central_upper = upper_diag["L"]["is_independent"] or upper_diag["R"]["is_independent"]

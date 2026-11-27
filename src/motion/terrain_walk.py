@@ -1362,7 +1362,6 @@ class TerrainWalkAction(MotionAction):
                 action_upper_limb_L=self.upper_limb_L,
                 action_upper_limb_R=self.upper_limb_R,
                 action_time_sec=action_time_sec,
-                validate_segments=(f_idx == 0),
             )
 
             # 5. Execute 6-Phase Frame via Bridge & WholeBodyController
