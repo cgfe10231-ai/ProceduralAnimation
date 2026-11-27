@@ -1,0 +1,43 @@
+{
+  "group": "Section 10 \u2014 Continuous Production Chain Verification",
+  "timestamp_utc": "2026-11-27T15:28:43.207331+00:00",
+  "passed": true,
+  "report": {
+    "chained_walk_plus_terrain": {
+      "frames": 296,
+      "counts": {
+        "bridge_calls": 296,
+        "wbc_calls": 296,
+        "com_calls": 296
+      },
+      "modes_seen": [
+        [
+          "FK",
+          "FK"
+        ],
+        [
+          "FK",
+          "IK"
+        ],
+        [
+          "IK",
+          "FK"
+        ],
+        [
+          "IK",
+          "IK"
+        ]
+      ],
+      "foot_L_lock_transitions": 10
+    },
+    "run_and_sprint_chain": {
+      "run_frames": 24,
+      "sprint_chain_frames": 162,
+      "sprint_boundary_pos_diff_m": 0.0
+    },
+    "reset_unequal_dt_retry": {
+      "reset_clean": true,
+      "retried_dt_sec": 0.06
+    }
+  }
+}

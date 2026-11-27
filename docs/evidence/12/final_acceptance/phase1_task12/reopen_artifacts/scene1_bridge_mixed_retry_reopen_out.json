@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "committed_frames_count": 12,
+  "rejected_frames_absent": [
+    13
+  ],
+  "max_pos_diff_m": 0.0,
+  "max_rot_diff_rad": 0.0,
+  "max_inf_diff": 0.0
+}

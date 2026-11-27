@@ -1,0 +1,90 @@
+[
+  {
+    "tier": "quick",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+      "--tier",
+      "quick",
+      "--fail-fast",
+      "--output-dir",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_quick"
+    ],
+    "started_at": "2026-11-27T23:32:22.342795+08:00",
+    "finished_at": "2026-11-27T23:33:08.537053+08:00",
+    "duration_sec": 46.19,
+    "returncode": 0,
+    "total_planned": null,
+    "counts": {
+      "PASSED": 16,
+      "AUTOMATED_PASS": 3
+    },
+    "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_quick/test_report.json"
+  },
+  {
+    "tier": "physics",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+      "--tier",
+      "physics",
+      "--fail-fast",
+      "--output-dir",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_physics"
+    ],
+    "started_at": "2026-11-27T23:33:08.545995+08:00",
+    "finished_at": "2026-11-27T23:34:52.180022+08:00",
+    "duration_sec": 103.63,
+    "returncode": 0,
+    "total_planned": null,
+    "counts": {
+      "PASSED": 24,
+      "AUTOMATED_PASS": 3
+    },
+    "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_physics/test_report.json"
+  },
+  {
+    "tier": "motion",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+      "--tier",
+      "motion",
+      "--fail-fast",
+      "--output-dir",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_motion"
+    ],
+    "started_at": "2026-11-27T23:34:52.187765+08:00",
+    "finished_at": "2026-11-27T23:35:41.662437+08:00",
+    "duration_sec": 49.47,
+    "returncode": 0,
+    "total_planned": null,
+    "counts": {
+      "PASSED": 6,
+      "AUTOMATED_PASS": 6
+    },
+    "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_motion/test_report.json"
+  },
+  {
+    "tier": "full",
+    "command": [
+      "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+      "--tier",
+      "full",
+      "--fail-fast",
+      "--output-dir",
+      "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_full"
+    ],
+    "started_at": "2026-11-27T23:35:41.670770+08:00",
+    "finished_at": "2026-11-27T23:38:18.963213+08:00",
+    "duration_sec": 157.29,
+    "returncode": 0,
+    "total_planned": null,
+    "counts": {
+      "PASSED": 33,
+      "AUTOMATED_PASS": 9
+    },
+    "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_full/test_report.json"
+  }
+]

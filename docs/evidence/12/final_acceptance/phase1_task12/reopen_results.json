@@ -1,0 +1,38 @@
+{
+  "group": "B20 & Section 11 \u2014 Automated Blender Save & Independent Process Reopen",
+  "timestamp_utc": "2026-11-27T15:28:48.944437+00:00",
+  "visual_acceptance_status": "OWNER WAIVED",
+  "passed": true,
+  "scenes": {
+    "scene1_bridge_mixed_retry": {
+      "blend_file": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task12_reopen_scenes\\scene1_bridge_mixed_retry.blend",
+      "blend_size_bytes": 112481,
+      "blend_sha256": "5e869f3ba4d097d77fa1716c043735fa5c13943a543fa2621d273b0c431c5a98",
+      "reopen_verification": {
+        "passed": true,
+        "committed_frames_count": 12,
+        "rejected_frames_absent": [
+          13
+        ],
+        "max_pos_diff_m": 0.0,
+        "max_rot_diff_rad": 0.0,
+        "max_inf_diff": 0.0
+      }
+    },
+    "scene2_terrain_bilateral": {
+      "blend_file": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task12_reopen_scenes\\scene2_terrain_bilateral.blend",
+      "blend_size_bytes": 143948,
+      "blend_sha256": "2d21fa1d2679d150eaaefb7b20723dd4026daf71da7c3eeac4397ac2c5a6d29e",
+      "reopen_verification": {
+        "passed": true,
+        "committed_frames_count": 92,
+        "rejected_frames_absent": [
+          97
+        ],
+        "max_pos_diff_m": 0.0,
+        "max_rot_diff_rad": 0.0,
+        "max_inf_diff": 0.0
+      }
+    }
+  }
+}

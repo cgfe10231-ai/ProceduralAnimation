@@ -1,0 +1,550 @@
+{
+  "task": "TASK 12-D Final Joint Acceptance & Full Regression",
+  "generated_at": "2026-11-27T23:38:54.599643+08:00",
+  "baseline_head_sha": "90f4628a0c4212f4bb0468941cdde362cd68bef2",
+  "frozen_production_commit": "eee276b39d204ccd46f4c17f37a09ec483bfcbae",
+  "blender_version": "Blender 5.1.1 (build date 2026-04-14, hash b70da489d7f4)",
+  "visual_acceptance_status": "OWNER WAIVED",
+  "phase1_task12_unified": {
+    "wbc_A01_A20": {
+      "passed": true,
+      "passed_count": 20,
+      "total": 20
+    },
+    "bridge_B01_B19": {
+      "passed": true,
+      "passed_count": 19,
+      "total": 19,
+      "b19_partial_fcurve_risk_preserved": {
+        "kinematics_exc": {
+          "keyframes_written": 0,
+          "seven_states_preserved": true
+        },
+        "inertia_exc": {
+          "keyframes_written": 0,
+          "seven_states_preserved": true
+        },
+        "contact_exc": {
+          "keyframes_written": 0,
+          "seven_states_preserved": true
+        },
+        "root_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 0,
+          "changed_vs_before": false
+        },
+        "root_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 1,
+          "changed_vs_before": true
+        },
+        "posebone_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 7,
+          "changed_vs_before": true
+        },
+        "posebone_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 4,
+          "changed_vs_before": true
+        },
+        "legctrl_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 40,
+          "changed_vs_before": true
+        },
+        "legctrl_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 47,
+          "changed_vs_before": true
+        },
+        "armctrl_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 48,
+          "changed_vs_before": true
+        },
+        "armctrl_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 55,
+          "changed_vs_before": true
+        },
+        "influence_false": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 56,
+          "changed_vs_before": true
+        },
+        "influence_exc": {
+          "seven_states_preserved": true,
+          "partial_frame2_fcurve_paths_count": 59,
+          "changed_vs_before": true
+        }
+      },
+      "risk_note": "7 Bridge commit states remain clean on keyframe failure, while partial F-Curve keyframe writes can remain before failing write step (not claimed full Blender F-Curve transactional atomicity)."
+    },
+    "telemetry_C01_C16_10C_retirement": {
+      "passed": true,
+      "passed_count": 17,
+      "total": 17
+    },
+    "continuous_production_chain": {
+      "chained_walk_plus_terrain": {
+        "frames": 296,
+        "counts": {
+          "bridge_calls": 296,
+          "wbc_calls": 296,
+          "com_calls": 296
+        },
+        "modes_seen": [
+          [
+            "FK",
+            "FK"
+          ],
+          [
+            "FK",
+            "IK"
+          ],
+          [
+            "IK",
+            "FK"
+          ],
+          [
+            "IK",
+            "IK"
+          ]
+        ],
+        "foot_L_lock_transitions": 10
+      },
+      "run_and_sprint_chain": {
+        "run_frames": 24,
+        "sprint_chain_frames": 162,
+        "sprint_boundary_pos_diff_m": 0.0
+      },
+      "reset_unequal_dt_retry": {
+        "reset_clean": true,
+        "retried_dt_sec": 0.06
+      }
+    },
+    "reopen_B20_section11": {
+      "passed": true,
+      "visual_acceptance_status": "OWNER WAIVED",
+      "scenes": {
+        "scene1_bridge_mixed_retry": {
+          "blend_file": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task12_reopen_scenes\\scene1_bridge_mixed_retry.blend",
+          "blend_size_bytes": 112481,
+          "blend_sha256": "5e869f3ba4d097d77fa1716c043735fa5c13943a543fa2621d273b0c431c5a98",
+          "reopen_verification": {
+            "passed": true,
+            "committed_frames_count": 12,
+            "rejected_frames_absent": [
+              13
+            ],
+            "max_pos_diff_m": 0.0,
+            "max_rot_diff_rad": 0.0,
+            "max_inf_diff": 0.0
+          }
+        },
+        "scene2_terrain_bilateral": {
+          "blend_file": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task12_reopen_scenes\\scene2_terrain_bilateral.blend",
+          "blend_size_bytes": 143948,
+          "blend_sha256": "2d21fa1d2679d150eaaefb7b20723dd4026daf71da7c3eeac4397ac2c5a6d29e",
+          "reopen_verification": {
+            "passed": true,
+            "committed_frames_count": 92,
+            "rejected_frames_absent": [
+              97
+            ],
+            "max_pos_diff_m": 0.0,
+            "max_rot_diff_rad": 0.0,
+            "max_inf_diff": 0.0
+          }
+        }
+      }
+    },
+    "commands": [
+      {
+        "script": "docs/evidence/12/unified_verification/verify_wbc_contract.py",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "docs\\evidence\\12\\unified_verification\\verify_wbc_contract.py"
+        ],
+        "started_at": "2026-11-27T23:28:22.681468+08:00",
+        "finished_at": "2026-11-27T23:28:26.316188+08:00",
+        "duration_sec": 3.63,
+        "returncode": 0,
+        "result_json": "docs/evidence/12/final_acceptance/phase1_task12/wbc_results.json"
+      },
+      {
+        "script": "docs/evidence/12/unified_verification/verify_bridge_commit_contract.py",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "docs\\evidence\\12\\unified_verification\\verify_bridge_commit_contract.py"
+        ],
+        "started_at": "2026-11-27T23:28:26.319410+08:00",
+        "finished_at": "2026-11-27T23:28:31.383652+08:00",
+        "duration_sec": 5.06,
+        "returncode": 0,
+        "result_json": "docs/evidence/12/final_acceptance/phase1_task12/bridge_results.json"
+      },
+      {
+        "script": "docs/evidence/12/unified_verification/verify_telemetry_ownership.py",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "docs\\evidence\\12\\unified_verification\\verify_telemetry_ownership.py"
+        ],
+        "started_at": "2026-11-27T23:28:31.385343+08:00",
+        "finished_at": "2026-11-27T23:28:38.074392+08:00",
+        "duration_sec": 6.69,
+        "returncode": 0,
+        "result_json": "docs/evidence/12/final_acceptance/phase1_task12/telemetry_results.json"
+      },
+      {
+        "script": "docs/evidence/12/unified_verification/verify_continuous_motion.py",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "docs\\evidence\\12\\unified_verification\\verify_continuous_motion.py"
+        ],
+        "started_at": "2026-11-27T23:28:38.076012+08:00",
+        "finished_at": "2026-11-27T23:28:43.383234+08:00",
+        "duration_sec": 5.31,
+        "returncode": 0,
+        "result_json": "docs/evidence/12/final_acceptance/phase1_task12/continuous_results.json"
+      },
+      {
+        "script": "docs/evidence/12/unified_verification/verify_reopen.py",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "docs\\evidence\\12\\unified_verification\\verify_reopen.py"
+        ],
+        "started_at": "2026-11-27T23:28:43.385207+08:00",
+        "finished_at": "2026-11-27T23:28:49.085146+08:00",
+        "duration_sec": 5.7,
+        "returncode": 0,
+        "result_json": "docs/evidence/12/final_acceptance/phase1_task12/reopen_results.json"
+      }
+    ]
+  },
+  "phase2_historical_contracts": {
+    "task10b_wbc_failure_CONTRACT10_01_06": {
+      "rc": 0,
+      "tests_run": 6
+    },
+    "task10d_T01_T15": {
+      "rc": 0,
+      "keys": [
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15"
+      ],
+      "T15_passed": true
+    },
+    "task11_footlock_38": {
+      "rc": 0,
+      "all_passed": true,
+      "executed": 38,
+      "total": 38
+    },
+    "task09b_world_rotation_27": {
+      "rc": 0,
+      "tests_run": 27
+    },
+    "task09_ground_height_20": {
+      "rc": 0,
+      "tests_run": 20
+    },
+    "task09_init_reset_6": {
+      "rc": 0,
+      "tests_run": 6
+    },
+    "commands": [
+      {
+        "name": "task10b_wbc_failure",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "tests\\test_task10b_wbc_failure_contract.py"
+        ],
+        "started_at": "2026-11-27T23:29:56.414305+08:00",
+        "finished_at": "2026-11-27T23:29:58.577013+08:00",
+        "duration_sec": 2.16,
+        "returncode": 0,
+        "copied_result_json": null
+      },
+      {
+        "name": "task10d_t01_t15",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+          "docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py"
+        ],
+        "started_at": "2026-11-27T23:29:58.578085+08:00",
+        "finished_at": "2026-11-27T23:31:04.914486+08:00",
+        "duration_sec": 66.34,
+        "returncode": 0,
+        "copied_result_json": "docs/evidence/12/final_acceptance/phase2_historical/task10d_t01_t15_results.json"
+      },
+      {
+        "name": "task11_footlock",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "docs\\evidence\\11\\unified_verification\\verify_footlock_contract.py"
+        ],
+        "started_at": "2026-11-27T23:31:04.918026+08:00",
+        "finished_at": "2026-11-27T23:31:17.050864+08:00",
+        "duration_sec": 12.13,
+        "returncode": 0,
+        "copied_result_json": "docs/evidence/12/final_acceptance/phase2_historical/task11_footlock_contract_results.json"
+      },
+      {
+        "name": "task09b_world_rotation",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "tests\\test_leg_ik_world_rotation_contract.py"
+        ],
+        "started_at": "2026-11-27T23:31:17.052787+08:00",
+        "finished_at": "2026-11-27T23:31:20.587759+08:00",
+        "duration_sec": 3.53,
+        "returncode": 0,
+        "copied_result_json": null
+      },
+      {
+        "name": "task09_ground_height",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "tests\\test_leg_ik_ground_height_contract.py"
+        ],
+        "started_at": "2026-11-27T23:31:20.588772+08:00",
+        "finished_at": "2026-11-27T23:31:24.107681+08:00",
+        "duration_sec": 3.52,
+        "returncode": 0,
+        "copied_result_json": null
+      },
+      {
+        "name": "task09_init_reset",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+          "--background",
+          "--factory-startup",
+          "--python-exit-code",
+          "1",
+          "-P",
+          "tests\\test_leg_ik_worldspace_init_reset.py"
+        ],
+        "started_at": "2026-11-27T23:31:24.108963+08:00",
+        "finished_at": "2026-11-27T23:31:26.140636+08:00",
+        "duration_sec": 2.03,
+        "returncode": 0,
+        "copied_result_json": null
+      }
+    ]
+  },
+  "phase3_four_tier_regression": {
+    "tiers": {
+      "quick": {
+        "total_planned": null,
+        "total_executed": 19,
+        "counts": {
+          "PASSED": 16,
+          "AUTOMATED_PASS": 3
+        },
+        "automated_pass_ids": [
+          "environment_gate01_unit3",
+          "environment_gate01_u3_s1",
+          "environment_gate01_u3_s2"
+        ]
+      },
+      "physics": {
+        "total_planned": null,
+        "total_executed": 27,
+        "counts": {
+          "PASSED": 24,
+          "AUTOMATED_PASS": 3
+        },
+        "automated_pass_ids": [
+          "dynamics_playground_blend",
+          "playground_dynamics_states",
+          "visual_evidence_telemetry"
+        ]
+      },
+      "motion": {
+        "total_planned": null,
+        "total_executed": 12,
+        "counts": {
+          "PASSED": 6,
+          "AUTOMATED_PASS": 6
+        },
+        "automated_pass_ids": [
+          "integration_unified_motion",
+          "task7a1_character_playground",
+          "task7a2_terrain_traversal",
+          "environment_gate01_unit3",
+          "environment_gate01_u3_s1",
+          "environment_gate01_u3_s2"
+        ]
+      },
+      "full": {
+        "total_planned": null,
+        "total_executed": 42,
+        "counts": {
+          "PASSED": 33,
+          "AUTOMATED_PASS": 9
+        },
+        "automated_pass_ids": [
+          "environment_gate01_unit3",
+          "environment_gate01_u3_s1",
+          "environment_gate01_u3_s2",
+          "dynamics_playground_blend",
+          "playground_dynamics_states",
+          "visual_evidence_telemetry",
+          "integration_unified_motion",
+          "task7a1_character_playground",
+          "task7a2_terrain_traversal"
+        ]
+      }
+    },
+    "commands": [
+      {
+        "tier": "quick",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+          "--tier",
+          "quick",
+          "--fail-fast",
+          "--output-dir",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_quick"
+        ],
+        "started_at": "2026-11-27T23:32:22.342795+08:00",
+        "finished_at": "2026-11-27T23:33:08.537053+08:00",
+        "duration_sec": 46.19,
+        "returncode": 0,
+        "total_planned": null,
+        "counts": {
+          "PASSED": 16,
+          "AUTOMATED_PASS": 3
+        },
+        "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_quick/test_report.json"
+      },
+      {
+        "tier": "physics",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+          "--tier",
+          "physics",
+          "--fail-fast",
+          "--output-dir",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_physics"
+        ],
+        "started_at": "2026-11-27T23:33:08.545995+08:00",
+        "finished_at": "2026-11-27T23:34:52.180022+08:00",
+        "duration_sec": 103.63,
+        "returncode": 0,
+        "total_planned": null,
+        "counts": {
+          "PASSED": 24,
+          "AUTOMATED_PASS": 3
+        },
+        "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_physics/test_report.json"
+      },
+      {
+        "tier": "motion",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+          "--tier",
+          "motion",
+          "--fail-fast",
+          "--output-dir",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_motion"
+        ],
+        "started_at": "2026-11-27T23:34:52.187765+08:00",
+        "finished_at": "2026-11-27T23:35:41.662437+08:00",
+        "duration_sec": 49.47,
+        "returncode": 0,
+        "total_planned": null,
+        "counts": {
+          "PASSED": 6,
+          "AUTOMATED_PASS": 6
+        },
+        "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_motion/test_report.json"
+      },
+      {
+        "tier": "full",
+        "command": [
+          "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\tests\\run_test_suite.py",
+          "--tier",
+          "full",
+          "--fail-fast",
+          "--output-dir",
+          "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\12\\final_acceptance\\phase3_regression\\regression_full"
+        ],
+        "started_at": "2026-11-27T23:35:41.670770+08:00",
+        "finished_at": "2026-11-27T23:38:18.963213+08:00",
+        "duration_sec": 157.29,
+        "returncode": 0,
+        "total_planned": null,
+        "counts": {
+          "PASSED": 33,
+          "AUTOMATED_PASS": 9
+        },
+        "report_json": "docs/evidence/12/final_acceptance/phase3_regression/regression_full/test_report.json"
+      }
+    ]
+  }
+}

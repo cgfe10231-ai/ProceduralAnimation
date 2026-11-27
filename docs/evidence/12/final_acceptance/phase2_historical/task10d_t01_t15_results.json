@@ -1,0 +1,628 @@
+{
+  "baseline_commit": "9f5f825059fad3b9dafa8ed0b9b2c0af1bb7d1d0",
+  "head": "824c52ec73f86aa3d08245a58297118cb4a9f110",
+  "commands": [
+    {
+      "label": "t02_t03_hist_9f5f8250",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "-b",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python",
+        "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py",
+        "--",
+        "--worker",
+        "baseline",
+        "--repo",
+        "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\baseline_9f5f825",
+        "--out",
+        "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\centralized_verification_work\\t02_t03_hist.json"
+      ]
+    },
+    {
+      "label": "t02_t03_cur_head",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "-b",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python",
+        "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py",
+        "--",
+        "--worker",
+        "baseline",
+        "--repo",
+        "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+        "--out",
+        "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\centralized_verification_work\\t02_t03_cur.json"
+      ]
+    },
+    {
+      "label": "t01_t15_contracts",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "-b",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python",
+        "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py",
+        "--",
+        "--worker",
+        "contracts",
+        "--out",
+        "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\centralized_verification_work\\t01_t15_cur.json"
+      ]
+    }
+  ],
+  "results": {
+    "T01": {
+      "passed": true,
+      "cases": {
+        "bad_fps_0": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "PipelineConfig.fps must be finite and positive, got 0",
+          "solve_calls_during_attempt": 0
+        },
+        "bad_fps_-24": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "PipelineConfig.fps must be finite and positive, got -24",
+          "solve_calls_during_attempt": 0
+        },
+        "bad_fps_nan": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "PipelineConfig.fps must be finite and positive, got nan",
+          "solve_calls_during_attempt": 0
+        },
+        "bad_fps_inf": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "PipelineConfig.fps must be finite and positive, got inf",
+          "solve_calls_during_attempt": 0
+        },
+        "bad_fps_True": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "PipelineConfig.fps must be finite and positive, got True",
+          "solve_calls_during_attempt": 0
+        },
+        "bad_fps_'24'": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "PipelineConfig.fps must be finite and positive, got '24'",
+          "solve_calls_during_attempt": 0
+        },
+        "missing_seq_dur_init": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "Enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps",
+          "solve_calls_during_attempt": 0
+        },
+        "missing_seq_dur_execute": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "MotionPlanner.execute(): enabling central upper_limb_L or upper_limb_R requires explicit finite sequence_duration_sec=(total_frames - 1) / fps",
+          "solve_calls_during_attempt": 0
+        },
+        "non_int_boundary_dur": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "sequence_duration_sec=1.01 does not align with integer frame boundaries at fps=24.0",
+          "solve_calls_during_attempt": 0
+        },
+        "illegal_seg_empty_tuple": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "upper_limb_L must not be an empty tuple",
+          "solve_calls_during_attempt": 0
+        },
+        "illegal_seg_list_not_tuple": {
+          "rejected": true,
+          "exc_type": "TypeError",
+          "msg": "upper_limb_L must be None or a tuple of UpperLimbSegment, got list",
+          "solve_calls_during_attempt": 0
+        },
+        "illegal_seg_bad_mode": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "mode must be 'FK' or 'IK', got 'MAGIC'",
+          "solve_calls_during_attempt": 0
+        },
+        "illegal_seg_neg_start": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "time_sec must be non-negative, got -0.1",
+          "solve_calls_during_attempt": 0
+        },
+        "illegal_seg_zero_dur": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "duration_sec must be strictly positive, got 0.0",
+          "solve_calls_during_attempt": 0
+        },
+        "illegal_seg_nan_coord": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "wrist_start_xyz[1] must be finite, got nan",
+          "solve_calls_during_attempt": 0
+        },
+        "overlapping_segs": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "upper_limb_L[1] start_time_sec (0.5) overlaps previous segment ending at 1.0",
+          "solve_calls_during_attempt": 0
+        },
+        "discontinuous_same_mode": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "upper_limb_L FK segment transition mismatch between index 0 and 1 at bone 0[0]",
+          "solve_calls_during_attempt": 0
+        },
+        "unadmitted_action": {
+          "rejected": true,
+          "exc_type": "TypeError",
+          "msg": "MotionPlanner.execute(): action 'unadmitted_custom' of type _UnadmittedAction is not an independently audited action type authorized for centralized upper-limb control.",
+          "solve_calls_during_attempt": 0
+        },
+        "unauthorized_derived_action": {
+          "rejected": true,
+          "exc_type": "TypeError",
+          "msg": "MotionPlanner.execute(): action 'start_stop_walk' of type _DerivedWalk is not an independently audited action type authorized for centralized upper-limb control.",
+          "solve_calls_during_attempt": 0
+        },
+        "seg_exceeds_seq_dur": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "upper_limb_L[1] end time 2.000000s exceeds sequence/action timeline upper bound 1.500000s",
+          "solve_calls_during_attempt": 0
+        },
+        "static_action_exceeds_seq_dur": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "msg": "MotionPlanner.execute(): static action prefix frames (204) already exceed declared sequence frame count 100 (sequence_duration_sec=4.125000s)",
+          "solve_calls_during_attempt": 0
+        },
+        "runtime_terrain_overbound": {
+          "rejected": true,
+          "exc_type": "ValueError",
+          "action1_solves": 204,
+          "action2_solves": 0
+        }
+      }
+    },
+    "T02": {
+      "passed": true,
+      "actions": {
+        "start_stop_walk": {
+          "frames": 204,
+          "max_root_diff_m": 0.0,
+          "max_foot_diff_m": 0.0,
+          "max_wrist_diff_m": 0.0,
+          "max_fk_diff_deg": 0.0,
+          "max_quat_diff": 0.0,
+          "max_inf_diff": 0.0,
+          "passed": true
+        },
+        "terrain_walk_no_upper": {
+          "frames": 128,
+          "max_root_diff_m": 0.0,
+          "max_foot_diff_m": 0.0,
+          "max_wrist_diff_m": 0.0,
+          "max_fk_diff_deg": 0.0,
+          "max_quat_diff": 0.0,
+          "max_inf_diff": 0.0,
+          "passed": true
+        },
+        "run": {
+          "frames": 48,
+          "max_root_diff_m": 0.0,
+          "max_foot_diff_m": 0.0,
+          "max_wrist_diff_m": 0.0,
+          "max_fk_diff_deg": 0.0,
+          "max_quat_diff": 0.0,
+          "max_inf_diff": 0.0,
+          "passed": true
+        },
+        "sprint_start": {
+          "frames": 114,
+          "max_root_diff_m": 0.0,
+          "max_foot_diff_m": 0.0,
+          "max_wrist_diff_m": 0.0,
+          "max_fk_diff_deg": 0.0,
+          "max_quat_diff": 0.0,
+          "max_inf_diff": 0.0,
+          "passed": true
+        },
+        "sprint_start_brake": {
+          "frames": 162,
+          "max_root_diff_m": 0.0,
+          "max_foot_diff_m": 0.0,
+          "max_wrist_diff_m": 0.0,
+          "max_fk_diff_deg": 0.0,
+          "max_quat_diff": 0.0,
+          "max_inf_diff": 0.0,
+          "passed": true
+        }
+      },
+      "fail_checks_match": true
+    },
+    "T03": {
+      "passed": true,
+      "frames": 128,
+      "max_root_diff_m": 0.0,
+      "max_foot_diff_m": 0.0,
+      "max_wrist_diff_m": 0.0,
+      "max_fk_diff_deg": 0.0,
+      "max_quat_diff": 0.0,
+      "max_inf_diff": 0.0
+    },
+    "T04": {
+      "passed": true,
+      "conflict_rejected": {
+        "rejected": true,
+        "exc_type": "ValueError",
+        "msg": "MotionPlanner.execute(): upper_limb_L control conflict \u2014 central MotionPlanner trajectory conflicts with action 'TerrainWalk_route_traversal'.upper_limb_L",
+        "solve_calls_during_attempt": 0
+      },
+      "cross_side_frames": 128,
+      "mid_source_L": "CENTRAL",
+      "mid_source_R": "ACTION_LOCAL"
+    },
+    "T05": {
+      "passed": true,
+      "call_chain": {
+        "expected_frames": 204,
+        "planner_execute_calls": 1,
+        "compose_calls": 204,
+        "bridge_exec_calls": 204,
+        "wbc_exec_calls": 204,
+        "unique_planner_instances": 1,
+        "unique_context_instances": 1,
+        "unique_bridge_instances": 1,
+        "unique_wbc_instances": 1,
+        "planner_ids": [
+          1629995109712
+        ],
+        "bridge_ids": [
+          1629969495568
+        ],
+        "wbc_ids": [
+          1629969490448
+        ],
+        "non_upper_integrity_mismatches": 0,
+        "compose_vs_bridge_mismatches": 0,
+        "all_wbc_success": true
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 45.65980040148745,
+        "forearm_rel_span_deg": 53.96111231957612,
+        "hand_rel_span_deg": 26.576554779673632,
+        "wrist_root_local_span_m": 0.7281805546554984,
+        "elbow_pole_span_m": 5.960464477539063e-08
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 19.151814691021187,
+        "forearm_rel_span_deg": 24.319536775882508,
+        "hand_rel_span_deg": 24.859165809936332,
+        "wrist_root_local_span_m": 0.2069029768229136,
+        "elbow_pole_span_m": 0.36736673932851316
+      }
+    },
+    "T06": {
+      "passed": true,
+      "call_chain": {
+        "expected_frames": 288,
+        "planner_execute_calls": 1,
+        "compose_calls": 288,
+        "bridge_exec_calls": 288,
+        "wbc_exec_calls": 288,
+        "unique_planner_instances": 1,
+        "unique_context_instances": 1,
+        "unique_bridge_instances": 1,
+        "unique_wbc_instances": 1,
+        "planner_ids": [
+          1630019671760
+        ],
+        "bridge_ids": [
+          1629992370256
+        ],
+        "wbc_ids": [
+          1629992370560
+        ],
+        "non_upper_integrity_mismatches": 0,
+        "compose_vs_bridge_mismatches": 0,
+        "all_wbc_success": true
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 43.912920447257825,
+        "forearm_rel_span_deg": 43.85047066490124,
+        "hand_rel_span_deg": 16.19747485151441,
+        "wrist_root_local_span_m": 0.5355368333158025,
+        "elbow_pole_span_m": 2.384185791015625e-07
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 17.921879690462408,
+        "forearm_rel_span_deg": 23.749266053032372,
+        "hand_rel_span_deg": 13.401697957215571,
+        "wrist_root_local_span_m": 0.1618523855424334,
+        "elbow_pole_span_m": 0.38146354300215096
+      }
+    },
+    "T07": {
+      "passed": true,
+      "call_chain": {
+        "expected_frames": 96,
+        "planner_execute_calls": 1,
+        "compose_calls": 96,
+        "bridge_exec_calls": 96,
+        "wbc_exec_calls": 96,
+        "unique_planner_instances": 1,
+        "unique_context_instances": 1,
+        "unique_bridge_instances": 1,
+        "unique_wbc_instances": 1,
+        "planner_ids": [
+          1630034323920
+        ],
+        "bridge_ids": [
+          1629969312832
+        ],
+        "wbc_ids": [
+          1629969316480
+        ],
+        "non_upper_integrity_mismatches": 0,
+        "compose_vs_bridge_mismatches": 0,
+        "all_wbc_success": true
+      },
+      "airborne_frames": 40,
+      "flight_wrist_local_span_L_m": 0.6236496370893758,
+      "flight_wrist_local_span_R_m": 0.14448167727651456,
+      "upper_L": {
+        "upper_arm_rel_span_deg": 62.47031395833206,
+        "forearm_rel_span_deg": 36.669450704806664,
+        "hand_rel_span_deg": 31.597712953251662,
+        "wrist_root_local_span_m": 0.6299950989568387,
+        "elbow_pole_span_m": 1.1920928955078125e-07
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 16.43254305153151,
+        "forearm_rel_span_deg": 17.400341071387217,
+        "hand_rel_span_deg": 20.94938911670902,
+        "wrist_root_local_span_m": 0.14533251063794247,
+        "elbow_pole_span_m": 0.3595119080739143
+      }
+    },
+    "T08": {
+      "passed": true,
+      "stages": [
+        "accelerate",
+        "prep",
+        "sprint",
+        "start"
+      ],
+      "call_chain": {
+        "expected_frames": 114,
+        "planner_execute_calls": 1,
+        "compose_calls": 114,
+        "bridge_exec_calls": 114,
+        "wbc_exec_calls": 114,
+        "unique_planner_instances": 1,
+        "unique_context_instances": 1,
+        "unique_bridge_instances": 1,
+        "unique_wbc_instances": 1,
+        "planner_ids": [
+          1630063875152
+        ],
+        "bridge_ids": [
+          1629969207600
+        ],
+        "wbc_ids": [
+          1629969214800
+        ],
+        "non_upper_integrity_mismatches": 0,
+        "compose_vs_bridge_mismatches": 0,
+        "all_wbc_success": true
+      },
+      "upper_L": {
+        "upper_arm_rel_span_deg": 52.74587931479866,
+        "forearm_rel_span_deg": 52.68619355451802,
+        "hand_rel_span_deg": 24.793313747928885,
+        "wrist_root_local_span_m": 0.6698693985191024,
+        "elbow_pole_span_m": 1.1920928955078125e-07
+      },
+      "upper_R": {
+        "upper_arm_rel_span_deg": 24.606173023375074,
+        "forearm_rel_span_deg": 42.45571677853758,
+        "hand_rel_span_deg": 25.534682722349984,
+        "wrist_root_local_span_m": 0.18852399063573158,
+        "elbow_pole_span_m": 0.37718332146258693
+      }
+    },
+    "T09": {
+      "passed": true,
+      "handoff_speed_mps": 2.0,
+      "brake_final_speed_mps": 0.0,
+      "brake_upper_L": {
+        "upper_arm_rel_span_deg": 27.041837481325917,
+        "forearm_rel_span_deg": 41.4207617554934,
+        "hand_rel_span_deg": 14.970893152145063,
+        "wrist_root_local_span_m": 0.4332370856735437,
+        "elbow_pole_span_m": 0.0
+      },
+      "brake_upper_R": {
+        "upper_arm_rel_span_deg": 8.185244182995698,
+        "forearm_rel_span_deg": 23.29491546071823,
+        "hand_rel_span_deg": 10.623360872209386,
+        "wrist_root_local_span_m": 0.1352617123714533,
+        "elbow_pole_span_m": 0.19478483619319176
+      }
+    },
+    "T10": {
+      "passed": true,
+      "boundaries": [
+        {
+          "before_frame": 204,
+          "after_frame": 205,
+          "seg_idx_L_before": 0,
+          "seg_idx_L_after": 0,
+          "seg_idx_R_before": 0,
+          "seg_idx_R_after": 0,
+          "root_jump_m": 0.0,
+          "spine_world_jump_deg": 0.0,
+          "wrist_local_jump_L_m": 0.03143,
+          "wrist_local_jump_R_m": 0.0002,
+          "max_fk_rel_rot_jump_L_deg": 0.18,
+          "max_ik_rel_rot_jump_R_deg": 4.892
+        },
+        {
+          "before_frame": 768,
+          "after_frame": 769,
+          "seg_idx_L_before": 1,
+          "seg_idx_L_after": 1,
+          "seg_idx_R_before": 0,
+          "seg_idx_R_after": 0,
+          "root_jump_m": 0.0,
+          "spine_world_jump_deg": 0.0,
+          "wrist_local_jump_L_m": 0.03513,
+          "wrist_local_jump_R_m": 4e-05,
+          "max_fk_rel_rot_jump_L_deg": 0.07,
+          "max_ik_rel_rot_jump_R_deg": 4.474
+        },
+        {
+          "before_frame": 882,
+          "after_frame": 883,
+          "seg_idx_L_before": 1,
+          "seg_idx_L_after": 1,
+          "seg_idx_R_before": 1,
+          "seg_idx_R_after": 1,
+          "root_jump_m": 0.08328,
+          "spine_world_jump_deg": 0.51,
+          "wrist_local_jump_L_m": 0.01278,
+          "wrist_local_jump_R_m": 0.00151,
+          "max_fk_rel_rot_jump_L_deg": 0.003,
+          "max_ik_rel_rot_jump_R_deg": 1.524
+        },
+        {
+          "before_frame": 930,
+          "after_frame": 931,
+          "seg_idx_L_before": 2,
+          "seg_idx_L_after": 2,
+          "seg_idx_R_before": 1,
+          "seg_idx_R_after": 1,
+          "root_jump_m": 0.0,
+          "spine_world_jump_deg": 6.35,
+          "wrist_local_jump_L_m": 0.1155,
+          "wrist_local_jump_R_m": 0.00046,
+          "max_fk_rel_rot_jump_L_deg": 0.962,
+          "max_ik_rel_rot_jump_R_deg": 12.972
+        }
+      ],
+      "total_frames": 978
+    },
+    "T11": {
+      "passed": true,
+      "non_1_start_range": [
+        101,
+        148
+      ],
+      "oob_pre": {
+        "rejected": true,
+        "exc_type": "ValueError",
+        "msg": "planned_pose.frame (100) precedes sequence_start_frame (101)",
+        "solve_calls_during_attempt": 0
+      },
+      "oob_post": {
+        "rejected": true,
+        "exc_type": "ValueError",
+        "msg": "planned_pose.frame (149) exceeds central sequence upper bound 148 (sequence_start_frame=101, sequence_duration_sec=1.958333s)",
+        "solve_calls_during_attempt": 0
+      },
+      "declared_duration_mismatch": {
+        "rejected": true,
+        "exc_type": "ValueError",
+        "msg": "MotionPlanner.execute(): static action prefix frames (48) already exceed declared sequence frame count 47 (sequence_duration_sec=1.916667s)",
+        "solve_calls_during_attempt": 0
+      }
+    },
+    "T12": {
+      "passed": true,
+      "strict_frame_call_order": true,
+      "call_chain": {
+        "expected_frames": 978,
+        "planner_execute_calls": 1,
+        "compose_calls": 978,
+        "bridge_exec_calls": 978,
+        "wbc_exec_calls": 978,
+        "unique_planner_instances": 1,
+        "unique_context_instances": 1,
+        "unique_bridge_instances": 1,
+        "unique_wbc_instances": 1,
+        "planner_ids": [
+          1630070503888
+        ],
+        "bridge_ids": [
+          1629969562848
+        ],
+        "wbc_ids": [
+          1629969562304
+        ],
+        "non_upper_integrity_mismatches": 0,
+        "compose_vs_bridge_mismatches": 0,
+        "all_wbc_success": true
+      }
+    },
+    "T13": {
+      "passed": true,
+      "frames_checked": 978,
+      "non_upper_integrity_mismatches": 0
+    },
+    "T14": {
+      "passed": true,
+      "cases": {
+        "unreachable_upper_limb": {
+          "blocked": true,
+          "follow_up_calls": 0,
+          "exc": "RunAction failed at Frame 1: KinematicBridge execution failed (unmet=2): hand.L (ROM_VIOLATION): Joint 'hand.L' (hand_L) violates anatomical ROM by max 31.05 de"
+        },
+        "rom_violation_upper_limb": {
+          "blocked": true,
+          "follow_up_calls": 0,
+          "exc": "RunAction failed at Frame 1: KinematicBridge execution failed (unmet=1): forearm.L (ROM_VIOLATION): Joint 'forearm.L' (forearm_L) violates anatomical ROM by max"
+        },
+        "bridge_non_support_failure": {
+          "blocked": true,
+          "follow_up_calls": 0,
+          "exc": "Footstep at (0.11, 23.90) requires vertical reach 2.500m, exceeding physical stepping limit (0.35m)"
+        }
+      }
+    },
+    "T15": {
+      "passed": true,
+      "B_vs_A_left_only": {
+        "max_right_planned_diff": 0.0,
+        "max_lower_planned_diff_m": 0.0,
+        "max_left_wrist_local_delta_m": 0.31258,
+        "max_left_bone_rel_delta_deg": 32.333
+      },
+      "C_vs_A_right_only": {
+        "max_left_planned_diff": 0.0,
+        "max_lower_planned_diff_m": 0.0,
+        "max_right_wrist_local_delta_m": 0.12458,
+        "max_right_bone_rel_delta_deg": 13.489
+      },
+      "D_vs_A_lower_only_world_vs_local": {
+        "max_left_fk_planned_diff_deg": 0.0,
+        "max_right_root_local_planned_diff_m": 8.881784197001252e-16,
+        "max_root_world_delta_m": 0.45361,
+        "max_right_wrist_world_delta_m": 0.45361,
+        "max_right_wrist_root_local_delta_m": 4.6e-05,
+        "max_left_bone_rel_delta_deg": 1e-05
+      }
+    }
+  }
+}
