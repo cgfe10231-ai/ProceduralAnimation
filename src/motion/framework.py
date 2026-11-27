@@ -41,6 +41,11 @@ from src.motion.start_stop_walk import (
     build_step_schedule,
     evaluate_root_kinematics,
 )
+from src.motion.upper_limb_trajectory import (
+    UpperLimbSegment,
+    evaluate_upper_limb_sequence_at_time,
+    validate_upper_limb_segment_sequence,
+)
 from src.motion.walk_cycle import _clear_existing_animation_data, _keyframe_walk_frame
 from src.rig.foot_contact import (
     evaluate_foot_support,
@@ -384,6 +389,116 @@ class BlenderPoseApplicator:
         _keyframe_walk_frame(self.armature_obj, self.root_obj, frame)
 
 
+_UNSET = object()
+
+
+# [INTRODUCED 2026-11-27T13:57:00+08:00]
+# TASK: TASK 10-d-5
+# FUNCTION: _round_optional_vec
+# PURPOSE: Format optional 3D coordinate/rotation tuples into rounded diagnostic lists without repeating rounding logic across planned and actual upper-limb feedback.
+# REASON: Eliminate duplicated optional vector rounding in MotionRuntimeContext.compose_planned_pose() and build_upper_limb_feedback_metadata().
+def _round_optional_vec(vec: Optional[Sequence[float]], digits: int) -> Optional[List[float]]:
+    """Round each component of an optional vector to the requested precision."""
+    if vec is None:
+        return None
+    return [round(float(v), digits) for v in vec]
+
+
+# [INTRODUCED 2026-11-27T13:55:00+08:00]
+# TASK: TASK 10-d-5
+# FUNCTION: build_upper_limb_feedback_metadata
+# PURPOSE: Extract unified, non-misleading upper-limb feedback distinguishing planned targets, optional historical arm-swing references, and actual WBC/Bridge execution feedback along BridgeExecutionResult -> MotionState -> ActionExecutionResult.
+# REASON: Enforce TASK 10-d-5 Section 9 across all five MotionAction classes without duplicating feedback formatting or allowing historical arm_l_rx/arm_r_rx values to masquerade as active independent targets or actual bone poses.
+def build_upper_limb_feedback_metadata(
+    bridge_res: Any,
+    compose_diag: Dict[str, Any],
+    hist_arm_l_rx: Optional[float] = None,
+    hist_arm_r_rx: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Assemble planned/historical/actual upper-limb feedback metadata for one executed frame."""
+    end_effectors = getattr(getattr(bridge_res, "wbc_result", None), "end_effectors", {}) or {}
+    rom_violations = getattr(bridge_res, "rom_violations", {}) or {}
+    tracking_errors = getattr(bridge_res, "tracking_errors", {}) or {}
+
+    planned_upper: Dict[str, Any] = {}
+    actual_upper: Dict[str, Any] = {}
+    for side in ("L", "R"):
+        sdiag = compose_diag[side]
+        planned_upper[side] = {
+            "source": sdiag["source"],
+            "is_independent": bool(sdiag["is_independent"]),
+            "mode": sdiag["mode"],
+            "segment_index": sdiag["segment_index"],
+            "time_base": sdiag["time_base"],
+            "time_sec": round(float(sdiag["time_sec"]), 6) if sdiag["time_sec"] is not None else None,
+            "target": sdiag["planned_target"],
+        }
+
+        eff_hand = end_effectors.get(f"hand_{side}")
+        side_rom_viols = {
+            k: v for k, v in rom_violations.items() if str(k).endswith(f".{side}")
+        }
+        actual_upper[side] = {
+            "enabled": bool(eff_hand and eff_hand.enabled),
+            "weight": float(eff_hand.weight) if eff_hand is not None else 0.0,
+            "wrist_world_xyz": _round_optional_vec(eff_hand.actual_world_xyz, 5) if eff_hand is not None else None,
+            "requested_world_xyz": (
+                _round_optional_vec(eff_hand.requested_world_xyz, 5)
+                if (eff_hand is not None and eff_hand.enabled)
+                else None
+            ),
+            "hand_rotation_deg": (
+                _round_optional_vec(eff_hand.actual_rotation_deg, 4)
+                if (eff_hand is not None and eff_hand.actual_rotation_deg is not None)
+                else None
+            ),
+            "position_error_m": (
+                round(float(eff_hand.position_error_m), 6)
+                if (eff_hand is not None and eff_hand.enabled)
+                else None
+            ),
+            "orientation_error_deg": (
+                round(float(eff_hand.orientation_error_deg), 4)
+                if (eff_hand is not None and eff_hand.enabled and eff_hand.orientation_error_deg is not None)
+                else None
+            ),
+            "is_reachable": (
+                bool(eff_hand.is_reachable)
+                if (eff_hand is not None and eff_hand.enabled)
+                else None
+            ),
+            "strictly_in_reach": (
+                bool(eff_hand.strictly_in_reach)
+                if (eff_hand is not None and eff_hand.enabled)
+                else None
+            ),
+            "tracking_error_m": (
+                round(float(tracking_errors[f"hand_{side}"]), 6)
+                if f"hand_{side}" in tracking_errors
+                else None
+            ),
+            "rom_violations": side_rom_viols,
+        }
+
+    hist_ref = {
+        "L": round(float(hist_arm_l_rx), 2) if hist_arm_l_rx is not None else None,
+        "R": round(float(hist_arm_r_rx), 2) if hist_arm_r_rx is not None else None,
+    }
+    return {
+        "planned_upper_limb": planned_upper,
+        "historical_arm_swing_ref_deg": hist_ref,
+        "actual_upper_limb": actual_upper,
+        "arm_l_rx_effective": (
+            hist_ref["L"] if (hist_ref["L"] is not None and not compose_diag["L"]["is_independent"]) else None
+        ),
+        "arm_r_rx_effective": (
+            hist_ref["R"] if (hist_ref["R"] is not None and not compose_diag["R"]["is_independent"]) else None
+        ),
+        "upper_limb_source_L": compose_diag["L"]["source"],
+        "upper_limb_source_R": compose_diag["R"]["source"],
+    }
+
+
 @dataclass
 class MotionRuntimeContext:
     """Execution context supplied by `MotionPlanner` to each `MotionAction`."""
@@ -396,6 +511,210 @@ class MotionRuntimeContext:
     contact_adapter: ContactConstraintAdapter
     pose_applicator: BlenderPoseApplicator
     bridge_executor: Optional[Any] = None
+    upper_limb_L: Optional[Tuple[UpperLimbSegment, ...]] = None
+    upper_limb_R: Optional[Tuple[UpperLimbSegment, ...]] = None
+    sequence_start_frame: Optional[int] = None
+
+    # [INTRODUCED 2026-11-27T13:55:00+08:00]
+    # TASK: TASK 10-d-5
+    # FUNCTION: MotionRuntimeContext.compose_planned_pose
+    # PURPOSE: Pure-data combination interface merging a MotionAction's full KinematicPlannedPose with optional central or legal action-local upper-limb tracks while preserving all non-overridden targets and rejecting same-side control conflicts.
+    # REASON: Converge upper-limb arbitration across TerrainWalkAction, StartStopWalkAction, RunAction, SprintStartAction, and SprintBrakeAction into one pure planning interface without touching Bridge, WBC, Rig, or scene writes.
+    def compose_planned_pose(
+        self,
+        planned_pose: Any,
+        action_upper_limb_L: Optional[Tuple[UpperLimbSegment, ...]] = None,
+        action_upper_limb_R: Optional[Tuple[UpperLimbSegment, ...]] = None,
+        action_time_sec: Optional[float] = None,
+    ) -> Tuple[Any, Dict[str, Any]]:
+        """Compose a KinematicPlannedPose with independent left/right upper-limb targets cleanly."""
+        from src.motion.kinematic_bridge import KinematicPlannedPose
+
+        if not isinstance(planned_pose, KinematicPlannedPose):
+            raise TypeError(
+                f"planned_pose must be KinematicPlannedPose, got {type(planned_pose).__name__}"
+            )
+        if isinstance(self.config.fps, bool) or not isinstance(self.config.fps, (int, float)) or float(self.config.fps) <= 0.0:
+            raise ValueError(f"MotionRuntimeContext.config.fps must be positive, got {self.config.fps!r}")
+        fps = float(self.config.fps)
+
+        central_L = validate_upper_limb_segment_sequence(
+            self.upper_limb_L, "L", parameter_name="central_upper_limb_L"
+        )
+        central_R = validate_upper_limb_segment_sequence(
+            self.upper_limb_R, "R", parameter_name="central_upper_limb_R"
+        )
+        local_L = validate_upper_limb_segment_sequence(
+            action_upper_limb_L, "L", parameter_name="action_upper_limb_L"
+        )
+        local_R = validate_upper_limb_segment_sequence(
+            action_upper_limb_R, "R", parameter_name="action_upper_limb_R"
+        )
+
+        # Rule 9: Disallow simultaneous central + action-local control on the same side
+        for side, c_segs, l_segs in (("L", central_L, local_L), ("R", central_R, local_R)):
+            if c_segs is not None and l_segs is not None:
+                raise ValueError(
+                    f"Upper-limb control ownership conflict on side '{side}': "
+                    f"central MotionPlanner upper_limb_{side} and action-local upper_limb_{side} cannot both be active."
+                )
+
+        uses_central = (central_L is not None) or (central_R is not None)
+        uses_local = (local_L is not None) or (local_R is not None)
+
+        sequence_time_sec: Optional[float] = None
+        if uses_central:
+            if (
+                isinstance(self.sequence_start_frame, bool)
+                or not isinstance(self.sequence_start_frame, int)
+                or self.sequence_start_frame < 1
+            ):
+                raise ValueError(
+                    "Central upper-limb trajectory requires valid integer sequence_start_frame >= 1 "
+                    f"in MotionRuntimeContext, got {self.sequence_start_frame!r}"
+                )
+            if isinstance(planned_pose.frame, bool) or not isinstance(planned_pose.frame, int):
+                raise TypeError(f"planned_pose.frame must be int, got {type(planned_pose.frame).__name__}")
+            if planned_pose.frame < self.sequence_start_frame:
+                raise ValueError(
+                    f"planned_pose.frame ({planned_pose.frame}) precedes sequence_start_frame ({self.sequence_start_frame})"
+                )
+            sequence_time_sec = (planned_pose.frame - self.sequence_start_frame) / fps
+
+        validated_action_time_sec: Optional[float] = None
+        if uses_local:
+            if isinstance(action_time_sec, bool) or not isinstance(action_time_sec, (int, float)):
+                raise TypeError(
+                    f"action_time_sec must be finite non-negative float when action-local upper limb is used, got {type(action_time_sec).__name__}"
+                )
+            validated_action_time_sec = float(action_time_sec)
+            if not math.isfinite(validated_action_time_sec) or validated_action_time_sec < 0.0:
+                raise ValueError(
+                    f"action_time_sec must be finite and non-negative, got {action_time_sec!r}"
+                )
+        elif action_time_sec is not None:
+            if isinstance(action_time_sec, bool) or not isinstance(action_time_sec, (int, float)):
+                raise TypeError(f"action_time_sec must be int or float, got {type(action_time_sec).__name__}")
+            val_t = float(action_time_sec)
+            if not math.isfinite(val_t) or val_t < 0.0:
+                raise ValueError(f"action_time_sec must be finite and non-negative, got {action_time_sec!r}")
+            validated_action_time_sec = val_t
+
+        fk_rotations: Dict[str, Tuple[float, float, float]] = {
+            str(k): tuple(float(c) for c in v)
+            for k, v in planned_pose.fk_joint_rotations_deg.items()
+        }
+
+        composed_hands: Dict[str, Optional[Any]] = {}
+        side_diag: Dict[str, Dict[str, Any]] = {}
+
+        for side, c_segs, l_segs, orig_hand in (
+            ("L", central_L, local_L, planned_pose.hand_L),
+            ("R", central_R, local_R, planned_pose.hand_R),
+        ):
+            if c_segs is None and l_segs is None:
+                cloned_hand = replace(orig_hand) if orig_hand is not None else None
+                composed_hands[side] = cloned_hand
+                if cloned_hand is not None and cloned_hand.enabled:
+                    diag_mode = "IK"
+                    planned_target_info: Any = {
+                        "mode": "IK",
+                        "world_xyz": [round(float(v), 5) for v in cloned_hand.world_xyz],
+                        "rotation_deg": _round_optional_vec(cloned_hand.rotation_deg, 4),
+                        "pole_hint_world_xyz": _round_optional_vec(cloned_hand.pole_hint_world_xyz, 5),
+                        "clamp_reach": bool(cloned_hand.clamp_reach),
+                    }
+                else:
+                    diag_mode = "HISTORICAL_FK"
+                    planned_target_info = {
+                        "mode": "HISTORICAL_FK",
+                        "fk_joint_rotations_deg": {
+                            b_key: [round(float(v), 4) for v in fk_rotations[b_key]]
+                            for b_key in (f"upper_arm.{side}", f"forearm.{side}", f"hand.{side}")
+                            if b_key in fk_rotations
+                        },
+                    }
+                side_diag[side] = {
+                    "source": "HISTORICAL_ACTION",
+                    "is_independent": False,
+                    "mode": diag_mode,
+                    "segment_index": None,
+                    "time_base": "ACTION",
+                    "time_sec": validated_action_time_sec,
+                    "planned_target": planned_target_info,
+                }
+                continue
+
+            if c_segs is not None:
+                active_segs = c_segs
+                source_label = "CENTRAL"
+                time_base = "SEQUENCE"
+                assert sequence_time_sec is not None
+                eval_time = sequence_time_sec
+            else:
+                assert l_segs is not None and validated_action_time_sec is not None
+                active_segs = l_segs
+                source_label = "ACTION_LOCAL"
+                time_base = "ACTION"
+                eval_time = validated_action_time_sec
+
+            for bone_prefix in ("upper_arm", "forearm", "hand"):
+                fk_rotations.pop(f"{bone_prefix}.{side}", None)
+
+            seg_idx, selected_seg, hand_target, side_fk = evaluate_upper_limb_sequence_at_time(
+                active_segs,
+                side,
+                eval_time,
+                planned_pose.root_position,
+                planned_pose.root_yaw_deg,
+            )
+
+            if selected_seg.mode == "FK":
+                fk_rotations.update(side_fk)
+                composed_hands[side] = None
+                planned_target_info = {
+                    "mode": "FK",
+                    "fk_joint_rotations_deg": {
+                        b_key: [round(float(v), 4) for v in fk_rotations[b_key]]
+                        for b_key in (f"upper_arm.{side}", f"forearm.{side}", f"hand.{side}")
+                        if b_key in fk_rotations
+                    },
+                }
+            else:
+                composed_hands[side] = hand_target
+                assert hand_target is not None
+                planned_target_info = {
+                    "mode": "IK",
+                    "world_xyz": [round(float(v), 5) for v in hand_target.world_xyz],
+                    "rotation_deg": _round_optional_vec(hand_target.rotation_deg, 4),
+                    "pole_hint_world_xyz": _round_optional_vec(hand_target.pole_hint_world_xyz, 5),
+                    "clamp_reach": bool(hand_target.clamp_reach),
+                }
+
+            side_diag[side] = {
+                "source": source_label,
+                "is_independent": True,
+                "mode": selected_seg.mode,
+                "segment_index": int(seg_idx),
+                "time_base": time_base,
+                "time_sec": float(eval_time),
+                "planned_target": planned_target_info,
+            }
+
+        composed_pose = replace(
+            planned_pose,
+            hand_L=composed_hands["L"],
+            hand_R=composed_hands["R"],
+            fk_joint_rotations_deg=fk_rotations,
+        )
+        diagnostics: Dict[str, Any] = {
+            "sequence_start_frame": self.sequence_start_frame,
+            "sequence_time_sec": sequence_time_sec,
+            "action_time_sec": validated_action_time_sec,
+            "L": side_diag["L"],
+            "R": side_diag["R"],
+        }
+        return composed_pose, diagnostics
 
 
 # ============================================================================
@@ -837,10 +1156,27 @@ class StartStopWalkAction(MotionAction):
                 is_flight=False,
             )
 
+            planned_pose, upper_diag = context.compose_planned_pose(planned_pose)
             bridge_res = bridge_executor.execute_frame(planned_pose, keyframe=True, dt=1.0 / fps)
+
+            if not bridge_res.success:
+                unmet_desc = "; ".join(
+                    f"{uc.target_name} ({uc.category}): {uc.description} (err={uc.error_amount:.4f})"
+                    for uc in bridge_res.unmet_constraints
+                ) if bridge_res.unmet_constraints else "unspecified constraint failure"
+                raise RuntimeError(
+                    f"StartStopWalkAction failed at Frame {frame}: "
+                    f"KinematicBridge execution failed (unmet={len(bridge_res.unmet_constraints)}): {unmet_desc}"
+                )
+            if bridge_res.motion_state is None:
+                raise RuntimeError(
+                    f"StartStopWalkAction failed at Frame {frame}: KinematicBridge returned motion_state=None"
+                )
 
             eff_l = bridge_res.wbc_result.end_effectors.get("foot_L")
             eff_r = bridge_res.wbc_result.end_effectors.get("foot_R")
+            eff_hand_l = bridge_res.wbc_result.end_effectors.get("hand_L")
+            eff_hand_r = bridge_res.wbc_result.end_effectors.get("hand_R")
 
             if eff_l and (not eff_l.is_reachable or not eff_l.strictly_in_reach):
                 unreachable_events.append({
@@ -856,16 +1192,20 @@ class StartStopWalkAction(MotionAction):
                     "phase": phase_r,
                     "dist": round(eff_r.reach_distance_m, 5),
                 })
-
-            if not bridge_res.success:
-                for uc in bridge_res.unmet_constraints:
-                    unreachable_events.append({
-                        "frame": frame,
-                        "category": uc.category,
-                        "target": uc.target_name,
-                        "error": uc.error_amount,
-                        "desc": uc.description,
-                    })
+            if eff_hand_l and eff_hand_l.enabled and (not eff_hand_l.is_reachable or not eff_hand_l.strictly_in_reach):
+                unreachable_events.append({
+                    "frame": frame,
+                    "side": "L",
+                    "phase": "hand_ik",
+                    "dist": round(eff_hand_l.reach_distance_m, 5),
+                })
+            if eff_hand_r and eff_hand_r.enabled and (not eff_hand_r.is_reachable or not eff_hand_r.strictly_in_reach):
+                unreachable_events.append({
+                    "frame": frame,
+                    "side": "R",
+                    "phase": "hand_ik",
+                    "dist": round(eff_hand_r.reach_distance_m, 5),
+                })
 
             state_l = {
                 "target_world": eff_l.requested_world_xyz if eff_l else (0.0, 0.0, 0.0),
@@ -884,6 +1224,9 @@ class StartStopWalkAction(MotionAction):
                 "position_error_m": eff_r.position_error_m if eff_r else 0.0,
             }
 
+            upper_fb = build_upper_limb_feedback_metadata(
+                bridge_res, upper_diag, hist_arm_l_rx=arm_l_rx, hist_arm_r_rx=arm_r_rx
+            )
             ms = bridge_res.motion_state
             ms_params = dict(ms.params)
             ms_params.update({
@@ -894,8 +1237,13 @@ class StartStopWalkAction(MotionAction):
                 "crouch_env": round(crouch_env, 4),
                 "pelvis_dz": round(pelvis_dz, 5),
                 "torso_lean_deg": round(-(pelvis_rx + spine_rx), 3),
-                "arm_l_rx": round(arm_l_rx, 2),
-                "arm_r_rx": round(arm_r_rx, 2),
+                "arm_l_rx": upper_fb["arm_l_rx_effective"],
+                "arm_r_rx": upper_fb["arm_r_rx_effective"],
+                "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                "planned_upper_limb": upper_fb["planned_upper_limb"],
+                "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
+                "actual_upper_limb": upper_fb["actual_upper_limb"],
             })
             ms = ms.clone_with(params=ms_params)
             states.append(ms)
@@ -917,8 +1265,13 @@ class StartStopWalkAction(MotionAction):
                 "phase_r": phase_r,
                 "state_l": state_l,
                 "state_r": state_r,
-                "arm_l_rx": round(arm_l_rx, 2),
-                "arm_r_rx": round(arm_r_rx, 2),
+                "arm_l_rx": upper_fb["arm_l_rx_effective"],
+                "arm_r_rx": upper_fb["arm_r_rx_effective"],
+                "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                "planned_upper_limb": upper_fb["planned_upper_limb"],
+                "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
+                "actual_upper_limb": upper_fb["actual_upper_limb"],
             })
 
         if unreachable_events:
@@ -999,6 +1352,36 @@ def create_initial_motion_state(
     )
 
 
+# [INTRODUCED 2026-11-27T13:55:00+08:00]
+# TASK: TASK 10-d-5
+# FUNCTION: _estimate_action_duration_frames
+# PURPOSE: Query an action's declared estimate_duration_frames() cleanly while respecting 2-arg vs 3-arg (environment-aware) signatures and enforcing positive non-bool integer duration output.
+# REASON: Enforce static and per-action declared duration contracts in MotionPlanner.execute() across legacy actions (RunAction, SprintStartAction, SprintBrakeAction) and environment-aware actions (StartStopWalkAction, TerrainWalkAction).
+def _estimate_action_duration_frames(
+    action: MotionAction,
+    initial_state: MotionState,
+    config: PipelineConfig,
+    environment: EnvironmentQuery,
+) -> int:
+    """Invoke action.estimate_duration_frames safely and validate positive integer output."""
+    fn = action.estimate_duration_frames
+    supports_env = False
+    try:
+        sig = inspect.signature(fn)
+        params = list(sig.parameters.values())
+        supports_env = ("environment" in sig.parameters) or (len(params) >= 3) or any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in params
+        )
+    except (ValueError, TypeError):
+        supports_env = False
+    est = fn(initial_state, config, environment) if supports_env else fn(initial_state, config)
+    if isinstance(est, bool) or not isinstance(est, int) or est < 1:
+        raise ValueError(
+            f"Action '{action.name}'.estimate_duration_frames() returned invalid frame count {est!r}"
+        )
+    return int(est)
+
+
 class MotionPlanner:
     """High-level motion sequence orchestrator.
 
@@ -1017,11 +1400,33 @@ class MotionPlanner:
         config: PipelineConfig,
         armature_obj: Optional[bpy.types.Object] = None,
         environment: Optional[EnvironmentQuery] = None,
+        upper_limb_L: Optional[Tuple[UpperLimbSegment, ...]] = None,
+        upper_limb_R: Optional[Tuple[UpperLimbSegment, ...]] = None,
+        sequence_duration_sec: Optional[float] = None,
     ) -> None:
         self.config = config
         self.armature_obj = armature_obj
         self.environment = environment or EnvironmentQuery(ground_z=0.0)
         self._actions: List[MotionAction] = []
+        if sequence_duration_sec is not None:
+            if isinstance(sequence_duration_sec, bool) or not isinstance(sequence_duration_sec, (int, float)):
+                raise TypeError(
+                    f"sequence_duration_sec must be int or float, got {type(sequence_duration_sec).__name__}"
+                )
+            seq_dur = float(sequence_duration_sec)
+            if not math.isfinite(seq_dur) or seq_dur < 0.0:
+                raise ValueError(
+                    f"sequence_duration_sec must be finite and non-negative, got {sequence_duration_sec!r}"
+                )
+        else:
+            seq_dur = None
+        self.sequence_duration_sec: Optional[float] = seq_dur
+        self.upper_limb_L: Optional[Tuple[UpperLimbSegment, ...]] = validate_upper_limb_segment_sequence(
+            upper_limb_L, "L", max_time_sec=seq_dur, parameter_name="upper_limb_L"
+        )
+        self.upper_limb_R: Optional[Tuple[UpperLimbSegment, ...]] = validate_upper_limb_segment_sequence(
+            upper_limb_R, "R", max_time_sec=seq_dur, parameter_name="upper_limb_R"
+        )
 
     @property
     def actions(self) -> Sequence[MotionAction]:
@@ -1066,9 +1471,97 @@ class MotionPlanner:
     def execute(
         self,
         initial_state: Optional[MotionState] = None,
+        upper_limb_L: Any = _UNSET,
+        upper_limb_R: Any = _UNSET,
+        sequence_duration_sec: Any = _UNSET,
     ) -> Dict[str, Any]:
         if not self._actions:
             raise ValueError("MotionPlanner requires at least one MotionAction before execute()")
+        if isinstance(self.config.fps, bool) or not isinstance(self.config.fps, (int, float)) or float(self.config.fps) <= 0.0:
+            raise ValueError(f"PipelineConfig.fps must be positive, got {self.config.fps!r}")
+        fps = float(self.config.fps)
+
+        if initial_state is not None:
+            if not isinstance(initial_state, MotionState):
+                raise TypeError(f"initial_state must be MotionState, got {type(initial_state).__name__}")
+            if (
+                isinstance(initial_state.frame, bool)
+                or not isinstance(initial_state.frame, int)
+                or initial_state.frame < 1
+            ):
+                raise ValueError(
+                    f"initial_state.frame must be a positive integer >= 1, got {initial_state.frame!r}"
+                )
+        entry_state = initial_state or create_initial_motion_state(self.config, start_frame=1)
+        sequence_start_frame = int(entry_state.frame)
+
+        # Static Phase-0 input & conflict checks BEFORE any scene writes
+        resolved_seq_dur = self.sequence_duration_sec if sequence_duration_sec is _UNSET else sequence_duration_sec
+        if resolved_seq_dur is not None:
+            if isinstance(resolved_seq_dur, bool) or not isinstance(resolved_seq_dur, (int, float)):
+                raise TypeError(
+                    f"sequence_duration_sec must be int or float, got {type(resolved_seq_dur).__name__}"
+                )
+            resolved_seq_dur = float(resolved_seq_dur)
+            if not math.isfinite(resolved_seq_dur) or resolved_seq_dur < 0.0:
+                raise ValueError(
+                    f"sequence_duration_sec must be finite and non-negative, got {resolved_seq_dur!r}"
+                )
+
+        raw_L = self.upper_limb_L if upper_limb_L is _UNSET else upper_limb_L
+        raw_R = self.upper_limb_R if upper_limb_R is _UNSET else upper_limb_R
+        resolved_L = validate_upper_limb_segment_sequence(
+            raw_L, "L", max_time_sec=resolved_seq_dur, parameter_name="upper_limb_L"
+        )
+        resolved_R = validate_upper_limb_segment_sequence(
+            raw_R, "R", max_time_sec=resolved_seq_dur, parameter_name="upper_limb_R"
+        )
+
+        # Static ownership conflict check between central tracks and action-local tracks
+        for action in self._actions:
+            if resolved_L is not None and getattr(action, "upper_limb_L", None) is not None:
+                raise ValueError(
+                    f"MotionPlanner.execute(): upper_limb_L control conflict — central MotionPlanner "
+                    f"trajectory conflicts with action '{action.name}'.upper_limb_L"
+                )
+            if resolved_R is not None and getattr(action, "upper_limb_R", None) is not None:
+                raise ValueError(
+                    f"MotionPlanner.execute(): upper_limb_R control conflict — central MotionPlanner "
+                    f"trajectory conflicts with action '{action.name}'.upper_limb_R"
+                )
+
+        # Static sequence duration contract check ONLY when statically determinable
+        # (never forge duration estimates for terrain-dependent actions whose start_pos depends on prior actions)
+        static_durations: List[int] = []
+        all_durations_statically_known = True
+        for idx, action in enumerate(self._actions):
+            is_runtime_terrain_dependent = (idx > 0) and (
+                hasattr(action, "route")
+                or hasattr(action, "spec")
+                or bool(getattr(action, "depends_on_runtime_terrain", False))
+            )
+            if is_runtime_terrain_dependent:
+                all_durations_statically_known = False
+                break
+            static_durations.append(
+                _estimate_action_duration_frames(action, entry_state, self.config, self.environment)
+            )
+
+        if all_durations_statically_known and static_durations:
+            static_total_frames = sum(static_durations)
+            static_max_seq_time_sec = (static_total_frames - 1) / fps
+            if resolved_seq_dur is not None and abs(resolved_seq_dur - static_max_seq_time_sec) > 1e-6:
+                raise ValueError(
+                    f"Declared sequence_duration_sec={resolved_seq_dur:.6f}s conflicts with "
+                    f"statically determined sequence time bound {static_max_seq_time_sec:.6f}s "
+                    f"(total_frames={static_total_frames})"
+                )
+            validate_upper_limb_segment_sequence(
+                resolved_L, "L", max_time_sec=static_max_seq_time_sec, parameter_name="upper_limb_L"
+            )
+            validate_upper_limb_segment_sequence(
+                resolved_R, "R", max_time_sec=static_max_seq_time_sec, parameter_name="upper_limb_R"
+            )
 
         arm = _resolve_armature(self.armature_obj)
         root_obj = arm.parent or bpy.data.objects.get("CharacterRoot")
@@ -1078,7 +1571,7 @@ class MotionPlanner:
         scene = bpy.context.scene
         scene.render.fps = self.config.fps
 
-        current_state = initial_state or create_initial_motion_state(self.config, start_frame=1)
+        current_state = entry_state
         start_x, start_y, start_z = current_state.position
         root_obj.location = Vector((start_x, start_y, start_z))
         root_obj.rotation_euler = tuple(math.radians(a) for a in current_state.orientation_deg)
@@ -1169,6 +1662,9 @@ class MotionPlanner:
             contact_adapter=contact_adapter,
             pose_applicator=pose_applicator,
             bridge_executor=bridge_executor,
+            upper_limb_L=resolved_L,
+            upper_limb_R=resolved_R,
+            sequence_start_frame=sequence_start_frame,
         )
 
         all_states: List[MotionState] = []
@@ -1177,15 +1673,17 @@ class MotionPlanner:
         action_results: List[ActionExecutionResult] = []
         total_unreachable = 0
 
-        entry_state = current_state
         for idx, action in enumerate(self._actions):
             if idx > 0:
                 # Subsequent actions begin on the next timeline frame from the previous final state
                 next_frame = current_state.frame + 1
                 current_state = current_state.clone_with(
                     frame=next_frame,
-                    time_sec=(next_frame - 1) / float(self.config.fps),
+                    time_sec=(next_frame - 1) / fps,
                 )
+            declared_action_frames = _estimate_action_duration_frames(
+                action, current_state, self.config, self.environment
+            )
             result = action.execute(current_state, context)
 
             # Contract Validation 1: Verify result type
@@ -1254,6 +1752,22 @@ class MotionPlanner:
                     f"(max_diff={pos_diff:.5f}m > 0.0001m)."
                 )
 
+            # Contract Validation 6: Verify realized trajectory matches action declared duration contract & monotonic frames
+            if len(result.states) != declared_action_frames or len(result.frame_records) != declared_action_frames:
+                raise RuntimeError(
+                    f"MotionPlanner execution failed: Action '{result.action_name}' produced "
+                    f"{len(result.states)} state(s) / {len(result.frame_records)} frame_record(s), "
+                    f"expected declared duration {declared_action_frames} frame(s)."
+                )
+            for offset, st in enumerate(result.states):
+                expected_frame = current_state.frame + offset
+                if st.frame != expected_frame or st.frame < sequence_start_frame:
+                    raise RuntimeError(
+                        f"MotionPlanner execution failed: Action '{result.action_name}' produced invalid "
+                        f"frame sequence {st.frame} at offset {offset} (expected {expected_frame}, "
+                        f"sequence_start_frame={sequence_start_frame})."
+                    )
+
             # Commit action result only after all contract checks pass
             action_results.append(result)
             all_states.extend(result.states)
@@ -1262,8 +1776,29 @@ class MotionPlanner:
             total_unreachable += result.unreachable_count
             current_state = result.final_state
 
-        scene.frame_start = entry_state.frame
-        scene.frame_end = all_states[-1].frame
+        actual_total_frames = len(all_states)
+        actual_end_frame = all_states[-1].frame
+        if actual_total_frames != (actual_end_frame - sequence_start_frame + 1):
+            raise RuntimeError(
+                f"MotionPlanner execution failed: total frames {actual_total_frames} does not match "
+                f"frame span {sequence_start_frame}..{actual_end_frame}"
+            )
+        actual_max_seq_time_sec = (actual_end_frame - sequence_start_frame) / fps
+        if resolved_seq_dur is not None and abs(resolved_seq_dur - actual_max_seq_time_sec) > 1e-6:
+            raise ValueError(
+                f"Declared sequence_duration_sec={resolved_seq_dur:.6f}s conflicts with "
+                f"realized sequence time bound {actual_max_seq_time_sec:.6f}s "
+                f"(frames={sequence_start_frame}..{actual_end_frame})"
+            )
+        validate_upper_limb_segment_sequence(
+            resolved_L, "L", max_time_sec=actual_max_seq_time_sec, parameter_name="upper_limb_L"
+        )
+        validate_upper_limb_segment_sequence(
+            resolved_R, "R", max_time_sec=actual_max_seq_time_sec, parameter_name="upper_limb_R"
+        )
+
+        scene.frame_start = sequence_start_frame
+        scene.frame_end = actual_end_frame
 
         total_disp = all_frame_records[-1]["root_y"] - all_frame_records[0]["root_y"]
         peak_speed = max(r["speed_mps"] for r in all_frame_records)
@@ -1280,6 +1815,13 @@ class MotionPlanner:
             "success": True,
             "total_frames": len(all_frame_records),
             "fps": self.config.fps,
+            "sequence_start_frame": sequence_start_frame,
+            "sequence_end_frame": actual_end_frame,
+            "sequence_duration_sec": round(actual_max_seq_time_sec, 6),
+            "central_upper_limb_enabled": {
+                "L": resolved_L is not None,
+                "R": resolved_R is not None,
+            },
             "total_root_displacement": round(total_disp, 5),
             "peak_speed_mps": round(peak_speed, 5),
             "unreachable_count": total_unreachable,

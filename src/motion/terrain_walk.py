@@ -41,6 +41,7 @@ from src.motion.framework import (
     WORLD_FORWARD_AXIS,
     WORLD_RIGHT_AXIS,
     WORLD_UP_AXIS,
+    build_upper_limb_feedback_metadata,
     forward_unit_vector_from_yaw,
     root_local_to_world_vector,
 )
@@ -50,37 +51,20 @@ from src.motion.kinematic_bridge import (
     PlannedFootTarget,
     PlannedHandTarget,
 )
+from src.motion.upper_limb_trajectory import (
+    UpperLimbSegment,
+    _evaluate_upper_limb_progress,
+    _evaluate_upper_limb_segment,
+    _validate_upper_limb_vector,
+    validate_upper_limb_segment_sequence,
+)
 from src.rig.ik import ANKLE_REST_Z, HIP_X_OFFSET, MAX_LEG_REACH, MIN_LEG_REACH
 from src.scene.environment_query import DynamicsEnvironmentQuery, SurfaceGeometryType, SurfaceQueryResult
 
 
-# [INTRODUCED 2026-11-26T17:13:00+08:00]
-# TASK: TASK 10-d-3
-# CLASS: UpperLimbSegment
-# PURPOSE: Immutable trajectory segment descriptor carrying caller-supplied FK/IK endpoints, timing, space, and clamp policy for decoupled upper-limb motion.
-# REASON: Resolve TASK 10-d-3 where upper-limb motion lacked an immutable parametric segment representation independent of lower-limb gait; needed so callers provide arbitrary FK/IK targets without hardcoding action schedules or mutating shared state.
-@dataclass(frozen=True)
-class UpperLimbSegment:
-    """Immutable caller-supplied parametric motion segment for a single arm."""
-
-    mode: str
-    start_time_sec: float
-    duration_sec: float
-
-    fk_start_deg: Optional[Tuple[Tuple[float, float, float], ...]] = None
-    fk_end_deg: Optional[Tuple[Tuple[float, float, float], ...]] = None
-
-    wrist_start_xyz: Optional[Tuple[float, float, float]] = None
-    wrist_end_xyz: Optional[Tuple[float, float, float]] = None
-
-    rotation_start_deg: Optional[Tuple[float, float, float]] = None
-    rotation_end_deg: Optional[Tuple[float, float, float]] = None
-
-    pole_start_xyz: Optional[Tuple[float, float, float]] = None
-    pole_end_xyz: Optional[Tuple[float, float, float]] = None
-
-    position_space: str = "WORLD"
-    clamp_reach: bool = True
+# UpperLimbSegment, _evaluate_upper_limb_progress, _validate_upper_limb_vector, and
+# _evaluate_upper_limb_segment are converged in src/motion/upper_limb_trajectory.py (TASK 10-d-5)
+# and re-exported above for backward compatibility.
 
 
 # =============================================================================
@@ -97,313 +81,6 @@ def _smooth_bell01(x: float) -> float:
     """C1 bell curve sin^2(pi * x) on [0, 1], peaking at 1.0 when x = 0.5."""
     t = max(0.0, min(1.0, x))
     return math.sin(math.pi * t) ** 2
-
-
-# [INTRODUCED 2026-11-26T16:52:00+08:00]
-# TASK: TASK 10-d-2
-# FUNCTION: _evaluate_upper_limb_progress
-# PURPOSE: Compute stateless, action-local time normalized linear progress u and C2-smooth quintic progress h for upper-limb motion from time_sec, start_time_sec, and duration_sec.
-# REASON: Resolve TASK 10-d-2 where terrain_walk.py lacked independent upper-limb temporal parameterization and relied on cosine _smoothstep01(); historical smoothers serve lower-limb gait locomotion and cannot alter their math semantics, so upper-limb trajectories must remain decoupled from gait_u, gait_amp, MotionMode, and lower-limb state.
-def _evaluate_upper_limb_progress(
-    time_sec: float,
-    start_time_sec: float,
-    duration_sec: float,
-) -> Tuple[float, float]:
-    """Evaluate decoupled upper-limb normalized linear progress u and quintic h."""
-    converted: List[float] = []
-    for name, raw in (
-        ("time_sec", time_sec),
-        ("start_time_sec", start_time_sec),
-        ("duration_sec", duration_sec),
-    ):
-        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-            raise TypeError(f"{name} must be int or float, got {type(raw).__name__}")
-        try:
-            val = float(raw)
-        except OverflowError as exc:
-            raise ValueError(f"{name} cannot be converted to a finite float") from exc
-        if not math.isfinite(val):
-            raise ValueError(f"{name} must be finite, got {val!r}")
-        converted.append(0.0 if val == 0.0 else val)
-
-    t, start, duration = converted
-    if t < 0.0:
-        raise ValueError(f"time_sec must be non-negative, got {t!r}")
-    if start < 0.0:
-        raise ValueError(f"start_time_sec must be non-negative, got {start!r}")
-    if not (duration > 0.0):
-        raise ValueError(f"duration_sec must be strictly positive, got {duration!r}")
-
-    end_time = start + duration
-    if not math.isfinite(end_time) or not (end_time > start):
-        raise ValueError(
-            "end_time (start_time_sec + duration_sec) must be finite and strictly "
-            f"greater than start_time_sec, got start={start!r}, duration={duration!r}, "
-            f"end={end_time!r}"
-        )
-
-    if t <= start:
-        return (0.0, 0.0)
-    if t >= end_time:
-        return (1.0, 1.0)
-
-    u = (t - start) / duration
-    if not math.isfinite(u):
-        u = 1.0
-    elif u < 0.0:
-        u = 0.0
-    elif u > 1.0:
-        u = 1.0
-
-    if u <= 0.5:
-        h = u**3 * (10.0 + u * (-15.0 + 6.0 * u))
-    else:
-        v = 1.0 - u
-        h = 1.0 - v**3 * (10.0 + v * (-15.0 + 6.0 * v))
-    h = max(0.0, min(1.0, h))
-    return (u, h)
-
-
-# [INTRODUCED 2026-11-26T17:13:00+08:00]
-# TASK: TASK 10-d-3
-# FUNCTION: _validate_upper_limb_vector
-# PURPOSE: Validate and normalize a 3-tuple of finite non-bool numeric coordinates/angles into a new 3-float tuple without mutating input.
-# REASON: Resolve TASK 10-d-3 to uniformly enforce 3D vector type, length, finiteness, and overflow safety across FK rotations, IK wrist/pole positions, and Root position without duplicating checks.
-def _validate_upper_limb_vector(
-    value: Tuple[float, float, float],
-    name: str,
-) -> Tuple[float, float, float]:
-    """Validate a 3D numeric tuple and return a fresh tuple of finite floats."""
-    if not isinstance(value, tuple):
-        raise TypeError(f"{name} must be a tuple, got {type(value).__name__}")
-    if len(value) != 3:
-        raise ValueError(f"{name} must have length 3, got {len(value)}")
-
-    out: List[float] = []
-    for idx, comp in enumerate(value):
-        if isinstance(comp, bool) or not isinstance(comp, (int, float)):
-            raise TypeError(
-                f"{name}[{idx}] must be int or float, got {type(comp).__name__}"
-            )
-        try:
-            val = float(comp)
-        except OverflowError as exc:
-            raise ValueError(
-                f"{name}[{idx}] cannot be converted to a finite float"
-            ) from exc
-        if not math.isfinite(val):
-            raise ValueError(f"{name}[{idx}] must be finite, got {val!r}")
-        out.append(0.0 if val == 0.0 else val)
-    return (out[0], out[1], out[2])
-
-
-# [INTRODUCED 2026-11-26T17:13:00+08:00]
-# TASK: TASK 10-d-3
-# FUNCTION: _evaluate_upper_limb_segment
-# PURPOSE: Evaluate a single UpperLimbSegment for side 'L' or 'R' at action-local time_sec and current frame Root into a stateless (Optional[PlannedHandTarget], Dict[str, Tuple[float, float, float]]) pair ready for KinematicPlannedPose.
-# REASON: Resolve TASK 10-d-3 so independent FK/IK upper-limb targets can be computed via _evaluate_upper_limb_progress() and root_local_to_world_vector() without touching lower-limb gait, scene state, or TerrainWalkAction frame loop.
-def _evaluate_upper_limb_segment(
-    segment: UpperLimbSegment,
-    side: str,
-    time_sec: float,
-    root_position: Tuple[float, float, float],
-    root_yaw_deg: float,
-) -> Tuple[
-    Optional[PlannedHandTarget],
-    Dict[str, Tuple[float, float, float]],
-]:
-    """Evaluate one decoupled upper-limb segment into FK or IK bridge targets."""
-    if not isinstance(segment, UpperLimbSegment):
-        raise TypeError(
-            f"segment must be UpperLimbSegment, got {type(segment).__name__}"
-        )
-    if not isinstance(side, str):
-        raise TypeError(f"side must be str, got {type(side).__name__}")
-    if side not in ("L", "R"):
-        raise ValueError(f"side must be 'L' or 'R', got {side!r}")
-    if not isinstance(segment.mode, str):
-        raise TypeError(f"mode must be str, got {type(segment.mode).__name__}")
-    if segment.mode not in ("FK", "IK"):
-        raise ValueError(f"mode must be 'FK' or 'IK', got {segment.mode!r}")
-    if not isinstance(segment.position_space, str):
-        raise TypeError(
-            f"position_space must be str, got {type(segment.position_space).__name__}"
-        )
-    if segment.position_space not in ("WORLD", "ROOT_LOCAL"):
-        raise ValueError(
-            "position_space must be 'WORLD' or 'ROOT_LOCAL', got "
-            f"{segment.position_space!r}"
-        )
-    if not isinstance(segment.clamp_reach, bool):
-        raise TypeError(
-            f"clamp_reach must be bool, got {type(segment.clamp_reach).__name__}"
-        )
-
-    root_pos = _validate_upper_limb_vector(root_position, "root_position")
-    if isinstance(root_yaw_deg, bool) or not isinstance(root_yaw_deg, (int, float)):
-        raise TypeError(
-            f"root_yaw_deg must be int or float, got {type(root_yaw_deg).__name__}"
-        )
-    try:
-        root_yaw = float(root_yaw_deg)
-    except OverflowError as exc:
-        raise ValueError("root_yaw_deg cannot be converted to a finite float") from exc
-    if not math.isfinite(root_yaw):
-        raise ValueError(f"root_yaw_deg must be finite, got {root_yaw!r}")
-
-    if segment.mode == "FK":
-        if segment.position_space != "WORLD":
-            raise ValueError(
-                f"FK mode requires position_space='WORLD', got {segment.position_space!r}"
-            )
-        for forbidden_name in (
-            "wrist_start_xyz",
-            "wrist_end_xyz",
-            "rotation_start_deg",
-            "rotation_end_deg",
-            "pole_start_xyz",
-            "pole_end_xyz",
-        ):
-            if getattr(segment, forbidden_name) is not None:
-                raise ValueError(f"FK mode must not carry IK field {forbidden_name}")
-        if segment.fk_start_deg is None or segment.fk_end_deg is None:
-            raise ValueError("FK mode requires both fk_start_deg and fk_end_deg")
-        if not isinstance(segment.fk_start_deg, tuple):
-            raise TypeError(
-                f"fk_start_deg must be a tuple, got {type(segment.fk_start_deg).__name__}"
-            )
-        if not isinstance(segment.fk_end_deg, tuple):
-            raise TypeError(
-                f"fk_end_deg must be a tuple, got {type(segment.fk_end_deg).__name__}"
-            )
-        if len(segment.fk_start_deg) != 3 or len(segment.fk_end_deg) != 3:
-            raise ValueError("fk_start_deg and fk_end_deg must each have length 3")
-
-        fk_start_vecs = tuple(
-            _validate_upper_limb_vector(vec, f"fk_start_deg[{idx}]")
-            for idx, vec in enumerate(segment.fk_start_deg)
-        )
-        fk_end_vecs = tuple(
-            _validate_upper_limb_vector(vec, f"fk_end_deg[{idx}]")
-            for idx, vec in enumerate(segment.fk_end_deg)
-        )
-
-        _, h = _evaluate_upper_limb_progress(
-            time_sec, segment.start_time_sec, segment.duration_sec
-        )
-
-        fk_targets: Dict[str, Tuple[float, float, float]] = {}
-        for bone_name, s_vec, e_vec in zip(
-            ("upper_arm", "forearm", "hand"), fk_start_vecs, fk_end_vecs
-        ):
-            if h == 0.0:
-                interp = s_vec
-            elif h == 1.0:
-                interp = e_vec
-            else:
-                interp = (
-                    (1.0 - h) * s_vec[0] + h * e_vec[0],
-                    (1.0 - h) * s_vec[1] + h * e_vec[1],
-                    (1.0 - h) * s_vec[2] + h * e_vec[2],
-                )
-                if not all(math.isfinite(c) for c in interp):
-                    raise ValueError(
-                        f"Non-finite interpolated FK target for {bone_name}.{side}: {interp!r}"
-                    )
-            fk_targets[f"{bone_name}.{side}"] = interp
-        return (None, fk_targets)
-
-    # IK mode
-    if segment.fk_start_deg is not None or segment.fk_end_deg is not None:
-        raise ValueError("IK mode requires fk_start_deg and fk_end_deg to be None")
-    if segment.wrist_start_xyz is None or segment.wrist_end_xyz is None:
-        raise ValueError("IK mode requires both wrist_start_xyz and wrist_end_xyz")
-    if (segment.rotation_start_deg is None) != (segment.rotation_end_deg is None):
-        raise ValueError(
-            "IK rotation_start_deg and rotation_end_deg must both be set or both be None"
-        )
-    if (segment.pole_start_xyz is None) != (segment.pole_end_xyz is None):
-        raise ValueError(
-            "IK pole_start_xyz and pole_end_xyz must both be set or both be None"
-        )
-
-    wrist_s = _validate_upper_limb_vector(segment.wrist_start_xyz, "wrist_start_xyz")
-    wrist_e = _validate_upper_limb_vector(segment.wrist_end_xyz, "wrist_end_xyz")
-    rot_s = (
-        _validate_upper_limb_vector(segment.rotation_start_deg, "rotation_start_deg")
-        if segment.rotation_start_deg is not None
-        else None
-    )
-    rot_e = (
-        _validate_upper_limb_vector(segment.rotation_end_deg, "rotation_end_deg")
-        if segment.rotation_end_deg is not None
-        else None
-    )
-    pole_s = (
-        _validate_upper_limb_vector(segment.pole_start_xyz, "pole_start_xyz")
-        if segment.pole_start_xyz is not None
-        else None
-    )
-    pole_e = (
-        _validate_upper_limb_vector(segment.pole_end_xyz, "pole_end_xyz")
-        if segment.pole_end_xyz is not None
-        else None
-    )
-
-    _, h = _evaluate_upper_limb_progress(
-        time_sec, segment.start_time_sec, segment.duration_sec
-    )
-
-    ik_values: Dict[str, Optional[Tuple[float, float, float]]] = {}
-    for field_name, s_vec, e_vec in (
-        ("wrist", wrist_s, wrist_e),
-        ("rotation", rot_s, rot_e),
-        ("pole", pole_s, pole_e),
-    ):
-        if s_vec is None:
-            ik_values[field_name] = None
-            continue
-        assert e_vec is not None
-        if h == 0.0:
-            val_vec = s_vec
-        elif h == 1.0:
-            val_vec = e_vec
-        else:
-            val_vec = (
-                (1.0 - h) * s_vec[0] + h * e_vec[0],
-                (1.0 - h) * s_vec[1] + h * e_vec[1],
-                (1.0 - h) * s_vec[2] + h * e_vec[2],
-            )
-            if not all(math.isfinite(c) for c in val_vec):
-                raise ValueError(
-                    f"Non-finite interpolated IK {field_name}: {val_vec!r}"
-                )
-        if field_name in ("wrist", "pole") and segment.position_space == "ROOT_LOCAL":
-            wx, wy, wz = root_local_to_world_vector(val_vec, root_yaw)
-            world_vec = (root_pos[0] + wx, root_pos[1] + wy, root_pos[2] + wz)
-            if not all(math.isfinite(c) for c in world_vec):
-                raise ValueError(
-                    f"Non-finite world-space IK {field_name}: {world_vec!r}"
-                )
-            ik_values[field_name] = world_vec
-        else:
-            ik_values[field_name] = val_vec
-
-    wrist_world_xyz = ik_values["wrist"]
-    assert wrist_world_xyz is not None
-    return (
-        PlannedHandTarget(
-            world_xyz=wrist_world_xyz,
-            rotation_deg=ik_values["rotation"],
-            enabled=True,
-            weight=1.0,
-            contact_intent=False,
-            is_locked=False,
-            pole_hint_world_xyz=ik_values["pole"],
-            clamp_reach=segment.clamp_reach,
-        ),
-        {},
-    )
 
 
 def _compute_swing_clearance_z(
@@ -1315,115 +992,12 @@ class TerrainWalkAction(MotionAction):
             raise ValueError(f"TerrainWalkAction '{self.name}' produced invalid total_frames={total_frames}")
         max_action_time_sec = (total_frames - 1) / fps
         for side_label, raw_segs in (("L", self.upper_limb_L), ("R", self.upper_limb_R)):
-            if raw_segs is None:
-                continue
-            if not isinstance(raw_segs, tuple):
-                raise TypeError(
-                    f"upper_limb_{side_label} must be None or a tuple of UpperLimbSegment, "
-                    f"got {type(raw_segs).__name__}"
-                )
-            if len(raw_segs) == 0:
-                raise ValueError(f"upper_limb_{side_label} must not be an empty tuple")
-            prev_start_sec: Optional[float] = None
-            prev_end_sec: Optional[float] = None
-            prev_seg: Optional[UpperLimbSegment] = None
-            for seg_idx, seg in enumerate(raw_segs):
-                if not isinstance(seg, UpperLimbSegment):
-                    raise TypeError(
-                        f"upper_limb_{side_label}[{seg_idx}] must be UpperLimbSegment, "
-                        f"got {type(seg).__name__}"
-                    )
-                _evaluate_upper_limb_segment(
-                    seg, side_label, seg.start_time_sec, (0.0, 0.0, 0.0), 0.0
-                )
-                seg_start_sec = float(seg.start_time_sec)
-                seg_end_sec = seg_start_sec + float(seg.duration_sec)
-                _evaluate_upper_limb_segment(
-                    seg, side_label, seg_end_sec, (0.0, 0.0, 0.0), 0.0
-                )
-                if seg_end_sec > max_action_time_sec + 1e-12:
-                    raise ValueError(
-                        f"upper_limb_{side_label}[{seg_idx}] end time {seg_end_sec:.6f}s "
-                        f"exceeds action timeline upper bound {max_action_time_sec:.6f}s"
-                    )
-                if prev_seg is not None:
-                    assert prev_start_sec is not None and prev_end_sec is not None
-                    if not (seg_start_sec > prev_start_sec):
-                        raise ValueError(
-                            f"upper_limb_{side_label}[{seg_idx}] start_time_sec ({seg_start_sec}) "
-                            f"must be strictly greater than previous ({prev_start_sec})"
-                        )
-                    if seg_start_sec < prev_end_sec - 1e-12:
-                        raise ValueError(
-                            f"upper_limb_{side_label}[{seg_idx}] start_time_sec ({seg_start_sec}) "
-                            f"overlaps previous segment ending at {prev_end_sec}"
-                        )
-                    if prev_seg.mode == seg.mode:
-                        if seg.mode == "FK":
-                            assert (
-                                prev_seg.fk_end_deg is not None
-                                and seg.fk_start_deg is not None
-                            )
-                            for bone_idx in range(3):
-                                for axis_idx in range(3):
-                                    diff = abs(
-                                        float(prev_seg.fk_end_deg[bone_idx][axis_idx])
-                                        - float(seg.fk_start_deg[bone_idx][axis_idx])
-                                    )
-                                    if diff > 1e-6:
-                                        raise ValueError(
-                                            f"upper_limb_{side_label} FK segment transition mismatch "
-                                            f"between index {seg_idx - 1} and {seg_idx} at bone {bone_idx}[{axis_idx}]"
-                                        )
-                        else:
-                            if prev_seg.position_space != seg.position_space:
-                                raise ValueError(
-                                    f"upper_limb_{side_label} IK position_space mismatch between "
-                                    f"index {seg_idx - 1} ({prev_seg.position_space!r}) and {seg_idx} ({seg.position_space!r})"
-                                )
-                            if (prev_seg.rotation_end_deg is None) != (seg.rotation_start_deg is None):
-                                raise ValueError(
-                                    f"upper_limb_{side_label} IK rotation presence mismatch between "
-                                    f"index {seg_idx - 1} and {seg_idx}"
-                                )
-                            if (prev_seg.pole_end_xyz is None) != (seg.pole_start_xyz is None):
-                                raise ValueError(
-                                    f"upper_limb_{side_label} IK pole presence mismatch between "
-                                    f"index {seg_idx - 1} and {seg_idx}"
-                                )
-                            assert (
-                                prev_seg.wrist_end_xyz is not None
-                                and seg.wrist_start_xyz is not None
-                            )
-                            if any(
-                                abs(float(prev_seg.wrist_end_xyz[k]) - float(seg.wrist_start_xyz[k])) > 1e-6
-                                for k in range(3)
-                            ):
-                                raise ValueError(
-                                    f"upper_limb_{side_label} IK wrist transition mismatch between "
-                                    f"index {seg_idx - 1} and {seg_idx}"
-                                )
-                            if prev_seg.rotation_end_deg is not None and seg.rotation_start_deg is not None:
-                                if any(
-                                    abs(float(prev_seg.rotation_end_deg[k]) - float(seg.rotation_start_deg[k])) > 1e-6
-                                    for k in range(3)
-                                ):
-                                    raise ValueError(
-                                        f"upper_limb_{side_label} IK rotation transition mismatch between "
-                                        f"index {seg_idx - 1} and {seg_idx}"
-                                    )
-                            if prev_seg.pole_end_xyz is not None and seg.pole_start_xyz is not None:
-                                if any(
-                                    abs(float(prev_seg.pole_end_xyz[k]) - float(seg.pole_start_xyz[k])) > 1e-6
-                                    for k in range(3)
-                                ):
-                                    raise ValueError(
-                                        f"upper_limb_{side_label} IK pole transition mismatch between "
-                                        f"index {seg_idx - 1} and {seg_idx}"
-                                    )
-                prev_start_sec = seg_start_sec
-                prev_end_sec = seg_end_sec
-                prev_seg = seg
+            validate_upper_limb_segment_sequence(
+                raw_segs,
+                side_label,
+                max_time_sec=max_action_time_sec,
+                parameter_name=f"upper_limb_{side_label}",
+            )
 
         # Monotonic, C1-continuous Hermite knot parameters for Root forward motion
         knot_frames, knot_y, knot_v = _build_continuous_root_forward_spline(schedule, fps)
@@ -1758,58 +1332,15 @@ class TerrainWalkAction(MotionAction):
                 "hand.R": (0.0, 0.0, 0.0),
             }
 
-            # [INTRODUCED 2026-11-26T17:52:00+08:00]
-            # TASK: TASK 10-d-4
-            # BLOCK: TerrainWalkAction.execute() frame-level independent upper-limb target selection & dispatch
-            # PURPOSE: Select and evaluate independent left/right UpperLimbSegment targets using action-local time (f_idx / fps) and current-frame planned Root without disturbing unconfigured historical arm swing.
-            # REASON: Resolve P01 / A3 / A4 so independent FK/IK hand/arm targets pass into KinematicPlannedPose without creating a second control pipeline or modifying legacy lower-limb motion.
+            # [CONVERGED 2026-11-27T13:55:00+08:00]
+            # TASK: TASK 10-d-5
+            # BLOCK: TerrainWalkAction.execute() converged upper-limb composition & Bridge call
+            # PURPOSE: Compose TerrainWalkAction's full KinematicPlannedPose with optional central or action-local upper-limb tracks through MotionRuntimeContext.compose_planned_pose() without altering lower-limb planning or duplicating segment arbitration.
+            # REASON: Converge all five MotionAction classes onto one shared pure-data upper-limb combination interface before KinematicBridgeExecutor.execute_frame().
             action_time_sec = f_idx / fps
-            hand_l_target: Optional[PlannedHandTarget] = None
-            hand_r_target: Optional[PlannedHandTarget] = None
-            upper_limb_meta: Dict[str, Dict[str, Any]] = {}
-            planned_root = (root_x, root_y, root_z)
-            planned_root_yaw_deg = 0.0
 
-            for side_label, raw_segs in (("L", self.upper_limb_L), ("R", self.upper_limb_R)):
-                if raw_segs is None:
-                    upper_limb_meta[side_label] = {
-                        "mode": "HISTORICAL_FK",
-                        "segment_index": None,
-                    }
-                    continue
-
-                selected_idx = 0
-                for idx, seg in enumerate(raw_segs):
-                    if action_time_sec >= seg.start_time_sec:
-                        selected_idx = idx
-                    else:
-                        break
-                selected_seg = raw_segs[selected_idx]
-
-                for bone_prefix in ("upper_arm", "forearm", "hand"):
-                    fk_rotations.pop(f"{bone_prefix}.{side_label}", None)
-
-                hand_target, side_fk = _evaluate_upper_limb_segment(
-                    selected_seg,
-                    side_label,
-                    action_time_sec,
-                    planned_root,
-                    planned_root_yaw_deg,
-                )
-                if selected_seg.mode == "FK":
-                    fk_rotations.update(side_fk)
-                elif side_label == "L":
-                    hand_l_target = hand_target
-                else:
-                    hand_r_target = hand_target
-
-                upper_limb_meta[side_label] = {
-                    "mode": selected_seg.mode,
-                    "segment_index": selected_idx,
-                }
-
-            # 4. Formulate Unified Planned Pose Contract
-            planned_pose = KinematicPlannedPose(
+            # 4. Formulate Unified Planned Pose Contract & Converged Upper-Limb Composition
+            base_planned_pose = KinematicPlannedPose(
                 frame=current_frame,
                 time_seconds=time_sec,
                 root_position=(root_x, root_y, root_z),
@@ -1820,11 +1351,17 @@ class TerrainWalkAction(MotionAction):
                 spine_rotation_deg=spine_rot_deg,
                 neck_rotation_deg=neck_rot_deg,
                 head_rotation_deg=head_rot_deg,
-                hand_L=hand_l_target,
-                hand_R=hand_r_target,
+                hand_L=None,
+                hand_R=None,
                 foot_L=foot_l_tgt,
                 foot_R=foot_r_tgt,
                 fk_joint_rotations_deg=fk_rotations,
+            )
+            planned_pose, compose_diag = context.compose_planned_pose(
+                base_planned_pose,
+                action_upper_limb_L=self.upper_limb_L,
+                action_upper_limb_R=self.upper_limb_R,
+                action_time_sec=action_time_sec,
             )
 
             # 5. Execute 6-Phase Frame via Bridge & WholeBodyController
@@ -1859,6 +1396,9 @@ class TerrainWalkAction(MotionAction):
             reach_l = eff_l.is_reachable if eff_l else True
             reach_r = eff_r.is_reachable if eff_r else True
 
+            upper_fb = build_upper_limb_feedback_metadata(
+                bridge_res, compose_diag, hist_arm_l_rx=arm_l_rx, hist_arm_r_rx=arm_r_rx
+            )
             ms_params = dict(ms.params)
             ms_params.update({
                 "planned_phase_l": phase_l,
@@ -1867,6 +1407,13 @@ class TerrainWalkAction(MotionAction):
                 "planned_locked_r": foot_r_tgt.is_locked,
                 "planned_target_l": foot_l_tgt.world_xyz,
                 "planned_target_r": foot_r_tgt.world_xyz,
+                "arm_l_rx": upper_fb["arm_l_rx_effective"],
+                "arm_r_rx": upper_fb["arm_r_rx_effective"],
+                "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                "planned_upper_limb": upper_fb["planned_upper_limb"],
+                "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
+                "actual_upper_limb": upper_fb["actual_upper_limb"],
             })
             ms = ms.clone_with(mode=mode, params=ms_params)
 
@@ -1875,31 +1422,10 @@ class TerrainWalkAction(MotionAction):
 
             # Build 6-Phase Diagnostic Record for this frame
             # [INTRODUCED 2026-11-26T17:52:00+08:00]
-            # TASK: TASK 10-d-4
+            # [UPDATED 2026-11-27T13:55:00+08:00] TASK 10-d-5
             # BLOCK: frame_records motion_planning & actual_armature upper-limb diagnostics
-            # PURPOSE: Record action-local time, per-side upper-limb mode/segment index, planned target, actual wrist position, IK tracking error (None when IK disabled), and IK reachability inside existing frame_records diagnostics.
-            # REASON: Resolve A5 truthfully without fabricating FK tracking accuracy from disabled-IK zero placeholders.
-            planned_upper_diag: Dict[str, Any] = {}
-            for side_diag, hand_diag in (("L", hand_l_target), ("R", hand_r_target)):
-                mode_diag = upper_limb_meta[side_diag]["mode"]
-                if hand_diag is not None:
-                    planned_upper_diag[side_diag] = {
-                        "mode": mode_diag,
-                        "world_xyz": [round(v, 5) for v in hand_diag.world_xyz],
-                        "rotation_deg": [round(v, 4) for v in hand_diag.rotation_deg] if hand_diag.rotation_deg is not None else None,
-                        "pole_hint_world_xyz": [round(v, 5) for v in hand_diag.pole_hint_world_xyz] if hand_diag.pole_hint_world_xyz is not None else None,
-                        "clamp_reach": hand_diag.clamp_reach,
-                    }
-                else:
-                    planned_upper_diag[side_diag] = {
-                        "mode": mode_diag,
-                        "fk_joint_rotations_deg": {
-                            b_key: [round(v, 4) for v in fk_rotations[b_key]]
-                            for b_key in (f"upper_arm.{side_diag}", f"forearm.{side_diag}", f"hand.{side_diag}")
-                            if b_key in fk_rotations
-                        },
-                    }
-
+            # PURPOSE: Record action/sequence upper-limb source, mode/segment index, planned target, historical reference separation, actual wrist position, IK tracking error, and IK reachability inside existing frame_records diagnostics.
+            # REASON: Converge upper-limb diagnostics onto compose_planned_pose() & build_upper_limb_feedback_metadata() without fabricating FK tracking accuracy or impersonating actual targets with historical arm_l_rx/arm_r_rx.
             prev_y = frame_records[-1]["root_y"] if frame_records else root_y
             speed_mps = abs(root_y - prev_y) * fps
             frame_records.append({
@@ -1931,12 +1457,16 @@ class TerrainWalkAction(MotionAction):
                     "planned_foot_R": [round(v, 4) for v in foot_r_tgt.world_xyz],
                     "foot_pitch_L": round(foot_l_tgt.rotation_deg[0], 2),
                     "foot_pitch_R": round(foot_r_tgt.rotation_deg[0], 2),
-                    "upper_limb_mode_L": upper_limb_meta["L"]["mode"],
-                    "upper_limb_mode_R": upper_limb_meta["R"]["mode"],
-                    "upper_limb_segment_index_L": upper_limb_meta["L"]["segment_index"],
-                    "upper_limb_segment_index_R": upper_limb_meta["R"]["segment_index"],
-                    "planned_hand_L": planned_upper_diag["L"],
-                    "planned_hand_R": planned_upper_diag["R"],
+                    "upper_limb_source_L": upper_fb["upper_limb_source_L"],
+                    "upper_limb_source_R": upper_fb["upper_limb_source_R"],
+                    "upper_limb_mode_L": compose_diag["L"]["mode"],
+                    "upper_limb_mode_R": compose_diag["R"]["mode"],
+                    "upper_limb_segment_index_L": compose_diag["L"]["segment_index"],
+                    "upper_limb_segment_index_R": compose_diag["R"]["segment_index"],
+                    "planned_hand_L": compose_diag["L"]["planned_target"],
+                    "planned_hand_R": compose_diag["R"]["planned_target"],
+                    "planned_upper_limb": upper_fb["planned_upper_limb"],
+                    "historical_arm_swing_ref_deg": upper_fb["historical_arm_swing_ref_deg"],
                 },
                 # Phase 3: Kinematic Bridge
                 "kinematic_bridge": {
@@ -1966,6 +1496,7 @@ class TerrainWalkAction(MotionAction):
                     "hand_tracking_error_R_m": round(eff_hand_r.position_error_m, 6) if (eff_hand_r and eff_hand_r.enabled) else None,
                     "hand_reachable_L": eff_hand_l.is_reachable if (eff_hand_l and eff_hand_l.enabled) else None,
                     "hand_reachable_R": eff_hand_r.is_reachable if (eff_hand_r and eff_hand_r.enabled) else None,
+                    "actual_upper_limb": upper_fb["actual_upper_limb"],
                 },
                 # Phase 6: Validation Metrics
                 "validation": {
