@@ -1,0 +1,249 @@
+{
+  "git_head": "7f14ff722caecadec555194cc7d08f454c94c6c8",
+  "10d2_migrated_upper_limb_progress": {
+    "passed": 12,
+    "failed": 0,
+    "total": 12,
+    "tests": [
+      {
+        "id": "T01",
+        "title": "开始前及开始时边界",
+        "status": "PASS",
+        "checked": 6
+      },
+      {
+        "id": "T02",
+        "title": "结束时及结束后边界",
+        "status": "PASS",
+        "checked": 4
+      },
+      {
+        "id": "T03",
+        "title": "五次插值数学正确性",
+        "status": "PASS",
+        "max_abs_err": 0.0
+      },
+      {
+        "id": "T04",
+        "title": "进度单调性与值域",
+        "status": "PASS",
+        "sample_count_per_interval": 10001
+      },
+      {
+        "id": "T05",
+        "title": "端点解析导数与有限差分收敛",
+        "status": "PASS",
+        "max_poly_diff": 1.1102230246251565e-16
+      },
+      {
+        "id": "T06",
+        "title": "非法类型拒绝",
+        "status": "PASS",
+        "subcases": 18
+      },
+      {
+        "id": "T07",
+        "title": "非有限数值拒绝",
+        "status": "PASS",
+        "subcases": 9
+      },
+      {
+        "id": "T08",
+        "title": "时间与持续时间范围拒绝",
+        "status": "PASS",
+        "subcases": 9
+      },
+      {
+        "id": "T09",
+        "title": "数值溢出与精度退化拒绝",
+        "status": "PASS",
+        "subcases": 6
+      },
+      {
+        "id": "T10",
+        "title": "左右独立开始时间",
+        "status": "PASS",
+        "left": [
+          0.75,
+          0.896484375
+        ],
+        "right": [
+          0.25,
+          0.103515625
+        ]
+      },
+      {
+        "id": "T11",
+        "title": "左右独立持续时间",
+        "status": "PASS",
+        "left": [
+          0.5,
+          0.5
+        ],
+        "right": [
+          0.25,
+          0.103515625
+        ]
+      },
+      {
+        "id": "T12",
+        "title": "重复与交替调用无状态性",
+        "status": "PASS",
+        "cycles": 50
+      }
+    ]
+  },
+  "10d3_migrated_upper_limb_segment": {
+    "passed": 18,
+    "failed": 0,
+    "total": 18,
+    "tests": [
+      {
+        "id": "T01",
+        "title": "FK 时间边界",
+        "status": "PASS",
+        "max_abs_err": 0.0
+      },
+      {
+        "id": "T02",
+        "title": "FK 独立三轴插值",
+        "status": "PASS",
+        "max_abs_err": 0.0
+      },
+      {
+        "id": "T03",
+        "title": "左右侧隔离",
+        "status": "PASS",
+        "ok": true
+      },
+      {
+        "id": "T04",
+        "title": "IK 世界空间插值",
+        "status": "PASS",
+        "max_abs_err": 0.0
+      },
+      {
+        "id": "T05",
+        "title": "IK Root 局部空间转换",
+        "status": "PASS",
+        "max_abs_err": 0.0
+      },
+      {
+        "id": "T06",
+        "title": "偏航角数学合同",
+        "status": "PASS",
+        "checked": 4
+      },
+      {
+        "id": "T07",
+        "title": "Root 平移反事实",
+        "status": "PASS",
+        "ok": true
+      },
+      {
+        "id": "T08",
+        "title": "ElbowPole 合同",
+        "status": "PASS",
+        "ok": true
+      },
+      {
+        "id": "T09",
+        "title": "手部姿态合同",
+        "status": "PASS",
+        "ok": true
+      },
+      {
+        "id": "T10",
+        "title": "Reach Clamp",
+        "status": "PASS",
+        "ok": true
+      },
+      {
+        "id": "T11",
+        "title": "IK 与接触分离",
+        "status": "PASS",
+        "ok": true
+      },
+      {
+        "id": "T12",
+        "title": "左右 FK/IK 混合目标",
+        "status": "PASS",
+        "combos": 4
+      },
+      {
+        "id": "T13",
+        "title": "左右轨迹参数独立",
+        "status": "PASS",
+        "mutations": 6
+      },
+      {
+        "id": "T14",
+        "title": "枚举及类型拒绝",
+        "status": "PASS",
+        "subcases": 16
+      },
+      {
+        "id": "T15",
+        "title": "向量输入与 Root yaw 拒绝",
+        "status": "PASS",
+        "subcases": 68
+      },
+      {
+        "id": "T16",
+        "title": "模式字段冲突",
+        "status": "PASS",
+        "subcases": 19
+      },
+      {
+        "id": "T17",
+        "title": "时间及派生计算边界",
+        "status": "PASS",
+        "subcases": 9
+      },
+      {
+        "id": "T18",
+        "title": "无状态性与输入不变性",
+        "status": "PASS",
+        "ok": true
+      }
+    ]
+  },
+  "10d4_repeat_cleanup_and_influence_clear": {
+    "pass1_frames": 252,
+    "pass1_actions": {
+      "HandIK.L": "HandIK.LAction",
+      "HandIK.R": "HandIK.RAction",
+      "ElbowPole.L": "ElbowPole.LAction",
+      "ElbowPole.R": "ElbowPole.RAction"
+    },
+    "pass2_cleaned": {
+      "HandIK.L": {
+        "fcurves": 6,
+        "frame_min": 1,
+        "frame_max": 204
+      },
+      "HandIK.R": {
+        "fcurves": 6,
+        "frame_min": 1,
+        "frame_max": 204
+      },
+      "ElbowPole.L": {
+        "fcurves": 6,
+        "frame_min": 1,
+        "frame_max": 204
+      },
+      "ElbowPole.R": {
+        "fcurves": 6,
+        "frame_min": 1,
+        "frame_max": 204
+      }
+    },
+    "pass2_frame100_influences": {
+      "ArmIK.L": 0.0,
+      "ArmIK.R": 0.0,
+      "HandRotation.L": 0.0,
+      "HandRotation.R": 0.0
+    }
+  },
+  "all_passed": true
+}

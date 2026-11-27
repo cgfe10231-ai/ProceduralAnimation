@@ -1,11 +1,11 @@
 # OPEN_FINDINGS: 生产接口审计问题登记表 (Master Registry)
 
-> **核验日期**：2026-11-26；当前主干源码及证据收归基线：`f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`；10-C 集成复验基线 `2e65a9463ab88714cfb864b4d63f1547135c29ae`。
+> **核验日期**：2026-11-27；Task 10-D 冻结生产基线：`824c52ec73f86aa3d08245a58297118cb4a9f110`（10-d-5 中央验证 `7f14ff722caecadec555194cc7d08f454c94c6c8`，收归分支 `task/10-d` 合并至 `master`）；10-C 历史集成基线 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`。
 > **登记口径**：统一历史 Finding **16项**，14项已关闭、2项仍 OPEN；不增删、不重编号。
-> **未关闭**：`FIND-R3-03`、`FIND-R3-04`，归属 Task 11 FootLock；其他14项历史结论保持不变。10-B 验收与主干合入不得自动解释为关闭 Task 11 的 Finding。
-> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 原于 2026-11-20 获项目负责人正式验收，现已完成六层拆分回归（`2f248bf4b98776222e37bc3228506a4fb85f7c32`，证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`）并合入 `master`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`），状态为 `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。Task 10-C 四个子节点于 2026-11-21 完成历史分支验收（`task/10-c-child4`，`d3d7f135975ac5a2a9b01e2706434d0463a563cd`）；2026-11-26 在六层架构集成基线 `2e65a9463ab88714cfb864b4d63f1547135c29ae` 复验通过，已 fast-forward 收归 `master`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）。 Task 10-D `NEXT — AUDIT ONLY — NOT STARTED`：下一工程节点，仅允许独立只读审计与方案冻结，任何生产修改及测试须另行批准。
+> **未关闭**：`FIND-R3-03`、`FIND-R3-04`，归属 Task 11 FootLock；其他14项历史结论保持不变。Task 10-B / 10-C / 10-D 验收与主干合入不得自动解释为关闭 Task 11 的 Finding。
+> **任务事实**：09-B-4 已验收；10-A 已归档；10-B 与 10-C 均为 `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；**10-D `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**（项目负责人于 2026-11-27 人工视觉验收通过两份中央全身场景 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend`，证据见 `docs/evidence/10-d/10-d-5/centralized_verification/` 与最终回归 `docs/evidence/10-d/final_acceptance/`）；**Task 10 整体 `COMPLETED`**；**下一任务为 `Task 11-A` FootLock（`FIND-R3-03`）**，Task 12 继续等待 Task 11 完成。
 > **独立问题域**：10-B 的 `CORE_REPAIR_LEDGER.md` 21项冻结记录（含证据与专项合同）**不属于**本16项 Finding 的新增条目，不能合并编号或机械改写历史 Finding 状态。
-> **Phase 7B**：`NOT AUTHORIZED`；须完成 Task 10/11/12 联合验收并由负责人准入。
+> **Phase 7B / 7C**：`NOT AUTHORIZED`；须完成 Task 11 / Task 12 联合验收并由负责人准入，不得宣称 Phase 7C 动力学合流已完成。
 
 ---
 
@@ -15,16 +15,17 @@
 |---|---|---|
 | 统一历史 Finding | **16** | 永久保留原16个ID |
 | 已关闭 | **14** | 历史修复结论继续有效 |
-| 当前 OPEN | **2** | `FIND-R3-03`、`FIND-R3-04`（Task 11） |
+| 当前 OPEN | **2** | `FIND-R3-03`、`FIND-R3-04`（归属 Task 11，不得提前关闭） |
 | 历史已确认缺陷 | **3项已修复** | `FIND-R2-01/02/07` |
 | 当前未关闭接口合同缺口 | **2项** | `FIND-R3-03/04` |
 | 09-B-4 | `ACCEPTED — VERIFIED` | 不得重新打开 |
 | Task 10-A | `COMPLETED — ARCHIVED` | 已完成 |
-| Task 10-B | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 原验收 2026-11-20；六层拆分回归（`2f248bf` / `dcf3057`）及双父节点合并至 `master`（`c45a40c`）已完成；不自动关闭 Task 11 的 Finding |
-| Task 10-C | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 集成复验 38/38 PASS，历史 Bridge 兼容 14/14 PASS；收归 `f2501ddc7d610d554d1e813b13564ea56ce2b51a` |
-| Task 10-D | `NEXT — AUDIT ONLY — NOT STARTED` | 下一节点，仅只读审计和方案冻结 |
-| Task 11 / Task 12 | 尚未完成 | Task 11 归属两个OPEN Finding |
-| Phase 7B | `NOT AUTHORIZED` | 不得越级开启 |
+| Task 10-B | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 原验收 2026-11-20；六层拆分回归及主干合并 `c45a40c` 已完成 |
+| Task 10-C | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 收归 `f2501ddc`；已在 `824c52ec` 现行 `kinematic_bridge.py` 复验通过（38/38 + 14/14） |
+| Task 10-D | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 五动作中央全身控制及公共上肢模块 `src/motion/upper_limb_trajectory.py`；2026-11-27 人工视觉验收两份场景；最终回归 `quick` 19/19、`physics` 27/27、`motion` 12/12、`full` 42/42 全 PASS（`docs/evidence/10-d/final_acceptance/`） |
+| Task 10（整体） | `COMPLETED` | 10-A / 10-B / 10-C / 10-D 全部完成 |
+| Task 11 / Task 12 | `NEXT: Task 11-A` / Task 12 等待中 | `FIND-R3-03`、`FIND-R3-04` 仍 OPEN |
+| Phase 7B / 7C | `NOT AUTHORIZED` | 不得越级开启或宣称 7C 合流已完成 |
 
 ---
 
