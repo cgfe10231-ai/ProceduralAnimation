@@ -1,0 +1,73 @@
+{
+  "task": "TASK 11 — FootLock Unified Verification & Final Regression",
+  "generated_at": "2026-11-27T18:04:12.030916",
+  "git": {
+    "branch": "task/11",
+    "frozen_head": "added88a7e27eaaa6d1644473d560c5dcf45bc80",
+    "master": "0b329cae8bd85de7ac5be1c6cb2273c054067906",
+    "production_blobs": {
+      "src/rig/foot_contact.py": "0b74e83a835362e9ff400106847a6f6c83dd18fc",
+      "src/rig/ik.py": "f1492c748f8f143041bc6ed4b29d9529824d527f",
+      "src/scene/playground_character_assembly.py": "5bb437d92cbd0d2816fffcae52ae026b35ceb0a4"
+    }
+  },
+  "blender_version": "5.1.1",
+  "commands_executed": [
+    {
+      "name": "Task 11 FootLock Contract & Production Chain",
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" --python-exit-code 1 -b -P docs/evidence/11/unified_verification/verify_footlock_contract.py",
+      "exit_code": 0
+    },
+    {
+      "name": "WBC Failure Contract (CONTRACT10-01..06)",
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" --python-exit-code 1 -b -P tests/test_task10b_wbc_failure_contract.py",
+      "exit_code": 0
+    },
+    {
+      "name": "Historical FootContact Reopen (legacy_foot_contact)",
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --test-id legacy_foot_contact --output-dir docs/evidence/11/unified_verification/legacy_foot_contact",
+      "exit_code": 0
+    },
+    {
+      "name": "Unified Regression — Quick (--fail-fast)",
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier quick --fail-fast --output-dir docs/evidence/11/unified_verification/regression_quick",
+      "exit_code": 0
+    },
+    {
+      "name": "Unified Regression — Physics (--fail-fast)",
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier physics --fail-fast --output-dir docs/evidence/11/unified_verification/regression_physics",
+      "exit_code": 0
+    },
+    {
+      "name": "Unified Regression — Motion (--fail-fast)",
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier motion --fail-fast --output-dir docs/evidence/11/unified_verification/regression_motion",
+      "exit_code": 0
+    },
+    {
+      "name": "Unified Regression — Full (--fail-fast)",
+      "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -B tests/run_test_suite.py --tier full --fail-fast --output-dir docs/evidence/11/unified_verification/regression_full",
+      "exit_code": 0
+    }
+  ],
+  "temporary_reopen_blend_assets": [
+    {
+      "case": "locked",
+      "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task11_reopen_scenes\\task11_a16_locked.blend",
+      "size_bytes": 101021,
+      "sha256": "fc149ef73f8ffd5b4861f3ce13cc408353147f8af9bed08e0b66e801dbdf84a6",
+      "subprocess_rc": 0
+    },
+    {
+      "case": "unlocked",
+      "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task11_reopen_scenes\\task11_a16_unlocked.blend",
+      "size_bytes": 100631,
+      "sha256": "be0e7d95022e73181809e907c400607168217d438ee6c353747ad30f6d17719d",
+      "subprocess_rc": 0
+    }
+  ],
+  "preserved_legacy_blend_asset": {
+    "path": "output/character_foot_contact_prototype.blend",
+    "size_bytes": 120404,
+    "sha256_before_and_after": "ED7DA0064DB5C603E024A8B978058AED735E391B12751CE17E08BD488A9657DA"
+  }
+}

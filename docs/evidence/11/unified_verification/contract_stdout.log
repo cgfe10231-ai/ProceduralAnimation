@@ -1,0 +1,460 @@
+[A01] Running: Fresh setup leaves is_locked=False and all 7 metadata keys absent
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A01] PASSED: {"checked_sides": ["L", "R"], "all_keys_absent": true}
+[A02] Running: Setup on already-locked controller clears all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A02] PASSED: {"cleared_both_sides": true}
+[A03] Running: Unilateral L/R locks populate all 8 fields cleanly
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A03] PASSED: {"L_fields": 8, "R_fields": 8}
+[A04] Running: Bilateral simultaneous locks maintain independent snapshots
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A04] PASSED: {"L_contact": [-0.14000000059604645, -7.920000076293945, 0.019999999552965164], "R_contact": [0.15000000596046448, -8.079999923706055, 0.0]}
+[A05] Running: Unlocking L preserves R is_locked and all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A05] PASSED: {"R_preserved": true}
+[A06] Running: Unlocking R preserves L is_locked and all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A06] PASSED: {"L_preserved": true}
+[A07] Running: Repeat unlock and legacy unlocked stale metadata cleanup
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A07] PASSED: {"repeat_and_legacy_cleaned": true}
+[A08] Running: Reset clears lock flag and all 7 metadata keys on both sides
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A08] PASSED: {"both_cleared_on_reset": true}
+[A09] Running: Relocking at new position/rotation updates all 7 keys to new geometry
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A09] PASSED: {"all_seven_updated": true}
+[A10] Running: Normal swing foot IK executes cleanly after unlock
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A10] PASSED: {"swing_target_error_m": 2.4e-05}
+[A11] Running: Illegal reparent, FootIK shear, KneePole shear reject atomically
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A11] PASSED: {"reparent_and_shears_rejected": 3}
+[A12] Running: Phase B fault injection rolls back is_locked and all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R00:03.875  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_12276_d5851733c998ddb36f5eaeefd5e86fc1.png.png"
+00:03.969  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_12276_3669de53aa34f625299c6e39581acff7.png.png"
+
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A12] PASSED: {"rolled_back_keys": 7}
+[A13] Running: Rollback restores exact partial metadata subset & values
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A13] PASSED: {"kept": 4, "still_absent": 3}
+[A14] Running: Rollback leaves originally absent metadata fields absent
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A14] PASSED: {"absent_preserved": 5}
+[A15] Running: Unrelated custom properties remain intact across all lifecycle ops
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A15] PASSED: {"unrelated_props_preserved_across_all_ops": true}
+[A16] Running: Saved locked/unlocked blends reopen cleanly in independent Blender processes
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Info: Saved as "task11_a16_locked.blend"
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Info: Saved as "task11_a16_unlocked.blend"
+[A16] PASSED: {"temp_assets": [{"case": "locked", "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task11_reopen_scenes\\task11_a16_locked.blend", "size_bytes": 101021, "sha256": "fc149ef73f8ffd5b4861f3ce13cc408353147f8af9bed08e0b66e801dbdf84a6", "subprocess_rc": 0}, {"case": "unlocked", "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task11_reopen_scenes\\task11_a16_unlocked.blend", "size_bytes": 100631, "sha256": "be0e7d95022e73181809e907c400607168217d438ee6c353747ad30f6d17719d", "subprocess_rc": 0}]}
+[A17] Running: WBC continuous L/R lock switching enforces per-frame metadata lifecycle
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A17] PASSED: {"frames_verified": 5}
+[A18] Running: WBC upper-limb failure after leg writes restores pre-frame foot metadata
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A18] PASSED: {"mid_frame_leg_mutated": {"L_locked_mid": false, "R_locked_mid": true}, "full_wbc_foot_restored": true}
+[B01] Running: Unlocked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B01] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 2, "get_leg_ik_state_update_true": 0}}
+[B02] Running: Left-locked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B02] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 1, "get_leg_ik_state_update_true": 0}}
+[B03] Running: Right-locked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B03] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 1, "get_leg_ik_state_update_true": 0}}
+[B04] Running: Bilateral-locked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B04] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 2, "get_leg_ik_state_update_true": 0}}
+[B05] Running: Repeated/alternating pure queries cause zero cumulative state change
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B05] PASSED: {"queries_executed": 6, "spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 6, "get_leg_ik_state_update_true": 0}}
+[B06] Running: Missing FootIK causes pure query rejection without creating objects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B06] PASSED: {"refused_without_creation": true}
+[B07] Running: Missing KneePole rejects pure query & locked evaluate_foot_support without setup_leg_ik
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B07] PASSED: {"setup_leg_ik_calls": 0, "ensure_ik_calls": 0}
+[B08] Running: All 7 metadata missing/invalid formats & missing KneePole combo reject before writes
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B08] PASSED: {"subcases_passed": 37}
+[B09] Running: Unlocked state with stale metadata neither consumes nor deletes stale fields
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B09] PASSED: {"stale_keys_intact": 7}
+[B10] Running: Drifted locked controller pure query reports real drift without repairing
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B10] PASSED: {"measured_ctrl_drift_m": 0.098995}
+[B11] Running: Active maintenance restores locked world coordinate & parentless state
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B11] PASSED: {"restored_ctrl_drift_m": 0.0}
+[B12] Running: Active maintenance updates KneePole world location by exact formula
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B12] PASSED: {"pole_formula_diff_m": 0.0}
+[B13] Running: Continuous root movement maintains locked foot world reference position
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B13] PASSED: {"max_ctrl_drift_m": 0.0, "max_bone_drift_m": 2.1e-05}
+[B14] Running: Out-of-reach root reports UNREACHABLE without moving locked target
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B14] PASSED: {"hip_to_target_dist_m": 0.98737}
+[B15] Running: get_leg_ik_state default refresh vs update_scene=False paths
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B15] PASSED: {"no_refresh_updates": 0, "default_updates": 1}
+[B16] Running: evaluate_foot_support result matches immediate subsequent pure query
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B16] PASSED: {"locked_equal": true, "unlocked_equal": true}
+[B17] Running: WBC continuous L/R support switching & active maintenance integration
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B17] PASSED: {"steps_verified": 5}
+[B18] Running: playground_character_assembly Stage D measures post-Bridge via pure query only
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B18] PASSED: {"stage_d_steps": 5, "eval_outside_bridge_in_stage_d": 0, "eval_inside_bridge_in_stage_d": 1, "query_outside_bridge_in_stage_d": 5}
+[B20] Running: unlock_foot_contact preserves transforms, runs Phase B prebend, and rolls back on fault
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B20] PASSED: {"unlock_prebend_calls": 1, "unlock_updates": 3}
+[CHAIN] Running: Continuous production chain (5 actions + central bilateral upper-limb)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['start_stop_walk']): frames 1..204 (@ 24 FPS), root Y -8.0000m -> -6.7400m (disp=1.2600m, peak_speed=0.2400m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['TerrainWalk_route_traversal']): frames 1..128 (@ 24 FPS), root Y 10.2000m -> 11.4000m (disp=1.2000m, peak_speed=0.4873m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['run']): frames 1..48 (@ 24 FPS), root Y 0.0000m -> 1.7625m (disp=1.7625m, peak_speed=0.9000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['sprint_start', 'sprint_brake']): frames 1..162 (@ 24 FPS), root Y 0.0000m -> 8.0833m (disp=8.0833m, peak_speed=2.0000m/s, unreachable=0)
+[CHAIN] PASSED: {"StartStopWalk_with_central_bilateral_upper": {"frames": 204, "locked_checks_L": 132, "unlocked_checks_L": 72, "locked_checks_R": 96, "unlocked_checks_R": 108, "lr_lock_transitions": 8, "max_locked_ctrl_drift_m": 0.0}, "TerrainWalk": {"frames": 128, "locked_checks_L": 96, "unlocked_checks_L": 32, "locked_checks_R": 80, "unlocked_checks_R": 48, "lr_lock_transitions": 6, "max_locked_ctrl_drift_m": 0.0}, "Run": {"frames": 48, "locked_checks_L": 14, "unlocked_checks_L": 34, "locked_checks_R": 14, "unlocked_checks_R": 34, "lr_lock_transitions": 7, "max_locked_ctrl_drift_m": 0.0}, "SprintStart_SprintBrake": {"frames": 162, "locked_checks_L": 77, "unlocked_checks_L": 85, "locked_checks_R": 68, "unlocked_checks_R": 94, "lr_lock_transitions": 23, "max_locked_ctrl_drift_m": 0.0}}
+TASK11_CONTRACT_SUITE_DONE all_passed=True executed=38/38

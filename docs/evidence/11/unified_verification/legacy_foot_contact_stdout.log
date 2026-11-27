@@ -1,0 +1,23 @@
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: QUICK | Fail-Fast: False
+================================================================================
+
+Resolved 1 test suite(s) to execute:
+  01. [legacy_foot_contact] Historical Foot Contact Prototype Artifact Verification (blender_with_blend, timeout=45.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[legacy_foot_contact] Starting: Historical Foot Contact Prototype Artifact Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output/character_foot_contact_prototype.blend -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task4d_foot_contact.py
+  [PASS] Test completed successfully (2.48s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 2.48s
+Planned: 1 | Executed: 1 | Passed: 1 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs/evidence/11/unified_verification/legacy_foot_contact\test_report.json
+  - Markdown: docs/evidence/11/unified_verification/legacy_foot_contact\test_report.md
+================================================================================

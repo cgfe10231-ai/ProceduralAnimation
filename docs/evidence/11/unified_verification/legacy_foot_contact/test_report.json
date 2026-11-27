@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "generated_at": "2026-11-27 17:54:30",
+    "tier": "single:legacy_foot_contact",
+    "total_planned": 1,
+    "total_executed": 1,
+    "passed_count": 1,
+    "automated_pass_count": 0,
+    "failed_count": 0,
+    "skipped_count": 0,
+    "required_skipped_count": 0,
+    "optional_skipped_count": 0,
+    "not_run_count": 0,
+    "total_duration_sec": 2.48,
+    "all_success": true
+  },
+  "results": [
+    {
+      "test_id": "legacy_foot_contact",
+      "name": "Historical Foot Contact Prototype Artifact Verification",
+      "tier_names": [
+        "legacy"
+      ],
+      "runner_type": "blender_with_blend",
+      "status": "PASSED",
+      "exit_code": 0,
+      "duration_sec": 2.48,
+      "failure_reason": null,
+      "is_visual_acceptance": false,
+      "is_optional": false,
+      "stdout_tail": "00:02.219  blend            | Read blend: \"C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\output\\character_foot_contact_prototype.blend\"\n=== START TASK 4D FOOT CONTACT & LOCK REOPEN VERIFICATION ===\nVerified 19 bones and 13 rigid body-part bindings preserved\nReopened Saved State: L_locked=True, L_status=REACHABLE_STRICT, L_ankle_drift=0.000011m, L_mesh_drift=0.000011m, Foot_L_minZ=-0.000008m | R_locked=False, Foot_R_minZ=0.1609m\nPure Horizontal Shift (+0.03X, +0.08Y): L_status=REACHABLE_NEAR_BOUNDARY, controller_drift=0.000000m, ankle_bone_drift=0.004439m, mesh_center_drift=0.004439m, Foot_L_minZ=0.004417m | Free_R_err=0.000060m\nRight Foot Locked Shift (-0.02X, +0.10Y, -0.015Z): R_status=REACHABLE_STRICT, R_ankle_drift=0.000011m, R_mesh_drift=0.000011m, Foot_R_minZ=-0.000008m | Free_L_err=0.000035m\nOut-of-Reach Shift (+0.45Y): R_status=UNREACHABLE, is_reachable=False, hip_dist=0.93536m, controller_drift=0.000000m, actual_ankle_drift=0.11536m\n[VERIFY_PASSED] Task 4D support-foot locking and ground contact verification completed.\n=== END TASK 4D FOOT CONTACT & LOCK REOPEN VERIFICATION ===\nBlender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)\n\nBlender quit\n",
+      "stderr_tail": ""
+    }
+  ]
+}

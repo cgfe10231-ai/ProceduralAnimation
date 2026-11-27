@@ -1,0 +1,21 @@
+===== [wbc_failure_contract] STDERR =====
+test_contract10_01_normal_bilateral_feedback (__main__.TestTask10BWBCFailureContract.test_contract10_01_normal_bilateral_feedback)
+CONTRACT10-01: 正常双臂反馈. ... C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\character\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+ok
+test_contract10_02_cleanup_pending_admission_rejection (__main__.TestTask10BWBCFailureContract.test_contract10_02_cleanup_pending_admission_rejection)
+CONTRACT10-02: CLEANUP_PENDING 准入拒绝. ... ok
+test_contract10_03_failed_isolation_propagation_to_wbc (__main__.TestTask10BWBCFailureContract.test_contract10_03_failed_isolation_propagation_to_wbc)
+CONTRACT10-03: FAILED Isolation 向 WBC 传播. ... ok
+test_contract10_04_arm_ik_rollback_vs_wbc_prior_writes_restoration (__main__.TestTask10BWBCFailureContract.test_contract10_04_arm_ik_rollback_vs_wbc_prior_writes_restoration)
+CONTRACT10-04: Arm IK 回滚成功，但 WBC 前序写入是否恢复. ... ok
+test_contract10_05_unreachable_hand_target_feedback (__main__.TestTask10BWBCFailureContract.test_contract10_05_unreachable_hand_target_feedback)
+CONTRACT10-05: 不可达手部目标反馈. ... ok
+test_contract10_06_second_hand_failure_bilateral_partial_commit (__main__.TestTask10BWBCFailureContract.test_contract10_06_second_hand_failure_bilateral_partial_commit)
+CONTRACT10-06: 第二只手失败后的单帧状态. ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 1.024s
+
+OK
+

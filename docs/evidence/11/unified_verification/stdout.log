@@ -1,0 +1,1112 @@
+===== [contract_suite] STDOUT =====
+[A01] Running: Fresh setup leaves is_locked=False and all 7 metadata keys absent
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A01] PASSED: {"checked_sides": ["L", "R"], "all_keys_absent": true}
+[A02] Running: Setup on already-locked controller clears all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A02] PASSED: {"cleared_both_sides": true}
+[A03] Running: Unilateral L/R locks populate all 8 fields cleanly
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A03] PASSED: {"L_fields": 8, "R_fields": 8}
+[A04] Running: Bilateral simultaneous locks maintain independent snapshots
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A04] PASSED: {"L_contact": [-0.14000000059604645, -7.920000076293945, 0.019999999552965164], "R_contact": [0.15000000596046448, -8.079999923706055, 0.0]}
+[A05] Running: Unlocking L preserves R is_locked and all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A05] PASSED: {"R_preserved": true}
+[A06] Running: Unlocking R preserves L is_locked and all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A06] PASSED: {"L_preserved": true}
+[A07] Running: Repeat unlock and legacy unlocked stale metadata cleanup
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A07] PASSED: {"repeat_and_legacy_cleaned": true}
+[A08] Running: Reset clears lock flag and all 7 metadata keys on both sides
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A08] PASSED: {"both_cleared_on_reset": true}
+[A09] Running: Relocking at new position/rotation updates all 7 keys to new geometry
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A09] PASSED: {"all_seven_updated": true}
+[A10] Running: Normal swing foot IK executes cleanly after unlock
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A10] PASSED: {"swing_target_error_m": 2.4e-05}
+[A11] Running: Illegal reparent, FootIK shear, KneePole shear reject atomically
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A11] PASSED: {"reparent_and_shears_rejected": 3}
+[A12] Running: Phase B fault injection rolls back is_locked and all 7 metadata keys
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R00:03.875  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_12276_d5851733c998ddb36f5eaeefd5e86fc1.png.png"
+00:03.969  image.write      | ERROR OpenImageIO write failed: Could not open file "C:\Users\64701\.thumbnails\large\blender_12276_3669de53aa34f625299c6e39581acff7.png.png"
+
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A12] PASSED: {"rolled_back_keys": 7}
+[A13] Running: Rollback restores exact partial metadata subset & values
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A13] PASSED: {"kept": 4, "still_absent": 3}
+[A14] Running: Rollback leaves originally absent metadata fields absent
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A14] PASSED: {"absent_preserved": 5}
+[A15] Running: Unrelated custom properties remain intact across all lifecycle ops
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A15] PASSED: {"unrelated_props_preserved_across_all_ops": true}
+[A16] Running: Saved locked/unlocked blends reopen cleanly in independent Blender processes
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Info: Saved as "task11_a16_locked.blend"
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Info: Saved as "task11_a16_unlocked.blend"
+[A16] PASSED: {"temp_assets": [{"case": "locked", "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task11_reopen_scenes\\task11_a16_locked.blend", "size_bytes": 101021, "sha256": "fc149ef73f8ffd5b4861f3ce13cc408353147f8af9bed08e0b66e801dbdf84a6", "subprocess_rc": 0}, {"case": "unlocked", "blend_path": "C:\\Users\\64701\\.gemini\\antigravity\\brain\\195cba67-abc9-47a3-9c96-4bd0bab568e0\\scratch\\task11_reopen_scenes\\task11_a16_unlocked.blend", "size_bytes": 100631, "sha256": "be0e7d95022e73181809e907c400607168217d438ee6c353747ad30f6d17719d", "subprocess_rc": 0}]}
+[A17] Running: WBC continuous L/R lock switching enforces per-frame metadata lifecycle
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A17] PASSED: {"frames_verified": 5}
+[A18] Running: WBC upper-limb failure after leg writes restores pre-frame foot metadata
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[A18] PASSED: {"mid_frame_leg_mutated": {"L_locked_mid": false, "R_locked_mid": true}, "full_wbc_foot_restored": true}
+[B01] Running: Unlocked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B01] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 2, "get_leg_ik_state_update_true": 0}}
+[B02] Running: Left-locked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B02] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 1, "get_leg_ik_state_update_true": 0}}
+[B03] Running: Right-locked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B03] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 1, "get_leg_ik_state_update_true": 0}}
+[B04] Running: Bilateral-locked pure query has zero side effects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B04] PASSED: {"spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 2, "get_leg_ik_state_update_true": 0}}
+[B05] Running: Repeated/alternating pure queries cause zero cumulative state change
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B05] PASSED: {"queries_executed": 6, "spy": {"view_layer_update": 0, "scene_frame_set": 0, "ensure_ik_controls": 0, "setup_leg_ik": 0, "apply_ik_prebend_hint": 0, "evaluate_foot_support": 0, "get_leg_ik_state": 6, "get_leg_ik_state_update_true": 0}}
+[B06] Running: Missing FootIK causes pure query rejection without creating objects
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B06] PASSED: {"refused_without_creation": true}
+[B07] Running: Missing KneePole rejects pure query & locked evaluate_foot_support without setup_leg_ik
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B07] PASSED: {"setup_leg_ik_calls": 0, "ensure_ik_calls": 0}
+[B08] Running: All 7 metadata missing/invalid formats & missing KneePole combo reject before writes
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B08] PASSED: {"subcases_passed": 37}
+[B09] Running: Unlocked state with stale metadata neither consumes nor deletes stale fields
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B09] PASSED: {"stale_keys_intact": 7}
+[B10] Running: Drifted locked controller pure query reports real drift without repairing
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B10] PASSED: {"measured_ctrl_drift_m": 0.098995}
+[B11] Running: Active maintenance restores locked world coordinate & parentless state
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B11] PASSED: {"restored_ctrl_drift_m": 0.0}
+[B12] Running: Active maintenance updates KneePole world location by exact formula
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B12] PASSED: {"pole_formula_diff_m": 0.0}
+[B13] Running: Continuous root movement maintains locked foot world reference position
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B13] PASSED: {"max_ctrl_drift_m": 0.0, "max_bone_drift_m": 2.1e-05}
+[B14] Running: Out-of-reach root reports UNREACHABLE without moving locked target
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B14] PASSED: {"hip_to_target_dist_m": 0.98737}
+[B15] Running: get_leg_ik_state default refresh vs update_scene=False paths
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B15] PASSED: {"no_refresh_updates": 0, "default_updates": 1}
+[B16] Running: evaluate_foot_support result matches immediate subsequent pure query
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B16] PASSED: {"locked_equal": true, "unlocked_equal": true}
+[B17] Running: WBC continuous L/R support switching & active maintenance integration
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B17] PASSED: {"steps_verified": 5}
+[B18] Running: playground_character_assembly Stage D measures post-Bridge via pure query only
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B18] PASSED: {"stage_d_steps": 5, "eval_outside_bridge_in_stage_d": 0, "eval_inside_bridge_in_stage_d": 1, "query_outside_bridge_in_stage_d": 5}
+[B20] Running: unlock_foot_contact preserves transforms, runs Phase B prebend, and rolls back on fault
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[B20] PASSED: {"unlock_prebend_calls": 1, "unlock_updates": 3}
+[CHAIN] Running: Continuous production chain (5 actions + central bilateral upper-limb)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['start_stop_walk']): frames 1..204 (@ 24 FPS), root Y -8.0000m -> -6.7400m (disp=1.2600m, peak_speed=0.2400m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['TerrainWalk_route_traversal']): frames 1..128 (@ 24 FPS), root Y 10.2000m -> 11.4000m (disp=1.2000m, peak_speed=0.4873m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['run']): frames 1..48 (@ 24 FPS), root Y 0.0000m -> 1.7625m (disp=1.7625m, peak_speed=0.9000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['sprint_start', 'sprint_brake']): frames 1..162 (@ 24 FPS), root Y 0.0000m -> 8.0833m (disp=8.0833m, peak_speed=2.0000m/s, unreachable=0)
+[CHAIN] PASSED: {"StartStopWalk_with_central_bilateral_upper": {"frames": 204, "locked_checks_L": 132, "unlocked_checks_L": 72, "locked_checks_R": 96, "unlocked_checks_R": 108, "lr_lock_transitions": 8, "max_locked_ctrl_drift_m": 0.0}, "TerrainWalk": {"frames": 128, "locked_checks_L": 96, "unlocked_checks_L": 32, "locked_checks_R": 80, "unlocked_checks_R": 48, "lr_lock_transitions": 6, "max_locked_ctrl_drift_m": 0.0}, "Run": {"frames": 48, "locked_checks_L": 14, "unlocked_checks_L": 34, "locked_checks_R": 14, "unlocked_checks_R": 34, "lr_lock_transitions": 7, "max_locked_ctrl_drift_m": 0.0}, "SprintStart_SprintBrake": {"frames": 162, "locked_checks_L": 77, "unlocked_checks_L": 85, "locked_checks_R": 68, "unlocked_checks_R": 94, "lr_lock_transitions": 23, "max_locked_ctrl_drift_m": 0.0}}
+TASK11_CONTRACT_SUITE_DONE all_passed=True executed=38/38
+
+===== [wbc_failure_contract] STDOUT =====
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+
+===== [legacy_foot_contact] STDOUT =====
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: QUICK | Fail-Fast: False
+================================================================================
+
+Resolved 1 test suite(s) to execute:
+  01. [legacy_foot_contact] Historical Foot Contact Prototype Artifact Verification (blender_with_blend, timeout=45.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[legacy_foot_contact] Starting: Historical Foot Contact Prototype Artifact Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output/character_foot_contact_prototype.blend -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task4d_foot_contact.py
+  [PASS] Test completed successfully (2.48s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 2.48s
+Planned: 1 | Executed: 1 | Passed: 1 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs/evidence/11/unified_verification/legacy_foot_contact\test_report.json
+  - Markdown: docs/evidence/11/unified_verification/legacy_foot_contact\test_report.md
+================================================================================
+
+===== [tier_quick] STDOUT =====
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: QUICK | Fail-Fast: True
+================================================================================
+
+Resolved 19 test suite(s) to execute:
+  01. [architecture_integrity_gate] Architecture Documentation Integrity & Symbol Existence Gate (python, timeout=15.0s)
+  02. [spatial_layout_clearance] Spatial Corridor Clearance & Math Layout (blender_headless, timeout=15.0s)
+  03. [dynamics_environment_query] Dynamics Environment Query & 3D Surface Geometry (python, timeout=15.0s)
+  04. [contact_dynamics_math] Contact Dynamics Foundation & Momentum Impulse (python, timeout=15.0s)
+  05. [contact_force_solver] Multi-Contact Force Solver & Constraint Allocation (python, timeout=30.0s)
+  06. [forward_dynamics] Forward Dynamics Single-Step Integration Kernel (python, timeout=15.0s)
+  07. [closed_loop_dynamics] Multi-Frame Dynamics Closed-Loop Control & State Feedback (python, timeout=30.0s)
+  08. [runner_unit_tests] Test Suite Runner Unit Tests (python, timeout=30.0s)
+  09. [physics_joint_limits] Anatomical Joint ROM Limit Verification (blender_headless, timeout=45.0s)
+  10. [physics_rigid_link_com] Rigid Link Segments & Whole-Body CoM (blender_headless, timeout=45.0s)
+  11. [mesh_environment_query] Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity (blender_headless, timeout=45.0s)
+  12. [task7a2_p0_teleport_regression] Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect (blender_headless, timeout=30.0s)
+  13. [task7a2_negative_invariance] Task 7A-2: Terrain Walk Invariance & Negative Physics Verification (blender_headless, timeout=20.0s)
+  14. [environment_gate01_unit3] Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification (blender_headless, timeout=60.0s)
+  15. [environment_gate01_u3_s1] Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps (blender_headless, timeout=60.0s)
+  16. [environment_gate01_u3_s2] Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair (blender_headless, timeout=60.0s)
+  17. [environment_gate01_unit4] Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency (blender_headless, timeout=60.0s)
+  18. [environment_gate01_unit4_closure] Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure (blender_headless, timeout=60.0s)
+  19. [terrain_planning_contract] Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts (blender_headless, timeout=120.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[architecture_integrity_gate] Starting: Architecture Documentation Integrity & Symbol Existence Gate
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_architecture_integrity_gate.py
+  [PASS] Test completed successfully (2.53s)
+
+[spatial_layout_clearance] Starting: Spatial Corridor Clearance & Math Layout
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_task3_spatial.py
+  [PASS] Test completed successfully (3.01s)
+
+[dynamics_environment_query] Starting: Dynamics Environment Query & 3D Surface Geometry
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_dynamics_playground.py
+  [PASS] Test completed successfully (1.13s)
+
+[contact_dynamics_math] Starting: Contact Dynamics Foundation & Momentum Impulse
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_dynamics.py
+  [PASS] Test completed successfully (1.32s)
+
+[contact_force_solver] Starting: Multi-Contact Force Solver & Constraint Allocation
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_force_solver.py
+  [PASS] Test completed successfully (1.33s)
+
+[forward_dynamics] Starting: Forward Dynamics Single-Step Integration Kernel
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_forward_dynamics.py
+  [PASS] Test completed successfully (1.14s)
+
+[closed_loop_dynamics] Starting: Multi-Frame Dynamics Closed-Loop Control & State Feedback
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_closed_loop_dynamics.py
+  [PASS] Test completed successfully (2.13s)
+
+[runner_unit_tests] Starting: Test Suite Runner Unit Tests
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_runner_unit.py
+  [PASS] Test completed successfully (1.87s)
+
+[physics_joint_limits] Starting: Anatomical Joint ROM Limit Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fc_joint_limits.py
+  [PASS] Test completed successfully (3.1s)
+
+[physics_rigid_link_com] Starting: Rigid Link Segments & Whole-Body CoM
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fb_rigid_link.py
+  [PASS] Test completed successfully (3.0s)
+
+[mesh_environment_query] Starting: Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_mesh_environment_query.py
+  [PASS] Test completed successfully (6.24s)
+
+[task7a2_p0_teleport_regression] Starting: Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_p0_frame226_teleport_regression.py
+  [PASS] Test completed successfully (3.41s)
+
+[task7a2_negative_invariance] Starting: Task 7A-2: Terrain Walk Invariance & Negative Physics Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_walk_negative.py
+  [PASS] Test completed successfully (2.38s)
+
+[environment_gate01_unit3] Starting: Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit3.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (23.06s)
+
+[environment_gate01_u3_s1] Starting: Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s1.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (6.77s)
+
+[environment_gate01_u3_s2] Starting: Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s2.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (7.01s)
+
+[environment_gate01_unit4] Starting: Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4.py
+  [PASS] Test completed successfully (2.73s)
+
+[environment_gate01_unit4_closure] Starting: Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4_closure.py
+  [PASS] Test completed successfully (2.83s)
+
+[terrain_planning_contract] Starting: Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_planning_contract.py
+  [PASS] Test completed successfully (3.27s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 78.26s
+Planned: 19 | Executed: 19 | Passed: 19 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs/evidence/11/unified_verification/regression_quick\test_report.json
+  - Markdown: docs/evidence/11/unified_verification/regression_quick\test_report.md
+================================================================================
+
+===== [tier_physics] STDOUT =====
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: PHYSICS | Fail-Fast: True
+================================================================================
+
+Resolved 27 test suite(s) to execute:
+  01. [dynamics_environment_query] Dynamics Environment Query & 3D Surface Geometry (python, timeout=15.0s)
+  02. [contact_dynamics_math] Contact Dynamics Foundation & Momentum Impulse (python, timeout=15.0s)
+  03. [contact_force_solver] Multi-Contact Force Solver & Constraint Allocation (python, timeout=30.0s)
+  04. [forward_dynamics] Forward Dynamics Single-Step Integration Kernel (python, timeout=15.0s)
+  05. [closed_loop_dynamics] Multi-Frame Dynamics Closed-Loop Control & State Feedback (python, timeout=30.0s)
+  06. [physics_joint_limits] Anatomical Joint ROM Limit Verification (blender_headless, timeout=45.0s)
+  07. [physics_rigid_link_com] Rigid Link Segments & Whole-Body CoM (blender_headless, timeout=45.0s)
+  08. [physics_whole_body_controller] Whole-Body Controller Coordination & Dispatch (blender_headless, timeout=60.0s)
+  09. [physics_arm_ik] Dual Arm Two-Bone IK & Hand Orientation (blender_headless, timeout=45.0s)
+  10. [physics_body_kinematics] Differential Kinematics & Velocity Tracking (blender_headless, timeout=60.0s)
+  11. [physics_body_inertia] Inertia Tensor & Whole-Body Angular Momentum (blender_headless, timeout=60.0s)
+  12. [physics_contact_model] Multi-Limb Contact Geometry & Support Classification (blender_headless, timeout=90.0s)
+  13. [contact_model_geometry_support_contract] ContactModel Geometry-to-Support Consistency Contract (FIND-R2-05) (blender_headless, timeout=60.0s)
+  14. [leg_ik_worldspace_init_reset] Leg IK Controller World-Space Initialization & Reset Invariant (PKG-5/WS-01) (blender_headless, timeout=45.0s)
+  15. [leg_ik_ground_height_contract] Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A) (blender_headless, timeout=45.0s)
+  16. [leg_ik_world_rotation_contract] Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B) (blender_headless, timeout=45.0s)
+  17. [arm_ik_lifecycle_world_transform_contract] Arm IK Lifecycle & Effective Parent Transform Contract (Task 10-A) (blender_headless, timeout=60.0s)
+  18. [arm_ik_input_validation_contract] Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B-1) (blender_headless, timeout=45.0s)
+  19. [physics_bridge_contract] Kinematic Bridge 14-Point Architectural Contract (blender_headless, timeout=120.0s)
+  20. [dynamics_playground_blend] Dynamics Playground Blender Scene Artifact Verification (blender_headless, timeout=45.0s)
+  21. [playground_dynamics_states] Dynamics Playground Real Dynamics State Integration Verification (blender_headless, timeout=45.0s)
+  22. [visual_evidence_telemetry] Dynamics Visual Evidence & Telemetry Coherence Verification (python, timeout=45.0s)
+  23. [mesh_environment_query] Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity (blender_headless, timeout=45.0s)
+  24. [contact_elevation_gap_repro] Environment Gate 01 Defect Reproduction: KinematicBridge Elevation Gap (blender_headless, timeout=45.0s)
+  25. [task7a2_negative_invariance] Task 7A-2: Terrain Walk Invariance & Negative Physics Verification (blender_headless, timeout=20.0s)
+  26. [environment_gate01_unit4] Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency (blender_headless, timeout=60.0s)
+  27. [environment_gate01_unit4_closure] Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure (blender_headless, timeout=60.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[dynamics_environment_query] Starting: Dynamics Environment Query & 3D Surface Geometry
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_dynamics_playground.py
+  [PASS] Test completed successfully (1.08s)
+
+[contact_dynamics_math] Starting: Contact Dynamics Foundation & Momentum Impulse
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_dynamics.py
+  [PASS] Test completed successfully (1.05s)
+
+[contact_force_solver] Starting: Multi-Contact Force Solver & Constraint Allocation
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_force_solver.py
+  [PASS] Test completed successfully (1.17s)
+
+[forward_dynamics] Starting: Forward Dynamics Single-Step Integration Kernel
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_forward_dynamics.py
+  [PASS] Test completed successfully (0.98s)
+
+[closed_loop_dynamics] Starting: Multi-Frame Dynamics Closed-Loop Control & State Feedback
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_closed_loop_dynamics.py
+  [PASS] Test completed successfully (1.59s)
+
+[physics_joint_limits] Starting: Anatomical Joint ROM Limit Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fc_joint_limits.py
+  [PASS] Test completed successfully (2.06s)
+
+[physics_rigid_link_com] Starting: Rigid Link Segments & Whole-Body CoM
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fb_rigid_link.py
+  [PASS] Test completed successfully (2.15s)
+
+[physics_whole_body_controller] Starting: Whole-Body Controller Coordination & Dispatch
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fd_whole_body_controller.py
+  [PASS] Test completed successfully (2.24s)
+
+[physics_arm_ik] Starting: Dual Arm Two-Bone IK & Hand Orientation
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fa_arm_ik.py
+  [PASS] Test completed successfully (2.0s)
+
+[physics_body_kinematics] Starting: Differential Kinematics & Velocity Tracking
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6ga_body_kinematics.py
+  [PASS] Test completed successfully (4.04s)
+
+[physics_body_inertia] Starting: Inertia Tensor & Whole-Body Angular Momentum
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gb_body_inertia.py
+  [PASS] Test completed successfully (15.54s)
+
+[physics_contact_model] Starting: Multi-Limb Contact Geometry & Support Classification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gc_contact_model.py
+  [PASS] Test completed successfully (30.36s)
+
+[contact_model_geometry_support_contract] Starting: ContactModel Geometry-to-Support Consistency Contract (FIND-R2-05)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_contact_model_geometry_support_contract.py
+  [PASS] Test completed successfully (2.44s)
+
+[leg_ik_worldspace_init_reset] Starting: Leg IK Controller World-Space Initialization & Reset Invariant (PKG-5/WS-01)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_worldspace_init_reset.py
+  [PASS] Test completed successfully (2.68s)
+
+[leg_ik_ground_height_contract] Starting: Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_ground_height_contract.py
+  [PASS] Test completed successfully (4.88s)
+
+[leg_ik_world_rotation_contract] Starting: Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_world_rotation_contract.py
+  [PASS] Test completed successfully (5.02s)
+
+[arm_ik_lifecycle_world_transform_contract] Starting: Arm IK Lifecycle & Effective Parent Transform Contract (Task 10-A)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_arm_ik_lifecycle_world_transform_contract.py
+  [PASS] Test completed successfully (6.73s)
+
+[arm_ik_input_validation_contract] Starting: Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B-1)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_task10b_input_validation.py
+  [PASS] Test completed successfully (4.52s)
+
+[physics_bridge_contract] Starting: Kinematic Bridge 14-Point Architectural Contract
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gc_r3b1_bridge.py
+  [PASS] Test completed successfully (26.28s)
+
+[dynamics_playground_blend] Starting: Dynamics Playground Blender Scene Artifact Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_playground_blend.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (1.81s)
+
+[playground_dynamics_states] Starting: Dynamics Playground Real Dynamics State Integration Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_playground_dynamics.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (3.53s)
+
+[visual_evidence_telemetry] Starting: Dynamics Visual Evidence & Telemetry Coherence Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_visual_telemetry.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (0.4s)
+
+[mesh_environment_query] Starting: Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_mesh_environment_query.py
+  [PASS] Test completed successfully (4.83s)
+
+[contact_elevation_gap_repro] Starting: Environment Gate 01 Defect Reproduction: KinematicBridge Elevation Gap
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_contact_elevation_gap_repro.py
+  [PASS] Test completed successfully (2.25s)
+
+[task7a2_negative_invariance] Starting: Task 7A-2: Terrain Walk Invariance & Negative Physics Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_walk_negative.py
+  [PASS] Test completed successfully (1.92s)
+
+[environment_gate01_unit4] Starting: Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4.py
+  [PASS] Test completed successfully (2.27s)
+
+[environment_gate01_unit4_closure] Starting: Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4_closure.py
+  [PASS] Test completed successfully (2.44s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 136.26s
+Planned: 27 | Executed: 27 | Passed: 27 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs/evidence/11/unified_verification/regression_physics\test_report.json
+  - Markdown: docs/evidence/11/unified_verification/regression_physics\test_report.md
+================================================================================
+
+===== [tier_motion] STDOUT =====
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: MOTION | Fail-Fast: True
+================================================================================
+
+Resolved 12 test suite(s) to execute:
+  01. [motion_walk_r3b2] StartStopWalkAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  02. [motion_run_r3b2] RunAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  03. [motion_sprint_start_r3b2] SprintStartAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  04. [motion_sprint_brake_r3b2] SprintBrakeAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  05. [integration_unified_motion] Unified 462-Frame Motion Pipeline Artifact Verification (blender_headless, timeout=60.0s)
+  06. [task7a1_character_playground] Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop (blender_headless, timeout=90.0s)
+  07. [task7a2_p0_teleport_regression] Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect (blender_headless, timeout=30.0s)
+  08. [task7a2_terrain_traversal] Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground (blender_headless, timeout=120.0s)
+  09. [environment_gate01_unit3] Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification (blender_headless, timeout=60.0s)
+  10. [environment_gate01_u3_s1] Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps (blender_headless, timeout=60.0s)
+  11. [environment_gate01_u3_s2] Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair (blender_headless, timeout=60.0s)
+  12. [terrain_planning_contract] Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts (blender_headless, timeout=120.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[motion_walk_r3b2] Starting: StartStopWalkAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_walk_action.py
+  [PASS] Test completed successfully (7.14s)
+
+[motion_run_r3b2] Starting: RunAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_run_action.py
+  [PASS] Test completed successfully (4.31s)
+
+[motion_sprint_start_r3b2] Starting: SprintStartAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_sprint_start.py
+  [PASS] Test completed successfully (5.12s)
+
+[motion_sprint_brake_r3b2] Starting: SprintBrakeAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_sprint_brake.py
+  [PASS] Test completed successfully (3.03s)
+
+[integration_unified_motion] Starting: Unified 462-Frame Motion Pipeline Artifact Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_unified_motion_integration.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (1.75s)
+
+[task7a1_character_playground] Starting: Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task7a1_character_playground.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (3.3s)
+
+[task7a2_p0_teleport_regression] Starting: Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_p0_frame226_teleport_regression.py
+  [PASS] Test completed successfully (2.52s)
+
+[task7a2_terrain_traversal] Starting: Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task7a2_terrain_traversal.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (3.08s)
+
+[environment_gate01_unit3] Starting: Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit3.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (16.04s)
+
+[environment_gate01_u3_s1] Starting: Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s1.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (5.34s)
+
+[environment_gate01_u3_s2] Starting: Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s2.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (6.06s)
+
+[terrain_planning_contract] Starting: Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_planning_contract.py
+  [PASS] Test completed successfully (2.9s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 60.59s
+Planned: 12 | Executed: 12 | Passed: 12 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs/evidence/11/unified_verification/regression_motion\test_report.json
+  - Markdown: docs/evidence/11/unified_verification/regression_motion\test_report.md
+================================================================================
+
+===== [tier_full] STDOUT =====
+================================================================================
+PROCEDURAL ANIMATION: UNIFIED TEST SUITE RUNNER
+Target Tier: FULL | Fail-Fast: True
+================================================================================
+
+Resolved 42 test suite(s) to execute:
+  01. [architecture_integrity_gate] Architecture Documentation Integrity & Symbol Existence Gate (python, timeout=15.0s)
+  02. [spatial_layout_clearance] Spatial Corridor Clearance & Math Layout (blender_headless, timeout=15.0s)
+  03. [dynamics_environment_query] Dynamics Environment Query & 3D Surface Geometry (python, timeout=15.0s)
+  04. [contact_dynamics_math] Contact Dynamics Foundation & Momentum Impulse (python, timeout=15.0s)
+  05. [contact_force_solver] Multi-Contact Force Solver & Constraint Allocation (python, timeout=30.0s)
+  06. [forward_dynamics] Forward Dynamics Single-Step Integration Kernel (python, timeout=15.0s)
+  07. [closed_loop_dynamics] Multi-Frame Dynamics Closed-Loop Control & State Feedback (python, timeout=30.0s)
+  08. [runner_unit_tests] Test Suite Runner Unit Tests (python, timeout=30.0s)
+  09. [physics_joint_limits] Anatomical Joint ROM Limit Verification (blender_headless, timeout=45.0s)
+  10. [physics_rigid_link_com] Rigid Link Segments & Whole-Body CoM (blender_headless, timeout=45.0s)
+  11. [mesh_environment_query] Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity (blender_headless, timeout=45.0s)
+  12. [task7a2_p0_teleport_regression] Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect (blender_headless, timeout=30.0s)
+  13. [task7a2_negative_invariance] Task 7A-2: Terrain Walk Invariance & Negative Physics Verification (blender_headless, timeout=20.0s)
+  14. [environment_gate01_unit3] Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification (blender_headless, timeout=60.0s)
+  15. [environment_gate01_u3_s1] Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps (blender_headless, timeout=60.0s)
+  16. [environment_gate01_u3_s2] Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair (blender_headless, timeout=60.0s)
+  17. [environment_gate01_unit4] Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency (blender_headless, timeout=60.0s)
+  18. [environment_gate01_unit4_closure] Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure (blender_headless, timeout=60.0s)
+  19. [terrain_planning_contract] Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts (blender_headless, timeout=120.0s)
+  20. [physics_whole_body_controller] Whole-Body Controller Coordination & Dispatch (blender_headless, timeout=60.0s)
+  21. [physics_arm_ik] Dual Arm Two-Bone IK & Hand Orientation (blender_headless, timeout=45.0s)
+  22. [physics_body_kinematics] Differential Kinematics & Velocity Tracking (blender_headless, timeout=60.0s)
+  23. [physics_body_inertia] Inertia Tensor & Whole-Body Angular Momentum (blender_headless, timeout=60.0s)
+  24. [physics_contact_model] Multi-Limb Contact Geometry & Support Classification (blender_headless, timeout=90.0s)
+  25. [contact_model_geometry_support_contract] ContactModel Geometry-to-Support Consistency Contract (FIND-R2-05) (blender_headless, timeout=60.0s)
+  26. [leg_ik_worldspace_init_reset] Leg IK Controller World-Space Initialization & Reset Invariant (PKG-5/WS-01) (blender_headless, timeout=45.0s)
+  27. [leg_ik_ground_height_contract] Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A) (blender_headless, timeout=45.0s)
+  28. [leg_ik_world_rotation_contract] Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B) (blender_headless, timeout=45.0s)
+  29. [arm_ik_lifecycle_world_transform_contract] Arm IK Lifecycle & Effective Parent Transform Contract (Task 10-A) (blender_headless, timeout=60.0s)
+  30. [arm_ik_input_validation_contract] Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B-1) (blender_headless, timeout=45.0s)
+  31. [physics_bridge_contract] Kinematic Bridge 14-Point Architectural Contract (blender_headless, timeout=120.0s)
+  32. [dynamics_playground_blend] Dynamics Playground Blender Scene Artifact Verification (blender_headless, timeout=45.0s)
+  33. [playground_dynamics_states] Dynamics Playground Real Dynamics State Integration Verification (blender_headless, timeout=45.0s)
+  34. [visual_evidence_telemetry] Dynamics Visual Evidence & Telemetry Coherence Verification (python, timeout=45.0s)
+  35. [contact_elevation_gap_repro] Environment Gate 01 Defect Reproduction: KinematicBridge Elevation Gap (blender_headless, timeout=45.0s)
+  36. [motion_walk_r3b2] StartStopWalkAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  37. [motion_run_r3b2] RunAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  38. [motion_sprint_start_r3b2] SprintStartAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  39. [motion_sprint_brake_r3b2] SprintBrakeAction Unified Bridge Regression (blender_headless, timeout=60.0s)
+  40. [integration_unified_motion] Unified 462-Frame Motion Pipeline Artifact Verification (blender_headless, timeout=60.0s)
+  41. [task7a1_character_playground] Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop (blender_headless, timeout=90.0s)
+  42. [task7a2_terrain_traversal] Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground (blender_headless, timeout=120.0s)
+
+Execution Toolchain:
+  - Blender: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe
+  - Python:  C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe
+
+[architecture_integrity_gate] Starting: Architecture Documentation Integrity & Symbol Existence Gate
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_architecture_integrity_gate.py
+  [PASS] Test completed successfully (1.95s)
+
+[spatial_layout_clearance] Starting: Spatial Corridor Clearance & Math Layout
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_task3_spatial.py
+  [PASS] Test completed successfully (2.03s)
+
+[dynamics_environment_query] Starting: Dynamics Environment Query & 3D Surface Geometry
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_dynamics_playground.py
+  [PASS] Test completed successfully (0.7s)
+
+[contact_dynamics_math] Starting: Contact Dynamics Foundation & Momentum Impulse
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_dynamics.py
+  [PASS] Test completed successfully (0.7s)
+
+[contact_force_solver] Starting: Multi-Contact Force Solver & Constraint Allocation
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_contact_force_solver.py
+  [PASS] Test completed successfully (0.79s)
+
+[forward_dynamics] Starting: Forward Dynamics Single-Step Integration Kernel
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_forward_dynamics.py
+  [PASS] Test completed successfully (0.71s)
+
+[closed_loop_dynamics] Starting: Multi-Frame Dynamics Closed-Loop Control & State Feedback
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_closed_loop_dynamics.py
+  [PASS] Test completed successfully (1.32s)
+
+[runner_unit_tests] Starting: Test Suite Runner Unit Tests
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_runner_unit.py
+  [PASS] Test completed successfully (1.44s)
+
+[physics_joint_limits] Starting: Anatomical Joint ROM Limit Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fc_joint_limits.py
+  [PASS] Test completed successfully (2.35s)
+
+[physics_rigid_link_com] Starting: Rigid Link Segments & Whole-Body CoM
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fb_rigid_link.py
+  [PASS] Test completed successfully (1.92s)
+
+[mesh_environment_query] Starting: Environment Gate 01: Blender Mesh Environment Adapter & Data Authenticity
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_mesh_environment_query.py
+  [PASS] Test completed successfully (4.92s)
+
+[task7a2_p0_teleport_regression] Starting: Task 7A-2 P0: Detection & Prevention of Frame 226->227 Teleportation Defect
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_p0_frame226_teleport_regression.py
+  [PASS] Test completed successfully (2.51s)
+
+[task7a2_negative_invariance] Starting: Task 7A-2: Terrain Walk Invariance & Negative Physics Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_walk_negative.py
+  [PASS] Test completed successfully (1.97s)
+
+[environment_gate01_unit3] Starting: Environment Gate 01 / Unit 3: Real Mesh BVH Integration & Counter-Factual Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit3.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (16.7s)
+
+[environment_gate01_u3_s1] Starting: Environment Gate 01 / Unit 3-S1: Root Forward Motion Continuity Across Alternating Footsteps
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s1.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (5.55s)
+
+[environment_gate01_u3_s2] Starting: Environment Gate 01 / Unit 3-S2: Swing-to-Stance Landing Continuity Repair
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_u3_s2.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (5.38s)
+
+[environment_gate01_unit4] Starting: Environment Gate 01 / Unit 4: Real Mesh Contact Elevation & Consistency
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4.py
+  [PASS] Test completed successfully (2.37s)
+
+[environment_gate01_unit4_closure] Starting: Environment Gate 01 / Unit 4: Non-Support Rejection & Analytical Fallback Closure
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_environment_gate01_unit4_closure.py
+  [PASS] Test completed successfully (2.55s)
+
+[terrain_planning_contract] Starting: Terrain Planning Joint Repair: Direction, Seam, and Timebase Contracts
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_terrain_planning_contract.py
+  [PASS] Test completed successfully (3.02s)
+
+[physics_whole_body_controller] Starting: Whole-Body Controller Coordination & Dispatch
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fd_whole_body_controller.py
+  [PASS] Test completed successfully (1.97s)
+
+[physics_arm_ik] Starting: Dual Arm Two-Bone IK & Hand Orientation
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6fa_arm_ik.py
+  [PASS] Test completed successfully (1.92s)
+
+[physics_body_kinematics] Starting: Differential Kinematics & Velocity Tracking
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6ga_body_kinematics.py
+  [PASS] Test completed successfully (3.07s)
+
+[physics_body_inertia] Starting: Inertia Tensor & Whole-Body Angular Momentum
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gb_body_inertia.py
+  [PASS] Test completed successfully (14.4s)
+
+[physics_contact_model] Starting: Multi-Limb Contact Geometry & Support Classification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gc_contact_model.py
+  [PASS] Test completed successfully (26.77s)
+
+[contact_model_geometry_support_contract] Starting: ContactModel Geometry-to-Support Consistency Contract (FIND-R2-05)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_contact_model_geometry_support_contract.py
+  [PASS] Test completed successfully (2.55s)
+
+[leg_ik_worldspace_init_reset] Starting: Leg IK Controller World-Space Initialization & Reset Invariant (PKG-5/WS-01)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_worldspace_init_reset.py
+  [PASS] Test completed successfully (2.47s)
+
+[leg_ik_ground_height_contract] Starting: Leg IK Ground-Height Contract & CharacterRoot Decoupling (PKG-5/09-IK-GROUND-A)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_ground_height_contract.py
+  [PASS] Test completed successfully (4.27s)
+
+[leg_ik_world_rotation_contract] Starting: Leg IK World Rotation Contract & Controller Lifecycle Closure (PKG-5/09-B)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_leg_ik_world_rotation_contract.py
+  [PASS] Test completed successfully (4.8s)
+
+[arm_ik_lifecycle_world_transform_contract] Starting: Arm IK Lifecycle & Effective Parent Transform Contract (Task 10-A)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_arm_ik_lifecycle_world_transform_contract.py
+  [PASS] Test completed successfully (6.64s)
+
+[arm_ik_input_validation_contract] Starting: Arm IK Input Pre-Validation & Zero-Side-Effect Contract (Task 10-B-1)
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_task10b_input_validation.py
+  [PASS] Test completed successfully (5.09s)
+
+[physics_bridge_contract] Starting: Kinematic Bridge 14-Point Architectural Contract
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gc_r3b1_bridge.py
+  [PASS] Test completed successfully (27.93s)
+
+[dynamics_playground_blend] Starting: Dynamics Playground Blender Scene Artifact Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_playground_blend.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (1.81s)
+
+[playground_dynamics_states] Starting: Dynamics Playground Real Dynamics State Integration Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_playground_dynamics.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (3.91s)
+
+[visual_evidence_telemetry] Starting: Dynamics Visual Evidence & Telemetry Coherence Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task6gd_visual_telemetry.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (0.39s)
+
+[contact_elevation_gap_repro] Starting: Environment Gate 01 Defect Reproduction: KinematicBridge Elevation Gap
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/test_contact_elevation_gap_repro.py
+  [PASS] Test completed successfully (2.31s)
+
+[motion_walk_r3b2] Starting: StartStopWalkAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_walk_action.py
+  [PASS] Test completed successfully (7.78s)
+
+[motion_run_r3b2] Starting: RunAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_run_action.py
+  [PASS] Test completed successfully (4.88s)
+
+[motion_sprint_start_r3b2] Starting: SprintStartAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_sprint_start.py
+  [PASS] Test completed successfully (6.05s)
+
+[motion_sprint_brake_r3b2] Starting: SprintBrakeAction Unified Bridge Regression
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_r3b2_sprint_brake.py
+  [PASS] Test completed successfully (3.1s)
+
+[integration_unified_motion] Starting: Unified 462-Frame Motion Pipeline Artifact Verification
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_unified_motion_integration.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (1.79s)
+
+[task7a1_character_playground] Starting: Task 7A-1: 19-Bone Character Integration into DynamicsPlayground & Control Loop
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task7a1_character_playground.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (3.52s)
+
+[task7a2_terrain_traversal] Starting: Task 7A-2: 19-Bone Character Continuous Terrain Traversal in DynamicsPlayground
+  Command: C:\Program Files\Blender Foundation\Blender 5.1\blender.exe -b -P C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests/verify_task7a2_terrain_traversal.py
+  [AUTOMATED_PASS] Test passed automation (Visual Inspection Required) (3.02s)
+
+================================================================================
+TEST SUITE EXECUTION COMPLETED IN 199.32s
+Planned: 42 | Executed: 42 | Passed: 42 | Failed: 0 | Skipped: 0 | Not Run: 0
+Reports Written:
+  - JSON: docs/evidence/11/unified_verification/regression_full\test_report.json
+  - Markdown: docs/evidence/11/unified_verification/regression_full\test_report.md
+================================================================================
+
