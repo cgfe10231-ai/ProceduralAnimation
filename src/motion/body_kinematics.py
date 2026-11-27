@@ -293,6 +293,8 @@ def sample_body_pose_snapshot(
     commanded_velocity: Optional[Tuple[float, float, float]] = None,
     contacts_override: Optional[Mapping[str, bool]] = None,
     source: str = "evaluated_armature",
+    *,
+    com_result: Optional[WholeBodyCoMResult] = None,
 ) -> BodyPoseSnapshot:
     """Sample a complete, evaluated BodyPoseSnapshot from the active Blender scene.
 
@@ -342,7 +344,34 @@ def sample_body_pose_snapshot(
         pelvis_quat = root_quat
 
     # 3. Whole-Body CoM and Segments
-    com_res = compute_whole_body_com(armature_obj, dist, update_scene=False)
+    # [INTRODUCED 2026-11-27T21:20:10+08:00]
+    # FUNCTION: sample_body_pose_snapshot.authoritative_com_reuse
+    # PURPOSE: Reuse externally provided WholeBodyCoMResult after validating mass distribution consistency so production callers avoid duplicate CoM computation while standalone callers preserve original behavior.
+    # REASON: TASK 12-C BUG-02
+    if com_result is not None:
+        if not isinstance(com_result, WholeBodyCoMResult):
+            raise TypeError("com_result must be a WholeBodyCoMResult instance")
+        if not math.isclose(float(com_result.total_mass_kg), float(dist.total_mass_kg), rel_tol=1e-9, abs_tol=1e-9):
+            raise ValueError(
+                f"com_result.total_mass_kg ({com_result.total_mass_kg}) does not match mass_distribution ({dist.total_mass_kg})"
+            )
+        if len(com_result.segments) != len(dist.segments):
+            raise ValueError(
+                f"com_result segment count ({len(com_result.segments)}) does not match mass_distribution ({len(dist.segments)})"
+            )
+        for seg_spec in dist.segments:
+            s_res = com_result.segments.get(seg_spec.segment_id)
+            if (
+                s_res is None
+                or s_res.bone_name != seg_spec.bone_name
+                or not math.isclose(float(s_res.mass_ratio), float(seg_spec.mass_ratio), rel_tol=1e-9, abs_tol=1e-9)
+            ):
+                raise ValueError(
+                    f"com_result segment '{seg_spec.segment_id}' is missing or inconsistent with mass_distribution"
+                )
+        com_res = com_result
+    else:
+        com_res = compute_whole_body_com(armature_obj, dist, update_scene=False)
     com_world = (com_res.com_world.x, com_res.com_world.y, com_res.com_world.z)
 
     seg_positions: Dict[str, Tuple[float, float, float]] = {}
@@ -434,13 +463,7 @@ def sample_body_pose_from_controller_result(
     commanded_velocity: Optional[Tuple[float, float, float]] = None,
 ) -> BodyPoseSnapshot:
     """Sample a BodyPoseSnapshot directly from a WholeBodyControlResult and its armature."""
-    contacts_override = {}
-    for eff_id in ("foot_L", "foot_R", "hand_L", "hand_R"):
-        fb = ctrl_res.end_effectors.get(eff_id)
-        if fb is not None:
-            # An effector is locked if active and indicated in feedback or custom dict
-            pass
-
+    _ = ctrl_res
     return sample_body_pose_snapshot(
         armature_obj=armature_obj,
         root_obj=root_obj,
@@ -676,6 +699,10 @@ class BodyKinematicsTracker:
             self._history.append(motion_state)
         return motion_state
 
+    # [INTRODUCED 2026-11-27T21:21:10+08:00]
+    # FUNCTION: BodyKinematicsTracker.sample_and_update()
+    # PURPOSE: Accept optional authoritative com_result and MultiContactState-derived contacts_override keyword-only arguments and forward them to sample_body_pose_snapshot() while preserving standalone defaults.
+    # REASON: TASK 12-C BUG-02 & BUG-03
     def sample_and_update(
         self,
         time_sec: float,
@@ -684,6 +711,8 @@ class BodyKinematicsTracker:
         dt: Optional[float] = None,
         *,
         commit: bool = True,
+        com_result: Optional[WholeBodyCoMResult] = None,
+        contacts_override: Optional[Mapping[str, bool]] = None,
     ) -> BodyMotionState:
         """Sample current scene state and perform sequential differential update."""
         snap = sample_body_pose_snapshot(
@@ -694,6 +723,8 @@ class BodyKinematicsTracker:
             mass_distribution=self.mass_distribution,
             joint_model=self.joint_model,
             commanded_velocity=commanded_velocity,
+            contacts_override=contacts_override,
+            com_result=com_result,
         )
         return self.update(snap, dt=dt, commit=commit)
 

@@ -19,12 +19,12 @@ Architectural Principles Enforced:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 import math
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import bpy
-from mathutils import Euler, Matrix, Vector
+from mathutils import Matrix, Vector
 
 from src.config import PipelineConfig
 from src.motion.body_inertia import (
@@ -49,7 +49,6 @@ from src.motion.contact_model import (
     evaluate_limb_contacts_from_armature,
 )
 from src.motion.framework import (
-    ContactPointState,
     EnvironmentQuery,
     MotionMode,
     MotionState,
@@ -59,7 +58,6 @@ from src.motion.framework import (
     forward_unit_vector_from_yaw,
 )
 from src.motion.joint_limits import JointModel
-from src.motion.rigid_link import compute_whole_body_com
 from src.motion.whole_body_controller import (
     EndEffectorTarget,
     UnmetConstraint,
@@ -70,8 +68,6 @@ from src.motion.whole_body_controller import (
 from src.rig.arm_ik import (
     ARM_IK_CONSTRAINT_NAMES,
     HAND_ROT_CONSTRAINT_NAMES,
-    MAX_ARM_REACH,
-    MIN_ARM_REACH,
 )
 from src.rig.foot_contact import (
     evaluate_foot_support,
@@ -82,7 +78,6 @@ from src.rig.ik import (
     ANKLE_REST_Z,
     HIP_X_OFFSET,
     IK_TARGET_NAMES,
-    MAX_LEG_REACH,
 )
 
 
@@ -298,199 +293,6 @@ class BridgeExecutionResult:
     multi_contact: Optional[MultiContactState] = None
 
 
-# [INTRODUCED 2026-11-21T17:05:15+08:00]
-# NODE: Task 10-C / 10-c-child4
-# FUNCTION: _reconcile_post_rom_feedback()
-# PURPOSE: Build a detached, final-pose-coherent WBC feedback snapshot for the
-#          Bridge after WBC's ROM clamping, without modifying the WBC result.
-# REASON: WBC records EndEffectorFeedback before clamping. The post-clamp
-#         Bridge must report final end-effector positions and errors, while
-#         preserving the WBC's historical ROM diagnoses and transaction ownership.
-def _reconcile_post_rom_feedback(
-    armature_obj: bpy.types.Object,
-    targets: WholeBodyControlTargets,
-    result: WholeBodyControlResult,
-) -> WholeBodyControlResult:
-    """Reconcile four end-effectors against one already-evaluated final frame.
-
-    Read-only: never updates depsgraph, advances frame, writes pose/keyframes,
-    invokes solvers or touches WBC transactions. Caller performs exactly one
-    view-layer update before invoking this function.
-
-    REACHABILITY and ORIENTATION_ERROR are current-state diagnoses and are
-    regenerated from the final pose. ROM_VIOLATION records the original
-    invalid pose; ROM_CONFLICT is WBC's own post-clamp diagnosis. Both are
-    retained verbatim and never fabricated here.
-
-    This function does not turn a failed WBC result into success.
-    """
-    if not isinstance(result, WholeBodyControlResult):
-        raise TypeError("post-ROM reconciliation requires WholeBodyControlResult")
-
-    # Four existing feedback records are mandatory. Missing records indicate
-    # a broken WBC contract, not permission to invent successful feedback.
-    required = ("foot_L", "foot_R", "hand_L", "hand_R")
-    for name in required:
-        if name not in result.end_effectors:
-            raise RuntimeError(f"POST_ROM_FEEDBACK_MISSING: {name}")
-
-    reconciled = dict(result.end_effectors)
-    diagnoses = [
-        uc for uc in result.unmet_constraints
-        if not (
-            uc.target_name in required
-            and uc.category in ("REACHABILITY", "ORIENTATION_ERROR")
-        )
-    ]
-    max_error = 0.0
-    all_reachable = True
-    position_tolerance_m = 0.005  # frozen WBC.execute_frame() default
-    orientation_tolerance_deg = 1.0  # frozen WBC.execute_frame() default
-
-    for kind, side in (("foot", "L"), ("foot", "R"),
-                       ("hand", "L"), ("hand", "R")):
-        name = f"{kind}_{side}"
-        fb = result.end_effectors[name]
-        target = getattr(targets, name)
-        bone_name = f"{'shin' if kind == 'foot' else 'forearm'}.{side}"
-        inactive_bone_name = f"{'foot' if kind == 'foot' else 'hand'}.{side}"
-        anchor_name = f"{'thigh' if kind == 'foot' else 'upper_arm'}.{side}"
-        end_bone = armature_obj.pose.bones.get(
-            bone_name if fb.enabled else inactive_bone_name
-        )
-        if end_bone is None:
-            raise RuntimeError(f"POST_ROM_BONE_MISSING: {name}")
-        end_point = end_bone.tail if fb.enabled else end_bone.head
-        actual = tuple(float(x) for x in armature_obj.matrix_world @ end_point)
-        if not all(math.isfinite(x) for x in actual):
-            raise ValueError(f"POST_ROM_NONFINITE_POSITION: {name}: {actual!r}")
-
-        if not fb.enabled:
-            # A zero-influence IK target remains FK; never reactivate it.
-            # Preserve WBC's explicit zero-error semantics for disabled sides.
-            reconciled[name] = replace(fb, actual_world_xyz=actual)
-            continue
-
-        if target is None or not target.enabled:
-            raise RuntimeError(f"POST_ROM_ENABLED_TARGET_MISMATCH: {name}")
-        anchor_bone = armature_obj.pose.bones.get(anchor_name)
-        if anchor_bone is None:
-            raise RuntimeError(f"POST_ROM_ANCHOR_MISSING: {name}")
-        anchor = tuple(float(x) for x in armature_obj.matrix_world @ anchor_bone.head)
-        requested = tuple(float(x) for x in fb.requested_world_xyz)
-        if not all(math.isfinite(x) for x in anchor + requested):
-            raise ValueError(f"POST_ROM_NONFINITE_REQUEST: {name}")
-
-        # Original planned world target, never the IK controller's clamped
-        # internal target, defines externally reported tracking error.
-        error_m = math.dist(actual, requested)
-        requested_reach_m = math.dist(anchor, requested)
-        actual_reach_m = math.dist(anchor, actual)
-        if not all(math.isfinite(x) for x in
-                   (error_m, requested_reach_m, actual_reach_m)):
-            raise ValueError(f"POST_ROM_NONFINITE_METRIC: {name}")
-
-        if kind == "hand":
-            reach_limit = MAX_ARM_REACH
-            is_reachable = (
-                MIN_ARM_REACH <= requested_reach_m <= reach_limit + 1e-4
-            )
-            strictly_in_reach = (requested_reach_m < reach_limit - 1e-4)
-            hand_bone = armature_obj.pose.bones.get(f"hand.{side}")
-            if hand_bone is None:
-                raise RuntimeError(f"POST_ROM_HAND_BONE_MISSING: {name}")
-            final_rotation = (
-                (armature_obj.matrix_world @ hand_bone.matrix)
-                .to_3x3().to_quaternion()
-            )
-            final_rotation_deg = tuple(
-                round(math.degrees(v), 4)
-                for v in final_rotation.to_euler("XYZ")
-            )
-            if fb.requested_rotation_deg is not None:
-                requested_quat = Euler(
-                    tuple(math.radians(float(v))
-                          for v in fb.requested_rotation_deg), "XYZ"
-                ).to_quaternion()
-                orientation_error_deg = round(math.degrees(
-                    requested_quat.rotation_difference(final_rotation).angle
-                ), 4)
-            else:
-                orientation_error_deg = None
-            if not all(math.isfinite(x) for x in final_rotation_deg) or (
-                orientation_error_deg is not None
-                and not math.isfinite(orientation_error_deg)
-            ):
-                raise ValueError(f"POST_ROM_NONFINITE_ORIENTATION: {name}")
-            extra = dict(
-                actual_rotation_deg=final_rotation_deg,
-                orientation_error_deg=orientation_error_deg,
-            )
-        else:
-            reach_limit = MAX_LEG_REACH
-            is_reachable = (requested_reach_m <= reach_limit + 1e-4)
-            strictly_in_reach = is_reachable  # retain WBC foot convention
-            orientation_error_deg = None
-            extra = {}  # WBC foot feedback has no actual orientation metric
-
-        reconciled[name] = replace(
-            fb,
-            actual_world_xyz=actual,
-            position_error_m=error_m,
-            is_reachable=is_reachable,
-            strictly_in_reach=strictly_in_reach,
-            reach_distance_m=actual_reach_m,
-            **extra,
-        )
-        max_error = max(max_error, error_m)
-
-        if not is_reachable or error_m > position_tolerance_m:
-            all_reachable = False
-            diagnoses.append(UnmetConstraint(
-                category="REACHABILITY",
-                target_name=name,
-                description=(
-                    f"Final post-ROM {name} requested reach {requested_reach_m:.6f}m "
-                    f"(limit {reach_limit:.6f}m); final tracking error "
-                    f"{error_m:.6f}m (tolerance {position_tolerance_m:.6f}m)"
-                ),
-                error_amount=error_m,
-                details={
-                    "requested_reach": requested_reach_m,
-                    "applied_reach": actual_reach_m,
-                    "max_reach": reach_limit,
-                },
-            ))
-        if (kind == "hand" and orientation_error_deg is not None
-                and orientation_error_deg > orientation_tolerance_deg):
-            diagnoses.append(UnmetConstraint(
-                category="ORIENTATION_ERROR",
-                target_name=name,
-                description=(
-                    f"Final post-ROM {name} orientation error "
-                    f"{orientation_error_deg:.4f}deg exceeds "
-                    f"{orientation_tolerance_deg:.4f}deg"
-                ),
-                error_amount=orientation_error_deg,
-            ))
-
-    # Atomic result publication: no mutation of frozen EndEffectorFeedback,
-    # original result, original diagnoses, Blender scene, or temporal caches.
-    return replace(
-        result,
-        success=(
-            bool(result.success)
-            and not result.has_rom_violation
-            and all_reachable
-            and not diagnoses
-        ),
-        end_effectors=reconciled,
-        unmet_constraints=diagnoses,
-        max_end_effector_error_m=max_error,
-        is_all_reachable=all_reachable,
-    )
-
-
 class KinematicBridgeExecutor:
     """Executes the strict 6-phase single-frame motion pipeline via WholeBodyController."""
 
@@ -593,6 +395,57 @@ class KinematicBridgeExecutor:
                 f"Resolved effective_dt={effective_dt!r} (from {dt_source}) must be finite and strictly greater than 1e-9s"
             )
 
+        # [INTRODUCED 2026-11-27T21:22:00+08:00]
+        # FUNCTION: KinematicBridgeExecutor.execute_frame.mass_distribution_consistency_gate
+        # PURPOSE: Reject physically inconsistent BodyMassDistribution parameters across controller, kinematics_tracker, and inertia_model before WBC pose solving without relying on model_name or creating a global registry.
+        # REASON: TASK 12-C BUG-02
+        mass_dists = (
+            ("controller", getattr(self.controller, "mass_distribution", None)),
+            ("kinematics_tracker", getattr(self.kinematics_tracker, "mass_distribution", None)),
+            ("inertia_model", getattr(self.inertia_model, "mass_distribution", None)),
+        )
+        ref_owner, ref_dist = mass_dists[0]
+        if ref_dist is None or not hasattr(ref_dist, "total_mass_kg") or not hasattr(ref_dist, "segments"):
+            raise ValueError(f"Missing valid mass_distribution on {ref_owner}")
+        ref_segments = {seg.segment_id: seg for seg in ref_dist.segments}
+        for owner_name, dist in mass_dists[1:]:
+            if dist is ref_dist:
+                continue
+            if dist is None or not hasattr(dist, "total_mass_kg") or not hasattr(dist, "segments"):
+                raise ValueError(f"Missing valid mass_distribution on {owner_name}")
+            if not math.isclose(float(dist.total_mass_kg), float(ref_dist.total_mass_kg), rel_tol=1e-9, abs_tol=1e-9):
+                raise ValueError(
+                    f"Mass distribution total_mass_kg mismatch between {ref_owner} "
+                    f"({ref_dist.total_mass_kg}) and {owner_name} ({dist.total_mass_kg})"
+                )
+            cand_segments = {seg.segment_id: seg for seg in dist.segments}
+            if len(cand_segments) != len(dist.segments) or set(cand_segments.keys()) != set(ref_segments.keys()):
+                raise ValueError(
+                    f"Mass distribution segment mapping mismatch between {ref_owner} and {owner_name}"
+                )
+            for seg_id, ref_seg in ref_segments.items():
+                cand_seg = cand_segments[seg_id]
+                if cand_seg.bone_name != ref_seg.bone_name:
+                    raise ValueError(
+                        f"Mass distribution bone_name mismatch for segment '{seg_id}' between "
+                        f"{ref_owner} ({ref_seg.bone_name!r}) and {owner_name} ({cand_seg.bone_name!r})"
+                    )
+                if not (
+                    math.isclose(float(cand_seg.mass_ratio), float(ref_seg.mass_ratio), rel_tol=1e-9, abs_tol=1e-9)
+                    and math.isclose(float(cand_seg.nominal_length), float(ref_seg.nominal_length), rel_tol=1e-9, abs_tol=1e-9)
+                    and math.isclose(float(cand_seg.local_com_fraction), float(ref_seg.local_com_fraction), rel_tol=1e-9, abs_tol=1e-9)
+                    and len(cand_seg.local_com_offset) == 3
+                    and len(ref_seg.local_com_offset) == 3
+                    and all(
+                        math.isclose(float(a), float(b), rel_tol=1e-9, abs_tol=1e-9)
+                        for a, b in zip(cand_seg.local_com_offset, ref_seg.local_com_offset)
+                    )
+                ):
+                    raise ValueError(
+                        f"Mass distribution physical parameter mismatch for segment '{seg_id}' between "
+                        f"{ref_owner} and {owner_name}"
+                    )
+
         # ---------------------------------------------------------------------
         # Phase 1: Planning / Target Packaging
         # ---------------------------------------------------------------------
@@ -626,29 +479,11 @@ class KinematicBridgeExecutor:
         # ---------------------------------------------------------------------
         bpy.context.view_layer.update()
 
-        # Telemetry A: Center of Mass (CoM)
-        com_res = compute_whole_body_com(arm, self.controller.mass_distribution, update_scene=False)
+        # Telemetry A: Authoritative Whole-Body CoM from WBC result
+        com_res = wbc_res.com_result
         com_world = com_res.com_world
 
-        # Telemetry B: Differential Kinematics (non-publishing until final frame commit)
-        kin_result = self.kinematics_tracker.sample_and_update(
-            time_sec=time_sec_f,
-            frame=frame,
-            dt=effective_dt,
-            commit=False,
-        )
-
-        # Telemetry C: Rigid Link Inertia Tensor & Whole-Body Angular Momentum
-        inertia_state = compute_whole_body_inertia(
-            armature_obj=arm,
-            velocity_state=kin_result.velocity,
-            inertia_model=self.inertia_model,
-            update_scene=False,
-            time_sec=planned.time_seconds,
-            frame=frame,
-        )
-
-        # Telemetry D: Multi-Limb Contact State & Decoupled Semantics
+        # Telemetry B: Multi-Limb Contact State & Geometric Compliance Validation
         surfaces: List[EnvironmentalSurface] = list(self.surfaces) if self.surfaces else []
         active_limb_targets: Dict[str, Dict[str, Any]] = {}
 
@@ -859,27 +694,40 @@ class KinematicBridgeExecutor:
                     )
                 )
 
+        # [INTRODUCED 2026-11-27T21:22:20+08:00]
+        # FUNCTION: KinematicBridgeExecutor.execute_frame.effective_contact_and_com_telemetry
+        # PURPOSE: Derive effective contact booleans from MultiContactState.effective_contacts after ContactModel validation and forward them together with authoritative wbc_res.com_result into BodyKinematicsTracker and BodyInertia without duplicate CoM computation or overwritten contact_states loops.
+        # REASON: TASK 12-C BUG-02, BUG-03 & BUG-04
+        effective_contacts = multi_contact.effective_contacts
+        contacts_override = {
+            limb_key: (limb_key in effective_contacts)
+            for limb_key in ("foot_L", "foot_R", "hand_L", "hand_R")
+        }
+
+        # Telemetry C: Differential Kinematics (non-publishing until final frame commit)
+        kin_result = self.kinematics_tracker.sample_and_update(
+            time_sec=time_sec_f,
+            frame=frame,
+            dt=effective_dt,
+            commit=False,
+            com_result=com_res,
+            contacts_override=contacts_override,
+        )
+
+        # Telemetry D: Rigid Link Inertia Tensor & Whole-Body Angular Momentum
+        inertia_state = compute_whole_body_inertia(
+            armature_obj=arm,
+            velocity_state=kin_result.velocity,
+            inertia_model=self.inertia_model,
+            update_scene=False,
+            time_sec=time_sec_f,
+            frame=frame,
+            com_result=com_res,
+        )
+
         # ---------------------------------------------------------------------
         # Phase 6: MotionState Assembly, Gated Keyframing & State Commit
         # ---------------------------------------------------------------------
-        # Assemble legacy & contact states
-        contact_states: Dict[str, ContactPointState] = {}
-        for side in ("L", "R"):
-            limb_key = f"foot_{side.lower()}"
-            is_locked = (planned.foot_L.is_locked if side == "L" else planned.foot_R.is_locked)
-            eff_fb = wbc_res.end_effectors.get(f"foot_{side}")
-            contact_states[limb_key] = ContactPointState(
-                limb=limb_key,
-                phase="stance" if is_locked else "swing",
-                is_locked=is_locked,
-                contact_world_xyz=eff_fb.actual_world_xyz if eff_fb else (0.0, 0.0, 0.0),
-                current_world_xyz=eff_fb.actual_world_xyz if eff_fb else (0.0, 0.0, 0.0),
-                drift_m=eff_fb.position_error_m if eff_fb else 0.0,
-                hip_to_target_dist=eff_fb.reach_distance_m if eff_fb else 0.0,
-                is_reachable=eff_fb.is_reachable if eff_fb else True,
-                strictly_in_reach=eff_fb.strictly_in_reach if eff_fb else True,
-            )
-
         root_world = root.location.to_tuple() if root is not None else (0.0, 0.0, 0.0)
         fx, fy, _ = forward_unit_vector_from_yaw(planned.root_yaw_deg)
         planned_vel = (fx * planned.speed_mps, fy * planned.speed_mps, 0.0)
@@ -893,7 +741,6 @@ class KinematicBridgeExecutor:
             acceleration=planned_acc,
             mode=planned.motion_mode,
             gait_phase=planned.gait_phase,
-            contacts=contact_states,
             is_airborne=planned.is_flight,
             params={
                 "step_index": planned.active_step_index,
