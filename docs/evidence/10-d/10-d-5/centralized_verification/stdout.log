@@ -1,0 +1,104 @@
+
+=== [contracts_t01_t15] cmd: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe -B C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-5\centralized_verification\verify_contracts_t01_t15.py (rc=0) ===
+[t02_t03_hist_9f5f8250] rc=0
+racterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['TerrainWalk_route_traversal']): frames 1..128 (@ 24 FPS), root Y 10.2000m -> 11.4000m (disp=1.2000m, peak_speed=0.4873m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, 0.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+CONTRACTS_WORKER_OK baseline
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit
+
+[t02_t03_cur_head] rc=0
+racterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['TerrainWalk_route_traversal']): frames 1..128 (@ 24 FPS), root Y 10.2000m -> 11.4000m (disp=1.2000m, peak_speed=0.4873m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, 0.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+CONTRACTS_WORKER_OK baseline
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit
+
+[t01_t15_contracts] rc=0
+r parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'run']): frames 1..276 (@ 24 FPS), root Y -8.0000m -> -4.0775m (disp=3.9225m, peak_speed=0.9000m/s, unreachable=0)
+Extensions: writing cache failed ([WinError 5] 拒绝访问。: 'C:\\Users\\64701\\AppData\\Roaming\\Blender Foundation\\Blender').
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, 0.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['start_stop_walk', 'run']): frames 1..276 (@ 24 FPS), root Y -8.0000m -> -4.5311m (disp=3.4689m, peak_speed=0.7467m/s, unreachable=0)
+CONTRACTS_WORKER_OK contracts
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit
+
+ALL_CONTRACTS_T01_T15_PASSED
+
+=== [scenes_t16_t17] cmd: C:\Program Files\Blender Foundation\Blender 5.1\5.1\python\bin\python.exe -B C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\docs\evidence\10-d\10-d-5\centralized_verification\generate_and_verify_scenes.py (rc=0) ===
+[generate_scene1] rc=0
+oles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 5 action(s) (['start_stop_walk', 'Central_TerrainWalk', 'sprint_start', 'sprint_brake', 'run']): frames 1..1026 (@ 24 FPS), root Y 8.9400m -> 34.0458m (disp=25.1058m, peak_speed=2.0000m/s, unreachable=0)
+[STAGE_METRICS] StartStopWalk frames=1..204 L(ua=64.1, fa=56.5, hd=34.2, w=0.755) R(ua=67.9, fa=50.7, hd=33.3, w=0.812)
+[STAGE_METRICS] TerrainWalk frames=205..768 L(ua=34.9, fa=41.2, hd=26.3, w=0.347) R(ua=64.7, fa=56.7, hd=29.4, w=0.747)
+[STAGE_METRICS] SprintStart frames=769..882 L(ua=62.5, fa=52.0, hd=32.4, w=0.666) R(ua=21.8, fa=30.6, hd=18.2, w=0.175)
+[STAGE_METRICS] SprintBrake frames=883..930 L(ua=31.8, fa=39.5, hd=18.8, w=0.526) R(ua=9.9, fa=15.4, hd=15.9, w=0.132)
+[STAGE_METRICS] Run frames=931..1026 L(ua=64.0, fa=56.1, hd=31.7, w=0.900) R(ua=48.1, fa=56.3, hd=32.3, w=0.779)
+Info: Saved as "task10d_centralized_whole_body.blend"
+SCENE_WORKER_OK generate
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit
+
+[reopen_scene1] rc=0
+[generate_scene2] rc=0
+IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['run']): frames 1..528 (@ 24 FPS), root Y 0.0000m -> 19.7625m (disp=19.7625m, peak_speed=0.9000m/s, unreachable=0)
+[STAGE_METRICS] win_00_04s_FK_FK frames=1..96 L(ua=51.9, fa=52.3, hd=31.9, w=0.967) R(ua=59.2, fa=46.7, hd=21.8, w=0.871)
+[STAGE_METRICS] win_04_07s_IK_FK frames=97..180 L(ua=33.9, fa=36.4, hd=24.4, w=0.306) R(ua=54.1, fa=39.8, hd=31.8, w=0.369)
+[STAGE_METRICS] win_07_14s_IK_IK frames=181..348 L(ua=28.9, fa=23.0, hd=26.3, w=0.279) R(ua=25.4, fa=34.8, hd=24.7, w=0.312)
+[STAGE_METRICS] win_14_18s_FK_IK frames=349..432 L(ua=51.6, fa=44.5, hd=30.9, w=0.599) R(ua=18.1, fa=28.8, hd=27.1, w=0.290)
+[STAGE_METRICS] win_18_22s_FK_FK frames=433..528 L(ua=69.3, fa=49.7, hd=24.1, w=0.838) R(ua=64.3, fa=64.4, hd=24.2, w=0.764)
+Info: Saved as "task10d_running_whole_body.blend"
+SCENE_WORKER_OK generate
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+
+Blender quit
+
+[reopen_scene2] rc=0
+SCENES_AND_REOPEN_PASSED
+
+RUN_ALL_SUMMARY exit_code=0
