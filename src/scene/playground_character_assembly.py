@@ -84,7 +84,7 @@ from src.rig.builder import (
     build_rig,
 )
 from src.rig.foot_contact import (
-    evaluate_foot_support,
+    get_foot_support_state,
     lock_foot_contact,
     move_character_root_with_support,
     unlock_foot_contact,
@@ -723,7 +723,11 @@ def run_minimal_control_stages_verification(
             is_flight=False,
         )
         res_d = bridge.execute_frame(pose_d, keyframe=False, dt=dt)
-        sup_l = evaluate_foot_support(arm_obj, "L")
+        # [INTRODUCED 2026-11-27T17:20:00+08:00]
+        # BLOCK: post-bridge Stage D pure support state query
+        # PURPOSE: Read post-WBC solved support state without invoking active support maintenance writes or scene refreshes.
+        # REASON: TASK 11-B (FIND-R3-04) — eliminate redundant active maintenance writes after bridge.execute_frame() in scene assembly.
+        sup_l = get_foot_support_state(arm_obj, "L")
         ik_l_obj = bpy.data.objects[IK_TARGET_NAMES["L"]]
 
         if step_idx in (0, 4):

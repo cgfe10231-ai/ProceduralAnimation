@@ -294,14 +294,24 @@ def reset_leg_ik(armature_obj: Optional[bpy.types.Object] = None) -> None:
     bpy.context.view_layer.update()
 
 
-def get_leg_ik_state(armature_obj: Optional[bpy.types.Object], side: str) -> dict:
+# [INTRODUCED 2026-11-27T17:20:00+08:00]
+# FUNCTION: get_leg_ik_state
+# PURPOSE: Add keyword-only update_scene: bool = True gate so callers performing pure read-only queries can read already-evaluated scene state without forcing view_layer.update().
+# REASON: TASK 11-B (FIND-R3-04) — eliminate hidden scene dependency-graph refresh side effects during pure foot support queries while preserving historical default behavior.
+def get_leg_ik_state(
+    armature_obj: Optional[bpy.types.Object],
+    side: str,
+    *,
+    update_scene: bool = True,
+) -> dict:
     """Inspect current world-space IK positions, target error, knee bend, and foot grounding."""
     side = side.upper()
     if side not in ("L", "R"):
         raise ValueError(f"Invalid leg side '{side}', expected 'L' or 'R'")
 
     arm = _resolve_armature(armature_obj)
-    bpy.context.view_layer.update()
+    if update_scene:
+        bpy.context.view_layer.update()
 
     p_thigh = arm.pose.bones[f"thigh.{side}"]
     p_shin = arm.pose.bones[f"shin.{side}"]
