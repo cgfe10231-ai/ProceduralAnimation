@@ -729,8 +729,10 @@ class WholeBodyController:
                     raw_pt = ik_obj.get("contact_world_xyz") if ik_obj is not None else None
                     cur_locked_pt = tuple(raw_pt) if raw_pt is not None else ()
                     loc_diff = math.dist(cur_locked_pt, contact_ground_xyz) if len(cur_locked_pt) == 3 else 999.0
-                    # [TASK 12-A BUG-03] Compare locked target orientation in normalized SO(3) space
-                    # alongside position so locked-foot rotation updates re-lock instead of reusing stale pose.
+                    # [INTRODUCED 2026-11-27T20:37:14+08:00]
+                    # FUNCTION: WholeBodyController._execute_frame_dispatch.foot_lock_rotation_check
+                    # PURPOSE: Compare locked foot target orientation against ik_obj target_rotation_deg in normalized SO(3) space so rotation changes trigger re-locking instead of reusing stale support.
+                    # REASON: TASK 12-A BUG-03
                     rot_diff_deg = 0.0
                     if foot_tgt.target_rotation_deg is not None:
                         raw_rot = ik_obj.get("target_rotation_deg") if ik_obj is not None else None
@@ -804,9 +806,10 @@ class WholeBodyController:
         # ---------------------------------------------------------------------
         # 5. Anatomical Joint ROM Validation (Evaluated Active Pose)
         # ---------------------------------------------------------------------
-        # [TASK 12-A BUG-01] Validate pre-clamp anatomical ROM and apply optional
-        # clamping before measuring final limb feedback and CoM so all telemetry
-        # reflects one consistent final solved frame.
+        # [INTRODUCED 2026-11-27T20:37:14+08:00]
+        # FUNCTION: WholeBodyController._execute_frame_dispatch.post_rom_feedback_pipeline
+        # PURPOSE: Validate anatomical ROM and apply optional clamping before unified limb feedback and CoM measurement so all pose telemetry reflects one solved final frame.
+        # REASON: TASK 12-A BUG-01
         rom_validation = self.joint_model.validate_armature_pose(arm, use_evaluated_ik=True)
         if not rom_validation.is_valid:
             for b_name, viol in rom_validation.violations.items():
@@ -840,8 +843,10 @@ class WholeBodyController:
         # Evaluate Foot IK tracking
         for side, foot_tgt in leg_targets:
             eff_id = f"foot_{side}"
-            # [TASK 12-A BUG-02] Treat zero/non-positive weight leg targets as inactive,
-            # matching leg dispatch and hand feedback semantics.
+            # [INTRODUCED 2026-11-27T20:37:14+08:00]
+            # FUNCTION: WholeBodyController._execute_frame_dispatch.leg_zero_weight_guard
+            # PURPOSE: Treat zero or non-positive weight leg targets as inactive in EndEffectorFeedback and constraint checks, matching leg dispatch and hand feedback semantics.
+            # REASON: TASK 12-A BUG-02
             if foot_tgt is None or not foot_tgt.enabled or foot_tgt.weight <= 0.0:
                 p_foot = arm.pose.bones.get(f"foot.{side}")
                 actual_pos = (arm.matrix_world @ p_foot.head).to_tuple() if p_foot else (0.0, 0.0, 0.0)
@@ -882,7 +887,7 @@ class WholeBodyController:
                 )
 
             if clamped_rom:
-                rom_conflict_errors[eff_id] = float(leg_state["target_error"])
+                rom_conflict_errors[eff_id] = pos_err
 
             effectors_feedback[eff_id] = EndEffectorFeedback(
                 effector_id=eff_id,
@@ -952,7 +957,7 @@ class WholeBodyController:
                 )
 
             if clamped_rom:
-                rom_conflict_errors[eff_id] = float(arm_state["target_error"])
+                rom_conflict_errors[eff_id] = pos_err
 
             actual_rot_deg = tuple(arm_state["hand_world_euler_deg"]) if arm_state.get("hand_world_euler_deg") is not None else None
             effectors_feedback[eff_id] = EndEffectorFeedback(
@@ -971,6 +976,10 @@ class WholeBodyController:
                 max_reach_m=MAX_ARM_REACH,
             )
 
+        # [INTRODUCED 2026-11-27T20:45:05+08:00]
+        # FUNCTION: WholeBodyController._execute_frame_dispatch.post_rom_conflict_emission
+        # PURPOSE: Emit ROM_CONFLICT diagnostics from post-clamp original requested target errors (pos_err) for active effectors without re-querying limb IK state.
+        # REASON: TASK 12-A BUG-01
         if clamped_rom:
             for eff_id in ("hand_L", "hand_R", "foot_L", "foot_R"):
                 if eff_id in rom_conflict_errors:
