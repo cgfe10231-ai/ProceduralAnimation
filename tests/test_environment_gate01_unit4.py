@@ -332,7 +332,7 @@ class TestEnvironmentGate01Unit4(unittest.TestCase):
         self.assertFalse(geom_err.is_valid)
         self.assertIn("NO_SUPPORT_SURFACE", geom_err.violation_reason)
         # Assert contact was NOT faked as established on Z=0
-        rec_l = bridge.last_multi_contact.contacts["foot_L"]
+        rec_l = result.multi_contact.contacts["foot_L"]
         self.assertNotEqual(rec_l.lifecycle, ContactLifecycle.ESTABLISHED)
         self.assertEqual(rec_l.surface_id, "none")
 
