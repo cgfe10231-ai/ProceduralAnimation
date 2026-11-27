@@ -4,7 +4,7 @@
 > **登记口径**：统一历史 Finding **16项**，**16 CLOSED / 0 OPEN**；不增删、不重编号。
 > **Task 12 关闭项**：`Task 12-A/B/C/D` `COMPLETED`，**`Task 12-D BUG-01` `CLOSED`**，**`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**。
 > **验收事实**：WBC A01–A20 `20/20`、Bridge B01–B19 `19/19`、C01–C16+10-C Retirement `17/17`、连续生产链 `PASS`、B20 场景重开 `2/2`、历史 WBC `6/6`、10-D T01–T15 `15/15`、Task 11 FootLock `38/38`、09-B `27/27`、地面高度 `20/20`、初始化/重置 `6/6`、历史 Bridge `14/14`、`quick` `19/19`、`physics` `27/27`、`motion` `12/12`、`full` `42/42` 全部 `rc=0`（`FAILED=SKIPPED=NOT_RUN=0`；Task 12 人工视觉验收登记为 `OWNER WAIVED`；B19 保留部分 F-Curve 残余风险记录；10-D 复验 `head` 字段保留旧常量但实际运行于当前仓库）。
-> **下一节点与阶段门禁**：**`Task 7B-1` — `AUDIT ONLY — OWNER AUTHORIZED`**（禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计）；**`Phase 7C`** 保持 `NOT AUTHORIZED`（19 骨骼运动学管线与 6-DOF 数值动力学管线尚未完成合流）。
+> **下一节点与阶段门禁**：**`Task 7B-1` — `VERIFICATION PREPARATION — OWNER AUTHORIZED`**（分支 `task/7b-1` 基于主干 `d1645452`；仅授权准备 `tests/verify_task7b1_environment_targets.py` T01–T12，禁止修改 `src/` 或运行测试/Blender，等待 ChatGPT 独立 Diff 审查）；**`Phase 7C`** 保持 `NOT AUTHORIZED`（19 骨骼运动学管线与 6-DOF 数值动力学管线尚未完成合流）。
 > **独立问题域**：10-B 的 `CORE_REPAIR_LEDGER.md` 21项冻结记录与 12 项架构合同定义保持原定义，不混入 16 项历史 Finding 编号。
 
 ---
@@ -22,7 +22,7 @@
 | Task 10（整体） | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 10-A / 10-B / 10-C / 10-D 全部完成 |
 | Task 11（`11-A` + `11-B`） | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | 正式关闭 `FIND-R3-03`、`FIND-R3-04`；证据 `docs/evidence/11/unified_verification/` |
 | **Task 12 / PKG-5（含 BUG-01）** | **`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`** | `12-A/B/C/D COMPLETED`、`12-D BUG-01 CLOSED`；证据 `docs/evidence/12/final_acceptance/`（`eee276b39d` / `90f4628a0c` / `e15d342b80`） |
-| **Task 7B-1** | **`AUDIT ONLY — OWNER AUTHORIZED`** | 下一节点；待 ChatGPT 独立源码审计，禁止自行编码 |
+| **Task 7B-1** | **`VERIFICATION PREPARATION — OWNER AUTHORIZED`** | 下一节点；仅授权准备 `tests/verify_task7b1_environment_targets.py` (T01–T12) 及五份指定文档同步，待 ChatGPT 独立 Diff 审查 |
 | Phase 7C | `NOT AUTHORIZED` | 19 骨骼运动学管线与 6-DOF 数值动力学管线仍独立，尚未完成 7C 合流 |
 
 ---
@@ -576,7 +576,7 @@ flowchart TD
      - `09-B`：世界旋转、有效父级变换、状态完整性及解锁事务补强已完成，最近节点 09-B-4 为 `ACCEPTED — VERIFIED`；
      - `10 Upper-Limb IK/FK`：10-A 已归档；10-B `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`）；10-C `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`f2501ddc7d610d554d1e813b13564ea56ce2b51a`）；10-D `NEXT — AUDIT ONLY — NOT STARTED`；
      - `11 FootLock`：`FIND-R3-03` 与 `FIND-R3-04` 已于 Task 11（`11-A` + `11-B`）关闭并合并至 `master`；
-     - `12 联合验收`：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`Task 12-A/B/C/D COMPLETED`，`Task 12-D BUG-01 CLOSED`，`eee276b39d` / `90f4628a0c` / `e15d342b80`）；**PKG-5 全部完成并合入 `master`**；下一节点 `Task 7B-1`（`AUDIT ONLY — OWNER AUTHORIZED`）。
+     - `12 联合验收`：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`Task 12-A/B/C/D COMPLETED`，`Task 12-D BUG-01 CLOSED`，`eee276b39d` / `90f4628a0c` / `e15d342b80` / `d1645452`）；**PKG-5 全部完成并合入 `master`**；下一节点 `Task 7B-1`（`VERIFICATION PREPARATION — OWNER AUTHORIZED`）。
 
 ---
 
@@ -938,7 +938,7 @@ flowchart TD
 - 09-B：Lower-Limb World Rotation 与控制器生命周期合同，已完成；最近补强节点为 `09-B-4`。
 - 10：Upper-Limb IK/FK，已完成（`COMPLETED`：10-A 已归档；10-B `c45a40c`；10-C `f2501ddc`；10-D `824c52ec` / `7f14ff72`）。
 - 11：FootLock，已完成并合入主干（`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`，`added88a7e` / `07aec5d8`，`FIND-R3-03`、`FIND-R3-04` 正式关闭）。
-- 12：PKG-5 综合闭环与联合验收（**`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**，`12-A/B/C/D COMPLETED`、`12-D BUG-01 CLOSED`、`eee276b39d` / `90f4628a0c` / `e15d342b80`）；下一节点：**`Task 7B-1`（`AUDIT ONLY — OWNER AUTHORIZED`）**；**`Phase 7C`** 保持 `NOT AUTHORIZED`。
+- 12：PKG-5 综合闭环与联合验收（**`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`**，`12-A/B/C/D COMPLETED`、`12-D BUG-01 CLOSED`、`eee276b39d` / `90f4628a0c` / `e15d342b80` / `d1645452`）；下一节点：**`Task 7B-1`（`VERIFICATION PREPARATION — OWNER AUTHORIZED`）**；**`Phase 7C`** 保持 `NOT AUTHORIZED`。
 
 09-B-4 是当前已接受的最新补强节点，不得自动衍生 09-B-5。
 

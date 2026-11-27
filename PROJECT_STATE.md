@@ -2,7 +2,7 @@
 
 > 状态核验日期：2026-11-27
 > **Task 12 / PKG-5 已验收冻结基线**：冻结生产源码基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据提交 `e15d342b805ef45e7d54db2edf1c2804973e81a7`（收归分支 `task/12` 合并至 `master`）；Task 11 历史基线：`added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`（收归 `task/11`）；Task 10-D 历史基线 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`（收归 `task/10-d`）；10-C 历史收归基线 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`、回归基线 `2f248bf4b98776222e37bc3228506a4fb85f7c32`、证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`。
-> **当前状态：`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；原 16 项历史 Finding 已全部关闭（16 CLOSED / 0 OPEN）；下一节点：`Task 7B-1`（`AUDIT ONLY — OWNER AUTHORIZED`）；`Phase 7C`：`NOT AUTHORIZED`。**
+> **当前状态：`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`d16454528e28b46e9cc60f9f6e1a10a7241eb551`）；原 16 项历史 Finding 已全部关闭（16 CLOSED / 0 OPEN）；下一节点：`Task 7B-1`（`VERIFICATION PREPARATION — OWNER AUTHORIZED`，`task/7b-1`）；`Phase 7C`：`NOT AUTHORIZED`。**
 
 ## 1. 阶段状态
 | 节点 | 当前状态 | 准入 |
@@ -12,7 +12,7 @@
 | Task 11-A / 11-B (`FIND-R3-03` / `FIND-R3-04`) | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | FootLock 元数据生命周期与纯查询/支撑维持分离完成并合入 `master` |
 | **Task 12-A / 12-B / 12-C / 12-D** | **`COMPLETED`** | 12-A WBC 单帧与 ROM 后反馈收敛、12-B Bridge 提交门禁与 `effective_dt` 校验、12-C 所有权收敛、12-D 联合专项与四级最终回归全通过（`BUG-01 CLOSED`） |
 | **Task 12 / PKG-5（整体）** | **`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`** | 已通过独立验收并由负责人批准合入 `master` |
-| **Task 7B-1** | **`AUDIT ONLY — OWNER AUTHORIZED`** | 下一节点；仅授权 ChatGPT 独立源码审计，**禁止自行开始 Task 7B-1 编码** |
+| **Task 7B-1** | **`VERIFICATION PREPARATION — OWNER AUTHORIZED`** | 基于 `master` `d1645452` 切出 `task/7b-1`；仅授权准备 `tests/verify_task7b1_environment_targets.py` (T01–T12) 与指定文档同步，**禁止修改 `src/`、禁止运行测试/Blender、禁止推进 7B-2～7B-4**，待 ChatGPT 独立 Diff 审查 |
 | Phase 7C | `NOT AUTHORIZED` | 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流 |
 
 ### Task 10-C 子节点职责摘要
@@ -68,6 +68,6 @@
 ## 5. Git / 文档边界
 - **Task 12 / PKG-5** 冻结生产基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`、冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`、最终验收证据提交 `e15d342b805ef45e7d54db2edf1c2804973e81a7` 经由 `task/12` 收归 `master`。
 - Task 11（`added88a7e` / `07aec5d8`）、Task 10-D（`824c52ec` / `7f14ff72`）、10-C（`f2501ddc`）、10-B（`c45a40c` / `2f248bf` / `dcf3057`）历史收归记录保持不变。
-- **下一节点为 `Task 7B-1`（`AUDIT ONLY — OWNER AUTHORIZED`）**；禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计；`Phase 7C` 保持 `NOT AUTHORIZED`。
+- **下一节点为 `Task 7B-1`（`VERIFICATION PREPARATION — OWNER AUTHORIZED`）**，仅验证 `output/dynamics_playground.blend` 真实 Mesh 查询获取环境三维目标（复用 `create_mesh_backed_dynamics_query()`、`BlenderMeshEnvironmentAdapter`、`DynamicsEnvironmentQuery.query_spatial_surface()`、`SurfaceQueryResult`），7B-2 至 7B-4 尚未开放编码；`Phase 7C` 保持 `NOT AUTHORIZED`。
 - 当前事实优先级：真实源码与对应版本测试证据 → 本文件 / `ARCHITECTURE_SYNC.md` / `OPEN_FINDINGS.md` 相互核对 → `AI_SYNC.md`、`HANDOFF.md` 摘要。
 - 历史细节由既有 `CHANGELOG.md`、冻结账本及 `docs/evidence/` 保存；本状态文件不复制旧轮次日志与历史过程。

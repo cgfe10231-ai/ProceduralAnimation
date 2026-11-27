@@ -5,7 +5,7 @@
 
 ## 当前交接状态
 - **当前状态：`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`）。**
-- **下一节点：`Task 7B-1` — `AUDIT ONLY — OWNER AUTHORIZED`**（禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计）。
+- **下一节点：`Task 7B-1`（Environmental End-Effector Target Acquisition）— `VERIFICATION PREPARATION — OWNER AUTHORIZED`**（基于 `master` `d16454528e28b46e9cc60f9f6e1a10a7241eb551` 创建 `task/7b-1`，本轮仅准备 `tests/verify_task7b1_environment_targets.py` T01–T12 验证真实 `output/dynamics_playground.blend` Mesh 目标获取，不修改 `src/`，不运行 Blender/测试，7B-2～7B-4 尚未开放编码，等待 ChatGPT 独立 Diff 审查）。
 - **`Phase 7C`**：`NOT AUTHORIZED`。
 - **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义。
 
@@ -34,4 +34,4 @@
 4. 历史九项人工视觉待办保持原登记（10-D 两份场景 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend` 保持原验收登记）。
 5. 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流。
 - 历史归档目录：Task 12 BUG-01 过程保全 `docs/evidence/12/unified_verification/`（`c9c9a2d`）；Task 11 `docs/evidence/11/unified_verification/`；10-D `docs/evidence/10-d/`；10-C `docs/evidence/10-c-integration/`；10-B `docs/evidence/10b_sixlayer_split/regression/`。
-- Antigravity 完成本轮授权结项并合并后恢复 Markdown 默认只读并停止，禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计。
+- Antigravity 完成 `Task 7B-1` 专项验证脚本准备与本轮授权文档同步后恢复 Markdown 默认只读并停止，禁止自行运行 Blender/测试或推进 7B-2，等待 ChatGPT 独立 Diff 审查。

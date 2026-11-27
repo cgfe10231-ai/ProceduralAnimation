@@ -6,7 +6,7 @@
 ## 当前交接事实
 - **当前阶段：`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。**
 - **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义不变。
-- **下一工程节点：`Task 7B-1` — `AUDIT ONLY — OWNER AUTHORIZED`**（禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计）；**`Phase 7C`**：`NOT AUTHORIZED`。
+- **下一工程节点：`Task 7B-1`（Environmental End-Effector Target Acquisition）— `VERIFICATION PREPARATION — OWNER AUTHORIZED`**（分支 `task/7b-1` 基于主干 `d16454528e28b46e9cc60f9f6e1a10a7241eb551`，仅授权文档同步与新增独立专项脚本 `tests/verify_task7b1_environment_targets.py` T01–T12，禁止新增生产包装/查询模块、禁止运行 Blender 或测试、禁止推进 7B-2～7B-4 编码，等待 ChatGPT 独立 Diff 审查）；**`Phase 7C`**：`NOT AUTHORIZED`。
 - **Task 12 生产与测试冻结收敛（`eee276b39d` / `90f4628a0c`）**：
   - **12-A（WBC 单帧执行与反馈合同）**：`WholeBodyController` 收归 ROM 截断后最终四肢反馈、真实请求误差（`ROM_CONFLICT`）及状态原子回滚唯一所有权（`src/motion/whole_body_controller.py` Blob `230a86acaa92b580c5c0aad0e0cdacd7df224a7a`）。
   - **12-B（Bridge 帧提交与时间步准入）**：`KinematicBridgeExecutor.execute_frame()` 在 `effective_dt` 准入与 WBC/ContactModel 成功前禁止提交跨帧 7 项状态（`_last_time_sec`、`_last_frame`、`last_multi_contact`、`last_active_limb_targets`、`kinematics_tracker._prev_snapshot`/`_prev_velocity`/`_history`）（`src/motion/kinematic_bridge.py` Blob `4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`）。
@@ -21,4 +21,4 @@
   3. Task 12 人工视觉验收登记为 `OWNER WAIVED`。
   4. 历史九项人工视觉待办保持原登记（10-D 两份人工视觉资产 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend` 保持原验收登记）。
   5. 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流。
-- ChatGPT 负责独立审计、根因和架构边界；Antigravity 完成本次授权结项后恢复 Markdown 默认只读并停止，禁止自行开始 Task 7B-1 编码，等待 ChatGPT 独立源码审计。
+- ChatGPT 负责独立审计、根因和架构边界；Antigravity 完成 `Task 7B-1` 验证脚本准备与本轮授权文档同步后恢复 Markdown 默认只读，等待 ChatGPT 独立 Diff 审查与测试授权，禁止自行运行 Blender/测试或开始 7B-2 编码。
