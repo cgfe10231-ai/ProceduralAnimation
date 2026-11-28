@@ -30,11 +30,18 @@ from src.config import PipelineConfig
 from src.motion.body_inertia import (
     DEFAULT_15_SEGMENT_INERTIA_MODEL,
     BodyInertiaModel,
+    InertiaTensor,
     WholeBodyInertiaState,
     compute_whole_body_inertia,
     enrich_motion_state_with_inertia,
 )
-from src.motion.body_kinematics import BodyKinematicsTracker, enrich_motion_state_with_kinematics
+from src.motion.body_kinematics import (
+    BodyKinematicsTracker,
+    BodyMotionState,
+    BodyPoseSnapshot,
+    BodyVelocityState,
+    enrich_motion_state_with_kinematics,
+)
 from src.motion.contact_model import (
     ContactLifecycle,
     ContactRecord,
@@ -47,6 +54,12 @@ from src.motion.contact_model import (
     SupportType,
     enrich_motion_state_with_contacts,
     evaluate_limb_contacts_from_armature,
+)
+from src.motion.forward_dynamics import (
+    ForwardDynamicsState,
+    InertiaTensor3x3,
+    mat3_transpose,
+    quat_to_rot_matrix,
 )
 from src.motion.framework import (
     EnvironmentQuery,
@@ -270,6 +283,162 @@ def convert_planned_pose_to_wbc_targets(
         )
 
     return targets
+
+
+# [INTRODUCED 2026-11-28T17:47:36+08:00]
+# TASK: TASK 7C-1
+# FUNCTION: convert_body_motion_to_dynamics_state
+# PURPOSE: Convert a matched evaluated pose, velocity and inertia snapshot into an instantaneous equivalent rigid-body state.
+# REASON: Give forward dynamics a validated initial state and express the world inertia tensor in the body's frame.
+def convert_body_motion_to_dynamics_state(
+    body_motion: BodyMotionState,
+    inertia: WholeBodyInertiaState,
+) -> ForwardDynamicsState:
+    """Convert same-frame whole-body telemetry without updating either pipeline."""
+    if not isinstance(body_motion, BodyMotionState):
+        raise TypeError("body_motion must be a BodyMotionState")
+    if not isinstance(inertia, WholeBodyInertiaState):
+        raise TypeError("inertia must be a WholeBodyInertiaState")
+    pose, velocity = body_motion.pose, body_motion.velocity
+    tensor = inertia.inertia_tensor_body_com
+    if not isinstance(pose, BodyPoseSnapshot):
+        raise TypeError("body_motion.pose must be a BodyPoseSnapshot")
+    if not isinstance(velocity, BodyVelocityState):
+        raise TypeError("body_motion.velocity must be a BodyVelocityState")
+    if not isinstance(tensor, InertiaTensor):
+        raise TypeError("inertia.inertia_tensor_body_com must be an InertiaTensor")
+
+    if pose.frame is None or inertia.frame is None:
+        raise ValueError("pose.frame and inertia.frame are required")
+    for name, value in (("pose.frame", pose.frame), ("inertia.frame", inertia.frame)):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} must be a non-boolean integer")
+    if pose.frame != inertia.frame:
+        raise ValueError("pose.frame and inertia.frame must match")
+
+    for name, value, expected in (
+        ("reference_frame", inertia.reference_frame, "WORLD_Z_UP"),
+        ("reference_point", inertia.reference_point, "WHOLE_BODY_COM"),
+    ):
+        if not isinstance(value, str):
+            raise TypeError(f"inertia.{name} must be a string")
+        if value != expected:
+            raise ValueError(f"inertia.{name} must be {expected}")
+
+    segment_maps = (
+        ("pose.segment_positions", pose.segment_positions),
+        ("pose.segment_orientations", pose.segment_orientations),
+        ("velocity.segment_linear_velocities", velocity.segment_linear_velocities),
+        ("velocity.segment_angular_velocities", velocity.segment_angular_velocities),
+        ("inertia.segments", inertia.segments),
+    )
+    for name, segments in segment_maps:
+        if not isinstance(segments, Mapping):
+            raise TypeError(f"{name} must be a mapping of segment IDs")
+    segment_ids = set(inertia.segments)
+    if not segment_ids or any(set(segments) != segment_ids for _, segments in segment_maps):
+        raise ValueError("Pose, velocity and inertia segment IDs must match and be non-empty")
+
+    masses = [
+        (f"inertia.segments[{key!r}].mass_kg", getattr(segment, "mass_kg", None))
+        for key, segment in inertia.segments.items()
+    ]
+    scalars = [
+        ("pose.time_sec", pose.time_sec),
+        ("velocity.time_sec", velocity.time_sec),
+        ("inertia.time_sec", inertia.time_sec),
+        ("velocity.dt", velocity.dt),
+        ("inertia.total_mass_kg", inertia.total_mass_kg),
+        *masses,
+    ]
+    scalars.extend(
+        (f"inertia_tensor_body_com.{name}", getattr(tensor, name))
+        for name in ("ixx", "iyy", "izz", "ixy", "ixz", "iyz")
+    )
+
+    coordinates = {}
+    for name, values, length in (
+        ("pose.com_world", pose.com_world, 3),
+        ("inertia.com_world", inertia.com_world, 3),
+        ("velocity.com_linear_velocity", velocity.com_linear_velocity, 3),
+        ("inertia.com_linear_velocity", inertia.com_linear_velocity, 3),
+        ("inertia.angular_momentum_body_com", inertia.angular_momentum_body_com, 3),
+        ("pose.root_orientation_quat", pose.root_orientation_quat, 4),
+    ):
+        if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
+            raise TypeError(f"{name} must be a numeric sequence")
+        if len(values) != length:
+            raise ValueError(f"{name} must contain exactly {length} components")
+        coordinates[name] = tuple(values)
+        scalars.extend((f"{name}[{i}]", value) for i, value in enumerate(coordinates[name]))
+
+    for name, value in scalars:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(f"{name} must be a non-boolean number")
+        try:
+            finite = math.isfinite(value)
+        except OverflowError as exc:
+            raise ValueError(f"{name} must be finite") from exc
+        if not finite:
+            raise ValueError(f"{name} must be finite")
+
+    times = (pose.time_sec, velocity.time_sec, inertia.time_sec)
+    if min(times) < 0.0 or max(times) - min(times) > 1e-9:
+        raise ValueError("Pose, velocity and inertia timestamps must be non-negative and match")
+    if velocity.dt <= 1e-9:
+        raise ValueError("velocity.dt must be greater than 1e-9 seconds")
+    if inertia.total_mass_kg <= 0.0 or any(value <= 0.0 for _, value in masses):
+        raise ValueError("Whole-body and segment masses must be strictly positive")
+    try:
+        segment_mass = math.fsum(value for _, value in masses)
+    except OverflowError as exc:
+        raise ValueError("Summed segment mass must be finite") from exc
+    if abs(segment_mass / inertia.total_mass_kg - 1.0) > 1e-4:
+        raise ValueError("Summed segment mass must agree with inertia.total_mass_kg")
+
+    for left, right in (
+        ("pose.com_world", "inertia.com_world"),
+        ("velocity.com_linear_velocity", "inertia.com_linear_velocity"),
+    ):
+        if not all(
+            math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-6)
+            for a, b in zip(coordinates[left], coordinates[right])
+        ):
+            raise ValueError(f"{left} and {right} must agree")
+
+    orientation = coordinates["pose.root_orientation_quat"]
+    norm = math.hypot(*orientation)
+    if abs(norm - 1.0) > 1e-6:
+        raise ValueError("pose.root_orientation_quat must have unit length within 1e-6")
+    q = tuple(value / norm for value in orientation)
+
+    try:
+        moments = tensor.principal_moments()
+    except OverflowError as exc:
+        raise ValueError("Inertia tensor is outside the supported principal-moment range") from exc
+    if any(not math.isfinite(moment) or moment <= 0.0 for moment in moments):
+        raise ValueError("Inertia principal moments must be finite and strictly positive")
+    smallest, middle, largest = sorted(moments)
+    if largest > smallest + middle + 1e-6 * max(1.0, abs(largest)):
+        raise ValueError("Inertia principal moments violate the triangle inequality")
+
+    rotation = quat_to_rot_matrix(q)
+    inertia_world = InertiaTensor3x3.from_matrix(tensor.to_tuple())
+    if not inertia_world.is_positive_definite():
+        raise ValueError("World inertia tensor must be positive definite")
+    inertia_body = inertia_world.rotate(mat3_transpose(rotation))
+    if not inertia_body.is_positive_definite():
+        raise ValueError("Body inertia tensor must be positive definite")
+
+    return ForwardDynamicsState(
+        timestamp=pose.time_sec,
+        mass=inertia.total_mass_kg,
+        com_position_world=coordinates["inertia.com_world"],
+        com_velocity_world=coordinates["velocity.com_linear_velocity"],
+        angular_momentum_about_com_world=coordinates["inertia.angular_momentum_body_com"],
+        orientation_quat_world=q,
+        inertia_tensor_body=inertia_body,
+    )
 
 
 # =============================================================================
