@@ -30,12 +30,14 @@ Intended execution (strictly after ChatGPT independent Diff review authorization
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import hashlib
+import json
 import math
 import os
 import sys
 import unittest
+from uuid import uuid4
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -325,6 +327,7 @@ class _PipelineReadOnlyObserver:
     # REASON: TASK 7B-3 (Section 8, T01, T19) — Capture per-frame evaluated bone matrices and exact call counts without mocking or altering execution semantics.
     def __enter__(self) -> "_PipelineReadOnlyObserver":
         obs = self
+        run_id = uuid4().hex
         self._orig["query_cls_spatial"] = DynamicsEnvironmentQuery.query_spatial_surface
         self._orig["compute_hand_target"] = contact_model_mod.compute_hand_target_from_surface
         self._orig["planner_execute"] = MotionPlanner.execute
@@ -514,6 +517,28 @@ class _PipelineReadOnlyObserver:
                     ),
                 )
             )
+            # [INTRODUCED 2026-11-28T15:40:19+08:00]
+            # FUNCTION: _PipelineReadOnlyObserver.__enter__._spy_bridge_exec
+            # PURPOSE: Emit one structured evidence record from the captured Bridge frame snapshot.
+            # REASON: TASK 7B-3 evidence output — correlate frames by observer run ID for independent review.
+            snapshot = obs.frame_snapshots[-1]
+            evidence = {
+                **vars(snapshot),
+                "event": "task_7b_3_bridge_frame",
+                "run_id": run_id,
+                "hand_matrix_world_L": [tuple(row) for row in snapshot.hand_matrix_world_L],
+                "hand_matrix_world_R": [tuple(row) for row in snapshot.hand_matrix_world_R],
+                "rom_violations": {
+                    bone: asdict(violation) for bone, violation in snapshot.rom_violations.items()
+                },
+                "eff_feedback": {
+                    limb: asdict(feedback) for limb, feedback in snapshot.eff_feedback.items()
+                },
+                "unmet_constraints": [
+                    asdict(constraint) for constraint in snapshot.unmet_constraints
+                ],
+            }
+            print(json.dumps(evidence, ensure_ascii=True), flush=True)
             return res
 
         DynamicsEnvironmentQuery.query_spatial_surface = _spy_query  # type: ignore[method-assign]
@@ -1620,8 +1645,8 @@ class TestTask7B3EnvironmentHandIntegration(unittest.TestCase):
             ground_z=0.0,
         )
         miss_res = query.query_spatial_surface(
-            origin=(0.0, -8.0, 1.80),
-            direction=(0.0, 0.0, 1.0),
+            point_world=(0.0, -8.0, 1.80),
+            ray_direction=(0.0, 0.0, 1.0),
             max_distance=2.0,
         )
         self.assertFalse(miss_res.success)
@@ -1631,7 +1656,7 @@ class TestTask7B3EnvironmentHandIntegration(unittest.TestCase):
             compute_hand_target_from_surface("L", miss_res, (0.0, 1.0, 0.0))
 
         err_msg = str(ctx.exception)
-        self.assertIn("SurfaceQueryResult.success must be True", err_msg)
+        self.assertIn("surface query must succeed", err_msg)
         self.assertIn(str(miss_res.error_reason), err_msg)
         print(
             f"[7B-3][T11] miss_success={miss_res.success} error_reason={miss_res.error_reason!r} "
