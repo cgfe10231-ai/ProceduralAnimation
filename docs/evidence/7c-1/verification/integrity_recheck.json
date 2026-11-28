@@ -1,0 +1,1438 @@
+{
+  "frozen_head": "9311cfef22ac8c8651d97bcd9d00dca41dbb57fa",
+  "frozen_master": "57d8de66ceaf1bbae8c5877bb4d7790ecc183bd9",
+  "checked_at": "2026-11-28T18:21:34.170696+08:00",
+  "original_worktree": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+  "isolated_worktree": "C:\\Users\\64701\\AppData\\Local\\Temp\\procedural-7c1-8969d1e1966a47e69e24e6c9cdae8fd5\\repo",
+  "tracked_checks": {
+    "original": "PASS",
+    "isolated": "PASS"
+  },
+  "frozen_blobs_verified_in_both": {
+    "src/motion/kinematic_bridge.py": "a8adb757c38a3a3722c64b5a4552778b0d6c784b",
+    "tests/verify_task7c1_dynamics_state_conversion.py": "df787b7bb010e1512a6bcdec2a412de1380e3e9a",
+    "WORKFLOW_GOVERNANCE.md": "f84f2a8f7b689bd84ef144d729460209d29aacca",
+    ".gitignore": "022493cdeb99550ddff77fa08f482075c08df93c"
+  },
+  "original_untracked_protection": {
+    "status": "PASS",
+    "count": 15,
+    "files": {
+      "10B_正常初始化拆分顺序.md": "b2b2ed8172494b58dd957f05332db89f6f286896404770cc829da61a3533b356",
+      "P2_R1_recovery.patch": "cd71c9cabf2b0f1e4def23beef4d2551e0d08d66fab1ae4d9ca3e8d779d324ba",
+      "Untitled-1.cpp": "1740676e61fedbaf405309f9f906ef9e93d5a388d9e8a52ead9d0f19571a0bc5",
+      "apply_10b_md_update.py": "bcbc549754d98cc9a40876aa7105ac4a07447c7ba50f6c8b52158d19c01eb9ed",
+      "round05_exact_apply.py": "407bf6ed09083ff4a5ab6a2854828cb97c646d4d5e41f18af0d00fb367a85d6f",
+      "round05_exact_apply_v2.py": "c6bc8dcc1f287bb992b4816957c4c2fd9ff906573ce1a5105d08f45cb78424e7",
+      "round05_exact_apply_v3.py": "e0d8d69a2d372c3f7dd0ced15043bbab67d85cc58b084c11f09a47c5a2c43e0c",
+      "round05_exact_apply_v3_local.py": "e1b941eb66302c678f9be907f5f12e7071cbc77064088e68d33799fff61999f1",
+      "round05_validate_finalize_v3.py": "a1c4a1a98252601ad1800d2dbf7fb9355660f94532b5fe5649618eea22c0a4bd",
+      "second_tier_closeout/README.txt": "7a2f050305b9d765972d4839518c57206a591ef635b492fe133b577c0f4e536f",
+      "second_tier_closeout/closeout_second_tier.py": "43587b74b3fec704ef5cad391c3a57e47aaa7274f6c74d0a9e59f92ba80b74ad",
+      "second_tier_closeout/run_closeout.ps1": "329ce13c425d9b02142aa02885088d1725a79e62ec14a66aedfd691e1b8e4a94",
+      "second_tier_sync/READ_ME_FIRST.txt": "3789979952f7b5319d5b867cb652281d116f030986d153363b39246277022ffe",
+      "second_tier_sync/apply_second_tier.py": "7fe3d48dbf19919fc0f8cc188af097861a8b6eefbff24367770090ada3fbe5e2",
+      "second_tier_sync/run_second_tier_sync.ps1": "1ad6aabbf485f9d531947892bbb43fb37ef5bfbe6c4df4aef3df43c96a1defc7"
+    }
+  },
+  "python_cache_count": 124,
+  "python_caches": [
+    {
+      "path": "src/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 279,
+      "sha256": "cfacfc7faf9c0aa60a1a0a786a6a69c6898f494559262a7978e80663ca92f06d",
+      "source_path": "src/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/__pycache__/config.cpython-313.pyc",
+      "bytes": 21923,
+      "sha256": "13cccd2c47dedf344d5dc10e931513f666eecddad314e725fb8a64ceea5cc62a",
+      "source_path": "src/config.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/character/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 421,
+      "sha256": "cf6054ed6c605820855c72e4c83c16a68af75d7647ee342dc19cc7a0a0667f6a",
+      "source_path": "src/character/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/character/__pycache__/builder.cpython-313.pyc",
+      "bytes": 11510,
+      "sha256": "623366501c3a0a2665a1ed187e84730bcb66e7d54495aa3a218b2bf3c7b0cfad",
+      "source_path": "src/character/builder.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 7206,
+      "sha256": "dca52900991eec6251b32c5c61bd6588f112894b4a96559c5e1fbe92fdf0b51a",
+      "source_path": "src/motion/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/body_inertia.cpython-313.pyc",
+      "bytes": 38834,
+      "sha256": "1142006be590d60dea0711dfe7f8ac8f5a63c2c08e28efcb0ba56de610aae120",
+      "source_path": "src/motion/body_inertia.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/body_kinematics.cpython-313.pyc",
+      "bytes": 37944,
+      "sha256": "1ca1f3b7d406fe1e3973575754a63bb69e8088cf3e736153c840288c6ddb29e6",
+      "source_path": "src/motion/body_kinematics.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/closed_loop_dynamics.cpython-313.pyc",
+      "bytes": 45577,
+      "sha256": "5f825096343fdcf3a2759d29949ebc7f3f8978a4ced2ced55b394cba7b41fa57",
+      "source_path": "src/motion/closed_loop_dynamics.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/contact_dynamics.cpython-313.pyc",
+      "bytes": 33900,
+      "sha256": "4601c2e5e5d43b780dbc95f6e0369682648c1e33029746e9a130b015cf60b42b",
+      "source_path": "src/motion/contact_dynamics.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/contact_force_solver.cpython-313.pyc",
+      "bytes": 55705,
+      "sha256": "7c90b45519862afb2edd1ad0553ef6e5a706001059321a62c49435c178a58dfb",
+      "source_path": "src/motion/contact_force_solver.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/contact_model.cpython-313.pyc",
+      "bytes": 41316,
+      "sha256": "b862888bd44736f44eb2487b05dcb6e5390bcdf8a4c96c7fc29c48a7f75146ea",
+      "source_path": "src/motion/contact_model.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/forward_dynamics.cpython-313.pyc",
+      "bytes": 54240,
+      "sha256": "716c4bbd1b6cecf0aecc095909f3b0c01d46d288392856e4dfdd3309fc178a58",
+      "source_path": "src/motion/forward_dynamics.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/forward_walk.cpython-313.pyc",
+      "bytes": 10832,
+      "sha256": "8ddcaad8a8e335eb33f256bafa45363b4b3589090f5c3fff4cada9d2f45db340",
+      "source_path": "src/motion/forward_walk.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/framework.cpython-313.pyc",
+      "bytes": 88149,
+      "sha256": "f10438c7024ee2552749d88ae0eb56d728d0ebfe9c908233ae1efda579330b5d",
+      "source_path": "src/motion/framework.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/joint_limits.cpython-313.pyc",
+      "bytes": 36275,
+      "sha256": "55eeddbc2f6aec130fe0d3d5ec0538d1a15ac54cfe81d003d1c993cca2aa73ed",
+      "source_path": "src/motion/joint_limits.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/kinematic_bridge.cpython-313.pyc",
+      "bytes": 48944,
+      "sha256": "0e6895ebf19d743e7204577b75cecc846156a266a4bd8383b2d029f0fd8efe0f",
+      "source_path": "src/motion/kinematic_bridge.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/rigid_link.cpython-313.pyc",
+      "bytes": 16942,
+      "sha256": "0f45b6f2a7022c907d7d17162af15143a7269f9d8ca68a67d9dddfce01f09960",
+      "source_path": "src/motion/rigid_link.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/run_cycle.cpython-313.pyc",
+      "bytes": 24537,
+      "sha256": "967213ce69665a0b1d1450918381783e7aa57ea27a8b1773635afcfff2f6f8c0",
+      "source_path": "src/motion/run_cycle.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/sprint_brake.cpython-313.pyc",
+      "bytes": 24180,
+      "sha256": "d75e823ceeeff1e27dd2efb7c64049f21c38623273deb6b7c14b71f4a4b52267",
+      "source_path": "src/motion/sprint_brake.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/sprint_start.cpython-313.pyc",
+      "bytes": 27868,
+      "sha256": "db14a21eaed1b6d3715f6cf71394b84aec715177378bfd6f4c12ed4cd52eb544",
+      "source_path": "src/motion/sprint_start.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/start_stop_walk.cpython-313.pyc",
+      "bytes": 20244,
+      "sha256": "26d516edf526dc5e39ce85a326b00c98fb7f35fcd381cd2307dd7ddd2ca41718",
+      "source_path": "src/motion/start_stop_walk.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/terrain_walk.cpython-313.pyc",
+      "bytes": 63008,
+      "sha256": "880d70a0281b24674b487320434b3feb7b1d3d57c02c2c5e5638f2b7a338747c",
+      "source_path": "src/motion/terrain_walk.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/upper_limb_trajectory.cpython-313.pyc",
+      "bytes": 24256,
+      "sha256": "c528ccb59d4e47286ab39228e5e9ab7572f66f0a1ed8363bc7b6fc8ddbf8fb28",
+      "source_path": "src/motion/upper_limb_trajectory.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/walk_cycle.cpython-313.pyc",
+      "bytes": 12075,
+      "sha256": "9d50e7772dda8a3da05392f802e8d275b89bc9bc1853c48e7bc25173126135a2",
+      "source_path": "src/motion/walk_cycle.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/motion/__pycache__/whole_body_controller.cpython-313.pyc",
+      "bytes": 48489,
+      "sha256": "a16667e18560897a4c73daaa9b73810317f96aeb9ced2ae62ea8ce859cfd2d5a",
+      "source_path": "src/motion/whole_body_controller.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/rig/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 2434,
+      "sha256": "8cb2f06972c2516128a606deef214212c5471f78b4a349a349ce1b5c41b7cdd2",
+      "source_path": "src/rig/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/rig/__pycache__/arm_ik.cpython-313.pyc",
+      "bytes": 9929,
+      "sha256": "ddd5e7b5b0ff1396c3803efb312cf395bbb7eec4dba0e59695e8ed1247814f14",
+      "source_path": "src/rig/arm_ik.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/rig/__pycache__/builder.cpython-313.pyc",
+      "bytes": 9469,
+      "sha256": "0e045475a43f7e646f6518481d9620f05d415530d39eaa6dc886ae3b84276805",
+      "source_path": "src/rig/builder.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/rig/__pycache__/foot_contact.cpython-313.pyc",
+      "bytes": 26161,
+      "sha256": "702b71a80bdfb39c25a16fe05f24fbdc3df3075a052c42e719a206358d1dbeaa",
+      "source_path": "src/rig/foot_contact.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/rig/__pycache__/ik.cpython-313.pyc",
+      "bytes": 51395,
+      "sha256": "b5b15081316e4662becf6dba5fe2894f5e62a9cd8d061eeb329ee6ce71b14360",
+      "source_path": "src/rig/ik.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/rig/__pycache__/pose.cpython-313.pyc",
+      "bytes": 6736,
+      "sha256": "66016b7b6e79e59134736e6bf7ce7b785731b4f7049a794ad2b44a42b75a90d8",
+      "source_path": "src/rig/pose.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/rig/__pycache__/transform_utils.cpython-313.pyc",
+      "bytes": 7929,
+      "sha256": "dd2193258528b037dc99fa4ff177a2c30e4ae3b40b1ac94587bd6ceb5cafe755",
+      "source_path": "src/rig/transform_utils.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 1119,
+      "sha256": "d6ad7113940d2654314d71fa748683b2939e3d42d075b025b36f5663c5d067ec",
+      "source_path": "src/scene/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/blender_mesh_query_adapter.cpython-313.pyc",
+      "bytes": 40154,
+      "sha256": "35eb9bda1b865e5c773b2d09cbd657b11eda344f5d71dc5abf09b7d5bbec1403",
+      "source_path": "src/scene/blender_mesh_query_adapter.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/builder.cpython-313.pyc",
+      "bytes": 22372,
+      "sha256": "7661e0f30a931c1d215046c4165eaac10b595bdc4e9c259b901db9121d6d2ab1",
+      "source_path": "src/scene/builder.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/dynamics_visual_evidence.cpython-313.pyc",
+      "bytes": 54919,
+      "sha256": "14e4c2d7a5e4fe24aeb0c0575afc0a0929c56caded968e6593ce2051810cec59",
+      "source_path": "src/scene/dynamics_visual_evidence.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/dynamics_visualizer.cpython-313.pyc",
+      "bytes": 26668,
+      "sha256": "8d13dd4221f404ddaf8cdb801ee4386481ab4f79125378ba26155c2ee800d93e",
+      "source_path": "src/scene/dynamics_visualizer.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/environment_query.cpython-313.pyc",
+      "bytes": 41011,
+      "sha256": "d1cb03eeef74ba9d55ce02f7c0af9c354ef2dc15ee70c7585ee3925b67bd3804",
+      "source_path": "src/scene/environment_query.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/layout.cpython-313.pyc",
+      "bytes": 7824,
+      "sha256": "352d20c18c7b6bc7abc655e7e72c2c8d9a333a21ed0d5488b53a482c789aa477",
+      "source_path": "src/scene/layout.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/playground_asset_preservation.cpython-313.pyc",
+      "bytes": 29747,
+      "sha256": "596c57c78c5f6f3099267fab0eecf2919c169ea0cc775a45d0ede024d76c15c5",
+      "source_path": "src/scene/playground_asset_preservation.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/playground_character_assembly.cpython-313.pyc",
+      "bytes": 71729,
+      "sha256": "ded77e785c61e64424996fe6cfab3f4286643ecb834cd76213fc81ee3be057eb",
+      "source_path": "src/scene/playground_character_assembly.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene/__pycache__/playground_evidence_exporter.cpython-313.pyc",
+      "bytes": 10993,
+      "sha256": "ad2c01a4c667dfe3e033f957843a9899beee33ddbe2528ec68afc318a8eb3887",
+      "source_path": "src/scene/playground_evidence_exporter.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 1490,
+      "sha256": "a85600316c5f31ab965b9b8366193b4c276f09ab88d7cc0ad7e1a8606270b8ee",
+      "source_path": "src/scene_transaction_integrity/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/__pycache__/fault_injection.cpython-313.pyc",
+      "bytes": 1422,
+      "sha256": "adb9431a1a1789d73f6f35b7e8096a99d959af1215c064e829d2ff56be05c83c",
+      "source_path": "src/scene_transaction_integrity/fault_injection.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/__pycache__/wiring.cpython-313.pyc",
+      "bytes": 36185,
+      "sha256": "a4256a03c359234b5e46919aeb38b341a90e109c407bd9a09ee61ae2d805c5a7",
+      "source_path": "src/scene_transaction_integrity/wiring.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 2780,
+      "sha256": "46032620ebc22e24493394a00a15f6ce88c6bdad1d2f24af1916cd093afc128a",
+      "source_path": "src/scene_transaction_integrity/layer1/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/admission_helpers.cpython-313.pyc",
+      "bytes": 2714,
+      "sha256": "db72151037471861f5cfd00ce8bc56a1ba97aaf3f4e91e6856d919499e102f0a",
+      "source_path": "src/scene_transaction_integrity/layer1/admission_helpers.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/authorization_grants.cpython-313.pyc",
+      "bytes": 11354,
+      "sha256": "457e600d6b01dbbc65e10252c3e8ed1dfdc362275ec8869d8a5d71655443b2b9",
+      "source_path": "src/scene_transaction_integrity/layer1/authorization_grants.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/authorization_registry.cpython-313.pyc",
+      "bytes": 634,
+      "sha256": "5baf215bed038108ef19537685dbfbe8a48c0b5c8ab567f580acb3b5f5dc7884",
+      "source_path": "src/scene_transaction_integrity/layer1/authorization_registry.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/cleanup_validation.cpython-313.pyc",
+      "bytes": 13988,
+      "sha256": "113bdf7a604c517defeacb6c6156933b335a71c56c6d3ee18a265ced36962300",
+      "source_path": "src/scene_transaction_integrity/layer1/cleanup_validation.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/isolation_governance.cpython-313.pyc",
+      "bytes": 7037,
+      "sha256": "3385aa0f5e61afcc72ee3525625eaabfa654e40ed3011ebcd1d4892fb63d12f6",
+      "source_path": "src/scene_transaction_integrity/layer1/isolation_governance.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/outermost_admission.cpython-313.pyc",
+      "bytes": 8064,
+      "sha256": "70aa1d94ef1e30fbfc6ba0917c3bdb76cf84632871577d1373e07583f7f76f66",
+      "source_path": "src/scene_transaction_integrity/layer1/outermost_admission.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/pending_cleanup.cpython-313.pyc",
+      "bytes": 5585,
+      "sha256": "cfabb7d513c170395b4df958b7ed781feda280366488bf1cbde0510d7c335bbc",
+      "source_path": "src/scene_transaction_integrity/layer1/pending_cleanup.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/post_commit_cleanup.cpython-313.pyc",
+      "bytes": 9635,
+      "sha256": "412b51e4497b09f2c49a2817c6e5061ad3c4d6883e3e80de8bf95e1c82117b5d",
+      "source_path": "src/scene_transaction_integrity/layer1/post_commit_cleanup.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/session_liveness.cpython-313.pyc",
+      "bytes": 5514,
+      "sha256": "e83cf0029f435851d763f2733824834d95193f96ae107be1636b349d118f174f",
+      "source_path": "src/scene_transaction_integrity/layer1/session_liveness.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/transaction_commit.cpython-313.pyc",
+      "bytes": 2274,
+      "sha256": "9414ea76accc3d46d09ac925e0aaa54840fd1dad5056559d25082c1fdc2a341b",
+      "source_path": "src/scene_transaction_integrity/layer1/transaction_commit.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/transaction_coordinator.cpython-313.pyc",
+      "bytes": 9057,
+      "sha256": "345c5dbf7cb8da2a85a490469d2bb3faa112ca9b883a1662f048e72e671aa291",
+      "source_path": "src/scene_transaction_integrity/layer1/transaction_coordinator.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer1/__pycache__/transaction_establishment.cpython-313.pyc",
+      "bytes": 2964,
+      "sha256": "4179b0795c62b5eaa1754845e7c6042928b61d9b6ec53dbfcb536154409955a6",
+      "source_path": "src/scene_transaction_integrity/layer1/transaction_establishment.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 3861,
+      "sha256": "4b9fcfe8fae06918d92fe7465cddd565e3ccc146dfd0212fcb1f7c32945e0f7d",
+      "source_path": "src/scene_transaction_integrity/layer2/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/admission_query.cpython-313.pyc",
+      "bytes": 3800,
+      "sha256": "09b361dbb3fe2e313034976bc90eeacccc686a99dd2484c11ce72b2612d49f70",
+      "source_path": "src/scene_transaction_integrity/layer2/admission_query.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/audit_registries.cpython-313.pyc",
+      "bytes": 2413,
+      "sha256": "6d51eb904754c5fb4f3aa2e98e1f2d7f50a82e82db46d3f6e5b6b51f44411077",
+      "source_path": "src/scene_transaction_integrity/layer2/audit_registries.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/collection_link_registry.cpython-313.pyc",
+      "bytes": 1483,
+      "sha256": "0030b042dd0d8bdfc36793bc6412fc6d5f6fa39cff8e21ef66eb7947451b8a8f",
+      "source_path": "src/scene_transaction_integrity/layer2/collection_link_registry.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/collection_receipts.cpython-313.pyc",
+      "bytes": 9587,
+      "sha256": "87660a48dfcf5d13dd84d29587ee0ee238cae3a4231ac209187bdd59cea80a80",
+      "source_path": "src/scene_transaction_integrity/layer2/collection_receipts.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/constraint_registration.cpython-313.pyc",
+      "bytes": 8651,
+      "sha256": "31bbf1ec6ae3c2017cb9a9d54b14cfb569a08642c5bda05e9ca38939023b411f",
+      "source_path": "src/scene_transaction_integrity/layer2/constraint_registration.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/controller_receipts.cpython-313.pyc",
+      "bytes": 4634,
+      "sha256": "662fc52c0c3bd2c5fd8a2800025e25edb099fe9b5862f31d3b1df47f18f37295",
+      "source_path": "src/scene_transaction_integrity/layer2/controller_receipts.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/datablock_cleanup_records.cpython-313.pyc",
+      "bytes": 3924,
+      "sha256": "bc3e3297de6494f361ab9079995ed3d82298a71f598c0876b26225efc0df13ea",
+      "source_path": "src/scene_transaction_integrity/layer2/datablock_cleanup_records.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/datablock_creation_receipts.cpython-313.pyc",
+      "bytes": 1959,
+      "sha256": "4c3b37000b9d0ccac6ef3f81555d2eea27a824e4af581907e4bd104ba845d7e1",
+      "source_path": "src/scene_transaction_integrity/layer2/datablock_creation_receipts.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/identity_helpers.cpython-313.pyc",
+      "bytes": 3350,
+      "sha256": "7fd42d596ed50a22492bd139fe3938781765b4ad2dfff2f840586033c1e212df",
+      "source_path": "src/scene_transaction_integrity/layer2/identity_helpers.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/isolation_transition.cpython-313.pyc",
+      "bytes": 10999,
+      "sha256": "6ffae11686c24bb61ff3eb6383a814cb494ddfb72072113edeb3101a320e9c4d",
+      "source_path": "src/scene_transaction_integrity/layer2/isolation_transition.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/pending_cleanup_registry.cpython-313.pyc",
+      "bytes": 1650,
+      "sha256": "77e485be316b1a06ccfe95745363cf9bd3278cc7b9b2a76e4049d8e2afdf8436",
+      "source_path": "src/scene_transaction_integrity/layer2/pending_cleanup_registry.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/relationship_mutation_prepare.cpython-313.pyc",
+      "bytes": 2257,
+      "sha256": "cd6f00e0167a014454d0016aeee759837dc067e2ad46837d6170430bd3b3a8db",
+      "source_path": "src/scene_transaction_integrity/layer2/relationship_mutation_prepare.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/relationship_mutation_state_update.cpython-313.pyc",
+      "bytes": 1456,
+      "sha256": "f220e7107bb89309f230807c66afc3490de2ebba3511913b72f9e0b17e568d7e",
+      "source_path": "src/scene_transaction_integrity/layer2/relationship_mutation_state_update.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/relationship_states.cpython-313.pyc",
+      "bytes": 2196,
+      "sha256": "9f6d40ec5aab8e2d940238896bec759ddc8fabf4a14d7fe483e3f7d1c1a588c0",
+      "source_path": "src/scene_transaction_integrity/layer2/relationship_states.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/session_identity.cpython-313.pyc",
+      "bytes": 4843,
+      "sha256": "beecba42dc7d93bb27753cad44706ee8088e3535fa11f5c62c214428a2f7e6fe",
+      "source_path": "src/scene_transaction_integrity/layer2/session_identity.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/session_records.cpython-313.pyc",
+      "bytes": 4969,
+      "sha256": "37aa6f95397e818eb5d72ac40c7ec30e09c080ceed19a80a1c09ea1da3faeb68",
+      "source_path": "src/scene_transaction_integrity/layer2/session_records.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/session_registries.cpython-313.pyc",
+      "bytes": 7203,
+      "sha256": "36c5b093ea192859086905939215dc31e0324122a44315de41056ee2901071b8",
+      "source_path": "src/scene_transaction_integrity/layer2/session_registries.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/session_verification.cpython-313.pyc",
+      "bytes": 8512,
+      "sha256": "5ecb7f7a8f1c2ff589ab04fc7ca44132246e1c90cc77006949dbbcbf3a1790de",
+      "source_path": "src/scene_transaction_integrity/layer2/session_verification.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/tombstone_registry.cpython-313.pyc",
+      "bytes": 545,
+      "sha256": "8e02aa68030c17abdb2930f59949ca433e9334058c3e2169ac7288e7746dc93f",
+      "source_path": "src/scene_transaction_integrity/layer2/tombstone_registry.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_context.cpython-313.pyc",
+      "bytes": 12563,
+      "sha256": "2e71c9df9bbc0cbcdd2d4a029e2e07a8fbbf58b3e4759e86f739795bc8a912c3",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_context.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_context_init.cpython-313.pyc",
+      "bytes": 3464,
+      "sha256": "d7c17b221f6dad7898b10ed75d94466ab5a5495e0d0537571143dca84baa6b2e",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_context_init.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_stack.cpython-313.pyc",
+      "bytes": 492,
+      "sha256": "bad1fc59e7aa598de1c691a096cb220e39c6a171db517d43a24c88d9bab004d9",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_stack.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_states.cpython-313.pyc",
+      "bytes": 1368,
+      "sha256": "d6cb21ea749434d2c1f94b500e67bf15e6d7e178417ebf2d9af9fd646d645ad5",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_states.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 4219,
+      "sha256": "c6384011fa9157e6e4757192f370f39eec8d54538d13505aefe73db239deb00e",
+      "source_path": "src/scene_transaction_integrity/layer3/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/character_collection_creation.cpython-313.pyc",
+      "bytes": 12230,
+      "sha256": "de2cb0a36be2ed3e08605af4c90b565ffac5f784dd5d54c9217ffd3931674f32",
+      "source_path": "src/scene_transaction_integrity/layer3/character_collection_creation.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/collection_child_link.cpython-313.pyc",
+      "bytes": 11775,
+      "sha256": "0154e562903d840a1189c3ef2d5c9757a9e4e1de8ae5ef5671ff6cd0bad02b26",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_child_link.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/collection_child_unlink.cpython-313.pyc",
+      "bytes": 4719,
+      "sha256": "e15c866a81ea391fee4726ef8263b92e4439fa312e672f49c34883c5ec8c7d07",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_child_unlink.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/collection_object_link.cpython-313.pyc",
+      "bytes": 5349,
+      "sha256": "923e180c6df5b119e928253a5600559cfad2d390753e80f16121526bec728549",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_object_link.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/collection_object_unlink.cpython-313.pyc",
+      "bytes": 4904,
+      "sha256": "985a2e7858c9ab95715567911cabc23bd7c329e889d9d680ff7db9e19b093875",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_object_unlink.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/collection_queries.cpython-313.pyc",
+      "bytes": 4494,
+      "sha256": "f9407f40155cec570342846a2c8f2ad31bddf7c59cac53afea42ee27bf9a4a5c",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_queries.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_creation.cpython-313.pyc",
+      "bytes": 16221,
+      "sha256": "d085465e8e20f5a7a02a9d9ce584483c020b2c280a9a9357c2f71cf3138ed886",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_creation.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_removal.cpython-313.pyc",
+      "bytes": 12153,
+      "sha256": "13241d91836bb7ee8f18ff9aff13aa6aaa8bece9efdef900d24b1f544e6d0321",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_removal.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_target_assignment.cpython-313.pyc",
+      "bytes": 3300,
+      "sha256": "61ddb817a4c14c2ffb70e0c5dc41e0b837897ef457818beba029f5c58684a9d7",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_target_assignment.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_target_pair_classifier.cpython-313.pyc",
+      "bytes": 3212,
+      "sha256": "d3bcc2b20010bfb78f09a1090e1e1106bf24dd6685f632a88b6bc4b4dbcdc7b3",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_target_pair_classifier.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_target_unit.cpython-313.pyc",
+      "bytes": 7524,
+      "sha256": "0e70c452dc559455fa375e170e639fe167d552d86f4829780d443bc03f28fa4f",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_target_unit.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/controller_creation.cpython-313.pyc",
+      "bytes": 5485,
+      "sha256": "74d52b157955334e6a92056fb73d89608c66bdb9a14d74fd03fbed4d507ec004",
+      "source_path": "src/scene_transaction_integrity/layer3/controller_creation.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/controller_ownership.cpython-313.pyc",
+      "bytes": 14186,
+      "sha256": "572f83de232c03f20daa16e2e2830e325e29e90a4da5900ad0e8889ff2ddc612",
+      "source_path": "src/scene_transaction_integrity/layer3/controller_ownership.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/controller_recovery_authority.cpython-313.pyc",
+      "bytes": 12556,
+      "sha256": "a3a514f7cb1d00f8b9dd229a2d932ece87423da93c7cdbf8ea89ff058787da4b",
+      "source_path": "src/scene_transaction_integrity/layer3/controller_recovery_authority.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/datablock_creation.cpython-313.pyc",
+      "bytes": 6627,
+      "sha256": "497d37de19aa19c0ad4e6e9c2f27c47c5fb5ba9f1f40163d3ea9db50f907cb35",
+      "source_path": "src/scene_transaction_integrity/layer3/datablock_creation.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/datablock_removal.cpython-313.pyc",
+      "bytes": 9647,
+      "sha256": "3c396533afc8edaced4a180e3b6ca953ec83ca867ce64446775b5c2912c8f91e",
+      "source_path": "src/scene_transaction_integrity/layer3/datablock_removal.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/object_parent_assignment.cpython-313.pyc",
+      "bytes": 9405,
+      "sha256": "1a48a3aed47e52511ca930f8f21400458f4d257715fa53c53aee332af54e6bf0",
+      "source_path": "src/scene_transaction_integrity/layer3/object_parent_assignment.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/relationship_reversal.cpython-313.pyc",
+      "bytes": 21861,
+      "sha256": "0a993ee5f2a8aa080821a9ee8dd146c27edd32be5f31b50f81aa330fac7d1c1c",
+      "source_path": "src/scene_transaction_integrity/layer3/relationship_reversal.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/resource_contracts.cpython-313.pyc",
+      "bytes": 5031,
+      "sha256": "eb10ff65756df04451de10d91ecf39488277560ff958aa7a04afa877b10dbfe3",
+      "source_path": "src/scene_transaction_integrity/layer3/resource_contracts.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/snapshot_relationship_restoration.cpython-313.pyc",
+      "bytes": 18975,
+      "sha256": "8b50f4ee7814b50696e881bf002192dd4a7d0494102ea9280629c9c4e5454a7b",
+      "source_path": "src/scene_transaction_integrity/layer3/snapshot_relationship_restoration.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer3/__pycache__/stashed_object_removal.cpython-313.pyc",
+      "bytes": 1707,
+      "sha256": "1d9018a8b144c5d5f56ba596d175793ddc6533d5f6be23f9d8a040ff81430505",
+      "source_path": "src/scene_transaction_integrity/layer3/stashed_object_removal.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 1475,
+      "sha256": "ea3f0136dcaff47059ef258d4c4de5c7dc199edc917b12bdb199a5407c3d08a6",
+      "source_path": "src/scene_transaction_integrity/layer4/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/armature_ops.cpython-313.pyc",
+      "bytes": 2881,
+      "sha256": "281cc32d65002968ce0eb20dfdb9c60d3b7cb017c4ebb8cc17bfb0d1143a3955",
+      "source_path": "src/scene_transaction_integrity/layer4/armature_ops.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/depsgraph.cpython-313.pyc",
+      "bytes": 2733,
+      "sha256": "98232bb6d6a209a6c1101669dcdcded276694f7597d7bb22c54cae7a8a006f5e",
+      "source_path": "src/scene_transaction_integrity/layer4/depsgraph.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/hand_target.cpython-313.pyc",
+      "bytes": 9870,
+      "sha256": "f9b3fa222598519ff2761c6b13ccdc134d4a39a5e9c49228909f3ed2534358b8",
+      "source_path": "src/scene_transaction_integrity/layer4/hand_target.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/influence.cpython-313.pyc",
+      "bytes": 2830,
+      "sha256": "98c47c75355c5d55652bffc1fe62421c6da36adc7ec8aa21afc20413dd5da723",
+      "source_path": "src/scene_transaction_integrity/layer4/influence.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/preflight.cpython-313.pyc",
+      "bytes": 4478,
+      "sha256": "c075a15b3800c7048997e3ae89f4e493895ac0d08d2a90e4d6d713d3751139ea",
+      "source_path": "src/scene_transaction_integrity/layer4/preflight.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/reset.cpython-313.pyc",
+      "bytes": 6449,
+      "sha256": "629371bd47424d39b7fe5adba535a3da0072390a0f93de802a755564899c0f1b",
+      "source_path": "src/scene_transaction_integrity/layer4/reset.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/setup.cpython-313.pyc",
+      "bytes": 9967,
+      "sha256": "529d1e9fe3fcd95eba26b2e63ef339a705612ce6957e8c46a7765eb18bd68e6d",
+      "source_path": "src/scene_transaction_integrity/layer4/setup.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/state_query.cpython-313.pyc",
+      "bytes": 5886,
+      "sha256": "5a945d6db64447701849b152d56788deab84c6d9818ff89e7a14408b89f880b1",
+      "source_path": "src/scene_transaction_integrity/layer4/state_query.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer4/__pycache__/validation.cpython-313.pyc",
+      "bytes": 4564,
+      "sha256": "eead41a0cd1e5876dc2551738e161ff4a8a8ba20232c5f93583ae562a23ee019",
+      "source_path": "src/scene_transaction_integrity/layer4/validation.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer5/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 1126,
+      "sha256": "a087f0106e71cffd504238a3e58454e6a9ef8cd27115637e65bf51e8c5e09fcb",
+      "source_path": "src/scene_transaction_integrity/layer5/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer5/__pycache__/isolation_evidence.cpython-313.pyc",
+      "bytes": 13482,
+      "sha256": "e58a6d68215794eb1127e8b29fc17d0cb202e9c7c6bf8c319f678017f31a7f15",
+      "source_path": "src/scene_transaction_integrity/layer5/isolation_evidence.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer5/__pycache__/rollback_execution.cpython-313.pyc",
+      "bytes": 44950,
+      "sha256": "e99dd6af79ba88a417d026350dc4dd8a91bc8ab3fff0fd568f301b36d7399d09",
+      "source_path": "src/scene_transaction_integrity/layer5/rollback_execution.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer5/__pycache__/rollback_verification.cpython-313.pyc",
+      "bytes": 27664,
+      "sha256": "5bfa6a7a4ea1e23120ff73ac602cffc6cd7484b611da5604218e46588223aae2",
+      "source_path": "src/scene_transaction_integrity/layer5/rollback_verification.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer5/__pycache__/snapshot_capture.cpython-313.pyc",
+      "bytes": 31450,
+      "sha256": "7f87dbad3303975ef6699cb4f324abde85926eca0fa6565087a385eaa1faa8e9",
+      "source_path": "src/scene_transaction_integrity/layer5/snapshot_capture.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer5/__pycache__/value_evidence.cpython-313.pyc",
+      "bytes": 8641,
+      "sha256": "4550c786befb3ae25dcb64879e4ed9421a5215b3ae6a6ee12ca875422a9ccbda",
+      "source_path": "src/scene_transaction_integrity/layer5/value_evidence.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer6/__pycache__/__init__.cpython-313.pyc",
+      "bytes": 636,
+      "sha256": "6cb3f254a164a0b1522b5be886e3008af05b014a830d8e8f0b86334b690167f6",
+      "source_path": "src/scene_transaction_integrity/layer6/__init__.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer6/__pycache__/cleanup_results.cpython-313.pyc",
+      "bytes": 2694,
+      "sha256": "dbc4a36738e8d0d6761441f3551474105f2d08a6ebd87b3b51854439715d08e7",
+      "source_path": "src/scene_transaction_integrity/layer6/cleanup_results.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "src/scene_transaction_integrity/layer6/__pycache__/stashed_cleanup.cpython-313.pyc",
+      "bytes": 7221,
+      "sha256": "534723a7b2b7dce6f674aad86e1dbe4a4b327f3adc99bc90b5077cf7cd5ebcc1",
+      "source_path": "src/scene_transaction_integrity/layer6/stashed_cleanup.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "path": "tests/__pycache__/verify_task7b3_environment_hand_integration.cpython-313.pyc",
+      "bytes": 108956,
+      "sha256": "59bdfe04adde2b6dedf1162fc6d41b4291db2ca63385488189d18f798ac069f1",
+      "source_path": "tests/verify_task7b3_environment_hand_integration.py",
+      "ignore_rule": {
+        "file": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    }
+  ],
+  "original_asset_sha256": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "isolated_asset_sha256": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "preserved_evidence_copy_hashes": {
+    "stdout.log": {
+      "isolated_sha256": "fd6f2aca56f386db52472456faf9f2a1ffb84f6ae1c8e3049aed9f68322113d6",
+      "copied_sha256": "fd6f2aca56f386db52472456faf9f2a1ffb84f6ae1c8e3049aed9f68322113d6"
+    },
+    "stderr.log": {
+      "isolated_sha256": "2194e8af9abd525d5d100032d0def45a356b17c90b1d48b7f7e20762ce657cd7",
+      "copied_sha256": "2194e8af9abd525d5d100032d0def45a356b17c90b1d48b7f7e20762ce657cd7"
+    },
+    "exit_code.txt": {
+      "isolated_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "copied_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    "execution.txt": {
+      "isolated_sha256": "ee432dd7a49c51131c6aceb7575a688f843d8069c3cdc149d31915e97e01341a",
+      "copied_sha256": "ee432dd7a49c51131c6aceb7575a688f843d8069c3cdc149d31915e97e01341a"
+    },
+    "result.json": {
+      "isolated_sha256": "7555eb5221ec4d61f965919cf4303c313656cea7301cc705598d74d7c94f2dc3",
+      "copied_sha256": "7555eb5221ec4d61f965919cf4303c313656cea7301cc705598d74d7c94f2dc3"
+    }
+  },
+  "previous_integrity_error": "Unexpected isolated status: !! src/__pycache__/__init__.cpython-313.pyc",
+  "original_test_evidence_verified": {
+    "status": "PASS",
+    "count": 12,
+    "exit_code": 0
+  },
+  "integrity_recheck": "PASS",
+  "blender_launches_this_round": 0,
+  "test_executions_this_round": 0
+}
