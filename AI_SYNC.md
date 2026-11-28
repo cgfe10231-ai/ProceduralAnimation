@@ -4,11 +4,12 @@
 > 此文件只记录**当前**状态，不复刻旧轮次长篇报告；历史过程请见 `CHANGELOG.md`、冻结账本与证据目录。
 
 ## 当前交接事实
-- **当前阶段：`Task 12-A/B/C/D` `COMPLETED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；`Task 7B-1` `COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（未合入 `master`）；`Task 7B-2` `COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（未合入 `master`）；当前执行节点：`Task 7B-3`（`INTEGRATION VERIFICATION PREPARATION — OWNER AUTHORIZED`，分支 `task/7b-3` 基于 `task/7b-2` `a92280bbcb2243f0b43edd10b61bbadb39c72869`）。**
-- **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义不变；`Task 12-D BUG-01` / `Task 7B-1 BUG-01` / `Task 7B-2 BUG-01、BUG-02`：均已 `CLOSED`。
+- **当前阶段：`Task 12-A/B/C/D` `COMPLETED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；`Task 7B-1` `COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（未合入 `master`）；`Task 7B-2` `COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（未合入 `master`）；`Task 7B-3`：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`；当前节点：`Task 7B-4`（`FINAL INTEGRATION ACCEPTANCE — OWNER AUTHORIZED`，分支 `task/7b-4`）。**
+- **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义不变；`Task 12-D BUG-01` / `Task 7B-1 BUG-01` / `Task 7B-2 BUG-01、BUG-02` / `Task 7B-3 BUG-01、BUG-02、BUG-03`：均已 `CLOSED`。
 - **Task 7B-1 验收事实（未合入 `master`）**：Blender 5.1.1 专项 `T01–T12` 全部通过（`12 PASS / 0 FAIL / 0 SKIP / 0 NOT_RUN`，退出码 `0`），生产源码零修改，新增生产函数及模块均为 `0`；验收证据提交 `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`，证据目录 `docs/evidence/7b-1/verification/`。
 - **Task 7B-2 验收事实（未合入 `master`）**：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`。Blender 5.1.1 专项 `T01–T14` 全部通过（`14 PASS / 0 FAIL / 0 SKIP / 0 NOT_RUN`，退出码 `0`），`BUG-01`、`BUG-02` `CLOSED`；生产文件 `src/motion/contact_model.py`（Blob `267c6c997e0c02cd5f76b2936fc2c975ae50cf07`），专项测试 `tests/verify_task7b2_hand_target_geometry.py`（Blob `b8381a354fc4e7e05e4b3c7013256baafa038aa4`），证据提交 `a92280bbcb2243f0b43edd10b61bbadb39c72869`，证据目录 `docs/evidence/7b-2/verification/`。
-- **Task 7B-3 当前范围**：`INTEGRATION VERIFICATION PREPARATION — OWNER AUTHORIZED`。仅允许通过现有生产接口完成环境目标与独立上肢轨迹集成验证（仅新增专项脚本 `tests/verify_task7b3_environment_hand_integration.py` `T01–T20`），不新增或修改生产函数、模块、控制器、求解器及状态所有权；本轮仅准备集成验证脚本及同步指定文档，禁止运行 Blender 或测试。`Task 7B-4` 尚未开放，`Phase 7C` 保持 `NOT AUTHORIZED`。Phase 7B 整体完成联合验收及四级回归后统一合入 `master`。
+- `Task 7B-3`：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`。Blender 5.1.1 专项 T01–T20 两轮累计 20/20 PASS；第一轮 T01–T15 PASS、T16 FAIL、T17–T20 NOT_RUN，退出码 1；BUG-03 修复后第二轮 T16–T20 全部 PASS，退出码 0；BUG-01、BUG-02、BUG-03 CLOSED；生产源码零修改。第一轮证据提交 `238383869203aaa39218d2695c2592bd80d44a2e`，`docs/evidence/7b-3/verification/`；第二轮证据提交 `d9862ada5c392080a03efb38ea7f2e90201580d2`，`docs/evidence/7b-3/verification_round2/`。
+- 当前节点：`Task 7B-4`（`FINAL INTEGRATION ACCEPTANCE — OWNER AUTHORIZED`，分支 `task/7b-4`）。仅允许联合专项、相关独立回归、四级回归及证据归档。生产源码、测试脚本和永久规范保持只读。Phase 7B 尚未合入 `master`，须等待独立最终验收及负责人合并批准。`Phase 7C` 保持 `NOT AUTHORIZED`。
 - **Task 12 生产与测试冻结收敛（`eee276b39d` / `90f4628a0c`）**：
   - **12-A（WBC 单帧执行与反馈合同）**：`WholeBodyController` 收归 ROM 截断后最终四肢反馈、真实请求误差（`ROM_CONFLICT`）及状态原子回滚唯一所有权（`src/motion/whole_body_controller.py` Blob `230a86acaa92b580c5c0aad0e0cdacd7df224a7a`）。
   - **12-B（Bridge 帧提交与时间步准入）**：`KinematicBridgeExecutor.execute_frame()` 在 `effective_dt` 准入与 WBC/ContactModel 成功前禁止提交跨帧 7 项状态（`_last_time_sec`、`_last_frame`、`last_multi_contact`、`last_active_limb_targets`、`kinematics_tracker._prev_snapshot`/`_prev_velocity`/`_history`）（`src/motion/kinematic_bridge.py` Blob `4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`）。
@@ -23,4 +24,4 @@
   3. Task 12 人工视觉验收登记为 `OWNER WAIVED`。
   4. 历史九项人工视觉待办保持原登记（10-D 两份人工视觉资产 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend` 保持原验收登记）。
   5. 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流。
-- ChatGPT 负责独立审计、根因和架构边界；Antigravity 完成 `Task 7B-3` 集成验证脚本准备与本轮授权文档同步后恢复 Markdown 默认只读并停止，等待 ChatGPT 独立 Diff 审查与测试授权，禁止自行运行 Blender/测试、禁止推进 `7B-4` / `Phase 7C` 或合入 `master`。
+- ChatGPT 负责独立审计、根因及架构边界；执行 Agent 完成指定状态文档同步并单独提交后恢复 Markdown 默认只读，按已授权 TASK 7B-4 执行联合验收及证据归档；失败立即停止，禁止自行修复、推进 Phase 7C 或合入 master；完成后等待 ChatGPT 独立最终验收。

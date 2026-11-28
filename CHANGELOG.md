@@ -2,6 +2,12 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-28] Task 7B-3 专项验收入账及 Task 7B-4 准入开启
+
+- `Task 7B-3`：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`。Blender 5.1.1 专项 T01–T20 两轮累计 20/20 PASS；第一轮 T01–T15 PASS、T16 FAIL、T17–T20 NOT_RUN，退出码 1；BUG-03 修复后第二轮 T16–T20 全部 PASS，退出码 0；BUG-01、BUG-02、BUG-03 CLOSED；生产源码零修改。第一轮证据提交 `238383869203aaa39218d2695c2592bd80d44a2e`，`docs/evidence/7b-3/verification/`；第二轮证据提交 `d9862ada5c392080a03efb38ea7f2e90201580d2`，`docs/evidence/7b-3/verification_round2/`。
+- 验收范围：真实 Mesh 环境目标、独立双臂轨迹、唯一生产控制链、三维末端姿态、ROM/可达性及接触状态合同。
+- 当前节点：`Task 7B-4`（`FINAL INTEGRATION ACCEPTANCE — OWNER AUTHORIZED`，分支 `task/7b-4`）。仅允许联合专项、相关独立回归、四级回归及证据归档。生产源码、测试脚本和永久规范保持只读。Phase 7B 尚未合入 `master`，须等待独立最终验收及负责人合并批准。`Phase 7C` 保持 `NOT AUTHORIZED`。
+
 ### [2026-11-28] Task 7B-2 专项验收入账及 Task 7B-3 准入开启
 
 - **Task 7B-2（环境目标至手腕位置及三维姿态转换）**：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（保留于 `task/7b-2` 及子分支 `task/7b-3`，**尚未合入 `master`**）。
