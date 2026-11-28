@@ -1,0 +1,188 @@
+{
+  "task": "7B-3",
+  "round": 2,
+  "branch": "task/7b-3",
+  "frozen_head": "a651351cdac907c375444eb662da39677124ee69",
+  "test_script": "tests/verify_task7b3_environment_hand_integration.py",
+  "test_blob": "ed66ce955c81375ad407e5d1c03d919542155fc1",
+  "prior_evidence_commit": "238383869203aaa39218d2695c2592bd80d44a2e",
+  "scope": [
+    "T16",
+    "T17",
+    "T18",
+    "T19",
+    "T20"
+  ],
+  "working_directory": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+  "command": "& \"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python tests/verify_task7b3_environment_hand_integration.py -- --failfast TestTask7B3EnvironmentHandIntegration.test_t16_ik_execution_creates_zero_fake_contact_or_support TestTask7B3EnvironmentHandIntegration.test_t17_timeline_bounds_endpoint_hold_and_contiguous_frames TestTask7B3EnvironmentHandIntegration.test_t18_non_target_limbs_and_historical_standing_preserved TestTask7B3EnvironmentHandIntegration.test_t19_single_armature_unique_control_chain_and_exact_call_counts TestTask7B3EnvironmentHandIntegration.test_t20_input_immutability_asset_integrity_and_evidence_completeness",
+  "argv": [
+    "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+    "-b",
+    "--factory-startup",
+    "--python-exit-code",
+    "1",
+    "--python",
+    "tests/verify_task7b3_environment_hand_integration.py",
+    "--",
+    "--failfast",
+    "TestTask7B3EnvironmentHandIntegration.test_t16_ik_execution_creates_zero_fake_contact_or_support",
+    "TestTask7B3EnvironmentHandIntegration.test_t17_timeline_bounds_endpoint_hold_and_contiguous_frames",
+    "TestTask7B3EnvironmentHandIntegration.test_t18_non_target_limbs_and_historical_standing_preserved",
+    "TestTask7B3EnvironmentHandIntegration.test_t19_single_armature_unique_control_chain_and_exact_call_counts",
+    "TestTask7B3EnvironmentHandIntegration.test_t20_input_immutability_asset_integrity_and_evidence_completeness"
+  ],
+  "launcher": "PowerShell Start-Process with native stdout/stderr redirection",
+  "blender_version": "5.1.1",
+  "exit_code": 0,
+  "result": "PASS",
+  "setup_class": "PASS",
+  "tests_run": 5,
+  "unittest_elapsed_seconds": 1.246,
+  "status_counts": {
+    "PASS": 5
+  },
+  "tests": {
+    "T16": {
+      "name": "test_t16_ik_execution_creates_zero_fake_contact_or_support",
+      "status": "PASS"
+    },
+    "T17": {
+      "name": "test_t17_timeline_bounds_endpoint_hold_and_contiguous_frames",
+      "status": "PASS"
+    },
+    "T18": {
+      "name": "test_t18_non_target_limbs_and_historical_standing_preserved",
+      "status": "PASS"
+    },
+    "T19": {
+      "name": "test_t19_single_armature_unique_control_chain_and_exact_call_counts",
+      "status": "PASS"
+    },
+    "T20": {
+      "name": "test_t20_input_immutability_asset_integrity_and_evidence_completeness",
+      "status": "PASS"
+    }
+  },
+  "test_stdout": {
+    "T16": [
+      "run=left_ik frames=16 support_type=double_stance hand_contacts=(('free', 'released'), ('free', 'released')) fake_hand_support=False",
+      "run=right_ik frames=16 support_type=double_stance hand_contacts=(('free', 'released'), ('free', 'released')) fake_hand_support=False",
+      "run=bilateral_ik frames=16 support_type=double_stance hand_contacts=(('free', 'released'), ('free', 'released')) fake_hand_support=False"
+    ],
+    "T17": [
+      "frames=1..16 seq_dur_sec=0.625000 pre_hold=3 post_hold=5 oob_rejected=True"
+    ],
+    "T18": [
+      "max_locked_foot_drift_m=0.000e+00 max_axial_trunk_diff_deg=0.000e+00"
+    ],
+    "T19": [
+      "armature=['CharacterArmature'] left_counts={'query_spatial_surface': 1, 'compute_hand_target_from_surface': 1, 'planner_execute': 1, 'compose_planned_pose': 16, 'bridge_execute_frame': 16, 'wbc_execute_frame': 16, 'set_hand_ik_target': 16, 'set_arm_ik_influence': 16} bilateral_counts={'query_spatial_surface': 2, 'compute_hand_target_from_surface': 2, 'planner_execute': 1, 'compose_planned_pose': 16, 'bridge_execute_frame': 16, 'wbc_execute_frame': 16, 'set_hand_ik_target': 32, 'set_arm_ik_influence': 0}"
+    ],
+    "T20": [
+      "blend_sha256=c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632 immutable_inputs=True complete_frame_records=16"
+    ]
+  },
+  "telemetry_record_count": 64,
+  "runs_by_id": {
+    "490c9555d7364116a5c606ef5fb47b64": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": []
+    },
+    "b2c9c14ac8b84a1b9b770d2dcb783770": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": []
+    },
+    "b812093c4893420fa720c7dac57d5ab7": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": []
+    },
+    "1a2d3dcd5e52420082ab19fda000f9d8": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": []
+    }
+  },
+  "source_scene": {
+    "path": "output/dynamics_playground.blend",
+    "sha256_before": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_reported_by_setup": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_reported_by_teardown": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "unchanged": true
+  }
+}

@@ -1,0 +1,12 @@
+C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\character\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+test_t16_ik_execution_creates_zero_fake_contact_or_support (__main__.TestTask7B3EnvironmentHandIntegration.test_t16_ik_execution_creates_zero_fake_contact_or_support) ... ok
+test_t17_timeline_bounds_endpoint_hold_and_contiguous_frames (__main__.TestTask7B3EnvironmentHandIntegration.test_t17_timeline_bounds_endpoint_hold_and_contiguous_frames) ... ok
+test_t18_non_target_limbs_and_historical_standing_preserved (__main__.TestTask7B3EnvironmentHandIntegration.test_t18_non_target_limbs_and_historical_standing_preserved) ... ok
+test_t19_single_armature_unique_control_chain_and_exact_call_counts (__main__.TestTask7B3EnvironmentHandIntegration.test_t19_single_armature_unique_control_chain_and_exact_call_counts) ... ok
+test_t20_input_immutability_asset_integrity_and_evidence_completeness (__main__.TestTask7B3EnvironmentHandIntegration.test_t20_input_immutability_asset_integrity_and_evidence_completeness) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 1.246s
+
+OK
