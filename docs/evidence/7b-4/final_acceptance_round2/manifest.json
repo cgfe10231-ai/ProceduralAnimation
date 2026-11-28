@@ -1,0 +1,142 @@
+{
+  "task": "7B-4",
+  "round": 2,
+  "branch": "task/7b-4",
+  "checkout_head": "4a2f4a0743803e1cb747f0927b236dd357694c39",
+  "frozen_execution_head": "a3720711bfdae1e759485c13f4fc3379be951534",
+  "prior_evidence_path": "docs/evidence/7b-4/final_acceptance",
+  "blender_version": "5.1.1",
+  "blender_build_hash": "b70da489d7f4",
+  "blender_python": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+  "frozen_blobs": {
+    "src/motion/contact_model.py": "267c6c997e0c02cd5f76b2936fc2c975ae50cf07",
+    "tests/verify_task7b1_environment_targets.py": "c62fa1626c92aa9a81757156af9b8e9e5e0e1ef9",
+    "tests/verify_task7b2_hand_target_geometry.py": "b8381a354fc4e7e05e4b3c7013256baafa038aa4",
+    "tests/verify_task7b3_environment_hand_integration.py": "ed66ce955c81375ad407e5d1c03d919542155fc1",
+    "tests/run_test_suite.py": "eaa4658fc5b9e7adc15dde80d3cc43857e18bc05",
+    "tests/test_registry.py": "43acac995be2994596f852460d52ea9f77a99998"
+  },
+  "working_directory": "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{4c1a9323-ae34-4202-bc14-d7484d5f46dc}\\Temp\\procedural-7b4-r2-obajzn3t\\repo",
+  "source_scene": {
+    "path": "output/dynamics_playground.blend",
+    "sha256_before": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632"
+  },
+  "files": [
+    {
+      "path": "isolated_asset_inventory.json",
+      "bytes": 171044,
+      "sha256": "0bf232b691f2ed79fd34c04ccc9e4635516dde02f953877bdfe114b0cd4dc2c8"
+    },
+    {
+      "path": "regression_full/command.json",
+      "bytes": 862,
+      "sha256": "16b41f95a07aef499582a4477091b810452b707bee46456f63ce42ae3f27a194"
+    },
+    {
+      "path": "regression_full/exitcode.txt",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+    },
+    {
+      "path": "regression_full/results.json",
+      "bytes": 520,
+      "sha256": "7af1198fdaff9d76c416284c1212ead707a21692e1732018804871f00be75957"
+    },
+    {
+      "path": "regression_full/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "regression_full/stdout.log",
+      "bytes": 24327,
+      "sha256": "5a31e854b209c93610d6a1e88c34db79d0614ca3a84efb015c23c65f230cc8c9"
+    },
+    {
+      "path": "regression_full/test_report.json",
+      "bytes": 79417,
+      "sha256": "92e68b349ce67d053ce37ee3c0fd4773c8b50456b161ec58bee5f4b9b7d51a4d"
+    },
+    {
+      "path": "regression_full/test_report.md",
+      "bytes": 6591,
+      "sha256": "fb6c1bf43aa809acee34230cb20b1ad604e06187204915b769de89179371dfa9"
+    },
+    {
+      "path": "regression_motion/command.json",
+      "bytes": 870,
+      "sha256": "8258046b6e65da5a2c187afa9888de6db623797abb99769ee161b2afc1e0ca5a"
+    },
+    {
+      "path": "regression_motion/exitcode.txt",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+    },
+    {
+      "path": "regression_motion/results.json",
+      "bytes": 518,
+      "sha256": "3ff3bc8bf8ff82561dc21891d1e38f53ac61b8f3443e5a90e151d7885ae9517a"
+    },
+    {
+      "path": "regression_motion/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "regression_motion/stdout.log",
+      "bytes": 7942,
+      "sha256": "ae051a94c304369cfd7944d300644853a9c1155d71ca1f21ec85049ad609cb07"
+    },
+    {
+      "path": "regression_motion/test_report.json",
+      "bytes": 26104,
+      "sha256": "6461e027871e1b616a04dfcd754c1605700c31d52dcea22a7df95cc7adc21799"
+    },
+    {
+      "path": "regression_motion/test_report.md",
+      "bytes": 2421,
+      "sha256": "6e9b03f32a464aa0fc6d62216655f47132a66697248b965608c686ed94464648"
+    },
+    {
+      "path": "regression_physics/command.json",
+      "bytes": 874,
+      "sha256": "01ed78e51059da5902537e7a7dcd27ff6b9e1659de05bd8048cb49dac16eb6c6"
+    },
+    {
+      "path": "regression_physics/exitcode.txt",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+    },
+    {
+      "path": "regression_physics/results.json",
+      "bytes": 520,
+      "sha256": "f4dc01345a318e72b3b73fa72d932fbbc3459ca3857d005f1c3e3de9e1492095"
+    },
+    {
+      "path": "regression_physics/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "regression_physics/stdout.log",
+      "bytes": 15955,
+      "sha256": "9841f912583c2c82bf5e9e26cff799b441a7013f6c464bf007e6d3de035d5127"
+    },
+    {
+      "path": "regression_physics/test_report.json",
+      "bytes": 51504,
+      "sha256": "0a8d2652af6c84bfa4385d43df05047c325645ddc76f083ff8fc072aeede5760"
+    },
+    {
+      "path": "regression_physics/test_report.md",
+      "bytes": 4301,
+      "sha256": "28c4cf8989d7872b212a0c24d183e8759875432111ab2296c55830168433b8db"
+    },
+    {
+      "path": "results.json",
+      "bytes": 2500,
+      "sha256": "daead5d71e97ef363f5189decbf27d64f8b79750837f7d678b2e42058872ff7d"
+    }
+  ]
+}
