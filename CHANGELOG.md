@@ -2,6 +2,12 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-28] Phase 7C 阶段划分与7C-1准入
+
+- 7C-1：实际人体状态至动力学状态转换；7C-2：有效接触至受力约束转换；7C-3：动力学结果至运动目标转换；7C-4：唯一生产链与统一帧提交合流；7C-5：连续反馈闭环验证及联合回归。
+- `Phase 7C` 五节点划分已获负责人批准。当前唯一实施节点：`Task 7C-1`（`IMPLEMENTATION — OWNER AUTHORIZED`，分支 `task/7c-1`）。仅允许无状态人体动力学初始状态转换函数及其专项测试脚本准备；禁止执行测试，禁止接入生产帧执行链。`7C-2` 至 `7C-5` 尚未开放实施。
+- 本节点尚未完成编码与动态验证；两条生产管线仍然独立。
+
 ### [2026-11-28] Phase 7B 最终验收与主干收归
 
 - `Task 7B-4`：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。Blender 5.1.1 联合专项 46/46 PASS（7B-1 12/12、7B-2 14/14、7B-3 20/20），独立相关回归 47/47 PASS；四级回归 quick 19/19、physics 27/27、motion 12/12、full 42/42，最终各组 rc=0、FAILED=SKIPPED=NOT_RUN=0。第一轮 physics 因隔离资产遗漏停止，补齐后通过，原始失败证据保留。源训练场 SHA-256 不变；AUTOMATED_PASS 不等于人工视觉验收。冻结执行基线 `a3720711bfdae1e759485c13f4fc3379be951534`；证据提交 `4a2f4a0743803e1cb747f0927b236dd357694c39`、`1cc2a4b18a309723dc5a0cae2a4e981e2e263f82`，证据目录 `docs/evidence/7b-4/final_acceptance/`、`docs/evidence/7b-4/final_acceptance_round2/`。Phase 7B 已收归 `master`。下一节点 `Phase 7C`：`NOT AUTHORIZED`（仅 ChatGPT 独立只读审计，尚未批准实施）。
