@@ -2,6 +2,11 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-28] Phase 7B 最终验收与主干收归
+
+- `Task 7B-4`：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。Blender 5.1.1 联合专项 46/46 PASS（7B-1 12/12、7B-2 14/14、7B-3 20/20），独立相关回归 47/47 PASS；四级回归 quick 19/19、physics 27/27、motion 12/12、full 42/42，最终各组 rc=0、FAILED=SKIPPED=NOT_RUN=0。第一轮 physics 因隔离资产遗漏停止，补齐后通过，原始失败证据保留。源训练场 SHA-256 不变；AUTOMATED_PASS 不等于人工视觉验收。冻结执行基线 `a3720711bfdae1e759485c13f4fc3379be951534`；证据提交 `4a2f4a0743803e1cb747f0927b236dd357694c39`、`1cc2a4b18a309723dc5a0cae2a4e981e2e263f82`，证据目录 `docs/evidence/7b-4/final_acceptance/`、`docs/evidence/7b-4/final_acceptance_round2/`。Phase 7B 已收归 `master`。下一节点 `Phase 7C`：`NOT AUTHORIZED`（仅 ChatGPT 独立只读审计，尚未批准实施）。
+- 生产代码仅 Task 7B-2 新增单一几何转换函数；其余生产控制链保持不变。历史九项人工视觉待办保持原登记。
+
 ### [2026-11-28] Task 7B-3 专项验收入账及 Task 7B-4 准入开启
 
 - `Task 7B-3`：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`。Blender 5.1.1 专项 T01–T20 两轮累计 20/20 PASS；第一轮 T01–T15 PASS、T16 FAIL、T17–T20 NOT_RUN，退出码 1；BUG-03 修复后第二轮 T16–T20 全部 PASS，退出码 0；BUG-01、BUG-02、BUG-03 CLOSED；生产源码零修改。第一轮证据提交 `238383869203aaa39218d2695c2592bd80d44a2e`，`docs/evidence/7b-3/verification/`；第二轮证据提交 `d9862ada5c392080a03efb38ea7f2e90201580d2`，`docs/evidence/7b-3/verification_round2/`。
