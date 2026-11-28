@@ -490,7 +490,7 @@ def convert_effective_contacts_to_force_constraints(
         for name, value in (("contact_id", record.contact_id), ("surface_id", record.surface_id)):
             if not isinstance(value, str):
                 raise TypeError(f"Contact {record.limb!r} {name} must be a string")
-            if not value:
+            if not value or (name == "contact_id" and not value.strip()):
                 raise ValueError(f"Contact {record.limb!r} {name} must be non-empty")
         contact_id = record.contact_id
         if contact_id in constraints:

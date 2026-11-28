@@ -322,6 +322,8 @@ class TestTask7C2ContactConstraintConversion(unittest.TestCase):
             ("wrong record", TypeError, MultiContactState(contacts={"foot_L": object()})),
             ("non-mapping", TypeError, MultiContactState(contacts=[good])),
             ("empty ID", ValueError, _state(replace(good, contact_id=""))),
+            ("whitespace-only ID", ValueError, _state(replace(good, contact_id="   "))),
+            ("control-whitespace ID", ValueError, _state(replace(good, contact_id="\t\n"))),
             ("non-string ID", TypeError, _state(replace(good, contact_id=1))),
             ("duplicate effective ID", ValueError, _state(good, duplicate)),
             ("wrong limb type", TypeError, MultiContactState(contacts={"foot_L": replace(good, limb=1)})),
