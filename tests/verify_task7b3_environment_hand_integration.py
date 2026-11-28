@@ -2003,8 +2003,15 @@ class TestTask7B3EnvironmentHandIntegration(unittest.TestCase):
                 )
                 self.assertFalse(snap.hand_ik_custom_locked_L)
                 self.assertFalse(snap.hand_ik_custom_locked_R)
-                self.assertNotIn("hand_L", snap.motion_state_contacts)
-                self.assertNotIn("hand_R", snap.motion_state_contacts)
+                # [INTRODUCED 2026-11-28T16:11:07+08:00]
+                # FUNCTION: test_t16_ik_execution_creates_zero_fake_contact_or_support
+                # PURPOSE: Verify that legacy MotionState hand contact entries remain unlocked in swing phase.
+                # REASON: TASK 7B-3 T16 — Match the independently reviewed legacy contact projection contract.
+                for limb in ("hand_L", "hand_R"):
+                    self.assertIn(limb, snap.motion_state_contacts)
+                    self.assertEqual(snap.motion_state_contacts[limb]["limb"], limb)
+                    self.assertEqual(snap.motion_state_contacts[limb]["phase"], "swing")
+                    self.assertFalse(snap.motion_state_contacts[limb]["is_locked"])
 
             print(
                 f"[7B-3][T16] run={run_label} frames={len(snaps)} support_type={snaps[-1].support_type} "
