@@ -1,0 +1,19 @@
+test_t01_real_wall_target_conversion (__main__.TestTask7B2HandTargetGeometry.test_t01_real_wall_target_conversion) ... ok
+test_t02_real_vault_box_top_target_conversion (__main__.TestTask7B2HandTargetGeometry.test_t02_real_vault_box_top_target_conversion) ... ok
+test_t03_real_ledge_bar_bottom_target_conversion (__main__.TestTask7B2HandTargetGeometry.test_t03_real_ledge_bar_bottom_target_conversion) ... ok
+test_t04_bilateral_hand_local_anchor_contract (__main__.TestTask7B2HandTargetGeometry.test_t04_bilateral_hand_local_anchor_contract) ... ok
+test_t05_non_axis_aligned_tilted_surface (__main__.TestTask7B2HandTargetGeometry.test_t05_non_axis_aligned_tilted_surface) ... ok
+test_t06_same_surface_different_tangents (__main__.TestTask7B2HandTargetGeometry.test_t06_same_surface_different_tangents) ... ok
+test_t07_so3_orthogonality_and_right_handedness (__main__.TestTask7B2HandTargetGeometry.test_t07_so3_orthogonality_and_right_handedness) ... ok
+test_t08_xyz_euler_roundtrip_via_rotation_matrix (__main__.TestTask7B2HandTargetGeometry.test_t08_xyz_euler_roundtrip_via_rotation_matrix) ... ok
+test_t09_forward_contact_anchor_reconstruction (__main__.TestTask7B2HandTargetGeometry.test_t09_forward_contact_anchor_reconstruction) ... ok
+test_t10_environment_translation_covariance (__main__.TestTask7B2HandTargetGeometry.test_t10_environment_translation_covariance) ... ok
+test_t11_environment_rotation_covariance (__main__.TestTask7B2HandTargetGeometry.test_t11_environment_rotation_covariance) ... ok
+test_t12_invalid_inputs_and_failed_query_rejection (__main__.TestTask7B2HandTargetGeometry.test_t12_invalid_inputs_and_failed_query_rejection) ... ok
+test_t13_zero_parallel_and_near_degenerate_tangent_rejection (__main__.TestTask7B2HandTargetGeometry.test_t13_zero_parallel_and_near_degenerate_tangent_rejection) ... ok
+test_t14_repeat_consistency_and_zero_state_side_effects (__main__.TestTask7B2HandTargetGeometry.test_t14_repeat_consistency_and_zero_state_side_effects) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.158s
+
+OK

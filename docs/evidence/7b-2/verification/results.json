@@ -1,0 +1,298 @@
+{
+  "task": "TASK 7B-2",
+  "title": "Environmental Surface to Wrist Position & 3D Orientation Conversion Verification",
+  "executed_at": "2026-11-28T14:16:50+08:00",
+  "git": {
+    "branch": "task/7b-2",
+    "frozen_head": "6a7779c574ece598b85ca7cb03b784bcb3c9f35a",
+    "production_file": "src/motion/contact_model.py",
+    "production_blob": "267c6c997e0c02cd5f76b2936fc2c975ae50cf07",
+    "test_script": "tests/verify_task7b2_hand_target_geometry.py",
+    "test_script_blob": "b8381a354fc4e7e05e4b3c7013256baafa038aa4"
+  },
+  "environment": {
+    "blender_executable": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+    "blender_version": "Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)",
+    "command": "& \"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python tests/verify_task7b2_hand_target_geometry.py -- --failfast",
+    "exit_code": 0,
+    "unittest_duration_sec": 0.158
+  },
+  "source_asset": {
+    "path": "output/dynamics_playground.blend",
+    "sha256_before": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "unchanged": true
+  },
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "not_run": 0
+  },
+  "tests": [
+    {
+      "id": "T01",
+      "method": "test_t01_real_wall_target_conversion",
+      "status": "PASS",
+      "metrics": {
+        "surface_id": "mesh:Surface_VerticalWall:2",
+        "L": {
+          "wrist_world_xyz": [0.0, 23.78499984741211, 1.25],
+          "hand_rotation_deg": [90.00000250447816, 0.0, 0.0],
+          "anchor_err_m": 0.0,
+          "normal_err": 4.371e-08,
+          "tangent_err": 4.371e-08,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        },
+        "R": {
+          "wrist_world_xyz": [0.0, 23.78499984741211, 1.25],
+          "hand_rotation_deg": [90.00000250447816, 0.0, 0.0],
+          "anchor_err_m": 0.0,
+          "normal_err": 4.371e-08,
+          "tangent_err": 4.371e-08,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        }
+      }
+    },
+    {
+      "id": "T02",
+      "method": "test_t02_real_vault_box_top_target_conversion",
+      "status": "PASS",
+      "metrics": {
+        "surface_id": "mesh:Surface_VaultBox:1",
+        "L": {
+          "wrist_world_xyz": [0.0, 27.950000762939453, 0.9149999618530273],
+          "hand_rotation_deg": [0.0, -0.0, 0.0],
+          "anchor_err_m": 0.0,
+          "normal_err": 0.0,
+          "tangent_err": 0.0,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        },
+        "R": {
+          "wrist_world_xyz": [0.0, 27.950000762939453, 0.9149999618530273],
+          "hand_rotation_deg": [0.0, -0.0, 0.0],
+          "anchor_err_m": 0.0,
+          "normal_err": 0.0,
+          "tangent_err": 0.0,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        }
+      }
+    },
+    {
+      "id": "T03",
+      "method": "test_t03_real_ledge_bar_bottom_target_conversion",
+      "status": "PASS",
+      "metrics": {
+        "surface_id": "mesh:Surface_LedgeBar_Crossbar:0",
+        "L": {
+          "wrist_world_xyz": [0.0, 31.950000762939453, 2.134999990463257],
+          "hand_rotation_deg": [-0.0, -180.00000500895632, -0.0],
+          "anchor_err_m": 1.311e-09,
+          "normal_err": 8.742e-08,
+          "tangent_err": 0.0,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        },
+        "R": {
+          "wrist_world_xyz": [0.0, 31.950000762939453, 2.134999990463257],
+          "hand_rotation_deg": [-0.0, -180.00000500895632, -0.0],
+          "anchor_err_m": 1.311e-09,
+          "normal_err": 8.742e-08,
+          "tangent_err": 0.0,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        }
+      }
+    },
+    {
+      "id": "T04",
+      "method": "test_t04_bilateral_hand_local_anchor_contract",
+      "status": "PASS",
+      "metrics": {
+        "surface_id": "mesh:TEST_CONSTRUCTED_anchor_contract:0",
+        "L": {
+          "anchor_err_m": 0.0,
+          "normal_err": 4.371e-08,
+          "tangent_err": 4.371e-08,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        },
+        "R": {
+          "anchor_err_m": 0.0,
+          "normal_err": 4.371e-08,
+          "tangent_err": 4.371e-08,
+          "ortho_err": 0.0,
+          "det_err": 0.0
+        }
+      }
+    },
+    {
+      "id": "T05",
+      "method": "test_t05_non_axis_aligned_tilted_surface",
+      "status": "PASS",
+      "metrics": {
+        "surface_id": "mesh:TEST_CONSTRUCTED_tilted_plane:0",
+        "L": {
+          "anchor_err_m": 0.0,
+          "normal_err": 2.98e-08,
+          "tangent_err": 5.96e-08,
+          "ortho_err": 5.96e-08,
+          "det_err": 0.0
+        },
+        "R": {
+          "anchor_err_m": 0.0,
+          "normal_err": 2.98e-08,
+          "tangent_err": 5.96e-08,
+          "ortho_err": 5.96e-08,
+          "det_err": 0.0
+        }
+      }
+    },
+    {
+      "id": "T06",
+      "method": "test_t06_same_surface_different_tangents",
+      "status": "PASS",
+      "metrics": {
+        "surface_id": "mesh:TEST_CONSTRUCTED_same_surface:0",
+        "hint_a": {"anchor_err_m": 1.229e-07, "normal_err": 8.56e-08, "tangent_err": 1.885e-07, "ortho_err": 5.96e-08, "det_err": 0.0},
+        "hint_b": {"anchor_err_m": 0.0, "normal_err": 9.541e-08, "tangent_err": 5.96e-08, "ortho_err": 3.725e-08, "det_err": 0.0},
+        "mat_diff": 1.126006,
+        "wrist_diff_m": 0.072732
+      }
+    },
+    {
+      "id": "T07",
+      "method": "test_t07_so3_orthogonality_and_right_handedness",
+      "status": "PASS",
+      "metrics": {
+        "cases": 6,
+        "worst_ortho_err": 5.96e-08,
+        "worst_det_err": 5.96e-08
+      }
+    },
+    {
+      "id": "T08",
+      "method": "test_t08_xyz_euler_roundtrip_via_rotation_matrix",
+      "status": "PASS",
+      "metrics": {
+        "cases": 5,
+        "worst_roundtrip_mat_err": 8.742e-08
+      }
+    },
+    {
+      "id": "T09",
+      "method": "test_t09_forward_contact_anchor_reconstruction",
+      "status": "PASS",
+      "metrics": {
+        "checks": 8,
+        "max_anchor_compliance_err_m": 1.311e-09
+      }
+    },
+    {
+      "id": "T10",
+      "method": "test_t10_environment_translation_covariance",
+      "status": "PASS",
+      "metrics": {
+        "L": {"pos_cov_err_m": 5.96e-08, "rot_cov_mat_err": 0.0},
+        "R": {"pos_cov_err_m": 5.96e-08, "rot_cov_mat_err": 0.0}
+      }
+    },
+    {
+      "id": "T11",
+      "method": "test_t11_environment_rotation_covariance",
+      "status": "PASS",
+      "metrics": {
+        "L": {"pos_cov_err_m": 9.537e-07, "rot_cov_mat_err": 5.96e-08},
+        "R": {"pos_cov_err_m": 9.537e-07, "rot_cov_mat_err": 5.96e-08}
+      }
+    },
+    {
+      "id": "T12",
+      "method": "test_t12_invalid_inputs_and_failed_query_rejection",
+      "status": "PASS",
+      "negative_subcases": [
+        {"case": "failed_query", "status": "REJECTED", "exc": "ValueError", "reason": "surface query must succeed (success=False, error_reason='NO_HIT: empty')"},
+        {"case": "source_analytical", "status": "REJECTED", "exc": "ValueError", "reason": "surface.source_type must be 'mesh', got 'analytical'"},
+        {"case": "source_default", "status": "REJECTED", "exc": "ValueError", "reason": "surface.source_type must be 'mesh', got 'default'"},
+        {"case": "source_none", "status": "REJECTED", "exc": "ValueError", "reason": "surface.source_type must be 'mesh', got 'none'"},
+        {"case": "side_both", "status": "REJECTED", "exc": "ValueError", "reason": "Invalid hand side 'BOTH'; expected strictly 'L' or 'R'"},
+        {"case": "side_lower", "status": "REJECTED", "exc": "ValueError", "reason": "Invalid hand side 'l'; expected strictly 'L' or 'R'"},
+        {"case": "side_empty", "status": "REJECTED", "exc": "ValueError", "reason": "Invalid hand side ''; expected strictly 'L' or 'R'"},
+        {"case": "side_int", "status": "REJECTED", "exc": "ValueError", "reason": "Invalid hand side 1; expected strictly 'L' or 'R'"},
+        {"case": "surface_not_dataclass", "status": "REJECTED", "exc": "TypeError", "reason": "surface must be SurfaceQueryResult, got dict"},
+        {"case": "id_empty", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must start with 'mesh:', got ''"},
+        {"case": "id_spaces", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must start with 'mesh:', got '   '"},
+        {"case": "id_none", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must start with 'mesh:', got 'none'"},
+        {"case": "id_default_ground", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must start with 'mesh:', got 'default_ground'"},
+        {"case": "id_prefix_only", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:'"},
+        {"case": "id_missing_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall'"},
+        {"case": "id_empty_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:'"},
+        {"case": "id_spaces_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:   '"},
+        {"case": "id_non_numeric_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:abc'"},
+        {"case": "id_decimal_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:1.5'"},
+        {"case": "id_non_ascii_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:²'"},
+        {"case": "id_plus_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:+1'"},
+        {"case": "id_empty_obj", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh::0'"},
+        {"case": "id_spaces_obj", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:   :0'"},
+        {"case": "id_neg_poly", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Wall:-1'"},
+        {"case": "dim_point_2d", "status": "REJECTED", "exc": "ValueError", "reason": "'surface.contact_point_world' must have exactly 3 components, got 2: (0.0, 0.0)"},
+        {"case": "dim_hint_4d", "status": "REJECTED", "exc": "ValueError", "reason": "'tangent_hint_world' must have exactly 3 components, got 4: (0.0, 0.0, 1.0, 0.0)"},
+        {"case": "type_hint_bool", "status": "REJECTED", "exc": "TypeError", "reason": "'tangent_hint_world[0]' must be a real number, got bool: True"},
+        {"case": "nan_point", "status": "REJECTED", "exc": "ValueError", "reason": "'surface.contact_point_world[0]' must be finite, got nan"},
+        {"case": "inf_normal", "status": "REJECTED", "exc": "ValueError", "reason": "'surface.surface_normal_world[2]' must be finite, got inf"},
+        {"case": "neg_inf_hint", "status": "REJECTED", "exc": "ValueError", "reason": "'tangent_hint_world[2]' must be finite, got -inf"},
+        {"case": "norm_zero", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_normal_world must be unit length within 1e-6, got length=0.0"},
+        {"case": "norm_double", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_normal_world must be unit length within 1e-6, got length=2.0"},
+        {"case": "norm_short_tol", "status": "REJECTED", "exc": "ValueError", "reason": "surface.surface_normal_world must be unit length within 1e-6, got length=0.9999"}
+      ],
+      "positive_colon_subcases": [
+        {"surface_id": "mesh:NS:SubRig:Surface_VerticalWall:12", "status": "PASS", "anchor_err_m": 0.0, "normal_err": 4.371e-08, "tangent_err": 4.371e-08, "ortho_err": 0.0, "det_err": 0.0},
+        {"surface_id": "mesh:Character:Wall:Front:0", "status": "PASS", "anchor_err_m": 0.0, "normal_err": 4.371e-08, "tangent_err": 4.371e-08, "ortho_err": 0.0, "det_err": 0.0}
+      ]
+    },
+    {
+      "id": "T13",
+      "method": "test_t13_zero_parallel_and_near_degenerate_tangent_rejection",
+      "status": "PASS",
+      "negative_subcases": [
+        {"case": "zero_vec", "status": "REJECTED", "reason": "tangent_hint_world must be non-zero"},
+        {"case": "sub_tol_vec", "status": "REJECTED", "reason": "tangent_hint_world is parallel or near-degenerate with surface normal (projected length=0.0 <= 1e-6)"},
+        {"case": "exact_parallel", "status": "REJECTED", "reason": "tangent_hint_world is parallel or near-degenerate with surface normal (projected length=0.0 <= 1e-6)"},
+        {"case": "exact_antiparallel", "status": "REJECTED", "reason": "tangent_hint_world is parallel or near-degenerate with surface normal (projected length=0.0 <= 1e-6)"},
+        {"case": "near_parallel_wall", "status": "REJECTED", "reason": "tangent_hint_world is parallel or near-degenerate with surface normal (projected length=9.999999999999948e-08 <= 1e-6)"},
+        {"case": "near_parallel_tilt", "status": "REJECTED", "reason": "tangent_hint_world is parallel or near-degenerate with surface normal (projected length=9.540567900670046e-08 <= 1e-6)"}
+      ],
+      "scale_invariance_subcases": [
+        {"side": "L", "scale": 1e-08, "status": "PASS", "pos_diff_m": 0.0, "rot_mat_diff": 0.0},
+        {"side": "L", "scale": 1.0, "status": "PASS", "pos_diff_m": 0.0, "rot_mat_diff": 0.0},
+        {"side": "L", "scale": 100000000.0, "status": "PASS", "pos_diff_m": 0.0, "rot_mat_diff": 0.0},
+        {"side": "R", "scale": 1e-08, "status": "PASS", "pos_diff_m": 0.0, "rot_mat_diff": 0.0},
+        {"side": "R", "scale": 1.0, "status": "PASS", "pos_diff_m": 0.0, "rot_mat_diff": 0.0},
+        {"side": "R", "scale": 100000000.0, "status": "PASS", "pos_diff_m": 0.0, "rot_mat_diff": 0.0}
+      ],
+      "near_degenerate_positive_subcases": [
+        {"side": "L", "proj_len": 2e-06, "status": "PASS", "indep_rot_mat_err": 5.96e-08, "indep_wrist_err_m": 0.0},
+        {"side": "R", "proj_len": 2e-06, "status": "PASS", "indep_rot_mat_err": 5.96e-08, "indep_wrist_err_m": 0.0},
+        {"side": "L", "proj_len": 5e-06, "status": "PASS", "indep_rot_mat_err": 5.96e-08, "indep_wrist_err_m": 0.0},
+        {"side": "R", "proj_len": 5e-06, "status": "PASS", "indep_rot_mat_err": 5.96e-08, "indep_wrist_err_m": 0.0}
+      ]
+    },
+    {
+      "id": "T14",
+      "method": "test_t14_repeat_consistency_and_zero_state_side_effects",
+      "status": "PASS",
+      "metrics": {
+        "repeat_calls": 20,
+        "object_count": 101,
+        "wrist_xyz": [-0.009805806912481785, 23.78499984741211, 1.2509709596633911],
+        "rot_deg": [90.00000250447816, 11.309932661705695, 0.0],
+        "blend_unchanged": true
+      }
+    }
+  ]
+}
