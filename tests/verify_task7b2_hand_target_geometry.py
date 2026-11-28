@@ -589,7 +589,15 @@ class TestTask7B2HandTargetGeometry(unittest.TestCase):
             ("id_none", "L", _make_constructed_mesh_surface("none", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
             ("id_default_ground", "L", _make_constructed_mesh_surface("default_ground", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
             ("id_prefix_only", "L", _make_constructed_mesh_surface("mesh:", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_missing_poly", "L", _make_constructed_mesh_surface("mesh:Surface_VerticalWall", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_empty_poly", "L", _make_constructed_mesh_surface("mesh:Surface_VerticalWall:", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_spaces_poly", "L", _make_constructed_mesh_surface("mesh:Surface_VerticalWall:   ", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_non_numeric_poly", "L", _make_constructed_mesh_surface("mesh:Surface_VerticalWall:abc", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_decimal_poly", "L", _make_constructed_mesh_surface("mesh:Surface_VerticalWall:1.5", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_non_ascii_poly", "L", _make_constructed_mesh_surface("mesh:Surface_VerticalWall:\u00b2", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_plus_poly", "L", _make_constructed_mesh_surface("mesh:Surface_VerticalWall:+1", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
             ("id_empty_obj", "L", _make_constructed_mesh_surface("mesh::0", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
+            ("id_spaces_obj", "L", _make_constructed_mesh_surface("mesh:   :0", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
             ("id_neg_poly", "L", _make_constructed_mesh_surface("mesh:Wall:-1", (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),
             ("dim_point_2d", "L", _make_constructed_mesh_surface("mesh:TEST:0", (0.0, 0.0), (0.0, 0.0, 1.0)), valid_hint),  # type: ignore[arg-type]
             ("dim_hint_4d", "L", valid_surf, (0.0, 0.0, 1.0, 0.0)),  # type: ignore[arg-type]
@@ -609,10 +617,23 @@ class TestTask7B2HandTargetGeometry(unittest.TestCase):
                 self.assertTrue(len(msg.strip()) > 0)
                 print(f"[7B-2][T12] rejected case={label} exc={type(ctx.exception).__name__} reason={msg!r}", flush=True)
 
+        # [INTRODUCED 2026-11-28T14:07:00+08:00]
+        # FUNCTION: TestTask7B2HandTargetGeometry.test_t12 (BUG-01 positive colon-containing object name)
+        # PURPOSE: Verify valid Blender object names containing colons with trailing non-negative ASCII polygon index are accepted.
+        # REASON: TASK 7B-2 BUG-01 — Confirm `rpartition(":")` handles object names containing colons without false rejection.
+        for colon_sid in ("mesh:NS:SubRig:Surface_VerticalWall:12", "mesh:Character:Wall:Front:0"):
+            surf_colon = _make_constructed_mesh_surface(
+                colon_sid,
+                contact_point_world=(0.0, 23.8, 1.3),
+                surface_normal_world=(0.0, -1.0, 0.0),
+            )
+            wrist_c, rot_c = compute_hand_target_from_surface("L", surf_colon, valid_hint)
+            _assert_hand_target_contract(self, "T12-COLON", "L", surf_colon, valid_hint, wrist_c, rot_c)
+
     # [INTRODUCED 2026-11-28T13:58:00+08:00]
     # FUNCTION: TestTask7B2HandTargetGeometry.test_t13_zero_parallel_and_near_degenerate_tangent_rejection
-    # PURPOSE: T13 — Reject zero, tiny, parallel, antiparallel, and near-degenerate tangent hints without inventing arbitrary fallback directions.
-    # REASON: TASK 7B-2 T13 — Verify Step 6–8 projection threshold (`<= 1e-6`) raises explicit `ValueError`.
+    # PURPOSE: T13 — Reject zero, parallel, and near-degenerate (`<= 1e-6` projection) tangent hints, while proving scale invariance (`1e-8`, `1`, `1e8`) and float64 near-degenerate (`> 1e-6`) accuracy.
+    # REASON: TASK 7B-2 T13 / BUG-02 — Verify Step 6–8 projection threshold (`<= 1e-6`) rejection and IEEE-754 float64 scale/precision fidelity.
     def test_t13_zero_parallel_and_near_degenerate_tangent_rejection(self) -> None:
         surf_wall = _make_constructed_mesh_surface(
             "mesh:TEST_CONSTRUCTED_degen_wall:0",
@@ -640,6 +661,70 @@ class TestTask7B2HandTargetGeometry(unittest.TestCase):
                 msg = str(ctx.exception)
                 self.assertTrue(len(msg.strip()) > 0)
                 print(f"[7B-2][T13] rejected case={label} reason={msg!r}", flush=True)
+
+        # [INTRODUCED 2026-11-28T14:07:00+08:00]
+        # FUNCTION: TestTask7B2HandTargetGeometry.test_t13 (BUG-02 scale invariance and near-degenerate positive cases)
+        # PURPOSE: Verify scaling a legal tangent hint by `1e-8`, `1`, and `1e8` yields consistent wrist position and SO(3) rotation, and verify a non-axis-aligned near-degenerate hint (`proj > 1e-6`) matches an independent known orthogonal basis within `1e-5`.
+        # REASON: TASK 7B-2 BUG-02 — Confirm elimination of `1e-6` pre-normalization length threshold and float64 projection accuracy.
+        base_hint = (0.8, 0.5, -0.2)
+        for side in ("L", "R"):
+            w_ref, r_ref_deg = compute_hand_target_from_surface(side, surf_tilt, base_hint)
+            m_ref = _matrix_from_euler_deg(r_ref_deg)
+            for scale in (1e-8, 1.0, 1e8):
+                scaled_hint = (base_hint[0] * scale, base_hint[1] * scale, base_hint[2] * scale)
+                w_s, r_s_deg = compute_hand_target_from_surface(side, surf_tilt, scaled_hint)
+                m_s = _matrix_from_euler_deg(r_s_deg)
+                pos_diff = (Vector(w_s) - Vector(w_ref)).length
+                mat_diff = _max_matrix_diff(m_s, m_ref)
+                self.assertLessEqual(pos_diff, METRIC_TOL)
+                self.assertLessEqual(mat_diff, METRIC_TOL)
+                print(
+                    f"[7B-2][T13-SCALE] side={side} scale={scale:.0e} "
+                    f"pos_diff_m={pos_diff:.3e} rot_mat_diff={mat_diff:.3e}",
+                    flush=True,
+                )
+
+        # Independent exact Pythagorean orthogonal pair in float64:
+        # |(2, -3, 6)| = 7, |(3, 6, 2)| = 7, and (2,-3,6).(3,6,2) = 6 - 18 + 12 = 0 identically.
+        n_exact = (2.0 / 7.0, -3.0 / 7.0, 6.0 / 7.0)
+        t_exact = (3.0 / 7.0, 6.0 / 7.0, 2.0 / 7.0)
+        x_exact = (
+            t_exact[1] * n_exact[2] - t_exact[2] * n_exact[1],
+            t_exact[2] * n_exact[0] - t_exact[0] * n_exact[2],
+            t_exact[0] * n_exact[1] - t_exact[1] * n_exact[0],
+        )
+        r_expected_indep = Matrix((
+            (x_exact[0], t_exact[0], n_exact[0]),
+            (x_exact[1], t_exact[1], n_exact[1]),
+            (x_exact[2], t_exact[2], n_exact[2]),
+        ))
+        surf_pyth = _make_constructed_mesh_surface(
+            "mesh:TEST_CONSTRUCTED_near_degen_positive:0",
+            contact_point_world=(0.5, 19.0, 1.35),
+            surface_normal_world=n_exact,
+        )
+        for eps_sin in (2e-6, 5e-6):
+            cos_theta = math.sqrt(1.0 - eps_sin * eps_sin)
+            hint_near_pos = (
+                cos_theta * n_exact[0] + eps_sin * t_exact[0],
+                cos_theta * n_exact[1] + eps_sin * t_exact[1],
+                cos_theta * n_exact[2] + eps_sin * t_exact[2],
+            )
+            for side in ("L", "R"):
+                w_near, r_near_deg = compute_hand_target_from_surface(side, surf_pyth, hint_near_pos)
+                m_near = _matrix_from_euler_deg(r_near_deg)
+                indep_rot_err = _max_matrix_diff(m_near, r_expected_indep)
+                self.assertLessEqual(indep_rot_err, METRIC_TOL)
+                expected_wrist_indep = Vector(surf_pyth.contact_point_world) - (
+                    r_expected_indep @ Vector(DEFAULT_LIMB_LOCAL_ANCHORS[f"hand_{side}"])
+                )
+                indep_wrist_err = (Vector(w_near) - expected_wrist_indep).length
+                self.assertLessEqual(indep_wrist_err, METRIC_TOL)
+                print(
+                    f"[7B-2][T13-NEAR-POS] side={side} proj_len={eps_sin:.1e} "
+                    f"indep_rot_mat_err={indep_rot_err:.3e} indep_wrist_err_m={indep_wrist_err:.3e}",
+                    flush=True,
+                )
 
     # [INTRODUCED 2026-11-28T13:58:00+08:00]
     # FUNCTION: TestTask7B2HandTargetGeometry.test_t14_repeat_consistency_and_zero_state_side_effects

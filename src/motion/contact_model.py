@@ -644,32 +644,32 @@ def compute_hand_target_from_surface(
             f"surface query must succeed (success={surface.success!r}, error_reason={surface.error_reason!r})"
         )
 
-    # 3. Require source_type == 'mesh' and a valid non-empty mesh surface_id
+    # 3. Require source_type == 'mesh' and authoritative 'mesh:<object_name>:<polygon_index>' format
+    # [INTRODUCED 2026-11-28T14:07:00+08:00]
+    # FUNCTION: compute_hand_target_from_surface.validate_mesh_surface_id_and_tangent_precision
+    # PURPOSE: Validate strict `mesh:<object_name>:<polygon_index>` identity via `rpartition(":")` (allowing colons in object name, requiring non-negative ASCII integer polygon index) and perform normal/tangent normalization and tangent-plane projection in IEEE-754 float64 using `math.hypot`, `math.fsum`, and max-abs scaling without a `1e-6` pre-normalization length cutoff.
+    # REASON: TASK 7B-2 BUG-01 / BUG-02 — Fix mesh identity edge-case acceptance and preserve float64 precision across large/small tangent scales and near-degenerate projections.
     if surface.source_type != "mesh":
         raise ValueError(f"surface.source_type must be 'mesh', got {surface.source_type!r}")
-    if not isinstance(surface.surface_id, str):
-        raise ValueError("surface.surface_id must be a valid non-empty mesh identifier")
-    raw_sid = surface.surface_id
-    sid = raw_sid.strip()
+    if not isinstance(surface.surface_id, str) or not surface.surface_id.startswith("mesh:"):
+        raise ValueError(
+            f"surface.surface_id must start with 'mesh:', got {surface.surface_id!r}"
+        )
+    sid_rest = surface.surface_id[len("mesh:"):]
+    obj_name_part, colon_sep, poly_idx_part = sid_rest.rpartition(":")
     if (
-        not sid
-        or sid != raw_sid
-        or sid.lower() in ("none", "free", "default", "default_ground")
-        or not sid.startswith("mesh:")
+        not colon_sep
+        or not obj_name_part.strip()
+        or not poly_idx_part
+        or not (poly_idx_part.isascii() and poly_idx_part.isdigit())
     ):
-        raise ValueError(f"surface.surface_id must be a valid non-empty mesh identifier, got {raw_sid!r}")
-    sid_rest = sid[5:]
-    if not sid_rest or not sid_rest.strip():
-        raise ValueError(f"surface.surface_id missing mesh object identity: {raw_sid!r}")
-    if ":" in sid_rest:
-        parts = sid_rest.split(":")
-        if any(not p.strip() for p in parts) or (
-            parts[-1].startswith("-") and parts[-1][1:].isdigit()
-        ):
-            raise ValueError(f"surface.surface_id has malformed mesh suffix: {raw_sid!r}")
+        raise ValueError(
+            f"surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty "
+            f"object name and non-negative ASCII integer polygon index, got {surface.surface_id!r}"
+        )
 
-    # 4. Validate 3D dimensionality, numeric type, and finiteness of position, normal, and tangent hint
-    parsed_vecs: List[Vector] = []
+    # 4. Validate 3D dimensionality, numeric type, and finiteness in Python float64 precision
+    parsed_xyz: List[Tuple[float, float, float]] = []
     for vec_name, vec_raw in (
         ("surface.contact_point_world", surface.contact_point_world),
         ("surface.surface_normal_world", surface.surface_normal_world),
@@ -695,37 +695,58 @@ def compute_hand_target_from_surface(
             if not math.isfinite(f_comp):
                 raise ValueError(f"'{vec_name}[{idx}]' must be finite, got {comp!r}")
             coords.append(f_comp)
-        parsed_vecs.append(Vector((coords[0], coords[1], coords[2])))
-    surface_point, normal_raw, tangent_raw = parsed_vecs
+        parsed_xyz.append((coords[0], coords[1], coords[2]))
+    surface_point_xyz, normal_xyz, tangent_xyz = parsed_xyz
 
-    # 5. Validate environment normal is unit length within 1e-6, then normalize
-    normal_len = normal_raw.length
-    if not math.isfinite(normal_len) or abs(normal_len - 1.0) > 1e-6:
+    # 5. Validate environment normal unit length within 1e-6 and normalize in float64
+    nx, ny, nz = normal_xyz
+    normal_len = math.hypot(nx, ny, nz)
+    if not math.isfinite(normal_len) or normal_len <= 0.0 or abs(normal_len - 1.0) > 1e-6:
         raise ValueError(
             f"surface.surface_normal_world must be unit length within 1e-6, got length={normal_len!r}"
         )
-    normal = normal_raw.normalized()
+    ux_n = nx / normal_len
+    uy_n = ny / normal_len
+    uz_n = nz / normal_len
 
-    # 6. Validate non-zero tangent hint and normalize
-    tangent_hint_len = tangent_raw.length
-    if not math.isfinite(tangent_hint_len) or tangent_hint_len <= 1e-6:
-        raise ValueError(
-            f"tangent_hint_world must be non-zero (length > 1e-6), got length={tangent_hint_len!r}"
-        )
-    tangent_hint_unit = tangent_raw.normalized()
+    # 6. Normalize non-zero tangent hint in float64 with max-abs component scaling (no 1e-6 raw length cutoff)
+    tx_raw, ty_raw, tz_raw = tangent_xyz
+    t_max_abs = max(abs(tx_raw), abs(ty_raw), abs(tz_raw))
+    if not math.isfinite(t_max_abs) or t_max_abs == 0.0:
+        raise ValueError("tangent_hint_world must be non-zero")
+    tx_scaled = tx_raw / t_max_abs
+    ty_scaled = ty_raw / t_max_abs
+    tz_scaled = tz_raw / t_max_abs
+    t_scaled_len = math.hypot(tx_scaled, ty_scaled, tz_scaled)
+    if not math.isfinite(t_scaled_len) or t_scaled_len == 0.0:
+        raise ValueError("tangent_hint_world could not be normalized")
+    tx_u = tx_scaled / t_scaled_len
+    ty_u = ty_scaled / t_scaled_len
+    tz_u = tz_scaled / t_scaled_len
 
-    # 7-8. Project tangent hint onto environment tangent plane and reject near-degenerate projections
-    tangent_proj = tangent_hint_unit - tangent_hint_unit.dot(normal) * normal
-    tangent_proj_len = tangent_proj.length
+    # 7-8. Project unit tangent hint onto tangent plane in float64 and reject projected length <= 1e-6
+    dot_tn = math.fsum((tx_u * ux_n, ty_u * uy_n, tz_u * uz_n))
+    px = math.fsum((tx_u, -dot_tn * ux_n))
+    py = math.fsum((ty_u, -dot_tn * uy_n))
+    pz = math.fsum((tz_u, -dot_tn * uz_n))
+    tangent_proj_len = math.hypot(px, py, pz)
     if not math.isfinite(tangent_proj_len) or tangent_proj_len <= 1e-6:
         raise ValueError(
             f"tangent_hint_world is parallel or near-degenerate with surface normal "
             f"(projected length={tangent_proj_len!r} <= 1e-6)"
         )
+    tx_dir = px / tangent_proj_len
+    ty_dir = py / tangent_proj_len
+    tz_dir = pz / tangent_proj_len
+
+    # Convert validated surface point and float64-normalized axes to mathutils.Vector
+    surface_point = Vector(surface_point_xyz)
+    normal = Vector((ux_n, uy_n, uz_n))
+    tangent = Vector((tx_dir, ty_dir, tz_dir))
 
     # 9. Construct right-handed orthonormal basis using mathutils
     z_axis = normal
-    y_axis = tangent_proj.normalized()
+    y_axis = tangent
     x_axis_raw = y_axis.cross(z_axis)
     if not math.isfinite(x_axis_raw.length) or x_axis_raw.length <= 1e-6:
         raise ValueError("Degenerate cross product while constructing hand orientation basis")
