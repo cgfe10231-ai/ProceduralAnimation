@@ -2,6 +2,14 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-28] Task 7B-2 专项验收入账及 Task 7B-3 准入开启
+
+- **Task 7B-2（环境目标至手腕位置及三维姿态转换）**：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（保留于 `task/7b-2` 及子分支 `task/7b-3`，**尚未合入 `master`**）。
+  - Blender 5.1.1 专项 `tests/verify_task7b2_hand_target_geometry.py`（Blob `b8381a354fc4e7e05e4b3c7013256baafa038aa4`，测试基线 `6a7779c574ece598b85ca7cb03b784bcb3c9f35a`，`src/motion/contact_model.py` Blob `267c6c997e0c02cd5f76b2936fc2c975ae50cf07`）`T01–T14` 全部通过：`14 PASS / 0 FAIL / 0 SKIP / 0 NOT_RUN`，退出码 `0`；`BUG-01`、`BUG-02` `CLOSED`。
+  - 验收证据提交：`a92280bbcb2243f0b43edd10b61bbadb39c72869`，证据目录：`docs/evidence/7b-2/verification/`。
+- **Task 7B-3（Environmental Target Integration into Upper-Limb Production Pipeline）**：`INTEGRATION VERIFICATION PREPARATION — OWNER AUTHORIZED`。基于 `task/7b-2`（`a92280bbcb2243f0b43edd10b61bbadb39c72869`）创建子分支 `task/7b-3`；仅允许通过现有生产接口完成环境目标与独立上肢轨迹集成验证（仅新增专项测试脚本 `tests/verify_task7b3_environment_hand_integration.py` `T01–T20`），不新增或修改生产函数、模块、控制器、求解器及状态所有权；本轮仅准备集成验证脚本及同步指定文档，禁止运行 Blender 或测试。
+- **后续门禁**：`Task 7B-4` 尚未开放，`Phase 7C` 保持 `NOT AUTHORIZED`。Phase 7B 整体完成联合验收及四级回归后统一合入 `master`。
+
 ### [2026-11-28] Task 7B-1 专项验收入账及 Task 7B-2 准入开启
 
 - **Task 7B-1（Environmental End-Effector Target Acquisition）**：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（保留于 `task/7b-1` 及子分支 `task/7b-2`，**尚未合入 `master`**）。
