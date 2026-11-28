@@ -42,6 +42,7 @@ from src.motion.body_kinematics import (
     BodyVelocityState,
     enrich_motion_state_with_kinematics,
 )
+from src.motion.contact_force_solver import ContactConstraintSpec
 from src.motion.contact_model import (
     ContactLifecycle,
     ContactRecord,
@@ -439,6 +440,120 @@ def convert_body_motion_to_dynamics_state(
         orientation_quat_world=q,
         inertia_tensor_body=inertia_body,
     )
+
+
+# [INTRODUCED 2026-11-28T19:34:08+08:00]
+# TASK: TASK 7C-2
+# FUNCTION: convert_effective_contacts_to_force_constraints
+# PURPOSE: Convert geometrically verified effective contacts into immutable world-space unilateral force constraints.
+# REASON: Bridge the two existing data contracts while rejecting effective grasps that the current solver cannot express.
+def convert_effective_contacts_to_force_constraints(
+    multi_contact: MultiContactState,
+) -> Tuple[ContactConstraintSpec, ...]:
+    """Convert ContactModel's effective contacts without evaluating or solving them.
+
+    ContactRecord does not guarantee ordinary ground-support information. A
+    missing allows_regular_support metadata flag is emitted as False (unconfirmed);
+    it does not exclude an effective unilateral contact.
+    """
+    if not isinstance(multi_contact, MultiContactState):
+        raise TypeError("multi_contact must be a MultiContactState")
+    if not isinstance(multi_contact.contacts, Mapping):
+        raise TypeError("multi_contact.contacts must be a Mapping")
+    for limb, record in multi_contact.contacts.items():
+        if not isinstance(record, ContactRecord):
+            raise TypeError(f"Contact {limb!r} must be a ContactRecord")
+        if not isinstance(limb, str) or not isinstance(record.limb, str):
+            raise TypeError("Contact keys and record.limb must be strings")
+        if not limb or not record.limb or limb != record.limb:
+            raise ValueError(f"Contact key {limb!r} must match its non-empty record.limb")
+        if not isinstance(record.contact_type, ContactType):
+            raise TypeError(f"Contact {limb!r} contact_type must be a ContactType")
+        if not isinstance(record.lifecycle, ContactLifecycle):
+            raise TypeError(f"Contact {limb!r} lifecycle must be a ContactLifecycle")
+        compliance = record.last_compliance_result
+        if compliance is not None:
+            if not isinstance(compliance, GeometricConstraintResult):
+                raise TypeError(f"Contact {limb!r} compliance must be a GeometricConstraintResult")
+            if type(compliance.is_valid) is not bool:
+                raise TypeError(f"Contact {limb!r} compliance.is_valid must be a bool")
+
+    effective = multi_contact.effective_contacts
+    for record in effective.values():
+        if record.contact_type is not ContactType.UNILATERAL:
+            raise ValueError(
+                f"UNSUPPORTED_CONTACT_TYPE {record.contact_type.name}: contact_id={record.contact_id!r}"
+            )
+
+    constraints = {}
+    for record in effective.values():
+        for name, value in (("contact_id", record.contact_id), ("surface_id", record.surface_id)):
+            if not isinstance(value, str):
+                raise TypeError(f"Contact {record.limb!r} {name} must be a string")
+            if not value:
+                raise ValueError(f"Contact {record.limb!r} {name} must be non-empty")
+        contact_id = record.contact_id
+        if contact_id in constraints:
+            raise ValueError(f"Duplicate effective contact_id: {contact_id!r}")
+
+        gap = record.max_allowable_gap_m
+        penetration = record.max_allowable_penetration_m
+        distance = record.last_compliance_result.distance_normal_m
+        friction = record.friction_coeff_static
+        numeric_fields = [
+            ("friction_coeff_static", friction),
+            ("max_allowable_gap_m", gap),
+            ("max_allowable_penetration_m", penetration),
+            ("distance_normal_m", distance),
+        ]
+        vectors = {}
+        for name, vector in (("world_position", record.world_position), ("world_normal", record.world_normal)):
+            if not isinstance(vector, Sequence) or isinstance(vector, (str, bytes, bytearray)):
+                raise TypeError(f"Contact {contact_id!r} {name} must be a numeric sequence")
+            if len(vector) != 3:
+                raise ValueError(f"Contact {contact_id!r} {name} must contain exactly three components")
+            vectors[name] = tuple(vector)
+            numeric_fields.extend((f"{name}[{i}]", value) for i, value in enumerate(vectors[name]))
+        for name, value in numeric_fields:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError(f"Contact {contact_id!r} {name} must be a non-boolean number")
+            try:
+                finite = math.isfinite(value)
+            except OverflowError as exc:
+                raise ValueError(f"Contact {contact_id!r} {name} must be finite") from exc
+            if not finite:
+                raise ValueError(f"Contact {contact_id!r} {name} must be finite")
+
+        normal = vectors["world_normal"]
+        if abs(math.hypot(*normal) - 1.0) > 1e-6:
+            raise ValueError(f"Contact {contact_id!r} world_normal must be unit length within 1e-6")
+        if friction < 0.0 or gap < 0.0 or penetration < 0.0:
+            raise ValueError(f"Contact {contact_id!r} friction and geometric tolerances must be non-negative")
+        tolerance = max(gap, penetration)
+        if tolerance == 0.0:
+            raise ValueError(f"Contact {contact_id!r} requires a positive contact_tolerance")
+        if distance > gap or -distance > penetration:
+            raise ValueError(f"Contact {contact_id!r} signed distance violates its original contact tolerances")
+
+        if not isinstance(record.metadata, Mapping):
+            raise TypeError(f"Contact {contact_id!r} metadata must be a Mapping")
+        regular_support = record.metadata.get("allows_regular_support", False)
+        if type(regular_support) is not bool:
+            raise TypeError(f"Contact {contact_id!r} allows_regular_support must be a bool")
+        constraints[contact_id] = ContactConstraintSpec(
+            contact_id=contact_id,
+            contact_point_world=vectors["world_position"],
+            surface_normal_world=normal,
+            friction_coeff=friction,
+            is_in_contact=True,
+            allows_regular_support=regular_support,
+            min_normal_force=0.0,
+            max_normal_force=float("inf"),
+            surface_id=record.surface_id,
+            surface_distance=distance,
+            contact_tolerance=tolerance,
+        )
+    return tuple(constraints[contact_id] for contact_id in sorted(constraints))
 
 
 # =============================================================================
