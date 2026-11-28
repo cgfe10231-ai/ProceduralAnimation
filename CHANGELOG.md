@@ -2,6 +2,15 @@
 
 所有条目必须严格遵循客观事实纪律，未经验证的不得标记为已验证。
 
+### [2026-11-28] Task 7B-1 专项验收入账及 Task 7B-2 准入开启
+
+- **Task 7B-1（Environmental End-Effector Target Acquisition）**：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（保留于 `task/7b-1` 及子分支 `task/7b-2`，**尚未合入 `master`**）。
+  - Blender 5.1.1 专项 `tests/verify_task7b1_environment_targets.py`（Blob `c62fa1626c92aa9a81757156af9b8e9e5e0e1ef9`，测试基线 `776f6de3aa8fd4cad0d4bd163481e12ee09b6382`）`T01–T12` 全部通过：`12 PASS / 0 FAIL / 0 SKIP / 0 NOT_RUN`，退出码 `0`；`BUG-01 CLOSED`。
+  - 生产源码零修改，新增生产函数及模块均为 `0`；复用现有真实 Mesh 查询接口，完成目标身份、三维位置、法向、遮挡、环境变换、缓存失效及源资产 `output/dynamics_playground.blend` 完整性验证（横杆通过真实 Mesh `surface_id` 确认身份，不要求现有分类器返回 `LEDGE_BAR`）。
+  - 验收证据提交：`fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`，证据目录：`docs/evidence/7b-1/verification/`。本节点未重新执行四级回归，沿用未发生生产源码变更的 Task 12 已验收基线，`7B-1` 至 `7B-4` 沿连续子阶段分支推进，待 `Task 7B-4` 完成四级联合回归、独立验收及负责人批准后整体合入 `master`。
+- **Task 7B-2（环境目标至手腕位置及三维姿态转换）**：基于 `task/7b-1`（`fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`）切出 `task/7b-2`，仅开放经负责人批准的单一无状态手掌目标几何转换函数（`src/motion/contact_model.py` 中 `compute_hand_target_from_surface()`）及对应专项测试脚本（`tests/verify_task7b2_hand_target_geometry.py` T01–T14）。禁止修改已有控制器、状态所有权、轨迹调度与求解逻辑；本轮为编码及专项测试脚本准备阶段，禁止执行测试。
+- **后续门禁**：`Task 7B-3`、`7B-4` 尚未开放实施，`Phase 7C` 保持 `NOT AUTHORIZED`。
+
 ### [2026-11-27] Task 12 / PKG-5 正式结项、联合验收及主干合并
 
 - **完成节点与状态**：`Task 12-A/B/C/D` `COMPLETED`、`Task 12-D BUG-01` `CLOSED`、`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（收归自 `task/12`）。

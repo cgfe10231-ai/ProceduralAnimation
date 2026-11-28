@@ -37,6 +37,7 @@ from src.motion.framework import (
     MotionState,
     WORLD_UP_AXIS,
 )
+from src.scene.environment_query import SurfaceQueryResult
 
 
 # =============================================================================
@@ -606,6 +607,162 @@ class EnvironmentalSurface:
     dimensions: Tuple[float, float, float] = (1.0, 1.0, 1.0) # Length, Width, Height
     friction_static: float = 0.60
     friction_dynamic: float = 0.50
+
+
+# [INTRODUCED 2026-11-28T13:57:00+08:00]
+# FUNCTION: compute_hand_target_from_surface
+# PURPOSE: Statelessly convert a validated mesh SurfaceQueryResult and world tangent hint into (wrist_world_xyz, hand_rotation_deg) via DEFAULT_LIMB_LOCAL_ANCHORS and mathutils basis construction, without mutating inputs, accessing bpy, or checking IK/ROM/reachability.
+# REASON: TASK 7B-2 — Implement geometric conversion from acquired environmental surface targets to hand IK wrist position and 3D world XYZ Euler orientation.
+def compute_hand_target_from_surface(
+    side: str,
+    surface: SurfaceQueryResult,
+    tangent_hint_world: Tuple[float, float, float],
+) -> Tuple[
+    Tuple[float, float, float],
+    Tuple[float, float, float],
+]:
+    """Convert an environmental mesh surface target into (wrist_world_xyz, hand_rotation_deg).
+
+    Stateless geometric transform using ``DEFAULT_LIMB_LOCAL_ANCHORS`` and ``mathutils``:
+    - Local +Z aligns with outward ``surface.surface_normal_world``.
+    - Local +Y aligns with projected ``tangent_hint_world`` on the surface tangent plane.
+    - Local +X = ``y_axis.cross(z_axis)`` forming a right-handed SO(3) frame.
+    - Wrist origin solves ``wrist_world = surface_point - R @ local_anchor``.
+
+    Does not touch bpy scenes, write bone poses, create ContactRecord instances,
+    or claim IK reachability / ROM feasibility.
+    """
+    # 1. Validate side strictly ('L' or 'R' only)
+    if not isinstance(side, str) or side not in ("L", "R"):
+        raise ValueError(f"Invalid hand side {side!r}; expected strictly 'L' or 'R'")
+
+    # 2. Validate surface is a valid and successful SurfaceQueryResult
+    if not isinstance(surface, SurfaceQueryResult):
+        raise TypeError(f"surface must be SurfaceQueryResult, got {type(surface).__name__}")
+    if surface.success is not True:
+        raise ValueError(
+            f"surface query must succeed (success={surface.success!r}, error_reason={surface.error_reason!r})"
+        )
+
+    # 3. Require source_type == 'mesh' and a valid non-empty mesh surface_id
+    if surface.source_type != "mesh":
+        raise ValueError(f"surface.source_type must be 'mesh', got {surface.source_type!r}")
+    if not isinstance(surface.surface_id, str):
+        raise ValueError("surface.surface_id must be a valid non-empty mesh identifier")
+    raw_sid = surface.surface_id
+    sid = raw_sid.strip()
+    if (
+        not sid
+        or sid != raw_sid
+        or sid.lower() in ("none", "free", "default", "default_ground")
+        or not sid.startswith("mesh:")
+    ):
+        raise ValueError(f"surface.surface_id must be a valid non-empty mesh identifier, got {raw_sid!r}")
+    sid_rest = sid[5:]
+    if not sid_rest or not sid_rest.strip():
+        raise ValueError(f"surface.surface_id missing mesh object identity: {raw_sid!r}")
+    if ":" in sid_rest:
+        parts = sid_rest.split(":")
+        if any(not p.strip() for p in parts) or (
+            parts[-1].startswith("-") and parts[-1][1:].isdigit()
+        ):
+            raise ValueError(f"surface.surface_id has malformed mesh suffix: {raw_sid!r}")
+
+    # 4. Validate 3D dimensionality, numeric type, and finiteness of position, normal, and tangent hint
+    parsed_vecs: List[Vector] = []
+    for vec_name, vec_raw in (
+        ("surface.contact_point_world", surface.contact_point_world),
+        ("surface.surface_normal_world", surface.surface_normal_world),
+        ("tangent_hint_world", tangent_hint_world),
+    ):
+        if (
+            isinstance(vec_raw, (str, bytes, dict))
+            or not hasattr(vec_raw, "__len__")
+            or not hasattr(vec_raw, "__getitem__")
+        ):
+            raise TypeError(
+                f"'{vec_name}' must be a 3-element sequence of finite numbers, got {type(vec_raw).__name__}"
+            )
+        if len(vec_raw) != 3:
+            raise ValueError(f"'{vec_name}' must have exactly 3 components, got {len(vec_raw)}: {vec_raw!r}")
+        coords: List[float] = []
+        for idx, comp in enumerate(vec_raw):
+            if isinstance(comp, bool) or not isinstance(comp, (int, float)):
+                raise TypeError(
+                    f"'{vec_name}[{idx}]' must be a real number, got {type(comp).__name__}: {comp!r}"
+                )
+            f_comp = float(comp)
+            if not math.isfinite(f_comp):
+                raise ValueError(f"'{vec_name}[{idx}]' must be finite, got {comp!r}")
+            coords.append(f_comp)
+        parsed_vecs.append(Vector((coords[0], coords[1], coords[2])))
+    surface_point, normal_raw, tangent_raw = parsed_vecs
+
+    # 5. Validate environment normal is unit length within 1e-6, then normalize
+    normal_len = normal_raw.length
+    if not math.isfinite(normal_len) or abs(normal_len - 1.0) > 1e-6:
+        raise ValueError(
+            f"surface.surface_normal_world must be unit length within 1e-6, got length={normal_len!r}"
+        )
+    normal = normal_raw.normalized()
+
+    # 6. Validate non-zero tangent hint and normalize
+    tangent_hint_len = tangent_raw.length
+    if not math.isfinite(tangent_hint_len) or tangent_hint_len <= 1e-6:
+        raise ValueError(
+            f"tangent_hint_world must be non-zero (length > 1e-6), got length={tangent_hint_len!r}"
+        )
+    tangent_hint_unit = tangent_raw.normalized()
+
+    # 7-8. Project tangent hint onto environment tangent plane and reject near-degenerate projections
+    tangent_proj = tangent_hint_unit - tangent_hint_unit.dot(normal) * normal
+    tangent_proj_len = tangent_proj.length
+    if not math.isfinite(tangent_proj_len) or tangent_proj_len <= 1e-6:
+        raise ValueError(
+            f"tangent_hint_world is parallel or near-degenerate with surface normal "
+            f"(projected length={tangent_proj_len!r} <= 1e-6)"
+        )
+
+    # 9. Construct right-handed orthonormal basis using mathutils
+    z_axis = normal
+    y_axis = tangent_proj.normalized()
+    x_axis_raw = y_axis.cross(z_axis)
+    if not math.isfinite(x_axis_raw.length) or x_axis_raw.length <= 1e-6:
+        raise ValueError("Degenerate cross product while constructing hand orientation basis")
+    x_axis = x_axis_raw.normalized()
+    y_axis = z_axis.cross(x_axis).normalized()
+
+    # 10. Assemble 3x3 rotation matrix with [x_axis, y_axis, z_axis] as column vectors
+    rotation_matrix = Matrix((
+        (x_axis.x, y_axis.x, z_axis.x),
+        (x_axis.y, y_axis.y, z_axis.y),
+        (x_axis.z, y_axis.z, z_axis.z),
+    ))
+
+    # 11-12. Read hand palm local anchor and solve wrist world coordinate
+    local_anchor = Vector(DEFAULT_LIMB_LOCAL_ANCHORS[f"hand_{side}"])
+    wrist_world = surface_point - (rotation_matrix @ local_anchor)
+
+    # 13. Convert rotation matrix to 'XYZ' Euler angles in degrees via mathutils
+    euler_rad = rotation_matrix.to_euler("XYZ")
+    hand_rotation_deg = (
+        math.degrees(euler_rad.x),
+        math.degrees(euler_rad.y),
+        math.degrees(euler_rad.z),
+    )
+
+    # 14-15. Validate finiteness of derived outputs and return independent 3-tuples
+    wrist_world_xyz = (
+        float(wrist_world.x),
+        float(wrist_world.y),
+        float(wrist_world.z),
+    )
+    if not (
+        all(math.isfinite(c) for c in wrist_world_xyz)
+        and all(math.isfinite(a) for a in hand_rotation_deg)
+    ):
+        raise ValueError("Derived hand target position or orientation contains non-finite values")
+    return (wrist_world_xyz, hand_rotation_deg)
 
 
 def evaluate_limb_contacts_from_armature(

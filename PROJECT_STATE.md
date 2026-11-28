@@ -1,8 +1,8 @@
 # PROJECT_STATE — 当前项目事实与准入状态
 
-> 状态核验日期：2026-11-27
-> **Task 12 / PKG-5 已验收冻结基线**：冻结生产源码基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据提交 `e15d342b805ef45e7d54db2edf1c2804973e81a7`（收归分支 `task/12` 合并至 `master`）；Task 11 历史基线：`added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`（收归 `task/11`）；Task 10-D 历史基线 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`（收归 `task/10-d`）；10-C 历史收归基线 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`、回归基线 `2f248bf4b98776222e37bc3228506a4fb85f7c32`、证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`。
-> **当前状态：`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`d16454528e28b46e9cc60f9f6e1a10a7241eb551`）；原 16 项历史 Finding 已全部关闭（16 CLOSED / 0 OPEN）；下一节点：`Task 7B-1`（`VERIFICATION PREPARATION — OWNER AUTHORIZED`，`task/7b-1`）；`Phase 7C`：`NOT AUTHORIZED`。**
+> 状态核验日期：2026-11-28
+> **Task 12 / PKG-5 已验收冻结基线**：冻结生产源码基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据提交 `e15d342b805ef45e7d54db2edf1c2804973e81a7`（收归分支 `task/12` 合并至 `master`）；Task 7B-1 专项验收提交 `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`（保留于 `task/7b-1` 并演进至 `task/7b-2`，未合入 `master`）；Task 11 历史基线：`added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`（收归 `task/11`）；Task 10-D 历史基线 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`（收归 `task/10-d`）；10-C 历史收归基线 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史主干合并 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`、回归基线 `2f248bf4b98776222e37bc3228506a4fb85f7c32`、证据提交 `dcf305738aa9191daeab0f002f97cf4975c12498`。
+> **当前状态：`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`d16454528e28b46e9cc60f9f6e1a10a7241eb551`）；原 16 项历史 Finding 已全部关闭（16 CLOSED / 0 OPEN）；`Task 7B-1` `COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（未合入 `master`，`BUG-01 CLOSED`）；当前节点：`Task 7B-2`（`CODING & TEST PREPARATION — OWNER AUTHORIZED`，`task/7b-2`）；`Task 7B-3`、`7B-4` 未开放；`Phase 7C`：`NOT AUTHORIZED`。**
 
 ## 1. 阶段状态
 | 节点 | 当前状态 | 准入 |
@@ -12,7 +12,9 @@
 | Task 11-A / 11-B (`FIND-R3-03` / `FIND-R3-04`) | `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER` | FootLock 元数据生命周期与纯查询/支撑维持分离完成并合入 `master` |
 | **Task 12-A / 12-B / 12-C / 12-D** | **`COMPLETED`** | 12-A WBC 单帧与 ROM 后反馈收敛、12-B Bridge 提交门禁与 `effective_dt` 校验、12-C 所有权收敛、12-D 联合专项与四级最终回归全通过（`BUG-01 CLOSED`） |
 | **Task 12 / PKG-5（整体）** | **`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`** | 已通过独立验收并由负责人批准合入 `master` |
-| **Task 7B-1** | **`VERIFICATION PREPARATION — OWNER AUTHORIZED`** | 基于 `master` `d1645452` 切出 `task/7b-1`；仅授权准备 `tests/verify_task7b1_environment_targets.py` (T01–T12) 与指定文档同步，**禁止修改 `src/`、禁止运行测试/Blender、禁止推进 7B-2～7B-4**，待 ChatGPT 独立 Diff 审查 |
+| **Task 7B-1** | **`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`** | Blender 5.1.1 专项 `T01–T12` `12/12 PASS`（`FAILED/SKIPPED/NOT_RUN=0`, `rc=0`）；`BUG-01 CLOSED`；生产源码零修改，证据提交 `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`（`docs/evidence/7b-1/verification/`）；**未合入 `master`**，待 `7B-4` 整体合入 |
+| **Task 7B-2** | **`OWNER AUTHORIZED (CODING & TEST PREPARATION ONLY)`** | 基于 `task/7b-1`（`fcb35bd5`）切出 `task/7b-2`；仅开放单一无状态手掌目标几何转换函数 `compute_hand_target_from_surface()`（`src/motion/contact_model.py`）与专项脚本 `tests/verify_task7b2_hand_target_geometry.py`（T01–T14）；**禁止修改已有控制器/状态/调度/求解器、禁止运行测试** |
+| Task 7B-3 / Task 7B-4 | `NOT AUTHORIZED` | `7B-3`、`7B-4` 尚未开放实施；Phase 7B 整体四级联合回归及主干合并均安排于 `7B-4` |
 | Phase 7C | `NOT AUTHORIZED` | 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流 |
 
 ### Task 10-C 子节点职责摘要
@@ -58,7 +60,9 @@
 | Task 12 历史合同复验 | **WBC `6/6`、10-D T01–T15 `15/15`、Task 11 FootLock `38/38`、09-B `27/27`、地面高度 `20/20`、初始化/重置 `6/6`、历史 Bridge `14/14`** | `docs/evidence/12/final_acceptance/phase2_historical/` 与 `regression_physics/`；10-D 复验 JSON 的 `head` 引用旧固定常量但实际 Worker 运行于当前仓库（原始报告未篡改） |
 | **Task 12 最终四级 `--fail-fast` 回归** | **`quick` `19/19` (16P+3AP)、`physics` `27/27` (24P+3AP)、`motion` `12/12` (6P+6AP)、`full` `42/42` (33P+9AP)** | 全部 `rc=0`，`FAILED=SKIPPED=NOT_RUN=0`；`docs/evidence/12/final_acceptance/phase3_regression/`；BUG-01 过程证据保全于 `docs/evidence/12/unified_verification/`（`c9c9a2d`） |
 
-证据：`docs/evidence/12/final_acceptance/`、`docs/evidence/12/unified_verification/`、`docs/evidence/11/unified_verification/`、`docs/evidence/10-d/final_acceptance/`、`docs/evidence/10-d/10-d-5/centralized_verification/`、`docs/evidence/10b_sixlayer_split/regression/`、`docs/evidence/10-c-integration/`；保留历史证据：`docs/evidence/fix-7/remaining_regression/round2/fix7_report.md`、`docs/evidence/fix-7/remaining_regression/round2/full/test_report.json`。
+| **Task 7B-1 专项验证（`fcb35bd5`）** | **T01–T12 `12/12 PASS`** (`rc=0`) | Blender 5.1.1 实测（`FAILED=SKIPPED=NOT_RUN=0`），生产源码零修改，证据：`docs/evidence/7b-1/verification/`；未重跑四级回归，待 `7B-4` 统一回归并合入 `master` |
+
+证据：`docs/evidence/7b-1/verification/`、`docs/evidence/12/final_acceptance/`、`docs/evidence/12/unified_verification/`、`docs/evidence/11/unified_verification/`、`docs/evidence/10-d/final_acceptance/`、`docs/evidence/10-d/10-d-5/centralized_verification/`、`docs/evidence/10b_sixlayer_split/regression/`、`docs/evidence/10-c-integration/`；保留历史证据：`docs/evidence/fix-7/remaining_regression/round2/fix7_report.md`、`docs/evidence/fix-7/remaining_regression/round2/full/test_report.json`。
 
 ## 4. 开放问题与责任边界
 - `OPEN_FINDINGS.md` 历史统一登记 **16 项**：**16 CLOSED / 0 OPEN**（其余 14 项历史结论与 `FIND-R3-03`/`FIND-R3-04` 关闭状态均保持不变）。
@@ -68,6 +72,7 @@
 ## 5. Git / 文档边界
 - **Task 12 / PKG-5** 冻结生产基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`、冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`、最终验收证据提交 `e15d342b805ef45e7d54db2edf1c2804973e81a7` 经由 `task/12` 收归 `master`。
 - Task 11（`added88a7e` / `07aec5d8`）、Task 10-D（`824c52ec` / `7f14ff72`）、10-C（`f2501ddc`）、10-B（`c45a40c` / `2f248bf` / `dcf3057`）历史收归记录保持不变。
-- **下一节点为 `Task 7B-1`（`VERIFICATION PREPARATION — OWNER AUTHORIZED`）**，仅验证 `output/dynamics_playground.blend` 真实 Mesh 查询获取环境三维目标（复用 `create_mesh_backed_dynamics_query()`、`BlenderMeshEnvironmentAdapter`、`DynamicsEnvironmentQuery.query_spatial_surface()`、`SurfaceQueryResult`），7B-2 至 7B-4 尚未开放编码；`Phase 7C` 保持 `NOT AUTHORIZED`。
+- **`Task 7B-1`：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`**（专项测试基线 `776f6de3aa8fd4cad0d4bd163481e12ee09b6382`、`tests/verify_task7b1_environment_targets.py` Blob `c62fa1626c92aa9a81757156af9b8e9e5e0e1ef9`、证据提交 `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`，尚未合入 `master`）。`7B-1` 至 `7B-4` 沿连续子阶段分支推进，`7B-4` 完成四级联合回归、独立验收及负责人批准后整体合入 `master`。
+- **当前节点为 `Task 7B-2`**（`OWNER AUTHORIZED`，分支 `task/7b-2` 基于 `task/7b-1` `fcb35bd5`）：仅开放 `src/motion/contact_model.py::compute_hand_target_from_surface()` 与 `tests/verify_task7b2_hand_target_geometry.py`；禁止修改已有控制器、状态所有权、轨迹调度与求解逻辑；`7B-3`、`7B-4` 尚未开放实施，`Phase 7C` 保持 `NOT AUTHORIZED`。
 - 当前事实优先级：真实源码与对应版本测试证据 → 本文件 / `ARCHITECTURE_SYNC.md` / `OPEN_FINDINGS.md` 相互核对 → `AI_SYNC.md`、`HANDOFF.md` 摘要。
 - 历史细节由既有 `CHANGELOG.md`、冻结账本及 `docs/evidence/` 保存；本状态文件不复制旧轮次日志与历史过程。

@@ -1,12 +1,13 @@
 # AI_SYNC — 当前跨会话状态卡片
 
-> **日期：2026-11-27**；**Task 12 / PKG-5** 已完成全部独立审计与联合最终验收并获项目负责人批准合入 `master`（冻结生产源码基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据 HEAD `e15d342b805ef45e7d54db2edf1c2804973e81a7`，证据目录 `docs/evidence/12/final_acceptance/`，BUG-01 过程保全 `docs/evidence/12/unified_verification/` 提交 `c9c9a2d7949aee916fa44273399aa6aff937cd54`）。
+> **日期：2026-11-28**；**Task 12 / PKG-5** 已完成全部独立审计与联合最终验收并获项目负责人批准合入 `master`（冻结生产源码基线 `eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线 `90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据 HEAD `e15d342b805ef45e7d54db2edf1c2804973e81a7`，证据目录 `docs/evidence/12/final_acceptance/`，BUG-01 过程保全 `docs/evidence/12/unified_verification/` 提交 `c9c9a2d7949aee916fa44273399aa6aff937cd54`）。
 > 此文件只记录**当前**状态，不复刻旧轮次长篇报告；历史过程请见 `CHANGELOG.md`、冻结账本与证据目录。
 
 ## 当前交接事实
-- **当前阶段：`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`。**
-- **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义不变。
-- **下一工程节点：`Task 7B-1`（Environmental End-Effector Target Acquisition）— `VERIFICATION PREPARATION — OWNER AUTHORIZED`**（分支 `task/7b-1` 基于主干 `d16454528e28b46e9cc60f9f6e1a10a7241eb551`，仅授权文档同步与新增独立专项脚本 `tests/verify_task7b1_environment_targets.py` T01–T12，禁止新增生产包装/查询模块、禁止运行 Blender 或测试、禁止推进 7B-2～7B-4 编码，等待 ChatGPT 独立 Diff 审查）；**`Phase 7C`**：`NOT AUTHORIZED`。
+- **当前阶段：`Task 12-A/B/C/D` `COMPLETED`，`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`；`Task 7B-1` `COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（未合入 `master`）；当前执行节点：`Task 7B-2`（`CODING & TEST PREPARATION — OWNER AUTHORIZED`，分支 `task/7b-2` 基于 `task/7b-1` `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`）。**
+- **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义不变；`Task 12-D BUG-01` / `Task 7B-1`：`BUG-01 CLOSED`。
+- **Task 7B-1 验收事实（未合入 `master`）**：Blender 5.1.1 专项 `T01–T12` 全部通过（`12 PASS / 0 FAIL / 0 SKIP / 0 NOT_RUN`，退出码 `0`），生产源码零修改，新增生产函数及模块均为 `0`；验收证据提交 `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`，证据目录 `docs/evidence/7b-1/verification/`。`7B-1` 至 `7B-4` 沿连续子阶段分支推进，`7B-4` 完成四级联合回归、独立验收及负责人批准后，整体合入 `master`。
+- **Task 7B-2 当前范围**：仅开放经负责人批准的单一无状态手掌目标几何转换函数（`src/motion/contact_model.py` 中 `compute_hand_target_from_surface()`）及对应专项测试脚本（`tests/verify_task7b2_hand_target_geometry.py` T01–T14）；禁止修改已有控制器、状态所有权、轨迹调度与求解逻辑，本轮禁止运行测试。`Task 7B-3`、`7B-4` 尚未开放实施，`Phase 7C` 保持 `NOT AUTHORIZED`。
 - **Task 12 生产与测试冻结收敛（`eee276b39d` / `90f4628a0c`）**：
   - **12-A（WBC 单帧执行与反馈合同）**：`WholeBodyController` 收归 ROM 截断后最终四肢反馈、真实请求误差（`ROM_CONFLICT`）及状态原子回滚唯一所有权（`src/motion/whole_body_controller.py` Blob `230a86acaa92b580c5c0aad0e0cdacd7df224a7a`）。
   - **12-B（Bridge 帧提交与时间步准入）**：`KinematicBridgeExecutor.execute_frame()` 在 `effective_dt` 准入与 WBC/ContactModel 成功前禁止提交跨帧 7 项状态（`_last_time_sec`、`_last_frame`、`last_multi_contact`、`last_active_limb_targets`、`kinematics_tracker._prev_snapshot`/`_prev_velocity`/`_history`）（`src/motion/kinematic_bridge.py` Blob `4f9cc856b9c9b34c59dd4c6a4f0cee1e1d86ef96`）。
@@ -21,4 +22,4 @@
   3. Task 12 人工视觉验收登记为 `OWNER WAIVED`。
   4. 历史九项人工视觉待办保持原登记（10-D 两份人工视觉资产 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend` 保持原验收登记）。
   5. 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流。
-- ChatGPT 负责独立审计、根因和架构边界；Antigravity 完成 `Task 7B-1` 验证脚本准备与本轮授权文档同步后恢复 Markdown 默认只读，等待 ChatGPT 独立 Diff 审查与测试授权，禁止自行运行 Blender/测试或开始 7B-2 编码。
+- ChatGPT 负责独立审计、根因和架构边界；Antigravity 完成 `Task 7B-2` 批准代码、专项脚本准备与本轮授权文档同步后恢复 Markdown 默认只读并停止，等待 ChatGPT 独立 Diff 审查与测试授权，禁止自行运行 Blender/测试、禁止合入 `master` 或开始 `7B-3` 编码。

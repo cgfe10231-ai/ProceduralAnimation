@@ -1,11 +1,13 @@
 # HANDOFF — 当前项目交接卡片
 
-> 核验日期：2026-11-27；Task 12 / PKG-5 冻结生产基线：`eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线：`90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据提交：`e15d342b805ef45e7d54db2edf1c2804973e81a7`（收归合入自 `task/12`）；Task 11 历史合入：`added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`；10-D 历史合入 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`；10-C 历史合入 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史合入 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`。
+> 核验日期：2026-11-28；Task 12 / PKG-5 冻结生产基线：`eee276b39d204ccd46f4c17f37a09ec483bfcbae`，冻结测试基线：`90f4628a0c4212f4bb0468941cdde362cd68bef2`，最终验收证据提交：`e15d342b805ef45e7d54db2edf1c2804973e81a7`（收归合入自 `task/12`）；Task 7B-1 验收证据提交：`fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`（保留于 `task/7b-1` 与 `task/7b-2` 子阶段分支，未合入 `master`）；Task 11 历史合入：`added88a7e27eaaa6d1644473d560c5dcf45bc80` / `07aec5d8d35e5d77ff956f160840d1c2491b770e`；10-D 历史合入 `824c52ec73f86aa3d08245a58297118cb4a9f110` / `7f14ff722caecadec555194cc7d08f454c94c6c8`；10-C 历史合入 `f2501ddc7d610d554d1e813b13564ea56ce2b51a`；10-B 历史合入 `c45a40cbd8bfffb0447ee73bd18bccff85d6f37e`。
 > 本文件是摘要，不授予任务准入；须以 `PROJECT_STATE.md`、`ARCHITECTURE_SYNC.md`、`OPEN_FINDINGS.md` 及 Git 实况核对。
 
 ## 当前交接状态
-- **当前状态：`Task 12 / PKG-5` `COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`）。**
-- **下一节点：`Task 7B-1`（Environmental End-Effector Target Acquisition）— `VERIFICATION PREPARATION — OWNER AUTHORIZED`**（基于 `master` `d16454528e28b46e9cc60f9f6e1a10a7241eb551` 创建 `task/7b-1`，本轮仅准备 `tests/verify_task7b1_environment_targets.py` T01–T12 验证真实 `output/dynamics_playground.blend` Mesh 目标获取，不修改 `src/`，不运行 Blender/测试，7B-2～7B-4 尚未开放编码，等待 ChatGPT 独立 Diff 审查）。
+- **Task 12 / PKG-5**：`COMPLETED — OWNER ACCEPTED — MERGED TO MASTER`（`Task 12-A/B/C/D` `COMPLETED`，`Task 12-D BUG-01` `CLOSED`）。
+- **Task 7B-1**：`COMPLETED — OWNER ACCEPTED — PENDING PHASE 7B MERGE`（Blender 5.1.1 专项 `T01–T12` `12 PASS / 0 FAIL / 0 SKIP / 0 NOT_RUN`，退出码 `0`；`BUG-01 CLOSED`；生产源码零修改，新增生产函数及模块 `0`；证据提交 `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`，证据目录 `docs/evidence/7b-1/verification/`；**尚未合入 `master`**，待 `7B-4` 完成四级联合回归、独立验收及负责人批准后整体合入 `master`）。
+- **当前节点：`Task 7B-2`（环境目标至手腕位置及三维姿态转换）— `OWNER AUTHORIZED (CODING & TEST PREPARATION ONLY)`**（分支 `task/7b-2` 基于 `task/7b-1` `fcb35bd58eeb4e5300d5f3b28e3615be8cb7c946`；仅开放 `src/motion/contact_model.py::compute_hand_target_from_surface()` 与 `tests/verify_task7b2_hand_target_geometry.py` T01–T14；禁止修改已有控制器、状态所有权、轨迹调度与求解逻辑，本轮禁止运行测试）。
+- **`Task 7B-3`、`7B-4`**：尚未开放实施；**`Phase 7C`**：`NOT AUTHORIZED`。
 - **`Phase 7C`**：`NOT AUTHORIZED`。
 - **原 16 项历史 Finding**：**16 CLOSED / 0 OPEN**；**21 项冻结记录**与 **12 项架构合同** 保持原定义。
 
@@ -33,5 +35,5 @@
 3. Task 12 人工视觉验收登记为 `OWNER WAIVED`。
 4. 历史九项人工视觉待办保持原登记（10-D 两份场景 `output/task10d_centralized_whole_body.blend` 与 `output/task10d_running_whole_body.blend` 保持原验收登记）。
 5. 19 骨骼运动学管线与 6-DOF 数值动力学管线仍然独立，尚未完成 7C 合流。
-- 历史归档目录：Task 12 BUG-01 过程保全 `docs/evidence/12/unified_verification/`（`c9c9a2d`）；Task 11 `docs/evidence/11/unified_verification/`；10-D `docs/evidence/10-d/`；10-C `docs/evidence/10-c-integration/`；10-B `docs/evidence/10b_sixlayer_split/regression/`。
-- Antigravity 完成 `Task 7B-1` 专项验证脚本准备与本轮授权文档同步后恢复 Markdown 默认只读并停止，禁止自行运行 Blender/测试或推进 7B-2，等待 ChatGPT 独立 Diff 审查。
+- 历史归档目录：Task 7B-1 `docs/evidence/7b-1/verification/`（`fcb35bd5`）；Task 12 BUG-01 过程保全 `docs/evidence/12/unified_verification/`（`c9c9a2d`）；Task 11 `docs/evidence/11/unified_verification/`；10-D `docs/evidence/10-d/`；10-C `docs/evidence/10-c-integration/`；10-B `docs/evidence/10b_sixlayer_split/regression/`。
+- Antigravity 完成 `Task 7B-2` 批准编码、专项测试脚本准备与本轮授权文档同步后恢复 Markdown 默认只读并停止，禁止运行 Blender/测试、禁止合入 `master` 或推进 `7B-3`，等待 ChatGPT 独立 Diff 审查。
