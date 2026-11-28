@@ -1,0 +1,1543 @@
+{
+  "status": "PASS",
+  "checked_at": "2026-11-28T19:58:18.787029+08:00",
+  "frozen_head": "51ea7a61a9e0fe86569649b2bef0da5592e8eefb",
+  "original_and_isolated_tracked_files_unchanged": true,
+  "isolated_status": [
+    "?? docs/evidence/7c-2/verification/execution.txt",
+    "?? docs/evidence/7c-2/verification/exit_code.txt",
+    "?? docs/evidence/7c-2/verification/result.json",
+    "!! docs/evidence/7c-2/verification/stderr.log",
+    "!! docs/evidence/7c-2/verification/stdout.log",
+    "!! output/dynamics_playground.blend",
+    "!! src/__pycache__/__init__.cpython-313.pyc",
+    "!! src/__pycache__/config.cpython-313.pyc",
+    "!! src/character/__pycache__/__init__.cpython-313.pyc",
+    "!! src/character/__pycache__/builder.cpython-313.pyc",
+    "!! src/motion/__pycache__/__init__.cpython-313.pyc",
+    "!! src/motion/__pycache__/body_inertia.cpython-313.pyc",
+    "!! src/motion/__pycache__/body_kinematics.cpython-313.pyc",
+    "!! src/motion/__pycache__/closed_loop_dynamics.cpython-313.pyc",
+    "!! src/motion/__pycache__/contact_dynamics.cpython-313.pyc",
+    "!! src/motion/__pycache__/contact_force_solver.cpython-313.pyc",
+    "!! src/motion/__pycache__/contact_model.cpython-313.pyc",
+    "!! src/motion/__pycache__/forward_dynamics.cpython-313.pyc",
+    "!! src/motion/__pycache__/forward_walk.cpython-313.pyc",
+    "!! src/motion/__pycache__/framework.cpython-313.pyc",
+    "!! src/motion/__pycache__/joint_limits.cpython-313.pyc",
+    "!! src/motion/__pycache__/kinematic_bridge.cpython-313.pyc",
+    "!! src/motion/__pycache__/rigid_link.cpython-313.pyc",
+    "!! src/motion/__pycache__/run_cycle.cpython-313.pyc",
+    "!! src/motion/__pycache__/sprint_brake.cpython-313.pyc",
+    "!! src/motion/__pycache__/sprint_start.cpython-313.pyc",
+    "!! src/motion/__pycache__/start_stop_walk.cpython-313.pyc",
+    "!! src/motion/__pycache__/terrain_walk.cpython-313.pyc",
+    "!! src/motion/__pycache__/upper_limb_trajectory.cpython-313.pyc",
+    "!! src/motion/__pycache__/walk_cycle.cpython-313.pyc",
+    "!! src/motion/__pycache__/whole_body_controller.cpython-313.pyc",
+    "!! src/rig/__pycache__/__init__.cpython-313.pyc",
+    "!! src/rig/__pycache__/arm_ik.cpython-313.pyc",
+    "!! src/rig/__pycache__/builder.cpython-313.pyc",
+    "!! src/rig/__pycache__/foot_contact.cpython-313.pyc",
+    "!! src/rig/__pycache__/ik.cpython-313.pyc",
+    "!! src/rig/__pycache__/pose.cpython-313.pyc",
+    "!! src/rig/__pycache__/transform_utils.cpython-313.pyc",
+    "!! src/scene/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene/__pycache__/blender_mesh_query_adapter.cpython-313.pyc",
+    "!! src/scene/__pycache__/builder.cpython-313.pyc",
+    "!! src/scene/__pycache__/dynamics_visual_evidence.cpython-313.pyc",
+    "!! src/scene/__pycache__/dynamics_visualizer.cpython-313.pyc",
+    "!! src/scene/__pycache__/environment_query.cpython-313.pyc",
+    "!! src/scene/__pycache__/layout.cpython-313.pyc",
+    "!! src/scene/__pycache__/playground_asset_preservation.cpython-313.pyc",
+    "!! src/scene/__pycache__/playground_character_assembly.cpython-313.pyc",
+    "!! src/scene/__pycache__/playground_evidence_exporter.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/__pycache__/fault_injection.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/__pycache__/wiring.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/admission_helpers.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/authorization_grants.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/authorization_registry.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/cleanup_validation.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/isolation_governance.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/outermost_admission.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/pending_cleanup.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/post_commit_cleanup.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/session_liveness.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/transaction_commit.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/transaction_coordinator.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer1/__pycache__/transaction_establishment.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/admission_query.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/audit_registries.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/collection_link_registry.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/collection_receipts.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/constraint_registration.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/controller_receipts.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/datablock_cleanup_records.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/datablock_creation_receipts.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/identity_helpers.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/isolation_transition.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/pending_cleanup_registry.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/relationship_mutation_prepare.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/relationship_mutation_state_update.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/relationship_states.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/session_identity.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/session_records.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/session_registries.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/session_verification.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/tombstone_registry.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/transaction_context.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/transaction_context_init.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/transaction_stack.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer2/__pycache__/transaction_states.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/character_collection_creation.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/collection_child_link.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/collection_child_unlink.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/collection_object_link.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/collection_object_unlink.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/collection_queries.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/constraint_creation.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/constraint_removal.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/constraint_target_assignment.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/constraint_target_pair_classifier.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/constraint_target_unit.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/controller_creation.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/controller_ownership.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/controller_recovery_authority.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/datablock_creation.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/datablock_removal.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/object_parent_assignment.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/relationship_reversal.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/resource_contracts.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/snapshot_relationship_restoration.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer3/__pycache__/stashed_object_removal.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/armature_ops.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/depsgraph.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/hand_target.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/influence.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/preflight.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/reset.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/setup.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/state_query.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer4/__pycache__/validation.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer5/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer5/__pycache__/isolation_evidence.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer5/__pycache__/rollback_execution.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer5/__pycache__/rollback_verification.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer5/__pycache__/snapshot_capture.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer5/__pycache__/value_evidence.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer6/__pycache__/__init__.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer6/__pycache__/cleanup_results.cpython-313.pyc",
+    "!! src/scene_transaction_integrity/layer6/__pycache__/stashed_cleanup.cpython-313.pyc",
+    "!! tests/__pycache__/verify_task7b3_environment_hand_integration.cpython-313.pyc",
+    "!! tests/__pycache__/verify_task7c1_dynamics_state_conversion.cpython-313.pyc"
+  ],
+  "cache_count": 125,
+  "caches": [
+    {
+      "relative_path": "src/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/__init__.py",
+      "bytes": 255,
+      "sha256": "d5708e56e573b2783ca52b248f648112f11f8754f2596720e9c876328e82a112",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/__pycache__/config.cpython-313.pyc",
+      "source_path": "src/config.py",
+      "bytes": 21899,
+      "sha256": "aed68eddbc9f33338fdf8ec6ee9fa0b55d7ea7c2f1ca5bf50cb5f45cfb05a2c3",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/character/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/character/__init__.py",
+      "bytes": 397,
+      "sha256": "0dc922557090607941b3b914363073a7e13cda9ff635f3048b8147258312f9da",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/character/__pycache__/builder.cpython-313.pyc",
+      "source_path": "src/character/builder.py",
+      "bytes": 11486,
+      "sha256": "84bdcd2a8e89a73f43ac13a78cf9718db2c65930f6593860b733edb3b18180eb",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/motion/__init__.py",
+      "bytes": 7182,
+      "sha256": "fa5ad6607a5c64eaafb4965918a57a5b3828dd50a0ae2e821e3aa34445609f31",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/body_inertia.cpython-313.pyc",
+      "source_path": "src/motion/body_inertia.py",
+      "bytes": 38810,
+      "sha256": "cdf3f2bdd467a2d7e0eb2e4bdc68c954cde31f94d3a30605974a46f1fdf74b2c",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/body_kinematics.cpython-313.pyc",
+      "source_path": "src/motion/body_kinematics.py",
+      "bytes": 37920,
+      "sha256": "ce97eb7947803bb0464d6f37ffa328bb9ec272780780eeeaedd73646976dafdf",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/closed_loop_dynamics.cpython-313.pyc",
+      "source_path": "src/motion/closed_loop_dynamics.py",
+      "bytes": 45553,
+      "sha256": "1dde06bbb0cb1cb21f413bb6ac97c5282f58091a9e8177a1216ba85b6e804749",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/contact_dynamics.cpython-313.pyc",
+      "source_path": "src/motion/contact_dynamics.py",
+      "bytes": 33876,
+      "sha256": "4581ac8df504fabaaa1b54579c76098fb60d98852a3cc553913eee5476fa6674",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/contact_force_solver.cpython-313.pyc",
+      "source_path": "src/motion/contact_force_solver.py",
+      "bytes": 55681,
+      "sha256": "e4fc5e535d92b9d295b372f44c773e09b7c525a313e24b9880242aa90d6ad46d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/contact_model.cpython-313.pyc",
+      "source_path": "src/motion/contact_model.py",
+      "bytes": 41292,
+      "sha256": "bd00c4e265a62d794f0a8b4fcdac0631400f1dd5aa38d9b3a7e9fce800274d80",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/forward_dynamics.cpython-313.pyc",
+      "source_path": "src/motion/forward_dynamics.py",
+      "bytes": 54216,
+      "sha256": "7cb3ab6849ad77b4badfc4c8fe7b89146781fdc9ba902fe0c578bb72b793aa80",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/forward_walk.cpython-313.pyc",
+      "source_path": "src/motion/forward_walk.py",
+      "bytes": 10808,
+      "sha256": "3427cd9039573f8225a4be9f4db2dea9cb52bef800df1cc50a28036522abeb7d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/framework.cpython-313.pyc",
+      "source_path": "src/motion/framework.py",
+      "bytes": 88125,
+      "sha256": "d8d5eda0ff47a4e8f46bbfe4d9a625a9666095c522ab8b8d5ba08fcd58288f69",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/joint_limits.cpython-313.pyc",
+      "source_path": "src/motion/joint_limits.py",
+      "bytes": 36251,
+      "sha256": "e312a4924023b509978d15b7f0cdc484952d626a18d15aab9a829541618fecdd",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/kinematic_bridge.cpython-313.pyc",
+      "source_path": "src/motion/kinematic_bridge.py",
+      "bytes": 56110,
+      "sha256": "342b7c6693b2df7fbb4c87797728cd85c1b3b2d5c6df8032443758c4e0c7efeb",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/rigid_link.cpython-313.pyc",
+      "source_path": "src/motion/rigid_link.py",
+      "bytes": 16918,
+      "sha256": "222513e1842b88079fc39ea1c83e662551fb15ae4e65c9c920ceb5865e293069",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/run_cycle.cpython-313.pyc",
+      "source_path": "src/motion/run_cycle.py",
+      "bytes": 24513,
+      "sha256": "9643bccbfcb9a5cdfc3ed409e0aa832a0fbb93f407c40bf32df39ab5d9e51bc4",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/sprint_brake.cpython-313.pyc",
+      "source_path": "src/motion/sprint_brake.py",
+      "bytes": 24156,
+      "sha256": "e93a323f39f1bcfb6058086121af233b022e4eca7b734278311b9feb979dbd34",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/sprint_start.cpython-313.pyc",
+      "source_path": "src/motion/sprint_start.py",
+      "bytes": 27844,
+      "sha256": "bf32e2e834219b53b45d1560872f44ee3a46c751cdbaf17e7a5014f50b110272",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/start_stop_walk.cpython-313.pyc",
+      "source_path": "src/motion/start_stop_walk.py",
+      "bytes": 20220,
+      "sha256": "fbcb5eb7ddacb383436f04af8d5263fefc883c5981f6cf38ef36a66c56a212c5",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/terrain_walk.cpython-313.pyc",
+      "source_path": "src/motion/terrain_walk.py",
+      "bytes": 62984,
+      "sha256": "79da5732157dde8cccafb3c344be9cb2e44e5a55cf3a1845664e38cdaf59ff74",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/upper_limb_trajectory.cpython-313.pyc",
+      "source_path": "src/motion/upper_limb_trajectory.py",
+      "bytes": 24232,
+      "sha256": "cecc6ffc324651d01947f1afd95442e10c7a0f2237c85f593759b38b261f39ef",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/walk_cycle.cpython-313.pyc",
+      "source_path": "src/motion/walk_cycle.py",
+      "bytes": 12051,
+      "sha256": "da2672f43ba38e5923b070a3eb8f9f719a1664481510c64ba01508bbcb9b82f9",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/motion/__pycache__/whole_body_controller.cpython-313.pyc",
+      "source_path": "src/motion/whole_body_controller.py",
+      "bytes": 48465,
+      "sha256": "d97ba28923eca381bcc02d0e862379f5c00528d670847e56b3dedd6828b9d7d5",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/rig/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/rig/__init__.py",
+      "bytes": 2410,
+      "sha256": "f5147af670f033b4fa1ed9e61722947124020e9a09c988d03e8798a087237cdb",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/rig/__pycache__/arm_ik.cpython-313.pyc",
+      "source_path": "src/rig/arm_ik.py",
+      "bytes": 9905,
+      "sha256": "de5904c22327f6e6438de701612bb74f32ee66aa21f7a9eda8eada6259a73465",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/rig/__pycache__/builder.cpython-313.pyc",
+      "source_path": "src/rig/builder.py",
+      "bytes": 9445,
+      "sha256": "9d8234aa40af461f6d49adaa1e4dcc8f46ed70c017250264b87e1df94d34c83d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/rig/__pycache__/foot_contact.cpython-313.pyc",
+      "source_path": "src/rig/foot_contact.py",
+      "bytes": 26137,
+      "sha256": "c569a82c749fabbbe8ab8aa4c3c6a90cda931366e897d34d08214b43651250be",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/rig/__pycache__/ik.cpython-313.pyc",
+      "source_path": "src/rig/ik.py",
+      "bytes": 51371,
+      "sha256": "88437226ded5f86fe4720ab980abdde3d2493076e453cf680616ab5134a6f31f",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/rig/__pycache__/pose.cpython-313.pyc",
+      "source_path": "src/rig/pose.py",
+      "bytes": 6712,
+      "sha256": "6ab1591f26507b54c73cf06092d457548b47d57f4d54cee4a09e3712e59ab747",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/rig/__pycache__/transform_utils.cpython-313.pyc",
+      "source_path": "src/rig/transform_utils.py",
+      "bytes": 7905,
+      "sha256": "7a0373492792eab5621ca41f8cf3c29200b59877d3a2deb63e0d14ac9f392509",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene/__init__.py",
+      "bytes": 1095,
+      "sha256": "ef093645402cc6518a1e78e9c8eb7e4123184251cad1369a3554fd06251298ef",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/blender_mesh_query_adapter.cpython-313.pyc",
+      "source_path": "src/scene/blender_mesh_query_adapter.py",
+      "bytes": 40130,
+      "sha256": "2f22c98e79e0fdfe7cb776ccdf6746dfc8df3fca1e487e07b0e18fb3ced4b488",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/builder.cpython-313.pyc",
+      "source_path": "src/scene/builder.py",
+      "bytes": 22348,
+      "sha256": "efd86a450baa5d7fb0276bbea8d27a9738213915666ce38028020a2c7127d2fa",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/dynamics_visual_evidence.cpython-313.pyc",
+      "source_path": "src/scene/dynamics_visual_evidence.py",
+      "bytes": 54895,
+      "sha256": "48e05247f6d37b5b021eb0596bdffcad27cc0e3591c75ca4641f185730f3d731",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/dynamics_visualizer.cpython-313.pyc",
+      "source_path": "src/scene/dynamics_visualizer.py",
+      "bytes": 26644,
+      "sha256": "606eaa7ded2bd7bb4d7942590ef3ee0cec9648d41ce96f7899e6e7a40d3d5405",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/environment_query.cpython-313.pyc",
+      "source_path": "src/scene/environment_query.py",
+      "bytes": 40987,
+      "sha256": "a93eebece102c254575994a138af704a22109d42fd92ddc22d787bcbee205e57",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/layout.cpython-313.pyc",
+      "source_path": "src/scene/layout.py",
+      "bytes": 7800,
+      "sha256": "6a98da3ad79ae84fca58b9c718a69ad642cd2400ce67a720d681c82a15312168",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/playground_asset_preservation.cpython-313.pyc",
+      "source_path": "src/scene/playground_asset_preservation.py",
+      "bytes": 29723,
+      "sha256": "42904d896c55a5a23323c952c175c81c4b28566125f8b7936a6396041a865bc6",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/playground_character_assembly.cpython-313.pyc",
+      "source_path": "src/scene/playground_character_assembly.py",
+      "bytes": 71705,
+      "sha256": "12c50267f4f4813fe64d0d3dd86fb0e0d5e6162c43cd242c6173374298f7a7db",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene/__pycache__/playground_evidence_exporter.cpython-313.pyc",
+      "source_path": "src/scene/playground_evidence_exporter.py",
+      "bytes": 10969,
+      "sha256": "656ae7fa5677f3d9ad1fc097eab6908a7d42b9aa0ae805ad99c0685e98e7705b",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/__init__.py",
+      "bytes": 1466,
+      "sha256": "3db5070efbaf7ef64c1ac389d20d7094a9d6e21ef56cb3c2ec0fe1be0184a71f",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/__pycache__/fault_injection.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/fault_injection.py",
+      "bytes": 1398,
+      "sha256": "0379b703d29bec2daf7e9b95b25baf332cac49e7ab4b65dcfebe09e4c222981f",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/__pycache__/wiring.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/wiring.py",
+      "bytes": 36161,
+      "sha256": "e703c7cd20ae4978458aa908dd5ccd5f3d18fbac68cba85c139a9dcb29a73c3d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/__init__.py",
+      "bytes": 2756,
+      "sha256": "a10da37e377fcb08b4a416e8d7ecae2f21a67680e537fc2f3b880e5163cc7e15",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/admission_helpers.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/admission_helpers.py",
+      "bytes": 2690,
+      "sha256": "6518041e0630118bf4ccb2ad317b2f607bb36f3b56289dcd3fefb8e4a6992e5a",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/authorization_grants.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/authorization_grants.py",
+      "bytes": 11330,
+      "sha256": "8710ed00411c3397c88c2e5aa4ece138ce149522779afeba35e2239838126d13",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/authorization_registry.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/authorization_registry.py",
+      "bytes": 610,
+      "sha256": "eda1b020663b76a103af7f2796424e9167e980b63a531d67336bf3c08660db32",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/cleanup_validation.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/cleanup_validation.py",
+      "bytes": 13964,
+      "sha256": "e447bd2d27cfe02ceda265eda8fa964173f723d629db90e23b17fd69f2e8f624",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/isolation_governance.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/isolation_governance.py",
+      "bytes": 7013,
+      "sha256": "e4b563dc169d034477b1d7d0d9428742fcde3072980735084cd485a18819d569",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/outermost_admission.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/outermost_admission.py",
+      "bytes": 8040,
+      "sha256": "a8619802953be934ca36de8f4787d61663cd25d19f6a39fc898fedf2de848a4c",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/pending_cleanup.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/pending_cleanup.py",
+      "bytes": 5561,
+      "sha256": "fc2388d32a42543d37bdda3f0c3d7c38ae653abdd2b96e7f25b715c749dc0cef",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/post_commit_cleanup.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/post_commit_cleanup.py",
+      "bytes": 9611,
+      "sha256": "007f5695a32dc6ca4e33b7058c8841edf7dbf4cfefc26fd02ab0db710d9d05bf",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/session_liveness.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/session_liveness.py",
+      "bytes": 5490,
+      "sha256": "3cab051d6a8debd858a3ed8beb3ac8254b5047da7466820b96a187acce2582ee",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/transaction_commit.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/transaction_commit.py",
+      "bytes": 2250,
+      "sha256": "035705d4c0197de06345db523a20aff781016759430ec8739fb978405cb587dc",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/transaction_coordinator.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/transaction_coordinator.py",
+      "bytes": 9033,
+      "sha256": "9f71d1b9a838380198de73f5705020cac6c5831529f2ff50b4d52bb366b7dee4",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer1/__pycache__/transaction_establishment.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer1/transaction_establishment.py",
+      "bytes": 2940,
+      "sha256": "8ae9bfe2a4a3532ed858bf698c761ac7562d5a3fc071c23f06589a4fbcac2aa4",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/__init__.py",
+      "bytes": 3837,
+      "sha256": "d2a2bbbf3d1eedf8255be1adb655c0de70300e43ac95fd67c0dbfa4decf4843f",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/admission_query.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/admission_query.py",
+      "bytes": 3776,
+      "sha256": "c394261cd3575a41d97212400c4394e19b3f6a463612bc1751563520474ef8d4",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/audit_registries.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/audit_registries.py",
+      "bytes": 2389,
+      "sha256": "c0c560189db72c400c57473a2ee76828611b60b29be2d41a5b43cefbd51eb7ca",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/collection_link_registry.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/collection_link_registry.py",
+      "bytes": 1459,
+      "sha256": "97a35462c153eb76c9385394642bf2e42a7c94da7d4f6a374c376d5dafd1004a",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/collection_receipts.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/collection_receipts.py",
+      "bytes": 9563,
+      "sha256": "f760783cf291dd7310453436ff1d9787c0af9d0070408ac04cf5a16acfa0cde2",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/constraint_registration.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/constraint_registration.py",
+      "bytes": 8627,
+      "sha256": "257f425ac2384a72d6e4bd3ada530fad4722fb6a2db39b9fdf878267dc4f17b7",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/controller_receipts.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/controller_receipts.py",
+      "bytes": 4610,
+      "sha256": "2f19ca50031c49e05db8c19fb8b279cf28016f4b6a8e838d8c9beb7abf251915",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/datablock_cleanup_records.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/datablock_cleanup_records.py",
+      "bytes": 3900,
+      "sha256": "04b30ee0b14875e8e6207627b8c10b35ebfb63983f73fb839b8e0729fac85d2b",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/datablock_creation_receipts.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/datablock_creation_receipts.py",
+      "bytes": 1935,
+      "sha256": "399266fd1859105c34229717004d9c10265a94e4d26a73cab7b68007e5cc34f5",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/identity_helpers.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/identity_helpers.py",
+      "bytes": 3326,
+      "sha256": "48a0a36bb78b6b7327f8bb04b284832bf0b086420441300c7a9194a65ba10714",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/isolation_transition.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/isolation_transition.py",
+      "bytes": 10975,
+      "sha256": "858bda30b7eca359f5c6f686e664fd16aba272dcba21b08cbfd5d95d78aa8596",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/pending_cleanup_registry.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/pending_cleanup_registry.py",
+      "bytes": 1626,
+      "sha256": "76c459009a5f67c412c83f4604f53f27bb8acc529af0646e45cb9b74e80c6d4e",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/relationship_mutation_prepare.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/relationship_mutation_prepare.py",
+      "bytes": 2233,
+      "sha256": "919955a7b7976f2c7aa7fab5d2bf2025e97896562ad6107b15bacefa963e84c0",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/relationship_mutation_state_update.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/relationship_mutation_state_update.py",
+      "bytes": 1432,
+      "sha256": "efe56f524a8d23a5ebec4d825790f4b65e0b650c8178b609493d9a200df209b3",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/relationship_states.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/relationship_states.py",
+      "bytes": 2172,
+      "sha256": "7f302c2ea7c30543154535c0e4df68721431bc74e0d94b0d02da7861c90e1c02",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/session_identity.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/session_identity.py",
+      "bytes": 4819,
+      "sha256": "62f6aed5f0e13d3b5be1f5b1d1936db8443af370efa458b137fb8d6e8f1e230d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/session_records.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/session_records.py",
+      "bytes": 4945,
+      "sha256": "4855db6b8735c5d99d13388ff9388e3a1baa493cd86cf950d7a0cf8b8fe0f9a3",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/session_registries.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/session_registries.py",
+      "bytes": 7179,
+      "sha256": "f0204f8c8e16351aa912d0053867ce7fdece915a1835142abc24909598291c47",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/session_verification.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/session_verification.py",
+      "bytes": 8488,
+      "sha256": "588805183dc4c79b9ae7806b3f166e490b04ac6323dbe9c0b928f1f5cee98926",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/tombstone_registry.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/tombstone_registry.py",
+      "bytes": 521,
+      "sha256": "b07fdc9bd84c3036e45350ce2a0cf3c56932c3a26c325595fb8d6819441703cf",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_context.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_context.py",
+      "bytes": 12539,
+      "sha256": "b4bb9a2a52c810feecafb198f8756831902c64b86f0ac73c86d3712e3fe4f51b",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_context_init.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_context_init.py",
+      "bytes": 3440,
+      "sha256": "fc421a39a7085e21b7d2b104fa2250d0165df83e9890c8930c2c8274f9a9f33e",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_stack.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_stack.py",
+      "bytes": 468,
+      "sha256": "82437427e6f622abce3f58ab24ad2e349c95079c3eee3a6d0b81b3165a63a798",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer2/__pycache__/transaction_states.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer2/transaction_states.py",
+      "bytes": 1344,
+      "sha256": "ef942b394518fc12cecd0bc682eb7dec4c330d784abd97d75d179f00afb1acaa",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/__init__.py",
+      "bytes": 4195,
+      "sha256": "010430774187af41c4f4532a5ef09806190681200724288116d6846ebb81b35a",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/character_collection_creation.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/character_collection_creation.py",
+      "bytes": 12206,
+      "sha256": "5dba5b1a73eebf4308939e70abab6ec674833e1f37967136cfcc2b4597c24d66",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/collection_child_link.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_child_link.py",
+      "bytes": 11751,
+      "sha256": "0c06291566a239fa18e082f0e08300b320e7ebb6e394a3b77c09d40322a28258",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/collection_child_unlink.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_child_unlink.py",
+      "bytes": 4695,
+      "sha256": "40471e0a253f492051eb95be2ab42801447734178db81c0ba79bad4915919e6e",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/collection_object_link.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_object_link.py",
+      "bytes": 5325,
+      "sha256": "5f256191deb3c5f9a9acb4836dbc35134944ddf7506dcc1804b2cb2c82ae0fd5",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/collection_object_unlink.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_object_unlink.py",
+      "bytes": 4880,
+      "sha256": "6f40f0c93a7c5834b1e8c10a45cba5c198db3ab5deec6b0099e7c28affc6dd3b",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/collection_queries.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/collection_queries.py",
+      "bytes": 4470,
+      "sha256": "337f50b0f97f2b68408147ea35522bf61e9bbacdcce94387f2c7b5f1ff29da37",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_creation.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_creation.py",
+      "bytes": 16197,
+      "sha256": "279e291ab9df9fe674905a76f92451ff2e9fc561f2c19f77982d0ec1b01c1247",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_removal.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_removal.py",
+      "bytes": 12129,
+      "sha256": "165b93cc5aaf2120d6db312683c5fd218017d1992e437642dbddb677bbd0bd14",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_target_assignment.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_target_assignment.py",
+      "bytes": 3276,
+      "sha256": "11b177e71c336f8c6b47e1e89ed62160eb4d82d3f68d7b634cbbfe211eb31a2d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_target_pair_classifier.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_target_pair_classifier.py",
+      "bytes": 3188,
+      "sha256": "1276caf7e29e09c1f424f040040887c019879abb03a427e3e651c5742d096253",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/constraint_target_unit.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/constraint_target_unit.py",
+      "bytes": 7500,
+      "sha256": "0f2d8f5ad66b81659585471b7c69997b27464f0baaf73e3596644a7bf9648c7d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/controller_creation.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/controller_creation.py",
+      "bytes": 5461,
+      "sha256": "3ee2b4e7be5324574b2e6c2d70c4ba0ae61fa4c9ec58fe261c7b0c5e8691462a",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/controller_ownership.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/controller_ownership.py",
+      "bytes": 14162,
+      "sha256": "9cf0b755b7f1f63a41b912d89fb16225c2b89e8b01df518cded21c7122f88184",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/controller_recovery_authority.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/controller_recovery_authority.py",
+      "bytes": 12532,
+      "sha256": "06c086927cdc9bc6d95f24bdeedac1b0d22e8b6605206e969ef2db97ab19c986",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/datablock_creation.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/datablock_creation.py",
+      "bytes": 6603,
+      "sha256": "c7964b96767f27aa2e01123b5f2786977211932d821d541b87c8e422e94c7e85",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/datablock_removal.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/datablock_removal.py",
+      "bytes": 9623,
+      "sha256": "b5718f07b6359b9d794494c4e0c589a7ac6d945781458c5bf4698e4ab68f7828",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/object_parent_assignment.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/object_parent_assignment.py",
+      "bytes": 9381,
+      "sha256": "a7ad7000f91c22b0be53bc5b957b1b8ccfc319c955fcac6d6dfa4a6c94f79cbc",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/relationship_reversal.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/relationship_reversal.py",
+      "bytes": 21837,
+      "sha256": "9026c14538303be59b56054061658ef9a77cb95d6649275753878d021df25b02",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/resource_contracts.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/resource_contracts.py",
+      "bytes": 5007,
+      "sha256": "4d1e3c035d06ad792b119d67c5f1bfaa56862a5a4240346fd9caf2db56a5137c",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/snapshot_relationship_restoration.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/snapshot_relationship_restoration.py",
+      "bytes": 18951,
+      "sha256": "db2e8dbf40cadce7568257bb609d8de0dcc86cb0ea5e79f91937b25038af3fa3",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer3/__pycache__/stashed_object_removal.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer3/stashed_object_removal.py",
+      "bytes": 1683,
+      "sha256": "64a4ae922ead9cc29cf79d319fc069772c35c47d22420aebbe01a5343e051994",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/__init__.py",
+      "bytes": 1451,
+      "sha256": "085d4bf55887ee1af4e165f902e2ab280efc4369567e4d375c8b55a3ff0f71f4",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/armature_ops.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/armature_ops.py",
+      "bytes": 2857,
+      "sha256": "c78774ff91c73f7b632638985831b19b9bd909aebf58fc560c685d3b3082dc5a",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/depsgraph.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/depsgraph.py",
+      "bytes": 2709,
+      "sha256": "fabd1408679a24154bef871cf7813be1d6c9bd12f544372883b6ae228f968e3a",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/hand_target.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/hand_target.py",
+      "bytes": 9846,
+      "sha256": "e69aff9b5232f84c7f9292ef511737cb950f0e5e0b3ad435509b9ee171879c30",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/influence.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/influence.py",
+      "bytes": 2806,
+      "sha256": "be666ad1846db083bfcbd0e09f877ade738607fef64afb04875004c6afc95f0c",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/preflight.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/preflight.py",
+      "bytes": 4454,
+      "sha256": "3e9bc693dfbcdfe31696266a1d6f3a68a68ff28404debceabcdf01b653fbaa67",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/reset.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/reset.py",
+      "bytes": 6425,
+      "sha256": "1286fe28e699db9c450a82413f2b108b8d3923ddb13d0205b90f0360864b18d6",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/setup.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/setup.py",
+      "bytes": 9943,
+      "sha256": "e9da03faea3796612e87400b86a299c06e043bb55601b30847688ebdbf9a662f",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/state_query.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/state_query.py",
+      "bytes": 5862,
+      "sha256": "dbdae3c3f7171ab48f9918ada78d768153f26b3a7859415e2efda3c1ce8d885d",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer4/__pycache__/validation.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer4/validation.py",
+      "bytes": 4540,
+      "sha256": "acaeda09c1a609c8ac8793a0df8756a288c5d383c59e936139ebfba042c0105a",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer5/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer5/__init__.py",
+      "bytes": 1102,
+      "sha256": "858f6740bb0b89b9dd37b69c051d56032264e14b3eae54110480825f042149b6",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer5/__pycache__/isolation_evidence.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer5/isolation_evidence.py",
+      "bytes": 13458,
+      "sha256": "f1e6f0a4817ad547c2ba37db383e0b649ebfb20789fd6f7137d47db1d39c958c",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer5/__pycache__/rollback_execution.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer5/rollback_execution.py",
+      "bytes": 44926,
+      "sha256": "4c9bfc82e413d915f9e87f00f7aa8e775d7d7d2d24d75262e76df09554d8d43c",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer5/__pycache__/rollback_verification.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer5/rollback_verification.py",
+      "bytes": 27640,
+      "sha256": "38d6fdf9cd1c38f6148841bc84ce074be4616f2086ac1007152bb1f890e9641c",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer5/__pycache__/snapshot_capture.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer5/snapshot_capture.py",
+      "bytes": 31426,
+      "sha256": "991de9c35ad1e720beac66ce814a38d2b9765d15e30c0aaac9ccf4b4ecd28825",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer5/__pycache__/value_evidence.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer5/value_evidence.py",
+      "bytes": 8617,
+      "sha256": "01a51961aec8714afb2164fe08e058e2e64e02cc9ce22163a468c434c2d75af3",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer6/__pycache__/__init__.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer6/__init__.py",
+      "bytes": 612,
+      "sha256": "9c1a2e7fb25a5f0aac4ee325810ed719e1382565993dea16c9606324ddaaef30",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer6/__pycache__/cleanup_results.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer6/cleanup_results.py",
+      "bytes": 2670,
+      "sha256": "8b74c1a0bc798e4a8b1cc4a017f281e63787f85cf0fd96bc2193728081090571",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "src/scene_transaction_integrity/layer6/__pycache__/stashed_cleanup.cpython-313.pyc",
+      "source_path": "src/scene_transaction_integrity/layer6/stashed_cleanup.py",
+      "bytes": 7197,
+      "sha256": "aeeefd55df2de9cb8d109703995bd8b345115f57d26b124c2722b375fff3857f",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "tests/__pycache__/verify_task7b3_environment_hand_integration.cpython-313.pyc",
+      "source_path": "tests/verify_task7b3_environment_hand_integration.py",
+      "bytes": 108932,
+      "sha256": "46bd5cf630a4b4d12c632e8caa04f03d5cdd7330a98dfe0a440ee1d6e0562072",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    },
+    {
+      "relative_path": "tests/__pycache__/verify_task7c1_dynamics_state_conversion.cpython-313.pyc",
+      "source_path": "tests/verify_task7c1_dynamics_state_conversion.py",
+      "bytes": 43927,
+      "sha256": "8865ff0c6c272ead2e0ca555a2037e650229b2bdabbcac3e41cb8862e269da54",
+      "ignore_rule": {
+        "source": ".gitignore",
+        "line": 2,
+        "pattern": "__pycache__/"
+      }
+    }
+  ],
+  "original_untracked_count": 15,
+  "original_untracked_unchanged": true,
+  "original_asset_sha256": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "isolated_asset_sha256": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "original_evidence_copy_hashes": {
+    "execution.txt": {
+      "isolated_sha256": "f95fb6169f0f78bda8b20fe6fb65d9a417f80f0533427b35afcf191b9613654d",
+      "copied_sha256": "f95fb6169f0f78bda8b20fe6fb65d9a417f80f0533427b35afcf191b9613654d"
+    },
+    "exit_code.txt": {
+      "isolated_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "copied_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    "result.json": {
+      "isolated_sha256": "681af821bc8675d290ca380f60ecdc0811ca48cff40eab131e12c756b8ce6359",
+      "copied_sha256": "681af821bc8675d290ca380f60ecdc0811ca48cff40eab131e12c756b8ce6359"
+    },
+    "stderr.log": {
+      "isolated_sha256": "ffeb8c0e013f2f6f9b93a39e17c7cb24c34b691b3b562bacfc19e619d5bae71e",
+      "copied_sha256": "ffeb8c0e013f2f6f9b93a39e17c7cb24c34b691b3b562bacfc19e619d5bae71e"
+    },
+    "stdout.log": {
+      "isolated_sha256": "409479bdcef5e20b7e147069f10faaead9914da362e9223d175377d2a4a1ae9d",
+      "copied_sha256": "409479bdcef5e20b7e147069f10faaead9914da362e9223d175377d2a4a1ae9d"
+    }
+  }
+}

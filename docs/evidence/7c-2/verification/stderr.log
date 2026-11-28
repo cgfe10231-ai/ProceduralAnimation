@@ -1,0 +1,23 @@
+C:\Users\64701\AppData\Local\Temp\procedural-7c2-_v2dwim7\repo\src\character\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+test_t01_real_standing_double_support (__main__.TestTask7C2ContactConstraintConversion.test_t01_real_standing_double_support) ... ok
+test_t02_real_independent_arm_ik_creates_no_force_contact (__main__.TestTask7C2ContactConstraintConversion.test_t02_real_independent_arm_ik_creates_no_force_contact) ... ok
+test_t03_lifecycle_exclusion_matrix (__main__.TestTask7C2ContactConstraintConversion.test_t03_lifecycle_exclusion_matrix) ... ok
+test_t04_excludes_unverified_and_geometrically_invalid_contacts (__main__.TestTask7C2ContactConstraintConversion.test_t04_excludes_unverified_and_geometrically_invalid_contacts) ... ok
+test_t05_airborne_and_empty_contact_sets (__main__.TestTask7C2ContactConstraintConversion.test_t05_airborne_and_empty_contact_sets) ... ok
+test_t06_synthetic_unilateral_hand_contact (__main__.TestTask7C2ContactConstraintConversion.test_t06_synthetic_unilateral_hand_contact) ... ok
+test_t07_floor_slope_and_wall_keep_distinct_world_geometry (__main__.TestTask7C2ContactConstraintConversion.test_t07_floor_slope_and_wall_keep_distinct_world_geometry) ... ok
+test_t08_static_friction_surface_identity_and_support_flag (__main__.TestTask7C2ContactConstraintConversion.test_t08_static_friction_surface_identity_and_support_flag) ... ok
+test_t09_signed_distance_with_asymmetric_limits (__main__.TestTask7C2ContactConstraintConversion.test_t09_signed_distance_with_asymmetric_limits) ... ok
+test_t10_world_translation_changes_only_constraint_positions (__main__.TestTask7C2ContactConstraintConversion.test_t10_world_translation_changes_only_constraint_positions) ... ok
+test_t11_world_rotation_preserves_constraint_covariance (__main__.TestTask7C2ContactConstraintConversion.test_t11_world_rotation_preserves_constraint_covariance) ... ok
+test_t12_rejects_invalid_structure_and_contact_identity (__main__.TestTask7C2ContactConstraintConversion.test_t12_rejects_invalid_structure_and_contact_identity) ... ok
+test_t13_rejects_non_finite_and_nonphysical_input_values (__main__.TestTask7C2ContactConstraintConversion.test_t13_rejects_non_finite_and_nonphysical_input_values) ... ok
+test_t14_effective_grasp_is_rejected_without_partial_results (__main__.TestTask7C2ContactConstraintConversion.test_t14_effective_grasp_is_rejected_without_partial_results) ... ok
+test_t15_sorted_constraints_feed_existing_wrench_mapping (__main__.TestTask7C2ContactConstraintConversion.test_t15_sorted_constraints_feed_existing_wrench_mapping) ... ok
+test_t16_deterministic_immutable_and_read_only (__main__.TestTask7C2ContactConstraintConversion.test_t16_deterministic_immutable_and_read_only) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.725s
+
+OK

@@ -1,0 +1,194 @@
+{
+  "status": "PASS",
+  "test_process_launches": 1,
+  "exit_code": 0,
+  "unittest_ran": 16,
+  "tests": {
+    "T01": {
+      "method": "test_t01_real_standing_double_support",
+      "status": "PASS",
+      "stderr_line": 3
+    },
+    "T02": {
+      "method": "test_t02_real_independent_arm_ik_creates_no_force_contact",
+      "status": "PASS",
+      "stderr_line": 4
+    },
+    "T03": {
+      "method": "test_t03_lifecycle_exclusion_matrix",
+      "status": "PASS",
+      "stderr_line": 5
+    },
+    "T04": {
+      "method": "test_t04_excludes_unverified_and_geometrically_invalid_contacts",
+      "status": "PASS",
+      "stderr_line": 6
+    },
+    "T05": {
+      "method": "test_t05_airborne_and_empty_contact_sets",
+      "status": "PASS",
+      "stderr_line": 7
+    },
+    "T06": {
+      "method": "test_t06_synthetic_unilateral_hand_contact",
+      "status": "PASS",
+      "stderr_line": 8
+    },
+    "T07": {
+      "method": "test_t07_floor_slope_and_wall_keep_distinct_world_geometry",
+      "status": "PASS",
+      "stderr_line": 9
+    },
+    "T08": {
+      "method": "test_t08_static_friction_surface_identity_and_support_flag",
+      "status": "PASS",
+      "stderr_line": 10
+    },
+    "T09": {
+      "method": "test_t09_signed_distance_with_asymmetric_limits",
+      "status": "PASS",
+      "stderr_line": 11
+    },
+    "T10": {
+      "method": "test_t10_world_translation_changes_only_constraint_positions",
+      "status": "PASS",
+      "stderr_line": 12
+    },
+    "T11": {
+      "method": "test_t11_world_rotation_preserves_constraint_covariance",
+      "status": "PASS",
+      "stderr_line": 13
+    },
+    "T12": {
+      "method": "test_t12_rejects_invalid_structure_and_contact_identity",
+      "status": "PASS",
+      "stderr_line": 14
+    },
+    "T13": {
+      "method": "test_t13_rejects_non_finite_and_nonphysical_input_values",
+      "status": "PASS",
+      "stderr_line": 15
+    },
+    "T14": {
+      "method": "test_t14_effective_grasp_is_rejected_without_partial_results",
+      "status": "PASS",
+      "stderr_line": 16
+    },
+    "T15": {
+      "method": "test_t15_sorted_constraints_feed_existing_wrench_mapping",
+      "status": "PASS",
+      "stderr_line": 17
+    },
+    "T16": {
+      "method": "test_t16_deterministic_immutable_and_read_only",
+      "status": "PASS",
+      "stderr_line": 18
+    }
+  },
+  "test_counts": {
+    "PASS": 16,
+    "FAIL": 0,
+    "ERROR": 0,
+    "SKIP": 0,
+    "NOT_RUN": 0
+  },
+  "exceptions": [],
+  "launch_error": null,
+  "bug_01": {
+    "subcases": [
+      "whitespace-only ID",
+      "control-whitespace ID"
+    ],
+    "status": "PASS",
+    "evidence": "Both checked by original T12 loop; no separate unittest subcase output."
+  },
+  "production_telemetry": {
+    "file": "stdout.log",
+    "records": 32,
+    "runs": {
+      "9e3d3272cb1d43b1925fb8ab44c221f0": {
+        "stdout_lines": [
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24
+        ],
+        "frames": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "bridge_successes": 16,
+        "wbc_successes": 16
+      },
+      "aecaa8d6ad4e4f648e7f7603febd43ba": {
+        "stdout_lines": [
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49
+        ],
+        "frames": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "bridge_successes": 16,
+        "wbc_successes": 16
+      }
+    }
+  },
+  "warnings": [
+    "C:\\Users\\64701\\AppData\\Local\\Temp\\procedural-7c2-_v2dwim7\\repo\\src\\character\\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0"
+  ]
+}

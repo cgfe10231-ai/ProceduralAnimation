@@ -1,0 +1,62 @@
+{
+  "task": "7C-2",
+  "actual_command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" --background --factory-startup --python-exit-code 1 --python \"C:\\Users\\64701\\AppData\\Local\\Temp\\procedural-7c2-_v2dwim7\\repo\\tests\\verify_task7c2_contact_constraint_conversion.py\" -- --failfast",
+  "blender_version": "5.1.1",
+  "blender_build_hash": "b70da489d7f4",
+  "process_environment": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPATH": "removed"
+  },
+  "run": {
+    "argv": "--background --factory-startup --python-exit-code 1 --python \"C:\\Users\\64701\\AppData\\Local\\Temp\\procedural-7c2-_v2dwim7\\repo\\tests\\verify_task7c2_contact_constraint_conversion.py\" -- --failfast",
+    "started_at": "2026-11-28T19:56:48.5210943+08:00",
+    "launch_error": null,
+    "finished_at": "2026-11-28T19:56:51.7098487+08:00",
+    "rc": 0
+  },
+  "isolated_worktree": "C:\\Users\\64701\\AppData\\Local\\Temp\\procedural-7c2-_v2dwim7\\repo",
+  "original_worktree": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+  "frozen_refs": {
+    "HEAD": "51ea7a61a9e0fe86569649b2bef0da5592e8eefb",
+    "origin/task/7c-2": "51ea7a61a9e0fe86569649b2bef0da5592e8eefb",
+    "task/7c-1": "7820fe9aec9d9831ec986ec2e3558777e48c7dc8",
+    "master": "57d8de66ceaf1bbae8c5877bb4d7790ecc183bd9"
+  },
+  "frozen_blobs": {
+    "src/motion/kinematic_bridge.py": "e43668f2dbd079ba7f42a9817440a7b51f67d873",
+    "tests/verify_task7c2_contact_constraint_conversion.py": "7dfa0b0f7c1838bbc31943b5eefebb2e89468a61",
+    "src/motion/contact_model.py": "267c6c997e0c02cd5f76b2936fc2c975ae50cf07",
+    "src/motion/contact_force_solver.py": "9f7d5b9d4faff974b67997b681afd320251fd60e",
+    "src/motion/contact_dynamics.py": "f2f8e0eec4c8494cef9cbf15a3a29b7e85fe322f",
+    "src/motion/closed_loop_dynamics.py": "8c28a244538d28a6d4a13e1acd4fc442bc0c6b64",
+    "tests/verify_task7c1_dynamics_state_conversion.py": "df787b7bb010e1512a6bcdec2a412de1380e3e9a",
+    "tests/verify_task7b3_environment_hand_integration.py": "ed66ce955c81375ad407e5d1c03d919542155fc1",
+    "WORKFLOW_GOVERNANCE.md": "f84f2a8f7b689bd84ef144d729460209d29aacca",
+    ".gitignore": "022493cdeb99550ddff77fa08f482075c08df93c"
+  },
+  "source_scene": {
+    "path": "output/dynamics_playground.blend",
+    "original_sha256_before": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "isolated_sha256_before": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "original_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "isolated_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632"
+  },
+  "original_status_before": "?? 10B_正常初始化拆分顺序.md\n?? P2_R1_recovery.patch\n?? Untitled-1.cpp\n?? apply_10b_md_update.py\n?? round05_exact_apply.py\n?? round05_exact_apply_v2.py\n?? round05_exact_apply_v3.py\n?? round05_exact_apply_v3_local.py\n?? round05_validate_finalize_v3.py\n?? second_tier_closeout/README.txt\n?? second_tier_closeout/closeout_second_tier.py\n?? second_tier_closeout/run_closeout.ps1\n?? second_tier_sync/READ_ME_FIRST.txt\n?? second_tier_sync/apply_second_tier.py\n?? second_tier_sync/run_second_tier_sync.ps1",
+  "original_untracked_sha256": {
+    "10B_正常初始化拆分顺序.md": "b2b2ed8172494b58dd957f05332db89f6f286896404770cc829da61a3533b356",
+    "P2_R1_recovery.patch": "cd71c9cabf2b0f1e4def23beef4d2551e0d08d66fab1ae4d9ca3e8d779d324ba",
+    "Untitled-1.cpp": "1740676e61fedbaf405309f9f906ef9e93d5a388d9e8a52ead9d0f19571a0bc5",
+    "apply_10b_md_update.py": "bcbc549754d98cc9a40876aa7105ac4a07447c7ba50f6c8b52158d19c01eb9ed",
+    "round05_exact_apply.py": "407bf6ed09083ff4a5ab6a2854828cb97c646d4d5e41f18af0d00fb367a85d6f",
+    "round05_exact_apply_v2.py": "c6bc8dcc1f287bb992b4816957c4c2fd9ff906573ce1a5105d08f45cb78424e7",
+    "round05_exact_apply_v3.py": "e0d8d69a2d372c3f7dd0ced15043bbab67d85cc58b084c11f09a47c5a2c43e0c",
+    "round05_exact_apply_v3_local.py": "e1b941eb66302c678f9be907f5f12e7071cbc77064088e68d33799fff61999f1",
+    "round05_validate_finalize_v3.py": "a1c4a1a98252601ad1800d2dbf7fb9355660f94532b5fe5649618eea22c0a4bd",
+    "second_tier_closeout/README.txt": "7a2f050305b9d765972d4839518c57206a591ef635b492fe133b577c0f4e536f",
+    "second_tier_closeout/closeout_second_tier.py": "43587b74b3fec704ef5cad391c3a57e47aaa7274f6c74d0a9e59f92ba80b74ad",
+    "second_tier_closeout/run_closeout.ps1": "329ce13c425d9b02142aa02885088d1725a79e62ec14a66aedfd691e1b8e4a94",
+    "second_tier_sync/READ_ME_FIRST.txt": "3789979952f7b5319d5b867cb652281d116f030986d153363b39246277022ffe",
+    "second_tier_sync/apply_second_tier.py": "7fe3d48dbf19919fc0f8cc188af097861a8b6eefbff24367770090ada3fbe5e2",
+    "second_tier_sync/run_second_tier_sync.ps1": "1ad6aabbf485f9d531947892bbb43fb37ef5bfbe6c4df4aef3df43c96a1defc7"
+  }
+}
