@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "exit_code": 0,
+  "expected_count": 10,
+  "tests_run": 10,
+  "status_counts": {
+    "PASS": 10,
+    "FAIL": 0,
+    "SKIP": 0,
+    "NOT_RUN": 0
+  },
+  "tests": [],
+  "measurements_stdout": [],
+  "unittest_progress": "..........",
+  "scene_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632"
+}

@@ -1,0 +1,14 @@
+{
+  "cwd": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+  "argv": [
+    "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+    "-b",
+    "--factory-startup",
+    "--python-exit-code",
+    "1",
+    "--python",
+    "tests/test_terrain_walk_failure_propagation.py"
+  ],
+  "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python tests/test_terrain_walk_failure_propagation.py",
+  "head": "a3720711bfdae1e759485c13f4fc3379be951534"
+}

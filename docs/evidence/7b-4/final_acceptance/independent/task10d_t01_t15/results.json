@@ -1,0 +1,82 @@
+{
+  "status": "PASS",
+  "exit_code": 0,
+  "tests": {
+    "T01": "PASS",
+    "T02": "PASS",
+    "T03": "PASS",
+    "T04": "PASS",
+    "T05": "PASS",
+    "T06": "PASS",
+    "T07": "PASS",
+    "T08": "PASS",
+    "T09": "PASS",
+    "T10": "PASS",
+    "T11": "PASS",
+    "T12": "PASS",
+    "T13": "PASS",
+    "T14": "PASS",
+    "T15": "PASS"
+  },
+  "actual_head": "a3720711bfdae1e759485c13f4fc3379be951534",
+  "historical_script_reported_head": "824c52ec73f86aa3d08245a58297118cb4a9f110",
+  "worker_commands": [
+    {
+      "label": "t02_t03_hist_9f5f8250",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "-b",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\repo\\docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py",
+        "--",
+        "--worker",
+        "baseline",
+        "--repo",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\historical_scratch\\baseline_9f5f825",
+        "--out",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\historical_scratch\\t02_t03_hist.json"
+      ]
+    },
+    {
+      "label": "t02_t03_cur_head",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "-b",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\repo\\docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py",
+        "--",
+        "--worker",
+        "baseline",
+        "--repo",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\repo",
+        "--out",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\historical_scratch\\t02_t03_cur.json"
+      ]
+    },
+    {
+      "label": "t01_t15_contracts",
+      "command": [
+        "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+        "-b",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\repo\\docs\\evidence\\10-d\\10-d-5\\centralized_verification\\verify_contracts_t01_t15.py",
+        "--",
+        "--worker",
+        "contracts",
+        "--out",
+        "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\historical_scratch\\t01_t15_cur.json"
+      ]
+    }
+  ],
+  "checkout_source_asset_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "scratch_routing": "Two coordinator scratch path constants redirected in memory into the temporary copy's sibling directory. Script, workers and assertions were run from byte-verified files."
+}

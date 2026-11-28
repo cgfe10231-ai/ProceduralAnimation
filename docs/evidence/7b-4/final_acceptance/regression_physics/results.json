@@ -1,0 +1,14 @@
+{
+  "status": "FAIL",
+  "exit_code": 1,
+  "status_counts": {
+    "PASSED": 19,
+    "AUTOMATED_PASS": 2,
+    "FAILED": 1,
+    "SKIPPED": 0,
+    "NOT_RUN": 5
+  },
+  "total": 27,
+  "source_scene_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "isolated_scene_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632"
+}

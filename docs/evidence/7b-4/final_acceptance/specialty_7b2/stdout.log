@@ -1,0 +1,86 @@
+[7B-2][setUpClass] blend=C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\dynamics_playground.blend initial_sha256=c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632
+00:01.516  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\dynamics_playground.blend"
+[7B-2][T01] side=L surface_id='mesh:Surface_VerticalWall:2' wrist_world_xyz=(0.0, 23.78499984741211, 1.25) hand_rotation_deg=(90.00000250447816, 0.0, 0.0) reconstructed_anchor=(0.0, 23.799999237060547, 1.2999999523162842) anchor_err_m=0.000e+00 normal_err=4.371e-08 tangent_err=4.371e-08 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T01] side=R surface_id='mesh:Surface_VerticalWall:2' wrist_world_xyz=(0.0, 23.78499984741211, 1.25) hand_rotation_deg=(90.00000250447816, 0.0, 0.0) reconstructed_anchor=(0.0, 23.799999237060547, 1.2999999523162842) anchor_err_m=0.000e+00 normal_err=4.371e-08 tangent_err=4.371e-08 ortho_err=0.000e+00 det_err=0.000e+00
+00:01.547  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\dynamics_playground.blend"
+[7B-2][T02] side=L surface_id='mesh:Surface_VaultBox:1' wrist_world_xyz=(0.0, 27.950000762939453, 0.9149999618530273) hand_rotation_deg=(0.0, -0.0, 0.0) reconstructed_anchor=(0.0, 28.0, 0.8999999761581421) anchor_err_m=0.000e+00 normal_err=0.000e+00 tangent_err=0.000e+00 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T02] side=R surface_id='mesh:Surface_VaultBox:1' wrist_world_xyz=(0.0, 27.950000762939453, 0.9149999618530273) hand_rotation_deg=(0.0, -0.0, 0.0) reconstructed_anchor=(0.0, 28.0, 0.8999999761581421) anchor_err_m=0.000e+00 normal_err=0.000e+00 tangent_err=0.000e+00 ortho_err=0.000e+00 det_err=0.000e+00
+00:01.579  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\dynamics_playground.blend"
+[7B-2][T03] side=L surface_id='mesh:Surface_LedgeBar_Crossbar:0' wrist_world_xyz=(0.0, 31.950000762939453, 2.134999990463257) hand_rotation_deg=(-0.0, -180.00000500895632, -0.0) reconstructed_anchor=(-1.3113415908705406e-09, 32.0, 2.1500000953674316) anchor_err_m=1.311e-09 normal_err=8.742e-08 tangent_err=0.000e+00 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T03] side=R surface_id='mesh:Surface_LedgeBar_Crossbar:0' wrist_world_xyz=(0.0, 31.950000762939453, 2.134999990463257) hand_rotation_deg=(-0.0, -180.00000500895632, -0.0) reconstructed_anchor=(-1.3113415908705406e-09, 32.0, 2.1500000953674316) anchor_err_m=1.311e-09 normal_err=8.742e-08 tangent_err=0.000e+00 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T04] side=L surface_id='mesh:TEST_CONSTRUCTED_anchor_contract:0' wrist_world_xyz=(1.2000000476837158, -3.4150002002716064, 2.450000047683716) hand_rotation_deg=(90.00000250447816, 0.0, 0.0) reconstructed_anchor=(1.2000000476837158, -3.4000000953674316, 2.5) anchor_err_m=0.000e+00 normal_err=4.371e-08 tangent_err=4.371e-08 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T04] side=R surface_id='mesh:TEST_CONSTRUCTED_anchor_contract:0' wrist_world_xyz=(1.2000000476837158, -3.4150002002716064, 2.450000047683716) hand_rotation_deg=(90.00000250447816, 0.0, 0.0) reconstructed_anchor=(1.2000000476837158, -3.4000000953674316, 2.5) anchor_err_m=0.000e+00 normal_err=4.371e-08 tangent_err=4.371e-08 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T05] side=L surface_id='mesh:TEST_CONSTRUCTED_tilted_plane:0' wrist_world_xyz=(-0.44217193126678467, 15.171719551086426, 1.462113857269287) hand_rotation_deg=(-4.1865845154400025, 49.3885514732286, -72.3091158748498) reconstructed_anchor=(-0.4000000059604645, 15.199999809265137, 1.4500000476837158) anchor_err_m=0.000e+00 normal_err=2.980e-08 tangent_err=5.960e-08 ortho_err=5.960e-08 det_err=0.000e+00
+[7B-2][T05] side=R surface_id='mesh:TEST_CONSTRUCTED_tilted_plane:0' wrist_world_xyz=(-0.44217193126678467, 15.171719551086426, 1.462113857269287) hand_rotation_deg=(-4.1865845154400025, 49.3885514732286, -72.3091158748498) reconstructed_anchor=(-0.4000000059604645, 15.199999809265137, 1.4500000476837158) anchor_err_m=0.000e+00 normal_err=2.980e-08 tangent_err=5.960e-08 ortho_err=5.960e-08 det_err=0.000e+00
+[7B-2][T06-A] side=L surface_id='mesh:TEST_CONSTRUCTED_same_surface:0' wrist_world_xyz=(0.3619228005409241, 21.96184730529785, 1.3664262294769287) hand_rotation_deg=(56.726916962774055, -0.0, 17.35402340731063) reconstructed_anchor=(0.3500000238418579, 22.0, 1.4000000953674316) anchor_err_m=1.229e-07 normal_err=8.560e-08 tangent_err=1.885e-07 ortho_err=5.960e-08 det_err=0.000e+00
+[7B-2][T06-B] side=L surface_id='mesh:TEST_CONSTRUCTED_same_surface:0' wrist_world_xyz=(0.3056224584579468, 21.974658966064453, 1.4106537103652954) hand_rotation_deg=(-5.050425006754549, 56.580255725820955, -78.69006984277247) reconstructed_anchor=(0.3499999940395355, 22.0, 1.399999976158142) anchor_err_m=0.000e+00 normal_err=9.541e-08 tangent_err=5.960e-08 ortho_err=3.725e-08 det_err=0.000e+00
+[7B-2][T06] mat_diff=1.126006 wrist_diff_m=0.072732
+[7B-2][T07-0] side=R surface_id='mesh:TEST_CONSTRUCTED_so3_0:0' wrist_world_xyz=(0.0, 9.949999809265137, 1.0149999856948853) hand_rotation_deg=(0.0, -0.0, 0.0) reconstructed_anchor=(0.0, 10.0, 1.0) anchor_err_m=0.000e+00 normal_err=0.000e+00 tangent_err=0.000e+00 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T07-1] side=R surface_id='mesh:TEST_CONSTRUCTED_so3_1:0' wrist_world_xyz=(0.10000000149011612, 10.949999809265137, 0.9850000143051147) hand_rotation_deg=(-0.0, -180.00000500895632, -0.0) reconstructed_anchor=(0.10000000149011612, 11.0, 1.0) anchor_err_m=0.000e+00 normal_err=8.742e-08 tangent_err=0.000e+00 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T07-2] side=R surface_id='mesh:TEST_CONSTRUCTED_so3_2:0' wrist_world_xyz=(0.20000000298023224, 11.984999656677246, 0.949999988079071) hand_rotation_deg=(90.00000250447816, 0.0, 0.0) reconstructed_anchor=(0.20000000298023224, 12.0, 1.0) anchor_err_m=0.000e+00 normal_err=4.371e-08 tangent_err=4.371e-08 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T07-3] side=R surface_id='mesh:TEST_CONSTRUCTED_so3_3:0' wrist_world_xyz=(0.3149999976158142, 13.0, 0.949999988079071) hand_rotation_deg=(90.00000250447816, -0.0, 90.00000250447816) reconstructed_anchor=(0.30000001192092896, 13.0, 1.0) anchor_err_m=0.000e+00 normal_err=6.182e-08 tangent_err=4.371e-08 ortho_err=2.118e-22 det_err=0.000e+00
+[7B-2][T07-4] side=R surface_id='mesh:TEST_CONSTRUCTED_so3_4:0' wrist_world_xyz=(0.45038267970085144, 13.989595413208008, 1.0088504552841187) hand_rotation_deg=(4.530107172198502, 36.45764075165505, 71.02958921687463) reconstructed_anchor=(0.4000000059604645, 14.0, 1.0) anchor_err_m=0.000e+00 normal_err=1.333e-07 tangent_err=7.029e-08 ortho_err=1.490e-08 det_err=5.960e-08
+[7B-2][T07-5] side=R surface_id='mesh:TEST_CONSTRUCTED_so3_5:0' wrist_world_xyz=(0.46270743012428284, 15.029329299926758, 0.9782276153564453) hand_rotation_deg=(66.46010386967689, 56.88088991723365, -83.4801976209183) reconstructed_anchor=(0.5, 15.0, 1.0) anchor_err_m=0.000e+00 normal_err=1.201e-07 tangent_err=5.960e-08 ortho_err=5.960e-08 det_err=5.960e-08
+[7B-2][T07] cases=6 worst_ortho_err=5.960e-08 worst_det_err=5.960e-08
+[7B-2][T08] cases=5 worst_roundtrip_mat_err=8.742e-08
+00:01.594  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\dynamics_playground.blend"
+[7B-2][T09] checks=8 max_anchor_compliance_err_m=1.311e-09
+[7B-2][T10] side=L pos_cov_err_m=5.960e-08 rot_cov_mat_err=0.000e+00
+[7B-2][T10] side=R pos_cov_err_m=5.960e-08 rot_cov_mat_err=0.000e+00
+[7B-2][T11] side=L pos_cov_err_m=9.537e-07 rot_cov_mat_err=5.960e-08
+[7B-2][T11] side=R pos_cov_err_m=9.537e-07 rot_cov_mat_err=5.960e-08
+[7B-2][T12] rejected case=failed_query exc=ValueError reason="surface query must succeed (success=False, error_reason='NO_HIT: empty')"
+[7B-2][T12] rejected case=source_analytical exc=ValueError reason="surface.source_type must be 'mesh', got 'analytical'"
+[7B-2][T12] rejected case=source_default exc=ValueError reason="surface.source_type must be 'mesh', got 'default'"
+[7B-2][T12] rejected case=source_none exc=ValueError reason="surface.source_type must be 'mesh', got 'none'"
+[7B-2][T12] rejected case=side_both exc=ValueError reason="Invalid hand side 'BOTH'; expected strictly 'L' or 'R'"
+[7B-2][T12] rejected case=side_lower exc=ValueError reason="Invalid hand side 'l'; expected strictly 'L' or 'R'"
+[7B-2][T12] rejected case=side_empty exc=ValueError reason="Invalid hand side ''; expected strictly 'L' or 'R'"
+[7B-2][T12] rejected case=side_int exc=ValueError reason="Invalid hand side 1; expected strictly 'L' or 'R'"
+[7B-2][T12] rejected case=surface_not_dataclass exc=TypeError reason='surface must be SurfaceQueryResult, got dict'
+[7B-2][T12] rejected case=id_empty exc=ValueError reason="surface.surface_id must start with 'mesh:', got ''"
+[7B-2][T12] rejected case=id_spaces exc=ValueError reason="surface.surface_id must start with 'mesh:', got '   '"
+[7B-2][T12] rejected case=id_none exc=ValueError reason="surface.surface_id must start with 'mesh:', got 'none'"
+[7B-2][T12] rejected case=id_default_ground exc=ValueError reason="surface.surface_id must start with 'mesh:', got 'default_ground'"
+[7B-2][T12] rejected case=id_prefix_only exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:'"
+[7B-2][T12] rejected case=id_missing_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall'"
+[7B-2][T12] rejected case=id_empty_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:'"
+[7B-2][T12] rejected case=id_spaces_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:   '"
+[7B-2][T12] rejected case=id_non_numeric_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:abc'"
+[7B-2][T12] rejected case=id_decimal_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:1.5'"
+[7B-2][T12] rejected case=id_non_ascii_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:²'"
+[7B-2][T12] rejected case=id_plus_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Surface_VerticalWall:+1'"
+[7B-2][T12] rejected case=id_empty_obj exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh::0'"
+[7B-2][T12] rejected case=id_spaces_obj exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:   :0'"
+[7B-2][T12] rejected case=id_neg_poly exc=ValueError reason="surface.surface_id must match 'mesh:<object_name>:<polygon_index>' with non-empty object name and non-negative ASCII integer polygon index, got 'mesh:Wall:-1'"
+[7B-2][T12] rejected case=dim_point_2d exc=ValueError reason="'surface.contact_point_world' must have exactly 3 components, got 2: (0.0, 0.0)"
+[7B-2][T12] rejected case=dim_hint_4d exc=ValueError reason="'tangent_hint_world' must have exactly 3 components, got 4: (0.0, 0.0, 1.0, 0.0)"
+[7B-2][T12] rejected case=type_hint_bool exc=TypeError reason="'tangent_hint_world[0]' must be a real number, got bool: True"
+[7B-2][T12] rejected case=nan_point exc=ValueError reason="'surface.contact_point_world[0]' must be finite, got nan"
+[7B-2][T12] rejected case=inf_normal exc=ValueError reason="'surface.surface_normal_world[2]' must be finite, got inf"
+[7B-2][T12] rejected case=neg_inf_hint exc=ValueError reason="'tangent_hint_world[2]' must be finite, got -inf"
+[7B-2][T12] rejected case=norm_zero exc=ValueError reason='surface.surface_normal_world must be unit length within 1e-6, got length=0.0'
+[7B-2][T12] rejected case=norm_double exc=ValueError reason='surface.surface_normal_world must be unit length within 1e-6, got length=2.0'
+[7B-2][T12] rejected case=norm_short_tol exc=ValueError reason='surface.surface_normal_world must be unit length within 1e-6, got length=0.9999'
+[7B-2][T12-COLON] side=L surface_id='mesh:NS:SubRig:Surface_VerticalWall:12' wrist_world_xyz=(0.0, 23.78499984741211, 1.25) hand_rotation_deg=(90.00000250447816, 0.0, 0.0) reconstructed_anchor=(0.0, 23.799999237060547, 1.2999999523162842) anchor_err_m=0.000e+00 normal_err=4.371e-08 tangent_err=4.371e-08 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T12-COLON] side=L surface_id='mesh:Character:Wall:Front:0' wrist_world_xyz=(0.0, 23.78499984741211, 1.25) hand_rotation_deg=(90.00000250447816, 0.0, 0.0) reconstructed_anchor=(0.0, 23.799999237060547, 1.2999999523162842) anchor_err_m=0.000e+00 normal_err=4.371e-08 tangent_err=4.371e-08 ortho_err=0.000e+00 det_err=0.000e+00
+[7B-2][T13] rejected case=zero_vec reason='tangent_hint_world must be non-zero'
+[7B-2][T13] rejected case=sub_tol_vec reason='tangent_hint_world is parallel or near-degenerate with surface normal (projected length=0.0 <= 1e-6)'
+[7B-2][T13] rejected case=exact_parallel reason='tangent_hint_world is parallel or near-degenerate with surface normal (projected length=0.0 <= 1e-6)'
+[7B-2][T13] rejected case=exact_antiparallel reason='tangent_hint_world is parallel or near-degenerate with surface normal (projected length=0.0 <= 1e-6)'
+[7B-2][T13] rejected case=near_parallel_wall reason='tangent_hint_world is parallel or near-degenerate with surface normal (projected length=9.999999999999948e-08 <= 1e-6)'
+[7B-2][T13] rejected case=near_parallel_tilt reason='tangent_hint_world is parallel or near-degenerate with surface normal (projected length=9.540567900670046e-08 <= 1e-6)'
+[7B-2][T13-SCALE] side=L scale=1e-08 pos_diff_m=0.000e+00 rot_mat_diff=0.000e+00
+[7B-2][T13-SCALE] side=L scale=1e+00 pos_diff_m=0.000e+00 rot_mat_diff=0.000e+00
+[7B-2][T13-SCALE] side=L scale=1e+08 pos_diff_m=0.000e+00 rot_mat_diff=0.000e+00
+[7B-2][T13-SCALE] side=R scale=1e-08 pos_diff_m=0.000e+00 rot_mat_diff=0.000e+00
+[7B-2][T13-SCALE] side=R scale=1e+00 pos_diff_m=0.000e+00 rot_mat_diff=0.000e+00
+[7B-2][T13-SCALE] side=R scale=1e+08 pos_diff_m=0.000e+00 rot_mat_diff=0.000e+00
+[7B-2][T13-NEAR-POS] side=L proj_len=2.0e-06 indep_rot_mat_err=5.960e-08 indep_wrist_err_m=0.000e+00
+[7B-2][T13-NEAR-POS] side=R proj_len=2.0e-06 indep_rot_mat_err=5.960e-08 indep_wrist_err_m=0.000e+00
+[7B-2][T13-NEAR-POS] side=L proj_len=5.0e-06 indep_rot_mat_err=5.960e-08 indep_wrist_err_m=0.000e+00
+[7B-2][T13-NEAR-POS] side=R proj_len=5.0e-06 indep_rot_mat_err=5.960e-08 indep_wrist_err_m=0.000e+00
+00:01.625  blend            | Read blend: "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\dynamics_playground.blend"
+[7B-2][T14] repeat_calls=20 object_count=101 wrist_xyz=(-0.009805806912481785, 23.78499984741211, 1.2509709596633911) rot_deg=(90.00000250447816, 11.309932661705695, 0.0) blend_unchanged=True
+[7B-2][tearDownClass] blend=C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\output\dynamics_playground.blend initial_sha256=c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632 final_sha256=c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632 unchanged=True
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)

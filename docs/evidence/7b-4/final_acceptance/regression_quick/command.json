@@ -1,0 +1,14 @@
+{
+  "cwd": "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\repo",
+  "argv": [
+    "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+    "tests/run_test_suite.py",
+    "--tier",
+    "quick",
+    "--fail-fast",
+    "--output-dir",
+    "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\7b-4\\final_acceptance\\regression_quick"
+  ],
+  "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" tests/run_test_suite.py --tier quick --fail-fast --output-dir C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\docs\\evidence\\7b-4\\final_acceptance\\regression_quick",
+  "head": "a3720711bfdae1e759485c13f4fc3379be951534"
+}

@@ -1,0 +1,13 @@
+{
+  "cwd": "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\repo",
+  "argv": [
+    "C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe",
+    "-c",
+    "import os, pathlib, runpy, sys\nscript, scratch, source_git = sys.argv[1:4]\nsys.path.insert(0, str(pathlib.Path(script).resolve().parent))\nimport common_helpers\ncommon_helpers.SCRATCH_WORK = scratch\ncommon_helpers.HIST_BASELINE_DIR = str(pathlib.Path(scratch) / 'baseline_9f5f825')\nos.environ['GIT_DIR'] = source_git\nos.environ['GIT_WORK_TREE'] = os.getcwd()\nos.environ['GIT_OPTIONAL_LOCKS'] = '0'\nsys.argv = [script]\nrunpy.run_path(script, run_name='__main__')\n",
+    "docs/evidence/10-d/10-d-5/centralized_verification/verify_contracts_t01_t15.py",
+    "C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\historical_scratch",
+    "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\.git"
+  ],
+  "command": "\"C:\\Program Files\\Blender Foundation\\Blender 5.1\\5.1\\python\\bin\\python.exe\" -c \"import os, pathlib, runpy, sys\nscript, scratch, source_git = sys.argv[1:4]\nsys.path.insert(0, str(pathlib.Path(script).resolve().parent))\nimport common_helpers\ncommon_helpers.SCRATCH_WORK = scratch\ncommon_helpers.HIST_BASELINE_DIR = str(pathlib.Path(scratch) / 'baseline_9f5f825')\nos.environ['GIT_DIR'] = source_git\nos.environ['GIT_WORK_TREE'] = os.getcwd()\nos.environ['GIT_OPTIONAL_LOCKS'] = '0'\nsys.argv = [script]\nrunpy.run_path(script, run_name='__main__')\n\" docs/evidence/10-d/10-d-5/centralized_verification/verify_contracts_t01_t15.py C:\\Users\\64701\\AppData\\Local\\Packages\\openai.codex_2p2nqsd0c76g0\\AC\\#!sandbox.{22fc9fb0-a52a-4d0f-bf9c-cf6dc8541e66}\\Temp\\procedural-7b4-5yedmnyl\\historical_scratch C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation\\.git",
+  "head": "a3720711bfdae1e759485c13f4fc3379be951534"
+}

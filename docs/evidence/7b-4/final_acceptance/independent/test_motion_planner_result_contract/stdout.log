@@ -1,0 +1,40 @@
+Blender 5.1.1 (hash b70da489d7f4 built 2026-04-14 01:37:22)
+[CHARACTER] Built placeholder at start waypoint (0.0, -8.0, 0.0)
+[CHARACTER] Parts: Head, Torso, Pelvis, UpperArm_L, UpperArm_R, LowerArm_L, LowerArm_R, UpperLeg_L, UpperLeg_R, LowerLeg_L, LowerLeg_R, Foot_L, Foot_R
+[RIG] Created CharacterArmature with 19 bones at (0.0, -8.0, 0.0)
+[RIG] Bound 13 character parts to CharacterArmature bones
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['Action_1', 'Action_2']): frames 1..10 (@ 24 FPS), root Y -7.9000m -> -7.0000m (disp=0.9000m, peak_speed=2.4000m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['WarningAction', 'NextAction']): frames 1..6 (@ 24 FPS), root Y -7.9500m -> -7.7000m (disp=0.2500m, peak_speed=1.2000m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['start_stop_walk']): frames 1..204 (@ 24 FPS), root Y -8.0000m -> -6.7400m (disp=1.2600m, peak_speed=0.2400m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 1 action(s) (['TerrainWalk_route_traversal']): frames 1..24 (@ 24 FPS), root Y 0.0000m -> 0.3000m (disp=0.3000m, peak_speed=0.5977m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['OrdinaryWarnAction', 'SubsequentC']): frames 1..6 (@ 24 FPS), root Y -7.9500m -> -7.7000m (disp=0.2500m, peak_speed=1.2000m/s, unreachable=0)
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[IK] Configured two-bone leg IK constraints, knee poles, and foot rotation controls for L/R
+[MOTION_PLANNER] Executed 2 action(s) (['OrdinaryTelemetryAction', 'SubsequentD']): frames 1..6 (@ 24 FPS), root Y -7.9500m -> -7.7000m (disp=0.2500m, peak_speed=1.2000m/s, unreachable=0)

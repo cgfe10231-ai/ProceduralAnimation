@@ -1,0 +1,40 @@
+{
+  "status": "PASS",
+  "exit_code": 0,
+  "expected_count": 6,
+  "tests_run": 6,
+  "status_counts": {
+    "PASS": 6,
+    "FAIL": 0,
+    "SKIP": 0,
+    "NOT_RUN": 0
+  },
+  "tests": [
+    {
+      "name": "test_contract10_01_normal_bilateral_feedback",
+      "status": "PASS"
+    },
+    {
+      "name": "test_contract10_02_cleanup_pending_admission_rejection",
+      "status": "PASS"
+    },
+    {
+      "name": "test_contract10_03_failed_isolation_propagation_to_wbc",
+      "status": "PASS"
+    },
+    {
+      "name": "test_contract10_04_arm_ik_rollback_vs_wbc_prior_writes_restoration",
+      "status": "PASS"
+    },
+    {
+      "name": "test_contract10_05_unreachable_hand_target_feedback",
+      "status": "PASS"
+    },
+    {
+      "name": "test_contract10_06_second_hand_failure_bilateral_partial_commit",
+      "status": "PASS"
+    }
+  ],
+  "measurements_stdout": [],
+  "scene_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632"
+}

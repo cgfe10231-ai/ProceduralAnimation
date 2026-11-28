@@ -1,0 +1,159 @@
+{
+  "task": "7B-4",
+  "frozen_execution_head": "a3720711bfdae1e759485c13f4fc3379be951534",
+  "result": "INCOMPLETE_OR_FAILED",
+  "groups": {
+    "specialty_7b1": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "specialty_7b1/results.json",
+      "status_counts": {
+        "PASS": 12,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 12
+    },
+    "specialty_7b2": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "specialty_7b2/results.json",
+      "status_counts": {
+        "PASS": 14,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 14
+    },
+    "specialty_7b3": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "specialty_7b3/results.json",
+      "status_counts": {
+        "PASS": 20,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 20
+    },
+    "independent/test_find_r2_01_hand_contact_lifecycle": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "independent/test_find_r2_01_hand_contact_lifecycle/results.json",
+      "status_counts": {
+        "PASS": 4,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 4
+    },
+    "independent/test_find_r2_02_contact_state_ownership": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "independent/test_find_r2_02_contact_state_ownership/results.json",
+      "status_counts": {
+        "PASS": 6,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 6
+    },
+    "independent/test_motion_planner_result_contract": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "independent/test_motion_planner_result_contract/results.json",
+      "status_counts": {
+        "PASS": 10,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 10
+    },
+    "independent/test_terrain_walk_failure_propagation": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "independent/test_terrain_walk_failure_propagation/results.json",
+      "status_counts": {
+        "PASS": 6,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 6
+    },
+    "independent/test_task10b_wbc_failure_contract": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "independent/test_task10b_wbc_failure_contract/results.json",
+      "status_counts": {
+        "PASS": 6,
+        "FAIL": 0,
+        "SKIP": 0,
+        "NOT_RUN": 0
+      },
+      "tests_run": 6
+    },
+    "independent/task10d_t01_t15": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "independent/task10d_t01_t15/results.json"
+    },
+    "regression_quick": {
+      "status": "PASS",
+      "exit_code": 0,
+      "evidence": "regression_quick/results.json",
+      "status_counts": {
+        "PASSED": 16,
+        "AUTOMATED_PASS": 3,
+        "FAILED": 0,
+        "SKIPPED": 0,
+        "NOT_RUN": 0
+      },
+      "total": 19
+    },
+    "regression_physics": {
+      "status": "FAIL",
+      "exit_code": 1,
+      "evidence": "regression_physics/results.json",
+      "status_counts": {
+        "PASSED": 19,
+        "AUTOMATED_PASS": 2,
+        "FAILED": 1,
+        "SKIPPED": 0,
+        "NOT_RUN": 5
+      },
+      "total": 27
+    },
+    "regression_motion": {
+      "status": "NOT_RUN",
+      "exit_code": null
+    },
+    "regression_full": {
+      "status": "NOT_RUN",
+      "exit_code": null
+    }
+  },
+  "source_asset_sha256_before": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "source_asset_sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+  "original_copied_assets_unchanged": true,
+  "automated_pass_means_manual_visual_review": false,
+  "independent_final_acceptance": "PENDING",
+  "stop": {
+    "tier": "physics",
+    "test_id": "visual_evidence_telemetry",
+    "exit_code": 1,
+    "missing_in_isolated_copy": [
+      "output/evidence/task6gd_c2a/telemetry.json",
+      "output/evidence/task6gd_c2a/contact_sheet.png"
+    ],
+    "original_inputs_exist": true,
+    "copy_scope": "Tracked files and output/*.blend only; historical ignored output evidence was omitted.",
+    "subsequent_tiers_executed": false
+  }
+}
