@@ -1,0 +1,707 @@
+{
+  "task": "7B-3",
+  "branch": "task/7b-3",
+  "frozen_head": "64b9abae0967abc0685e53502e937a8d10997a9a",
+  "test_script": "tests/verify_task7b3_environment_hand_integration.py",
+  "test_blob": "f01087ad11f5ed019cc88daf6105b04accb44e0b",
+  "contact_model_blob": "267c6c997e0c02cd5f76b2936fc2c975ae50cf07",
+  "working_directory": "C:\\Users\\64701\\OneDrive\\Desktop\\ProceduralAnimation",
+  "command": "& \"C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe\" -b --factory-startup --python-exit-code 1 --python tests/verify_task7b3_environment_hand_integration.py -- --failfast",
+  "argv": [
+    "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+    "-b",
+    "--factory-startup",
+    "--python-exit-code",
+    "1",
+    "--python",
+    "tests/verify_task7b3_environment_hand_integration.py",
+    "--",
+    "--failfast"
+  ],
+  "launcher": "PowerShell Start-Process with native stdout/stderr redirection",
+  "blender_version": "5.1.1",
+  "exit_code": 1,
+  "result": "FAIL",
+  "setup_class": "PASS",
+  "tests_run": 16,
+  "unittest_elapsed_seconds": 2.738,
+  "status_counts": {
+    "PASS": 15,
+    "FAIL": 1,
+    "NOT_RUN": 4
+  },
+  "tests": {
+    "T01": {
+      "name": "test_t01_real_mesh_target_through_full_central_pipeline",
+      "status": "PASS"
+    },
+    "T02": {
+      "name": "test_t02_left_hand_ik_right_hand_preserves_historical_fk",
+      "status": "PASS"
+    },
+    "T03": {
+      "name": "test_t03_right_hand_ik_left_hand_preserves_historical_fk",
+      "status": "PASS"
+    },
+    "T04": {
+      "name": "test_t04_bilateral_distinct_surface_targets_and_independent_trajectories",
+      "status": "PASS"
+    },
+    "T05": {
+      "name": "test_t05_continuous_frame_planned_and_actual_wrist_tracking",
+      "status": "PASS"
+    },
+    "T06": {
+      "name": "test_t06_actual_hand_bone_matrix_reconstructs_palm_anchor",
+      "status": "PASS"
+    },
+    "T07": {
+      "name": "test_t07_actual_3d_orientation_normal_and_tangent_alignment",
+      "status": "PASS"
+    },
+    "T08": {
+      "name": "test_t08_world_target_invariance_under_root_translation_and_yaw",
+      "status": "PASS"
+    },
+    "T09": {
+      "name": "test_t09_environment_translation_requery_replan_and_execute",
+      "status": "PASS"
+    },
+    "T10": {
+      "name": "test_t10_environment_rotation_requery_replan_and_execute",
+      "status": "PASS"
+    },
+    "T11": {
+      "name": "test_t11_failed_mesh_query_refuses_hand_trajectory_generation",
+      "status": "PASS"
+    },
+    "T12": {
+      "name": "test_t12_beyond_max_arm_reach_fails_truthfully",
+      "status": "PASS"
+    },
+    "T13": {
+      "name": "test_t13_below_min_arm_reach_fails_truthfully",
+      "status": "PASS"
+    },
+    "T14": {
+      "name": "test_t14_geometrically_reachable_but_rom_infeasible_reports_truthfully",
+      "status": "PASS"
+    },
+    "T15": {
+      "name": "test_t15_same_side_central_and_local_ownership_conflict_rejected",
+      "status": "PASS"
+    },
+    "T16": {
+      "name": "test_t16_ik_execution_creates_zero_fake_contact_or_support",
+      "status": "FAIL"
+    },
+    "T17": {
+      "name": "test_t17_timeline_bounds_endpoint_hold_and_contiguous_frames",
+      "status": "NOT_RUN"
+    },
+    "T18": {
+      "name": "test_t18_non_target_limbs_and_historical_standing_preserved",
+      "status": "NOT_RUN"
+    },
+    "T19": {
+      "name": "test_t19_single_armature_unique_control_chain_and_exact_call_counts",
+      "status": "NOT_RUN"
+    },
+    "T20": {
+      "name": "test_t20_input_immutability_asset_integrity_and_evidence_completeness",
+      "status": "NOT_RUN"
+    }
+  },
+  "first_failure": {
+    "test": "T16",
+    "assertion": "self.assertNotIn(\"hand_L\", snap.motion_state_contacts)",
+    "observed_hand_L_phase": "swing",
+    "observed_hand_L_is_locked": false,
+    "source": "stderr.log"
+  },
+  "source_scene": {
+    "path": "output/dynamics_playground.blend",
+    "sha256_before": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_after": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_reported_by_setup": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "sha256_reported_by_teardown": "c6d7a1f4c3b3535a177bf8d2544ba594e6a08bb2f69aeee9b3226d4dd11ae632",
+    "unchanged": true
+  },
+  "telemetry_record_count": 118,
+  "runs_by_id": {
+    "7fdad80c70454ebdb79ca9f24495f031": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": [],
+      "enabled_hand_errors": {},
+      "failed_frame_constraints": []
+    },
+    "d6925e0642354c879412096387589a3b": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": [],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 1.8823186691720903e-05,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": []
+    },
+    "b6aaf4d879024c65afb0bed660b6ca64": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": [],
+      "enabled_hand_errors": {
+        "hand_R": {
+          "max_position_error_m": 5.304758342513617e-05,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": []
+    },
+    "b0066abca3f845efa860071f7ddd8728": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": [],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 1.8823186691720903e-05,
+          "max_orientation_error_deg": 0.0
+        },
+        "hand_R": {
+          "max_position_error_m": 5.304758342513617e-05,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": []
+    },
+    "27d774e42c764cc5a4e22d63015a8ba5": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": [],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 4.8155979137592446e-05,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": []
+    },
+    "165c99a8112940b7a13f63402a702f65": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": [],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 3.998921160769802e-05,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": []
+    },
+    "3251d55655d74fb8b313996a1f79b26b": {
+      "frame_count": 16,
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "bridge_failed_frames": [],
+      "wbc_failed_frames": [],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 1.798303470972292e-05,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": []
+    },
+    "0586f2efd00643bfae6e87e1e7cc44b8": {
+      "frame_count": 2,
+      "frames": [
+        1,
+        2
+      ],
+      "bridge_failed_frames": [
+        2
+      ],
+      "wbc_failed_frames": [
+        2
+      ],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 0.2757333731489573,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": [
+        {
+          "frame": 2,
+          "constraints": [
+            {
+              "category": "ROM_VIOLATION",
+              "target_name": "hand.L",
+              "description": "Joint 'hand.L' (hand_L) violates anatomical ROM by max 22.27 deg",
+              "error_amount": 22.272420101719746,
+              "details": {
+                "joint_id": "hand_L",
+                "violations": [
+                  {
+                    "axis": "X",
+                    "requested_deg": 92.27242010171975,
+                    "limit_min_deg": -60.0,
+                    "limit_max_deg": 70.0,
+                    "excess_deg": 22.272420101719746
+                  }
+                ]
+              }
+            },
+            {
+              "category": "REACHABILITY",
+              "target_name": "hand_L",
+              "description": "Hand L target exceeds maximum arm reach (0.836m > 0.560m) or tracking error 275.7mm > 5.0mm",
+              "error_amount": 0.2757333731489573,
+              "details": {
+                "requested_reach": 0.8357317986982642,
+                "applied_reach": 0.5599984637190403,
+                "max_reach": 0.56
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "146a395311864a8f8c89c3ebfc7003f8": {
+      "frame_count": 2,
+      "frames": [
+        1,
+        2
+      ],
+      "bridge_failed_frames": [
+        2
+      ],
+      "wbc_failed_frames": [
+        2
+      ],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 0.10256612372907427,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": [
+        {
+          "frame": 2,
+          "constraints": [
+            {
+              "category": "ROM_VIOLATION",
+              "target_name": "upper_arm.L",
+              "description": "Joint 'upper_arm.L' (upper_arm_L) violates anatomical ROM by max 28.50 deg",
+              "error_amount": 28.499881086210195,
+              "details": {
+                "joint_id": "upper_arm_L",
+                "violations": [
+                  {
+                    "axis": "Z",
+                    "requested_deg": 174.28951607034045,
+                    "limit_min_deg": -30.0,
+                    "limit_max_deg": 150.0,
+                    "excess_deg": 24.289516070340454
+                  }
+                ]
+              }
+            },
+            {
+              "category": "ROM_VIOLATION",
+              "target_name": "forearm.L",
+              "description": "Joint 'forearm.L' (forearm_L) violates anatomical ROM by max 5.00 deg",
+              "error_amount": 4.999997343941118,
+              "details": {
+                "joint_id": "forearm_L",
+                "violations": [
+                  {
+                    "axis": "X",
+                    "requested_deg": 149.99999734394112,
+                    "limit_min_deg": -2.0,
+                    "limit_max_deg": 145.0,
+                    "excess_deg": 4.999997343941118
+                  }
+                ]
+              }
+            },
+            {
+              "category": "ROM_VIOLATION",
+              "target_name": "hand.L",
+              "description": "Joint 'hand.L' (hand_L) violates anatomical ROM by max 159.98 deg",
+              "error_amount": 159.98082583776693,
+              "details": {
+                "joint_id": "hand_L",
+                "violations": [
+                  {
+                    "axis": "Y",
+                    "requested_deg": 179.98082583776693,
+                    "limit_min_deg": -20.0,
+                    "limit_max_deg": 20.0,
+                    "excess_deg": 159.98082583776693
+                  }
+                ]
+              }
+            },
+            {
+              "category": "REACHABILITY",
+              "target_name": "hand_L",
+              "description": "Hand L target exceeds maximum arm reach (0.047m > 0.560m) or tracking error 102.6mm > 5.0mm",
+              "error_amount": 0.10256612372907427,
+              "details": {
+                "requested_reach": 0.047434307301605985,
+                "applied_reach": 0.15000023525168968,
+                "max_reach": 0.56
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "922cf03e81494598a739441b0f192a19": {
+      "frame_count": 2,
+      "frames": [
+        1,
+        2
+      ],
+      "bridge_failed_frames": [
+        2
+      ],
+      "wbc_failed_frames": [
+        2
+      ],
+      "enabled_hand_errors": {
+        "hand_L": {
+          "max_position_error_m": 2.647546805681325e-05,
+          "max_orientation_error_deg": 0.0
+        }
+      },
+      "failed_frame_constraints": [
+        {
+          "frame": 2,
+          "constraints": [
+            {
+              "category": "ROM_VIOLATION",
+              "target_name": "hand.L",
+              "description": "Joint 'hand.L' (hand_L) violates anatomical ROM by max 125.24 deg",
+              "error_amount": 125.23611598432126,
+              "details": {
+                "joint_id": "hand_L",
+                "violations": [
+                  {
+                    "axis": "Z",
+                    "requested_deg": 155.23611598432126,
+                    "limit_min_deg": -30.0,
+                    "limit_max_deg": 30.0,
+                    "excess_deg": 125.23611598432126
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "physical_measurements_by_test": {
+    "T01": [
+      {
+        "reported_values": {
+          "wrist_err_m": 1.1e-05
+        },
+        "stdout_line": "surface_id=mesh:Surface_Ramp_TopPlatform:1 contact_pt=(-0.23999999463558197, -7.599999904632568, 1.3397459983825684) wrist_target=(-0.23999999463558197, -7.650000095367432, 1.3547459840774536) final_wrist=(-0.23999986052513123, -7.649989128112793, 1.3547435998916626) wrist_err_m=0.000011 chain_indices=[0, 1, 2, 3, 4, 5, 6]"
+      }
+    ],
+    "T02": [
+      {
+        "reported_values": {
+          "left_final_err_m": 1.1e-05,
+          "right_fk_max_wrist_diff_m": 0.0,
+          "right_fk_max_euler_diff_deg": 0.0
+        },
+        "stdout_line": "left_final_err_m=0.000011 right_fk_max_wrist_diff_m=0.000e+00 right_fk_max_euler_diff_deg=0.000e+00"
+      }
+    ],
+    "T03": [
+      {
+        "reported_values": {
+          "right_final_err_m": 2.1e-05,
+          "left_fk_max_wrist_diff_m": 0.0,
+          "left_fk_max_euler_diff_deg": 0.0
+        },
+        "stdout_line": "surface_id=mesh:Surface_VerticalWall:2 right_final_err_m=0.000021 left_fk_max_wrist_diff_m=0.000e+00 left_fk_max_euler_diff_deg=0.000e+00"
+      }
+    ],
+    "T04": [
+      {
+        "reported_values": {
+          "normal_sep_deg": 90.0,
+          "f12_rem_L_m": 0.0,
+          "f12_rem_R_m": 0.0164,
+          "final_err_L_m": 1.1e-05,
+          "final_err_R_m": 2.1e-05
+        },
+        "stdout_line": "surf_L=mesh:Surface_Ramp_TopPlatform:1 surf_R=mesh:Surface_VerticalWall:2 normal_sep_deg=90.00 f12_rem_L_m=0.000e+00 f12_rem_R_m=0.0164 final_err_L_m=0.000011 final_err_R_m=0.000021"
+      }
+    ],
+    "T05": [
+      {
+        "reported_values": {
+          "max_wrist_err_m": 1.9e-05,
+          "max_so3_rot_err_deg": 0.0,
+          "min_reach_margin_m": 0.1791
+        },
+        "stdout_line": "run=left_ik frames=16 max_wrist_err_m=0.000019 max_so3_rot_err_deg=0.0000 min_reach_margin_m=0.1791"
+      },
+      {
+        "reported_values": {
+          "max_wrist_err_m": 5.3e-05,
+          "max_so3_rot_err_deg": 0.0,
+          "min_reach_margin_m": 0.1912
+        },
+        "stdout_line": "run=right_ik frames=16 max_wrist_err_m=0.000053 max_so3_rot_err_deg=0.0000 min_reach_margin_m=0.1912"
+      },
+      {
+        "reported_values": {
+          "max_wrist_err_m": 5.3e-05,
+          "max_so3_rot_err_deg": 0.0,
+          "min_reach_margin_m": 0.1791
+        },
+        "stdout_line": "run=bilateral_ik frames=16 max_wrist_err_m=0.000053 max_so3_rot_err_deg=0.0000 min_reach_margin_m=0.1791"
+      }
+    ],
+    "T06": [
+      {
+        "reported_values": {
+          "palm_bound_m": 0.005921,
+          "max_surface_palm_err_m": 1.1e-05,
+          "max_transition_palm_err_m": 1.9e-05
+        },
+        "stdout_line": "side=L palm_bound_m=0.005921 hold_frames=5 max_surface_palm_err_m=0.000011 max_transition_palm_err_m=0.000019"
+      },
+      {
+        "reported_values": {
+          "palm_bound_m": 0.005921,
+          "max_surface_palm_err_m": 2.1e-05,
+          "max_transition_palm_err_m": 5.3e-05
+        },
+        "stdout_line": "side=R palm_bound_m=0.005921 hold_frames=3 max_surface_palm_err_m=0.000021 max_transition_palm_err_m=0.000053"
+      }
+    ],
+    "T07": [
+      {
+        "reported_values": {
+          "max_so3_err_deg": 0.0,
+          "max_normal_err_deg": 0.0,
+          "max_tangent_err_deg": 0.0
+        },
+        "stdout_line": "side=L hold_frames=5 max_so3_err_deg=0.0000 max_normal_err_deg=0.0000 max_tangent_err_deg=0.0000"
+      },
+      {
+        "reported_values": {
+          "max_so3_err_deg": 0.0,
+          "max_normal_err_deg": 0.0,
+          "max_tangent_err_deg": 0.0
+        },
+        "stdout_line": "side=R hold_frames=3 max_so3_err_deg=0.0000 max_normal_err_deg=0.0000 max_tangent_err_deg=0.0000"
+      }
+    ],
+    "T08": [
+      {
+        "reported_values": {
+          "planned_world_diff_m": 0.0,
+          "shifted_palm_surface_err_m": 2.9e-05
+        },
+        "stdout_line": "shifted_root=(0.08, -8.06, 0.0) planned_world_diff_m=0.000e+00 shifted_palm_surface_err_m=0.000029 yaw_cases_verified=3"
+      }
+    ],
+    "T09": [
+      {
+        "reported_values": {
+          "wrist_err_m": 1.7e-05,
+          "palm_err_m": 1.7e-05
+        },
+        "stdout_line": "contact_before=(-0.23999999463558197, -7.599999904632568, 1.3397459983825684) contact_after=(-0.1899999976158142, -7.539999961853027, 1.4197460412979126) wrist_err_m=0.000017 palm_err_m=0.000017"
+      }
+    ],
+    "T10": [
+      {
+        "reported_values": {
+          "normal_tilt_deg": 16.957,
+          "wrist_err_m": 1.1e-05,
+          "palm_err_m": 1.1e-05,
+          "so3_err_deg": 0.0,
+          "norm_err_deg": 0.0,
+          "tan_err_deg": 0.0
+        },
+        "stdout_line": "normal_tilt_deg=16.957 tilted_normal=(-0.13443085551261902, -0.25881895422935486, 0.9565255641937256) wrist_err_m=0.000011 palm_err_m=0.000011 so3_err_deg=0.0000 norm_err_deg=0.0000 tan_err_deg=0.0000"
+      }
+    ],
+    "T11": [
+      {
+        "reported_values": {},
+        "stdout_line": "miss_success=False error_reason='NO_HIT: No mesh surface intersected along ray within 2.00m' rejected_with=\"surface query must succeed (success=False, error_reason='NO_HIT: No mesh surface intersected along ray within 2.00m')\""
+      }
+    ],
+    "T12": [
+      {
+        "reported_values": {
+          "req_dist_m": 0.8357,
+          "max_arm_reach_m": 0.56
+        },
+        "stdout_line": "req_dist_m=0.8357 max_arm_reach_m=0.5600 failed_frame=2 reason=\"TerrainWalkAction 'Task7B3_T12_TooFar' failed at Frame 2: KinematicBridge execution failed (unmet=2): hand.L (ROM_VIOLATION): Joint 'hand.L' (hand_L) violates anatomical ROM by max 22.27 deg (err=22.2724); hand_L (REACHABILITY): Hand L target exceeds maximum arm reach (0.836m > 0.560m) or tracking error 275.7mm > 5.0mm (err=0.2757)\""
+      }
+    ],
+    "T13": [
+      {
+        "reported_values": {
+          "live_req_dist_m": 0.04743,
+          "min_arm_reach_m": 0.08
+        },
+        "stdout_line": "live_req_dist_m=0.04743 min_arm_reach_m=0.0800 failed_frame=2 reason=\"TerrainWalkAction 'Task7B3_T13_TooClose' failed at Frame 2: KinematicBridge execution failed (unmet=4): upper_arm.L (ROM_VIOLATION): Joint 'upper_arm.L' (upper_arm_L) violates anatomical ROM by max 28.50 deg (err=28.4999); forearm.L (ROM_VIOLATION): Joint 'forearm.L' (forearm_L) violates anatomical ROM by max 5.00 deg (err=5.0000); hand.L (ROM_VIOLATION): Joint 'hand.L' (hand_L) violates anatomical ROM by max 159.98 deg (err=159.9808); hand_L (REACHABILITY): Hand L target exceeds maximum arm reach (0.047m > 0.560m) or tracking error 102.6mm > 5.0mm (err=0.1026)\""
+      }
+    ],
+    "T14": [
+      {
+        "reported_values": {
+          "req_dist_m": 0.4687,
+          "pos_err_m": 2.6e-05,
+          "rot_err_deg": 0.0
+        },
+        "stdout_line": "req_dist_m=0.4687 pos_err_m=0.000026 rot_err_deg=0.0000 rom_violations=['hand.L'] reason=\"TerrainWalkAction 'Task7B3_T14_RomInfeasible' failed at Frame 2: KinematicBridge execution failed (unmet=1): hand.L (ROM_VIOLATION): Joint 'hand.L' (hand_L) violates anatomical ROM by max 125.24 deg (err=125.2361)\""
+      }
+    ],
+    "T15": [
+      {
+        "reported_values": {},
+        "stdout_line": "planner_err=\"MotionPlanner.execute(): upper_limb_L control conflict — central MotionPlanner trajectory conflicts with action 'Task7B3_T15_Conflict'.upper_limb_L\" compose_err=\"Upper-limb control ownership conflict on side 'L': central MotionPlanner upper_limb_L and action-local upper_limb_L cannot both be active.\""
+      }
+    ]
+  }
+}

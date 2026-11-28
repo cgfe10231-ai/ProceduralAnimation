@@ -1,0 +1,32 @@
+C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\src\character\builder.py:38: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  mat.use_nodes = True
+test_t01_real_mesh_target_through_full_central_pipeline (__main__.TestTask7B3EnvironmentHandIntegration.test_t01_real_mesh_target_through_full_central_pipeline) ... ok
+test_t02_left_hand_ik_right_hand_preserves_historical_fk (__main__.TestTask7B3EnvironmentHandIntegration.test_t02_left_hand_ik_right_hand_preserves_historical_fk) ... ok
+test_t03_right_hand_ik_left_hand_preserves_historical_fk (__main__.TestTask7B3EnvironmentHandIntegration.test_t03_right_hand_ik_left_hand_preserves_historical_fk) ... ok
+test_t04_bilateral_distinct_surface_targets_and_independent_trajectories (__main__.TestTask7B3EnvironmentHandIntegration.test_t04_bilateral_distinct_surface_targets_and_independent_trajectories) ... ok
+test_t05_continuous_frame_planned_and_actual_wrist_tracking (__main__.TestTask7B3EnvironmentHandIntegration.test_t05_continuous_frame_planned_and_actual_wrist_tracking) ... ok
+test_t06_actual_hand_bone_matrix_reconstructs_palm_anchor (__main__.TestTask7B3EnvironmentHandIntegration.test_t06_actual_hand_bone_matrix_reconstructs_palm_anchor) ... ok
+test_t07_actual_3d_orientation_normal_and_tangent_alignment (__main__.TestTask7B3EnvironmentHandIntegration.test_t07_actual_3d_orientation_normal_and_tangent_alignment) ... ok
+test_t08_world_target_invariance_under_root_translation_and_yaw (__main__.TestTask7B3EnvironmentHandIntegration.test_t08_world_target_invariance_under_root_translation_and_yaw) ... ok
+test_t09_environment_translation_requery_replan_and_execute (__main__.TestTask7B3EnvironmentHandIntegration.test_t09_environment_translation_requery_replan_and_execute) ... ok
+test_t10_environment_rotation_requery_replan_and_execute (__main__.TestTask7B3EnvironmentHandIntegration.test_t10_environment_rotation_requery_replan_and_execute) ... ok
+test_t11_failed_mesh_query_refuses_hand_trajectory_generation (__main__.TestTask7B3EnvironmentHandIntegration.test_t11_failed_mesh_query_refuses_hand_trajectory_generation) ... ok
+test_t12_beyond_max_arm_reach_fails_truthfully (__main__.TestTask7B3EnvironmentHandIntegration.test_t12_beyond_max_arm_reach_fails_truthfully) ... ok
+test_t13_below_min_arm_reach_fails_truthfully (__main__.TestTask7B3EnvironmentHandIntegration.test_t13_below_min_arm_reach_fails_truthfully) ... ok
+test_t14_geometrically_reachable_but_rom_infeasible_reports_truthfully (__main__.TestTask7B3EnvironmentHandIntegration.test_t14_geometrically_reachable_but_rom_infeasible_reports_truthfully) ... ok
+test_t15_same_side_central_and_local_ownership_conflict_rejected (__main__.TestTask7B3EnvironmentHandIntegration.test_t15_same_side_central_and_local_ownership_conflict_rejected) ... ok
+test_t16_ik_execution_creates_zero_fake_contact_or_support (__main__.TestTask7B3EnvironmentHandIntegration.test_t16_ik_execution_creates_zero_fake_contact_or_support) ... FAIL
+
+======================================================================
+FAIL: test_t16_ik_execution_creates_zero_fake_contact_or_support (__main__.TestTask7B3EnvironmentHandIntegration.test_t16_ik_execution_creates_zero_fake_contact_or_support)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\64701\OneDrive\Desktop\ProceduralAnimation\tests\verify_task7b3_environment_hand_integration.py", line 2006, in test_t16_ik_execution_creates_zero_fake_contact_or_support
+    self.assertNotIn("hand_L", snap.motion_state_contacts)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'hand_L' unexpectedly found in {'foot_L': {'limb': 'foot_L', 'phase': 'stance', 'is_locked': True, 'contact_world_xyz': (-0.11000000685453415, -8.000000953674316, 0.0), 'current_world_xyz': (-0.11000000685453415, -8.000000953674316, 0.0), 'target_rotation_deg': (0.0, 0.0, 0.0), 'drift_m': 0.0, 'hip_to_target_dist': 0.0, 'is_reachable': True, 'strictly_in_reach': True, 'surface_normal': (0.0, 0.0, 1.0)}, 'foot_R': {'limb': 'foot_R', 'phase': 'stance', 'is_locked': True, 'contact_world_xyz': (0.10999999195337296, -8.000000953674316, 0.0), 'current_world_xyz': (0.10999999195337296, -8.000000953674316, 0.0), 'target_rotation_deg': (0.0, 0.0, 0.0), 'drift_m': 0.0, 'hip_to_target_dist': 0.0, 'is_reachable': True, 'strictly_in_reach': True, 'surface_normal': (0.0, 0.0, 1.0)}, 'hand_L': {'limb': 'hand_L', 'phase': 'swing', 'is_locked': False, 'contact_world_xyz': (-0.23999997973442078, -7.72, 1.2649999952316284), 'current_world_xyz': (-0.23999997973442078, -7.72, 1.2649999952316284), 'target_rotation_deg': (0.0, 0.0, 0.0), 'drift_m': 0.0, 'hip_to_target_dist': 0.0, 'is_reachable': True, 'strictly_in_reach': True, 'surface_normal': (0.0, 0.0, 1.0)}, 'hand_R': {'limb': 'hand_R', 'phase': 'swing', 'is_locked': False, 'contact_world_xyz': (0.0, 0.0, 0.0), 'current_world_xyz': (0.0, 0.0, 0.0), 'target_rotation_deg': (0.0, 0.0, 0.0), 'drift_m': 0.0, 'hip_to_target_dist': 0.0, 'is_reachable': True, 'strictly_in_reach': True, 'surface_normal': (0.0, 0.0, 1.0)}}
+
+----------------------------------------------------------------------
+Ran 16 tests in 2.738s
+
+FAILED (failures=1)
